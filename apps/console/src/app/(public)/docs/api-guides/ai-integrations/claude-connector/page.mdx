@@ -1,0 +1,114 @@
+import { Callout } from "@/components/docs/callout"
+
+# Claude.ai Connector
+
+Connect SALLY directly to [Claude.ai](https://claude.ai) as an MCP Connector. This is the easiest way to use Sally from Claude -- just paste a URL and sign in.
+
+<Callout type="info">
+  Requires a Claude Pro, Team, or Enterprise plan with MCP Connectors enabled.
+</Callout>
+
+## Setup (2 minutes)
+
+### Step 1: Get Your Connector URL
+
+| Environment | Connector URL |
+|-------------|--------------|
+| **Production** | `https://api.trysally.com` |
+| **Staging** | `https://sally-api.apps.appshore.in` |
+
+<Callout type="info">
+  Use the **base URL** — Claude.ai discovers endpoints automatically via `/.well-known/oauth-authorization-server`.
+</Callout>
+
+### Step 2: Add the Connector in Claude.ai
+
+1. Open [claude.ai](https://claude.ai) and sign in
+2. Click your **profile icon** (bottom-left) and select **Customize**
+3. Navigate to **Connectors** in the left sidebar
+4. Click the **+** button (top-right) to add a new connector
+5. Paste the connector URL from Step 1
+6. Click **Connect**
+
+### Step 3: Authorize SALLY
+
+1. Claude.ai will redirect you to the **SALLY consent page**
+2. Sign in with your **SALLY account** (same credentials you use in the app)
+3. Review the permission scopes being requested
+4. Click **Authorize** to grant access
+
+Once authorized, you'll be redirected back to Claude.ai.
+
+### Step 4: Start Using Sally
+
+Open a new chat in Claude and try these prompts:
+
+```
+"Show me all active loads"
+
+"What's the fleet status today?"
+
+"What invoices are overdue?"
+
+"What's the compliance score for my fleet?"
+
+"Generate an invoice for load #1234"
+
+"Plan a route from Dallas to Chicago for driver John Smith"
+```
+
+## How It Works
+
+When you add SALLY as a connector:
+
+1. **Discovery**: Claude.ai fetches `/.well-known/oauth-authorization-server` to find OAuth endpoints
+2. **Registration**: Claude.ai registers itself as an OAuth client via dynamic client registration
+3. **Authorization**: You sign in and approve scopes via SALLY's consent page
+4. **Token Exchange**: Claude.ai exchanges the auth code for access/refresh tokens (OAuth 2.1 + PKCE)
+5. **Tool Access**: Claude sees your available SALLY tools based on granted scopes
+6. **Execution**: When you ask a fleet question, Claude calls the appropriate SALLY tool with your token
+
+## Available Tools in Claude
+
+After connecting, Claude will have access to tools like:
+
+- **query-loads** -- Search and filter your loads
+- **get-fleet-status** -- Dashboard summary of active loads, drivers, alerts
+- **get-invoice-summary** -- A/R aging and invoice breakdown
+- **get-shield-score** -- Fleet compliance score
+- **generate-invoice** -- Create a draft invoice from a delivered load
+- **plan-route** -- Create an optimized route with HOS compliance
+
+The exact tools available depend on the scopes you approved during authorization.
+
+## Troubleshooting
+
+### "Connection failed" or "Could not discover server"
+
+- Verify the URL is the **base URL** (e.g., `https://api.trysally.com`, not `https://api.trysally.com/api/v1/mcp` or any other path)
+- Check that the SALLY API is running and accessible
+- For staging: ensure you're not behind a VPN that blocks the domain
+
+### "Authorization failed"
+
+- Make sure you're signing in with valid SALLY credentials
+- Your account must be active and belong to a tenant
+- Check that your role (Dispatcher, Admin, etc.) has access to the requested scopes
+
+### "No tools available"
+
+- You may have denied scopes during authorization. Disconnect and reconnect, approving all scopes
+- Check your SALLY role -- Drivers see fewer tools than Dispatchers or Admins
+
+### Token Expired
+
+- Claude.ai automatically refreshes tokens using the refresh token
+- If you're still getting errors, disconnect and reconnect the SALLY connector
+
+## Disconnecting
+
+1. Go to **Customize** > **Connectors** in Claude.ai
+2. Find the SALLY connector
+3. Click **Disconnect**
+
+This revokes the OAuth tokens. You can reconnect anytime by repeating the setup steps.

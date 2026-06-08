@@ -1,0 +1,9 @@
+.vercel
+
+
+# Marketing videos — served from S3 + CloudFront CDN, not git
+public/videos/sally-demo.mp4
+public/videos/sally-demo.webm
+public/videos/sally-launch.mp4
+public/videos/sally-launch.webm
+public/videos/*.archive

@@ -1,0 +1,150 @@
+/* === Sally Canvas Landing Page: Living Canvas === */
+
+/* Gradient blob drift */
+@keyframes blobDrift1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(5%, -3%) scale(1.05);
+  }
+  50% {
+    transform: translate(-3%, 5%) scale(0.95);
+  }
+  75% {
+    transform: translate(3%, 2%) scale(1.02);
+  }
+}
+
+@keyframes blobDrift2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-4%, 4%) scale(0.97);
+  }
+  50% {
+    transform: translate(5%, -2%) scale(1.04);
+  }
+  75% {
+    transform: translate(-2%, -4%) scale(1.01);
+  }
+}
+
+@keyframes blobDrift3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.02);
+  }
+  33% {
+    transform: translate(3%, 5%) scale(0.98);
+  }
+  66% {
+    transform: translate(-5%, -3%) scale(1.05);
+  }
+}
+
+/* Constellation node pulse */
+@keyframes nodePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+/* Floating particles */
+@keyframes particleFloat {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-40px) translateX(-5px);
+    opacity: 0.3;
+  }
+  75% {
+    transform: translateY(-20px) translateX(-10px);
+    opacity: 0.5;
+  }
+}
+
+/* === Utility Classes === */
+
+.sc-canvas {
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Gradient blobs */
+.sc-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.sc-blob-1 {
+  animation: blobDrift1 20s ease-in-out infinite;
+}
+
+.sc-blob-2 {
+  animation: blobDrift2 25s ease-in-out infinite;
+}
+
+.sc-blob-3 {
+  animation: blobDrift3 30s ease-in-out infinite;
+}
+
+/* Film grain noise overlay */
+.sc-noise {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.03;
+}
+
+/* Constellation */
+.constellation-node {
+  animation: nodePulse 3s ease-in-out infinite;
+}
+
+/* Floating particle */
+.sc-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particleFloat 8s ease-in-out infinite;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .sc-blob,
+  .sc-blob-1,
+  .sc-blob-2,
+  .sc-blob-3,
+  .constellation-node,
+  .sc-particle {
+    animation: none !important;
+  }
+
+  .sc-noise {
+    display: none;
+  }
+}

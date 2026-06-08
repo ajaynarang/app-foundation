@@ -1,0 +1,139 @@
+# Manage Your Fleet
+
+Before you can plan routes, you need three things in SALLY: a **driver**, a **vehicle**, and at least one **load** (shipment). This page walks through creating each one.
+
+## Setup
+
+```bash
+export SALLY_API_KEY="sk_staging_your_key_here"
+export SALLY_BASE="https://sally-api-staging.appshore.in/api/v1"
+```
+
+## Create a driver
+
+```bash
+curl -X POST $SALLY_BASE/drivers \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Mike",
+    "lastName": "Johnson",
+    "licenseNumber": "D410-7892-4501",
+    "licenseState": "IL",
+    "phoneNumber": "+1-312-555-0147",
+    "email": "mike.johnson@acmefreight.com"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "id": "drv_a1b2c3d4",
+  "firstName": "Mike",
+  "lastName": "Johnson",
+  "status": "ACTIVE",
+  "createdAt": "2026-02-10T08:00:00Z"
+}
+```
+
+Save the `id` — you'll need it when planning routes.
+
+## Create a vehicle
+
+The `fuelTankCapacity` and `mpg` fields matter — SALLY uses them to calculate when fuel stops are needed.
+
+```bash
+curl -X POST $SALLY_BASE/vehicles \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "unitNumber": "TRK-4821",
+    "make": "Freightliner",
+    "model": "Cascadia",
+    "year": 2023,
+    "vin": "3AKJHHDR7PSLA9274",
+    "fuelTankCapacity": 150,
+    "mpg": 6.2
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "id": "veh_e5f6g7h8",
+  "unitNumber": "TRK-4821",
+  "make": "Freightliner",
+  "model": "Cascadia",
+  "status": "ACTIVE",
+  "createdAt": "2026-02-10T08:01:00Z"
+}
+```
+
+## Create a load
+
+A load represents a shipment with a pickup and delivery location.
+
+```bash
+curl -X POST $SALLY_BASE/loads \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "referenceNumber": "LD-2026-001",
+    "customer": "Midwest Auto Parts",
+    "originAddress": "2800 S Western Ave, Chicago, IL 60608",
+    "originLat": 41.8423,
+    "originLon": -87.6845,
+    "destinationAddress": "5900 W Raymond St, Indianapolis, IN 46241",
+    "destinationLat": 39.7355,
+    "destinationLon": -86.2388,
+    "scheduledPickup": "2026-03-01T09:00:00Z",
+    "scheduledDelivery": "2026-03-01T15:00:00Z",
+    "weight": 38500,
+    "commodity": "Auto parts"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "id": "load_i9j0k1l2",
+  "referenceNumber": "LD-2026-001",
+  "status": "PENDING",
+  "createdAt": "2026-02-10T08:02:00Z"
+}
+```
+
+## List your resources
+
+Once created, you can list and filter:
+
+```bash
+# List active drivers
+curl "$SALLY_BASE/drivers?status=ACTIVE" \
+  -H "Authorization: Bearer $SALLY_API_KEY"
+
+# List vehicles
+curl "$SALLY_BASE/vehicles" \
+  -H "Authorization: Bearer $SALLY_API_KEY"
+
+# List pending loads
+curl "$SALLY_BASE/loads?status=PENDING" \
+  -H "Authorization: Bearer $SALLY_API_KEY"
+```
+
+All list endpoints support pagination with `page` and `pageSize` query parameters.
+
+## What's next
+
+Now that you have a driver, vehicle, and loads, you're ready to plan a route:
+
+| Goal | Guide |
+|------|-------|
+| Plan an optimized, HOS-compliant route | [Plan a Route](/docs/getting-started/plan-a-route) |
+| Deep dive into driver management | [Drivers API Guide](/docs/api-guides/fleet-management/drivers) |
+| Deep dive into vehicle management | [Vehicles API Guide](/docs/api-guides/fleet-management/vehicles) |
+| Deep dive into load management | [Loads API Guide](/docs/api-guides/fleet-management/loads) |
+| Explore all endpoints interactively | [API Reference](/docs/api-playground) |

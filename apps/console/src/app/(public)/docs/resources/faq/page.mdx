@@ -1,0 +1,119 @@
+# FAQ
+
+Answers to the most common questions about SALLY -- what it does, how authentication works, what integrations are supported, and how to get started.
+
+---
+
+## General
+
+### What is SALLY?
+
+SALLY is a fleet operations assistant for US trucking carriers. It generates optimized multi-stop routes that comply with federal Hours of Service (HOS) regulations, automatically inserts rest and fuel stops where needed, monitors active routes in real time, and alerts dispatchers before problems occur.
+
+SALLY is not just a route planner. It is an end-to-end operations platform that covers route planning, HOS compliance, real-time monitoring, alert management, and dispatcher-driver coordination.
+
+### What makes SALLY different from Google Maps or an existing TMS?
+
+Google Maps and consumer navigation tools do not understand HOS regulations. They will route a driver on a 14-hour drive without considering that the driver is legally required to stop after 11 hours of driving or 14 hours on duty.
+
+Traditional TMS platforms manage load lifecycle (booking, dispatch, settlement) but typically lack real-time HOS-aware route planning. Dispatchers manually estimate where drivers need to rest, which leads to compliance risks.
+
+SALLY closes this gap by:
+
+- **Simulating HOS clocks segment by segment** to guarantee that every route is legally compliant before the driver starts.
+- **Automatically inserting rest stops** at optimal locations when the driver cannot legally complete the next segment.
+- **Automatically inserting fuel stops** based on vehicle range and fuel prices along the route.
+- **Monitoring active routes 24/7** and generating alerts when conditions change (dock delays, weather, HOS approaching limits).
+- **Dynamically re-planning routes** when a trigger makes the current plan infeasible.
+
+### What HOS rules does SALLY enforce?
+
+SALLY enforces all FMCSA Hours of Service rules for property-carrying CMV drivers:
+
+| Rule | Limit |
+|---|---|
+| Driving limit | 11 hours after 10 consecutive hours off duty |
+| Duty window | 14 hours after coming on duty |
+| Break requirement | 30-minute break after 8 cumulative hours of driving |
+| Off-duty minimum | 10 consecutive hours off duty to reset clocks |
+| Cycle limit | 60 hours in 7 days, or 70 hours in 8 days |
+| 34-hour restart | Resets the 60/70-hour cycle |
+| Split sleeper | 7/3 or 8/2 hour splits using sleeper berth provision |
+
+Every route plan is validated for zero HOS violations before it is returned.
+
+---
+
+## Integrations
+
+### What ELD and TMS systems does SALLY integrate with?
+
+SALLY uses an adapter-based integration framework. Current integrations include:
+
+| System | Type | Data Exchanged |
+|---|---|---|
+| Samsara | ELD / Telematics | HOS clocks, duty status, GPS location |
+| Motive (KeepTruckin) | ELD / Telematics | HOS clocks, duty status, GPS location |
+| McLeod | TMS | Loads, stops, appointment windows |
+| Project44 | TMS / Visibility | Loads, tracking, ETAs |
+| GasBuddy | Fuel Prices | Diesel prices by location |
+| OpenWeather | Weather | Forecasts and severe weather alerts |
+
+Additional integrations can be added through the adapter pattern without modifying the core platform.
+
+### Can I connect SALLY to a system that is not listed?
+
+Yes. SALLY's integration framework uses a standard adapter interface. A new integration requires implementing the adapter for data mapping, setting up the sync schedule, and configuring credentials. Contact the team for guidance on building a custom integration.
+
+---
+
+## Architecture
+
+### Is SALLY multi-tenant?
+
+Yes. SALLY is a SaaS platform with row-level tenant isolation. Every major database table includes a `tenantId` column. A `TenantGuard` middleware extracts the tenant from the authenticated JWT and filters all queries so that one carrier's data is never visible to another.
+
+### What user roles are supported?
+
+SALLY supports six roles with hierarchical permissions:
+
+| Role | Description |
+|---|---|
+| `SUPER_ADMIN` | Platform-wide access across all tenants (internal use) |
+| `ADMIN` | Full access within a single tenant |
+| `OWNER` | Tenant owner with billing and settings access |
+| `DISPATCHER` | Plans routes, manages alerts, coordinates drivers |
+| `CUSTOMER` | Views shipments, tracking, and delivery status |
+| `DRIVER` | Views assigned routes, sends status updates |
+
+### What database does SALLY use?
+
+PostgreSQL 16 with pgvector, accessed through Prisma 7.3 ORM. The schema contains 75 models and 36 enums across nine functional groups (fleet, financials, operations, routing, integrations, platform, platform-services, ai, admin). JSONB columns store flexible data like HOS state snapshots. All queries are scoped by tenant via row-level isolation.
+
+---
+
+## Authentication
+
+### How does authentication work?
+
+SALLY uses a two-step authentication flow:
+
+1. **Identity verification** -- The frontend authenticates the user through Firebase Authentication (email/password, Google sign-in, or SSO). Firebase issues a token.
+2. **API authorization** -- The backend exchanges the Firebase token for a SALLY-issued JWT that contains the user's role, tenant, and permissions. This JWT is stored in an HTTP-only cookie and included in all subsequent API requests.
+
+This approach delegates identity management (password hashing, email verification, OAuth) to Firebase while keeping authorization logic in SALLY's backend.
+
+### Can I use API keys instead of JWT for server-to-server calls?
+
+Yes. SALLY supports API key authentication for server-to-server integrations. API keys are issued from the dashboard and included in the `Authorization` header as a Bearer token.
+
+- **Staging keys** use the prefix `sk_staging_` and are rate-limited to 1,000 requests per hour.
+- **Production keys** use the prefix `sk_live_` and are rate-limited to 10,000 requests per hour.
+
+See the [Authentication guide](/docs/api-reference/authentication) for details.
+
+---
+
+## Still have questions?
+
+If your question is not answered here, visit the [Support page](/docs/resources/support) to learn how to reach the team.

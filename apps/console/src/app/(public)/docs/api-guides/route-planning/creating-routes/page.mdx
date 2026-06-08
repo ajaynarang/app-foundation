@@ -1,0 +1,279 @@
+# Creating Routes
+
+The route planning endpoint takes a driver, vehicle, and set of stops, then returns an optimized route plan with rest stops, fuel stops, and HOS compliance validation.
+
+## Endpoint
+
+```
+POST /api/v1/routes/plan
+```
+
+**Authentication:** Bearer token required. Roles: `DISPATCHER`, `ADMIN`, `OWNER`.
+
+---
+
+## Request
+
+### Headers
+
+```http
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+### Body
+
+```json
+{
+  "driver_id": "DRV-M1A2B3",
+  "vehicle_id": "VEH-X9Y8Z7",
+  "stops": [
+    {
+      "location_id": "LOC-001",
+      "name": "ABC Distribution Center",
+      "latitude": 34.0522,
+      "longitude": -118.2437,
+      "type": "pickup",
+      "time_window": {
+        "earliest": "2026-02-11T08:00:00Z",
+        "latest": "2026-02-11T12:00:00Z"
+      },
+      "estimated_dock_time_hours": 2.0
+    },
+    {
+      "location_id": "LOC-002",
+      "name": "XYZ Warehouse",
+      "latitude": 36.7783,
+      "longitude": -119.4179,
+      "type": "delivery",
+      "time_window": {
+        "earliest": "2026-02-12T06:00:00Z",
+        "latest": "2026-02-12T18:00:00Z"
+      },
+      "estimated_dock_time_hours": 1.5
+    }
+  ],
+  "origin": {
+    "latitude": 33.9425,
+    "longitude": -118.4081,
+    "name": "Truck Yard - LAX"
+  },
+  "destination": {
+    "latitude": 33.9425,
+    "longitude": -118.4081,
+    "name": "Truck Yard - LAX"
+  },
+  "optimization_priority": "time"
+}
+```
+
+### Request Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `driver_id` | string | Yes | Driver ID (format: `DRV-XXXXXX`). The driver's current HOS state is fetched automatically. |
+| `vehicle_id` | string | Yes | Vehicle ID (format: `VEH-XXXXXX`). Fuel level, MPG, and capacity are fetched automatically. |
+| `stops` | array | Yes | List of stops (pickups and deliveries). Minimum 1 stop. |
+| `stops[].location_id` | string | Yes | Unique location identifier |
+| `stops[].name` | string | Yes | Human-readable location name |
+| `stops[].latitude` | number | Yes | Latitude (-90 to 90) |
+| `stops[].longitude` | number | Yes | Longitude (-180 to 180) |
+| `stops[].type` | string | Yes | `pickup` or `delivery` |
+| `stops[].time_window` | object | No | Appointment window with `earliest` and `latest` ISO timestamps |
+| `stops[].estimated_dock_time_hours` | number | No | Expected dock time in hours (default: 1.0) |
+| `origin` | object | Yes | Route starting point |
+| `destination` | object | No | Route ending point (defaults to origin if omitted) |
+| `optimization_priority` | string | No | `time` (default), `cost`, or `balanced` |
+
+---
+
+## Response
+
+### Success (200 OK)
+
+```json
+{
+  "plan_id": "RPL-2026021101",
+  "version": 1,
+  "status": "planned",
+  "driver_id": "DRV-M1A2B3",
+  "vehicle_id": "VEH-X9Y8Z7",
+  "summary": {
+    "total_distance_miles": 520,
+    "total_duration_hours": 24.5,
+    "total_drive_hours": 11.0,
+    "total_rest_hours": 10.0,
+    "total_dock_hours": 3.5,
+    "fuel_stops": 1,
+    "rest_stops": 1,
+    "hos_compliant": true,
+    "feasible": true
+  },
+  "segments": [
+    {
+      "sequence": 1,
+      "type": "drive",
+      "from": "Truck Yard - LAX",
+      "to": "ABC Distribution Center",
+      "distance_miles": 15,
+      "duration_hours": 0.5,
+      "hos_state_after": {
+        "hours_driven": 0.5,
+        "on_duty_hours": 0.5,
+        "hours_since_break": 0.5,
+        "drive_hours_remaining": 10.5
+      }
+    },
+    {
+      "sequence": 2,
+      "type": "dock",
+      "location": "ABC Distribution Center",
+      "duration_hours": 2.0,
+      "activity": "pickup"
+    },
+    {
+      "sequence": 3,
+      "type": "drive",
+      "from": "ABC Distribution Center",
+      "to": "Pilot Travel Center - Bakersfield",
+      "distance_miles": 110,
+      "duration_hours": 2.0,
+      "hos_state_after": {
+        "hours_driven": 2.5,
+        "on_duty_hours": 4.5,
+        "hours_since_break": 4.5,
+        "drive_hours_remaining": 8.5
+      }
+    },
+    {
+      "sequence": 4,
+      "type": "fuel",
+      "location": "Pilot Travel Center - Bakersfield",
+      "station_name": "Pilot #4521",
+      "fuel_price_per_gallon": 4.29,
+      "gallons_to_fill": 65,
+      "fuel_cost": 278.85,
+      "duration_hours": 0.5
+    },
+    {
+      "sequence": 5,
+      "type": "drive",
+      "from": "Pilot Travel Center - Bakersfield",
+      "to": "XYZ Warehouse",
+      "distance_miles": 145,
+      "duration_hours": 2.5
+    },
+    {
+      "sequence": 6,
+      "type": "dock",
+      "location": "XYZ Warehouse",
+      "duration_hours": 1.5,
+      "activity": "delivery"
+    },
+    {
+      "sequence": 7,
+      "type": "rest",
+      "location": "TA Travel Center - Fresno",
+      "rest_type": "full_rest",
+      "duration_hours": 10.0,
+      "reason": "HOS 14h duty window approaching. Full rest required to continue safely."
+    },
+    {
+      "sequence": 8,
+      "type": "drive",
+      "from": "TA Travel Center - Fresno",
+      "to": "Truck Yard - LAX",
+      "distance_miles": 250,
+      "duration_hours": 5.5
+    }
+  ],
+  "compliance": {
+    "hos_violations": 0,
+    "missed_appointments": 0,
+    "fuel_warnings": 0,
+    "overall_status": "COMPLIANT"
+  },
+  "created_at": "2026-02-11T03:15:00Z"
+}
+```
+
+### Response Fields
+
+| Field | Description |
+|---|---|
+| `plan_id` | Unique plan identifier |
+| `version` | Plan version (increments with each update) |
+| `status` | `planned`, `active`, `completed`, `cancelled` |
+| `summary` | Aggregated route statistics |
+| `segments` | Ordered list of route segments |
+| `segments[].type` | `drive`, `dock`, `rest`, `fuel`, `break` |
+| `segments[].hos_state_after` | HOS state after completing the segment (drive segments only) |
+| `compliance` | HOS compliance validation results |
+
+---
+
+## Error Responses
+
+### 400 Bad Request
+
+```json
+{
+  "statusCode": 400,
+  "message": "At least one stop is required",
+  "error": "Bad Request"
+}
+```
+
+### 404 Not Found
+
+```json
+{
+  "statusCode": 404,
+  "message": "Driver DRV-INVALID not found",
+  "error": "Not Found"
+}
+```
+
+### 422 Unprocessable Entity
+
+```json
+{
+  "statusCode": 422,
+  "message": "Route is not feasible: driver cycle hours exceeded (72h / 70h limit)",
+  "error": "Unprocessable Entity"
+}
+```
+
+---
+
+## Planning Workflow
+
+The typical dispatcher workflow for creating a route:
+
+1. **Select a load** — Choose the shipment with pickup/delivery stops
+2. **Select a driver** — The system shows each driver's current HOS state
+3. **Select a vehicle** — The system shows fuel level and range
+4. **Call the API** — Submit the plan request
+5. **Review the plan** — Check segments, HOS compliance, and timing
+6. **Assign to driver** — Route becomes active, monitoring begins
+
+---
+
+## Optimization Priorities
+
+| Priority | Behavior |
+|---|---|
+| `time` | Minimizes total route duration. Prefers faster routes even if fuel costs are slightly higher. |
+| `cost` | Minimizes total cost (fuel + tolls). May choose longer routes with cheaper fuel stops. |
+| `balanced` | Weighs time and cost equally. Default for most use cases. |
+
+---
+
+## What Gets Inserted Automatically
+
+You don't need to specify rest stops, fuel stops, or breaks in the request. The planner inserts them automatically:
+
+- **Rest stops** — When HOS simulation detects the driver cannot complete a segment. See [Rest Stops](/docs/api-guides/route-planning/rest-stops).
+- **Fuel stops** — When the vehicle's fuel level drops below 25% capacity. See [Fuel Stops](/docs/api-guides/route-planning/fuel-stops).
+- **Breaks** — When the driver has driven 8 hours since last break (30-minute FMCSA requirement).
+- **Stop sequence** — Stops are reordered by the TSP optimizer for minimum drive time. See [Stop Optimization](/docs/api-guides/route-planning/stop-optimization).

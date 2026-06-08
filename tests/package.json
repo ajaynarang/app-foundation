@@ -1,0 +1,30 @@
+{
+  "name": "@sally/qa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write \"api/**/*.ts\" \"browser/**/*.ts\" \"config/**/*.ts\" \"fixtures/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
+    "format:check": "prettier --check \"api/**/*.ts\" \"browser/**/*.ts\" \"config/**/*.ts\" \"fixtures/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
+    "test": "playwright test",
+    "test:smoke": "playwright test --grep @smoke --project=api",
+    "test:rbac": "playwright test --grep @rbac --project=api",
+    "test:api": "playwright test tests/api --project=api",
+    "test:contracts": "playwright test --grep @contract --project=api",
+    "test:browser": "playwright test --project=browser",
+    "test:load": "node loadtest/run.mjs",
+    "report": "tsx scripts/generate-matrix.ts",
+    "list-tenants": "tsx scripts/list-tenants.ts",
+    "generate:rbac": "tsx scripts/generate-rbac-matrix.ts --write",
+    "generate:rbac:diff": "tsx scripts/generate-rbac-matrix.ts --diff",
+    "qa:enable-features": "tsx scripts/enable-qa-features.ts"
+  },
+  "dependencies": {
+    "@sally/test-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "typescript": "^5.9.0",
+    "tsx": "^4.19.0",
+    "autocannon": "^8.0.0"
+  }
+}

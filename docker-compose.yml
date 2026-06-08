@@ -1,0 +1,198 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sally-postgres
+    environment:
+      POSTGRES_USER: sally_user
+      POSTGRES_PASSWORD: sally_password
+      POSTGRES_DB: sally
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sally_user -d sally']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sally-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  # Observability stack (Loki + Tempo + Grafana)
+  # Opt-in: only starts with `docker-compose --profile observability up -d`
+  # UI: http://localhost:3003 (anonymous admin, localhost-only)
+  # ─────────────────────────────────────────────────────────────
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: sally-loki
+    profiles: [observability]
+    ports:
+      - '127.0.0.1:3100:3100'
+    volumes:
+      - ./infra/observability/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/config.yaml
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3100/ready || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: sally-tempo
+    profiles: [observability]
+    ports:
+      - '127.0.0.1:3200:3200' # Tempo query API
+      - '127.0.0.1:4318:4318' # OTLP HTTP receiver
+      - '127.0.0.1:4317:4317' # OTLP gRPC receiver
+    volumes:
+      - ./infra/observability/tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - tempo_data:/var/tempo
+    command: -config.file=/etc/tempo/config.yaml
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:3200/ready || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: sally-grafana
+    profiles: [observability]
+    ports:
+      - '127.0.0.1:3003:3000'
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Admin'
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    depends_on:
+      - loki
+      - tempo
+
+  # ─────────────────────────────────────────────────────────────
+  # App services (backend + frontend) — DISABLED for local dev.
+  #
+  # For local development, use the Doppler-injected host flow instead:
+  #   pnpm doppler:backend     # http://localhost:8001
+  #   pnpm doppler:frontend    # http://localhost:3001
+  #   pnpm doppler:console     # http://localhost:3002
+  #
+  # Or run multiple instances side-by-side with different ports:
+  #   ./scripts/sally-dev.sh --backend 8004 --web 3010 --console 3012
+  #
+  # The services below are only useful for testing the production image
+  # locally. They DO NOT use Doppler secrets and will not work for full
+  # app development. Uncomment and run with:
+  #   docker-compose --profile apps up -d
+  # ─────────────────────────────────────────────────────────────
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: ./apps/backend/Dockerfile
+  #   container_name: sally-backend
+  #   profiles: [apps]
+  #   environment:
+  #     NODE_ENV: production
+  #     ENV_TYPE: development
+  #     DATABASE_URL: postgresql://sally_user:sally_password@postgres:5432/sally
+  #     REDIS_URL: redis://redis:6379/0
+  #     CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:8000/health/live || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: ./apps/web/Dockerfile
+  #     target: development
+  #   container_name: sally-frontend
+  #   profiles: [apps]
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://localhost:8000
+  #     NODE_ENV: development
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     # Mount full monorepo so pnpm workspace symlinks (@sally/ui, @sally/shared-types) resolve.
+  #     # Anonymous volumes below shadow host node_modules with container-built ones.
+  #     - ./:/workspace
+  #     - /workspace/node_modules
+  #     - /workspace/apps/web/node_modules
+  #     - /workspace/apps/web/.next
+  #     - /workspace/packages/ui/node_modules
+  #     - /workspace/packages/shared-types/node_modules
+  #   depends_on:
+  #     - backend
+  #   command: pnpm run dev
+
+  # ─────────────────────────────────────────────────────────────
+  # Inngest dev server — durable workflow engine for Sally's Desk
+  # UI: http://localhost:8288
+  #
+  # Points at the backend running on the host via host.docker.internal.
+  # Backend port defaults to 8001 (standard `pnpm doppler:backend`); set
+  # BACKEND_PORT in a local `.env` (gitignored) or inline to override:
+  #   BACKEND_PORT=8004 docker-compose up -d inngest
+  #
+  # macOS/Windows: host.docker.internal resolves natively.
+  # Linux:         extra_hosts creates the mapping.
+  # ─────────────────────────────────────────────────────────────
+  inngest:
+    image: inngest/inngest:latest
+    container_name: sally-inngest
+    ports:
+      - '8288:8288'
+    command:
+      - inngest
+      - dev
+      - --host
+      - '0.0.0.0'
+      - --sdk-url
+      - 'http://host.docker.internal:${BACKEND_PORT:-8001}/api/v1/inngest'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  loki_data:
+    driver: local
+  tempo_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  default:
+    name: sally-network

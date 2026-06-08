@@ -1,0 +1,30 @@
+# API Keys Reference
+
+Generate and manage API keys from the **[API Keys](/docs/keys)** page in this portal. Copy your key immediately after creation — it's only shown once.
+
+## Key types
+
+| Prefix | Environment | Rate limit |
+|--------|-------------|------------|
+| `sk_staging_` | Staging | 1,000 req/hour |
+| `sk_live_` | Production | 10,000 req/hour |
+
+## Security best practices
+
+- **Store in environment variables** — never hardcode in source
+- **One key per service** — easier to rotate and audit
+- **Rotate periodically** — generate new key, update services, revoke old key
+- **Add `.env` to `.gitignore`** — prevent accidental commits
+
+```bash
+# .env (never commit this file)
+SALLY_API_KEY=sk_staging_your_key_here
+```
+
+## Error responses
+
+| Status | Meaning |
+|--------|---------|
+| `401` | Key is missing, invalid, expired, or revoked |
+| `403` | Key doesn't have permission for this resource |
+| `429` | Rate limit exceeded — check `X-RateLimit-Reset` header |

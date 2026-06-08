@@ -1,0 +1,36 @@
+/**
+ * Single source of truth for all contact emails and domains.
+ * Update here — all legal pages, footer, product pages pull from this.
+ */
+
+const DOMAIN = 'appshore.in';
+
+export const CONTACTS = {
+  // --- Corporate / functional ---
+  /** Legal, privacy, DMCA, DPA inquiries */
+  legal: `legal@${DOMAIN}`,
+  /** Security disclosures, vulnerability reports */
+  security: `security@${DOMAIN}`,
+  /** General info */
+  info: `info@${DOMAIN}`,
+  /** Job inquiries */
+  careers: `careers@${DOMAIN}`,
+
+  // --- Product / customer-facing ---
+  /** Sales, enterprise, pricing CTAs, general product contact */
+  sally: `sally@${DOMAIN}`,
+  /** Product support, billing, AI questions, abuse reports */
+  sallySupport: `sally-support@${DOMAIN}`,
+
+  // --- Generic (internal aliases) ---
+  /** General contact */
+  hello: `hello@${DOMAIN}`,
+  /** Generic support alias */
+  support: `support@${DOMAIN}`,
+} as const;
+
+/** Helper to create mailto: link */
+export function mailto(email: keyof typeof CONTACTS | string, subject?: string): string {
+  const address = email in CONTACTS ? CONTACTS[email as keyof typeof CONTACTS] : email;
+  return subject ? `mailto:${address}?subject=${encodeURIComponent(subject)}` : `mailto:${address}`;
+}

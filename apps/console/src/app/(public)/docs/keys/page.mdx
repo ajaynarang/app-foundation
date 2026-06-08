@@ -1,0 +1,38 @@
+import { ApiKeyManager } from "@/components/docs/api-key-manager"
+
+# API Keys
+
+Generate API keys for your integration. Keys start with `sk_staging_` and authenticate against the staging API.
+
+<ApiKeyManager returnTo="/keys" />
+
+---
+
+## Using your key
+
+Pass your API key as a Bearer token on every request:
+
+```bash
+curl https://sally-api-staging.appshore.in/api/v1/drivers \
+  -H "Authorization: Bearer sk_staging_your_key_here"
+```
+
+Keys are scoped to your tenant and carry full API permissions. Store them in environment variables — never commit them to source control.
+
+```bash
+# .env
+SALLY_API_KEY=sk_staging_your_key_here
+```
+
+## Key types
+
+| Prefix | Environment | Rate limit |
+|--------|-------------|------------|
+| `sk_staging_` | Staging | 1,000 req/hour |
+| `sk_live_` | Production | 10,000 req/hour |
+
+## Next steps
+
+- [Quickstart](/docs/getting-started/quickstart) — Make your first API call
+- [Authentication](/docs/getting-started/authentication) — How auth works in detail
+- [API Keys Reference](/docs/getting-started/api-keys) — Create, list, and revoke keys via API

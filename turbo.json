@@ -1,0 +1,62 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "NODE_ENV",
+    "NEXT_PUBLIC_API_URL",
+    "DEV_AUTH_SECRET",
+    "API_BASE_URL",
+    "WEB_BASE_URL",
+    "TENANT_ID"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": ["NEXT_PUBLIC_API_URL"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+    "test:qa": {
+      "cache": false,
+      "env": ["DEV_AUTH_SECRET", "API_BASE_URL", "WEB_BASE_URL", "TENANT_ID"]
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "format": {
+      "cache": false
+    },
+    "format:check": {
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx,json,md,yaml,yml}",
+        "test/**/*.{ts,tsx,js,jsx}",
+        "**/*.{ts,tsx,js,jsx,json,md,yaml,yml}",
+        "!node_modules/**",
+        "!dist/**",
+        "!.next/**",
+        "!.turbo/**",
+        "!coverage/**",
+        "!playwright-report/**",
+        "../../.prettierrc",
+        "../../.prettierignore"
+      ],
+      "cache": true
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

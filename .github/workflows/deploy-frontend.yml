@@ -1,0 +1,80 @@
+# .github/workflows/deploy-frontend.yaml
+# Deploy frontend apps (web + console) to Vercel without backend deploy.
+# Use when only frontend code has changed and backend doesn't need updating.
+#
+# Required GitHub Secrets:
+#   VERCEL_WEB_DEPLOY_HOOK_STAGING / VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
+#   VERCEL_CONSOLE_DEPLOY_HOOK_STAGING / VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION
+#   VERCEL_TOKEN, VERCEL_TEAM_ID
+
+name: Deploy Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [staging, production]
+      apps:
+        description: 'Which apps to deploy'
+        required: true
+        default: 'both'
+        type: choice
+        options: [web, console, both]
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate branch
+    runs-on: ubuntu-latest # runs-on: self-hosted
+    steps:
+      - name: Enforce branch-environment mapping
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          BRANCH="${{ github.ref_name }}"
+          if [ "$ENV" = "staging" ] && [ "$BRANCH" != "develop" ]; then
+            echo "::error::Staging must be deployed from 'develop' branch. You selected '$BRANCH'."
+            exit 1
+          fi
+          if [ "$ENV" = "production" ] && [ "$BRANCH" != "main" ]; then
+            echo "::error::Production must be deployed from 'main' branch. You selected '$BRANCH'."
+            exit 1
+          fi
+          echo "✓ Deploying $ENV frontend from $BRANCH"
+
+  deploy:
+    name: Deploy Frontend to Vercel
+    needs: validate
+    runs-on: ubuntu-latest # runs-on: self-hosted
+
+    steps:
+      - name: Trigger Vercel deployments
+        run: |
+          APPS="${{ github.event.inputs.apps }}"
+          ENV="${{ github.event.inputs.environment }}"
+
+          if [ "$APPS" = "web" ] || [ "$APPS" = "both" ]; then
+            echo "Triggering web deployment..."
+            if [ "$ENV" = "staging" ]; then
+              curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_STAGING }}" > /dev/null
+            else
+              curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
+            fi
+            echo "✓ Web deployment triggered"
+          fi
+
+          if [ "$APPS" = "console" ] || [ "$APPS" = "both" ]; then
+            echo "Triggering console deployment..."
+            if [ "$ENV" = "staging" ]; then
+              curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_STAGING }}" > /dev/null
+            else
+              curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
+            fi
+            echo "✓ Console deployment triggered"
+          fi

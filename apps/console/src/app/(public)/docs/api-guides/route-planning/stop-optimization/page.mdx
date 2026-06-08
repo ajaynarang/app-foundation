@@ -1,0 +1,144 @@
+# Stop Optimization
+
+When a route has multiple stops, SALLY uses a Travelling Salesman Problem (TSP) solver to find the optimal sequence that minimizes total drive time while respecting appointment time windows.
+
+---
+
+## How It Works
+
+The stop optimization pipeline runs before HOS simulation:
+
+1. **Build distance matrix** — Calculate drive time and distance between every pair of stops (N x N matrix)
+2. **Apply TSP solver** — Find the ordering that minimizes total drive time
+3. **Enforce time windows** — Adjust sequence to respect appointment earliest/latest constraints
+4. **Output ordered stops** — Pass the optimized sequence to the HOS simulation step
+
+```
+Input: [Stop A, Stop B, Stop C, Stop D] (unordered)
+                        ↓
+            Build Distance Matrix (4 x 4)
+                        ↓
+           TSP Solver (greedy + 2-opt)
+                        ↓
+       Enforce Time Window Constraints
+                        ↓
+Output: [Stop C, Stop A, Stop D, Stop B] (optimized)
+```
+
+---
+
+## Algorithm
+
+### Phase 1 (Current): Greedy + 2-opt
+
+**Greedy nearest-neighbor:**
+1. Start at the origin
+2. Visit the nearest unvisited stop
+3. Repeat until all stops are visited
+4. Return to destination
+
+**2-opt improvement:**
+1. Take the greedy solution
+2. Try swapping every pair of edges
+3. If a swap reduces total distance, keep it
+4. Repeat until no improvement is found
+
+This combination produces good solutions quickly:
+
+| Stops | Optimization Time | Solution Quality |
+|---|---|---|
+| 5 | Under 1 second | Near-optimal |
+| 10 | Under 5 seconds | Within 5% of optimal |
+| 20 | Under 15 seconds | Within 10% of optimal |
+
+### Phase 2 (Planned): OR-Tools VRP Solver
+
+For fleet-wide optimization with multiple drivers and vehicles, SALLY will upgrade to Google OR-Tools:
+
+- **Vehicle Routing Problem (VRP)** — Assign stops to multiple drivers
+- **Capacity constraints** — Respect truck weight/volume limits
+- **Driver preferences** — Factor in home time, preferred regions
+- **Team driving** — Handle two-driver teams
+
+---
+
+## Time Window Constraints
+
+Stops can have appointment windows that constrain the sequence:
+
+```json
+{
+  "time_window": {
+    "earliest": "2026-02-11T08:00:00Z",
+    "latest": "2026-02-11T12:00:00Z"
+  }
+}
+```
+
+**How constraints are enforced:**
+
+| Scenario | Behavior |
+|---|---|
+| Arrival before `earliest` | Driver waits until the window opens (wait time added to schedule) |
+| Arrival within window | Normal delivery/pickup |
+| Arrival after `latest` | Route marked with a missed appointment warning |
+| Conflicting windows | Optimizer finds best achievable sequence; infeasible conflicts flagged |
+
+If time windows make a sequence impossible (e.g., Stop A must be visited by 8 AM but is 6 hours away), the route is marked as **infeasible** with an explanation.
+
+---
+
+## Distance Matrix
+
+The distance matrix stores drive time and distance between every pair of locations in the route. For N stops plus origin and destination, this is an (N+2) x (N+2) matrix.
+
+**Example for 3 stops:**
+
+| From / To | Origin | Stop A | Stop B | Stop C | Destination |
+|---|---|---|---|---|---|
+| **Origin** | -- | 2.0h | 4.5h | 1.5h | 0h |
+| **Stop A** | 2.0h | -- | 3.0h | 2.5h | 2.0h |
+| **Stop B** | 4.5h | 3.0h | -- | 1.0h | 4.5h |
+| **Stop C** | 1.5h | 2.5h | 1.0h | -- | 1.5h |
+| **Destination** | 0h | 2.0h | 4.5h | 1.5h | -- |
+
+**Data source (current):** Static calculations using OSM road network data with average speed assumptions.
+
+**Data source (Phase 3):** Google Maps Directions API or HERE API for real-time drive times including traffic.
+
+---
+
+## Optimization Priority Impact
+
+The `optimization_priority` field in the route plan request affects how the TSP solver weighs its decisions:
+
+| Priority | TSP Behavior |
+|---|---|
+| `time` | Minimize total drive time (default). Shortest time sequence. |
+| `cost` | Minimize total distance (correlates with fuel cost). May choose routes with less highway driving. |
+| `balanced` | Weight time at 60% and distance at 40%. Good default for most routes. |
+
+---
+
+## Interaction with HOS Simulation
+
+Stop optimization runs **before** HOS simulation. The optimized sequence is then fed into the HOS engine, which may insert rest stops, fuel stops, and breaks between the ordered stops.
+
+This means the optimal sequence without HOS constraints might not be the optimal sequence with them. For example:
+
+**Without HOS:** A → B → C → D (shortest drive time)
+
+**With HOS:** A → B → Rest → D → C (inserting rest after Stop B makes it faster to visit D before C, because the driver has fresh hours)
+
+In Phase 2 (VRP solver), HOS constraints will be integrated directly into the optimization, producing globally optimal plans.
+
+---
+
+## Limitations
+
+| Limitation | Impact | Mitigation |
+|---|---|---|
+| Greedy + 2-opt is not globally optimal | Solutions within 5-10% of optimal for 10-20 stops | Acceptable for MVP; OR-Tools planned for Phase 2 |
+| HOS not integrated into TSP | Sequence may not be optimal after rest insertion | Phase 2 VRP will integrate HOS constraints |
+| Static distance data | Drive times don't reflect real-time traffic | Phase 3 will add live traffic data |
+| No capacity constraints | Doesn't check truck weight/volume per stop | Phase 2 VRP will add capacity constraints |

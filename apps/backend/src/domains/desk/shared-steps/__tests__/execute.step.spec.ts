@@ -1,0 +1,171 @@
+import { DeskEpisodeStepKind } from '@prisma/client';
+
+// nestApp() needs a live Nest container; replace it with a fake that
+// returns our per-test service mocks.
+const nestGet = jest.fn();
+jest.mock('../../core/inngest/nest-context', () => ({
+  nestApp: () => ({ get: nestGet }),
+}));
+
+// fromDeskResponsibility validates DB ids and builds the principal; we
+// spy on it to assert the scope set derived from the responsibility's
+// tool inventory.
+jest.mock('../../../ai/agent-contract/agent-principal', () => ({
+  fromDeskResponsibility: jest.fn(() => ({ kind: 'desk_responsibility' })),
+}));
+
+import { fromDeskResponsibility } from '../../../ai/agent-contract/agent-principal';
+import { InvocationPipelineService } from '../../../ai/agent-contract/invocation-pipeline.service';
+import { ScopeRegistryService } from '../../../ai/agent-contract/scope-registry.service';
+import { DeskStepWriter } from '../../core/episode/desk-step-writer.service';
+import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { AR_FOLLOWUP_DEFINITION } from '../../responsibilities';
+import { executeStep } from '../execute.step';
+
+const fromDeskResponsibilityMock = fromDeskResponsibility as jest.MockedFunction<typeof fromDeskResponsibility>;
+
+const EPISODE_ID = 'e1';
+
+type EpisodeRow = {
+  tenantId: number;
+  responsibilityId: number;
+  responsibility: { key: string };
+  ownerAgent: { supervisorUserId: number | null };
+};
+
+function makeEpisode(overrides: Partial<EpisodeRow> = {}): EpisodeRow {
+  return {
+    tenantId: 10,
+    responsibilityId: 5,
+    responsibility: { key: 'ar_followup' },
+    ownerAgent: { supervisorUserId: 99 },
+    ...overrides,
+  };
+}
+
+function setup(episode: EpisodeRow) {
+  const prisma = {
+    deskEpisode: { findUniqueOrThrow: jest.fn().mockResolvedValue(episode) },
+  };
+  const pipeline = {
+    run: jest.fn().mockResolvedValue({ isError: false, content: [{ type: 'text', text: 'ok' }] }),
+  };
+  // Map known AR tools to deterministic scopes; one tool maps to undefined
+  // (registry miss) to verify it is filtered out of the principal scope set.
+  const scopeRegistry = {
+    scopeForTool: jest.fn((tool: string) => {
+      const map: Record<string, string> = {
+        'send-email': 'comms:send',
+        'get-invoice-detail': 'invoices:read',
+        'record-promise-to-pay': 'invoices:write',
+      };
+      return map[tool];
+    }),
+  };
+  const stepWriter = {
+    open: jest.fn().mockResolvedValue({ id: 'step-1' }),
+    succeeded: jest.fn().mockResolvedValue(undefined),
+    failed: jest.fn().mockResolvedValue(undefined),
+  };
+
+  nestGet.mockImplementation((token: unknown) => {
+    if (token === PrismaService) return prisma;
+    if (token === InvocationPipelineService) return pipeline;
+    if (token === ScopeRegistryService) return scopeRegistry;
+    if (token === DeskStepWriter) return stepWriter;
+    throw new Error('unexpected DI token requested in executeStep test');
+  });
+
+  return { prisma, pipeline, scopeRegistry, stepWriter };
+}
+
+describe('executeStep — registry-driven scope set', () => {
+  beforeEach(() => {
+    nestGet.mockReset();
+    fromDeskResponsibilityMock.mockClear().mockReturnValue({ kind: 'desk_responsibility' } as never);
+  });
+
+  it('derives the principal scope set from the responsibility definition tools', async () => {
+    const { stepWriter } = setup(makeEpisode());
+
+    await executeStep({ episodeId: EPISODE_ID, tool: 'send-email', args: { to: 'x@y.com' } });
+
+    expect(fromDeskResponsibilityMock).toHaveBeenCalledTimes(1);
+    const principalArg = fromDeskResponsibilityMock.mock.calls[0][0];
+    // Scopes come from AR_FOLLOWUP_DEFINITION.tools mapped via the registry,
+    // de-duplicated, with registry misses (undefined) filtered out.
+    const expectedScopes = Array.from(
+      new Set(['comms:send', 'invoices:read', 'invoices:write']), // the three mapped tools
+    );
+    expect([...principalArg.scopes].sort()).toEqual(expectedScopes.sort());
+    expect(principalArg.responsibilityId).toBe(5);
+    expect(principalArg.tenantId).toBe(10);
+    expect(principalArg.enabledByUserId).toBe(99);
+    expect(stepWriter.succeeded).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses AR_FOLLOWUP_DEFINITION.tools as the inventory (no hardcoded list)', async () => {
+    const { scopeRegistry } = setup(makeEpisode());
+
+    await executeStep({ episodeId: EPISODE_ID, tool: 'send-email', args: {} });
+
+    // Every tool in the definition is looked up to build the scope set,
+    // plus the executed tool itself (looked up first for the step row).
+    for (const tool of AR_FOLLOWUP_DEFINITION.tools) {
+      expect(scopeRegistry.scopeForTool).toHaveBeenCalledWith(tool);
+    }
+  });
+});
+
+describe('executeStep — fail-closed paths', () => {
+  beforeEach(() => {
+    nestGet.mockReset();
+    fromDeskResponsibilityMock.mockClear().mockReturnValue({ kind: 'desk_responsibility' } as never);
+  });
+
+  it('fails closed when the responsibility key has no registry definition', async () => {
+    const { stepWriter, pipeline } = setup(makeEpisode({ responsibility: { key: 'not_a_real_key' } }));
+
+    await expect(executeStep({ episodeId: EPISODE_ID, tool: 'send-email', args: {} })).rejects.toThrow(
+      'execute: unknown responsibility "not_a_real_key"',
+    );
+
+    expect(stepWriter.open).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: DeskEpisodeStepKind.EXECUTE, toolName: 'send-email' }),
+    );
+    expect(stepWriter.failed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stepId: 'step-1',
+        errorMessage: expect.stringContaining('no registry definition'),
+      }),
+    );
+    // Never reaches the pipeline.
+    expect(pipeline.run).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the executed tool has no registered scope', async () => {
+    const { stepWriter, pipeline } = setup(makeEpisode());
+
+    await expect(executeStep({ episodeId: EPISODE_ID, tool: 'unknown-tool', args: {} })).rejects.toThrow(
+      'execute: unknown tool "unknown-tool"',
+    );
+
+    expect(stepWriter.failed).toHaveBeenCalledWith(
+      expect.objectContaining({ errorMessage: expect.stringContaining('no scope registered') }),
+    );
+    expect(pipeline.run).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the owner agent has no supervisor', async () => {
+    const { stepWriter, pipeline } = setup(makeEpisode({ ownerAgent: { supervisorUserId: null } }));
+
+    await expect(executeStep({ episodeId: EPISODE_ID, tool: 'send-email', args: {} })).rejects.toThrow(
+      'execute: agent has no supervisor',
+    );
+
+    expect(stepWriter.failed).toHaveBeenCalledWith(
+      expect.objectContaining({ errorMessage: expect.stringContaining('no supervisor') }),
+    );
+    expect(pipeline.run).not.toHaveBeenCalled();
+  });
+});

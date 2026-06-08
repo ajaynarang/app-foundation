@@ -1,0 +1,322 @@
+@import '@sally/ui/globals.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Text gradients */
+  .text-gradient {
+    @apply bg-gradient-to-r from-black to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-reverse {
+    @apply bg-gradient-to-r from-gray-600 to-black dark:from-gray-400 dark:to-white bg-clip-text text-transparent;
+  }
+
+  /* Glassmorphism effects */
+  .glass {
+    @apply backdrop-blur-sm bg-white/80 border border-gray-200;
+  }
+
+  .glass-dark {
+    @apply backdrop-blur-sm bg-black/80 border border-gray-800;
+  }
+
+  /* Smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom animations */
+  @keyframes route-draw {
+    0% {
+      stroke-dashoffset: 1000;
+    }
+    100% {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .animate-route-draw {
+    animation: route-draw 3s ease-out forwards;
+  }
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-4px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(4px);
+    }
+  }
+
+  .animate-shake {
+    animation: shake 0.4s ease-in-out;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-card-hover;
+  }
+
+  /* Sally AI panel push-content */
+  .sally-main-content {
+    transition: margin-right 0.3s ease-in-out;
+  }
+
+  .sally-main-content.sally-layout-side {
+    margin-right: var(--sally-side-width, 380px);
+  }
+
+  .sally-main-content.sally-layout-split {
+    margin-right: 50%;
+  }
+
+  .sally-main-content.sally-layout-float {
+    margin-right: 0;
+  }
+
+  @media (max-width: 640px) {
+    .sally-main-content.sally-layout-side,
+    .sally-main-content.sally-layout-split,
+    .sally-main-content.sally-layout-float {
+      margin-right: 0;
+    }
+  }
+
+  /* Sally AI markdown rendering */
+  .sally-markdown p {
+    margin-bottom: 0.5em;
+  }
+  .sally-markdown p:last-child {
+    margin-bottom: 0;
+  }
+  .sally-markdown strong {
+    font-weight: 600;
+  }
+  .sally-markdown em {
+    font-style: italic;
+  }
+  .sally-markdown ul,
+  .sally-markdown ol {
+    margin: 0.25em 0 0.5em;
+    padding-left: 1.25em;
+  }
+  .sally-markdown ul {
+    list-style-type: disc;
+  }
+  .sally-markdown ol {
+    list-style-type: decimal;
+  }
+  .sally-markdown li {
+    margin-bottom: 0.15em;
+  }
+  .sally-markdown li > p {
+    margin-bottom: 0;
+  }
+  .sally-markdown h1,
+  .sally-markdown h2,
+  .sally-markdown h3 {
+    font-weight: 600;
+    margin-top: 0.75em;
+    margin-bottom: 0.25em;
+  }
+  .sally-markdown h1 {
+    font-size: 1.1em;
+  }
+  .sally-markdown h2 {
+    font-size: 1.05em;
+  }
+  .sally-markdown h3 {
+    font-size: 1em;
+  }
+  .sally-markdown code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em;
+    padding: 0.15em 0.35em;
+    border-radius: 0.25rem;
+    background: hsl(var(--muted));
+  }
+  .sally-markdown pre {
+    margin: 0.5em 0;
+    padding: 0.75em;
+    border-radius: 0.5rem;
+    background: hsl(var(--muted));
+    overflow-x: auto;
+  }
+  .sally-markdown pre code {
+    padding: 0;
+    background: transparent;
+  }
+  .sally-markdown blockquote {
+    border-left: 2px solid hsl(var(--border));
+    padding-left: 0.75em;
+    margin: 0.5em 0;
+    color: hsl(var(--muted-foreground));
+  }
+  .sally-markdown a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .sally-markdown hr {
+    border-color: hsl(var(--border));
+    margin: 0.75em 0;
+  }
+  .sally-markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    font-size: 0.85em;
+  }
+  .sally-markdown th,
+  .sally-markdown td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.35em 0.65em;
+    text-align: left;
+  }
+  .sally-markdown th {
+    background: hsl(var(--muted));
+    font-weight: 600;
+  }
+  .sally-markdown tr:nth-child(even) td {
+    background: hsl(var(--muted) / 0.4);
+  }
+
+  /* Reduced motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Safe area utilities for notched devices (iPhone home indicator) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Route Plan Map Popup Styling ────────────────────────────────────────── */
+.route-popup .mapboxgl-popup-content {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.3);
+}
+
+.route-popup .mapboxgl-popup-tip {
+  border-top-color: hsl(var(--card));
+  border-bottom-color: hsl(var(--card));
+  border-left-color: hsl(var(--card));
+  border-right-color: hsl(var(--card));
+}
+
+.route-popup .mapboxgl-popup-close-button {
+  color: hsl(var(--muted-foreground));
+  font-size: 18px;
+  padding: 2px 6px;
+}
+
+.route-popup .mapboxgl-popup-close-button:hover {
+  color: hsl(var(--foreground));
+  background: transparent;
+}
+
+/* Sally AI Chat */
+.sally-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sally AI Chat animations */
+@keyframes sallyInputGlow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.sally-input-glow {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--foreground) / 0.25),
+    hsl(var(--foreground) / 0.05) 40%,
+    transparent 60%,
+    hsl(var(--foreground) / 0.15)
+  );
+  background-size: 200% 200%;
+  animation: sallyInputGlow 4s ease-in-out infinite;
+}
+
+@keyframes sallyFloatGlow {
+  0% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.sally-float-glow {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--foreground) / 0.3),
+    hsl(var(--foreground) / 0.05) 30%,
+    transparent 50%,
+    hsl(var(--foreground) / 0.08) 70%,
+    hsl(var(--foreground) / 0.2)
+  );
+  background-size: 300% 300%;
+  animation: sallyFloatGlow 6s ease-in-out infinite;
+  padding: 1.5px;
+}
+
+.sally-float-glow > .sally-float-inner {
+  background: hsl(var(--background));
+  border-radius: calc(1rem - 1.5px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

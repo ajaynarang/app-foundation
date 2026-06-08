@@ -1,0 +1,206 @@
+# Rest Stops
+
+SALLY automatically inserts rest stops into routes when the HOS simulation detects that a driver cannot legally complete a segment. This page explains how rest decisions are made and how they appear in route plans.
+
+---
+
+## How Rest Insertion Works
+
+During route planning, the HOS simulation walks through each segment tracking the driver's:
+- **11-hour drive clock** — Maximum continuous driving time
+- **14-hour on-duty window** — Maximum time from start of duty to end of driving
+- **8-hour break rule** — 30-minute break required after 8 hours of driving
+- **70-hour cycle** — Maximum on-duty hours in 8 days
+
+When the simulation detects that `hours_remaining < hours_needed` for the next segment, it triggers the REST Optimization Engine.
+
+```
+Route Planner (simulating segment)
+        ↓
+Detects: hours_remaining < hours_needed
+        ↓
+Calls: REST Optimization Engine
+        ↓
+Returns: Recommendation (rest type, duration, reasoning)
+        ↓
+Route Planner: Inserts rest segment into route
+```
+
+---
+
+## Rest Types
+
+| Type | Duration | Effect | When Used |
+|---|---|---|---|
+| Full rest | 10 hours | Resets 11h drive clock AND 14h duty window | Duty window expired, or drive clock insufficient for remaining route |
+| Partial rest (sleeper berth) | 7h or 8h | Sleeper berth split provision (7/3 or 8/2 split) | Driver in sleeper berth, partial reset available |
+| Break | 30 minutes | Satisfies 8h break requirement | After 8 hours of continuous driving |
+
+---
+
+## REST Optimization Engine
+
+The REST Optimization Engine is a component called internally by the route planner. It evaluates the situation and recommends the best rest strategy.
+
+### API (Internal)
+
+```
+POST /api/v1/rest/recommend
+```
+
+This endpoint is called by the route planner, not directly by clients.
+
+### Request
+
+```json
+{
+  "current_location": {
+    "latitude": 35.3733,
+    "longitude": -119.0187,
+    "name": "After Stop A"
+  },
+  "driver_state": {
+    "hours_driven": 8.0,
+    "on_duty_hours": 10.0,
+    "hours_since_break": 8.0,
+    "cycle_hours_used": 45.0
+  },
+  "dock_duration_hours": 0,
+  "remaining_route_hours": 6.5,
+  "is_dedicated_rest_stop": true
+}
+```
+
+### Response
+
+```json
+{
+  "recommendation": "FULL_REST",
+  "duration_hours": 10,
+  "confidence": 1.0,
+  "feasibility": "NOT_FEASIBLE",
+  "reasoning": "Mandatory rest required. HOS 14h duty window will be exceeded before reaching next stop. Full rest resets both drive clock (11h) and duty window (14h).",
+  "opportunity_score": null,
+  "rest_location": {
+    "name": "Truck Stop - Exit 45",
+    "latitude": 35.3801,
+    "longitude": -119.0429,
+    "type": "truck_stop"
+  }
+}
+```
+
+---
+
+## Recommendation Categories
+
+### Mandatory Rest (Confidence: 100%)
+
+The route is **not feasible** with current hours. The driver must rest.
+
+**Triggers:**
+- Drive clock insufficient for next segment
+- Duty window will expire before segment completion
+- Cycle hours approaching 70h limit
+
+```json
+{
+  "recommendation": "FULL_REST",
+  "confidence": 1.0,
+  "feasibility": "NOT_FEASIBLE",
+  "reasoning": "Mandatory rest required. Driver has 2h drive time remaining but next segment requires 4h."
+}
+```
+
+### Opportunistic Rest (Confidence: 60–75%)
+
+The route is feasible but marginal. Dock time is available and could be leveraged for rest.
+
+**Triggers:**
+- Long dock time at next stop (3+ hours)
+- Driver's hours are getting low but technically sufficient
+- Extending dock time to 7–10h provides significant hour recovery
+
+```json
+{
+  "recommendation": "PARTIAL_REST",
+  "confidence": 0.7,
+  "feasibility": "FEASIBLE_BUT_TIGHT",
+  "reasoning": "Opportunistic rest recommended. Dock time of 4h at Stop B could be extended to 7h partial rest, recovering 7h of drive time for remaining route.",
+  "opportunity_score": 72
+}
+```
+
+### No Rest Needed
+
+The driver has sufficient hours to complete the remaining route.
+
+```json
+{
+  "recommendation": "NO_REST",
+  "confidence": 1.0,
+  "feasibility": "FEASIBLE",
+  "reasoning": "Driver has 8.5h drive time remaining. Remaining route requires 5.2h. No rest needed."
+}
+```
+
+---
+
+## Rest Segments in Route Plans
+
+When a rest stop is inserted, it appears as a segment in the route plan:
+
+```json
+{
+  "sequence": 7,
+  "type": "rest",
+  "location": "TA Travel Center - Fresno",
+  "rest_type": "full_rest",
+  "duration_hours": 10.0,
+  "reason": "HOS 14h duty window approaching. Full rest required to continue safely.",
+  "hos_state_after": {
+    "hours_driven": 0.0,
+    "on_duty_hours": 0.0,
+    "hours_since_break": 0.0,
+    "drive_hours_remaining": 11.0
+  }
+}
+```
+
+**Key fields:**
+
+| Field | Description |
+|---|---|
+| `rest_type` | `full_rest`, `partial_rest`, or `break` |
+| `duration_hours` | How long the rest lasts |
+| `reason` | Human-readable explanation of why rest was inserted |
+| `hos_state_after` | HOS state after rest completes (clocks reset for full rest) |
+
+---
+
+## Decision Factors
+
+The REST Optimization Engine considers these factors when making a recommendation:
+
+| Factor | Weight | Description |
+|---|---|---|
+| HOS feasibility | Highest | Can the driver legally complete the remaining route? |
+| Hours remaining | High | How close is the driver to HOS limits? |
+| Remaining route demand | High | How many driving hours does the rest of the route require? |
+| Dock time availability | Medium | Is there dock time that could double as rest? |
+| Cost (extra time) | Medium | How much total time does inserting rest add? |
+| Opportunity score | Low | Composite score (0–100) for opportunistic rest |
+
+---
+
+## FMCSA Rules Reference
+
+| Rule | Limit | Reset Mechanism |
+|---|---|---|
+| Daily drive time | 11 hours | 10h consecutive off-duty (full rest) |
+| Daily on-duty window | 14 hours | 10h consecutive off-duty (full rest) |
+| Break requirement | 30 min after 8h driving | Any 30-min off-duty or sleeper berth period |
+| Cycle limit | 70 hours / 8 days | 34-hour restart, or daily recap (oldest day drops off) |
+| Sleeper berth split | 7/3 or 8/2 split | One period in sleeper berth, other off-duty |
+
+SALLY enforces all of these rules. Routes with zero violations are guaranteed.

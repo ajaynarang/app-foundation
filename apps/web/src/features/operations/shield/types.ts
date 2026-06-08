@@ -1,0 +1,20 @@
+// Re-exported from @sally/shared-types — do not add local types here
+export type {
+  ShieldAuditScope,
+  ShieldAuditStatus,
+  ShieldStatusLabel,
+  ShieldFindingSeverity,
+  ShieldFindingCategory,
+  ShieldFindingSource,
+  ShieldFinding,
+  ShieldAIInsight,
+  ShieldPriorityAction,
+  ShieldCoverageItem,
+  ShieldAudit,
+  ShieldInProgressAudit,
+  ShieldLatestResponse,
+  TriggerAuditResponse,
+  AuditHistoryResponse,
+  ShieldCustomRule,
+  TriggerAuditParams,
+} from '@sally/shared-types';

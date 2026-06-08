@@ -1,0 +1,219 @@
+import { Callout } from "@/components/docs/callout"
+
+# Any MCP Client
+
+SALLY implements the **Model Context Protocol (MCP)** with Streamable HTTP transport. Any MCP-compatible client can connect to SALLY's MCP server.
+
+## Server Details
+
+| Property | Value |
+|----------|-------|
+| **Protocol** | MCP (Model Context Protocol) |
+| **Transport** | Streamable HTTP (stateless) |
+| **Auth** | OAuth 2.1 with PKCE (S256) |
+| **Spec Version** | JSON-RPC 2.0 |
+
+### Server URLs
+
+| Environment | Server URL | OAuth Metadata |
+|-------------|-----------|----------------|
+| **Production** | `https://api.trysally.com` | `https://api.trysally.com/.well-known/oauth-authorization-server` |
+| **Staging** | `https://sally-api.apps.appshore.in` | `https://sally-api.apps.appshore.in/.well-known/oauth-authorization-server` |
+| **Local** | `http://localhost:8000` | `http://localhost:8000/.well-known/oauth-authorization-server` |
+
+## Authentication Flow
+
+SALLY uses **OAuth 2.1 with PKCE** (no client secrets required):
+
+### 1. Discover OAuth Metadata
+
+```bash
+curl https://api.trysally.com/.well-known/oauth-authorization-server
+```
+
+Response:
+```json
+{
+  "issuer": "https://api.trysally.com",
+  "authorization_endpoint": "https://api.trysally.com/api/v1/oauth/authorize",
+  "token_endpoint": "https://api.trysally.com/api/v1/oauth/token",
+  "registration_endpoint": "https://api.trysally.com/api/v1/oauth/register",
+  "revocation_endpoint": "https://api.trysally.com/api/v1/oauth/revoke",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"],
+  "token_endpoint_auth_methods_supported": ["client_secret_post", "none"]
+}
+```
+
+### 2. Register Your Client (Optional)
+
+SALLY supports **Dynamic Client Registration** (RFC 7591):
+
+```bash
+curl -X POST https://api.trysally.com/api/v1/oauth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "My MCP Client",
+    "redirect_uris": ["http://localhost:3333/callback"],
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "token_endpoint_auth_method": "none"
+  }'
+```
+
+### 3. Authorization (PKCE)
+
+Generate a code verifier and challenge, then redirect the user:
+
+```
+GET https://api.trysally.com/api/v1/oauth/authorize
+  ?response_type=code
+  &client_id={client_id}
+  &redirect_uri={redirect_uri}
+  &code_challenge={challenge}
+  &code_challenge_method=S256
+  &scope=fleet:read+fleet:write+invoices:read+invoices:write
+  &state={random_state}
+```
+
+The user signs in on SALLY's consent page and is redirected back with an authorization code.
+
+### 4. Token Exchange
+
+```bash
+curl -X POST https://api.trysally.com/api/v1/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code&code={auth_code}&redirect_uri={redirect_uri}&client_id={client_id}&code_verifier={verifier}"
+```
+
+Response:
+```json
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "eyJ...",
+  "expiresIn": 3600,
+  "tokenType": "Bearer",
+  "scope": "fleet:read fleet:write invoices:read invoices:write"
+}
+```
+
+### 5. Refresh Tokens
+
+```bash
+curl -X POST https://api.trysally.com/api/v1/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}"
+```
+
+## Making MCP Requests
+
+Send JSON-RPC 2.0 requests to the server URL with the Bearer token:
+
+### List Available Tools
+
+```bash
+curl -X POST https://api.trysally.com \
+  -H "Authorization: Bearer {access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "1",
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+### Call a Tool
+
+```bash
+curl -X POST https://api.trysally.com \
+  -H "Authorization: Bearer {access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "2",
+    "method": "tools/call",
+    "params": {
+      "name": "query-loads",
+      "arguments": {
+        "status": "in_transit"
+      }
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "2",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Found 5 loads currently in transit..."
+      }
+    ],
+    "isError": false
+  }
+}
+```
+
+## Write Actions & Confirmation
+
+Write tools (send-invoice, void-invoice, approve-settlement, etc.) require a **Human-in-the-Loop (HITL) confirmation**:
+
+1. First call returns a `confirmationToken` and a description of the action
+2. Call the tool again with the `confirmationToken` to execute
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "3",
+  "method": "tools/call",
+  "params": {
+    "name": "send-invoice",
+    "arguments": {
+      "invoiceId": "inv_123",
+      "confirmationToken": "ct_abc123..."
+    }
+  }
+}
+```
+
+Confirmation tokens expire after **5 minutes**.
+
+## Protected Resource Metadata
+
+SALLY also exposes RFC 9728 metadata:
+
+```bash
+curl https://api.trysally.com/.well-known/oauth-protected-resource
+```
+
+```json
+{
+  "resource": "https://api.trysally.com",
+  "authorization_servers": ["https://api.trysally.com"],
+  "scopes_supported": ["fleet:read", "fleet:write", "invoices:read", ...]
+}
+```
+
+## Rate Limits
+
+MCP requests are subject to the same rate limits as the REST API:
+
+| Endpoint | Limit |
+|----------|-------|
+| MCP tools (general) | 100 requests / 60 seconds |
+| OAuth token endpoint | 10 requests / 60 seconds |
+| OAuth registration | 5 requests / 60 seconds |
+
+## Security Notes
+
+- All MCP requests require a valid OAuth Bearer token
+- Tokens are scoped -- tools are filtered based on granted scopes
+- Tenant isolation is enforced server-side (you can only access your own fleet data)
+- Write actions require HITL confirmation tokens
+- All tool calls are logged in the audit trail

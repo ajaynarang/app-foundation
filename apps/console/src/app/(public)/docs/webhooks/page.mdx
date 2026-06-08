@@ -1,0 +1,178 @@
+import { WebhookManager } from "@/components/docs/webhook-manager"
+
+# Webhooks
+
+Register HTTPS endpoints to receive real-time event notifications from SALLY. SALLY sends HTTP POST requests with HMAC-signed payloads whenever relevant events occur.
+
+<WebhookManager returnTo="/webhooks" />
+
+---
+
+## Supported Events
+
+All events use the `sally.*` prefix:
+
+| Event | When it fires |
+|-------|--------------|
+| `sally.load.created` | A new load is added to the system |
+| `sally.load.updated` | A load's status, stops, or assignment changes |
+| `sally.route.planned` | A route plan is created for a driver |
+| `sally.alert.fired` | An alert is generated (HOS violation, delay, deviation) |
+
+Subscribe to `*` to receive all current and future events.
+
+## Payload Format
+
+Every delivery has a standard envelope:
+
+```json
+{
+  "id": "evt_a1b2c3d4",
+  "event": "sally.alert.fired",
+  "timestamp": "2026-02-23T14:00:00Z",
+  "webhookId": "wh_x1y2z3",
+  "data": { ... }
+}
+```
+
+### `sally.alert.fired`
+
+```json
+{
+  "id": "evt_h8i9j0k1",
+  "event": "sally.alert.fired",
+  "timestamp": "2026-02-23T14:00:00Z",
+  "webhookId": "wh_a1b2c3d4",
+  "data": {
+    "id": "alt_x1y2z3w4",
+    "type": "HOS_APPROACHING_DRIVE_LIMIT",
+    "priority": "HIGH",
+    "status": "ACTIVE",
+    "title": "Driver approaching 11-hour drive limit",
+    "message": "Mike Johnson has 45 minutes of drive time remaining.",
+    "driverId": "drv_a1b2c3d4",
+    "routePlanId": "rte_f8e7d6c5",
+    "createdAt": "2026-02-23T14:00:00Z"
+  }
+}
+```
+
+### `sally.route.planned`
+
+```json
+{
+  "id": "evt_d4e5f6g7",
+  "event": "sally.route.planned",
+  "timestamp": "2026-02-23T08:00:00Z",
+  "webhookId": "wh_a1b2c3d4",
+  "data": {
+    "id": "rte_f8e7d6c5",
+    "status": "PLANNED",
+    "driverId": "drv_a1b2c3d4",
+    "vehicleId": "veh_t4r5k6",
+    "hosCompliant": true,
+    "estimatedDurationHours": 9.5,
+    "estimatedDistanceMiles": 487,
+    "createdAt": "2026-02-23T08:00:00Z"
+  }
+}
+```
+
+### `sally.load.created` / `sally.load.updated`
+
+```json
+{
+  "id": "evt_a1b2c3d4",
+  "event": "sally.load.created",
+  "timestamp": "2026-02-23T16:15:00Z",
+  "webhookId": "wh_a1b2c3d4",
+  "data": {
+    "id": "load_l1l2l3",
+    "referenceNumber": "ORD-2026-0042",
+    "status": "PENDING",
+    "tenantId": "tnt_acme001",
+    "createdAt": "2026-02-23T16:15:00Z"
+  }
+}
+```
+
+## Signature Verification
+
+SALLY signs every request with HMAC-SHA256. **Always verify signatures** before processing.
+
+```javascript
+import crypto from 'crypto'
+
+function verifyWebhook(payload, signature, timestamp, secret) {
+  const signedPayload = `${timestamp}.${payload}`
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(signedPayload)
+    .digest('hex')
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+}
+
+// Express.js
+app.post('/webhooks/sally', express.raw({ type: 'application/json' }), (req, res) => {
+  const sig = req.headers['x-sally-signature']
+  const ts = req.headers['x-sally-timestamp']
+
+  if (!verifyWebhook(req.body.toString(), sig, ts, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).send('Invalid signature')
+  }
+
+  // Respond immediately, process async
+  res.status(200).send('OK')
+  setImmediate(() => handleEvent(JSON.parse(req.body)))
+})
+```
+
+```python
+import hmac, hashlib
+
+def verify_webhook(payload: bytes, signature: str, timestamp: str, secret: str) -> bool:
+    signed = f"{timestamp}.{payload.decode()}"
+    expected = hmac.new(secret.encode(), signed.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(signature, expected)
+```
+
+## Retry Policy
+
+| Attempt | Delay |
+|---------|-------|
+| 1st retry | 30 seconds |
+| 2nd retry | 2 minutes |
+| 3rd retry | 10 minutes |
+| 4th retry | 30 minutes |
+| 5th retry | 1 hour |
+
+After 5 failures the delivery is marked failed. Use the delivery logs in the manager above to retry manually.
+
+## Local Testing
+
+**ngrok:** Expose localhost to the internet for testing.
+```bash
+ngrok http 3000
+# Use the https://xxx.ngrok.io URL as your webhook endpoint
+```
+
+**webhook.site:** For quick payload inspection without a local server — visit [webhook.site](https://webhook.site).
+
+## Troubleshooting
+
+**Events not arriving:**
+- Verify endpoint is active in the manager above
+- Your URL must be public HTTPS (not localhost)
+- Check delivery logs for error details
+
+**Signature verification failing:**
+- Use the **raw** request body — do not parse JSON before computing HMAC
+- Trim whitespace from your secret
+- Must use HMAC-SHA256 (not SHA1 or MD5)
+
+**Timeout errors:**
+Respond `200 OK` immediately, process the event asynchronously.
+
+## Full Reference
+
+See the [Webhook Integration Guide](/docs/api-guides/integrations/webhooks) for complete handler examples, idempotency patterns, and best practices.

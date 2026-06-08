@@ -1,0 +1,70 @@
+# Authentication
+
+Every request to the SALLY API must include an authentication credential. For most integrations, that means an API key.
+
+## API keys (recommended for integrations)
+
+Generate a key at **[API Keys](/docs/keys)**, then pass it as a Bearer token:
+
+```bash
+curl https://sally-api-staging.appshore.in/api/v1/drivers \
+  -H "Authorization: Bearer sk_staging_your_key_here"
+```
+
+API keys are long-lived, scoped to your tenant, and carry the permissions of the user who created them. They don't expire automatically but can be revoked at any time from the [API Keys](/docs/keys) page.
+
+### Key format
+
+| Environment | Prefix | Rate limit |
+|-------------|--------|------------|
+| Staging | `sk_staging_` | 1,000 req/hour |
+| Production | `sk_live_` | 10,000 req/hour |
+
+### Code examples
+
+**JavaScript:**
+
+```javascript
+const SALLY_API_KEY = process.env.SALLY_API_KEY;
+
+const res = await fetch("https://sally-api-staging.appshore.in/api/v1/drivers", {
+  headers: { Authorization: `Bearer ${SALLY_API_KEY}` },
+});
+
+const drivers = await res.json();
+```
+
+**Python:**
+
+```python
+import os, requests
+
+API_KEY = os.environ["SALLY_API_KEY"]
+
+res = requests.get(
+    "https://sally-api-staging.appshore.in/api/v1/drivers",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+)
+
+drivers = res.json()
+```
+
+## Error responses
+
+| Status | Meaning | What to do |
+|--------|---------|------------|
+| `401` | Missing, invalid, or expired credential | Check your key/token. Generate a new one if needed. |
+| `403` | Valid credential but insufficient permissions | Your account doesn't have access to this resource. |
+| `429` | Rate limit exceeded | Back off and retry. Check `X-RateLimit-Reset` header for when to retry. |
+
+## Best practices
+
+- **Store keys in environment variables** — never commit them to source code
+- **Use one key per service** — easier to rotate and audit
+- **Rotate keys periodically** — revoke old keys after deploying new ones
+- **Monitor usage** — check rate limit headers to avoid throttling
+
+## Next steps
+
+- [Plan a Route](/docs/getting-started/plan-a-route) — See SALLY's route optimization in action
+- [API Keys Reference](/docs/getting-started/api-keys) — Full reference for key management (create, list, revoke via API)

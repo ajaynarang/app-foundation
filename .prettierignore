@@ -1,0 +1,46 @@
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/.turbo/
+**/coverage/
+
+# Dependencies
+**/node_modules/
+
+# Generated
+**/prisma/migrations/
+**/*.generated.*
+apps/backend/src/generated/
+packages/shared-types/src/generated/
+**/playwright-report/
+**/test-results/
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Large / binary
+**/*.excalidraw
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.svg
+**/*.ico
+**/*.woff
+**/*.woff2
+
+# Obsidian
+Obsidian Vault/
+.obsidian/
+
+# Runtime
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Git / IDE
+.git/
+.vscode/
+.idea/

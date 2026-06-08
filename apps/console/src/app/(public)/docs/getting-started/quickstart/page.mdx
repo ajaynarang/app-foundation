@@ -1,0 +1,94 @@
+# Quickstart
+
+Get from zero to a working API call in under 5 minutes.
+
+## 1. Get your API key
+
+Go to **[API Keys](/docs/keys)** and sign in with your SALLY account. Click **Generate Key**, give it a name, and copy the key. It starts with `sk_staging_`.
+
+Store it as an environment variable:
+
+```bash
+export SALLY_API_KEY="sk_staging_your_key_here"
+```
+
+Don't have an account? [Sign up at sally.appshore.in](https://sally.appshore.in).
+
+## 2. Make your first request
+
+Let's list the drivers in your tenant to verify your key works:
+
+```bash
+curl https://sally-api-staging.appshore.in/api/v1/drivers \
+  -H "Authorization: Bearer $SALLY_API_KEY"
+```
+
+You should get a `200 OK` response with a JSON array (empty if no drivers exist yet — that's fine).
+
+## 3. Plan a route
+
+This is where SALLY shines. Send an origin, a destination, and a driver — SALLY returns an optimized, HOS-compliant route with automatic rest and fuel stops.
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "driverId": "YOUR_DRIVER_ID",
+    "vehicleId": "YOUR_VEHICLE_ID",
+    "stops": [
+      {
+        "type": "PICKUP",
+        "address": "2800 S Western Ave, Chicago, IL 60608",
+        "scheduledArrival": "2026-03-01T09:00:00Z"
+      },
+      {
+        "type": "DELIVERY",
+        "address": "5900 W Raymond St, Indianapolis, IN 46241",
+        "scheduledArrival": "2026-03-01T15:00:00Z"
+      }
+    ]
+  }'
+```
+
+No driver or vehicle yet? See [Manage Your Fleet](/docs/getting-started/manage-fleet) to create them first, or follow the full [Plan a Route](/docs/getting-started/plan-a-route) tutorial.
+
+## 4. What you get back
+
+SALLY returns a route plan with:
+
+- **Optimized stop sequence** — stops reordered for shortest travel time
+- **HOS-compliant segments** — drive time validated against federal Hours of Service rules
+- **Rest stops inserted automatically** — if the driver needs a 10-hour break, SALLY adds it
+- **Fuel stops optimized by price** — cheapest fuel along the route within range
+
+```json
+{
+  "planId": "rte_abc123",
+  "status": "PLANNED",
+  "totalDistanceMiles": 181,
+  "totalDurationHours": 3.5,
+  "hosCompliant": true,
+  "segments": [
+    {
+      "type": "DRIVE",
+      "from": "Chicago, IL",
+      "to": "Indianapolis, IN",
+      "distanceMiles": 181,
+      "durationHours": 3.0
+    }
+  ]
+}
+```
+
+## What's next
+
+Now that your key works, explore the full capabilities:
+
+| Goal | Guide |
+|------|-------|
+| Understand how authentication works | [Authentication](/docs/getting-started/authentication) |
+| Plan a multi-stop route with HOS tracking | [Plan a Route](/docs/getting-started/plan-a-route) |
+| Create drivers, vehicles, and loads | [Manage Your Fleet](/docs/getting-started/manage-fleet) |
+| Receive real-time events via webhooks | [Webhooks](/docs/webhooks) |
+| Explore all endpoints interactively | [API Reference](/docs/api-playground) |

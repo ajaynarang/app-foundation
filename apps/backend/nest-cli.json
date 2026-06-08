@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "tsconfig": "tsconfig.build.json",
+    "webpack": false,
+    "assets": [
+      {
+        "include": "domains/ai/skills/**/*.md",
+        "watchAssets": false
+      }
+    ],
+    "watchAssets": false
+  }
+}

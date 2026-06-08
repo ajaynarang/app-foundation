@@ -1,0 +1,19 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow authenticated pages
+Disallow: /admin/
+Disallow: /dispatcher/
+Disallow: /driver/
+Disallow: /settings/
+Disallow: /onboarding/
+Disallow: /api/
+
+# Allow public pages
+Allow: /login
+Allow: /register
+Allow: /
+
+# Sitemap
+Sitemap: https://sally.com/sitemap.xml

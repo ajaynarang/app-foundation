@@ -1,0 +1,691 @@
+name: Deploy All
+
+# Triggered by workflow_dispatch only → manual deploy to staging or production
+#
+# Architecture: Terraform is the single source of truth for ECS task definitions.
+# CI builds the Docker image, pushes to ECR, then runs terraform apply with the
+# image tag — ensuring env vars, secrets, and image are always in sync.
+#
+# Required GitHub Secrets:
+#   AWS_REGION, AWS_ACCOUNT_ID, STAGING_OIDC_ROLE_ARN, PRODUCTION_OIDC_ROLE_ARN, DOMAIN
+#   DOPPLER_TOKEN_STG, DOPPLER_TOKEN_PRD
+#   VERCEL_WEB_DEPLOY_HOOK_STAGING, VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
+#   VERCEL_CONSOLE_DEPLOY_HOOK_STAGING, VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION
+#   VERCEL_TOKEN, VERCEL_TEAM_ID
+#
+# Required GitHub Environments: staging, production (with Required Reviewers)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+
+# Prevent concurrent deploys to the same ref — queue second deploy rather than cancel,
+# to ensure both deploys complete in order and ECS isn't left mid-transition.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: sally-ecr-backend
+  TF_VERSION: "1.14.5"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 0. Validate branch matches environment
+  # ─────────────────────────────────────────────────────────────
+  validate:
+    name: Validate branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce branch-environment mapping
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          BRANCH="${{ github.ref_name }}"
+          if [ "$ENV" = "staging" ] && [ "$BRANCH" != "develop" ]; then
+            echo "::error::Staging must be deployed from 'develop' branch. You selected '$BRANCH'."
+            exit 1
+          fi
+          if [ "$ENV" = "production" ] && [ "$BRANCH" != "main" ]; then
+            echo "::error::Production must be deployed from 'main' branch. You selected '$BRANCH'."
+            exit 1
+          fi
+          echo "✓ Deploying $ENV from $BRANCH"
+
+  # ─────────────────────────────────────────────────────────────
+  # 1. Build the Docker image, run tests, push to ECR
+  # ─────────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push to ECR
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Unit tests
+        run: pnpm --filter=backend test
+
+      - name: Configure AWS credentials (via OIDC — no long-lived keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_OIDC_ROLE_ARN || secrets.STAGING_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag (git SHA for traceability)
+        id: meta
+        run: echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker build \
+            -f apps/backend/Dockerfile \
+            --build-arg BUILD_SHA=$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # ─────────────────────────────────────────────────────────────
+  # 1.5. Run database migrations via SSM tunnel
+  #      - Runs prisma migrate deploy from CI runner
+  #      - Connects to private RDS via SSM port-forwarding through the
+  #        CURRENTLY-RUNNING ECS task (previous deploy's task).
+  #      - MUST run BEFORE deploy-staging so the new image finds the
+  #        schema it expects on boot. Running after caused health-check
+  #        failures when new Prisma client columns were missing.
+  # ─────────────────────────────────────────────────────────────
+  migrate-staging:
+    name: Run Migrations (Staging)
+    needs: [build-and-push]
+    if: github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.STAGING_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SSM plugin
+        run: |
+          curl -sL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o ssm-plugin.deb
+          sudo dpkg -i ssm-plugin.deb
+          session-manager-plugin --version
+
+      - name: Install Doppler CLI
+        run: |
+          curl -sLf --retry 3 --tlsv1.2 --proto "=https" "https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key" | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+          sudo apt-get update && sudo apt-get install -y doppler
+
+      - name: Get DATABASE_URL from Doppler
+        id: db-secret
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          DATABASE_URL=$(doppler secrets get DATABASE_URL --plain)
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is empty in Doppler (sally-backend/stg)"
+            exit 1
+          fi
+
+          echo "::add-mask::$DATABASE_URL"
+          echo "database_url=$DATABASE_URL" >> $GITHUB_OUTPUT
+
+          RDS_HOST=$(DB_URL_FOR_PARSE="$DATABASE_URL" python3 -c "
+          import os, sys
+          from urllib.parse import urlparse
+          url = urlparse(os.environ['DB_URL_FOR_PARSE'])
+          if not url.hostname:
+              print('::error::Could not parse hostname from DATABASE_URL', file=sys.stderr)
+              sys.exit(1)
+          print(url.hostname)
+          ")
+          if [ -z "$RDS_HOST" ]; then
+            echo "::error::RDS_HOST is empty — failed to parse hostname from DATABASE_URL"
+            exit 1
+          fi
+          echo "rds_host=$RDS_HOST" >> $GITHUB_OUTPUT
+
+      - name: Run prisma migrate deploy via SSM tunnel
+        env:
+          DATABASE_URL: ${{ steps.db-secret.outputs.database_url }}
+          RDS_HOST: ${{ steps.db-secret.outputs.rds_host }}
+        run: |
+          CLUSTER="sally-staging-ecs-cluster"
+          TUNNEL_PORT=5433
+
+          # Find a running ECS task to use as SSM jump host
+          TASK_ARNS=$(aws ecs list-tasks \
+            --cluster "$CLUSTER" \
+            --desired-status RUNNING \
+            --query 'taskArns[0]' \
+            --output text)
+
+          if [ -z "$TASK_ARNS" ] || [ "$TASK_ARNS" = "None" ]; then
+            echo "::error::No running tasks in cluster $CLUSTER"
+            exit 1
+          fi
+
+          # Get task ID and container runtime ID for SSM target
+          TASK_INFO=$(aws ecs describe-tasks \
+            --cluster "$CLUSTER" \
+            --tasks "$TASK_ARNS" \
+            --query 'tasks[0].{taskId:taskArn,containers:containers[*].{name:name,runtimeId:runtimeId}}' \
+            --output json)
+
+          TASK_ID=$(echo "$TASK_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['taskId'].split('/')[-1])")
+          RUNTIME_ID=$(echo "$TASK_INFO" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          for c in d['containers']:
+              if c['runtimeId']:
+                  print(c['runtimeId'])
+                  sys.exit(0)
+          ")
+
+          TARGET="ecs:${CLUSTER}_${TASK_ID}_${RUNTIME_ID}"
+          echo "SSM target: $TARGET"
+
+          # Start SSM port-forwarding tunnel to RDS
+          aws ssm start-session \
+            --target "$TARGET" \
+            --document-name AWS-StartPortForwardingSessionToRemoteHost \
+            --parameters "{\"host\":[\"$RDS_HOST\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"$TUNNEL_PORT\"]}" \
+            > /tmp/ssm.log 2>&1 &
+          TUNNEL_PID=$!
+
+          # Wait for tunnel to be ready
+          echo -n "Waiting for tunnel"
+          for i in $(seq 1 30); do
+            if nc -z 127.0.0.1 $TUNNEL_PORT 2>/dev/null; then
+              sleep 2
+              echo " ready!"
+              break
+            fi
+            if ! kill -0 $TUNNEL_PID 2>/dev/null; then
+              echo ""
+              echo "::error::SSM tunnel process died"
+              cat /tmp/ssm.log
+              exit 1
+            fi
+            echo -n "."
+            sleep 1
+          done
+
+          if ! nc -z 127.0.0.1 $TUNNEL_PORT 2>/dev/null; then
+            echo ""
+            echo "::error::Tunnel failed to start within 30s"
+            cat /tmp/ssm.log
+            kill $TUNNEL_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # Replace RDS host with localhost tunnel in DATABASE_URL
+          TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
+
+          # Resolve any previously failed migrations before deploying
+          cd apps/backend
+          FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
+          if [ -n "$FAILED_MIGRATIONS" ]; then
+            echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"
+            for m in $FAILED_MIGRATIONS; do
+              DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate resolve --rolled-back "$m" || true
+            done
+          fi
+
+          # Run Prisma migrations
+          echo "Running prisma migrate deploy..."
+          DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate deploy
+
+          echo "✓ Migrations applied successfully"
+
+          # Run base seeds (reference data, plans, flags, etc.)
+          echo "Running base seeds..."
+          DATABASE_URL="$TUNNEL_URL" pnpm exec ts-node prisma/seeds/index.ts
+
+          echo "✓ Seeds applied successfully"
+
+          # Cleanup tunnel
+          kill $TUNNEL_PID 2>/dev/null || true
+
+      - name: Seed Langfuse prompts
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          LANGFUSE_SECRET_KEY=$(doppler secrets get LANGFUSE_SECRET_KEY --plain)
+          LANGFUSE_PUBLIC_KEY=$(doppler secrets get LANGFUSE_PUBLIC_KEY --plain)
+          if [ -z "$LANGFUSE_SECRET_KEY" ] || [ -z "$LANGFUSE_PUBLIC_KEY" ]; then
+            echo "LANGFUSE keys not configured — skipping"
+            exit 0
+          fi
+          echo "Seeding Langfuse prompts..."
+          cd apps/backend
+          doppler run -- npx tsx scripts/seed-langfuse-prompts.ts
+          echo "Langfuse prompts seeded"
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Deploy to Staging via Terraform
+  #    Terraform owns the full ECS task definition (env vars + image).
+  #    terraform apply with image_tag creates a new task def revision
+  #    and updates the ECS service in one atomic operation.
+  # ─────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy Backend to Staging
+    needs: [build-and-push, migrate-staging]
+    if: github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (staging)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.STAGING_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init -backend-config="key=staging/terraform.tfstate"
+
+      - name: Terraform apply (deploy image + Doppler token)
+        working-directory: infra/terraform
+        run: |
+          terraform apply \
+            -var-file=environments/staging.tfvars \
+            -var="image_tag=${{ needs.build-and-push.outputs.image-tag }}" \
+            -var="doppler_token=${{ secrets.DOPPLER_TOKEN_STG }}" \
+            -auto-approve
+
+      - name: Wait for ECS service stability
+        run: |
+          echo "Waiting for API service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster sally-staging-ecs-cluster \
+            --services sally-staging-ecs-service-api
+          echo "✓ API service stable"
+
+      - name: Smoke test staging health endpoint (with retries)
+        run: |
+          URL="https://sally-api-staging.${{ secrets.DOMAIN }}/api/v1/health/ready"
+          for i in $(seq 1 10); do
+            if curl --fail --silent --show-error "$URL"; then
+              echo ""
+              echo "Staging smoke test passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Staging smoke test failed after 10 attempts"
+          exit 1
+
+  # ─────────────────────────────────────────────────────────────
+  # 2.5. Run database migrations (Production)
+  # ─────────────────────────────────────────────────────────────
+  migrate-production:
+    name: Run Migrations (Production)
+    needs: [build-and-push]
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PRODUCTION_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install SSM plugin
+        run: |
+          curl -sL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o ssm-plugin.deb
+          sudo dpkg -i ssm-plugin.deb
+          session-manager-plugin --version
+
+      - name: Install Doppler CLI
+        run: |
+          curl -sLf --retry 3 --tlsv1.2 --proto "=https" "https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key" | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+          sudo apt-get update && sudo apt-get install -y doppler
+
+      - name: Get DATABASE_URL from Doppler
+        id: db-secret
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          DATABASE_URL=$(doppler secrets get DATABASE_URL --plain)
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is empty in Doppler (sally-backend/prd)"
+            exit 1
+          fi
+
+          echo "::add-mask::$DATABASE_URL"
+          echo "database_url=$DATABASE_URL" >> $GITHUB_OUTPUT
+
+          RDS_HOST=$(DB_URL_FOR_PARSE="$DATABASE_URL" python3 -c "
+          import os, sys
+          from urllib.parse import urlparse
+          url = urlparse(os.environ['DB_URL_FOR_PARSE'])
+          if not url.hostname:
+              print('::error::Could not parse hostname from DATABASE_URL', file=sys.stderr)
+              sys.exit(1)
+          print(url.hostname)
+          ")
+          if [ -z "$RDS_HOST" ]; then
+            echo "::error::RDS_HOST is empty — failed to parse hostname from DATABASE_URL"
+            exit 1
+          fi
+          echo "rds_host=$RDS_HOST" >> $GITHUB_OUTPUT
+
+      - name: Run prisma migrate deploy via SSM tunnel
+        env:
+          DATABASE_URL: ${{ steps.db-secret.outputs.database_url }}
+          RDS_HOST: ${{ steps.db-secret.outputs.rds_host }}
+        run: |
+          CLUSTER="sally-prod-ecs-cluster"
+          TUNNEL_PORT=5433
+
+          TASK_ARNS=$(aws ecs list-tasks \
+            --cluster "$CLUSTER" \
+            --desired-status RUNNING \
+            --query 'taskArns[0]' \
+            --output text)
+
+          if [ -z "$TASK_ARNS" ] || [ "$TASK_ARNS" = "None" ]; then
+            echo "::error::No running tasks in cluster $CLUSTER"
+            exit 1
+          fi
+
+          TASK_INFO=$(aws ecs describe-tasks \
+            --cluster "$CLUSTER" \
+            --tasks "$TASK_ARNS" \
+            --query 'tasks[0].{taskId:taskArn,containers:containers[*].{name:name,runtimeId:runtimeId}}' \
+            --output json)
+
+          TASK_ID=$(echo "$TASK_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['taskId'].split('/')[-1])")
+          RUNTIME_ID=$(echo "$TASK_INFO" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          for c in d['containers']:
+              if c['runtimeId']:
+                  print(c['runtimeId'])
+                  sys.exit(0)
+          ")
+
+          TARGET="ecs:${CLUSTER}_${TASK_ID}_${RUNTIME_ID}"
+          echo "SSM target: $TARGET"
+
+          aws ssm start-session \
+            --target "$TARGET" \
+            --document-name AWS-StartPortForwardingSessionToRemoteHost \
+            --parameters "{\"host\":[\"$RDS_HOST\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"$TUNNEL_PORT\"]}" \
+            > /tmp/ssm.log 2>&1 &
+          TUNNEL_PID=$!
+
+          echo -n "Waiting for tunnel"
+          for i in $(seq 1 30); do
+            if nc -z 127.0.0.1 $TUNNEL_PORT 2>/dev/null; then
+              sleep 2
+              echo " ready!"
+              break
+            fi
+            if ! kill -0 $TUNNEL_PID 2>/dev/null; then
+              echo ""
+              echo "::error::SSM tunnel process died"
+              cat /tmp/ssm.log
+              exit 1
+            fi
+            echo -n "."
+            sleep 1
+          done
+
+          if ! nc -z 127.0.0.1 $TUNNEL_PORT 2>/dev/null; then
+            echo ""
+            echo "::error::Tunnel failed to start within 30s"
+            cat /tmp/ssm.log
+            kill $TUNNEL_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
+
+          # Resolve any previously failed migrations before deploying
+          cd apps/backend
+          FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
+          if [ -n "$FAILED_MIGRATIONS" ]; then
+            echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"
+            for m in $FAILED_MIGRATIONS; do
+              DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate resolve --rolled-back "$m" || true
+            done
+          fi
+
+          echo "Running prisma migrate deploy..."
+          DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate deploy
+
+          echo "✓ Migrations applied successfully"
+
+          # Run base seeds (reference data, plans, flags, etc.)
+          echo "Running base seeds..."
+          DATABASE_URL="$TUNNEL_URL" pnpm exec ts-node prisma/seeds/index.ts
+
+          echo "✓ Seeds applied successfully"
+
+          kill $TUNNEL_PID 2>/dev/null || true
+
+      - name: Seed Langfuse prompts
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          LANGFUSE_SECRET_KEY=$(doppler secrets get LANGFUSE_SECRET_KEY --plain)
+          LANGFUSE_PUBLIC_KEY=$(doppler secrets get LANGFUSE_PUBLIC_KEY --plain)
+          if [ -z "$LANGFUSE_SECRET_KEY" ] || [ -z "$LANGFUSE_PUBLIC_KEY" ]; then
+            echo "LANGFUSE keys not configured — skipping"
+            exit 0
+          fi
+          echo "Seeding Langfuse prompts..."
+          cd apps/backend
+          doppler run -- npx tsx scripts/seed-langfuse-prompts.ts
+          echo "Langfuse prompts seeded"
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Deploy to Production via Terraform
+  # ─────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy Backend to Production
+    needs: [build-and-push, migrate-production]
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production # ← GitHub pauses here for required reviewer approval
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (production)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PRODUCTION_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init -backend-config="key=production/terraform.tfstate"
+
+      - name: Terraform apply (deploy image + Doppler token)
+        working-directory: infra/terraform
+        run: |
+          terraform apply \
+            -var-file=environments/production.tfvars \
+            -var="image_tag=${{ needs.build-and-push.outputs.image-tag }}" \
+            -var="doppler_token=${{ secrets.DOPPLER_TOKEN_PRD }}" \
+            -auto-approve
+
+      - name: Wait for ECS service stability
+        run: |
+          echo "Waiting for API service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster sally-prod-ecs-cluster \
+            --services sally-prod-ecs-service-api
+          echo "✓ API service stable"
+
+      - name: Smoke test production health endpoint (with retries)
+        run: |
+          URL="https://sally-api.${{ secrets.DOMAIN }}/api/v1/health/ready"
+          for i in $(seq 1 10); do
+            if curl --fail --silent --show-error "$URL"; then
+              echo ""
+              echo "Production smoke test passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Production smoke test failed after 10 attempts"
+          exit 1
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Deploy Frontends to Vercel (after backend succeeds)
+  #    Triggers both web and console, then polls until builds complete.
+  #    Requires: VERCEL_TOKEN, VERCEL_TEAM_ID
+  # ─────────────────────────────────────────────────────────────
+  deploy-frontend-staging:
+    name: Deploy Web + Console to Staging (Vercel)
+    needs: migrate-staging
+    if: github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Vercel staging deployments
+        run: |
+          echo "Triggering web deployment..."
+          curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_STAGING }}" > /dev/null
+          echo "Triggering console deployment..."
+          curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_STAGING }}" > /dev/null
+          echo "✓ Vercel staging deployments triggered"
+
+  deploy-frontend-production:
+    name: Deploy Web + Console to Production (Vercel)
+    needs: migrate-production
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Vercel production deployments
+        run: |
+          echo "Triggering web deployment..."
+          curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
+          echo "Triggering console deployment..."
+          curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
+          echo "✓ Vercel production deployments triggered"

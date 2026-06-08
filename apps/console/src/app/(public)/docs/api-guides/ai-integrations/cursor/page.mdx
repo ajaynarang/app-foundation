@@ -1,0 +1,97 @@
+import { Callout } from "@/components/docs/callout"
+
+# Cursor / Windsurf
+
+Connect SALLY to your IDE's AI assistant using MCP support in [Cursor](https://cursor.sh) or [Windsurf](https://codeium.com/windsurf). This is useful for developers working on SALLY integrations who want to query fleet data without leaving their editor.
+
+## Cursor Setup
+
+### Step 1: Open MCP Settings
+
+1. Open Cursor
+2. Go to **Settings** (Cmd+, / Ctrl+,)
+3. Navigate to **Features** > **MCP Servers**
+4. Click **Add new MCP server**
+
+### Step 2: Add SALLY Server
+
+Add the following configuration:
+
+**Name:** `sally`
+
+**Type:** `sse` (or `streamable-http` if available)
+
+**URL:**
+
+| Environment | URL |
+|-------------|-----|
+| **Production** | `https://api.trysally.com` |
+| **Staging** | `https://sally-api.apps.appshore.in` |
+| **Local** | `http://localhost:8000` |
+
+Alternatively, create a `.cursor/mcp.json` file in your project root:
+
+```json
+{
+  "mcpServers": {
+    "sally": {
+      "url": "https://api.trysally.com"
+    },
+    "sally-staging": {
+      "url": "https://sally-api.apps.appshore.in"
+    }
+  }
+}
+```
+
+### Step 3: Authenticate
+
+When you first use a SALLY tool, Cursor will open a browser window for OAuth authorization. Sign in with your SALLY credentials and approve access.
+
+## Windsurf Setup
+
+### Step 1: Open MCP Configuration
+
+1. Open Windsurf
+2. Open the command palette (Cmd+Shift+P / Ctrl+Shift+P)
+3. Search for **"MCP: Configure Servers"**
+
+### Step 2: Add SALLY Server
+
+Add to the MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "sally": {
+      "serverUrl": "https://api.trysally.com"
+    }
+  }
+}
+```
+
+## Example Usage in IDE
+
+In the AI chat panel, try:
+
+```
+@sally What loads are currently active?
+
+@sally Show me the fleet compliance score
+
+@sally What invoices are pending for customer ABC Logistics?
+```
+
+## Troubleshooting
+
+### Tools not showing up
+
+- Restart the IDE after adding the MCP configuration
+- Check the MCP server status in settings -- it should show as "Connected"
+- Verify the URL is accessible from your network
+
+### Authentication errors
+
+- Clear stored OAuth tokens in your IDE's MCP settings
+- Re-authenticate by triggering a tool call
+- Ensure the SALLY backend has CORS configured for your IDE's origin

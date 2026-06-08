@@ -1,0 +1,1011 @@
+# Understanding HOS Compliance
+
+Hours of Service (HOS) regulations are the foundation of safe and legal trucking operations. Understanding how SALLY validates compliance is essential for building reliable fleet management integrations.
+
+This guide explains the federal HOS rules, how SALLY tracks driver state, and how the platform ensures every route is compliant before a driver starts.
+
+## What You'll Learn
+
+- Federal HOS regulations (11h drive, 14h duty, 30min break, 10h rest)
+- How SALLY validates compliance segment-by-segment
+- Driver state tracking and HOS consumption
+- Understanding compliance reports
+- Common HOS scenarios and how SALLY handles them
+- Best practices for HOS-compliant route planning
+
+---
+
+## What is HOS and Why It Matters
+
+Hours of Service regulations are federal rules that limit how long commercial truck drivers can work before they must rest. These rules exist to:
+
+- **Prevent driver fatigue** - The leading cause of commercial vehicle accidents
+- **Ensure public safety** - Tired drivers endanger everyone on the road
+- **Protect drivers** - Forced rest periods prevent overwork and exploitation
+- **Maintain compliance** - Violations result in fines up to $16,000 and CSA points
+
+For fleet managers, HOS compliance means:
+- **No violations** - Every route must respect driver hours
+- **Accurate planning** - Routes that ignore HOS fail in the real world
+- **Better utilization** - Optimize rest timing to maximize productive hours
+- **Audit trail** - Prove compliance with clear reasoning
+
+**SALLY's mission: Plan routes that are compliant by design, not by luck.**
+
+---
+
+## Federal HOS Rules
+
+The Federal Motor Carrier Safety Administration (FMCSA) enforces four critical HOS limits:
+
+### 1. 11-Hour Driving Limit
+
+**Rule:** A driver may drive a maximum of **11 hours** after 10 consecutive hours off duty.
+
+**What it means:**
+- Once a driver reaches 11 hours of driving time, they **must stop driving**
+- Driving time includes all time behind the wheel (including traffic delays)
+- Does **not** include loading/unloading, inspections, or breaks
+
+**SALLY validation:**
+```typescript
+// After each drive segment, SALLY checks:
+if (hours_driven + segment_drive_time > 11) {
+  // Insert rest stop before this segment
+  insertRestStop(location, "HOS 11h drive limit reached");
+}
+```
+
+**Example:**
+```
+Driver starts with 5h already driven today
+Route requires 8h of drive time
+Total: 5h + 8h = 13h (EXCEEDS 11h limit)
+Action: SALLY inserts 10h rest stop to reset hours
+```
+
+---
+
+### 2. 14-Hour On-Duty Window
+
+**Rule:** A driver may not drive beyond the **14th consecutive hour** after coming on duty, following 10 consecutive hours off duty.
+
+**What it means:**
+- The 14-hour clock starts when the driver begins any work
+- Includes **all** on-duty time: driving, loading, unloading, inspections, fueling
+- Does **not** include off-duty time or sleeper berth
+- **Cannot be paused** - Once you start, the clock runs for 14 hours straight
+
+**Critical insight:** Even if a driver has 6 hours of drive time remaining, if they're at hour 13 of their duty window, they only have 1 hour left to drive.
+
+**SALLY validation:**
+```typescript
+// SALLY tracks both drive time AND duty time
+if (on_duty_time + segment_time > 14) {
+  // Duty window exceeded, must rest
+  insertRestStop(location, "HOS 14h duty window exceeded");
+}
+```
+
+**Example:**
+```
+Driver timeline:
+- Hour 0: Start shift
+- Hour 1-3: Drive to customer (3h) - ON DUTY
+- Hour 3-6: Dock at customer (3h) - ON DUTY (not driving)
+- Hour 6-10: Drive to next stop (4h) - ON DUTY
+- Hour 10: Now at 10h on-duty, 7h driven
+- Remaining window: 4h on-duty, but still have 4h drive time left
+
+If next segment is 5h drive time:
+- Would exceed 14h duty window (10h + 5h = 15h)
+- SALLY inserts rest stop before this segment
+```
+
+---
+
+### 3. 30-Minute Break Requirement
+
+**Rule:** A driver may not drive if **8 hours have passed since the end of the last off-duty or sleeper berth period of at least 30 minutes**.
+
+**What it means:**
+- After 8 hours of driving, driver must take a 30-minute break
+- Break can be taken anytime within the 8-hour window (doesn't have to be at hour 8)
+- Break counts as **on-duty time** (does not stop the 14-hour clock)
+- Break resets the 8-hour driving window
+
+**SALLY validation:**
+```typescript
+// SALLY tracks hours since last break
+if (hours_since_break + segment_drive_time >= 8) {
+  // Insert 30-minute break segment
+  insertBreak(location, "30-minute break required after 8h driving");
+}
+```
+
+**Example:**
+```
+Driver has driven 7h without a break
+Next segment is 2h drive time
+Total: 7h + 2h = 9h (EXCEEDS 8h before break)
+Action: SALLY inserts 30-min break before the segment
+```
+
+---
+
+### 4. 10-Hour Rest Requirement
+
+**Rule:** A driver must take **10 consecutive hours off duty** before starting a new 11/14 hour workday.
+
+**What it means:**
+- 10 hours of rest resets **all** HOS hours:
+  - Drive time: 0 hours → 11 hours available
+  - Duty time: 0 hours → 14 hours available
+  - Hours since break: 0 hours → 8 hours until break needed
+- Rest must be **consecutive** (no interruptions)
+- Rest can be off-duty or sleeper berth time
+
+**Advanced: Sleeper Berth Split Provision**
+
+Drivers can split the 10-hour rest period into:
+- **7/3 split:** 7 hours in sleeper berth + 3 hours off duty (separate periods)
+- **8/2 split:** 8 hours in sleeper berth + 2 hours off duty (separate periods)
+
+SALLY supports sleeper berth splits in advanced scenarios (Phase 2).
+
+**SALLY validation:**
+```typescript
+// When SALLY inserts a rest stop:
+function insertRestStop(location, reason) {
+  segment = {
+    type: "rest",
+    location: location,
+    rest_type: "full_rest",
+    duration_hours: 10.0,
+    reason: reason,
+    hos_state_after: {
+      hours_driven: 0.0,      // Reset
+      on_duty_time: 0.0,      // Reset
+      hours_since_break: 0.0  // Reset
+    }
+  };
+}
+```
+
+---
+
+## How SALLY Validates HOS
+
+SALLY validates HOS compliance using a **segment-by-segment simulation approach**. Here's how it works:
+
+### Step 1: Initialize Driver State
+
+When you request a route plan, SALLY starts with the driver's current HOS state:
+
+```json
+{
+  "driver_state": {
+    "hours_driven": 5.0,        // Already driven 5h today
+    "on_duty_time": 8.0,        // Been on duty 8h total
+    "hours_since_break": 4.5    // Last break was 4.5h ago
+  }
+}
+```
+
+**SALLY calculates remaining hours:**
+```
+Drive hours remaining:  11h - 5h   = 6h
+Duty hours remaining:   14h - 8h   = 6h
+Hours until break:      8h - 4.5h  = 3.5h
+```
+
+---
+
+### Step 2: Simulate Route Segment-by-Segment
+
+SALLY walks through each segment of the route and tracks HOS consumption:
+
+```typescript
+// Pseudocode: SALLY's HOS simulation loop
+let currentHos = {
+  hours_driven: 5.0,
+  on_duty_time: 8.0,
+  hours_since_break: 4.5
+};
+
+for (segment of route_segments) {
+  // Check 1: Can driver complete this segment?
+  if (currentHos.hours_driven + segment.drive_time > 11) {
+    // NO - Insert rest stop before this segment
+    insertRestStop("HOS 11h drive limit reached");
+    currentHos = resetHOS();  // Reset all hours after rest
+  }
+
+  // Check 2: Will driver exceed duty window?
+  if (currentHos.on_duty_time + segment.duration > 14) {
+    // NO - Insert rest stop
+    insertRestStop("HOS 14h duty window exceeded");
+    currentHos = resetHOS();
+  }
+
+  // Check 3: Break needed?
+  if (currentHos.hours_since_break + segment.drive_time >= 8) {
+    // YES - Insert 30-min break
+    insertBreak("30-minute break required");
+    currentHos.hours_since_break = 0;  // Reset break timer
+    currentHos.on_duty_time += 0.5;    // Break counts as on-duty
+  }
+
+  // Execute segment and update HOS
+  if (segment.type === "drive") {
+    currentHos.hours_driven += segment.drive_time;
+    currentHos.on_duty_time += segment.drive_time;
+    currentHos.hours_since_break += segment.drive_time;
+  } else if (segment.type === "dock") {
+    // Dock time counts as on-duty, not driving
+    currentHos.on_duty_time += segment.dock_time;
+  }
+}
+```
+
+**Key insight:** SALLY simulates the **entire route** before the driver starts. If any segment would violate HOS, SALLY inserts rest stops proactively.
+
+---
+
+### Step 3: Generate Compliance Report
+
+After simulating the route, SALLY generates a compliance report:
+
+```json
+{
+  "compliance_report": {
+    "is_feasible": true,
+    "max_drive_hours_used": 10.5,
+    "max_duty_hours_used": 13.2,
+    "breaks_required": 0,
+    "breaks_planned": 0,
+    "violations": []
+  }
+}
+```
+
+**What each field means:**
+
+- `is_feasible`: Can the driver complete this route without violations?
+- `max_drive_hours_used`: Peak drive time reached during route (must be ≤ 11h)
+- `max_duty_hours_used`: Peak duty time reached during route (must be ≤ 14h)
+- `breaks_required`: Number of 30-min breaks needed
+- `breaks_planned`: Number of breaks SALLY inserted
+- `violations`: Array of HOS violations (should always be empty)
+
+**If violations are detected:**
+```json
+{
+  "compliance_report": {
+    "is_feasible": false,
+    "violations": [
+      "Driver would exceed 11h drive limit at segment 5",
+      "Driver would exceed 14h duty window at segment 8"
+    ]
+  },
+  "feasibility_issues": [
+    "Route requires 12h drive time, but driver only has 6h available",
+    "Suggest inserting rest stop after segment 3"
+  ]
+}
+```
+
+---
+
+## Driver State Tracking
+
+SALLY tracks three HOS state variables throughout the route:
+
+### 1. hours_driven
+
+**What it tracks:** Total time spent driving (behind the wheel)
+
+**Federal limit:** 11 hours
+
+**Consumed by:**
+- Drive segments (e.g., driving from Stop A to Stop B)
+
+**NOT consumed by:**
+- Dock segments (loading/unloading)
+- Rest segments (off-duty)
+- Break segments (on-duty, not driving)
+- Fuel stops (on-duty, not driving)
+
+**Reset by:**
+- 10-hour rest period
+
+**Example progression:**
+```json
+// Start of day
+{ "hours_driven": 0.0 }
+
+// After 2h drive
+{ "hours_driven": 2.0 }
+
+// After 1h dock (loading)
+{ "hours_driven": 2.0 }  // Unchanged
+
+// After 3h drive
+{ "hours_driven": 5.0 }
+
+// After 10h rest
+{ "hours_driven": 0.0 }  // Reset
+```
+
+---
+
+### 2. on_duty_time
+
+**What it tracks:** Total time spent on duty (working, not resting)
+
+**Federal limit:** 14 hours (duty window)
+
+**Consumed by:**
+- Drive segments (driving)
+- Dock segments (loading/unloading)
+- Break segments (30-min break counts as on-duty)
+- Fuel stops (on-duty, not driving)
+- Pre-trip inspections
+- Paperwork
+
+**NOT consumed by:**
+- Rest segments (off-duty or sleeper berth)
+
+**Reset by:**
+- 10-hour rest period
+
+**Critical:** The 14-hour duty window **cannot be paused**. Once you start working, the clock runs continuously until you take a 10-hour rest.
+
+**Example progression:**
+```json
+// Start of day
+{ "on_duty_time": 0.0 }
+
+// After 2h drive
+{ "on_duty_time": 2.0 }
+
+// After 1h dock (loading)
+{ "on_duty_time": 3.0 }  // Dock time counts!
+
+// After 3h drive
+{ "on_duty_time": 6.0 }
+
+// After 30-min break
+{ "on_duty_time": 6.5 }  // Break counts as on-duty!
+
+// After 4h drive
+{ "on_duty_time": 10.5 }
+
+// After 10h rest
+{ "on_duty_time": 0.0 }  // Reset
+```
+
+---
+
+### 3. hours_since_break
+
+**What it tracks:** Hours driven since last 30-minute break
+
+**Federal limit:** 8 hours (break required after 8h of driving)
+
+**Consumed by:**
+- Drive segments only
+
+**NOT consumed by:**
+- Dock segments (not driving)
+- Fuel stops (not driving)
+
+**Reset by:**
+- 30-minute break (on-duty, not driving)
+- 10-hour rest period
+
+**Example progression:**
+```json
+// Start of day
+{ "hours_since_break": 0.0 }
+
+// After 3h drive
+{ "hours_since_break": 3.0 }
+
+// After 1h dock
+{ "hours_since_break": 3.0 }  // Unchanged (not driving)
+
+// After 4h drive
+{ "hours_since_break": 7.0 }
+
+// After 30-min break
+{ "hours_since_break": 0.0 }  // Reset
+
+// After 2h drive
+{ "hours_since_break": 2.0 }
+```
+
+---
+
+## Code Examples: HOS Validation API
+
+### Request: Plan Route with HOS Validation
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "driver_id": "DRV-001",
+    "vehicle_id": "TRUCK-123",
+    "driver_state": {
+      "hours_driven": 6.0,
+      "on_duty_time": 8.0,
+      "hours_since_break": 5.5
+    },
+    "stops": [
+      {
+        "stop_id": "STOP-001",
+        "name": "Origin Warehouse",
+        "lat": 34.0522,
+        "lon": -118.2437,
+        "is_origin": true,
+        "estimated_dock_hours": 1.0
+      },
+      {
+        "stop_id": "STOP-002",
+        "name": "Customer A",
+        "lat": 33.4484,
+        "lon": -112.0740,
+        "is_destination": true,
+        "estimated_dock_hours": 2.0
+      }
+    ]
+  }'
+```
+
+### Response: Route with HOS State After Each Segment
+
+```json
+{
+  "plan_id": "plan_a1b2c3d4e5f6",
+  "segments": [
+    {
+      "sequence_order": 1,
+      "segment_type": "dock",
+      "from_location": "Origin Warehouse",
+      "to_location": "Origin Warehouse",
+      "dock_duration_hours": 1.0,
+      "hos_state_after": {
+        "hours_driven": 6.0,
+        "on_duty_time": 9.0,
+        "hours_since_break": 5.5
+      }
+    },
+    {
+      "sequence_order": 2,
+      "segment_type": "drive",
+      "from_location": "Origin Warehouse",
+      "to_location": "Rest Area - Exit 45",
+      "distance_miles": 120.0,
+      "drive_time_hours": 2.0,
+      "hos_state_after": {
+        "hours_driven": 8.0,
+        "on_duty_time": 11.0,
+        "hours_since_break": 7.5
+      }
+    },
+    {
+      "sequence_order": 3,
+      "segment_type": "rest",
+      "from_location": "Rest Area - Exit 45",
+      "to_location": "Rest Area - Exit 45",
+      "rest_type": "full_rest",
+      "rest_duration_hours": 10.0,
+      "rest_reason": "Driver approaching 11h drive limit and 14h duty window. Full rest required.",
+      "hos_state_after": {
+        "hours_driven": 0.0,
+        "on_duty_time": 0.0,
+        "hours_since_break": 0.0
+      }
+    },
+    {
+      "sequence_order": 4,
+      "segment_type": "drive",
+      "from_location": "Rest Area - Exit 45",
+      "to_location": "Customer A",
+      "distance_miles": 180.0,
+      "drive_time_hours": 3.0,
+      "hos_state_after": {
+        "hours_driven": 3.0,
+        "on_duty_time": 3.0,
+        "hours_since_break": 3.0
+      }
+    }
+  ],
+  "compliance_report": {
+    "is_feasible": true,
+    "max_drive_hours_used": 8.0,
+    "max_duty_hours_used": 11.0,
+    "breaks_required": 0,
+    "breaks_planned": 0,
+    "violations": []
+  }
+}
+```
+
+**Key observations:**
+
+1. **Sequence 1 (Dock):** On-duty time increased by 1h (6.0 → 9.0), but drive time unchanged
+2. **Sequence 2 (Drive):** Both drive time and on-duty time increased by 2h
+3. **Sequence 3 (Rest):** SALLY inserted a 10h rest stop because driver was approaching both 11h drive limit (8h/11h) and 14h duty window (11h/14h)
+4. **Sequence 4 (Drive):** After rest, all HOS hours reset to 0.0, allowing driver to continue
+
+---
+
+## Common HOS Scenarios
+
+### Scenario 1: Rest Stop Needed
+
+**Situation:** Driver has limited hours remaining, route requires more than available.
+
+**Input:**
+```json
+{
+  "driver_state": {
+    "hours_driven": 9.0,
+    "on_duty_time": 11.0,
+    "hours_since_break": 7.0
+  }
+}
+```
+
+**Available hours:**
+- Drive: 11h - 9h = 2h remaining
+- Duty: 14h - 11h = 3h remaining
+- Break needed in: 8h - 7h = 1h
+
+**Route requirement:** 5h drive time
+
+**SALLY's decision:**
+```
+Driver needs 5h drive time, but only has 2h available.
+Shortfall: 3h
+Action: Insert rest stop after 2h of driving
+Result: Driver takes 10h rest, resets to 0h, continues with fresh 11h
+```
+
+**Output:**
+```json
+{
+  "segments": [
+    { "segment_type": "drive", "drive_time_hours": 2.0 },
+    {
+      "segment_type": "rest",
+      "rest_type": "full_rest",
+      "rest_duration_hours": 10.0,
+      "rest_reason": "Driver has 2h drive time remaining but route requires 5h. Full rest required."
+    },
+    { "segment_type": "drive", "drive_time_hours": 3.0 }
+  ]
+}
+```
+
+---
+
+### Scenario 2: No Rest Needed
+
+**Situation:** Driver has sufficient hours to complete route without rest.
+
+**Input:**
+```json
+{
+  "driver_state": {
+    "hours_driven": 2.0,
+    "on_duty_time": 3.0,
+    "hours_since_break": 2.0
+  }
+}
+```
+
+**Available hours:**
+- Drive: 11h - 2h = 9h remaining
+- Duty: 14h - 3h = 11h remaining
+- Break needed in: 8h - 2h = 6h
+
+**Route requirement:** 4h drive time + 2h dock time = 6h total on-duty time
+
+**SALLY's decision:**
+```
+Driver has 9h drive time and 11h duty time remaining.
+Route needs 4h drive and 6h total on-duty time.
+No rest stop needed.
+```
+
+**Output:**
+```json
+{
+  "segments": [
+    { "segment_type": "drive", "drive_time_hours": 4.0 },
+    { "segment_type": "dock", "dock_duration_hours": 2.0 }
+  ],
+  "rest_stops": [],
+  "compliance_report": {
+    "is_feasible": true,
+    "violations": []
+  }
+}
+```
+
+---
+
+### Scenario 3: Break Required
+
+**Situation:** Driver needs 30-minute break before continuing.
+
+**Input:**
+```json
+{
+  "driver_state": {
+    "hours_driven": 7.5,
+    "on_duty_time": 9.0,
+    "hours_since_break": 7.5
+  }
+}
+```
+
+**Available hours:**
+- Drive: 11h - 7.5h = 3.5h remaining
+- Duty: 14h - 9h = 5h remaining
+- Break needed in: 8h - 7.5h = 0.5h (IMMINENT)
+
+**Route requirement:** 2h drive time
+
+**SALLY's decision:**
+```
+Driver has driven 7.5h since last break.
+Next segment is 2h drive (would total 9.5h without break).
+30-minute break required after 8h.
+Action: Insert break before continuing.
+```
+
+**Output:**
+```json
+{
+  "segments": [
+    {
+      "segment_type": "break",
+      "duration_hours": 0.5,
+      "reason": "30-minute break required after 8h driving"
+    },
+    { "segment_type": "drive", "drive_time_hours": 2.0 }
+  ]
+}
+```
+
+---
+
+### Scenario 4: Duty Window Constraint
+
+**Situation:** Driver has drive hours available but duty window is limiting factor.
+
+**Input:**
+```json
+{
+  "driver_state": {
+    "hours_driven": 5.0,
+    "on_duty_time": 12.0,
+    "hours_since_break": 4.0
+  }
+}
+```
+
+**Available hours:**
+- Drive: 11h - 5h = 6h remaining
+- Duty: 14h - 12h = 2h remaining (LIMITING FACTOR)
+- Break needed in: 8h - 4h = 4h
+
+**Route requirement:** 3h drive time + 1h dock time = 4h total on-duty
+
+**SALLY's decision:**
+```
+Driver has 6h drive time remaining (plenty).
+But only 2h duty time remaining.
+Route needs 4h on-duty time total.
+Duty window is the constraint.
+Action: Insert rest stop to reset duty window.
+```
+
+**Output:**
+```json
+{
+  "segments": [
+    {
+      "segment_type": "rest",
+      "rest_type": "full_rest",
+      "rest_duration_hours": 10.0,
+      "rest_reason": "Driver would exceed 14h duty window. Only 2h duty time remaining but route requires 4h total."
+    },
+    { "segment_type": "drive", "drive_time_hours": 3.0 },
+    { "segment_type": "dock", "dock_duration_hours": 1.0 }
+  ]
+}
+```
+
+**Key lesson:** Always check BOTH drive limit AND duty window. The 14-hour duty window (which includes dock time, breaks, and driving) is often the limiting factor for routes with multiple customer stops.
+
+---
+
+## Understanding the Compliance Report
+
+The `compliance_report` object provides a complete HOS validation summary:
+
+```json
+{
+  "compliance_report": {
+    "is_feasible": true,
+    "max_drive_hours_used": 10.5,
+    "max_duty_hours_used": 13.2,
+    "breaks_required": 1,
+    "breaks_planned": 1,
+    "violations": []
+  }
+}
+```
+
+### Field Explanations
+
+**is_feasible**
+- `true`: Driver can complete route without HOS violations
+- `false`: Route is not feasible with current driver hours (see `violations` and `feasibility_issues`)
+
+**max_drive_hours_used**
+- Peak drive time reached during any point in the route
+- Must be ≤ 11.0 for compliance
+- Example: 10.5 means driver will have 0.5h drive time remaining at peak usage
+
+**max_duty_hours_used**
+- Peak on-duty time reached during any point in the route
+- Must be ≤ 14.0 for compliance
+- Example: 13.2 means driver will have 0.8h duty time remaining at peak usage
+
+**breaks_required**
+- Number of 30-minute breaks needed based on route simulation
+- Calculated by checking when `hours_since_break >= 8`
+
+**breaks_planned**
+- Number of break segments SALLY inserted into the route
+- Should equal `breaks_required` for compliant routes
+
+**violations**
+- Array of HOS violations detected during simulation
+- Should always be empty (`[]`) for routes returned by SALLY
+- If non-empty, route is infeasible
+
+---
+
+## Best Practices for HOS-Compliant Route Planning
+
+### 1. Always Provide Accurate Driver State
+
+❌ **Wrong:** Guessing driver hours
+```json
+{
+  "driver_state": {
+    "hours_driven": 0.0,
+    "on_duty_time": 0.0,
+    "hours_since_break": 0.0
+  }
+}
+```
+
+✅ **Right:** Get real-time HOS from ELD
+```json
+{
+  "driver_state": {
+    "hours_driven": 5.5,
+    "on_duty_time": 7.2,
+    "hours_since_break": 4.8
+  }
+}
+```
+
+**Why it matters:** Inaccurate driver state leads to unrealistic routes. If SALLY thinks the driver has 11h available but they actually have 5h, the route will fail in the real world.
+
+**Best practice:** Integrate with your ELD (Samsara, KeepTruckin) to pull real-time HOS data before planning routes.
+
+---
+
+### 2. Account for Dock Time in Duty Window
+
+❌ **Wrong:** Only tracking drive time
+```json
+{
+  "estimated_dock_hours": 0.0
+}
+```
+
+✅ **Right:** Include realistic dock time estimates
+```json
+{
+  "estimated_dock_hours": 2.5
+}
+```
+
+**Why it matters:** Dock time counts toward the 14-hour duty window. A driver might have plenty of drive hours left, but if they've been on duty for 12 hours (including dock time), they only have 2 hours left before they must rest.
+
+**Best practice:** Use historical average dock times for each customer. Track actual vs. estimated dock time to improve future estimates.
+
+---
+
+### 3. Plan Routes Well Before Departure
+
+❌ **Wrong:** Planning routes 30 minutes before driver leaves
+```
+8:00 AM: Driver starts shift
+8:25 AM: Dispatcher plans route (5h drive time)
+8:30 AM: Driver leaves
+1:30 PM: Driver runs out of hours (already drove 5h earlier in the week)
+Result: Stranded driver, missed delivery
+```
+
+✅ **Right:** Plan routes at start of shift with current HOS
+```
+8:00 AM: Driver clocks in
+8:05 AM: Pull real-time HOS from ELD
+8:10 AM: Plan route with SALLY (detects limited hours)
+8:15 AM: SALLY inserts rest stop proactively
+8:30 AM: Driver leaves with compliant plan
+```
+
+**Best practice:** Plan routes at the beginning of the driver's shift, after pulling fresh HOS data.
+
+---
+
+### 4. Monitor Routes During Execution
+
+HOS compliance doesn't end after planning. Conditions change during execution:
+
+**Dynamic events that affect HOS:**
+- Dock time exceeds estimate (consumes extra duty hours)
+- Traffic delays (consumes extra drive and duty hours)
+- Driver takes longer break than planned
+- Load added mid-route (requires more hours)
+
+**Best practice:** Use SALLY's monitoring API to track routes in real-time. If HOS approaches limits, SALLY will recommend re-planning or inserting rest stops dynamically.
+
+---
+
+### 5. Trust SALLY's Rest Recommendations
+
+SALLY inserts rest stops for a reason. Don't remove them.
+
+❌ **Wrong:** "This rest stop looks inconvenient, I'll remove it"
+```json
+// Route returned by SALLY with rest stop
+{
+  "segments": [
+    { "segment_type": "drive", "drive_time_hours": 8.0 },
+    { "segment_type": "rest", "rest_duration_hours": 10.0 },  // DON'T REMOVE
+    { "segment_type": "drive", "drive_time_hours": 3.0 }
+  ]
+}
+```
+
+✅ **Right:** Follow SALLY's plan or adjust driver state
+```
+If rest stop seems wrong:
+1. Check driver_state input (is it accurate?)
+2. Check estimated_dock_hours (is dock time realistic?)
+3. If inputs are correct, trust SALLY's recommendation
+```
+
+**Why it matters:** SALLY inserts rest stops because the route is **not feasible** without them. Removing rest stops creates an illegal route that will fail during execution.
+
+**Best practice:** If you disagree with SALLY's rest recommendation, review your input data. SALLY's HOS engine is conservative and rule-based (no black-box ML). If the inputs are correct, the recommendation is correct.
+
+---
+
+### 6. Understand the Difference Between Drive and Duty
+
+**Drive time** ≠ **Duty time**
+
+| Activity | Drive Time | Duty Time |
+|----------|-----------|-----------|
+| Driving | ✅ Counts | ✅ Counts |
+| Loading/Unloading | ❌ Does not count | ✅ Counts |
+| Pre-trip inspection | ❌ Does not count | ✅ Counts |
+| Fueling | ❌ Does not count | ✅ Counts |
+| 30-min break | ❌ Does not count | ✅ Counts (on-duty, not driving) |
+| 10h rest | ❌ Does not count | ❌ Does not count (off-duty) |
+
+**Common mistake:** Thinking a driver with 6h drive time remaining can work for 6 more hours.
+
+**Reality:** If driver has been on duty for 12h (including dock time and breaks), they only have 2h left in their duty window, even though they have 6h of drive time remaining.
+
+**Best practice:** Always check BOTH `hours_driven` and `on_duty_time` when evaluating driver availability.
+
+---
+
+## Integration with SALLY API
+
+### Get HOS Validation Before Assigning Route
+
+```bash
+# Step 1: Get current driver HOS (from your ELD integration)
+curl -X GET https://your-eld-api.com/driver/DRV-001/hos
+
+# Step 2: Plan route with SALLY
+curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $SALLY_API_KEY" \
+  -d '{
+    "driver_id": "DRV-001",
+    "driver_state": { /* HOS from ELD */ },
+    "stops": [ /* your stops */ ]
+  }'
+
+# Step 3: Check compliance before assigning
+if (response.compliance_report.is_feasible) {
+  // Assign route to driver
+} else {
+  // Route is infeasible, handle appropriately
+  console.log(response.feasibility_issues);
+}
+```
+
+### Handle Infeasible Routes
+
+```typescript
+const response = await sallyApi.planRoute(request);
+
+if (!response.compliance_report.is_feasible) {
+  // Option 1: Assign route to different driver (with more hours)
+  // Option 2: Delay route start time (give driver time to rest)
+  // Option 3: Split route across multiple drivers
+
+  console.log("Route not feasible:");
+  response.feasibility_issues.forEach(issue => {
+    console.log(`- ${issue}`);
+  });
+
+  // Example output:
+  // - Driver needs 8h drive time but only has 5h available
+  // - Earliest completion: 2026-02-07T10:00:00Z (after 10h rest)
+}
+```
+
+---
+
+## Summary
+
+**Federal HOS Rules (FMCSA):**
+- **11-hour driving limit:** Max drive time per shift
+- **14-hour on-duty window:** Max total work time per shift (includes dock time, breaks)
+- **30-minute break:** Required after 8h of driving
+- **10-hour rest:** Required to reset all HOS hours
+
+**SALLY's HOS Validation:**
+- Segment-by-segment simulation
+- Proactive rest stop insertion when hours insufficient
+- Tracks three state variables: `hours_driven`, `on_duty_time`, `hours_since_break`
+- Validates against all four federal rules simultaneously
+- Generates compliance report with zero violations
+
+**Best Practices:**
+- Use real-time HOS data from ELD
+- Include accurate dock time estimates
+- Plan routes at start of shift
+- Monitor routes during execution
+- Trust SALLY's rest recommendations
+- Check both drive limit AND duty window
+
+**Key Insight:** The 14-hour duty window is often the limiting factor, not the 11-hour drive limit. Always account for dock time, breaks, and other on-duty activities when planning routes.
+
+---
+
+## Next Steps
+
+- **[Your First Route Tutorial](/docs/getting-started/first-route)** - See HOS validation in action with a complete route planning example
+- **[Rest Optimization Guide](/docs/api-guides/route-planning/rest-stops)** - Learn how SALLY decides when and where to rest
+- **[Route Updates Guide](/docs/api-guides/route-planning/route-updates)** - Handle HOS changes during route execution
+- **[API Reference: HOS Validation](/docs/api-reference/authentication#hos-validation)** - Complete API documentation

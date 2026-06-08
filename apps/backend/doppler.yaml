@@ -1,0 +1,3 @@
+setup:
+  project: sally-backend
+  config: dev

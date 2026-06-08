@@ -1,0 +1,198 @@
+# .github/workflows/ci.yml
+# Runs on every push to develop/main and every PR targeting them.
+# Blocks merge if lint, type-check, test, or build fails.
+
+name: CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Formatting gate (fast — fails early if Prettier drift)
+  # ─────────────────────────────────────────────────────────────
+  format:
+    name: Formatting — Prettier
+    runs-on: self-hosted # runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  # ─────────────────────────────────────────────────────────────
+  # Backend CI
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    name: Backend — Lint, Type-check, Test, Build
+    runs-on: self-hosted # runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Lint
+        run: pnpm --filter=backend lint
+
+      - name: Schema lint (ID + naming convention)
+        run: pnpm --filter=backend lint:schema
+
+      - name: Type-check
+        run: pnpm --filter=backend exec tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm --filter=backend test
+
+      - name: RBAC gap audit
+        run: npx tsx tests/domain/scripts/audit-rbac-gaps.ts --ci
+        continue-on-error: true
+
+      - name: Build (verify compilation)
+        run: pnpm --filter=shared-types build && pnpm --filter=backend build
+
+  # ─────────────────────────────────────────────────────────────
+  # Web CI
+  # ─────────────────────────────────────────────────────────────
+  web:
+    name: Web — Lint, Type-check, Build
+    runs-on: self-hosted # runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Lint
+        run: pnpm --filter=@sally/web lint
+
+      - name: Type-check
+        run: pnpm --filter=@sally/web type-check
+
+      - name: Build (verify compilation)
+        run: pnpm --filter=@sally/web build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-placeholder.firebasestorage.app
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
+
+  # ─────────────────────────────────────────────────────────────
+  # Console CI
+  # ─────────────────────────────────────────────────────────────
+  console:
+    name: Console — Lint, Type-check, Build
+    runs-on: self-hosted # runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Lint
+        run: pnpm --filter=@sally/console lint
+
+      - name: Type-check
+        run: pnpm --filter=@sally/console type-check
+
+      - name: Build (verify compilation)
+        run: pnpm --filter=@sally/console build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-placeholder.firebasestorage.app
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
+
+  # ─────────────────────────────────────────────────────────────
+  # Shared UI package CI
+  # ─────────────────────────────────────────────────────────────
+  ui:
+    name: UI — Lint, Type-check
+    runs-on: self-hosted # runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter=@sally/ui lint
+
+      - name: Type-check
+        run: pnpm --filter=@sally/ui type-check

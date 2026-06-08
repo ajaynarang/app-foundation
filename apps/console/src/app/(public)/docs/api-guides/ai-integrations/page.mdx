@@ -1,0 +1,76 @@
+import { Callout } from "@/components/docs/callout"
+
+# AI Integrations
+
+SALLY is an **AI-native** fleet operations platform. In addition to the built-in Sally AI chat, you can connect SALLY to your favorite AI assistants and use natural language to manage your fleet from anywhere.
+
+## How It Works
+
+SALLY exposes a **Model Context Protocol (MCP)** server that gives AI assistants secure access to your fleet data. When you connect an AI client to SALLY:
+
+1. You authenticate with your SALLY account (OAuth 2.1)
+2. You choose which permissions (scopes) to grant
+3. The AI client can then call SALLY tools on your behalf
+
+All actions respect your role permissions and tenant isolation -- the AI can only do what you can do in the SALLY app.
+
+## Available Tools
+
+Once connected, your AI assistant gets access to **20+ fleet operations tools**:
+
+| Category | Tools | Examples |
+|----------|-------|---------|
+| Fleet & Operations | 6 tools | Query loads, driver HOS, fleet status, alerts |
+| Invoicing | 5 tools | Generate invoices, record payments, send/void |
+| Settlements & Pay | 5 tools | View settlements, driver pay, approve payouts |
+| Customers | 3 tools | Customer details, payment stats |
+| Billing & Close-out | 3 tools | Billing readiness, approve for billing |
+| Shield Compliance | 3 tools | Compliance scores, findings, trigger audits |
+| Route Planning | 2 tools | Plan routes, check route status |
+
+<Callout type="info">
+  Write actions (approve, send, void) require a confirmation step -- the AI will ask you to confirm before executing.
+</Callout>
+
+## Supported Platforms
+
+| Platform | Method | Difficulty |
+|----------|--------|-----------|
+| [Claude.ai](/docs/api-guides/ai-integrations/claude-connector) | MCP Connector (OAuth) | Easy -- paste URL and sign in |
+| [Claude Desktop](/docs/api-guides/ai-integrations/claude-desktop) | MCP config file | Medium -- edit JSON config |
+| [ChatGPT](/docs/api-guides/ai-integrations/chatgpt) | Custom GPT with Actions | Medium -- create GPT + paste OpenAPI spec |
+| [Cursor / Windsurf](/docs/api-guides/ai-integrations/cursor) | MCP config | Medium -- add to IDE settings |
+| [Any MCP Client](/docs/api-guides/ai-integrations/mcp-clients) | MCP protocol | Advanced -- manual setup |
+
+## Connection URLs
+
+Your SALLY server URL depends on your environment. All MCP clients connect to the **base URL** — the server handles OAuth discovery and MCP requests automatically.
+
+| Environment | Server URL |
+|-------------|-----------|
+| **Production** | `https://api.trysally.com` |
+| **Staging** | `https://sally-api.apps.appshore.in` |
+| **Local Development** | `http://localhost:8000` |
+
+<Callout type="info">
+  Use the base URL for all clients (Claude.ai, Claude Desktop, ChatGPT, etc.). The server handles endpoint discovery via `/.well-known/oauth-authorization-server` automatically.
+</Callout>
+
+## Permission Scopes
+
+When connecting, you'll be asked to approve access scopes:
+
+| Scope | Access Level |
+|-------|-------------|
+| `fleet:read` | View drivers, vehicles, loads, alerts |
+| `fleet:write` | Acknowledge/resolve alerts, plan routes |
+| `invoices:read` | View invoices and summaries |
+| `invoices:write` | Create, send, void invoices, record payments |
+| `settlements:read` | View settlements and driver pay |
+| `settlements:write` | Approve settlements |
+| `customers:read` | View customer information |
+| `billing:read` | View billing readiness |
+| `billing:write` | Approve loads for billing |
+| `shield:read` | View compliance scores |
+| `shield:write` | Trigger compliance audits |
+| `documents:read` | View document compliance status |

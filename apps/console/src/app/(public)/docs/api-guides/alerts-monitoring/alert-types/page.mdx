@@ -1,0 +1,463 @@
+# Alert Types
+
+SALLY generates alerts across six categories. Each category contains specific alert types with defined priority levels and recommended dispatcher actions. This page serves as a complete reference for every alert your fleet may encounter.
+
+## HOS Violation Alerts
+
+Hours of Service alerts fire when a driver is approaching or has exceeded FMCSA regulatory limits. These are among the most critical alerts because HOS violations carry federal penalties.
+
+### HOS_APPROACHING_DRIVE_LIMIT
+
+The driver is nearing the 11-hour driving limit.
+
+| Field | Value |
+|---|---|
+| **Category** | `HOS_VIOLATION` |
+| **Default Priority** | `HIGH` |
+| **Trigger** | Less than 1 hour of drive time remaining |
+
+```json
+{
+  "id": "alt_hos001",
+  "type": "HOS_APPROACHING_DRIVE_LIMIT",
+  "category": "HOS_VIOLATION",
+  "priority": "HIGH",
+  "title": "Driver approaching 11-hour drive limit",
+  "message": "Mike Johnson (TRK-4821) has 45 minutes of drive time remaining. Current route segment requires 1.2 hours. Route re-plan recommended.",
+  "driverId": "drv_a1b2c3d4",
+  "routePlanId": "rte_f8e7d6c5",
+  "metadata": {
+    "currentHoursDriven": 10.25,
+    "driveTimeRemaining": 0.75,
+    "nextSegmentDriveTime": 1.2,
+    "recommendedAction": "PLAN_REST_STOP"
+  }
+}
+```
+
+**Recommended action:** Contact the driver to confirm a safe stopping location. Trigger a route re-plan to insert a rest stop before the limit is reached.
+
+### HOS_APPROACHING_DUTY_LIMIT
+
+The driver is nearing the 14-hour on-duty limit.
+
+| Field | Value |
+|---|---|
+| **Category** | `HOS_VIOLATION` |
+| **Default Priority** | `HIGH` |
+| **Trigger** | Less than 1 hour of on-duty time remaining |
+
+```json
+{
+  "id": "alt_hos002",
+  "type": "HOS_APPROACHING_DUTY_LIMIT",
+  "category": "HOS_VIOLATION",
+  "priority": "HIGH",
+  "title": "Driver approaching 14-hour duty limit",
+  "message": "Sarah Chen (TRK-7710) has 50 minutes of on-duty time remaining. A 10-hour off-duty period is required before driving again.",
+  "metadata": {
+    "currentOnDutyTime": 13.17,
+    "dutyTimeRemaining": 0.83,
+    "recommendedAction": "PLAN_FULL_REST"
+  }
+}
+```
+
+**Recommended action:** Ensure the driver can reach a safe location to begin their 10-hour off-duty rest before the 14-hour window closes.
+
+### HOS_BREAK_REQUIRED
+
+The driver must take a 30-minute break per the 8-hour rule.
+
+| Field | Value |
+|---|---|
+| **Category** | `HOS_VIOLATION` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | 7.5+ hours since last qualifying break |
+
+```json
+{
+  "id": "alt_hos003",
+  "type": "HOS_BREAK_REQUIRED",
+  "category": "HOS_VIOLATION",
+  "priority": "MEDIUM",
+  "title": "30-minute break required soon",
+  "message": "Mike Johnson (TRK-4821) has been driving for 7.5 hours since last break. A 30-minute break must be taken before 8 hours.",
+  "metadata": {
+    "hoursSinceBreak": 7.5,
+    "breakRequiredWithin": 0.5,
+    "recommendedAction": "TAKE_30_MIN_BREAK"
+  }
+}
+```
+
+**Recommended action:** Confirm the driver is planning to stop. The next rest area or truck stop along the route should be communicated to the driver.
+
+### HOS_VIOLATION_ACTIVE
+
+A driver has exceeded an HOS limit. This is the most severe HOS alert.
+
+| Field | Value |
+|---|---|
+| **Category** | `HOS_VIOLATION` |
+| **Default Priority** | `CRITICAL` |
+| **Trigger** | Any HOS limit has been exceeded |
+
+```json
+{
+  "id": "alt_hos004",
+  "type": "HOS_VIOLATION_ACTIVE",
+  "category": "HOS_VIOLATION",
+  "priority": "CRITICAL",
+  "title": "HOS VIOLATION: Drive time limit exceeded",
+  "message": "VIOLATION: Mike Johnson (TRK-4821) has driven 11.3 hours, exceeding the 11-hour limit by 18 minutes. Driver must stop immediately.",
+  "metadata": {
+    "violationType": "DRIVE_TIME_EXCEEDED",
+    "currentHoursDriven": 11.3,
+    "exceededBy": 0.3,
+    "recommendedAction": "STOP_IMMEDIATELY"
+  }
+}
+```
+
+**Recommended action:** Contact the driver immediately. The driver must cease driving at the earliest safe opportunity. Document the circumstances for compliance records.
+
+### HOS_CYCLE_APPROACHING
+
+The driver is nearing the 70-hour/8-day cycle limit.
+
+| Field | Value |
+|---|---|
+| **Category** | `HOS_VIOLATION` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | Less than 5 hours remaining in the 70-hour cycle |
+
+```json
+{
+  "id": "alt_hos005",
+  "type": "HOS_CYCLE_APPROACHING",
+  "category": "HOS_VIOLATION",
+  "priority": "MEDIUM",
+  "title": "70-hour cycle limit approaching",
+  "message": "Sarah Chen (TRK-7710) has used 66.5 of 70 available cycle hours. A 34-hour restart may be needed soon.",
+  "metadata": {
+    "currentCycleUsed": 66.5,
+    "cycleTimeRemaining": 3.5,
+    "recommendedAction": "PLAN_34_HOUR_RESTART"
+  }
+}
+```
+
+**Recommended action:** Plan upcoming loads around the cycle limit. Consider scheduling a 34-hour restart if the driver's cycle is nearly exhausted.
+
+## Route Deviation Alerts
+
+Route deviation alerts fire when the driver is not following the planned route.
+
+### ROUTE_DEVIATION_DETECTED
+
+The driver has left the planned route path.
+
+| Field | Value |
+|---|---|
+| **Category** | `ROUTE_DEVIATION` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | Driver position more than 2 miles from planned route for more than 5 minutes |
+
+```json
+{
+  "id": "alt_dev001",
+  "type": "ROUTE_DEVIATION_DETECTED",
+  "category": "ROUTE_DEVIATION",
+  "priority": "MEDIUM",
+  "title": "Route deviation detected",
+  "message": "Mike Johnson (TRK-4821) has deviated from the planned route on I-65 S near Lebanon, IN. Driver is 3.2 miles off route.",
+  "metadata": {
+    "deviationDistanceMiles": 3.2,
+    "lastKnownLocation": { "lat": 40.0417, "lon": -86.4612 },
+    "plannedRouteSegment": "I-65 S toward Indianapolis",
+    "durationMinutes": 8,
+    "recommendedAction": "CONTACT_DRIVER"
+  }
+}
+```
+
+**Recommended action:** Contact the driver to understand the reason for the deviation. Common causes include construction detours, road closures, or the driver stopped for fuel or a break at an unplanned location.
+
+### UNPLANNED_STOP
+
+The driver has stopped at an unplanned location for an extended period.
+
+| Field | Value |
+|---|---|
+| **Category** | `ROUTE_DEVIATION` |
+| **Default Priority** | `LOW` |
+| **Trigger** | Vehicle stationary at unplanned location for more than 15 minutes |
+
+```json
+{
+  "id": "alt_dev002",
+  "type": "UNPLANNED_STOP",
+  "category": "ROUTE_DEVIATION",
+  "priority": "LOW",
+  "title": "Unplanned stop detected",
+  "message": "Mike Johnson (TRK-4821) has been stopped at an unplanned location near Zionsville, IN for 22 minutes.",
+  "metadata": {
+    "stopLocation": { "lat": 39.9509, "lon": -86.2619 },
+    "stopDurationMinutes": 22,
+    "nearestKnownLocation": "Pilot Travel Center - Zionsville",
+    "recommendedAction": "MONITOR"
+  }
+}
+```
+
+**Recommended action:** Monitor the situation. The driver may be taking a break, fueling, or addressing a minor issue. Escalate if the stop exceeds 45 minutes without communication.
+
+## Weather Alerts
+
+Weather alerts fire when severe weather conditions are detected along the active route path.
+
+### SEVERE_WEATHER_WARNING
+
+A severe weather warning is in effect along the driver's upcoming route.
+
+| Field | Value |
+|---|---|
+| **Category** | `WEATHER` |
+| **Default Priority** | `HIGH` |
+| **Trigger** | NWS severe weather warning intersects route segments ahead of driver |
+
+```json
+{
+  "id": "alt_wx001",
+  "type": "SEVERE_WEATHER_WARNING",
+  "category": "WEATHER",
+  "priority": "HIGH",
+  "title": "Winter storm warning on route",
+  "message": "A winter storm warning is in effect along I-70 between Dayton, OH and Columbus, OH from 18:00 to 06:00 UTC. Expected: 4-6 inches of snow, reduced visibility, icy roads.",
+  "metadata": {
+    "weatherType": "WINTER_STORM_WARNING",
+    "affectedSegments": [5, 6],
+    "affectedMiles": 72.4,
+    "startTime": "2026-02-10T18:00:00Z",
+    "endTime": "2026-02-11T06:00:00Z",
+    "source": "NWS",
+    "recommendedAction": "CONSIDER_DELAY_OR_REROUTE"
+  }
+}
+```
+
+**Recommended action:** Evaluate whether to delay departure, reroute around the affected area, or continue with caution. Contact the driver and share weather details.
+
+### WEATHER_ADVISORY
+
+A weather advisory (less severe than a warning) is in effect along the route.
+
+| Field | Value |
+|---|---|
+| **Category** | `WEATHER` |
+| **Default Priority** | `LOW` |
+| **Trigger** | NWS weather advisory intersects route |
+
+```json
+{
+  "id": "alt_wx002",
+  "type": "WEATHER_ADVISORY",
+  "category": "WEATHER",
+  "priority": "LOW",
+  "title": "Wind advisory on route",
+  "message": "A wind advisory is in effect along I-65 in central Indiana. Gusts up to 45 mph expected. Use caution with empty or light trailers.",
+  "metadata": {
+    "weatherType": "WIND_ADVISORY",
+    "windSpeedMph": 45,
+    "affectedSegments": [2],
+    "recommendedAction": "PROCEED_WITH_CAUTION"
+  }
+}
+```
+
+**Recommended action:** Inform the driver. If the vehicle is running empty or with a light load, consider whether high winds pose a tip-over risk.
+
+## Mechanical Alerts
+
+Mechanical alerts fire when vehicle telematics report issues.
+
+### ENGINE_FAULT
+
+A diagnostic trouble code (DTC) has been reported by the vehicle's ECU.
+
+| Field | Value |
+|---|---|
+| **Category** | `MECHANICAL` |
+| **Default Priority** | `HIGH` |
+| **Trigger** | Active DTC received from telematics integration |
+
+```json
+{
+  "id": "alt_mech001",
+  "type": "ENGINE_FAULT",
+  "category": "MECHANICAL",
+  "priority": "HIGH",
+  "title": "Engine fault code detected",
+  "message": "TRK-4821 reported engine fault code P0087 (fuel rail pressure too low). Driver Mike Johnson should reduce speed and plan to stop for service.",
+  "metadata": {
+    "faultCode": "P0087",
+    "faultDescription": "Fuel rail pressure too low",
+    "vehicleId": "veh_e5f6g7h8",
+    "severity": "HIGH",
+    "recommendedAction": "SERVICE_REQUIRED"
+  }
+}
+```
+
+**Recommended action:** Contact the driver. Depending on the fault code severity, the driver may need to proceed to the nearest service location or pull over immediately.
+
+### TIRE_PRESSURE_WARNING
+
+A tire pressure anomaly has been detected.
+
+| Field | Value |
+|---|---|
+| **Category** | `MECHANICAL` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | Tire pressure below threshold reported by TPMS |
+
+```json
+{
+  "id": "alt_mech002",
+  "type": "TIRE_PRESSURE_WARNING",
+  "category": "MECHANICAL",
+  "priority": "MEDIUM",
+  "title": "Low tire pressure detected",
+  "message": "TRK-4821 right rear outer tire pressure at 72 PSI (threshold: 95 PSI). Possible slow leak.",
+  "metadata": {
+    "tirePosition": "RIGHT_REAR_OUTER",
+    "currentPressurePsi": 72,
+    "thresholdPsi": 95,
+    "recommendedAction": "INSPECT_AT_NEXT_STOP"
+  }
+}
+```
+
+**Recommended action:** Advise the driver to inspect the tire at the next safe stopping point. If pressure is dropping rapidly, the driver should stop immediately.
+
+## Scheduling Alerts
+
+Scheduling alerts fire when appointments or delivery windows are at risk.
+
+### LATE_TO_APPOINTMENT
+
+The driver will not arrive at the next stop by the scheduled time.
+
+| Field | Value |
+|---|---|
+| **Category** | `SCHEDULING` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | ETA exceeds scheduled appointment time |
+
+```json
+{
+  "id": "alt_sched001",
+  "type": "LATE_TO_APPOINTMENT",
+  "category": "SCHEDULING",
+  "priority": "MEDIUM",
+  "title": "Late arrival expected at Midwest Auto Parts",
+  "message": "Mike Johnson (TRK-4821) is estimated to arrive at Midwest Auto Parts - Indianapolis at 15:45 UTC, 45 minutes after the scheduled 15:00 appointment.",
+  "metadata": {
+    "stopName": "Midwest Auto Parts - Indianapolis",
+    "scheduledArrival": "2026-02-10T15:00:00Z",
+    "estimatedArrival": "2026-02-10T15:45:00Z",
+    "delayMinutes": 45,
+    "cause": "TRAFFIC_DELAY",
+    "recommendedAction": "NOTIFY_CUSTOMER"
+  }
+}
+```
+
+**Recommended action:** Notify the customer about the delayed arrival. Update the appointment window if possible. Check if the delay cascades to subsequent stops.
+
+### DOCK_DELAY
+
+The driver is experiencing an extended wait time at a customer dock.
+
+| Field | Value |
+|---|---|
+| **Category** | `SCHEDULING` |
+| **Default Priority** | `MEDIUM` |
+| **Trigger** | Time at dock exceeds estimated dock hours by more than 30 minutes |
+
+```json
+{
+  "id": "alt_sched002",
+  "type": "DOCK_DELAY",
+  "category": "SCHEDULING",
+  "priority": "MEDIUM",
+  "title": "Dock delay at Midwest Auto Parts",
+  "message": "Mike Johnson (TRK-4821) has been at dock for 2.5 hours (estimated: 1.5 hours). The 1-hour delay may impact the next stop's appointment.",
+  "metadata": {
+    "stopName": "Midwest Auto Parts - Indianapolis",
+    "estimatedDockHours": 1.5,
+    "actualDockHours": 2.5,
+    "delayHours": 1.0,
+    "impactsNextStop": true,
+    "recommendedAction": "EVALUATE_ROUTE_REPLAN"
+  }
+}
+```
+
+**Recommended action:** If the delay impacts downstream stops, consider triggering a route re-plan. Notify subsequent customers of potential delays.
+
+### DELIVERY_WINDOW_MISSED
+
+The driver has missed a delivery window entirely.
+
+| Field | Value |
+|---|---|
+| **Category** | `SCHEDULING` |
+| **Default Priority** | `HIGH` |
+| **Trigger** | Current time exceeds the delivery window end time and driver has not arrived |
+
+```json
+{
+  "id": "alt_sched003",
+  "type": "DELIVERY_WINDOW_MISSED",
+  "category": "SCHEDULING",
+  "priority": "HIGH",
+  "title": "Delivery window missed at Central Ohio Distribution",
+  "message": "The delivery window for Central Ohio Distribution (21:00 UTC) has passed. Mike Johnson (TRK-4821) is still 48 miles away with an ETA of 22:15 UTC.",
+  "metadata": {
+    "stopName": "Central Ohio Distribution Center",
+    "deliveryWindowEnd": "2026-02-10T21:00:00Z",
+    "estimatedArrival": "2026-02-10T22:15:00Z",
+    "distanceRemainingMiles": 48,
+    "recommendedAction": "CONTACT_CUSTOMER_FOR_RESCHEDULE"
+  }
+}
+```
+
+**Recommended action:** Contact the customer to negotiate a new delivery window. Determine if the receiving facility will accept a late delivery or if the load needs to be rescheduled for the next day.
+
+## Alert Type Quick Reference
+
+| Type | Category | Default Priority |
+|---|---|---|
+| `HOS_APPROACHING_DRIVE_LIMIT` | HOS_VIOLATION | HIGH |
+| `HOS_APPROACHING_DUTY_LIMIT` | HOS_VIOLATION | HIGH |
+| `HOS_BREAK_REQUIRED` | HOS_VIOLATION | MEDIUM |
+| `HOS_VIOLATION_ACTIVE` | HOS_VIOLATION | CRITICAL |
+| `HOS_CYCLE_APPROACHING` | HOS_VIOLATION | MEDIUM |
+| `ROUTE_DEVIATION_DETECTED` | ROUTE_DEVIATION | MEDIUM |
+| `UNPLANNED_STOP` | ROUTE_DEVIATION | LOW |
+| `SEVERE_WEATHER_WARNING` | WEATHER | HIGH |
+| `WEATHER_ADVISORY` | WEATHER | LOW |
+| `ENGINE_FAULT` | MECHANICAL | HIGH |
+| `TIRE_PRESSURE_WARNING` | MECHANICAL | MEDIUM |
+| `LATE_TO_APPOINTMENT` | SCHEDULING | MEDIUM |
+| `DOCK_DELAY` | SCHEDULING | MEDIUM |
+| `DELIVERY_WINDOW_MISSED` | SCHEDULING | HIGH |
+
+## Next Steps
+
+- [Real-time Events](/docs/api-guides/alerts-monitoring/real-time-events) -- Subscribe to alerts via SSE or WebSocket
+- [Alert Management](/docs/api-guides/alerts-monitoring/alert-management) -- Acknowledge, resolve, and analyze alerts
+- [Alerts Overview](/docs/api-guides/alerts-monitoring) -- Alert system architecture and lifecycle

@@ -1,0 +1,211 @@
+name: "Quality Gate"
+
+# Manual-dispatch only. No PR/push/schedule triggers in this round.
+# Click "Run workflow" in GitHub Actions to trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "API base URL"
+        required: true
+        default: "https://sally-api-staging.appshore.in/api/v1"
+      web_target:
+        description: "Frontend base URL (browser tests)"
+        required: true
+        default: "https://staging.sally.appshore.in"
+      tenant:
+        description: "Tenant ID to test against"
+        required: true
+      suite:
+        description: "Test suite to run"
+        required: true
+        type: choice
+        default: "all"
+        options:
+          - all
+          - unit
+          - smoke
+          - rbac
+          - api
+          - browser
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Unit Tests — backend Jest suite with coverage + test-utils
+  # ─────────────────────────────────────────────────────────────
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm --filter=shared-types build
+
+      - name: Generate Prisma client
+        run: pnpm --filter=backend exec prisma generate
+
+      - name: Prepare reports dir
+        run: mkdir -p tests/reports
+
+      - name: Run backend unit tests with coverage
+        working-directory: apps/backend
+        run: |
+          pnpm test -- --passWithNoTests --forceExit \
+            --coverage \
+            --coverageReporters=json-summary \
+            --json --outputFile=../../tests/reports/unit-test-results.json \
+            2>&1 || true
+          cp coverage/coverage-summary.json ../../tests/reports/unit-coverage-summary.json 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Run @sally/test-utils unit tests
+        run: pnpm --filter @sally/test-utils test
+        continue-on-error: true
+
+      - name: RBAC gap audit
+        run: |
+          npx tsx tests/scripts/audit-rbac-gaps.ts --ci 2>&1 | tee tests/reports/rbac-audit-output.txt || true
+        continue-on-error: true
+
+      - name: Upload unit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-results-${{ github.run_number }}
+          path: |
+            tests/reports/unit-test-results.json
+            tests/reports/unit-coverage-summary.json
+            tests/reports/rbac-audit.json
+            tests/reports/rbac-audit-output.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────
+  # QA Suite — Playwright against staging/target
+  # ─────────────────────────────────────────────────────────────
+  qa:
+    name: QA Suite (${{ github.event.inputs.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: unit
+    if: inputs.suite != 'unit'
+    env:
+      API_BASE_URL: ${{ inputs.target }}
+      WEB_BASE_URL: ${{ inputs.web_target }}
+      TENANT_ID: ${{ inputs.tenant }}
+      DEV_AUTH_SECRET: ${{ secrets.DEV_AUTH_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download unit artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-results-${{ github.run_number }}
+          path: tests/reports/
+        continue-on-error: true
+
+      - name: Validate DEV_AUTH_SECRET present
+        run: |
+          if [ -z "$DEV_AUTH_SECRET" ]; then
+            echo "::error::DEV_AUTH_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions (match the value in Doppler sally-backend/stg or /qa)."
+            exit 1
+          fi
+
+      - name: Select Playwright args
+        id: args
+        run: |
+          case "${{ inputs.suite }}" in
+            smoke)   echo "args=--grep @smoke --project=api"        >> $GITHUB_OUTPUT ;;
+            rbac)    echo "args=--grep @rbac  --project=api"        >> $GITHUB_OUTPUT ;;
+            api)     echo "args=api --project=api"                  >> $GITHUB_OUTPUT ;;
+            browser) echo "args=--project=browser"                  >> $GITHUB_OUTPUT ;;
+            all)     echo "args="                                   >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Install Playwright browsers
+        if: inputs.suite == 'all' || inputs.suite == 'browser'
+        working-directory: tests
+        run: npx playwright install chromium --with-deps
+
+      - name: Run QA suite — ${{ inputs.suite }} against ${{ env.TENANT_ID }}
+        working-directory: tests
+        run: npx playwright test ${{ steps.args.outputs.args }}
+        continue-on-error: true
+
+      - name: Generate confidence matrix
+        if: always()
+        working-directory: tests
+        run: npx tsx scripts/generate-matrix.ts || true
+
+      - name: Upload full QA report bundle (reports + HTML + traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report-${{ github.run_number }}
+          path: |
+            tests/reports/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test-results (traces, videos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-traces-${{ github.run_number }}
+          path: tests/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Post summary
+        if: always()
+        working-directory: tests
+        run: |
+          echo "## SALLY Confidence Matrix" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Suite:** ${{ inputs.suite }} | **Target:** ${{ env.API_BASE_URL }} | **Tenant:** ${{ env.TENANT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f reports/confidence-matrix.json ]; then
+            node -e "
+              const m = JSON.parse(require('fs').readFileSync('reports/confidence-matrix.json', 'utf8'));
+              console.log('| Metric | Value |');
+              console.log('|--------|-------|');
+              console.log('| Total | ' + m.summary.total + ' |');
+              console.log('| Passed | ' + m.summary.passed + ' |');
+              console.log('| Failed | ' + m.summary.failed + ' |');
+              console.log('| Skipped | ' + m.summary.skipped + ' |');
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "_No confidence matrix generated (tests may have failed to start)._" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- \`qa-report-${{ github.run_number }}\` — reports + Playwright HTML" >> $GITHUB_STEP_SUMMARY
+          echo "- \`qa-traces-${{ github.run_number }}\` — traces, videos, screenshots (7-day retention)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`unit-results-${{ github.run_number }}\` — unit test results + coverage" >> $GITHUB_STEP_SUMMARY

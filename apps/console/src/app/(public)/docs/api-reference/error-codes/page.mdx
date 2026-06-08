@@ -1,0 +1,280 @@
+# Error Codes
+
+Every SALLY API error returns a consistent JSON structure with an HTTP status code, a human-readable message, and an error classification. This page documents the format, all status codes, and common error scenarios.
+
+---
+
+## Error Response Format
+
+All error responses follow this structure:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "error": "Bad Request"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `statusCode` | `number` | The HTTP status code |
+| `message` | `string` | A human-readable description of the error |
+| `error` | `string` | The HTTP status text (e.g., "Bad Request", "Unauthorized") |
+
+---
+
+## Validation Errors
+
+When a request fails input validation, the response includes an array of field-level errors in the `message` field:
+
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "stops must contain at least 2 elements",
+    "driver.hosState.driveTimeRemaining must be a positive number",
+    "vehicle.fuelCapacityGallons is required"
+  ],
+  "error": "Bad Request"
+}
+```
+
+Each entry in the `message` array identifies the field that failed validation and the constraint that was violated. Fix all listed issues before retrying the request.
+
+---
+
+## HTTP Status Codes
+
+### 400 Bad Request
+
+The request body or query parameters failed validation.
+
+**Common causes:**
+- Missing required fields
+- Invalid data types (string where number expected)
+- Values outside allowed ranges
+- Malformed JSON
+
+**Example:**
+
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "origin.latitude must be between -90 and 90",
+    "stops must contain at least 2 elements"
+  ],
+  "error": "Bad Request"
+}
+```
+
+**Resolution:** Review the error messages, correct the listed fields, and retry.
+
+---
+
+### 401 Unauthorized
+
+The request is missing authentication credentials or the provided credentials are invalid.
+
+**Common causes:**
+- No `Authorization` header included
+- API key is malformed or revoked
+- JWT has expired
+- Firebase token exchange failed
+
+**Example:**
+
+```json
+{
+  "statusCode": 401,
+  "message": "Invalid API key",
+  "error": "Unauthorized"
+}
+```
+
+**Resolution:** Verify that the `Authorization` header contains a valid Bearer token. Check that the API key has not been revoked. If using JWT, obtain a fresh token.
+
+---
+
+### 403 Forbidden
+
+The authenticated user does not have permission to perform the requested action.
+
+**Common causes:**
+- User role lacks the required permission (e.g., a DRIVER trying to create a route plan)
+- User attempting to access a resource in a different tenant
+- API key does not have the necessary scope
+
+**Example:**
+
+```json
+{
+  "statusCode": 403,
+  "message": "Insufficient permissions. Required role: DISPATCHER",
+  "error": "Forbidden"
+}
+```
+
+**Resolution:** Confirm that the authenticated user has the appropriate role. See the [FAQ](/docs/resources/faq) for a list of roles and their permissions.
+
+---
+
+### 404 Not Found
+
+The requested resource does not exist or is not accessible to the current tenant.
+
+**Common causes:**
+- Incorrect resource ID
+- Resource was deleted
+- Resource belongs to a different tenant (returns 404 rather than 403 to avoid leaking existence information)
+
+**Example:**
+
+```json
+{
+  "statusCode": 404,
+  "message": "Route plan not found",
+  "error": "Not Found"
+}
+```
+
+**Resolution:** Verify the resource ID. Confirm you are authenticated as a user in the correct tenant.
+
+---
+
+### 409 Conflict
+
+The request conflicts with the current state of a resource.
+
+**Common causes:**
+- Attempting to create a resource that already exists (duplicate name, email, or external ID)
+- Concurrent modification conflict
+
+**Example:**
+
+```json
+{
+  "statusCode": 409,
+  "message": "A driver with this email already exists",
+  "error": "Conflict"
+}
+```
+
+**Resolution:** Check for existing resources before creating new ones. If updating, fetch the latest version and retry.
+
+---
+
+### 422 Unprocessable Entity
+
+The request is syntactically valid but violates a business rule.
+
+**Common causes:**
+- Route planning request that cannot produce an HOS-compliant plan (e.g., appointment windows are physically unreachable)
+- Attempting to assign a load to a driver whose HOS clocks are exhausted
+- Invalid state transition (e.g., resolving an alert that has not been acknowledged)
+
+**Example:**
+
+```json
+{
+  "statusCode": 422,
+  "message": "Cannot plan route: appointment window at Stop 3 is unreachable given driver's remaining HOS hours",
+  "error": "Unprocessable Entity"
+}
+```
+
+**Resolution:** Review the business rule described in the message. Adjust the input data to satisfy the constraint (e.g., extend appointment windows, assign a different driver, or reduce the number of stops).
+
+---
+
+### 429 Too Many Requests
+
+The request was rejected because the client has exceeded the rate limit.
+
+**Common causes:**
+- Sending more requests than the allowed rate for your API key type
+- Burst traffic without throttling
+
+**Example:**
+
+```json
+{
+  "statusCode": 429,
+  "message": "Rate limit exceeded. Try again in 45 seconds.",
+  "error": "Too Many Requests"
+}
+```
+
+**Rate limits by key type:**
+
+| Key Type | Limit |
+|---|---|
+| Staging (`sk_staging_`) | 1,000 requests/hour |
+| Production (`sk_live_`) | 10,000 requests/hour |
+
+**Rate limit headers** are included in every response:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | Total requests allowed in the current window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the window resets |
+
+**Resolution:** Implement exponential backoff with jitter. Monitor the `X-RateLimit-Remaining` header and throttle requests as you approach the limit. If you consistently need higher limits, contact [Support](/docs/resources/support).
+
+---
+
+### 500 Internal Server Error
+
+An unexpected error occurred on the server.
+
+**Common causes:**
+- Unhandled exception in business logic
+- Database connectivity issue
+- Third-party integration failure (ELD, TMS, fuel price API)
+
+**Example:**
+
+```json
+{
+  "statusCode": 500,
+  "message": "Internal server error",
+  "error": "Internal Server Error"
+}
+```
+
+**Resolution:** Retry the request after a brief delay. If the error persists, report it to [Support](/docs/resources/support) with the request details, timestamp, and any `requestId` from the response headers.
+
+---
+
+## Error Handling Best Practices
+
+1. **Always check the status code** before parsing the response body. Do not assume success.
+
+2. **Parse validation errors as arrays.** The `message` field for 400 responses may be a string or an array of strings.
+
+3. **Implement retry logic** for transient errors (429, 500, 503). Use exponential backoff with jitter:
+
+```typescript
+async function requestWithRetry(fn: () => Promise<Response>, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fn()
+
+    if (response.status === 429 || response.status >= 500) {
+      if (attempt === maxRetries) throw new Error(`Failed after ${maxRetries} retries`)
+      const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 30000)
+      await new Promise(resolve => setTimeout(resolve, delay))
+      continue
+    }
+
+    return response
+  }
+}
+```
+
+4. **Do not retry 400, 401, 403, or 404 errors.** These indicate client-side issues that will not resolve on retry.
+
+5. **Log the full error response** for debugging. The `message` field often contains enough detail to diagnose the issue without contacting support.
+
+6. **Monitor rate limit headers** proactively. Throttle requests before hitting the limit rather than reacting to 429 responses.

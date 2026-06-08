@@ -1,0 +1,109 @@
+# API Guides
+
+These guides help you integrate SALLY's API into your fleet management systems. Whether you are planning routes, managing drivers and vehicles, or subscribing to real-time alerts, you will find step-by-step instructions and working examples here.
+
+## Base URL
+
+| Environment | Base URL |
+|---|---|
+| Development | `http://localhost:8000/api/v1/` |
+| Staging | `https://staging.sally.appshore.in/api/v1/` |
+| Production | `https://your-instance.sally.appshore.in/api/v1/` |
+
+All endpoints documented in these guides are relative to the base URL. For example, `POST /routes/plan` means `POST https://your-instance.sally.appshore.in/api/v1/routes/plan`.
+
+## Authentication
+
+Every request must include a Bearer token in the `Authorization` header:
+
+```bash
+curl -X GET https://your-instance.sally.appshore.in/api/v1/drivers \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+See [Getting Started > Authentication](/docs/getting-started/quickstart) for instructions on obtaining your token.
+
+## Guide Map
+
+| Guide | What You Will Learn |
+|---|---|
+| [Route Planning](/docs/api-guides/route-planning) | Plan, optimize, and manage routes with full HOS compliance. Create routes, insert rest and fuel stops, update routes dynamically. |
+| [Fleet Management](/docs/api-guides/fleet-management) | Manage drivers, vehicles, and loads. Create and update resources, query status, handle assignments. |
+| [Alerts and Monitoring](/docs/api-guides/alerts-monitoring) | Subscribe to real-time alerts, handle monitoring events, acknowledge and resolve dispatcher notifications. |
+| [Integrations](/docs/api-guides/integrations) | Connect external services -- ELD providers, TMS platforms, fuel price feeds, and weather data sources. |
+| [Multi-tenancy](/docs/api-guides/multi-tenancy) | Set up tenants, manage users and roles, configure tenant-specific settings. |
+
+## Response Format
+
+All responses return JSON.
+
+### Successful Responses
+
+Successful requests return the resource or collection directly:
+
+```json
+{
+  "id": "route_abc123",
+  "status": "planned",
+  "stops": [ ... ],
+  "createdAt": "2026-02-10T14:30:00Z"
+}
+```
+
+List endpoints return an array with pagination metadata:
+
+```json
+{
+  "data": [ ... ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 47
+  }
+}
+```
+
+### Error Responses
+
+Errors return a consistent structure:
+
+```json
+{
+  "statusCode": 422,
+  "message": "Validation failed: origin is required",
+  "error": "Unprocessable Entity"
+}
+```
+
+Common status codes:
+
+| Code | Meaning |
+|---|---|
+| `400` | Bad request -- malformed JSON or missing required fields |
+| `401` | Unauthorized -- missing or invalid Bearer token |
+| `403` | Forbidden -- valid token but insufficient permissions |
+| `404` | Not found -- resource does not exist |
+| `422` | Validation error -- request body failed validation |
+| `429` | Rate limited -- too many requests, back off and retry |
+| `500` | Server error -- unexpected failure, contact support |
+
+## Pagination
+
+List endpoints accept `page` and `limit` query parameters:
+
+```
+GET /api/v1/drivers?page=2&limit=50
+```
+
+| Parameter | Default | Maximum | Description |
+|---|---|---|---|
+| `page` | `1` | -- | Page number (1-indexed) |
+| `limit` | `20` | `100` | Items per page |
+
+## Interactive Testing
+
+Use the [API Playground](/docs/api-playground) to test endpoints directly in your browser with live request and response previews.
+
+## Next Steps
+
+If you are new to SALLY, start with the [Route Planning](/docs/api-guides/route-planning) guide -- it covers the core workflow that most integrations build on.

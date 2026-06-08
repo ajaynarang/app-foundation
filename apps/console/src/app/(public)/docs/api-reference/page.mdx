@@ -1,0 +1,93 @@
+# API Reference
+
+SALLY provides a powerful REST API for route planning, HOS compliance, and fleet management.
+
+## Base URL
+
+```
+https://sally-api-staging.appshore.in/api/v1
+```
+
+## Quick Start
+
+1. [Get your API key](/docs/getting-started/api-keys)
+2. [Authenticate your requests](/docs/api-reference/authentication)
+3. [Explore endpoints](/docs/api-playground) in the interactive playground
+
+## Core Endpoints
+
+### Routes
+Plan optimized, HOS-compliant routes with automatic rest and fuel stop insertion.
+
+**Key endpoints:**
+- `POST /api/v1/routes/plan` - Plan a new route
+- `GET /api/v1/routes/{planId}` - Get route details
+- `POST /api/v1/routes/{planId}/activate` - Activate route
+- `POST /api/v1/routes/{planId}/cancel` - Cancel route
+
+[Explore in playground →](/docs/api-playground#tag/Routes)
+
+### Alerts
+Manage dispatcher alerts and notifications for proactive fleet management.
+
+**Key endpoints:**
+- `GET /api/v1/alerts` - List active alerts
+- `POST /api/v1/alerts/{id}/acknowledge` - Acknowledge alert
+- `POST /api/v1/alerts/{id}/resolve` - Resolve alert
+
+[Explore in playground →](/docs/api-playground#tag/Alerts)
+
+### HOS Validation
+The HOS compliance engine is an internal component of the route planner. It is not directly accessible as a standalone API. HOS validation runs automatically during route planning and continuous monitoring.
+
+See [Route Planning](/docs/api-guides/route-planning) for how HOS compliance is enforced.
+
+## Response Format
+
+All API responses follow this structure:
+
+### Success (200 OK)
+```json
+{
+  "data": {
+    // Response data here
+  }
+}
+```
+
+### Error (4xx, 5xx)
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "error": "Bad Request"
+}
+```
+
+## Rate Limits
+
+- **Staging keys**: 1,000 requests/hour
+- **Production keys**: 10,000 requests/hour
+
+Rate limit headers:
+- `X-RateLimit-Limit` - Total requests allowed
+- `X-RateLimit-Remaining` - Requests remaining
+- `X-RateLimit-Reset` - Reset timestamp
+
+## Status Codes
+
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 404 | Not Found |
+| 429 | Rate Limit Exceeded |
+| 500 | Server Error |
+
+## Next Steps
+
+- [Authentication Guide](/docs/api-reference/authentication) - Learn how to authenticate
+- [API Playground](/docs/api-playground) - Test endpoints interactively
+- [Quickstart](/docs/getting-started/quickstart) - Build your first integration

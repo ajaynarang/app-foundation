@@ -1,0 +1,260 @@
+# TMS Integration
+
+SALLY integrates with Transportation Management Systems (TMS) to sync load data, dispatch assignments, and shipment tracking. Two TMS adapters are available: McLeod for dispatch-oriented workflows and Project44 for visibility and tracking.
+
+## McLeod Integration
+
+McLeod Software is a widely-used TMS in North American trucking. Connecting McLeod to SALLY enables automatic load sync, so dispatchers do not need to create loads manually in both systems.
+
+### What You Get
+
+- **Automatic load creation** -- New loads dispatched in McLeod appear in SALLY automatically
+- **Status sync** -- Load status changes in either system are reflected in the other
+- **Customer data** -- Customer and facility information syncs for accurate stop planning
+- **Dispatch assignments** -- Driver and vehicle assignments flow from McLeod to SALLY
+
+### Setup
+
+#### Step 1: Get McLeod API Credentials
+
+Contact your McLeod account representative to enable API access. You will need:
+- API URL (your McLeod instance endpoint)
+- API key
+- Company ID
+
+#### Step 2: Create the Integration
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vendor": "mcleod",
+    "name": "McLeod TMS - Production",
+    "config": {
+      "apiUrl": "https://your-company.mcleod.com/api",
+      "apiKey": "mcleod_XXXXXXXXXXXXXXXX",
+      "companyId": "ACME001"
+    },
+    "syncIntervalMinutes": 30
+  }'
+```
+
+**JavaScript (fetch):**
+
+```javascript
+const response = await fetch(
+  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  {
+    method: "POST",
+    headers: {
+      "X-API-Key": process.env.SALLY_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      vendor: "mcleod",
+      name: "McLeod TMS - Production",
+      config: {
+        apiUrl: process.env.MCLEOD_API_URL,
+        apiKey: process.env.MCLEOD_API_KEY,
+        companyId: "ACME001",
+      },
+      syncIntervalMinutes: 30,
+    }),
+  }
+);
+
+const integration = await response.json();
+```
+
+**Response:**
+
+```json
+{
+  "id": "int_m1c2l3d4",
+  "vendor": "mcleod",
+  "category": "TMS",
+  "name": "McLeod TMS - Production",
+  "status": "CONFIGURED",
+  "syncIntervalMinutes": 30,
+  "createdAt": "2026-02-10T10:00:00Z"
+}
+```
+
+#### Step 3: Test and Activate
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_m1c2l3d4/test \
+  -H "X-API-Key: $SALLY_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "id": "int_m1c2l3d4",
+  "testResult": "SUCCESS",
+  "message": "Successfully connected to McLeod. Found 47 active loads and 23 customers.",
+  "details": {
+    "activeLoads": 47,
+    "customers": 23,
+    "drivers": 15,
+    "latency": "380ms"
+  },
+  "testedAt": "2026-02-10T10:01:00Z"
+}
+```
+
+### Data Mapping
+
+SALLY maps McLeod fields to SALLY load fields:
+
+| McLeod Field | SALLY Field | Notes |
+|---|---|---|
+| `orderNumber` | `referenceNumber` | Primary load identifier |
+| `billTo.name` | `customer` | Billing customer name |
+| `stops[0].address` | `originAddress` | First stop = origin |
+| `stops[last].address` | `destinationAddress` | Last stop = destination |
+| `stops[0].earlyDate` | `scheduledPickup` | Pickup appointment |
+| `stops[last].earlyDate` | `scheduledDelivery` | Delivery appointment |
+| `totalWeight` | `weight` | In pounds |
+| `commodity.description` | `commodity` | Freight description |
+
+## Project44 Integration
+
+Project44 provides advanced shipment visibility and predictive ETAs. Connecting Project44 to SALLY enhances monitoring accuracy with external tracking data.
+
+### What You Get
+
+- **Shipment visibility** -- Real-time tracking from Project44's carrier network
+- **Predictive ETAs** -- Machine learning-based ETA predictions
+- **Exception alerts** -- Project44's exception events feed into SALLY's alert system
+- **Multi-modal tracking** -- Track shipments across truck, rail, and intermodal
+
+### Setup
+
+#### Step 1: Get Project44 API Credentials
+
+Register for API access at [developer.project44.com](https://developer.project44.com). You will need:
+- Client ID
+- Client Secret
+- Environment (sandbox or production)
+
+#### Step 2: Create the Integration
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $SALLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vendor": "project44",
+    "name": "Project44 Visibility",
+    "config": {
+      "clientId": "p44_client_XXXXXXXX",
+      "clientSecret": "p44_secret_XXXXXXXX",
+      "environment": "production"
+    },
+    "syncIntervalMinutes": 15
+  }'
+```
+
+**JavaScript (fetch):**
+
+```javascript
+const response = await fetch(
+  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  {
+    method: "POST",
+    headers: {
+      "X-API-Key": process.env.SALLY_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      vendor: "project44",
+      name: "Project44 Visibility",
+      config: {
+        clientId: process.env.P44_CLIENT_ID,
+        clientSecret: process.env.P44_CLIENT_SECRET,
+        environment: "production",
+      },
+      syncIntervalMinutes: 15,
+    }),
+  }
+);
+
+const integration = await response.json();
+```
+
+#### Step 3: Test and Activate
+
+```bash
+curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_p4q5r6s7/test \
+  -H "X-API-Key: $SALLY_API_KEY"
+```
+
+**Response:**
+
+```json
+{
+  "id": "int_p4q5r6s7",
+  "testResult": "SUCCESS",
+  "message": "Successfully authenticated with Project44 API. Connection verified.",
+  "details": {
+    "environment": "production",
+    "apiVersion": "v4",
+    "capabilities": ["truckload_tracking", "ltl_tracking", "predictive_eta"],
+    "latency": "312ms"
+  },
+  "testedAt": "2026-02-10T10:01:00Z"
+}
+```
+
+### How Project44 Data Enhances SALLY
+
+When both a TMS integration (McLeod) and visibility integration (Project44) are active, SALLY combines data from both sources:
+
+1. **McLeod** provides load details, dispatch assignments, and appointment times
+2. **Project44** provides real-time tracking, predictive ETAs, and exception events
+3. **SALLY** uses both to plan optimal routes and generate accurate alerts
+
+For example, if Project44 detects that a carrier is running late, SALLY generates a `LATE_TO_APPOINTMENT` alert before the scheduled time, giving dispatchers time to notify the customer.
+
+## Sync Interval Recommendations
+
+| Vendor | Use Case | Recommended Interval |
+|---|---|---|
+| McLeod | Active dispatch operations | 15-30 minutes |
+| McLeod | Off-hours | 60 minutes |
+| Project44 | Active shipment monitoring | 15 minutes |
+| Project44 | Low-volume periods | 30 minutes |
+
+## Troubleshooting
+
+### McLeod: "Company not found"
+
+- Verify the `companyId` matches your McLeod company code exactly
+- Confirm your API key has access to the specified company
+
+### McLeod: Loads Not Syncing
+
+- Check that loads in McLeod have a status that SALLY recognizes (dispatched, in-transit)
+- Completed or voided loads are not synced
+- Verify the sync interval -- newly created loads appear after the next sync
+
+### Project44: "Authentication Failed"
+
+- Client credentials may have expired -- generate new ones in the Project44 developer portal
+- Verify you are using the correct environment (sandbox vs. production)
+
+### Project44: Missing Tracking Data
+
+- Tracking requires a valid SCAC code or MC number for the carrier
+- Some shipment modes may not have real-time tracking available
+- Check that the shipment has been tendered and accepted by the carrier
+
+## Next Steps
+
+- [ELD / Samsara Integration](/docs/api-guides/integrations/eld-samsara) -- Connect HOS data
+- [Webhooks](/docs/api-guides/integrations/webhooks) -- Receive event notifications
+- [Error Handling](/docs/api-guides/integrations/error-handling) -- Handle integration errors
+- [Integrations Overview](/docs/api-guides/integrations) -- All supported vendors
