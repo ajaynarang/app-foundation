@@ -10,19 +10,14 @@ dotenv.config({ path: '.env.local' });
 
 // ---------------------------------------------------------------------------
 // Seeds — single list of platform reference data.
-// Demo tenant data is handled separately by `pnpm run setup:demo`.
 // ---------------------------------------------------------------------------
 
 const SEED_LIST = [
   '01-super-admin',
   '02-feature-flags',
-  '03-truck-stops',
-  '06-reference-data',
   '07-plan-config',
   '08-plan-entitlements',
-  '09-migrate-existing-tenants',
   '10-vendor-configs',
-  '11-fuel-card-types',
   '12-add-ons',
   '13-desk',
   '14-model-pricing',
@@ -43,7 +38,6 @@ function parseArgs(): { command: 'seed' | 'reset' | 'status' } {
     return { command: 'reset' };
   }
 
-  // Accept --profile for backward compat (ignored — single seed list now)
   return { command: 'seed' };
 }
 
@@ -52,21 +46,18 @@ function parseArgs(): { command: 'seed' | 'reset' | 'status' } {
 // ---------------------------------------------------------------------------
 
 async function showStatus(prisma: PrismaClient): Promise<void> {
-  const [superAdminCount, flagCount, flagsEnabled, stopCount, driverCount, alertCount, notificationCount] =
-    await Promise.all([
-      prisma.user.count({ where: { role: 'SUPER_ADMIN' } }),
-      prisma.featureFlag.count(),
-      prisma.featureFlag.count({ where: { enabled: true } }),
-      prisma.stop.count(),
-      prisma.driver.count(),
-      prisma.alert.count(),
-      prisma.notification.count(),
-    ]);
+  const [superAdminCount, flagCount, flagsEnabled, tenantCount, notificationCount] = await Promise.all([
+    prisma.user.count({ where: { role: 'SUPER_ADMIN' } }),
+    prisma.featureFlag.count(),
+    prisma.featureFlag.count({ where: { enabled: true } }),
+    prisma.tenant.count(),
+    prisma.notification.count(),
+  ]);
 
   const flagsDisabled = flagCount - flagsEnabled;
 
   console.log('');
-  console.log('  SALLY Setup Status');
+  console.log('  Platform Setup Status');
   console.log(`  Database: ${getDatabaseName()}`);
   console.log('');
   console.log('  Entity             Count    Status');
@@ -77,9 +68,7 @@ async function showStatus(prisma: PrismaClient): Promise<void> {
   console.log(
     `  Feature Flags      ${String(flagCount).padEnd(7)}  ${flagCount > 0 ? `${flagsEnabled} on, ${flagsDisabled} off` : 'not seeded'}`,
   );
-  console.log(`  Truck Stops        ${String(stopCount).padEnd(7)}  ${stopCount > 0 ? 'seeded' : 'not seeded'}`);
-  console.log(`  Drivers            ${String(driverCount).padEnd(7)}  ${driverCount > 0 ? 'synced' : 'run TMS sync'}`);
-  console.log(`  Alerts             ${String(alertCount).padEnd(7)}  ${alertCount > 0 ? 'present' : 'none'}`);
+  console.log(`  Tenants            ${String(tenantCount).padEnd(7)}  ${tenantCount > 0 ? 'present' : 'none'}`);
   console.log(
     `  Notifications      ${String(notificationCount).padEnd(7)}  ${notificationCount > 0 ? 'present' : 'none'}`,
   );
@@ -121,7 +110,8 @@ async function main(): Promise<void> {
   const env = detectEnvironment();
 
   // Initialize Prisma
-  const connectionString = process.env.DATABASE_URL || 'postgresql://sally_user:sally_password@localhost:5432/sally';
+  const connectionString =
+    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/app?schema=public';
   const pool = new pg.Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
@@ -143,8 +133,6 @@ async function main(): Promise<void> {
 
     if (command === 'reset') {
       console.log('  Resetting database...');
-      // Note: prisma migrate reset is handled by the npm script wrapper
-      // This just re-seeds after reset
     }
 
     await runSeeds(prisma);

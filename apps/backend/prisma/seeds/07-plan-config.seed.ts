@@ -6,7 +6,7 @@ const planConfigs = [
     displayName: 'Trial',
     tagline: 'Full platform access for 30 days',
     pricePerUnit: null,
-    unitLabel: 'truck/month',
+    unitLabel: 'seat/month',
     fleetLimit: 50, // Generous trial limit
     userLimit: 50,
     isPopular: false,
@@ -17,10 +17,10 @@ const planConfigs = [
   },
   {
     plan: TenantPlan.STARTER,
-    displayName: 'Haul',
-    tagline: 'For carriers getting started',
-    pricePerUnit: 2900, // $29/truck/month
-    unitLabel: 'truck/month',
+    displayName: 'Starter',
+    tagline: 'For teams getting started',
+    pricePerUnit: 2900, // $29/seat/month
+    unitLabel: 'seat/month',
     fleetLimit: 10,
     userLimit: 5,
     isPopular: false,
@@ -31,10 +31,10 @@ const planConfigs = [
   },
   {
     plan: TenantPlan.PROFESSIONAL,
-    displayName: 'Fleet',
-    tagline: 'For growing fleet operations',
-    pricePerUnit: 4900, // $49/truck/month
-    unitLabel: 'truck/month',
+    displayName: 'Professional',
+    tagline: 'For growing teams',
+    pricePerUnit: 4900, // $49/seat/month
+    unitLabel: 'seat/month',
     fleetLimit: 25,
     userLimit: 25,
     isPopular: true,
@@ -45,15 +45,15 @@ const planConfigs = [
   },
   {
     plan: TenantPlan.ENTERPRISE,
-    displayName: 'Freight Force',
-    tagline: 'For enterprise-grade carriers',
+    displayName: 'Enterprise',
+    tagline: 'For enterprise-grade organizations',
     pricePerUnit: null,
-    unitLabel: 'truck/month',
+    unitLabel: 'seat/month',
     fleetLimit: null,
     userLimit: null,
     isPopular: false,
     ctaLabel: 'Contact Sales',
-    ctaUrl: 'mailto:sally@appshore.in',
+    ctaUrl: 'mailto:sales@example.com',
     displayOrder: 3,
     isActive: true,
   },
@@ -61,7 +61,7 @@ const planConfigs = [
 
 export const seed = {
   name: 'Plan Config',
-  description: 'Creates pricing tier display configuration (Haul, Fleet, Freight Force)',
+  description: 'Creates pricing tier display configuration (Starter, Professional, Enterprise)',
 
   async run(prisma: PrismaClient): Promise<{ created: number; skipped: number }> {
     let created = 0;

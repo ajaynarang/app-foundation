@@ -1,26 +1,26 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: sally-postgres
+    container_name: app-postgres
     environment:
-      POSTGRES_USER: sally_user
-      POSTGRES_PASSWORD: sally_password
-      POSTGRES_DB: sally
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
     ports:
-      - '5432:5432'
+      - '5499:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U sally_user -d sally']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d app']
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: sally-redis
+    container_name: app-redis
     ports:
-      - '6379:6379'
+      - '6399:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -36,7 +36,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   loki:
     image: grafana/loki:3.2.0
-    container_name: sally-loki
+    container_name: app-loki
     profiles: [observability]
     ports:
       - '127.0.0.1:3100:3100'
@@ -52,7 +52,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.0
-    container_name: sally-tempo
+    container_name: app-tempo
     profiles: [observability]
     ports:
       - '127.0.0.1:3200:3200' # Tempo query API
@@ -70,7 +70,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.3.0
-    container_name: sally-grafana
+    container_name: app-grafana
     profiles: [observability]
     ports:
       - '127.0.0.1:3003:3000'
@@ -107,12 +107,12 @@ services:
   #   build:
   #     context: .
   #     dockerfile: ./apps/backend/Dockerfile
-  #   container_name: sally-backend
+  #   container_name: app-backend
   #   profiles: [apps]
   #   environment:
   #     NODE_ENV: production
   #     ENV_TYPE: development
-  #     DATABASE_URL: postgresql://sally_user:sally_password@postgres:5432/sally
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
   #     REDIS_URL: redis://redis:6379/0
   #     CORS_ORIGINS: http://localhost:3000,http://frontend:3000
   #   ports:
@@ -134,7 +134,7 @@ services:
   #     context: .
   #     dockerfile: ./apps/web/Dockerfile
   #     target: development
-  #   container_name: sally-frontend
+  #   container_name: app-frontend
   #   profiles: [apps]
   #   environment:
   #     NEXT_PUBLIC_API_URL: http://localhost:8000
@@ -168,7 +168,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   inngest:
     image: inngest/inngest:latest
-    container_name: sally-inngest
+    container_name: app-inngest
     ports:
       - '8288:8288'
     command:
@@ -195,4 +195,4 @@ volumes:
 
 networks:
   default:
-    name: sally-network
+    name: app-network

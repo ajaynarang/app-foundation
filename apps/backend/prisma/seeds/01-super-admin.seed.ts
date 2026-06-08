@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as admin from 'firebase-admin';
 
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'SallyAdmin@2026';
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'PlatformAdmin@2026';
 
 let firebaseAuth: admin.auth.Auth | null = null;
 
@@ -69,13 +69,13 @@ export const seed = {
 
     initFirebase();
 
-    const superAdminFirebaseUid = await createFirebaseUser('admin@sally.com', SUPER_ADMIN_PASSWORD, 'SALLY Admin');
+    const superAdminFirebaseUid = await createFirebaseUser('admin@example.com', SUPER_ADMIN_PASSWORD, 'Platform Admin');
 
     const superAdmin = await prisma.user.create({
       data: {
-        userId: 'user_sally_superadmin_001',
-        email: 'admin@sally.com',
-        firstName: 'SALLY',
+        userId: 'user_platform_superadmin_001',
+        email: 'admin@example.com',
+        firstName: 'Platform',
         lastName: 'Admin',
         role: 'SUPER_ADMIN',
         tenantId: null,
