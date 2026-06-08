@@ -70,7 +70,7 @@ export class ApiKeysController extends BaseTenantController {
   // ─── Tenant-admin endpoints (Phase D) ────────────────────────────
 
   @Get('admin/tenant')
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'List every API key in the tenant (admin view)',
   })

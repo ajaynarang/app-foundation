@@ -27,10 +27,6 @@ describe('UserInvitationsService', () => {
     tenant: {
       findUnique: jest.fn(),
     },
-    driver: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
     $transaction: jest.fn(),
   };
 
@@ -111,7 +107,7 @@ describe('UserInvitationsService', () => {
         email: 'newuser@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        role: 'DISPATCHER' as any,
+        role: 'MEMBER' as any,
       };
 
       mockPrismaService.tenant.findUnique.mockResolvedValue({
@@ -141,7 +137,7 @@ describe('UserInvitationsService', () => {
         email: 'existing@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        role: 'DISPATCHER' as any,
+        role: 'MEMBER' as any,
       };
 
       mockPrismaService.tenant.findUnique.mockResolvedValue({
@@ -152,43 +148,6 @@ describe('UserInvitationsService', () => {
       mockPrismaService.user.findFirst.mockResolvedValue({ id: 1 });
 
       await expect(service.inviteUser(inviteDto, defaultCurrentUser)).rejects.toThrow(ConflictException);
-    });
-
-    it('should validate driver exists when driverId provided', async () => {
-      const inviteDto = {
-        email: 'driver@example.com',
-        firstName: 'Mike',
-        lastName: 'Driver',
-        role: 'DRIVER' as any,
-        driverId: 'driver_123',
-      };
-
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        id: 1,
-        tenantId: 'tenant_abc',
-      });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
-      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
-      mockPrismaService.driver.findUnique.mockResolvedValue({
-        id: 1,
-        driverId: 'driver_123',
-        tenantId: 1,
-        user: null,
-      });
-      mockPrismaService.userInvitation.create.mockResolvedValue({
-        id: 1,
-        status: 'PENDING',
-        invitedByUser: { firstName: 'Admin', lastName: 'User' },
-        tenant: { companyName: 'Fleet Co' },
-      });
-
-      await service.inviteUser(inviteDto, defaultCurrentUser);
-
-      expect(mockPrismaService.driver.findUnique).toHaveBeenCalledWith({
-        where: { driverId: 'driver_123' },
-        include: { user: true },
-      });
     });
   });
 
@@ -203,9 +162,8 @@ describe('UserInvitationsService', () => {
         email: 'newuser@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        role: 'DISPATCHER',
+        role: 'MEMBER',
         tenantId: 1,
-        driverId: null,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       };
@@ -239,63 +197,6 @@ describe('UserInvitationsService', () => {
       });
 
       await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toThrow(BadRequestException);
-    });
-
-    it('should auto-activate PENDING_ACTIVATION driver when invitation accepted', async () => {
-      const token = 'valid-token';
-      const firebaseUid = 'firebase-uid-456';
-
-      const mockInvitation = {
-        id: 1,
-        invitationId: 'inv_driver1',
-        email: 'driver@example.com',
-        firstName: 'Mike',
-        lastName: 'Driver',
-        role: 'DRIVER',
-        tenantId: 1,
-        driverId: 5,
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      };
-
-      const mockDriver = {
-        id: 5,
-        driverId: 'DRV-005',
-        status: 'PENDING_ACTIVATION',
-      };
-
-      const mockUser = {
-        id: 2,
-        userId: 'user_driver1',
-        email: mockInvitation.email,
-        driverId: 5,
-      };
-
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue(mockInvitation);
-      mockPrismaService.$transaction.mockImplementation(async (callback) => {
-        return callback(mockPrismaService);
-      });
-      mockPrismaService.user.create.mockResolvedValue(mockUser);
-      mockPrismaService.userInvitation.update.mockResolvedValue({
-        ...mockInvitation,
-        status: 'ACCEPTED',
-      });
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.driver.update.mockResolvedValue({
-        ...mockDriver,
-        status: 'ACTIVE',
-      });
-
-      await service.acceptInvitation(token, firebaseUid);
-
-      expect(mockPrismaService.driver.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 5 },
-          data: expect.objectContaining({
-            status: 'ACTIVE',
-          }),
-        }),
-      );
     });
   });
 
@@ -605,7 +506,7 @@ describe('UserInvitationsService', () => {
             email: 'a@b.com',
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'u1', role: 'SUPER_ADMIN', tenantId: null },
         ),
@@ -619,7 +520,7 @@ describe('UserInvitationsService', () => {
             email: 'a@b.com',
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'u1', role: 'ADMIN', tenantId: null },
         ),
@@ -648,7 +549,7 @@ describe('UserInvitationsService', () => {
           phone: '+15551234567',
           firstName: 'Driver',
           lastName: 'One',
-          role: 'DRIVER' as any,
+          role: 'MEMBER' as any,
         },
         { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
       );
@@ -741,10 +642,8 @@ describe('UserInvitationsService', () => {
         phone: '+15551234567',
         firstName: 'Mike',
         lastName: 'Driver',
-        role: 'DRIVER',
+        role: 'MEMBER',
         tenantId: 1,
-        driverId: null,
-        customerId: null,
         email: null,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -863,64 +762,6 @@ describe('UserInvitationsService', () => {
         }),
       ).rejects.toThrow('Invalid or expired verification code');
     });
-
-    it('should auto-activate linked driver on phone invitation acceptance', async () => {
-      const mockInvitation = {
-        id: 1,
-        token: 'phone-token',
-        phone: '+15551234567',
-        firstName: 'Mike',
-        lastName: 'Driver',
-        role: 'DRIVER',
-        tenantId: 1,
-        driverId: 5,
-        customerId: null,
-        email: 'mike@test.com',
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      };
-
-      const mockDriver = {
-        id: 5,
-        driverId: 'DRV-005',
-        status: 'PENDING_ACTIVATION',
-      };
-
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue(mockInvitation);
-      mockTwilioVerifyService.checkVerification.mockResolvedValue(true);
-      mockPinService.hashPin.mockResolvedValue('hashed-pin');
-      mockPrismaService.$transaction.mockImplementation(async (callback) => {
-        return callback(mockPrismaService);
-      });
-      mockPrismaService.user.create.mockResolvedValue({
-        id: 2,
-        userId: 'user_driver1',
-        driverId: 5,
-      });
-      mockPrismaService.driver.findUnique.mockResolvedValue(mockDriver);
-      mockPrismaService.driver.update.mockResolvedValue({
-        ...mockDriver,
-        status: 'ACTIVE',
-      });
-      mockPrismaService.userInvitation.update.mockResolvedValue({
-        ...mockInvitation,
-        status: 'ACCEPTED',
-      });
-
-      await service.acceptPhoneInvitation({
-        token: 'phone-token',
-        phone: '+15551234567',
-        otp: '123456',
-        pin: '1234',
-      });
-
-      expect(mockPrismaService.driver.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 5 },
-          data: expect.objectContaining({ status: 'ACTIVE' }),
-        }),
-      );
-    });
   });
 
   describe('inviteUser — phone user already exists', () => {
@@ -941,101 +782,11 @@ describe('UserInvitationsService', () => {
             phone: '+15551234567',
             firstName: 'A',
             lastName: 'B',
-            role: 'DRIVER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
         ),
       ).rejects.toThrow('phone number already exists');
-    });
-  });
-
-  describe('inviteUser — driver validation edge cases', () => {
-    const defaultCurrentUser = {
-      userId: 'user_admin1',
-      role: 'ADMIN',
-      tenantId: 'tenant_abc',
-    };
-
-    it('should throw when driver already linked to a user', async () => {
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        id: 1,
-        tenantId: 'tenant_abc',
-      });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
-      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
-      mockPrismaService.driver.findUnique.mockResolvedValue({
-        id: 1,
-        driverId: 'driver_123',
-        tenantId: 1,
-        user: { id: 5 },
-      });
-
-      await expect(
-        service.inviteUser(
-          {
-            email: 'new@test.com',
-            firstName: 'A',
-            lastName: 'B',
-            role: 'DRIVER' as any,
-            driverId: 'driver_123',
-          },
-          defaultCurrentUser,
-        ),
-      ).rejects.toThrow('already linked');
-    });
-
-    it('should throw when driver belongs to a different tenant', async () => {
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        id: 1,
-        tenantId: 'tenant_abc',
-      });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
-      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
-      mockPrismaService.driver.findUnique.mockResolvedValue({
-        id: 1,
-        driverId: 'driver_123',
-        tenantId: 999, // different tenant
-        user: null,
-      });
-
-      await expect(
-        service.inviteUser(
-          {
-            email: 'new@test.com',
-            firstName: 'A',
-            lastName: 'B',
-            role: 'DRIVER' as any,
-            driverId: 'driver_123',
-          },
-          defaultCurrentUser,
-        ),
-      ).rejects.toThrow('does not belong');
-    });
-
-    it('should throw when driver not found', async () => {
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        id: 1,
-        tenantId: 'tenant_abc',
-      });
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
-      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
-      mockPrismaService.driver.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.inviteUser(
-          {
-            email: 'new@test.com',
-            firstName: 'A',
-            lastName: 'B',
-            role: 'DRIVER' as any,
-            driverId: 'driver_nonexistent',
-          },
-          defaultCurrentUser,
-        ),
-      ).rejects.toThrow('Driver not found');
     });
   });
 
@@ -1052,7 +803,7 @@ describe('UserInvitationsService', () => {
           {
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
         ),
@@ -1079,7 +830,7 @@ describe('UserInvitationsService', () => {
             email: 'new@test.com',
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
         ),
@@ -1097,7 +848,7 @@ describe('UserInvitationsService', () => {
             email: 'new@test.com',
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'user_admin1', role: 'ADMIN', tenantId: 'bad_tenant' },
         ),
@@ -1119,7 +870,7 @@ describe('UserInvitationsService', () => {
             email: 'new@test.com',
             firstName: 'A',
             lastName: 'B',
-            role: 'DISPATCHER' as any,
+            role: 'MEMBER' as any,
           },
           { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
         ),

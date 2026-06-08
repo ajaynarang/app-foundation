@@ -1,28 +1,11 @@
-// UserMode is a plain string in the DB (not a Prisma enum)
-export type UserMode =
-  | 'prospect'
-  | 'customer'
-  | 'dispatcher'
-  | 'driver'
-  | 'owner'
-  | 'admin'
-  | 'super_admin'
-  | 'support';
+// UserMode is a plain string in the DB (not a Prisma enum). It mirrors the
+// user's role and is used for greeting copy + routing. Add modes as you grow
+// the assistant's surfaces.
+export type UserMode = 'owner' | 'admin' | 'member' | 'super_admin';
 
-export const AGENT_IDS = [
-  'dispatch',
-  'billing',
-  'compliance',
-  'safety',
-  'route',
-  'payroll',
-  'maintenance',
-  'fuel',
-  'driver',
-  'customer',
-  'support',
-  'prospect',
-] as const;
+// The starter ships ONE generic agent. Add agent ids here as you register
+// more specialist agents in agents.module.ts.
+export const AGENT_IDS = ['assistant'] as const;
 
 export type AgentId = (typeof AGENT_IDS)[number];
 

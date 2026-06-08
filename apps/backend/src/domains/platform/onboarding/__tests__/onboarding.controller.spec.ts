@@ -8,7 +8,7 @@ describe('OnboardingController', () => {
 
   const mockStatus = {
     overallProgress: 50,
-    items: [{ id: 'drivers', label: 'Add Drivers', done: true }],
+    items: [{ id: 'profile', label: 'Complete Your Profile', done: true }],
   };
 
   beforeEach(() => {

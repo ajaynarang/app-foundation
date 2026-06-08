@@ -11,7 +11,7 @@ export class FileStorageService {
   private readonly bucket: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.bucket = this.configService.get<string>('s3.bucket', 'sally-documents');
+    this.bucket = this.configService.get<string>('s3.bucket', process.env.S3_BUCKET || 'app-files');
     const region = this.configService.get<string>('s3.region', 'us-east-1');
 
     this.s3Client = new S3Client({ region });
@@ -94,15 +94,6 @@ export class FileStorageService {
 
     const byteArray = await response.Body.transformToByteArray();
     return Buffer.from(byteArray);
-  }
-
-  /**
-   * Generate an S3 key for a ratecon upload (before load creation).
-   */
-  generateRateconUploadKey(tenantId: number, fileName: string): string {
-    const sanitized = this.sanitizeFileName(fileName);
-    const uuid = randomUUID().slice(0, 13);
-    return `tenants/${tenantId}/ratecon-uploads/${uuid}_${sanitized}`;
   }
 
   async deleteObject(s3Key: string): Promise<void> {

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { NotificationType } from '@prisma/client';
 import { ChannelResolutionService } from './channel-resolution.service';
 import { NotificationDeliveryService } from './delivery.service';
@@ -119,116 +119,6 @@ export class NotificationTriggersService {
 
   // --- Convenience methods for each trigger type ---
 
-  async invoiceGenerated(tenantId: number, invoiceNumber: string, loadNumber: string, amount: string) {
-    return this.trigger({
-      tenantId,
-      type: 'INVOICE_GENERATED' as NotificationType,
-      category: 'BILLING',
-      title: `Invoice ${invoiceNumber} Generated`,
-      message: `Invoice for Load ${loadNumber} — ${amount}`,
-      actionUrl: '/dispatcher/billing',
-      actionLabel: 'View Billing',
-      iconType: 'billing',
-      recipientRoles: ['OWNER', 'ADMIN', 'DISPATCHER'],
-    });
-  }
-
-  async invoiceSent(tenantId: number, invoiceNumber: string, customerName: string) {
-    return this.trigger({
-      tenantId,
-      type: 'INVOICE_SENT' as NotificationType,
-      category: 'BILLING',
-      title: `Invoice ${invoiceNumber} Sent`,
-      message: `Sent to ${customerName}`,
-      actionUrl: '/dispatcher/billing',
-      actionLabel: 'View Billing',
-      iconType: 'billing',
-      recipientRoles: ['OWNER', 'ADMIN', 'DISPATCHER'],
-    });
-  }
-
-  async customerInvoiceSent(tenantId: number, customerId: number, invoiceNumber: string, amount: string) {
-    const customerUsers = await this.prisma.user.findMany({
-      where: { tenantId, role: 'CUSTOMER', customerId, isActive: true },
-      select: { id: true },
-    });
-    if (!customerUsers.length) return;
-
-    return this.trigger({
-      tenantId,
-      type: 'CUSTOMER_INVOICE_SENT' as NotificationType,
-      category: 'BILLING',
-      title: `Invoice ${invoiceNumber}`,
-      message: `New invoice for ${amount}`,
-      actionUrl: '/customer/dashboard',
-      actionLabel: 'View Invoice',
-      iconType: 'billing',
-      recipientUserIds: customerUsers.map((u) => u.id),
-    });
-  }
-
-  async paymentReceived(tenantId: number, invoiceNumber: string, amount: string, customerName: string) {
-    return this.trigger({
-      tenantId,
-      type: 'PAYMENT_RECEIVED' as NotificationType,
-      category: 'BILLING',
-      title: `Payment Received — ${invoiceNumber}`,
-      message: `${amount} from ${customerName}`,
-      actionUrl: '/dispatcher/billing',
-      actionLabel: 'View Billing',
-      iconType: 'billing',
-      recipientRoles: ['OWNER', 'ADMIN', 'DISPATCHER'],
-    });
-  }
-
-  async customerPaymentConfirmed(tenantId: number, customerId: number, invoiceNumber: string, amount: string) {
-    const customerUsers = await this.prisma.user.findMany({
-      where: { tenantId, role: 'CUSTOMER', customerId, isActive: true },
-      select: { id: true },
-    });
-    if (!customerUsers.length) return;
-
-    return this.trigger({
-      tenantId,
-      type: 'CUSTOMER_PAYMENT_CONFIRMED' as NotificationType,
-      category: 'BILLING',
-      title: 'Payment Confirmed',
-      message: `Your payment of ${amount} for invoice ${invoiceNumber} has been recorded`,
-      actionUrl: '/customer/dashboard',
-      actionLabel: 'View Dashboard',
-      iconType: 'billing',
-      recipientUserIds: customerUsers.map((u) => u.id),
-    });
-  }
-
-  async settlementReady(tenantId: number, settlementNumber: string, driverName: string, amount: string) {
-    return this.trigger({
-      tenantId,
-      type: 'SETTLEMENT_READY' as NotificationType,
-      category: 'BILLING',
-      title: `Settlement ${settlementNumber} Ready`,
-      message: `${driverName} — ${amount}`,
-      actionUrl: '/dispatcher/pay',
-      actionLabel: 'View Settlements',
-      iconType: 'billing',
-      recipientRoles: ['OWNER', 'ADMIN'],
-    });
-  }
-
-  async driverPaymentProcessed(tenantId: number, driverUserId: number, settlementNumber: string, amount: string) {
-    return this.trigger({
-      tenantId,
-      type: 'DRIVER_PAYMENT_PROCESSED' as NotificationType,
-      category: 'BILLING',
-      title: 'Payment Processed',
-      message: `Settlement ${settlementNumber} — ${amount} has been paid`,
-      actionUrl: '/driver/settlements',
-      actionLabel: 'View Settlement',
-      iconType: 'billing',
-      recipientUserIds: [driverUserId],
-    });
-  }
-
   async userJoined(tenantId: number, userName: string, role: string) {
     return this.trigger({
       tenantId,
@@ -263,30 +153,6 @@ export class NotificationTriggersService {
     });
   }
 
-  async driverActivated(tenantId: number, driverName: string) {
-    return this.trigger({
-      tenantId,
-      type: 'DRIVER_ACTIVATED' as NotificationType,
-      category: 'TEAM',
-      title: 'Driver Activated',
-      message: `${driverName} is now active`,
-      iconType: 'user',
-      recipientRoles: ['OWNER', 'ADMIN'],
-    });
-  }
-
-  async driverDeactivated(tenantId: number, driverName: string, reason?: string) {
-    return this.trigger({
-      tenantId,
-      type: 'DRIVER_DEACTIVATED' as NotificationType,
-      category: 'TEAM',
-      title: 'Driver Deactivated',
-      message: `${driverName} has been deactivated${reason ? `: ${reason}` : ''}`,
-      iconType: 'user',
-      recipientRoles: ['OWNER', 'ADMIN'],
-    });
-  }
-
   async integrationSyncCompleted(tenantId: number, integrationName: string, summary: string) {
     return this.trigger({
       tenantId,
@@ -311,7 +177,7 @@ export class NotificationTriggersService {
       actionUrl: 'console:/integrations/connections',
       actionLabel: 'View Integrations',
       iconType: 'integration',
-      recipientRoles: ['OWNER', 'ADMIN', 'DISPATCHER'],
+      recipientRoles: ['OWNER', 'ADMIN'],
     });
   }
 }

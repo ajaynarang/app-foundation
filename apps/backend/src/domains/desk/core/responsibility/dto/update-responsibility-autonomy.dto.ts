@@ -1,6 +1,6 @@
 import { IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type { UpdateResponsibilityAutonomyRequest } from '@app/shared-types';
+import type { UpdateResponsibilityAutonomyRequest } from '../../types';
 
 /**
  * PATCH /desk/responsibilities/:key/autonomy — flips the per-responsibility

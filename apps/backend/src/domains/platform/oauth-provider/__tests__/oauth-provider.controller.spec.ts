@@ -84,10 +84,10 @@ describe('OAuthProviderController', () => {
 
     it('should forward selectedScopes when provided', async () => {
       const req = { user: { dbId: 1, tenantDbId: 7 } } as any;
-      await controller.approveConsent('challenge_token', ['fleet:read', 'invoices:read'], req);
+      await controller.approveConsent('challenge_token', ['platform:read', 'documents:read'], req);
       expect(oauthService.approveConsent).toHaveBeenCalledWith('challenge_token', 1, 7, [
-        'fleet:read',
-        'invoices:read',
+        'platform:read',
+        'documents:read',
       ]);
     });
 

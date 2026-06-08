@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean } from 'class-validator';
-import type { SetMemoryPinnedRequest } from '@app/shared-types';
+import type { SetMemoryPinnedRequest } from '../../types';
 
 export class SetMemoryPinnedDto implements SetMemoryPinnedRequest {
   @ApiProperty({ description: 'Pin (true) or unpin (false). Pinned memories skip auto-decay.' })

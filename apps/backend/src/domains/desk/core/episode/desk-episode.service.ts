@@ -18,7 +18,7 @@ import {
   type Priority,
   type ResponsibilityKey,
   type StepRecord,
-} from '@app/shared-types';
+} from '../types';
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';

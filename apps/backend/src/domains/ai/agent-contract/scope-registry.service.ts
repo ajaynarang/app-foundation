@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { McpRegistryService } from '@rekog/mcp-nest';
+import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { AgentScope } from '@app/shared-types';
 import { getRequiredScope } from './requires-scope.decorator';
@@ -31,7 +31,7 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
   private readonly toolByName = new Map<string, ToolRecord>();
   private readonly namesByScope = new Map<AgentScope, Set<string>>();
 
-  constructor(private readonly mcpRegistry: McpRegistryService) {}
+  constructor(private readonly mcpRegistry: McpRegistryDiscoveryService) {}
 
   /**
    * Use `onApplicationBootstrap` rather than `onModuleInit` so every MCP

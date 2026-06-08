@@ -11,41 +11,30 @@ export class ScheduleManagerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(QUEUE_NAMES.TELEMETRY)
-    private readonly telemetryQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.VENDOR_DATA)
-    private readonly vendorDataQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.SAFETY_DETECT)
-    private readonly safetyDetectQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.BULK_OPS)
-    private readonly bulkOpsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.DOCUMENTS) private readonly documentsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.WEBHOOKS) private readonly webhooksQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.FINANCE)
-    private readonly financeQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.GEO_COMPUTE)
-    private readonly geoComputeQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.EVENTS)
+    private readonly eventsQueue: Queue,
     @InjectQueue(QUEUE_NAMES.NOTIFICATIONS)
     private readonly notificationsQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.WEBHOOKS) private readonly webhooksQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.AI_BACKGROUND)
+    private readonly aiBackgroundQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.BULK_OPS)
+    private readonly bulkOpsQueue: Queue,
   ) {}
 
   private getQueueForCategory(category: JobCategory): Queue | null {
     const meta = JOB_CATEGORIES[category];
     if (!meta) return null;
-    // queueMap is keyed by the new queue NAMES — `meta.queue` is the source of
+    // queueMap is keyed by the queue NAMES — `meta.queue` is the source of
     // truth (see job.types.ts) so we resolve the injected Queue instance via
-    // that lookup. Multiple categories may point to the same queue (e.g.
-    // `vendor` and `tms` both → vendor-data) — the map handles that naturally.
+    // that lookup. Multiple categories may point to the same queue — the map
+    // handles that naturally.
     const queueMap: Record<string, Queue> = {
-      [QUEUE_NAMES.TELEMETRY]: this.telemetryQueue,
-      [QUEUE_NAMES.VENDOR_DATA]: this.vendorDataQueue,
-      [QUEUE_NAMES.SAFETY_DETECT]: this.safetyDetectQueue,
-      [QUEUE_NAMES.BULK_OPS]: this.bulkOpsQueue,
-      [QUEUE_NAMES.DOCUMENTS]: this.documentsQueue,
-      [QUEUE_NAMES.WEBHOOKS]: this.webhooksQueue,
-      [QUEUE_NAMES.FINANCE]: this.financeQueue,
-      [QUEUE_NAMES.GEO_COMPUTE]: this.geoComputeQueue,
+      [QUEUE_NAMES.EVENTS]: this.eventsQueue,
       [QUEUE_NAMES.NOTIFICATIONS]: this.notificationsQueue,
+      [QUEUE_NAMES.WEBHOOKS]: this.webhooksQueue,
+      [QUEUE_NAMES.AI_BACKGROUND]: this.aiBackgroundQueue,
+      [QUEUE_NAMES.BULK_OPS]: this.bulkOpsQueue,
     };
     const queue = queueMap[meta.queue];
     if (!queue) {
@@ -112,62 +101,18 @@ export class ScheduleManagerService {
       return;
     }
 
-    // For integration-scoped jobs (tms, eld), re-register per integration
-    const meta = JOB_CATEGORIES[category];
-    if (meta.requiredIntegration) {
-      const integrationType = meta.requiredIntegration!;
-      const integrations = await this.prisma.integrationConfig.findMany({
-        where: {
-          integrationType,
-          isEnabled: true,
-          status: { in: ['ACTIVE', 'CONFIGURED'] },
-        },
-        select: {
-          id: true,
-          tenantId: true,
-          displayName: true,
-          integrationType: true,
-        },
-      });
+    // System-wide repeatable job.
+    const repeatOpts =
+      schedule.scheduleType === 'cron' ? { pattern: schedule.pattern } : { every: schedule.intervalMs };
 
-      for (const integration of integrations) {
-        const repeatOpts =
-          schedule.scheduleType === 'cron' ? { pattern: schedule.pattern } : { every: schedule.intervalMs };
-
-        await queue.add(
-          jobType,
-          {
-            tenantId: integration.tenantId,
-            integrationId: integration.id,
-            integrationName: integration.displayName,
-            integrationType: integration.integrationType,
-            type: jobType,
-            triggerSource: 'scheduled',
-          },
-          {
-            repeat: repeatOpts,
-            jobId: `${category}-${jobType}-tenant-${integration.tenantId}-integration-${integration.id}`,
-            // Repeatable jobs run on a short cron cycle, so limit retries
-            // to avoid stacking failures (next cron tick will try again).
-            attempts: 1,
-            removeOnFail: { age: 86400 },
-          },
-        );
-      }
-    } else {
-      // System-wide job (safety, maintenance, vendor)
-      const repeatOpts =
-        schedule.scheduleType === 'cron' ? { pattern: schedule.pattern } : { every: schedule.intervalMs };
-
-      await queue.add(
-        jobType,
-        {},
-        {
-          repeat: repeatOpts,
-          jobId: `${category}-${jobType}`,
-        },
-      );
-    }
+    await queue.add(
+      jobType,
+      {},
+      {
+        repeat: repeatOpts,
+        jobId: `${category}-${jobType}`,
+      },
+    );
 
     this.logger.log(`Reloaded schedule: ${category}/${jobType}`);
   }

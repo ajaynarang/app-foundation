@@ -11,19 +11,21 @@ export interface RouteResult {
   source: 'regex' | 'classifier' | 'default';
 }
 
+/**
+ * Default agent per persona. The starter has a single generic agent, so every
+ * persona maps to `assistant`. Add specialist agents and route to them here.
+ */
 const PERSONA_DEFAULT_AGENT: Record<string, AgentId> = {
-  dispatcher: 'dispatch',
-  admin: 'dispatch',
-  owner: 'dispatch',
-  super_admin: 'dispatch',
-  driver: 'driver',
-  customer: 'customer',
-  support: 'support',
-  prospect: 'prospect',
+  member: 'assistant',
+  admin: 'assistant',
+  owner: 'assistant',
+  super_admin: 'assistant',
 };
 
-/** Personas that always go to their default agent (skip Haiku classification) */
-const SINGLE_DOMAIN_PERSONAS: string[] = ['driver', 'customer', 'prospect', 'support'];
+const DEFAULT_AGENT: AgentId = 'assistant';
+
+/** Personas that always go to their default agent (skip classification). */
+const SINGLE_DOMAIN_PERSONAS: string[] = [];
 
 @Injectable()
 export class SallyRouterService {
@@ -43,7 +45,7 @@ export class SallyRouterService {
    * `route()` for its richer routing.
    */
   defaultAgentFor(userMode: string): AgentId {
-    return PERSONA_DEFAULT_AGENT[userMode] ?? 'dispatch';
+    return PERSONA_DEFAULT_AGENT[userMode] ?? DEFAULT_AGENT;
   }
 
   async route(message: string, userMode: UserMode): Promise<RouteResult> {
@@ -62,7 +64,7 @@ export class SallyRouterService {
 
     // Step 2: Single-domain personas → default agent, no classifier needed
     if (SINGLE_DOMAIN_PERSONAS.includes(userMode)) {
-      const agentId = PERSONA_DEFAULT_AGENT[userMode] ?? 'dispatch';
+      const agentId = PERSONA_DEFAULT_AGENT[userMode] ?? DEFAULT_AGENT;
       return {
         agentId,
         taskSkill: null,

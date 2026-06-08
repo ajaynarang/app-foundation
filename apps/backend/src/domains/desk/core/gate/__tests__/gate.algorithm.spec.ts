@@ -32,7 +32,7 @@ function baseInput(overrides: Partial<GateDecisionInput> = {}): GateDecisionInpu
 describe('decideGate — universal fail-safes', () => {
   it('read tier never gates (even Supervised)', () => {
     for (const trustLevel of ['SUPERVISED', 'ASSISTED', 'AUTONOMOUS'] as const) {
-      const decision = decideGate(baseInput({ toolScope: 'invoices:read', trustLevel }));
+      const decision = decideGate(baseInput({ toolScope: 'documents:read', trustLevel }));
       expect(decision.gated).toBe(false);
       expect(decision.rule).toBe('read_never_gates');
     }
@@ -42,7 +42,7 @@ describe('decideGate — universal fail-safes', () => {
     for (const trustLevel of ['SUPERVISED', 'ASSISTED', 'AUTONOMOUS'] as const) {
       const decision = decideGate(
         baseInput({
-          toolScope: 'invoices:write:sensitive',
+          toolScope: 'platform:write:sensitive',
           trustLevel,
           lastLlmConfidence: 1.0,
           conditionsResult: CONDITIONS_MET,
@@ -79,7 +79,7 @@ describe('decideGate — universal fail-safes', () => {
 });
 
 describe('decideGate — Supervised trust on standard tier', () => {
-  const standardScopes = ['comms:send', 'invoices:write', 'settlements:write', 'fleet:write'] as const;
+  const standardScopes = ['comms:send', 'platform:write', 'integrations:write'] as const;
 
   it.each(standardScopes)('gates %s regardless of confidence or conditions', (toolScope) => {
     const decision = decideGate(
@@ -184,7 +184,7 @@ describe('decideGate — Assisted trust on standard tier', () => {
     const decision = decideGate(
       baseInput({
         trustLevel: 'ASSISTED',
-        toolScope: 'invoices:write:sensitive',
+        toolScope: 'platform:write:sensitive',
         conditionsResult: CONDITIONS_MET,
         lastLlmConfidence: 1.0,
       }),
@@ -224,7 +224,7 @@ describe('decideGate — Autonomous trust on standard tier', () => {
     const decision = decideGate(
       baseInput({
         trustLevel: 'AUTONOMOUS',
-        toolScope: 'invoices:write:sensitive',
+        toolScope: 'platform:write:sensitive',
         lastLlmConfidence: 1.0,
       }),
     );
@@ -236,7 +236,7 @@ describe('decideGate — Autonomous trust on standard tier', () => {
     const decision = decideGate(
       baseInput({
         trustLevel: 'AUTONOMOUS',
-        toolScope: 'invoices:write',
+        toolScope: 'platform:write',
         lastLlmConfidence: null,
       }),
     );
@@ -248,7 +248,7 @@ describe('decideGate — Autonomous trust on standard tier', () => {
     const decision = decideGate(
       baseInput({
         trustLevel: 'AUTONOMOUS',
-        toolScope: 'invoices:write',
+        toolScope: 'platform:write',
         lastLlmConfidence: 0.75,
       }),
     );

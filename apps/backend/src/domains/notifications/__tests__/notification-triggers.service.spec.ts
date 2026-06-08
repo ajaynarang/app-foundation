@@ -3,7 +3,7 @@ import { NotificationTriggersService } from '../notification-triggers.service';
 import { InAppNotificationService } from '../notifications.service';
 import { ChannelResolutionService } from '../channel-resolution.service';
 import { NotificationDeliveryService } from '../delivery.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 describe('NotificationTriggersService', () => {
   let service: NotificationTriggersService;
@@ -273,44 +273,8 @@ describe('NotificationTriggersService', () => {
       channelResolution.resolveForNotification.mockResolvedValue(allChannelsPrefs);
     });
 
-    it('invoiceGenerated sends BILLING notification to dispatchers', async () => {
-      await service.invoiceGenerated(1, 'INV-001', 'LD-001', '$2,500');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'INVOICE_GENERATED',
-          category: 'BILLING',
-          title: expect.stringContaining('INV-001'),
-        }),
-      );
-    });
-
-    it('invoiceSent sends BILLING notification', async () => {
-      await service.invoiceSent(1, 'INV-001', 'Acme Corp');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'INVOICE_SENT',
-          title: expect.stringContaining('INV-001'),
-          message: expect.stringContaining('Acme Corp'),
-        }),
-      );
-    });
-
-    it('settlementReady sends to OWNER and ADMIN roles', async () => {
-      await service.settlementReady(1, 'SET-001', 'John Driver', '$3,000');
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            role: { in: ['OWNER', 'ADMIN'] },
-          }),
-        }),
-      );
-    });
-
     it('userJoined sends TEAM notification', async () => {
-      await service.userJoined(1, 'Jane Doe', 'DISPATCHER');
+      await service.userJoined(1, 'Jane Doe', 'MEMBER');
 
       expect(deliveryService.deliver).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -321,134 +285,14 @@ describe('NotificationTriggersService', () => {
       );
     });
 
-    it('driverActivated sends TEAM notification', async () => {
-      await service.driverActivated(1, 'Bob Wilson');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'DRIVER_ACTIVATED',
-          category: 'TEAM',
-          message: expect.stringContaining('Bob Wilson'),
-        }),
-      );
-    });
-
     it('integrationSyncFailed sends SYSTEM notification', async () => {
-      await service.integrationSyncFailed(1, 'Samsara', 'API key expired');
+      await service.integrationSyncFailed(1, 'QuickBooks', 'API key expired');
 
       expect(deliveryService.deliver).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'INTEGRATION_SYNC_FAILED',
           category: 'SYSTEM',
           message: 'API key expired',
-        }),
-      );
-    });
-
-    it('customerInvoiceSent sends to customer users only', async () => {
-      // First call: customer users
-      prisma.user.findMany
-        .mockResolvedValueOnce([{ id: 50 }]) // customer query
-        .mockResolvedValueOnce([
-          {
-            id: 50,
-            userId: 'uid-50',
-            firebaseUid: 'uid-50',
-            email: 'cust@test.com',
-            phone: null,
-          },
-        ]); // recipient resolve
-
-      await service.customerInvoiceSent(1, 10, 'INV-002', '$1,500');
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            role: 'CUSTOMER',
-            customerId: 10,
-          }),
-        }),
-      );
-    });
-
-    it('customerInvoiceSent skips when no customer users exist', async () => {
-      prisma.user.findMany.mockResolvedValueOnce([]); // no customer users
-
-      await service.customerInvoiceSent(1, 10, 'INV-002', '$1,500');
-
-      // deliver should not be called because there are no customer users
-      expect(deliveryService.deliver).not.toHaveBeenCalled();
-    });
-
-    it('paymentReceived sends BILLING notification', async () => {
-      await service.paymentReceived(1, 'INV-001', '$5,000', 'Acme Corp');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'PAYMENT_RECEIVED',
-          category: 'BILLING',
-          title: expect.stringContaining('INV-001'),
-          message: expect.stringContaining('Acme Corp'),
-        }),
-      );
-    });
-
-    it('customerPaymentConfirmed sends to customer users only', async () => {
-      prisma.user.findMany.mockResolvedValueOnce([{ id: 60 }]).mockResolvedValueOnce([
-        {
-          id: 60,
-          userId: 'uid-60',
-          firebaseUid: 'uid-60',
-          email: 'cust@test.com',
-          phone: null,
-        },
-      ]);
-
-      await service.customerPaymentConfirmed(1, 10, 'INV-003', '$2,000');
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ role: 'CUSTOMER', customerId: 10 }),
-        }),
-      );
-    });
-
-    it('customerPaymentConfirmed skips when no customer users', async () => {
-      prisma.user.findMany.mockResolvedValueOnce([]);
-
-      await service.customerPaymentConfirmed(1, 10, 'INV-003', '$2,000');
-      expect(deliveryService.deliver).not.toHaveBeenCalled();
-    });
-
-    it('driverPaymentProcessed sends to specific driver user', async () => {
-      await service.driverPaymentProcessed(1, 42, 'STL-001', '$3,000');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'DRIVER_PAYMENT_PROCESSED',
-          category: 'BILLING',
-        }),
-      );
-    });
-
-    it('driverDeactivated includes reason when provided', async () => {
-      await service.driverDeactivated(1, 'John Doe', 'Left company');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'DRIVER_DEACTIVATED',
-          message: expect.stringContaining('Left company'),
-        }),
-      );
-    });
-
-    it('driverDeactivated works without reason', async () => {
-      await service.driverDeactivated(1, 'John Doe');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'DRIVER_DEACTIVATED',
-          message: 'John Doe has been deactivated',
         }),
       );
     });
@@ -462,13 +306,13 @@ describe('NotificationTriggersService', () => {
           { id: 42, userId: 'uid-42', firebaseUid: 'uid-42', email: 'c@t.com', phone: null },
         ]);
 
-      await service.userRoleChanged(1, 42, 'Jane Doe', 'DISPATCHER', 'ADMIN');
+      await service.userRoleChanged(1, 42, 'Jane Doe', 'MEMBER', 'ADMIN');
 
       expect(deliveryService.deliver).toHaveBeenCalled();
     });
 
     it('integrationSyncCompleted sends SYSTEM notification', async () => {
-      await service.integrationSyncCompleted(1, 'Samsara', '10 drivers synced');
+      await service.integrationSyncCompleted(1, 'QuickBooks', '10 records synced');
 
       expect(deliveryService.deliver).toHaveBeenCalledWith(
         expect.objectContaining({

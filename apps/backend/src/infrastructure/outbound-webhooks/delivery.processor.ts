@@ -101,10 +101,10 @@ export class WebhookDeliveryProcessor extends WorkerHost {
       const response = await axios.post(subscription.url, body, {
         headers: {
           'Content-Type': 'application/json',
-          'X-Sally-Signature': signature,
-          'X-Sally-Event': payload.event,
-          'X-Sally-Delivery': logId,
-          'X-Sally-Event-Version': String(payload.version ?? 1),
+          'X-Webhook-Signature': signature,
+          'X-Webhook-Event': payload.event,
+          'X-Webhook-Delivery': logId,
+          'X-Webhook-Event-Version': String(payload.version ?? 1),
         },
         timeout: 10_000,
         validateStatus: () => true, // handle all statuses manually below

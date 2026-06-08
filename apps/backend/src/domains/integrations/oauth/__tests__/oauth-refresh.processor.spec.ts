@@ -4,7 +4,6 @@ import { OAuthRefreshJobHandler } from '../oauth-refresh.processor';
 import { AuthTokenService } from '../auth-token.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { VendorCircuitBreakerService } from '../../../../infrastructure/queue/vendor-circuit-breaker.service';
-import { VENDOR_DATA_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
 
 interface OAuthRefreshJobData {
   tenantId: number;
@@ -53,8 +52,7 @@ describe('OAuthRefreshJobHandler', () => {
     metadata: { enqueuedAt: new Date().toISOString(), source: 'cron', version: 1 },
   });
 
-  const makeJob = (data: OAuthRefreshJobData, name: string = VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH) =>
-    ({ name, data: wrap(data) }) as any;
+  const makeJob = (data: OAuthRefreshJobData, name: string = 'oauth-refresh') => ({ name, data: wrap(data) }) as any;
 
   describe('process', () => {
     it('should throw when circuit breaker is open', async () => {

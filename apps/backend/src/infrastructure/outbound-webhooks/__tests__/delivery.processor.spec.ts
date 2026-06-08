@@ -76,7 +76,7 @@ describe('WebhookDeliveryProcessor', () => {
       const secret = 'my-secret';
       const payload = {
         id: 'evt-1',
-        event: 'sally.load.created',
+        event: 'app.notification.created',
         tenantId: 'tenant_x',
         data: {},
       };
@@ -95,7 +95,7 @@ describe('WebhookDeliveryProcessor', () => {
       tenantId: 'tenant_x',
       url: 'https://partner.com/hook',
       secret: 'my-secret',
-      events: ['sally.load.created'],
+      events: ['app.notification.created'],
       active: true,
     };
 
@@ -104,7 +104,7 @@ describe('WebhookDeliveryProcessor', () => {
       logId: 'log-1',
       payload: {
         id: 'evt-1',
-        event: 'sally.load.created',
+        event: 'app.notification.created',
         tenantId: 'tenant_x',
         timestamp: new Date().toISOString(),
         data: {},
@@ -127,8 +127,8 @@ describe('WebhookDeliveryProcessor', () => {
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
-            'X-Sally-Signature': expect.stringMatching(/^sha256=/),
-            'X-Sally-Event': 'sally.load.created',
+            'X-Webhook-Signature': expect.stringMatching(/^sha256=/),
+            'X-Webhook-Event': 'app.notification.created',
           }),
         }),
       );
@@ -188,7 +188,7 @@ describe('WebhookDeliveryProcessor', () => {
       logId: 'log-1',
       payload: {
         id: 'evt-1',
-        event: 'sally.load.created',
+        event: 'app.notification.created',
         tenantId: 'tenant_x',
         timestamp: new Date().toISOString(),
         data: {},

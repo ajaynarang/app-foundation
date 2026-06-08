@@ -19,8 +19,14 @@ import { InvocationPipelineService } from '../../../ai/agent-contract/invocation
 import { ScopeRegistryService } from '../../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../../core/episode/desk-step-writer.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { AR_FOLLOWUP_DEFINITION } from '../../responsibilities';
+import { findResponsibilityDefinition } from '../../responsibilities';
 import { executeStep } from '../execute.step';
+
+// The starter ships ONE generic responsibility ('welcome') with empty tools.
+// These tests exercise the engine's scope-derivation + fail-closed paths
+// against it. Add tools to your own responsibilities and assert their derived
+// scope set the same way.
+const WELCOME = findResponsibilityDefinition('welcome')!;
 
 const fromDeskResponsibilityMock = fromDeskResponsibility as jest.MockedFunction<typeof fromDeskResponsibility>;
 
@@ -37,7 +43,7 @@ function makeEpisode(overrides: Partial<EpisodeRow> = {}): EpisodeRow {
   return {
     tenantId: 10,
     responsibilityId: 5,
-    responsibility: { key: 'ar_followup' },
+    responsibility: { key: 'welcome' },
     ownerAgent: { supervisorUserId: 99 },
     ...overrides,
   };
@@ -50,14 +56,14 @@ function setup(episode: EpisodeRow) {
   const pipeline = {
     run: jest.fn().mockResolvedValue({ isError: false, content: [{ type: 'text', text: 'ok' }] }),
   };
-  // Map known AR tools to deterministic scopes; one tool maps to undefined
-  // (registry miss) to verify it is filtered out of the principal scope set.
+  // Map known tools to deterministic scopes; unmapped tools return undefined
+  // (registry miss) and are filtered out of the principal scope set.
   const scopeRegistry = {
     scopeForTool: jest.fn((tool: string) => {
       const map: Record<string, string> = {
         'send-email': 'comms:send',
-        'get-invoice-detail': 'invoices:read',
-        'record-promise-to-pay': 'invoices:write',
+        'read-document': 'documents:read',
+        'write-record': 'platform:write',
       };
       return map[tool];
     }),
@@ -92,28 +98,28 @@ describe('executeStep — registry-driven scope set', () => {
 
     expect(fromDeskResponsibilityMock).toHaveBeenCalledTimes(1);
     const principalArg = fromDeskResponsibilityMock.mock.calls[0][0];
-    // Scopes come from AR_FOLLOWUP_DEFINITION.tools mapped via the registry,
-    // de-duplicated, with registry misses (undefined) filtered out.
-    const expectedScopes = Array.from(
-      new Set(['comms:send', 'invoices:read', 'invoices:write']), // the three mapped tools
-    );
-    expect([...principalArg.scopes].sort()).toEqual(expectedScopes.sort());
+    // The starter 'welcome' responsibility declares no tools, so the principal
+    // carries an empty scope set — the executed tool's own scope still gates the
+    // step row, but the principal is minimally scoped to what the responsibility
+    // declared (nothing).
+    expect([...principalArg.scopes]).toEqual([]);
     expect(principalArg.responsibilityId).toBe(5);
     expect(principalArg.tenantId).toBe(10);
     expect(principalArg.enabledByUserId).toBe(99);
     expect(stepWriter.succeeded).toHaveBeenCalledTimes(1);
   });
 
-  it('uses AR_FOLLOWUP_DEFINITION.tools as the inventory (no hardcoded list)', async () => {
+  it('uses the responsibility definition tools as the inventory (no hardcoded list)', async () => {
     const { scopeRegistry } = setup(makeEpisode());
 
     await executeStep({ episodeId: EPISODE_ID, tool: 'send-email', args: {} });
 
-    // Every tool in the definition is looked up to build the scope set,
-    // plus the executed tool itself (looked up first for the step row).
-    for (const tool of AR_FOLLOWUP_DEFINITION.tools) {
+    // Every tool in the definition is looked up to build the scope set.
+    // 'welcome' has no tools, so only the executed tool itself is looked up.
+    for (const tool of WELCOME.tools) {
       expect(scopeRegistry.scopeForTool).toHaveBeenCalledWith(tool);
     }
+    expect(scopeRegistry.scopeForTool).toHaveBeenCalledWith('send-email');
   });
 });
 

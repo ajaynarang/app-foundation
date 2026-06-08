@@ -525,12 +525,12 @@ function makePrismaWithOneApproval() {
 
 describe('resolveApprovalScope', () => {
   it('returns the explicit scope when provided', () => {
-    expect(resolveApprovalScope('all', UserRole.DISPATCHER)).toBe('all');
+    expect(resolveApprovalScope('all', UserRole.MEMBER)).toBe('all');
     expect(resolveApprovalScope('mine', UserRole.OWNER)).toBe('mine');
   });
 
   it('defaults DISPATCHER to mine', () => {
-    expect(resolveApprovalScope(undefined, UserRole.DISPATCHER)).toBe('mine');
+    expect(resolveApprovalScope(undefined, UserRole.MEMBER)).toBe('mine');
   });
 
   it.each([UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN])('defaults %s to all', (role) => {

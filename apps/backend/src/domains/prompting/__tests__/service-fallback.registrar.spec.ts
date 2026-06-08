@@ -17,16 +17,7 @@ describe('ServiceFallbackRegistrar', () => {
 
     const registeredNames = registerFallback.mock.calls.map(([name]) => name);
     expect(registeredNames).toEqual(
-      expect.arrayContaining([
-        PROMPT_NAMES.RATECON_PARSER,
-        PROMPT_NAMES.FUEL_RECEIPT_PARSER,
-        PROMPT_NAMES.SHIELD_ANALYST,
-        PROMPT_NAMES.BRIEFING,
-        PROMPT_NAMES.ALERT_BRIEFING,
-        PROMPT_NAMES.FEEDBACK_CATEGORIZER,
-        PROMPT_NAMES.SKILL_CLASSIFIER,
-        PROMPT_NAMES.LOAD_BOARD_SEARCH_PARSER,
-      ]),
+      expect.arrayContaining([PROMPT_NAMES.FEEDBACK_CATEGORIZER, PROMPT_NAMES.SKILL_CLASSIFIER]),
     );
   });
 

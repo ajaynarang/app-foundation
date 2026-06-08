@@ -22,7 +22,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     emitter = new EventEmitter2({ wildcard: true, delimiter: '.' });
     sse = new SseService();
     bridge = new DomainEventSseBridge(sse);
-    emitter.on('sally.**', (e: DomainEvent) => bridge.handleDomainEvent(e));
+    emitter.on('app.**', (e: DomainEvent) => bridge.handleDomainEvent(e));
   });
 
   it('routes NOTIFICATION_SENT to a client registered with the matching User.userId', () => {
@@ -71,7 +71,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     expect(received).toHaveLength(0); // mismatch — silently undeliverable
   });
 
-  it('routes ALERT_FIRED to the right user when multiple clients are connected', () => {
+  it('routes NOTIFICATION_SENT to the right user when multiple clients are connected', () => {
     const subjA = new Subject<MessageEvent>();
     const subjB = new Subject<MessageEvent>();
     const recvA: MessageEvent[] = [];
@@ -83,10 +83,9 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     sse.addClient('user-B', 7, subjB);
 
     emitter.emit(
-      DOMAIN_EVENTS.ALERT_FIRED,
-      new DomainEvent(DOMAIN_EVENTS.ALERT_FIRED, '7', {
-        alertId: 'a-1',
-        priority: 'critical',
+      DOMAIN_EVENTS.NOTIFICATION_SENT,
+      new DomainEvent(DOMAIN_EVENTS.NOTIFICATION_SENT, '7', {
+        notificationId: 'n-1',
         title: 'X',
         message: 'Y',
         recipientUserIds: ['user-A'],
@@ -108,10 +107,10 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     sse.addClient('user-1', 7, subj1);
     sse.addClient('user-2', 7, subj2);
 
-    emitter.emit(DOMAIN_EVENTS.LOAD_CREATED, new DomainEvent(DOMAIN_EVENTS.LOAD_CREATED, '7', { loadId: 'L-1' }));
+    emitter.emit(DOMAIN_EVENTS.TENANT_UPDATED, new DomainEvent(DOMAIN_EVENTS.TENANT_UPDATED, '7', { name: 'Acme' }));
 
     expect(recv1).toHaveLength(1);
     expect(recv2).toHaveLength(1);
-    expect(recv1[0].type).toBe(SSE_EVENTS.LOAD_CREATED);
+    expect(recv1[0].type).toBe(SSE_EVENTS.TENANT_UPDATED);
   });
 });

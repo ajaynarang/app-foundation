@@ -13,7 +13,7 @@ jest.mock('ai', () => ({
 jest.mock('@ai-sdk/anthropic', () => ({ createAnthropic: jest.fn() }));
 jest.mock('zod-to-json-schema', () => ({ zodToJsonSchema: jest.fn() }));
 jest.mock('@rekog/mcp-nest', () => ({
-  McpRegistryService: jest.fn(),
+  McpRegistryDiscoveryService: jest.fn(),
   Tool: () => () => {},
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
@@ -23,56 +23,20 @@ import { AgentRegistry } from '../agent.registry';
 
 describe('AgentRegistry', () => {
   let registry: AgentRegistry;
-  const mockAgents: any = {};
 
   beforeEach(() => {
-    const agentDefs = [
-      {
-        id: 'dispatch',
-        displayName: 'Dispatch',
-        personas: ['dispatcher', 'admin'],
-      },
-      { id: 'billing', displayName: 'Billing', personas: ['dispatcher'] },
-      { id: 'compliance', displayName: 'Compliance', personas: ['dispatcher'] },
-      { id: 'safety', displayName: 'Safety', personas: ['dispatcher'] },
-      { id: 'route', displayName: 'Route', personas: ['dispatcher'] },
-      { id: 'payroll', displayName: 'Payroll', personas: ['dispatcher'] },
-      {
-        id: 'maintenance',
-        displayName: 'Maintenance',
-        personas: ['dispatcher'],
-      },
-      { id: 'fuel', displayName: 'Fuel', personas: ['driver'] },
-      { id: 'driver', displayName: 'Driver', personas: ['driver'] },
-      { id: 'customer', displayName: 'Customer', personas: ['customer'] },
-      { id: 'support', displayName: 'Support', personas: ['dispatcher'] },
-      { id: 'prospect', displayName: 'Prospect', personas: ['prospect'] },
-    ];
-
-    for (const def of agentDefs) {
-      mockAgents[def.id] = def;
-    }
-
-    registry = new AgentRegistry(
-      mockAgents.dispatch,
-      mockAgents.billing,
-      mockAgents.compliance,
-      mockAgents.safety,
-      mockAgents.route,
-      mockAgents.payroll,
-      mockAgents.maintenance,
-      mockAgents.fuel,
-      mockAgents.driver,
-      mockAgents.customer,
-      mockAgents.support,
-      mockAgents.prospect,
-    );
+    const assistant: any = {
+      id: 'assistant',
+      displayName: 'Assistant',
+      personas: ['owner', 'admin', 'member', 'super_admin'],
+    };
+    registry = new AgentRegistry(assistant);
   });
 
   describe('get', () => {
     it('returns agent by id', () => {
-      const agent = registry.get('dispatch');
-      expect(agent.displayName).toBe('Dispatch');
+      const agent = registry.get('assistant');
+      expect(agent.displayName).toBe('Assistant');
     });
 
     it('throws NotFoundException for unknown agent', () => {
@@ -82,9 +46,9 @@ describe('AgentRegistry', () => {
 
   describe('getForPersona', () => {
     it('returns agents matching persona', () => {
-      const agents = registry.getForPersona('dispatcher');
+      const agents = registry.getForPersona('member');
       expect(agents.length).toBeGreaterThan(0);
-      expect(agents.every((a) => a.personas.includes('dispatcher'))).toBe(true);
+      expect(agents.every((a) => a.personas.includes('member'))).toBe(true);
     });
 
     it('returns empty for unknown persona', () => {
@@ -94,8 +58,8 @@ describe('AgentRegistry', () => {
   });
 
   describe('getAll', () => {
-    it('returns all 12 agents', () => {
-      expect(registry.getAll()).toHaveLength(12);
+    it('returns the single registered agent', () => {
+      expect(registry.getAll()).toHaveLength(1);
     });
   });
 });

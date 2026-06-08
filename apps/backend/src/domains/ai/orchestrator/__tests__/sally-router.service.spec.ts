@@ -14,16 +14,9 @@ describe('SallyRouterService', () => {
       getAllTaskSkills: jest.fn().mockReturnValue([
         {
           metadata: {
-            name: 'route-planning',
-            primaryAgent: 'route',
-            triggers: ['plan.*route', 'route planning'],
-          },
-        },
-        {
-          metadata: {
-            name: 'shield-audit',
-            primaryAgent: 'compliance',
-            triggers: ['run shield', 'compliance audit'],
+            name: 'example-skill',
+            primaryAgent: 'assistant',
+            triggers: ['do.*thing', 'example task'],
           },
         },
         {
@@ -38,7 +31,7 @@ describe('SallyRouterService', () => {
     };
 
     classifier = {
-      classify: jest.fn().mockResolvedValue({ agentId: 'billing', taskSkill: null }),
+      classify: jest.fn().mockResolvedValue({ agentId: 'assistant', taskSkill: null }),
     };
 
     service = new SallyRouterService(skillLoader, classifier);
@@ -46,59 +39,45 @@ describe('SallyRouterService', () => {
 
   describe('route', () => {
     it('should match regex trigger and return regex source', async () => {
-      const result = await service.route('plan my route to Chicago', 'dispatcher');
+      const result = await service.route('do the thing now', 'member');
       expect(result.source).toBe('regex');
-      expect(result.agentId).toBe('route');
-      expect(result.taskSkill).toBe('route-planning');
+      expect(result.agentId).toBe('assistant');
+      expect(result.taskSkill).toBe('example-skill');
       expect(result.taskSkillContent).toBe('skill content here');
     });
 
     it('should match plain text trigger (case insensitive)', async () => {
-      const result = await service.route('Run Shield audit now', 'dispatcher');
+      const result = await service.route('Run Example Task now', 'member');
       expect(result.source).toBe('regex');
-      expect(result.agentId).toBe('compliance');
-      expect(result.taskSkill).toBe('shield-audit');
+      expect(result.agentId).toBe('assistant');
+      expect(result.taskSkill).toBe('example-skill');
     });
 
     it('should skip skills without primaryAgent', async () => {
-      const result = await service.route('something unrelated about billing', 'dispatcher');
+      const result = await service.route('something unrelated', 'member');
       // Should fall through to classifier since no primaryAgent on the matching skill
       expect(result.source).toBe('classifier');
     });
 
-    it('should return default for single-domain personas (driver)', async () => {
-      const result = await service.route('what is my next stop', 'driver');
-      expect(result.source).toBe('default');
-      expect(result.agentId).toBe('driver');
-      expect(result.taskSkill).toBeNull();
-    });
-
-    it('should return default for customer persona', async () => {
-      const result = await service.route('where is my shipment', 'customer');
-      expect(result.source).toBe('default');
-      expect(result.agentId).toBe('customer');
-    });
-
-    it('should return default for prospect persona', async () => {
-      const result = await service.route('what does SALLY do', 'prospect');
-      expect(result.source).toBe('default');
-      expect(result.agentId).toBe('prospect');
-    });
-
     it('should use classifier for multi-domain personas', async () => {
-      const result = await service.route('show me unpaid invoices', 'dispatcher');
+      const result = await service.route('show me the latest', 'member');
       expect(result.source).toBe('classifier');
-      expect(result.agentId).toBe('billing');
-      expect(classifier.classify).toHaveBeenCalledWith('show me unpaid invoices');
+      expect(result.agentId).toBe('assistant');
+      expect(classifier.classify).toHaveBeenCalledWith('show me the latest');
     });
 
     it('should load task skill content from classifier result', async () => {
       classifier.classify.mockResolvedValue({
-        agentId: 'route',
-        taskSkill: 'route-planning',
+        agentId: 'assistant',
+        taskSkill: 'example-skill',
       });
-      const result = await service.route('help me plan', 'dispatcher');
+      const result = await service.route('help me out', 'member');
       expect(result.taskSkillContent).toBe('skill content here');
+    });
+
+    it('defaultAgentFor returns the generic assistant agent', () => {
+      expect(service.defaultAgentFor('member')).toBe('assistant');
+      expect(service.defaultAgentFor('unknown-persona')).toBe('assistant');
     });
   });
 });

@@ -8,14 +8,6 @@ export interface OnboardingItem {
   actionType: 'link' | 'chat' | 'sheet' | 'console';
 }
 
-export interface LoadPath {
-  id: string;
-  title: string;
-  description: string;
-  actionLink: string;
-  actionType: 'link' | 'sheet' | 'dialog' | 'console';
-}
-
 export interface MilestoneStatus {
   id: string;
   title: string;
@@ -23,7 +15,6 @@ export interface MilestoneStatus {
   status: 'complete' | 'in_progress' | 'available';
   unlockMessage: string;
   items: OnboardingItem[];
-  loadPaths?: LoadPath[];
 }
 
 export interface OnboardingStatusResponse {

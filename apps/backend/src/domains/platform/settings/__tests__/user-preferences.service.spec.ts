@@ -14,7 +14,6 @@ describe('UserPreferencesService', () => {
     theme: 'dark',
     timezone: 'America/Chicago',
   };
-  const mockDriverPrefs = { id: 1, userId: 10, language: 'en' };
 
   beforeEach(() => {
     prisma = {
@@ -25,11 +24,6 @@ describe('UserPreferencesService', () => {
         upsert: jest.fn().mockResolvedValue(mockPrefs),
         delete: jest.fn().mockResolvedValue(undefined),
         create: jest.fn().mockResolvedValue(mockPrefs),
-      },
-      driverPreferences: {
-        upsert: jest.fn().mockResolvedValue(mockDriverPrefs),
-        delete: jest.fn().mockResolvedValue(undefined),
-        create: jest.fn().mockResolvedValue(mockDriverPrefs),
       },
     };
 
@@ -65,23 +59,6 @@ describe('UserPreferencesService', () => {
     });
   });
 
-  describe('getDriverPreferences', () => {
-    it('should return driver preferences with cache', async () => {
-      const result = await service.getDriverPreferences('user_abc');
-      expect(result).toEqual(mockDriverPrefs);
-    });
-  });
-
-  describe('updateDriverPreferences', () => {
-    it('should update driver preferences and invalidate cache', async () => {
-      const result = await service.updateDriverPreferences('user_abc', {
-        language: 'es',
-      } as any);
-      expect(result).toEqual(mockDriverPrefs);
-      expect(cache.del).toHaveBeenCalled();
-    });
-  });
-
   describe('resetToDefaults', () => {
     it('should reset user preferences', async () => {
       const result = await service.resetToDefaults('user_abc', 'user');
@@ -89,14 +66,6 @@ describe('UserPreferencesService', () => {
       expect(prisma.userPreferences.create).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
       expect(result).toEqual(mockPrefs);
-    });
-
-    it('should reset driver preferences', async () => {
-      const result = await service.resetToDefaults('user_abc', 'driver');
-      expect(prisma.driverPreferences.delete).toHaveBeenCalled();
-      expect(prisma.driverPreferences.create).toHaveBeenCalled();
-      expect(cache.del).toHaveBeenCalled();
-      expect(result).toEqual(mockDriverPrefs);
     });
 
     it('should throw BadRequestException for invalid scope', async () => {

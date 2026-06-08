@@ -5,7 +5,7 @@ import {
   type DeskResponsibilityDetail,
   type DeskResponsibilityListItem,
   type UpdateDeskResponsibilityRequest,
-} from '@app/shared-types';
+} from '../types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { findResponsibilityDefinition, RESPONSIBILITY_REGISTRY } from '../../responsibilities';

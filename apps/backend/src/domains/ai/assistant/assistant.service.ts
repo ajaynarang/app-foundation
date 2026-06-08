@@ -1,6 +1,5 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, HttpException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { TimezoneService } from '../../../shared/services/timezone.service';
 import { generateId } from '../../../shared/utils/id-generator';
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from './mastra/mastra.provider';
@@ -10,13 +9,15 @@ import { SallyRouterService } from '../orchestrator/sally-router.service';
 import { AgentRegistry } from '../agents/agent.registry';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
-import { VOICE_MODE_INSTRUCTIONS } from '../../../domains/prompting/prompts/persona/base-prompts';
 import { UserMode } from '../agents/agent.types';
 import type { Request, Response } from 'express';
 import { pipeAgentResponse } from './utils/pipe-agent-response';
 import { parseFollowups } from './utils/parse-followups';
-import { classifyTimeOfDay } from './lib/time-of-day';
-import { PROMPT_NAMES } from '../../../domains/prompting/prompting.types';
+
+/** Appended to agent instructions when the turn arrives over the voice channel. */
+const VOICE_MODE_INSTRUCTIONS =
+  'You are responding over voice. Keep replies short, conversational, and easy to speak aloud. ' +
+  'Avoid markdown, lists, and long enumerations.';
 
 @Injectable()
 export class SallyAiService {
@@ -31,7 +32,6 @@ export class SallyAiService {
     private readonly sallyRouter: SallyRouterService,
     private readonly agentRegistry: AgentRegistry,
     private readonly aiTelemetry: AiTelemetryService,
-    private readonly timezoneService: TimezoneService,
   ) {}
 
   private async getUserDbId(userId: string): Promise<number> {
@@ -95,22 +95,7 @@ export class SallyAiService {
     const conversationId = generateId('conv');
     const greetingMessageId = generateId('msg');
 
-    const greetings: Record<string, string> = {
-      prospect:
-        "Hi! I'm SALLY. I can tell you about our fleet operations platform, pricing, integrations, or set up a demo. What would you like to know?",
-      dispatcher:
-        "Hi! I'm SALLY. I can check alerts, look up drivers, query routes, and manage your fleet. What do you need?",
-      driver: "Hey! I'm SALLY. I can show your route, check HOS, report delays, or find fuel. What's up?",
-      owner:
-        "Hi! I'm SALLY. I can give you a full view of your fleet — alerts, loads, driver status, routes. What do you need?",
-      admin:
-        "Hi! I'm SALLY. I can check fleet alerts, driver status, loads, and routes across your operation. What do you need?",
-      super_admin:
-        "Hi! I'm SALLY. I can check system status, fleet operations, alerts, and driver HOS across the platform. What do you need?",
-      customer:
-        "Hi! I'm SALLY. I can help you track shipments, request quotes, and connect with your dispatcher. What do you need?",
-    };
-    const greetingText = greetings[userMode] ?? greetings.dispatcher;
+    const greetingText = "Hi! I'm your assistant. How can I help you today?";
 
     const conversation = await this.prisma.conversation.create({
       data: {
@@ -210,8 +195,7 @@ export class SallyAiService {
       const inputResult = await this.moderationService.moderate(content, 'input', conversation.userMode);
 
       if (inputResult.blocked) {
-        const blockedText =
-          'I can only help with fleet operations topics like routes, drivers, loads, and HOS compliance. Could you rephrase your question?';
+        const blockedText = "I'm not able to help with that. Could you rephrase your question?";
         await this.prisma.conversationMessage.create({
           data: {
             messageId: generateId('msg'),
@@ -343,51 +327,17 @@ export class SallyAiService {
   }
 
   /**
-   * Resolve a server-side prompt key into rendered text.
-   * When `promptKey === PROMPT_NAMES.BRIEFING` ('sally-briefing'), the server
-   * overrides `timeOfDay`, `tenantName`, `now`, and `userRole` regardless of
-   * what the client supplied — those variables are server-authoritative.
+   * Resolve a server-side prompt key into rendered text using the
+   * client-supplied template variables. Server-side prompt keys let the client
+   * trigger a canned prompt (e.g. a summary) without sending the raw text.
    */
   private async resolvePromptKey(
     promptKey: string,
     clientVariables: Record<string, string> | undefined,
-    tenantId: number,
-    userId: string,
+    _tenantId: number,
+    _userId: string,
   ): Promise<string> {
     const variables: Record<string, string> = { ...(clientVariables ?? {}) };
-
-    if (promptKey === PROMPT_NAMES.BRIEFING) {
-      // Server-authoritative context for the catch-me-up prompt.
-      let tenantName = '';
-      let userRole = '';
-      try {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id: tenantId },
-          select: { companyName: true },
-        });
-        tenantName = tenant?.companyName ?? '';
-      } catch (err) {
-        this.logger.warn('Failed to read tenant for briefing variables', err);
-      }
-      try {
-        const user = await this.prisma.user.findUnique({
-          where: { userId },
-          select: { role: true },
-        });
-        userRole = user?.role ? String(user.role) : '';
-      } catch (err) {
-        this.logger.warn('Failed to read user for briefing variables', err);
-      }
-
-      const now = new Date();
-      const timezone = await this.timezoneService.resolveTenantTimezone(tenantId);
-      // Server overrides any client-supplied values for these keys.
-      variables.timeOfDay = classifyTimeOfDay(now, timezone);
-      variables.tenantName = tenantName;
-      variables.now = now.toISOString();
-      variables.userRole = userRole;
-    }
-
     return this.promptService.getPrompt(promptKey, variables);
   }
 
@@ -490,23 +440,10 @@ export class SallyAiService {
       { tenantId, userId, userDbId, conversationId },
       cardAccumulator,
     );
-    // The streaming turn routes via SallyRouterService.route() — for
-    // OWNER / ADMIN / SUPER_ADMIN that resolves to `dispatch`, never
-    // `owner` (no `sally-owner` agent is registered with Mastra), so
-    // `getAgent('sally-owner')` would throw `Agent with name sally-owner
-    // not found`. Resume falls back to the persona's default agent so
-    // the common case (ack alert, void invoice from a vanilla turn that
-    // didn't hit a regex skill match) targets the same agent that
-    // suspended on the confirm-action.
-    //
-    // Followup: the streaming path can route to a non-default agent via
-    // regex skill matches (e.g. a billing-specific phrase landing on
-    // `sally-billing`). Resume currently can't recover that, since we
-    // don't persist the resolved agentId on the conversation. Track as
-    // followup to add `agentId` to the conversation row when the run
-    // suspends, and read it here.
+    // Resume targets the persona's default agent (the same agent the streaming
+    // turn would have defaulted to). The Mastra agent key equals the agent id.
     const agentId = this.sallyRouter.defaultAgentFor(conversation.userMode as UserMode);
-    const agent = this.mastra.getMastra().getAgent(`sally-${agentId}`);
+    const agent = this.mastra.getMastra().getAgent(agentId);
 
     try {
       const response = await agent.resumeStream(

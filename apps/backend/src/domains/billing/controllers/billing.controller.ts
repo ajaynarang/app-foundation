@@ -38,7 +38,7 @@ export class BillingController {
   /**
    * Get billing overview: subscription, wallet, payment methods, upcoming invoice
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('overview')
   async getOverview(@TenantDbId() tenantDbId: number) {
     return this.subscriptionService.getBillingOverview(tenantDbId);
@@ -119,7 +119,7 @@ export class BillingController {
   /**
    * Get wallet balance and recent transactions
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('wallet')
   async getWallet(@TenantDbId() tenantDbId: number) {
     return this.walletService.getBalance(tenantDbId);
@@ -152,7 +152,7 @@ export class BillingController {
   /**
    * Get paginated wallet transaction history
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('wallet/transactions')
   async getTransactions(@TenantDbId() tenantDbId: number, @Query() query: WalletTransactionsQueryDto) {
     return this.walletService.getTransactions(tenantDbId, {
@@ -167,7 +167,7 @@ export class BillingController {
   /**
    * List invoices for the current tenant
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('invoices')
   async listInvoices(@TenantDbId() tenantDbId: number, @Query() query: PaginationQueryDto) {
     return this.invoiceService.listInvoices(tenantDbId, {
@@ -179,7 +179,7 @@ export class BillingController {
   /**
    * Get the upcoming invoice preview
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('invoices/upcoming')
   async getUpcomingInvoice(@TenantDbId() tenantDbId: number) {
     return this.invoiceService.getUpcomingInvoice(tenantDbId);
@@ -188,7 +188,7 @@ export class BillingController {
   /**
    * Download an invoice PDF
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('invoices/:id/download')
   async downloadInvoice(@TenantDbId() tenantDbId: number, @Param('id') invoiceId: string) {
     return this.invoiceService.downloadInvoice(tenantDbId, invoiceId);
@@ -208,7 +208,7 @@ export class BillingController {
   /**
    * List all payment methods
    */
-  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('payment-methods')
   async listPaymentMethods(@TenantDbId() tenantDbId: number) {
     return this.paymentMethodService.listPaymentMethods(tenantDbId);

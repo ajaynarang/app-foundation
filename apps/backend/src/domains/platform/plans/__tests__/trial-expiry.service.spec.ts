@@ -1,6 +1,5 @@
 import { TrialExpiryService } from '../trial-expiry.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { FINANCE_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
 
 describe('TrialExpiryService', () => {
   let service: TrialExpiryService;
@@ -18,7 +17,6 @@ describe('TrialExpiryService', () => {
       tenant: { update: jest.fn().mockResolvedValue({}) },
       tenantPlanEvent: { create: jest.fn().mockResolvedValue({}) },
       tenantAddOn: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-      alert: { create: jest.fn().mockResolvedValue({}) },
     };
 
     prisma = {
@@ -34,7 +32,7 @@ describe('TrialExpiryService', () => {
   describe('run', () => {
     it('should call expireTrials for TRIAL_EXPIRY job', async () => {
       const spy = jest.spyOn(service, 'expireTrials').mockResolvedValue({ expired: 0 });
-      const job = { name: FINANCE_JOB_NAMES.TRIAL_EXPIRY } as any;
+      const job = { name: 'trial-expiry' } as any;
       await service.run(job);
       expect(spy).toHaveBeenCalled();
     });
@@ -61,7 +59,6 @@ describe('TrialExpiryService', () => {
           tenant: { update: jest.fn() },
           tenantPlanEvent: { create: jest.fn() },
           tenantAddOn: { updateMany: jest.fn() },
-          alert: { create: jest.fn() },
         }),
       );
 

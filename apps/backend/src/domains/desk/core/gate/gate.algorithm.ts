@@ -1,5 +1,6 @@
 import type { AgentScope, ScopeTier, TrustLevel } from '@app/shared-types';
-import { TRUST_LEVEL_CONFIDENCE_THRESHOLDS, scopeTier } from '@app/shared-types';
+import { scopeTier } from '@app/shared-types';
+import { TRUST_LEVEL_CONFIDENCE_THRESHOLDS } from '../types';
 
 import type { ConditionsResult } from '../../responsibilities/definition.types';
 

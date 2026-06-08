@@ -1,5 +1,5 @@
 /**
- * Code-level fallback for the `sally-feedback-categorizer` LangFuse prompt.
+ * Code-level fallback for the `feedback-categorizer` LangFuse prompt.
  */
 export const CATEGORIZER_FALLBACK = `You are a feedback categorizer. Given a user feedback message, respond with exactly one word: "bug", "idea", or "general".
 - "bug" = the user is reporting something broken, an error, a crash, or unexpected behavior

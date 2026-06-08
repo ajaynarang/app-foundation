@@ -3,6 +3,5 @@ export const DIGEST_LOCAL_HOUR = 8;
 
 /** `jobKey` values for TenantJobRun per-day idempotency stamps. */
 export const TENANT_JOB_KEYS = {
-  ALERT_DIGEST: 'alert-digest',
-  SHIELD_AUDIT: 'shield-audit',
+  NOTIFICATION_DIGEST: 'notification-digest',
 } as const;

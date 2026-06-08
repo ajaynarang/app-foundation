@@ -31,12 +31,11 @@ describe('AdminJobsController', () => {
     };
 
     queues = {
-      [QUEUE_NAMES.DOCUMENTS]: { add: jest.fn().mockResolvedValue({}) },
-      [QUEUE_NAMES.TELEMETRY]: { add: jest.fn().mockResolvedValue({}) },
-      [QUEUE_NAMES.VENDOR_DATA]: { add: jest.fn().mockResolvedValue({}) },
-      [QUEUE_NAMES.BULK_OPS]: { add: jest.fn().mockResolvedValue({}) },
-      [QUEUE_NAMES.SAFETY_DETECT]: { add: jest.fn().mockResolvedValue({}) },
+      [QUEUE_NAMES.EVENTS]: { add: jest.fn().mockResolvedValue({}) },
+      [QUEUE_NAMES.NOTIFICATIONS]: { add: jest.fn().mockResolvedValue({}) },
       [QUEUE_NAMES.WEBHOOKS]: { add: jest.fn().mockResolvedValue({}) },
+      [QUEUE_NAMES.AI_BACKGROUND]: { add: jest.fn().mockResolvedValue({}) },
+      [QUEUE_NAMES.BULK_OPS]: { add: jest.fn().mockResolvedValue({}) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -45,28 +44,24 @@ describe('AdminJobsController', () => {
         { provide: JobService, useValue: jobService },
         { provide: PrismaService, useValue: prisma },
         {
-          provide: getQueueToken(QUEUE_NAMES.DOCUMENTS),
-          useValue: queues[QUEUE_NAMES.DOCUMENTS],
+          provide: getQueueToken(QUEUE_NAMES.EVENTS),
+          useValue: queues[QUEUE_NAMES.EVENTS],
         },
         {
-          provide: getQueueToken(QUEUE_NAMES.TELEMETRY),
-          useValue: queues[QUEUE_NAMES.TELEMETRY],
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.VENDOR_DATA),
-          useValue: queues[QUEUE_NAMES.VENDOR_DATA],
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.BULK_OPS),
-          useValue: queues[QUEUE_NAMES.BULK_OPS],
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.SAFETY_DETECT),
-          useValue: queues[QUEUE_NAMES.SAFETY_DETECT],
+          provide: getQueueToken(QUEUE_NAMES.NOTIFICATIONS),
+          useValue: queues[QUEUE_NAMES.NOTIFICATIONS],
         },
         {
           provide: getQueueToken(QUEUE_NAMES.WEBHOOKS),
           useValue: queues[QUEUE_NAMES.WEBHOOKS],
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.AI_BACKGROUND),
+          useValue: queues[QUEUE_NAMES.AI_BACKGROUND],
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.BULK_OPS),
+          useValue: queues[QUEUE_NAMES.BULK_OPS],
         },
       ],
     }).compile();
@@ -188,9 +183,9 @@ describe('AdminJobsController', () => {
         10,
         expect.any(Object),
         expect.objectContaining({
-          [QUEUE_NAMES.TELEMETRY]: queues[QUEUE_NAMES.TELEMETRY],
-          [QUEUE_NAMES.VENDOR_DATA]: queues[QUEUE_NAMES.VENDOR_DATA],
-          [QUEUE_NAMES.DOCUMENTS]: queues[QUEUE_NAMES.DOCUMENTS],
+          [QUEUE_NAMES.EVENTS]: queues[QUEUE_NAMES.EVENTS],
+          [QUEUE_NAMES.NOTIFICATIONS]: queues[QUEUE_NAMES.NOTIFICATIONS],
+          [QUEUE_NAMES.BULK_OPS]: queues[QUEUE_NAMES.BULK_OPS],
         }),
       );
     });
@@ -230,90 +225,60 @@ describe('AdminJobsController', () => {
       await expect(controller.retryJob(101)).rejects.toThrow(BadRequestException);
     });
 
-    it('should retry a failed documents job', async () => {
+    it('should retry a failed maintenance job (routes to bulk-ops queue)', async () => {
       jobService.getJob.mockResolvedValue({
         id: 101,
         status: 'FAILED',
-        category: 'documents',
+        category: 'maintenance',
+        type: 'data-retention',
         tenantId: 1,
         submittedBy: 1,
         inputHash: 'hash-1',
-        inputData: { fileName: 'test.pdf', fileBase64: 'base64data' },
+        inputData: { foo: 'bar' },
       });
 
       const result = await controller.retryJob(101);
 
       expect(jobService.resetForRetry).toHaveBeenCalledWith(101);
-      expect(queues[QUEUE_NAMES.DOCUMENTS].add).toHaveBeenCalledWith(
-        'ratecon',
+      expect(queues[QUEUE_NAMES.BULK_OPS].add).toHaveBeenCalledWith(
+        'data-retention',
         expect.objectContaining({
           payload: expect.objectContaining({
             jobId: 101,
-            forceReparse: true,
+            foo: 'bar',
           }),
         }),
         // BullMQ rejects pure-digit jobId strings — prefix with category to avoid
         // "Custom Id cannot be integers". See bullJobIdFromDbId helper.
-        { jobId: 'documents-101' },
+        { jobId: 'maintenance-101' },
       );
       expect(result).toEqual({ jobId: 101, status: 'QUEUED' });
     });
 
-    it('should retry a failed vendor job (routes to vendor-data queue)', async () => {
+    it('should retry a failed ai job (routes to ai-background queue)', async () => {
       jobService.getJob.mockResolvedValue({
         id: 102,
         status: 'FAILED',
-        category: 'vendor',
-        type: 'drivers',
+        category: 'ai',
+        type: 'embed',
         tenantId: 1,
-        inputData: {
-          integrationId: 'int-1',
-          integrationName: 'test',
-          integrationType: 'TMS',
-        },
+        inputData: { docId: 7 },
       });
 
       const result = await controller.retryJob(102);
 
-      expect(queues[QUEUE_NAMES.VENDOR_DATA].add).toHaveBeenCalledWith(
-        'tms-drivers',
+      expect(queues[QUEUE_NAMES.AI_BACKGROUND].add).toHaveBeenCalledWith(
+        'embed',
         expect.objectContaining({
           payload: expect.objectContaining({
             jobId: 102,
-            triggerSource: 'manual',
+            docId: 7,
           }),
         }),
+        { jobId: 'ai-102' },
       );
-      expect(queues[QUEUE_NAMES.TELEMETRY].add).not.toHaveBeenCalled();
+      expect(queues[QUEUE_NAMES.BULK_OPS].add).not.toHaveBeenCalled();
       expect(result).toEqual({ jobId: 102, status: 'QUEUED' });
-    });
-
-    it('should retry a failed telemetry job (routes to telemetry queue)', async () => {
-      jobService.getJob.mockResolvedValue({
-        id: 103,
-        status: 'FAILED',
-        category: 'telemetry',
-        type: 'gps',
-        tenantId: 1,
-        inputData: {
-          integrationId: 'int-2',
-          integrationName: 'samsara',
-          integrationType: 'ELD',
-        },
-      });
-
-      await controller.retryJob(103);
-
-      expect(queues[QUEUE_NAMES.TELEMETRY].add).toHaveBeenCalledWith(
-        'gps',
-        expect.objectContaining({
-          payload: expect.objectContaining({
-            type: 'gps',
-            triggerSource: 'manual',
-          }),
-        }),
-      );
-      expect(queues[QUEUE_NAMES.VENDOR_DATA].add).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for unsupported category', async () => {
@@ -331,7 +296,8 @@ describe('AdminJobsController', () => {
       jobService.getJob.mockResolvedValue({
         id: 105,
         status: 'FAILED',
-        category: 'documents',
+        category: 'maintenance',
+        type: 'job-cleanup',
         tenantId: 1,
         submittedBy: 1,
         inputHash: 'hash-5',
@@ -340,15 +306,14 @@ describe('AdminJobsController', () => {
 
       const result = await controller.retryJob(105);
 
-      expect(queues[QUEUE_NAMES.DOCUMENTS].add).toHaveBeenCalledWith(
-        'ratecon',
+      expect(queues[QUEUE_NAMES.BULK_OPS].add).toHaveBeenCalledWith(
+        'job-cleanup',
         expect.objectContaining({
           payload: expect.objectContaining({
-            fileName: undefined,
-            fileBase64: undefined,
+            jobId: 105,
           }),
         }),
-        { jobId: 'documents-105' },
+        { jobId: 'maintenance-105' },
       );
       expect(result).toEqual({ jobId: 105, status: 'QUEUED' });
     });

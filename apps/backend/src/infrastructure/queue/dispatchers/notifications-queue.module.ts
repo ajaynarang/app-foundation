@@ -2,28 +2,25 @@ import { Module, forwardRef } from '@nestjs/common';
 import { QueueModule } from '../queue.module';
 import { QUEUE_NAMES } from '../queue.constants';
 import { jobHandlersToken, QueueJobHandler } from '../job-handler.contract';
-import { OperationsModule } from '../../../domains/operations/operations.module';
-import { InAppNotificationsModule } from '../../../domains/operations/notifications/notifications.module';
-import { AlertNotificationsJobHandler } from '../../../domains/operations/alert-notifications.processor';
-import { NotificationJobsHandler } from '../../../domains/operations/notifications/notification-cleanup.processor';
+import { InAppNotificationsModule } from '../../../domains/notifications/notifications.module';
+import { NotificationJobsHandler } from '../../../domains/notifications/notification-cleanup.processor';
 import { NotificationsQueueProcessor } from './notifications-queue.processor';
 
 /**
- * Wires the single `notifications` queue dispatcher. Imports the modules that
- * export the two handler classes and assembles them into the queue's
+ * Wires the single `notifications` queue dispatcher. Imports the module that
+ * exports the housekeeping handler and assembles it into the queue's
  * handler-array token via an explicit factory.
+ *
+ * Register additional notification job handlers here as your app grows.
  */
 @Module({
-  imports: [QueueModule, forwardRef(() => OperationsModule), forwardRef(() => InAppNotificationsModule)],
+  imports: [QueueModule, forwardRef(() => InAppNotificationsModule)],
   providers: [
     NotificationsQueueProcessor,
     {
       provide: jobHandlersToken(QUEUE_NAMES.NOTIFICATIONS),
-      useFactory: (alerts: AlertNotificationsJobHandler, jobs: NotificationJobsHandler): QueueJobHandler[] => [
-        alerts,
-        jobs,
-      ],
-      inject: [AlertNotificationsJobHandler, NotificationJobsHandler],
+      useFactory: (jobs: NotificationJobsHandler): QueueJobHandler[] => [jobs],
+      inject: [NotificationJobsHandler],
     },
   ],
 })

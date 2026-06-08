@@ -48,11 +48,11 @@ export class SkillClassifierService {
       const parsed = JSON.parse(jsonText);
       const agentId = (AGENT_IDS as readonly string[]).includes(parsed.agentId)
         ? (parsed.agentId as AgentId)
-        : 'dispatch';
+        : 'assistant';
       return { agentId, taskSkill: parsed.taskSkill ?? null };
     } catch (error) {
-      this.logger.warn(`Classifier failed, defaulting to dispatch: ${error}`);
-      return { agentId: 'dispatch', taskSkill: null };
+      this.logger.warn(`Classifier failed, defaulting to assistant: ${error}`);
+      return { agentId: 'assistant', taskSkill: null };
     }
   }
 }

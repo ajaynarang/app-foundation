@@ -9,7 +9,7 @@ import { UserRole } from '@prisma/client';
 @ApiTags('Feedback')
 @Controller('feedback')
 @ApiBearerAuth()
-@Roles(UserRole.DRIVER, UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
 export class FeedbackController {
   constructor(private readonly feedbackService: FeedbackService) {}
 

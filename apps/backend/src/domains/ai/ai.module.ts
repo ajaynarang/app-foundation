@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { AiInfrastructureModule } from './infrastructure/ai-infrastructure.module';
-import { DocumentIntelligenceModule } from './document-intelligence/document-intelligence.module';
 import { SallyAiModule } from './assistant/assistant.module';
 import { McpToolsModule } from './mcp/mcp-tools.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
@@ -13,20 +12,17 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
  * AI Domain Module — aggregates all AI-related functionality.
  *
  * Submodules:
- * - Infrastructure: Shared LLM providers (Anthropic, future OpenAI)
- * - Document Intelligence: PDF parsing (ratecon, future BOL/POD)
- * - Sally AI: Conversational assistant (AI SDK agent with MCP tools)
- * - MCP Tools: Model Context Protocol tool server (internal)
+ * - Infrastructure: Shared LLM providers
+ * - Assistant: Conversational assistant (AI SDK agent with MCP tools)
+ * - MCP Tools: Model Context Protocol tool server (internal extension point)
  * - MCP External Server: MCP Streamable HTTP for external AI clients
  * - Knowledge Base: RAG knowledge base with pgvector search
  * - Moderation: Content moderation, guardrails, PII redaction
- *
- * NOTE: DeskModule moved to domains/desk/ as a top-level domain.
+ * - Voice: LiveKit voice sessions
  */
 @Module({
   imports: [
     AiInfrastructureModule,
-    DocumentIntelligenceModule,
     SallyAiModule,
     McpToolsModule,
     McpExternalServerModule,
@@ -37,7 +33,6 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     AgentContractModule,
   ],
   exports: [
-    DocumentIntelligenceModule,
     SallyAiModule,
     McpToolsModule,
     McpExternalServerModule,

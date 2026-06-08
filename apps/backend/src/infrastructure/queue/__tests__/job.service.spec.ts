@@ -13,7 +13,6 @@ const mockPrisma = {
     count: jest.fn(),
     groupBy: jest.fn(),
   },
-  load: { findFirst: jest.fn() },
   integrationConfig: { findMany: jest.fn() },
   $queryRaw: jest.fn(),
 };
@@ -34,8 +33,8 @@ describe('JobService', () => {
       const params = {
         tenantId: 1,
         submittedBy: 42,
-        category: 'vendor' as const,
-        type: 'drivers',
+        category: 'webhooks' as const,
+        type: 'deliver',
         inputData: { foo: 'bar' },
       };
       mockPrisma.job.create.mockResolvedValue({
@@ -61,8 +60,8 @@ describe('JobService', () => {
       await service.createJob({
         tenantId: 1,
         submittedBy: null,
-        category: 'telemetry',
-        type: 'hos',
+        category: 'maintenance',
+        type: 'job-cleanup',
         inputData: {},
         priority: 5,
         maxAttempts: 1,
@@ -181,36 +180,18 @@ describe('JobService', () => {
     it('should filter by category and status', async () => {
       mockPrisma.job.findMany.mockResolvedValue([]);
       await service.listJobs(1, {
-        category: 'vendor',
+        category: 'webhooks',
         status: ['QUEUED', 'PROCESSING'],
       });
       expect(mockPrisma.job.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             tenantId: 1,
-            category: 'vendor',
+            category: 'webhooks',
             status: { in: ['QUEUED', 'PROCESSING'] },
           }),
         }),
       );
-    });
-  });
-
-  describe('findActiveLoadByHash', () => {
-    it('should return null if no completed job', async () => {
-      mockPrisma.job.findFirst.mockResolvedValue(null);
-      const result = await service.findActiveLoadByHash(1, 'tms', 'ratecon', 'hash');
-      expect(result).toBeNull();
-    });
-
-    it('should return null if load is cancelled', async () => {
-      mockPrisma.job.findFirst.mockResolvedValue({
-        resultData: { loadId: 'L-1', loadNumber: 'LN-1' },
-      });
-      mockPrisma.load.findFirst.mockResolvedValue(null);
-
-      const result = await service.findActiveLoadByHash(1, 'tms', 'ratecon', 'hash');
-      expect(result).toBeNull();
     });
   });
 });

@@ -22,7 +22,7 @@ export class TimezoneService {
   /** Tenant's IANA tz, validated; falls back to UTC. Cached (COLD — rarely changes). */
   async resolveTenantTimezone(tenantId: number): Promise<string> {
     return this.cache.getOrSet(
-      buildKey('sally:tenants', 'tz', tenantId),
+      buildKey('app:tenants', 'tz', tenantId),
       async () => {
         const tenant = await this.prisma.tenant.findUnique({
           where: { id: tenantId },

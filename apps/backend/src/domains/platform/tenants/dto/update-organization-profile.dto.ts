@@ -1,6 +1,5 @@
-import { IsString, IsEmail, IsOptional, IsEnum, Matches, MinLength } from 'class-validator';
+import { IsString, IsEmail, IsOptional, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { FleetSize, CarrierType } from '@prisma/client';
 import type { UpdateOrganizationProfileInput } from '@app/shared-types';
 
 import { IsIanaTimezone } from '../../../../shared/validators/is-iana-timezone.validator';
@@ -29,26 +28,6 @@ export class UpdateOrganizationProfileDto implements UpdateOrganizationProfileIn
   @IsOptional()
   @IsString()
   contactPhone?: string;
-
-  @ApiPropertyOptional({ example: '1234567', description: 'DOT number, 1-8 digits' })
-  @IsOptional()
-  @Matches(/^\d{1,8}$/, { message: 'DOT number must be 1-8 digits' })
-  dotNumber?: string;
-
-  @ApiPropertyOptional({ example: '987654', description: 'MC number, 1-8 digits' })
-  @IsOptional()
-  @Matches(/^\d{1,8}$/, { message: 'MC number must be 1-8 digits' })
-  mcNumber?: string;
-
-  @ApiPropertyOptional({ enum: CarrierType })
-  @IsOptional()
-  @IsEnum(CarrierType)
-  carrierType?: CarrierType;
-
-  @ApiPropertyOptional({ enum: FleetSize })
-  @IsOptional()
-  @IsEnum(FleetSize)
-  fleetSize?: FleetSize;
 
   @ApiPropertyOptional({ example: 'America/Chicago', description: 'IANA timezone identifier' })
   @IsOptional()

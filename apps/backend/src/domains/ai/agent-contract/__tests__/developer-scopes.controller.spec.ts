@@ -34,14 +34,14 @@ describe('DeveloperScopesController', () => {
   });
 
   it('prefers live registry tools over static sampleTools when both are present', () => {
-    // Simulate the registry returning live tools for loads:read
+    // Simulate the registry returning live tools for documents:read
     scopeRegistry.toolsForScope.mockImplementation((scope: string) =>
-      scope === 'loads:read' ? ['live-tool-1', 'live-tool-2'] : [],
+      scope === 'documents:read' ? ['live-tool-1', 'live-tool-2'] : [],
     );
     const rows = controller.list();
-    const loadsRead = rows.find((r) => r.scope === 'loads:read');
-    expect(loadsRead).toBeDefined();
-    expect(loadsRead?.sampleTools).toEqual(['live-tool-1', 'live-tool-2']);
+    const documentsRead = rows.find((r) => r.scope === 'documents:read');
+    expect(documentsRead).toBeDefined();
+    expect(documentsRead?.sampleTools).toEqual(['live-tool-1', 'live-tool-2']);
   });
 
   it('falls back to static sampleTools when registry returns no live tools', () => {
@@ -49,10 +49,10 @@ describe('DeveloperScopesController', () => {
     // should be used as a fallback.
     scopeRegistry.toolsForScope.mockReturnValue([]);
     const rows = controller.list();
-    const fleetRead = rows.find((r) => r.scope === 'fleet:read');
-    expect(fleetRead).toBeDefined();
-    // SCOPE_DESCRIPTIONS['fleet:read'].sampleTools is non-empty
-    expect(fleetRead?.sampleTools.length).toBeGreaterThan(0);
+    const platformRead = rows.find((r) => r.scope === 'platform:read');
+    expect(platformRead).toBeDefined();
+    // SCOPE_DESCRIPTIONS['platform:read'].sampleTools is non-empty
+    expect(platformRead?.sampleTools.length).toBeGreaterThan(0);
   });
 
   it('truncates live tools at 4 entries', () => {

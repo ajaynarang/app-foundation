@@ -1,59 +1,24 @@
 /**
  * Canonical prompt name registry — every LangFuse-managed prompt name in one place.
  * Consumers reference these constants instead of hardcoding string keys.
+ *
+ * This is an extension point: the starter ships ONE generic assistant persona
+ * plus a couple of generic extraction prompts. Add your own prompt names here
+ * (and register a code fallback in a registrar) as your product grows.
  */
 export const PROMPT_NAMES = {
-  // Chat personas
-  PROSPECT: 'sally-prospect',
-  DISPATCHER: 'sally-dispatcher',
-  DRIVER: 'sally-driver',
-  CUSTOMER: 'sally-customer',
-  OWNER: 'sally-owner',
-  ADMIN: 'sally-admin',
-  SUPER_ADMIN: 'sally-super_admin',
-  SUPPORT: 'sally-support',
+  // Chat persona (one generic assistant). Add role-specific personas as needed.
+  ASSISTANT: 'assistant',
+  SUPPORT: 'assistant-support',
 
-  // Domain agent personas (chat mode)
-  BILLING: 'sally-billing',
-  COMPLIANCE: 'sally-compliance',
-  SAFETY: 'sally-safety',
-  ROUTE: 'sally-route',
-  PAYROLL: 'sally-payroll',
-  MAINTENANCE: 'sally-maintenance',
-  FUEL: 'sally-fuel',
+  // Generic extraction/analysis prompts (examples of the registrar pattern).
+  FEEDBACK_CATEGORIZER: 'feedback-categorizer',
+  SKILL_CLASSIFIER: 'skill-classifier',
 
-  // Extraction/analysis agents
-  RATECON_PARSER: 'sally-ratecon-parser',
-  SHIELD_ANALYST: 'sally-shield-analyst',
-  ALERT_BRIEFING: 'sally-alert-briefing',
-  BRIEFING: 'sally-briefing',
-  FUEL_RECEIPT_PARSER: 'sally-fuel-receipt-parser',
-  FEEDBACK_CATEGORIZER: 'sally-feedback-categorizer',
-  SKILL_CLASSIFIER: 'sally-skill-classifier',
-  LOAD_BOARD_SEARCH_PARSER: 'sally-load-board-search-parser',
-
-  // ─── Desk (v3) — per-responsibility step prompts ──────────────────────
-  // Vocabulary: desk.<responsibility_key>.<step_kind>.v<version>
-  // Registered by the backend-worker's responsibility modules on init.
-  // Added per responsibility as they ship.
-  DESK_AR_FOLLOWUP_PERCEIVE: 'desk.ar_followup.perceive.v1',
-  DESK_AR_FOLLOWUP_DECIDE: 'desk.ar_followup.decide.v1',
-  DESK_AR_FOLLOWUP_DRAFT: 'desk.ar_followup.draft.v1',
-  DESK_CLOSEOUT_REVIEW_PERCEIVE: 'desk.closeout_review.perceive.v1',
-  DESK_CLOSEOUT_REVIEW_DECIDE: 'desk.closeout_review.decide.v1',
-  DESK_CLOSEOUT_REVIEW_DRAFT: 'desk.closeout_review.draft.v1',
-
-  DESK_DOCUMENT_EXPIRY_PERCEIVE: 'desk.document_expiry.perceive.v1',
-  DESK_DOCUMENT_EXPIRY_DECIDE: 'desk.document_expiry.decide.v1',
-  DESK_DOCUMENT_EXPIRY_DRAFT: 'desk.document_expiry.draft.v1',
-
-  DESK_SETTLEMENT_REVIEW_PERCEIVE: 'desk.settlement_review.perceive.v1',
-  DESK_SETTLEMENT_REVIEW_DECIDE: 'desk.settlement_review.decide.v1',
-
-  // ─── Desk (v3) — memory subsystem ─────────────────────────────────────
-  // Default memory-extract prompt. Per-responsibility variants follow the
-  // pattern desk.memory.extract.<responsibilityKey>.v1 and are looked up
-  // first; this default is the fallback.
+  // ─── Desk (durable workflow engine) — memory subsystem ────────────────
+  // Default memory-extract prompt. Per-responsibility step prompts follow the
+  // pattern `desk.<responsibility_key>.<step_kind>.v<n>` and are registered by
+  // each responsibility module as it ships — they are NOT enumerated here.
   DESK_MEMORY_EXTRACT: 'desk.memory.extract.v1',
 } as const;
 

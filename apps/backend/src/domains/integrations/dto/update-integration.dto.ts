@@ -1,7 +1,6 @@
 import { IsString, IsOptional, IsObject, IsBoolean } from 'class-validator';
-import type { UpdateIntegrationInput } from '@app/shared-types';
 
-export class UpdateIntegrationDto implements UpdateIntegrationInput {
+export class UpdateIntegrationDto {
   @IsString()
   @IsOptional()
   displayName?: string;

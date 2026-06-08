@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ApprovalDecision, DeskEpisodeStatus, DeskEpisodeStepKind, Prisma, UserRole } from '@prisma/client';
-import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '@app/shared-types';
+import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '../types';
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
@@ -16,7 +16,7 @@ import { InngestClientService } from '../inngest/inngest.client';
 
 import { ApprovalEnrichmentService, type EnrichedApprovalPayload } from './approval-enrichment.service';
 
-const SUPERVISOR_DEFAULT_SCOPE_ROLES: readonly UserRole[] = [UserRole.DISPATCHER];
+const SUPERVISOR_DEFAULT_SCOPE_ROLES: readonly UserRole[] = [UserRole.MEMBER];
 
 const EPISODE_STATUS = DeskEpisodeStatus;
 
@@ -42,7 +42,7 @@ const HANDLED_COUNT_STATUSES: readonly DeskEpisodeStatus[] = [...HANDLED_EPISODE
  * Resolve the scope query param to a concrete predicate.
  * - 'mine' + currentUserId → filter by agent supervisor.
  * - 'all' → unrestricted tenant-wide.
- * - undefined → default per role: DISPATCHER → 'mine', rest → 'all'.
+ * - undefined → default per role: MEMBER → 'mine', rest → 'all'.
  */
 export function resolveApprovalScope(scope: ApprovalScope | undefined, role: UserRole): ApprovalScope {
   if (scope) return scope;

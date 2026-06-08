@@ -30,7 +30,7 @@ import { z } from 'zod';
 export const confirmActionTool = createTool({
   id: 'confirm-action',
   description:
-    'Request explicit user confirmation before executing a write operation. Call this BEFORE any write action (acknowledge alert, resolve alert, plan route). The user will see a confirmation card and must approve before the action proceeds.',
+    'Request explicit user confirmation before executing a write operation. Call this BEFORE any write action. The user will see a confirmation card and must approve before the action proceeds.',
   inputSchema: z.object({
     action: z.string().describe('What action is being requested (e.g., "Acknowledge Alert")'),
     description: z.string().describe('Human-readable description of what will happen'),

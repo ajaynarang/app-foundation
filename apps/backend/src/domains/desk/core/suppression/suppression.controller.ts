@@ -16,7 +16,7 @@ import { SuppressionService } from './suppression.service';
  * and the Handled sheet exposes an "Un-snooze" card when the episode's
  * entity has an active suppression row.
  *
- * Auth: DISPATCHER + ADMIN + OWNER + SUPER_ADMIN. Tenant scoping:
+ * Auth: MEMBER + ADMIN + OWNER + SUPER_ADMIN. Tenant scoping:
  *   • snooze   — tenantId resolved from the caller's user, passed to service
  *   • unsnooze — tenantId resolved from the caller and passed to the service
  *                so the service read is `findFirst({ id, tenantId })`, never
@@ -26,7 +26,7 @@ import { SuppressionService } from './suppression.service';
 @ApiTags('Desk — Suppressions')
 @ApiBearerAuth()
 @Controller('desk')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class SuppressionController extends BaseTenantController {
   constructor(
     prisma: PrismaService,

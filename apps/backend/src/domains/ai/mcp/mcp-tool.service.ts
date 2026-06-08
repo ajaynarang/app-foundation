@@ -2,14 +2,12 @@ import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { jsonSchema, type ToolSet } from 'ai';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { McpRegistryService } from '@rekog/mcp-nest';
-import { getPersonaConfig, PERSONA_CONFIGS } from '../../../domains/prompting/prompts/persona/persona.config';
+import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { AiPrismaService } from '../rls/ai-prisma.service';
 import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
 import { fromUser } from '../agent-contract/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';
-import { ToolNames } from '../agent-contract/tool-names.constants';
 
 /**
  * Accumulates `_card` metadata emitted by MCP tools during a single request.
@@ -58,7 +56,7 @@ export class McpToolService implements OnModuleInit {
   private mcpModuleId: string | null = null;
 
   constructor(
-    private readonly registry: McpRegistryService,
+    private readonly registry: McpRegistryDiscoveryService,
     private readonly moduleRef: ModuleRef,
     private readonly aiPrisma: AiPrismaService,
     @Optional() private readonly pipeline?: InvocationPipelineService,
@@ -102,7 +100,10 @@ export class McpToolService implements OnModuleInit {
   }
 
   /**
-   * Get AI SDK-compatible tools filtered by persona.
+   * Get AI SDK-compatible tools for the generic assistant.
+   *
+   * The starter exposes every discovered MCP tool to the single assistant
+   * persona. To gate tools per persona, reintroduce an allowlist lookup here.
    *
    * When `context` is provided, `_tenantId` and `_userId` are injected into
    * every tool call's arguments, ensuring tenant isolation at the service boundary.
@@ -124,10 +125,9 @@ export class McpToolService implements OnModuleInit {
       this.discoverTools();
     }
 
-    const persona = getPersonaConfig(userMode);
     const tools: ToolSet = {};
 
-    for (const toolName of persona.allowedTools) {
+    for (const toolName of this.allTools.keys()) {
       const registeredTool = this.allTools.get(toolName);
       if (!registeredTool) continue;
 
@@ -380,54 +380,19 @@ export class McpToolService implements OnModuleInit {
     return Array.from(McpToolService.WRITE_TOOLS).sort();
   }
 
-  /** Write tools that require HITL confirmation before execution. */
-  private static readonly WRITE_TOOLS = new Set<string>([
-    ToolNames.ACKNOWLEDGE_ALERT,
-    ToolNames.RESOLVE_ALERT,
-    ToolNames.PLAN_ROUTE,
-    ToolNames.REPORT_DELAY,
-    ToolNames.REPORT_ARRIVAL,
-    ToolNames.REPORT_FUEL_STOP,
-    ToolNames.SEND_INVOICE,
-    ToolNames.VOID_INVOICE,
-    ToolNames.RECORD_PAYMENT,
-    ToolNames.GENERATE_INVOICE,
-    ToolNames.SUBMIT_INVOICE_TO_FACTOR,
-    ToolNames.APPROVE_SETTLEMENT,
-    ToolNames.APPROVE_FOR_BILLING,
-    ToolNames.TRIGGER_SHIELD_AUDIT,
-    // Phase 2: Fleet action tools
-    ToolNames.ASSIGN_LOAD,
-    ToolNames.UPDATE_LOAD_STATUS,
-    ToolNames.UPDATE_LOAD,
-    ToolNames.ADD_LOAD_NOTE,
-    ToolNames.DUPLICATE_LOAD,
-    ToolNames.GENERATE_LOAD_FROM_LANE,
-    ToolNames.UPDATE_DRIVER,
-    ToolNames.UPDATE_DRIVER_STATUS,
-    ToolNames.UPDATE_VEHICLE,
-    ToolNames.UPDATE_VEHICLE_STATUS,
-    ToolNames.UPDATE_STOP_STATUS,
-    ToolNames.REPORT_ISSUE,
-    // Phase C: agent-native write tools
-    ToolNames.CREATE_LOAD,
-    ToolNames.ACCEPT_RATECON_DRAFT,
-    ToolNames.CREATE_DRIVER,
-    ToolNames.TERMINATE_DRIVER,
-    ToolNames.CREATE_CUSTOMER,
-    ToolNames.DEACTIVATE_CUSTOMER,
-    ToolNames.RETIRE_VEHICLE,
-    ToolNames.CREATE_SETTLEMENT,
-    ToolNames.DISPUTE_SHIELD_FINDING,
-    ToolNames.SEND_DRIVER_MESSAGE,
-    ToolNames.SEND_CUSTOMER_MESSAGE,
-    ToolNames.BULK_BROADCAST_DRIVERS,
-  ]);
+  /**
+   * Write tools that require HITL confirmation before execution.
+   *
+   * Empty in the starter — register write-class tool names here as you add
+   * `@Tool` providers that mutate state, so the assistant prompts the user
+   * with `confirm-action` before invoking them.
+   */
+  private static readonly WRITE_TOOLS = new Set<string>([]);
 
   /**
    * Get tools in Mastra's `toolsets` format for dynamic injection.
    *
-   * Returns `{ 'sally-tools': { ...mcpTools, 'confirm-action': ... } }`
+   * Returns `{ 'app-tools': { ...mcpTools, 'confirm-action': ... } }`
    * which is passed to `agent.stream()` / `agent.generate()` via `toolsets`.
    *
    * Includes confirm-action tool for personas with write tools.
@@ -439,13 +404,12 @@ export class McpToolService implements OnModuleInit {
   ): Promise<Record<string, ToolSet>> {
     const tools = await this.getToolsForPersona(userMode, context, cardAccumulator);
 
-    // Include confirm-action tool if this persona has any write tools
-    const persona = PERSONA_CONFIGS[userMode] ?? PERSONA_CONFIGS.prospect;
-    const hasWriteTools = persona.allowedTools.some((t) => McpToolService.WRITE_TOOLS.has(t));
+    // Include confirm-action tool if any exposed tool is write-class.
+    const hasWriteTools = Object.keys(tools).some((t) => McpToolService.WRITE_TOOLS.has(t));
     if (hasWriteTools) {
       (tools as any)['confirm-action'] = confirmActionTool;
     }
 
-    return { 'sally-tools': tools };
+    return { 'app-tools': tools };
   }
 }

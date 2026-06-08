@@ -63,11 +63,11 @@ describe('ApiKeysController', () => {
     await controller.resume(authUser as any, 501);
     await controller.revokeForTenant(authUser as any, 501);
     await controller.updateScopes(authUser as any, 501, {
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
     } as any);
     expect(service.pause).toHaveBeenCalledWith(501, 7);
     expect(service.resume).toHaveBeenCalledWith(501, 7);
     expect(service.revokeForTenant).toHaveBeenCalledWith(501, 7);
-    expect(service.updateScopes).toHaveBeenCalledWith(501, 7, expect.objectContaining({ scopes: ['fleet:read'] }));
+    expect(service.updateScopes).toHaveBeenCalledWith(501, 7, expect.objectContaining({ scopes: ['platform:read'] }));
   });
 });

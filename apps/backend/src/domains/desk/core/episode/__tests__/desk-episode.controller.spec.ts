@@ -27,7 +27,7 @@ describe('DeskEpisodeController', () => {
   describe('list (legacy episodes)', () => {
     it('resolves scope via role → DISPATCHER defaults to mine', async () => {
       const { controller, service } = makeController();
-      await controller.list({ role: UserRole.DISPATCHER, dbId: 42 });
+      await controller.list({ role: UserRole.MEMBER, dbId: 42 });
       expect(service.listForTenant).toHaveBeenCalledWith(10, expect.objectContaining({ scope: 'mine' }), {
         currentUserId: 42,
       });
@@ -57,7 +57,7 @@ describe('DeskEpisodeController', () => {
     it('forwards tenant + episode + user + note to the service', async () => {
       const { controller, service } = makeController();
       const result = await controller.resolve(
-        { role: UserRole.DISPATCHER, dbId: 42 },
+        { role: UserRole.MEMBER, dbId: 42 },
         'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         { note: 'Handled by phone' },
       );
@@ -81,7 +81,7 @@ describe('DeskEpisodeController', () => {
     it('parses query params and forwards them to the service', async () => {
       const { controller, service } = makeController();
       await controller.listHandled(
-        { role: UserRole.DISPATCHER, dbId: 42 },
+        { role: UserRole.MEMBER, dbId: 42 },
         'all',
         '7d',
         undefined,
@@ -108,7 +108,7 @@ describe('DeskEpisodeController', () => {
 
     it('defaults scope by role when missing — DISPATCHER → mine', async () => {
       const { controller, service } = makeController();
-      await controller.listHandled({ role: UserRole.DISPATCHER, dbId: 42 });
+      await controller.listHandled({ role: UserRole.MEMBER, dbId: 42 });
       expect(service.listHandled).toHaveBeenCalledWith(
         10,
         expect.objectContaining({ scope: 'mine' }),

@@ -30,7 +30,7 @@ export class DeskScheduleController extends BaseTenantController {
   }
 
   @Get()
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get the tenant-wide autonomous-run master switch state' })
   async get(@CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);

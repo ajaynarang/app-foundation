@@ -1,6 +1,6 @@
 import { buildIdempotencyKey } from '../idempotency';
 
-const ctx = { surface: 'DOC_RATECON' as const, linkRefType: 'document', linkRefId: 'doc-1' };
+const ctx = { surface: 'KB_INGEST' as const, linkRefType: 'document', linkRefId: 'doc-1' };
 
 describe('buildIdempotencyKey', () => {
   it('produces a stable key for identical inputs (retry collapse)', () => {
@@ -49,7 +49,7 @@ describe('buildIdempotencyKey', () => {
   it('follows the documented shape surface:linkRefType:linkRefId:kind:hash', () => {
     const key = buildIdempotencyKey(ctx, 'primary', 'c');
     const parts = key.split(':');
-    expect(parts[0]).toBe('DOC_RATECON');
+    expect(parts[0]).toBe('KB_INGEST');
     expect(parts[1]).toBe('document');
     expect(parts[2]).toBe('doc-1');
     expect(parts[3]).toBe('primary');
@@ -57,9 +57,9 @@ describe('buildIdempotencyKey', () => {
   });
 
   it('collapses missing linkRef parts to "na" so the key stays well-formed', () => {
-    const key = buildIdempotencyKey({ surface: 'APP_CHAT' as const }, 'primary', 'c');
+    const key = buildIdempotencyKey({ surface: 'CHAT' as const }, 'primary', 'c');
     const parts = key.split(':');
-    expect(parts[0]).toBe('APP_CHAT');
+    expect(parts[0]).toBe('CHAT');
     expect(parts[1]).toBe('na');
     expect(parts[2]).toBe('na');
   });

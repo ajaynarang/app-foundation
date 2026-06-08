@@ -66,9 +66,9 @@ export class UserInvitationsController {
   }
 
   /**
-   * Get invite link for an existing pending invitation (OWNER, ADMIN, DISPATCHER)
+   * Get invite link for an existing pending invitation (OWNER, ADMIN, MEMBER)
    */
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @Get(':invitationId/link')
   async getInvitationLink(@Param('invitationId') invitationId: string, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.getInvitationLink(invitationId, currentUser.tenantId);

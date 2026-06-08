@@ -176,15 +176,14 @@ export class PlansService {
         trialEndsAt: true,
         planAssignedAt: true,
         planAssignedBy: true,
-        fleetLimitWarning: true,
         id: true,
       },
     });
 
-    const [planConfig, vehicleCount, planEvents, entitlements] = await Promise.all([
+    const [planConfig, userCount, planEvents, entitlements] = await Promise.all([
       this.prisma.planConfig.findUnique({ where: { plan: tenant.plan } }),
-      this.prisma.vehicle.count({
-        where: { tenantId: tenant.id, lifecycleStatus: 'ACTIVE' },
+      this.prisma.user.count({
+        where: { tenantId: tenant.id, isActive: true },
       }),
       this.prisma.tenantPlanEvent.findMany({
         where: { tenantId: tenant.id },
@@ -207,15 +206,14 @@ export class PlansService {
       trialEndsAt: tenant.trialEndsAt,
       planAssignedAt: tenant.planAssignedAt,
       planAssignedBy: tenant.planAssignedBy,
-      fleetLimitWarning: tenant.fleetLimitWarning,
       planConfig: planConfig
         ? {
             ...planConfig,
             entitlements: [...entitlements].sort((a, b) => Number(b.enabled) - Number(a.enabled)),
           }
         : null,
-      vehicleCount,
-      fleetLimit: planConfig?.fleetLimit ?? null,
+      userCount,
+      seatLimit: planConfig?.userLimit ?? null,
       daysLeftInTrial,
       planEvents,
     };

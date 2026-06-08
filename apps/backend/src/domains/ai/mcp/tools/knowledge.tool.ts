@@ -8,23 +8,15 @@ import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 export class KnowledgeTool {
   constructor(private readonly knowledgeBaseService: KnowledgeBaseService) {}
 
-  @RequiresScope('documents:read')
+  @RequiresScope('knowledge:read')
   @Tool({
     name: 'search-kb',
     description:
-      'Search the SALLY knowledge base for product features, capabilities, pricing, and how-to guides. Use this to answer questions about what SALLY does, how features work, or how to use the platform. Returns the most relevant content chunks ranked by relevance.',
+      'Search the knowledge base for product features, how-to guides, and reference content. Use this to answer questions about what the platform does or how to use it. Returns the most relevant content chunks ranked by relevance.',
     parameters: z.object({
-      query: z.string().describe('The search query — what the prospect is asking about'),
-      audience: z
-        .enum(['prospect', 'dispatcher', 'driver', 'all'])
-        .default('prospect')
-        .describe('Filter results by target audience'),
-      category: z
-        .string()
-        .optional()
-        .describe(
-          'Optional category filter: route_planning, hos_compliance, alerts, integrations, fuel_optimization, pricing, security, driver_experience, dispatcher_experience, monitoring, general',
-        ),
+      query: z.string().describe('The search query — what the user is asking about'),
+      audience: z.enum(['user', 'all']).default('all').describe('Filter results by target audience'),
+      category: z.string().optional().describe('Optional category filter'),
       limit: z.number().min(1).max(10).default(5).describe('Max results to return'),
     }),
     annotations: {
@@ -51,47 +43,14 @@ export class KnowledgeTool {
     };
   }
 
-  @RequiresScope('documents:read')
+  @RequiresScope('knowledge:read')
   @Tool({
     name: 'get-product-info',
     description:
-      'Get structured product information by topic. Use this when a user asks about a specific feature category (e.g., "tell me about pricing", "how does route planning work?", "how do I manage loads?"). Returns all knowledge documents for that topic.',
+      'Get structured product information by topic. Use this when a user asks about a specific feature category (e.g., "tell me about pricing", "how does X work?"). Returns all knowledge documents for that topic.',
     parameters: z.object({
-      topic: z
-        .enum([
-          // Prospect KB categories
-          'route_planning',
-          'hos_compliance',
-          'alerts',
-          'integrations',
-          'fuel_optimization',
-          'pricing',
-          'security',
-          'driver_experience',
-          'dispatcher_experience',
-          'monitoring',
-          'general',
-          'onboarding',
-          'analytics',
-          'support',
-          'comparison',
-          'roi',
-          'dynamic_updates',
-          // Product manual categories
-          'getting_started',
-          'dispatcher',
-          'driver',
-          'admin',
-          'customer',
-          'console',
-          'sally_ai',
-          'reference',
-        ])
-        .describe('The product topic to retrieve information about'),
-      audience: z
-        .enum(['prospect', 'dispatcher', 'driver', 'all'])
-        .default('prospect')
-        .describe('Filter by target audience'),
+      topic: z.string().describe('The product topic / category to retrieve information about'),
+      audience: z.enum(['user', 'all']).default('all').describe('Filter by target audience'),
     }),
     annotations: {
       readOnlyHint: true,

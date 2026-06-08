@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { ModuleRef } from '@nestjs/core';
-import { McpRegistryService } from '@rekog/mcp-nest';
+import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { ScopeRegistryService } from '../scope-registry.service';
 import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
@@ -22,7 +22,7 @@ import type { DomainEventService } from '../../../../infrastructure/events/domai
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://sally_user:sally_password@localhost:5432/sally';
 
 class TestFleetReadTool {
-  @RequiresScope('fleet:read')
+  @RequiresScope('platform:read')
   async queryLoads(_args: Record<string, unknown>) {
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ count: 0 }) }],
@@ -67,7 +67,7 @@ describe('Phase A pipeline integration', () => {
           methodName: 'queryLoads',
         },
       ],
-    } as unknown as McpRegistryService;
+    } as unknown as McpRegistryDiscoveryService;
 
     const moduleRef = {
       get: (token: unknown) => (token === TestFleetReadTool ? toolInstance : null),
@@ -113,8 +113,8 @@ describe('Phase A pipeline integration', () => {
     const principal = fromUser({
       userId: 1,
       tenantId: testTenantId,
-      role: 'DISPATCHER',
-      scopes: ['fleet:read'],
+      role: 'MEMBER',
+      scopes: ['platform:read'],
     });
     const result = await pipeline.run(principal, 'query-loads', {});
     expect(result.isError).toBeFalsy();
@@ -130,7 +130,7 @@ describe('Phase A pipeline integration', () => {
     });
     expect(row).toBeTruthy();
     expect(row?.success).toBe(true);
-    expect(row?.scopeRequired).toBe('fleet:read');
+    expect(row?.scopeRequired).toBe('platform:read');
     expect(row?.hitlTier).toBe('none');
     expect(row?.durationMs).toBeGreaterThanOrEqual(0);
     expect(row?.argsRaw).toBeNull();

@@ -3,7 +3,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as crypto from 'crypto';
-import { NotificationTriggersService } from '../../operations/notifications/notification-triggers.service';
+import { NotificationTriggersService } from '../../notifications/notification-triggers.service';
 
 @Injectable()
 export class UsersService {
@@ -61,12 +61,6 @@ export class UsersService {
             companyName: true,
           },
         },
-        driver: {
-          select: {
-            driverId: true,
-            name: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -84,7 +78,6 @@ export class UsersService {
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
       tenant: user.tenant,
-      driver: user.driver,
     }));
   }
 
@@ -93,7 +86,6 @@ export class UsersService {
       where: { userId },
       include: {
         tenant: true,
-        driver: true,
       },
     });
 
@@ -117,7 +109,6 @@ export class UsersService {
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
       tenant: user.tenant,
-      driver: user.driver,
     };
   }
 
@@ -232,7 +223,6 @@ export class UsersService {
       },
       include: {
         tenant: true,
-        driver: true,
       },
     });
 
@@ -257,7 +247,6 @@ export class UsersService {
       role: updatedUser.role,
       isActive: updatedUser.isActive,
       tenant: updatedUser.tenant,
-      driver: updatedUser.driver,
     };
   }
 

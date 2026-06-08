@@ -10,11 +10,8 @@ import { OrchestratorModule } from '../orchestrator/orchestrator.module';
 import { SallyAiController } from './assistant.controller';
 import { SallyAiService } from './assistant.service';
 import { MastraProvider } from './mastra/mastra.provider';
-import { ProspectController } from './prospect.controller';
-import { ProspectService } from './prospect.service';
 import { ConversationSessionService } from './services/conversation-session.service';
 import { AiInfrastructureModule } from '../infrastructure/ai-infrastructure.module';
-import { CapabilityRegistryModule } from './capabilities/capability-registry.module';
 
 @Module({
   imports: [
@@ -27,10 +24,9 @@ import { CapabilityRegistryModule } from './capabilities/capability-registry.mod
     forwardRef(() => AgentsModule),
     OrchestratorModule,
     AiInfrastructureModule,
-    CapabilityRegistryModule,
   ],
-  controllers: [SallyAiController, ProspectController],
-  providers: [SallyAiService, MastraProvider, ProspectService, ConversationSessionService],
-  exports: [SallyAiService, MastraProvider, AiInfrastructureModule, CapabilityRegistryModule],
+  controllers: [SallyAiController],
+  providers: [SallyAiService, MastraProvider, ConversationSessionService],
+  exports: [SallyAiService, MastraProvider, AiInfrastructureModule],
 })
 export class SallyAiModule {}

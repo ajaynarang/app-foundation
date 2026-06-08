@@ -73,7 +73,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
     // the AI Spend deep-link resolves. Same session shape as the cost ledger.
     const { sessionId, userId, tags } = buildLangfuseSession({
       tenantId: ctx.tenantId,
-      surface: AiSurface.APP_CHAT,
+      surface: AiSurface.CHAT,
       agentId: this.mastraAgentId,
       linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
       linkRefId: ctx.conversationId,
@@ -116,11 +116,12 @@ export abstract class AbstractBaseAgent implements SallyAgent {
   }
 
   private async buildChatInstructions(
-    agent: ReturnType<ReturnType<MastraProvider['getMastra']>['getAgent']>,
+    // Mastra's Agent type for getInstructions varies by version; treat loosely.
+    agent: { getInstructions: (...args: any[]) => unknown },
     ctx: AgentContext,
     domainSkillContent: string,
   ): Promise<string> {
-    const rawInstructions = await agent.getInstructions();
+    const rawInstructions = await Promise.resolve(agent.getInstructions());
     const parts: string[] = [
       typeof rawInstructions === 'string' ? rawInstructions : '',
       `You are assisting a ${ctx.userMode}.`,
@@ -204,7 +205,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
         {
           tenantId: ctx.tenantId,
           userId: ctx.userDbId ?? undefined,
-          surface: AiSurface.APP_CHAT,
+          surface: AiSurface.CHAT,
           agentId: this.mastraAgentId,
           linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
           linkRefId: ctx.conversationId,
@@ -233,13 +234,13 @@ export abstract class AbstractBaseAgent implements SallyAgent {
       userDbId: ctx.userDbId,
       conversationId: ctx.conversationId,
     });
-    if (toolsets['sally-tools']) {
-      delete toolsets['sally-tools']['confirm-action'];
+    if (toolsets['app-tools']) {
+      delete toolsets['app-tools']['confirm-action'];
     }
 
     const { sessionId, userId, tags } = buildLangfuseSession({
       tenantId: ctx.tenantId,
-      surface: AiSurface.APP_CHAT,
+      surface: AiSurface.CHAT,
       agentId: this.mastraAgentId,
       linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
       linkRefId: ctx.conversationId,

@@ -7,38 +7,20 @@ import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { generateId } from '../../../shared/utils/id-generator';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
+import { Prisma, TenantPlan, TenantStatus } from '@prisma/client';
 import {
-  BundleFormat,
-  CarrierType,
-  DriverPayTiming,
-  FleetSize,
-  Prisma,
-  TenantPlan,
-  TenantStatus,
-} from '@prisma/client';
-import {
-  BundleFormatSchema,
   DEFAULT_TENANT_TIMEZONE,
-  DriverPayTimingSchema,
-  type BundleFormat as BundleFormatType,
-  type DriverPayTiming as DriverPayTimingType,
   type OrganizationProfile,
   type UpdateOrganizationProfileInput,
 } from '@app/shared-types';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../desk/responsibilities/desk-bootstrap.service';
-import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 
 /** Prisma select for the editable organization-profile field set. */
 const ORGANIZATION_PROFILE_SELECT = {
   companyName: true,
   contactEmail: true,
   contactPhone: true,
-  dotNumber: true,
-  mcNumber: true,
-  carrierType: true,
-  fleetSize: true,
   timezone: true,
 } satisfies Prisma.TenantSelect;
 
@@ -51,7 +33,6 @@ export class TenantsService {
     private notificationService: NotificationService,
     private readonly cache: AppCacheService,
     private readonly deskBootstrap: DeskBootstrapService,
-    private readonly events: DomainEventService,
   ) {}
 
   /**
@@ -82,7 +63,6 @@ export class TenantsService {
       select: {
         companyName: true,
         status: true,
-        invoiceSettings: { select: { logoUrl: true } },
       },
     });
 
@@ -90,7 +70,7 @@ export class TenantsService {
 
     return {
       companyName: tenant.companyName,
-      logoUrl: tenant.invoiceSettings?.logoUrl ?? null,
+      logoUrl: null,
     };
   }
 
@@ -130,10 +110,6 @@ export class TenantsService {
           contactEmail: dto.email,
           contactPhone: dto.phone,
           status: 'PENDING_APPROVAL',
-          dotNumber: dto.dotNumber,
-          carrierType: dto.carrierType,
-          mcNumber: dto.mcNumber || null,
-          fleetSize: dto.fleetSize,
           isActive: false,
           plan: TenantPlan.TRIAL,
           trialStartedAt: now,
@@ -212,7 +188,6 @@ export class TenantsService {
             _count: {
               select: {
                 users: true,
-                drivers: true,
               },
             },
           },
@@ -260,13 +235,6 @@ export class TenantsService {
         data: {
           isActive: true,
         },
-      });
-
-      // Create default operations settings for the tenant
-      await tx.fleetOperationsSettings.upsert({
-        where: { tenantId: tenant.id },
-        create: { tenantId: tenant.id },
-        update: {},
       });
 
       // Create default user preferences for the owner
@@ -490,10 +458,6 @@ export class TenantsService {
     const tenantUpdate: any = {};
     if (dto.companyName !== undefined) tenantUpdate.companyName = dto.companyName;
     if (dto.subdomain !== undefined) tenantUpdate.subdomain = dto.subdomain.toLowerCase();
-    if (dto.dotNumber !== undefined) tenantUpdate.dotNumber = dto.dotNumber;
-    if (dto.fleetSize !== undefined) tenantUpdate.fleetSize = dto.fleetSize;
-    if (dto.carrierType !== undefined) tenantUpdate.carrierType = dto.carrierType;
-    if (dto.mcNumber !== undefined) tenantUpdate.mcNumber = dto.mcNumber;
 
     // Build owner user update data
     const ownerUpdate: any = {};
@@ -557,9 +521,6 @@ export class TenantsService {
         _count: {
           select: {
             users: true,
-            drivers: true,
-            vehicles: true,
-            routePlans: true,
           },
         },
       },
@@ -576,10 +537,6 @@ export class TenantsService {
         companyName: tenant.companyName,
         subdomain: tenant.subdomain,
         status: tenant.status,
-        dotNumber: tenant.dotNumber,
-        carrierType: tenant.carrierType,
-        mcNumber: tenant.mcNumber,
-        fleetSize: tenant.fleetSize,
         contactEmail: tenant.contactEmail,
         contactPhone: tenant.contactPhone,
         createdAt: tenant.createdAt.toISOString(),
@@ -596,9 +553,6 @@ export class TenantsService {
       users: tenant.users,
       metrics: {
         totalUsers: tenant._count.users,
-        totalDrivers: tenant._count.drivers,
-        totalVehicles: tenant._count.vehicles,
-        totalRoutePlans: tenant._count.routePlans,
       },
     };
   }
@@ -637,10 +591,6 @@ export class TenantsService {
     if (dto.companyName !== undefined) data.companyName = dto.companyName;
     if (dto.contactEmail !== undefined) data.contactEmail = dto.contactEmail;
     if (dto.contactPhone !== undefined) data.contactPhone = dto.contactPhone;
-    if (dto.dotNumber !== undefined) data.dotNumber = dto.dotNumber;
-    if (dto.mcNumber !== undefined) data.mcNumber = dto.mcNumber;
-    if (dto.carrierType !== undefined) data.carrierType = dto.carrierType as CarrierType;
-    if (dto.fleetSize !== undefined) data.fleetSize = dto.fleetSize as FleetSize;
     if (dto.timezone !== undefined) data.timezone = dto.timezone;
 
     let tenant;
@@ -665,162 +615,14 @@ export class TenantsService {
     companyName: string;
     contactEmail: string | null;
     contactPhone: string | null;
-    dotNumber: string | null;
-    mcNumber: string | null;
-    carrierType: CarrierType;
-    fleetSize: FleetSize | null;
     timezone: string | null;
   }): OrganizationProfile {
     return {
       companyName: tenant.companyName,
       contactEmail: tenant.contactEmail,
       contactPhone: tenant.contactPhone,
-      dotNumber: tenant.dotNumber,
-      mcNumber: tenant.mcNumber,
-      carrierType: tenant.carrierType,
-      fleetSize: tenant.fleetSize,
       timezone: tenant.timezone ?? DEFAULT_TENANT_TIMEZONE,
     };
-  }
-
-  /**
-   * Pin or unpin the tenant's default factoring company.
-   * Pass `null` to unpin. Validates the FK belongs to the same tenant. Emits
-   * `sally.tenant.factoring-default-changed` only when the value actually changes.
-   */
-  async setDefaultFactoringCompany(
-    tenantDbId: number,
-    factoringCompanyId: number | null,
-    changedBy: string,
-  ): Promise<{ factoringCompanyId: number | null }> {
-    if (factoringCompanyId !== null) {
-      const company = await this.prisma.factoringCompany.findFirst({
-        where: { id: factoringCompanyId, tenantId: tenantDbId },
-      });
-      if (!company) {
-        throw new NotFoundException('Factoring company not found for this tenant');
-      }
-    }
-
-    const previous = await this.prisma.tenant.findUnique({
-      where: { id: tenantDbId },
-      select: { id: true, defaultFactoringCompanyId: true },
-    });
-    if (!previous) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const updated = await this.prisma.tenant.update({
-      where: { id: tenantDbId },
-      data: { defaultFactoringCompanyId: factoringCompanyId },
-      select: { id: true, defaultFactoringCompanyId: true },
-    });
-
-    if (previous.defaultFactoringCompanyId !== factoringCompanyId) {
-      await this.events.emit(DOMAIN_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED, tenantDbId, {
-        entityId: String(tenantDbId),
-        entityType: 'tenant',
-        previousFactoringCompanyId: previous.defaultFactoringCompanyId,
-        newFactoringCompanyId: factoringCompanyId,
-        changedBy,
-      });
-    }
-
-    await this.invalidateTenantSettingsCache(tenantDbId);
-    return { factoringCompanyId: updated.defaultFactoringCompanyId };
-  }
-
-  /**
-   * Returns the tenant-level settings the dispatcher UI needs (pinned factor,
-   * resolved company chip, factor bundle format). Cached because the invoice
-   * detail screen reads this on every render.
-   */
-  async getMyTenantSettings(tenantDbId: number): Promise<{
-    factoringCompanyId: number | null;
-    factoringCompany: { id: number; companyId: string; companyName: string } | null;
-    bundleFormat: BundleFormatType;
-    driverPayTiming: DriverPayTimingType;
-  }> {
-    const cacheKey = buildKey('sally:tenants', 'me-settings', tenantDbId);
-    return this.cache.getOrSet(
-      cacheKey,
-      async () => {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id: tenantDbId },
-          select: {
-            defaultFactoringCompanyId: true,
-            defaultFactoringCompany: {
-              select: { id: true, companyId: true, companyName: true },
-            },
-            bundleFormat: true,
-            driverPayTiming: true,
-          },
-        });
-        return {
-          factoringCompanyId: tenant?.defaultFactoringCompanyId ?? null,
-          factoringCompany: tenant?.defaultFactoringCompany ?? null,
-          bundleFormat: (tenant?.bundleFormat ?? BundleFormat.ZIP) as BundleFormatType,
-          driverPayTiming: (tenant?.driverPayTiming ?? DriverPayTiming.ON_DELIVERY) as DriverPayTimingType,
-        };
-      },
-      CACHE_TTL_WARM_5M,
-    );
-  }
-
-  /**
-   * Set the tenant's factor bundle format. ADMIN/OWNER only — gating is
-   * enforced at the controller layer; the service trusts its caller. Format
-   * choice is the canonical config surface for ZIP vs MERGED_PDF (the cleanup
-   * phase deleted the env-var flag that previously gated this behavior).
-   */
-  async setBundleFormat(tenantDbId: number, format: BundleFormatType): Promise<{ format: BundleFormatType }> {
-    // Defensive parse — DTO already validates, but the service is also called
-    // by tests and may eventually be reused by AI tools. Single source of truth
-    // = the schema.
-    const parsed = BundleFormatSchema.parse(format);
-
-    try {
-      await this.prisma.tenant.update({
-        where: { id: tenantDbId },
-        data: { bundleFormat: parsed as BundleFormat },
-        select: { id: true, bundleFormat: true },
-      });
-    } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2025') {
-        throw new NotFoundException('Tenant not found');
-      }
-      throw err;
-    }
-
-    await this.invalidateTenantSettingsCache(tenantDbId);
-    return { format: parsed };
-  }
-
-  /**
-   * Set the tenant's driver pay timing (Phase 4C). ADMIN/OWNER only — gating
-   * is enforced at the controller layer. Default ON_DELIVERY preserves
-   * pre-Phase-4 behavior; ON_FACTOR_FUND gates settlement creation on
-   * Invoice.advanceReceivedAt being set (with shadow-mode for one billing
-   * cycle of validation).
-   */
-  async setDriverPayTiming(tenantDbId: number, timing: DriverPayTimingType): Promise<{ timing: DriverPayTimingType }> {
-    const parsed = DriverPayTimingSchema.parse(timing);
-
-    try {
-      await this.prisma.tenant.update({
-        where: { id: tenantDbId },
-        data: { driverPayTiming: parsed as DriverPayTiming },
-        select: { id: true, driverPayTiming: true },
-      });
-    } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code?: string }).code === 'P2025') {
-        throw new NotFoundException('Tenant not found');
-      }
-      throw err;
-    }
-
-    await this.invalidateTenantSettingsCache(tenantDbId);
-    return { timing: parsed };
   }
 
   private async invalidateTenantSettingsCache(tenantDbId: number): Promise<void> {

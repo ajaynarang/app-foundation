@@ -48,7 +48,7 @@ describe('McpServerService — API-key principal path', () => {
       apiKeyId: 1,
       tenantId: 7,
       userId: 42,
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
     });
     const res = await service.executeToolCallForPrincipal('query-loads', { status: 'active' }, principal);
 

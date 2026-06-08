@@ -1,11 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { SnoozeDuration } from '@app/shared-types';
+import type { SnoozeDuration } from '../../types';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * POST /desk/episodes/:id/snooze body.
  *
- * Mirrors `SnoozeEpisodeRequestSchema` in @app/shared-types. Using
+ * Mirrors `SnoozeEpisodeRequestSchema` in the desk types barrel. Using
  * class-validator (project convention — no `createZodDto` in this codebase).
  *
  * Canned durations only (design spec D16): 1d / 3d / 1w / 1mo / forever.

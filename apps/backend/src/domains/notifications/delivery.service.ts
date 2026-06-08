@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InAppNotificationService } from './notifications.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DomainEvent } from '../../../infrastructure/events/domain-event';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
-import { PushService } from '../../../infrastructure/push/push.service';
-import { SmsService } from '../../../infrastructure/sms/sms.service';
-import { EmailService } from '../../../infrastructure/notification/services/email.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { DomainEvent } from '../../infrastructure/events/domain-event';
+import { DOMAIN_EVENTS } from '../../infrastructure/events/sally-events.constants';
+import { PushService } from '../../infrastructure/push/push.service';
+import { SmsService } from '../../infrastructure/sms/sms.service';
+import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { NotificationType } from '@prisma/client';
 
 interface DeliveryParams {
@@ -95,7 +95,7 @@ export class NotificationDeliveryService {
       try {
         await this.emailService.sendEmail({
           to: params.recipientEmail,
-          subject: `[SALLY] ${params.title}`,
+          subject: params.title,
           html: `<h2>${params.title}</h2><p>${params.message}</p>${
             params.actionUrl ? `<p><a href="${params.actionUrl}">${params.actionLabel || 'View Details'}</a></p>` : ''
           }`,
@@ -127,7 +127,7 @@ export class NotificationDeliveryService {
     // SMS delivery
     if (params.channels.includes('sms') && params.recipientPhone) {
       try {
-        const sent = await this.smsService.sendSms(params.recipientPhone, `[SALLY] ${params.title}: ${params.message}`);
+        const sent = await this.smsService.sendSms(params.recipientPhone, `${params.title}: ${params.message}`);
         results.sms = sent;
       } catch (error: any) {
         this.logger.error(`SMS delivery failed: ${error.message}`);

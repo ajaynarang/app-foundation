@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../../../infrastructure/database/prisma.module';
-import { ShieldModule } from '../../../operations/shield/shield.module';
 import { DeskInngestModule } from '../inngest/inngest.module';
 
 import { DomainEventBridge } from './domain-event-bridge.service';
@@ -10,14 +9,13 @@ import { TriggerService } from './trigger.service';
 /**
  * Desk trigger layer — fan-out + domain event bridge.
  *
- * - TriggerService: manual + future-scheduled entrypoint that publishes
- *   sally/desk.<responsibility>.run events. Document Expiry uses
- *   ShieldService for the stale-audit guard's audit trigger.
- * - DomainEventBridge: listens to sally.* domain events; v1 closes
- *   AR Follow-up episodes on invoice.paid.
+ * - TriggerService: manual + scheduled entrypoint that opens episodes +
+ *   publishes `<app>/desk.<responsibility>.run` Inngest events. The starter
+ *   ships an empty responsibility registry, so it fail-closes on every key.
+ * - DomainEventBridge: listens to domain events and can close/start episodes.
  */
 @Module({
-  imports: [PrismaModule, DeskInngestModule, ShieldModule],
+  imports: [PrismaModule, DeskInngestModule],
   providers: [TriggerService, DomainEventBridge],
   exports: [TriggerService],
 })

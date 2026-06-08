@@ -23,7 +23,7 @@ export class HitlStepUpController {
   ) {}
 
   @Get(':token')
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Fetch context for a pending HITL challenge (for the approval UI)',
     description:
@@ -91,7 +91,7 @@ export class HitlStepUpController {
   }
 
   @Post(':token/step-up')
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Complete PIN step-up for a pending HITL challenge token',
     description:

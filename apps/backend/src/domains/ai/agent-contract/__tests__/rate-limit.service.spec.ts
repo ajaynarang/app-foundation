@@ -17,7 +17,7 @@ describe('RateLimitService', () => {
 
   it('uses user=600 default for user principals', async () => {
     cache.increment.mockResolvedValue(10);
-    const r = await svc.consume(fromUser({ userId: 1, tenantId: 7, role: 'DISPATCHER' }));
+    const r = await svc.consume(fromUser({ userId: 1, tenantId: 7, role: 'MEMBER' }));
     expect(r.allowed).toBe(true);
     expect(r.limit).toBe(600);
     expect(r.remaining).toBe(590);

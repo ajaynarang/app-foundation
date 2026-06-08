@@ -20,7 +20,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
     key: 'sk_live_old',
     name: 'BI script',
     userId: 42,
-    scopes: ['fleet:read'] as string[],
+    scopes: ['platform:read'] as string[],
     ipAllowlist: [] as string[],
     rateLimitPerMinute: 300,
     isWriteEnabled: false,
@@ -64,7 +64,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
     it('revokes the old row and creates a new one with preserved scopes/ipAllowlist/rateLimit', async () => {
       const existing = {
         ...baseRow,
-        scopes: ['fleet:read', 'loads:write'],
+        scopes: ['platform:read', 'platform:write'],
         ipAllowlist: ['10.0.0.0/24'],
         rateLimitPerMinute: 120,
         isWriteEnabled: true,
@@ -172,7 +172,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       });
       await expect(
         svc.updateScopes(501, 7, {
-          scopes: ['loads:write'],
+          scopes: ['platform:write'],
           ipAllowlist: [],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -183,20 +183,20 @@ describe('ApiKeysService — Phase D admin surface', () => {
       prisma.apiKey.findFirst.mockResolvedValue({ ...baseRow });
       prisma.apiKey.update.mockResolvedValue({
         ...baseRow,
-        scopes: ['loads:write'],
+        scopes: ['platform:write'],
         ipAllowlist: ['10.0.0.0/24'],
         isWriteEnabled: true,
       });
 
       await svc.updateScopes(501, 7, {
-        scopes: ['loads:write'],
+        scopes: ['platform:write'],
         ipAllowlist: ['10.0.0.0/24'],
       });
 
       expect(prisma.apiKey.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            scopes: ['loads:write'],
+            scopes: ['platform:write'],
             ipAllowlist: ['10.0.0.0/24'],
             isWriteEnabled: true,
           }),
@@ -213,12 +213,12 @@ describe('ApiKeysService — Phase D admin surface', () => {
       prisma.apiKey.findFirst.mockResolvedValue({ ...baseRow });
       prisma.apiKey.update.mockResolvedValue({
         ...baseRow,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         isWriteEnabled: false,
       });
 
       const out = await svc.updateScopes(501, 7, {
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         ipAllowlist: [],
       });
 
@@ -234,11 +234,11 @@ describe('ApiKeysService — Phase D admin surface', () => {
       prisma.apiKey.update.mockResolvedValue({
         ...baseRow,
         ipAllowlist: ['10.0.0.0/24'],
-        scopes: ['loads:write'],
+        scopes: ['platform:write'],
         isWriteEnabled: true,
       });
 
-      await svc.updateScopes(501, 7, { scopes: ['loads:write'] });
+      await svc.updateScopes(501, 7, { scopes: ['platform:write'] });
 
       expect(prisma.apiKey.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -254,7 +254,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
         ...baseRow,
         revokedAt: new Date(),
       });
-      await expect(svc.updateScopes(501, 7, { scopes: ['fleet:read'] })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.updateScopes(501, 7, { scopes: ['platform:read'] })).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

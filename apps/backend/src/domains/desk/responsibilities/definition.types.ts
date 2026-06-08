@@ -1,6 +1,6 @@
 import type { ZodSchema } from 'zod';
 
-import type { AgentKey, ConditionsUISpec, Lifecycle, ResponsibilityKey, TrustLevel } from '@app/shared-types';
+import type { AgentKey, ConditionsUISpec, Lifecycle, ResponsibilityKey, TrustLevel } from '../core/types';
 
 import type { ReinforcementJudge } from '../core/memory/reinforcement.types';
 
@@ -38,7 +38,7 @@ export type ConditionsEvaluator = (conditions: unknown, hydrate: unknown) => Con
  */
 export interface ResponsibilityDefinition {
   key: ResponsibilityKey;
-  agentKey: AgentKey; // e.g. 'sally-billing'
+  agentKey: AgentKey; // e.g. 'assistant'
   title: string; // shown in Desk index + settings
   description: string; // shown in settings + coming-soon card
   lifecycle: Lifecycle; // AVAILABLE | COMING_SOON

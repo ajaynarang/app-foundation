@@ -68,14 +68,14 @@ describe('OAuthClientsController', () => {
     await controller.pause('sally_abc', adminReq);
     await controller.resume('sally_abc', adminReq);
     await controller.revokeViaAction('sally_abc', adminReq);
-    await controller.updateScopes('sally_abc', { scopes: ['fleet:read'] } as any, adminReq);
+    await controller.updateScopes('sally_abc', { scopes: ['platform:read'] } as any, adminReq);
     expect(clientsService.pause).toHaveBeenCalledWith('sally_abc', 10);
     expect(clientsService.resume).toHaveBeenCalledWith('sally_abc', 10);
     expect(clientsService.revoke).toHaveBeenCalledWith('sally_abc', 10);
     expect(clientsService.updateScopes).toHaveBeenCalledWith(
       'sally_abc',
       10,
-      expect.objectContaining({ scopes: ['fleet:read'] }),
+      expect.objectContaining({ scopes: ['platform:read'] }),
     );
   });
 });

@@ -21,21 +21,11 @@ export const DESK_OUTCOMES = {
   PREFLIGHT_SKIPPED: 'preflight_skipped',
   FAILED: 'failed',
 
-  // ── AR Follow-up ────────────────────────────────────────────────────
-  FOLLOWUP_SENT: 'followup_sent',
-  PROMISE_RECORDED: 'promise_recorded',
-  INVOICE_PAID: 'invoice_paid',
-
-  // ── Closeout Review ─────────────────────────────────────────────────
-  INVOICE_DRAFTED: 'invoice_drafted',
-
-  // ── Document Expiry ─────────────────────────────────────────────────
-  REMINDER_SENT: 'reminder_sent',
-  ESCALATED_TO_ADMIN: 'escalated_to_admin',
-
-  // ── Settlement Review ───────────────────────────────────────────────
-  SETTLEMENT_APPROVED: 'settlement_approved',
-  ANOMALY_FLAGGED: 'anomaly_flagged',
+  // ── Generic success ─────────────────────────────────────────────────
+  // The `outcome` column is free-form VarChar — each responsibility declares
+  // its own terminal outcome strings. Add yours here so a typo is a compile
+  // error, not a silent fallthrough.
+  COMPLETED: 'completed',
 } as const;
 
 export type DeskOutcome = (typeof DESK_OUTCOMES)[keyof typeof DESK_OUTCOMES];
@@ -53,8 +43,7 @@ export type DeskOutcome = (typeof DESK_OUTCOMES)[keyof typeof DESK_OUTCOMES];
  * settlement_approved, …) pass their status explicitly or take the default.
  */
 export const TERMINAL_STATUS_BY_OUTCOME: Partial<Record<DeskOutcome, CloseInput['terminalStatus']>> = {
-  [DESK_OUTCOMES.FOLLOWUP_SENT]: 'RESOLVED',
-  [DESK_OUTCOMES.PROMISE_RECORDED]: 'RESOLVED',
+  [DESK_OUTCOMES.COMPLETED]: 'RESOLVED',
   [DESK_OUTCOMES.NO_ACTION_NEEDED]: 'RESOLVED',
   [DESK_OUTCOMES.ESCALATED_TO_HUMAN]: 'ESCALATED',
   [DESK_OUTCOMES.REJECTED_BY_OPERATOR]: 'REJECTED_BY_OPERATOR',

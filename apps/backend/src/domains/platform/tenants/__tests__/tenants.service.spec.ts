@@ -5,7 +5,6 @@ import { PrismaService } from '../../../../infrastructure/database/prisma.servic
 import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../../desk/responsibilities/desk-bootstrap.service';
-import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 
 const mockPrisma = {
   tenant: {
@@ -22,7 +21,6 @@ const mockPrisma = {
     findMany: jest.fn(),
   },
   tenantPlanEvent: { create: jest.fn() },
-  fleetOperationsSettings: { upsert: jest.fn() },
   userPreferences: { upsert: jest.fn() },
   $transaction: jest.fn((cb: any) => cb(mockPrisma)),
 };
@@ -62,7 +60,6 @@ describe('TenantsService', () => {
         { provide: AppCacheService, useValue: mockCache },
         { provide: NotificationService, useValue: mockNotification },
         { provide: DeskBootstrapService, useValue: mockDeskBootstrap },
-        { provide: DomainEventService, useValue: { emit: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -97,37 +94,32 @@ describe('TenantsService', () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         companyName: 'Acme',
         status: 'SUSPENDED',
-        invoiceSettings: null,
       });
       expect(await service.getTenantBranding('acme')).toBeNull();
     });
 
     it('should return branding for active tenant', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
-        companyName: 'Acme Freight',
+        companyName: 'Acme Inc',
         status: 'ACTIVE',
-        invoiceSettings: { logoUrl: 'https://example.com/logo.png' },
       });
       const result = await service.getTenantBranding('acme');
       expect(result).toEqual({
-        companyName: 'Acme Freight',
-        logoUrl: 'https://example.com/logo.png',
+        companyName: 'Acme Inc',
+        logoUrl: null,
       });
     });
   });
 
   describe('registerTenant', () => {
     const dto = {
-      companyName: 'Acme Freight',
+      companyName: 'Acme Inc',
       subdomain: 'acme',
       email: 'owner@acme.com',
       phone: '+12025551234',
       firstName: 'John',
       lastName: 'Doe',
       firebaseUid: 'firebase-123',
-      dotNumber: 'DOT123',
-      carrierType: 'CARRIER',
-      fleetSize: 10,
     };
 
     it('should throw ConflictException for taken subdomain', async () => {
@@ -221,7 +213,6 @@ describe('TenantsService', () => {
         subdomain: 'acme',
       });
       mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.fleetOperationsSettings.upsert.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ id: 10 });
       mockPrisma.userPreferences.upsert.mockResolvedValue({});
 
@@ -249,7 +240,6 @@ describe('TenantsService', () => {
         subdomain: 'acme',
       });
       mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.fleetOperationsSettings.upsert.mockResolvedValue({});
       mockPrisma.user.findFirst.mockResolvedValue({ id: 10 });
       mockPrisma.userPreferences.upsert.mockResolvedValue({});
 
@@ -398,15 +388,14 @@ describe('TenantsService', () => {
   });
 
   describe('getTenantBranding — with null logoUrl', () => {
-    it('should return null logoUrl when invoiceSettings is null', async () => {
+    it('should return null logoUrl for an active tenant', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
-        companyName: 'Acme Freight',
+        companyName: 'Acme Inc',
         status: 'ACTIVE',
-        invoiceSettings: null,
       });
       const result = await service.getTenantBranding('acme');
       expect(result).toEqual({
-        companyName: 'Acme Freight',
+        companyName: 'Acme Inc',
         logoUrl: null,
       });
     });
@@ -457,7 +446,7 @@ describe('TenantsService', () => {
           id: 1,
           companyName: 'Acme',
           users: [],
-          _count: { users: 5, drivers: 10 },
+          _count: { users: 5 },
         },
       ]);
 
@@ -515,10 +504,6 @@ describe('TenantsService', () => {
         companyName: 'Acme',
         subdomain: 'acme',
         status: 'ACTIVE',
-        dotNumber: 'DOT123',
-        carrierType: 'CARRIER',
-        mcNumber: null,
-        fleetSize: 5,
         contactEmail: 'test@acme.com',
         contactPhone: '+1234',
         createdAt: now,
@@ -532,14 +517,13 @@ describe('TenantsService', () => {
         reactivatedAt: null,
         reactivatedBy: null,
         users: [],
-        _count: { users: 3, drivers: 10, vehicles: 8, routePlans: 5 },
+        _count: { users: 3 },
       });
 
       const result = await service.getTenantDetails('TNT-001');
 
       expect(result.tenant.tenantId).toBe('TNT-001');
-      expect(result.metrics.totalDrivers).toBe(10);
-      expect(result.metrics.totalVehicles).toBe(8);
+      expect(result.metrics.totalUsers).toBe(3);
     });
   });
 });

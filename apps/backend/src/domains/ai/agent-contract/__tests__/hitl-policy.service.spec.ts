@@ -5,57 +5,57 @@ describe('HitlPolicyService', () => {
   const svc = new HitlPolicyService();
 
   it('returns "none" for any read scope, any principal', () => {
-    const u = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const u = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
     const o = fromOAuthUser({
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       scopes: [],
       clientId: 'c',
     });
-    expect(svc.resolveTier('fleet:read', u)).toBe<HitlTier>('none');
-    expect(svc.resolveTier('invoices:read', o)).toBe<HitlTier>('none');
+    expect(svc.resolveTier('platform:read', u)).toBe<HitlTier>('none');
+    expect(svc.resolveTier('platform:read', o)).toBe<HitlTier>('none');
   });
 
   it('returns "standard" for a standard write by a user principal (inline confirm)', () => {
-    const u = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
-    expect(svc.resolveTier('loads:write', u)).toBe<HitlTier>('standard');
+    const u = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+    expect(svc.resolveTier('documents:write', u)).toBe<HitlTier>('standard');
   });
 
   it('returns "sensitive" for a sensitive write by a user principal', () => {
-    const u = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
-    expect(svc.resolveTier('invoices:write:sensitive', u)).toBe<HitlTier>('sensitive');
+    const u = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+    expect(svc.resolveTier('platform:write:sensitive', u)).toBe<HitlTier>('sensitive');
   });
 
   it('returns "none" for a desk principal on a standard write (pre-authorized at enable)', () => {
     const d = fromDeskResponsibility({
       responsibilityId: 1,
       tenantId: 1,
-      scopes: ['loads:write'],
+      scopes: ['documents:write'],
       enabledByUserId: 1,
     });
-    expect(svc.resolveTier('loads:write', d)).toBe<HitlTier>('none');
+    expect(svc.resolveTier('documents:write', d)).toBe<HitlTier>('none');
   });
 
   it('returns "sensitive" for a desk principal on a sensitive write (guardrail + review-inbox in executor)', () => {
     const d = fromDeskResponsibility({
       responsibilityId: 1,
       tenantId: 1,
-      scopes: ['invoices:write:sensitive'],
+      scopes: ['platform:write:sensitive'],
       enabledByUserId: 1,
     });
-    expect(svc.resolveTier('invoices:write:sensitive', d)).toBe<HitlTier>('sensitive');
+    expect(svc.resolveTier('platform:write:sensitive', d)).toBe<HitlTier>('sensitive');
   });
 
   it('returns "standard" for an OAuth client on a standard write', () => {
     const o = fromOAuthUser({
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
-      role: 'DISPATCHER',
-      scopes: ['loads:write'],
+      role: 'MEMBER',
+      scopes: ['documents:write'],
       clientId: 'c',
     });
-    expect(svc.resolveTier('loads:write', o)).toBe<HitlTier>('standard');
+    expect(svc.resolveTier('documents:write', o)).toBe<HitlTier>('standard');
   });
 
   it('returns "sensitive" for an OAuth client on a sensitive write', () => {
@@ -63,10 +63,10 @@ describe('HitlPolicyService', () => {
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
       role: 'ADMIN',
-      scopes: ['invoices:write:sensitive'],
+      scopes: ['platform:write:sensitive'],
       clientId: 'c',
     });
-    expect(svc.resolveTier('invoices:write:sensitive', o)).toBe<HitlTier>('sensitive');
+    expect(svc.resolveTier('platform:write:sensitive', o)).toBe<HitlTier>('sensitive');
   });
 
   it('returns "standard" for an API key on a standard write', () => {
@@ -74,9 +74,9 @@ describe('HitlPolicyService', () => {
       apiKeyId: 1,
       tenantId: 1,
       userId: 1,
-      scopes: ['loads:write'],
+      scopes: ['documents:write'],
     });
-    expect(svc.resolveTier('loads:write', k)).toBe<HitlTier>('standard');
+    expect(svc.resolveTier('documents:write', k)).toBe<HitlTier>('standard');
   });
 
   it('tokenTtlSeconds(standard) = 300, tokenTtlSeconds(sensitive) = 120', () => {

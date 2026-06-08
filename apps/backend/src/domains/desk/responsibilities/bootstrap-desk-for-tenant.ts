@@ -3,83 +3,19 @@ import { type Prisma, type PrismaClient, UserRole } from '@prisma/client';
 import { RESPONSIBILITY_REGISTRY } from './index';
 
 /**
- * 12 AI personas ("agents"). Mirrors AGENT_KEYS in shared-types/desk/enums.
- * System-prompt keys follow the DESK_<ROLE>_SYSTEM naming used by
- * PromptingService; the registrar (P1.10) supplies the fallback content.
+ * Desk agents ("personas"). The starter seeds ONE generic `assistant` agent.
+ * System-prompt keys follow the `desk.agent.<key>.v1` naming used by
+ * PromptingService; DeskPromptRegistrar supplies the fallback content.
+ *
+ * Add more agents here (and a matching `agentKey` on your responsibilities in
+ * `responsibilities/index.ts`) as you build out the Desk.
  */
 const AGENT_SEED: Array<{ key: string; name: string; systemPromptKey: string; description: string }> = [
   {
-    key: 'sally-dispatch',
-    name: 'Dispatch',
-    systemPromptKey: 'desk.agent.dispatch.v1',
-    description: 'Picks the best driver for new loads and watches late ETAs before they become problems.',
-  },
-  {
-    key: 'sally-billing',
-    name: 'Billing',
-    systemPromptKey: 'desk.agent.billing.v1',
-    description:
-      'Keeps invoices moving — nudges overdue customers, handles close-out review, flags anything unusual for approval.',
-  },
-  {
-    key: 'sally-payroll',
-    name: 'Payroll',
-    systemPromptKey: 'desk.agent.payroll.v1',
-    description: 'Runs driver settlements with pay precision over speed — zero silent edits.',
-  },
-  {
-    key: 'sally-compliance',
-    name: 'Compliance',
-    systemPromptKey: 'desk.agent.compliance.v1',
-    description: 'Watches DOT, HOS and safety risk — risk-averse by default, escalates anything borderline.',
-  },
-  {
-    key: 'sally-safety',
-    name: 'Safety',
-    systemPromptKey: 'desk.agent.safety.v1',
-    description: 'Keeps the safety culture honest — facts first, blame last, always traceable.',
-  },
-  {
-    key: 'sally-maintenance',
-    name: 'Maintenance',
-    systemPromptKey: 'desk.agent.maintenance.v1',
-    description: 'Coordinates shop visits and PM around when drivers are actually home.',
-  },
-  {
-    key: 'sally-fuel',
-    name: 'Fuel',
-    systemPromptKey: 'desk.agent.fuel.v1',
-    description: 'Plans fuel stops and IFTA posture to find the cheapest legal gallon on each route.',
-  },
-  {
-    key: 'sally-route',
-    name: 'Route',
-    systemPromptKey: 'desk.agent.route.v1',
-    description: 'Plans HOS-aware routes and ETAs so drivers do not burn hours on avoidable detours.',
-  },
-  {
-    key: 'sally-driver',
-    name: 'Driver',
-    systemPromptKey: 'desk.agent.driver.v1',
-    description: 'Handles driver check-ins, day-of changes, and the small acknowledgements dispatchers forget.',
-  },
-  {
-    key: 'sally-customer',
-    name: 'Customer',
-    systemPromptKey: 'desk.agent.customer.v1',
-    description: 'Sends customer updates and confirmations at the exact moment they want them.',
-  },
-  {
-    key: 'sally-support',
-    name: 'Support',
-    systemPromptKey: 'desk.agent.support.v1',
-    description: 'Triages inbound tickets, answers what is obvious, and escalates what is not.',
-  },
-  {
-    key: 'sally-prospect',
-    name: 'Prospect',
-    systemPromptKey: 'desk.agent.prospect.v1',
-    description: 'Researches carriers and loads before outreach so the first email is informed.',
+    key: 'assistant',
+    name: 'Assistant',
+    systemPromptKey: 'desk.agent.assistant.v1',
+    description: 'The generic Desk assistant. Owns responsibilities, proposes actions, and respects approval gates.',
   },
 ];
 
@@ -111,7 +47,7 @@ export async function bootstrapDeskForTenant(
   });
   const defaultSupervisorUserId = defaultSupervisor?.id ?? null;
 
-  // 12 agents — upsert by (tenantId, key)
+  // Agents — upsert by (tenantId, key)
   for (const a of AGENT_SEED) {
     await prisma.deskAgent.upsert({
       where: { tenantId_key: { tenantId, key: a.key } },
@@ -149,8 +85,8 @@ export async function bootstrapDeskForTenant(
     agentsUpserted++;
   }
 
-  // 10 responsibilities — upsert by (tenantId, key), respect tenant-set
-  // trustLevel / conditions / notes / enabled / supervisor on update
+  // Responsibilities — upsert by (tenantId, key), respect tenant-set
+  // trustLevel / conditions / enabled / supervisor on update
   for (const def of RESPONSIBILITY_REGISTRY) {
     const agent = await prisma.deskAgent.findUniqueOrThrow({
       where: { tenantId_key: { tenantId, key: def.agentKey } },

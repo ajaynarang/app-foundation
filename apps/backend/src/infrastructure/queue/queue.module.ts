@@ -11,12 +11,7 @@ import { JobCleanupJob } from './job-cleanup.job';
 import { BullBoardAuthMiddleware } from './bull-board-auth.middleware';
 import { VendorCircuitBreakerService } from './vendor-circuit-breaker.service';
 import { DeadLetterService } from './dead-letter.service';
-import {
-  AiInteractivePlaceholderProcessor,
-  AiBackgroundPlaceholderProcessor,
-  AnalyticsPlaceholderProcessor,
-  ReplaysPlaceholderProcessor,
-} from './placeholder.processors';
+import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } from './placeholder.processors';
 import { CacheModule } from '../cache/cache.module';
 
 @Module({
@@ -54,46 +49,30 @@ import { CacheModule } from '../cache/cache.module';
         };
       },
     }),
-    // All 14 queues are registered centrally here (v2 topology, 2026-05-27).
-    // Domain modules import QueueModule to gain access; no domain module
-    // calls BullModule.registerQueue itself.
+    // All queues are registered centrally here. Domain modules import
+    // QueueModule to gain access; no domain module calls
+    // BullModule.registerQueue itself.
     BullModule.registerQueue(
       { name: QUEUE_NAMES.EVENTS },
-      { name: QUEUE_NAMES.TELEMETRY },
-      { name: QUEUE_NAMES.SAFETY_DETECT },
       { name: QUEUE_NAMES.NOTIFICATIONS },
       { name: QUEUE_NAMES.WEBHOOKS },
-      { name: QUEUE_NAMES.VENDOR_DATA },
-      { name: QUEUE_NAMES.DOCUMENTS },
-      { name: QUEUE_NAMES.GEO_COMPUTE },
-      { name: QUEUE_NAMES.FINANCE },
       { name: QUEUE_NAMES.AI_INTERACTIVE },
       { name: QUEUE_NAMES.AI_BACKGROUND },
       { name: QUEUE_NAMES.BULK_OPS },
-      { name: QUEUE_NAMES.ANALYTICS },
-      { name: QUEUE_NAMES.REPLAYS },
     ),
     // Bull Board dashboard at /admin/queues — protected by BullBoardAuthMiddleware
     BullBoardModule.forRoot({
       route: '/admin/queues',
       adapter: ExpressAdapter,
     }),
-    // Register all 14 queues with Bull Board so the UI surfaces every queue.
+    // Register every queue with Bull Board so the UI surfaces them all.
     BullBoardModule.forFeature(
       { name: QUEUE_NAMES.EVENTS, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.TELEMETRY, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.SAFETY_DETECT, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.NOTIFICATIONS, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.WEBHOOKS, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.VENDOR_DATA, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.DOCUMENTS, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.GEO_COMPUTE, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.FINANCE, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.AI_INTERACTIVE, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.AI_BACKGROUND, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.BULK_OPS, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.ANALYTICS, adapter: BullMQAdapter },
-      { name: QUEUE_NAMES.REPLAYS, adapter: BullMQAdapter },
     ),
     // JwtModule is re-registered here because AuthModule does not export it.
     // BullBoardAuthMiddleware needs JwtService to verify access tokens but
@@ -115,8 +94,6 @@ import { CacheModule } from '../cache/cache.module';
     DeadLetterService,
     AiInteractivePlaceholderProcessor,
     AiBackgroundPlaceholderProcessor,
-    AnalyticsPlaceholderProcessor,
-    ReplaysPlaceholderProcessor,
   ],
   exports: [BullModule, JobService, JobCleanupJob, VendorCircuitBreakerService, DeadLetterService],
 })

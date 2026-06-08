@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { APPROVAL_SCOPES, type ApprovalScope, type HandoffCounts } from '@app/shared-types';
+import { APPROVAL_SCOPES, type ApprovalScope, type HandoffCounts } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -25,16 +25,16 @@ import { DecideApprovalDto } from './dto/decide-approval.dto';
 
 /**
  * HTTP surface for Desk approvals. Consumed by the Desk UI's
- * pending-approval queue on /dispatcher/desk/responsibilities/<key>.
+ * pending-approval queue.
  *
- * Auth: Dispatcher + Admin + SuperAdmin. Tenant scoping happens via
+ * Auth: Member + Admin + Owner + SuperAdmin. Tenant scoping happens via
  * base controller — every read returns only this tenant's approvals,
  * every write asserts the approval belongs to this tenant first.
  */
 @ApiTags('Desk — Approvals')
 @ApiBearerAuth()
 @Controller('desk/approvals')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class ApprovalController extends BaseTenantController {
   constructor(
     prisma: PrismaService,

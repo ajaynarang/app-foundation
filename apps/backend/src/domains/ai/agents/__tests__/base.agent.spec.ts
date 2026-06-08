@@ -13,7 +13,7 @@ jest.mock('ai', () => ({
 jest.mock('@ai-sdk/anthropic', () => ({ createAnthropic: jest.fn() }));
 jest.mock('zod-to-json-schema', () => ({ zodToJsonSchema: jest.fn() }));
 jest.mock('@rekog/mcp-nest', () => ({
-  McpRegistryService: jest.fn(),
+  McpRegistryDiscoveryService: jest.fn(),
   Tool: () => () => {},
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
@@ -23,13 +23,13 @@ import { AgentDefinition } from '../agent.types';
 
 class TestAgent extends AbstractBaseAgent {
   readonly definition: AgentDefinition = {
-    id: 'dispatch',
-    displayName: 'Dispatch',
-    mastraAgentId: 'sally-dispatch',
+    id: 'assistant',
+    displayName: 'Assistant',
+    mastraAgentId: 'assistant',
     modelAlias: 'standard',
-    domainSkills: ['load-lifecycle'],
-    taskSkills: ['assign-load'],
-    personas: ['dispatcher', 'admin'],
+    domainSkills: [],
+    taskSkills: [],
+    personas: ['member', 'admin'],
     maxToolSteps: 10,
   };
 }
@@ -47,7 +47,7 @@ describe('AbstractBaseAgent', () => {
       getSkill: jest.fn().mockResolvedValue('skill content'),
     };
     mockMcpToolService = {
-      getToolsetsForPersona: jest.fn().mockResolvedValue({ 'sally-tools': {} }),
+      getToolsetsForPersona: jest.fn().mockResolvedValue({ 'app-tools': {} }),
     };
     mockMastraProvider = {
       getMastra: jest.fn(),
@@ -60,12 +60,12 @@ describe('AbstractBaseAgent', () => {
   });
 
   it('exposes definition properties', () => {
-    expect(agent.id).toBe('dispatch');
-    expect(agent.displayName).toBe('Dispatch');
-    expect(agent.mastraAgentId).toBe('sally-dispatch');
-    expect(agent.domainSkills).toEqual(['load-lifecycle']);
-    expect(agent.taskSkills).toEqual(['assign-load']);
-    expect(agent.personas).toEqual(['dispatcher', 'admin']);
+    expect(agent.id).toBe('assistant');
+    expect(agent.displayName).toBe('Assistant');
+    expect(agent.mastraAgentId).toBe('assistant');
+    expect(agent.domainSkills).toEqual([]);
+    expect(agent.taskSkills).toEqual([]);
+    expect(agent.personas).toEqual(['member', 'admin']);
   });
 
   describe('chat', () => {
@@ -93,7 +93,7 @@ describe('AbstractBaseAgent', () => {
 
       const chunks: any[] = [];
       const gen = agent.chat('Test message', {
-        userMode: 'dispatcher',
+        userMode: 'member',
         tenantId: 1,
         userId: 'user_1',
         userDbId: 1,
@@ -135,12 +135,12 @@ describe('AbstractBaseAgent', () => {
       // Simulate card capture during tool execution
       mockMcpToolService.getToolsetsForPersona.mockImplementation((_mode: string, _ctx: any, accumulator: any) => {
         if (accumulator) accumulator.capture({ type: 'fleet', data: {} });
-        return { 'sally-tools': {} };
+        return { 'app-tools': {} };
       });
 
       const chunks: any[] = [];
       for await (const chunk of agent.chat('test', {
-        userMode: 'dispatcher',
+        userMode: 'member',
         tenantId: 1,
         userId: 'user_1',
         userDbId: 1,
@@ -174,7 +174,7 @@ describe('AbstractBaseAgent', () => {
 
       const chunks: any[] = [];
       for await (const chunk of agent.chat('ack alert', {
-        userMode: 'dispatcher',
+        userMode: 'member',
         tenantId: 1,
         userId: 'user_1',
         userDbId: 1,
@@ -208,7 +208,7 @@ describe('AbstractBaseAgent', () => {
       });
 
       const gen = agent.chat('test', {
-        userMode: 'dispatcher',
+        userMode: 'member',
         tenantId: 1,
         userId: 'user_1',
         userDbId: 1,
@@ -239,7 +239,7 @@ describe('AbstractBaseAgent', () => {
         'assign-load',
         { loadId: 'ld_1' },
         {
-          userMode: 'dispatcher',
+          userMode: 'member',
           tenantId: 1,
           userId: 'user_1',
           userDbId: 1,

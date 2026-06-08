@@ -21,7 +21,7 @@ import { DOMAIN_EVENTS } from '../events/sally-events.constants';
 import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 
-@Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.DISPATCHER)
+@Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
 @ApiTags('Webhooks')
 @ApiBearerAuth()
 @Controller('webhooks')
@@ -127,9 +127,9 @@ export class SubscriptionController {
   })
   async test(@CurrentUser() user: any, @Param('id') id: string) {
     await this.subscriptionService.findOne(user.tenantDbId, id);
-    await this.dispatcher.deliverToSubscription(id, DOMAIN_EVENTS.LOAD_CREATED, {
+    await this.dispatcher.deliverToSubscription(id, DOMAIN_EVENTS.NOTIFICATION_CREATED, {
       test: true,
-      message: 'This is a test delivery from SALLY',
+      message: 'This is a test webhook delivery',
     });
     return { message: 'Test event queued for delivery' };
   }

@@ -28,7 +28,7 @@ export class VoiceController {
 
   /** Check if voice mode is available (all vendor keys configured). */
   @Get('status')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
   async getStatus() {
     const status = await this.voiceService.getStatus();
     // Only expose availability flag — don't leak missing env var names
@@ -36,7 +36,7 @@ export class VoiceController {
   }
 
   @Post('token')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async getToken(@CurrentUser() user: any, @Body() dto: VoiceTokenDto) {
     const status = await this.voiceService.getStatus();

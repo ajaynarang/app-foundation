@@ -1,25 +1,13 @@
-import {
-  QUEUE_NAMES,
-  DOCUMENTS_JOB_NAMES,
-  VENDOR_DATA_JOB_NAMES,
-  WEBHOOKS_JOB_NAMES,
-  FINANCE_JOB_NAMES,
-} from './queue.constants';
+import { QUEUE_NAMES, WEBHOOKS_JOB_NAMES, NOTIFICATIONS_JOB_NAMES, BULK_OPS_JOB_NAMES } from './queue.constants';
 
 // --- Category Metadata (single source of truth) ---
 
 export const JOB_CATEGORIES = {
-  telemetry: {
-    display: 'Telemetry',
-    queue: QUEUE_NAMES.TELEMETRY,
-    requiredIntegration: 'ELD' as const,
-    tenantVisible: true,
-  },
-  safety: {
-    display: 'Safety & Compliance',
-    queue: QUEUE_NAMES.SAFETY_DETECT,
+  events: {
+    display: 'Domain Events',
+    queue: QUEUE_NAMES.EVENTS,
     requiredIntegration: null,
-    tenantVisible: true,
+    tenantVisible: false,
   },
   notifications: {
     display: 'Notifications',
@@ -33,35 +21,11 @@ export const JOB_CATEGORIES = {
     requiredIntegration: null,
     tenantVisible: false,
   },
-  vendor: {
-    display: 'Vendor Sync',
-    queue: QUEUE_NAMES.VENDOR_DATA,
+  ai: {
+    display: 'AI',
+    queue: QUEUE_NAMES.AI_BACKGROUND,
     requiredIntegration: null,
     tenantVisible: true,
-  },
-  documents: {
-    display: 'Documents',
-    queue: QUEUE_NAMES.DOCUMENTS,
-    requiredIntegration: null,
-    tenantVisible: true,
-  },
-  geo: {
-    display: 'Routing & Geo',
-    queue: QUEUE_NAMES.GEO_COMPUTE,
-    requiredIntegration: null,
-    tenantVisible: true,
-  },
-  finance: {
-    display: 'Finance',
-    queue: QUEUE_NAMES.FINANCE,
-    requiredIntegration: 'ACCOUNTING' as const,
-    tenantVisible: true,
-  },
-  events: {
-    display: 'Domain Events',
-    queue: QUEUE_NAMES.EVENTS,
-    requiredIntegration: null,
-    tenantVisible: false,
   },
   maintenance: {
     display: 'System Maintenance',
@@ -78,24 +42,27 @@ export const ALL_CATEGORIES = Object.keys(JOB_CATEGORIES) as JobCategory[];
 export const TENANT_VISIBLE_CATEGORIES = ALL_CATEGORIES.filter((c) => JOB_CATEGORIES[c].tenantVisible);
 
 // --- Type Display Names ---
-// Single source of truth lives in @app/shared-types — shared with the web admin UI.
-export { TYPE_DISPLAY_NAMES, CATEGORY_DISPLAY_NAMES } from '@app/shared-types';
+// Generic display names for the built-in job types. Add app-specific job
+// types here so the admin jobs console renders friendly labels.
+export const TYPE_DISPLAY_NAMES: Record<string, string> = {
+  [NOTIFICATIONS_JOB_NAMES.CLEANUP]: 'Notification Cleanup',
+  [NOTIFICATIONS_JOB_NAMES.DIGEST]: 'Notification Digest',
+  [WEBHOOKS_JOB_NAMES.DELIVER]: 'Webhook Delivery',
+  [BULK_OPS_JOB_NAMES.JOB_CLEANUP]: 'Job Cleanup',
+  [BULK_OPS_JOB_NAMES.DATA_RETENTION]: 'Data Retention',
+  [BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP]: 'Uploads Cleanup',
+  [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: 'Login Events Cleanup',
+  [BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]: 'Tokens Cleanup',
+};
+
+export const CATEGORY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
+  ALL_CATEGORIES.map((c) => [c, JOB_CATEGORIES[c].display]),
+);
 
 // --- Manual-only types (no repeatable schedule) ---
 
 export const MANUAL_CATEGORY_TYPES: Record<string, string[]> = {
-  documents: [DOCUMENTS_JOB_NAMES.RATECON],
-  vendor: [VENDOR_DATA_JOB_NAMES.LANES_AUTO_GENERATION, VENDOR_DATA_JOB_NAMES.LANES_RETRY_SINGLE],
   webhooks: [WEBHOOKS_JOB_NAMES.DELIVER],
-  finance: [
-    FINANCE_JOB_NAMES.INVOICE,
-    FINANCE_JOB_NAMES.SETTLEMENT,
-    FINANCE_JOB_NAMES.PAYMENT,
-    FINANCE_JOB_NAMES.SETTLEMENT_PAYMENT,
-    FINANCE_JOB_NAMES.WEBHOOK_PAYMENT,
-    FINANCE_JOB_NAMES.WEBHOOK_BILL_PAYMENT,
-    FINANCE_JOB_NAMES.INITIAL_SYNC,
-  ],
 };
 
 // --- Interfaces ---

@@ -22,7 +22,7 @@ describe('DeskScheduleController', () => {
   });
 
   it('get returns the master-switch state for the tenant', async () => {
-    const res = await controller.get({ role: UserRole.DISPATCHER });
+    const res = await controller.get({ role: UserRole.MEMBER });
     expect(schedule.getState).toHaveBeenCalledWith(7);
     expect(res).toEqual({ enabled: false });
   });

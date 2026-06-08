@@ -3,7 +3,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { OAuthTokenRefreshJob } from '../oauth-token-refresh.job';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { AuthTokenService } from '../auth-token.service';
-import { QUEUE_NAMES, VENDOR_DATA_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
+import { QUEUE_NAMES } from '../../../../infrastructure/queue/queue.constants';
 
 describe('OAuthTokenRefreshJob', () => {
   let job: OAuthTokenRefreshJob;
@@ -32,7 +32,7 @@ describe('OAuthTokenRefreshJob', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuthTokenService, useValue: authTokenService },
         {
-          provide: getQueueToken(QUEUE_NAMES.VENDOR_DATA),
+          provide: getQueueToken(QUEUE_NAMES.BULK_OPS),
           useValue: vendorDataQueue,
         },
       ],
@@ -46,7 +46,7 @@ describe('OAuthTokenRefreshJob', () => {
       await job.registerForIntegration(1, 'int-1', 'SAMSARA_ELD', 3600);
 
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
-        VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH,
+        'oauth-refresh',
         expect.objectContaining({
           tenantId: '1',
           payload: { tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' },
@@ -66,9 +66,9 @@ describe('OAuthTokenRefreshJob', () => {
         {
           id: 'oauth-refresh-SAMSARA_ELD-1',
           key: 'key-1',
-          name: VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH,
+          name: 'oauth-refresh',
         },
-        { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH },
+        { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: 'oauth-refresh' },
       ]);
 
       await job.removeForIntegration('SAMSARA_ELD', 1);
@@ -79,7 +79,7 @@ describe('OAuthTokenRefreshJob', () => {
 
     it('should do nothing when no matching job found', async () => {
       vendorDataQueue.getRepeatableJobs.mockResolvedValue([
-        { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH },
+        { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: 'oauth-refresh' },
       ]);
 
       await job.removeForIntegration('SAMSARA_ELD', 1);
@@ -92,7 +92,7 @@ describe('OAuthTokenRefreshJob', () => {
     it('should clear existing refresh jobs and register new ones', async () => {
       // Mock existing repeatable jobs to clear
       vendorDataQueue.getRepeatableJobs.mockResolvedValue([
-        { name: VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH, key: 'old-key-1' },
+        { name: 'oauth-refresh', key: 'old-key-1' },
         { name: 'other-job', key: 'other-key' },
       ]);
 
@@ -130,7 +130,7 @@ describe('OAuthTokenRefreshJob', () => {
       await job.onModuleInit();
 
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
-        VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH,
+        'oauth-refresh',
         expect.objectContaining({
           payload: expect.objectContaining({ tenantId: 5, vendor: 'SAMSARA_ELD' }),
         }),
@@ -203,7 +203,7 @@ describe('OAuthTokenRefreshJob', () => {
       // With null credentials, the code skips the api_token check
       // and proceeds to register the refresh job (assumes OAuth)
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
-        VENDOR_DATA_JOB_NAMES.OAUTH_REFRESH,
+        'oauth-refresh',
         expect.objectContaining({ payload: expect.objectContaining({ tenantId: 8, vendor: 'SAMSARA_ELD' }) }),
         expect.any(Object),
       );

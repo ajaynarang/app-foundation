@@ -66,7 +66,7 @@ describe('OAuthProviderService', () => {
     const params = {
       clientId: 'client-1',
       redirectUri: 'https://app.com/callback',
-      scope: 'fleet:read fleet:write',
+      scope: 'platform:read platform:write',
       state: 'state-abc',
       codeChallenge: 'challenge',
       codeChallengeMethod: 'S256',
@@ -86,7 +86,7 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthClient.findUnique.mockResolvedValue({
         isActive: true,
         redirectUris: ['https://other.com/callback'],
-        scopes: ['fleet:read', 'fleet:write'],
+        scopes: ['platform:read', 'platform:write'],
       });
       await expect(service.authorize(params as any)).rejects.toThrow(BadRequestException);
     });
@@ -95,7 +95,7 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthClient.findUnique.mockResolvedValue({
         isActive: true,
         redirectUris: ['https://app.com/callback'],
-        scopes: ['fleet:read'], // missing fleet:write
+        scopes: ['platform:read'], // missing platform:write
       });
       await expect(service.authorize(params as any)).rejects.toThrow(BadRequestException);
     });
@@ -107,7 +107,7 @@ describe('OAuthProviderService', () => {
         description: 'desc',
         isActive: true,
         redirectUris: ['https://app.com/callback'],
-        scopes: ['fleet:read', 'fleet:write'],
+        scopes: ['platform:read', 'platform:write'],
       });
 
       const result = await service.authorize(params as any);
@@ -115,7 +115,7 @@ describe('OAuthProviderService', () => {
       expect(mockJwtService.sign).toHaveBeenCalledWith(
         expect.objectContaining({
           clientId: 'client-1',
-          requestedScopes: ['fleet:read', 'fleet:write'],
+          requestedScopes: ['platform:read', 'platform:write'],
         }),
         expect.objectContaining({ expiresIn: '10m' }),
       );
@@ -134,7 +134,7 @@ describe('OAuthProviderService', () => {
     it('should generate authorization code and return redirect URL', async () => {
       mockJwtService.verify.mockReturnValue({
         clientId: 'client-1',
-        requestedScopes: ['fleet:read'],
+        requestedScopes: ['platform:read'],
         redirectUri: 'https://app.com/callback',
         state: 'state-abc',
         codeChallenge: 'challenge',
@@ -207,7 +207,7 @@ describe('OAuthProviderService', () => {
       mockJwtService.verify.mockReturnValue({
         sub: '1',
         clientId: 'c-1',
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
       mockPrisma.oAuthAccessToken.findUnique.mockResolvedValue(null);
 
@@ -219,7 +219,7 @@ describe('OAuthProviderService', () => {
       mockJwtService.verify.mockReturnValue({
         sub: '1',
         clientId: 'c-1',
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
       mockPrisma.oAuthAccessToken.findUnique.mockResolvedValue({
         revokedAt: new Date(),
@@ -235,7 +235,7 @@ describe('OAuthProviderService', () => {
         tenantId: 10,
         role: 'ADMIN',
         clientId: 'c-1',
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         jti: 'abc',
       };
       mockJwtService.verify.mockReturnValue(payload);
@@ -295,7 +295,7 @@ describe('OAuthProviderService', () => {
         originalIssuedAt: new Date(),
         client: { clientId: 'c-other', clientType: 'public' },
         user: { id: 1, tenantId: 1, role: 'ADMIN' },
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         userId: 1,
         clientId: 1,
       });
@@ -316,7 +316,7 @@ describe('OAuthProviderService', () => {
           clientSecret: null,
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         userId: 1,
         clientId: 1,
       });
@@ -329,7 +329,7 @@ describe('OAuthProviderService', () => {
       expect(result.access_token).toBeDefined();
       expect(result.refresh_token).toBeDefined();
       expect(result.token_type).toBe('Bearer');
-      expect(result.scope).toBe('fleet:read');
+      expect(result.scope).toBe('platform:read');
       expect(mockPrisma.oAuthRefreshToken.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -429,7 +429,7 @@ describe('OAuthProviderService', () => {
     it('should throw when client is no longer active', async () => {
       mockJwtService.verify.mockReturnValue({
         clientId: 'c-1',
-        requestedScopes: ['fleet:read'],
+        requestedScopes: ['platform:read'],
         redirectUri: 'https://app.com/cb',
         state: 'state',
       });
@@ -443,7 +443,7 @@ describe('OAuthProviderService', () => {
     it('should throw when client is null', async () => {
       mockJwtService.verify.mockReturnValue({
         clientId: 'c-1',
-        requestedScopes: ['fleet:read'],
+        requestedScopes: ['platform:read'],
         redirectUri: 'https://app.com/cb',
         state: 'state',
       });
@@ -465,7 +465,7 @@ describe('OAuthProviderService', () => {
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
         codeChallenge: 'wrong-challenge-hash',
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
 
       await expect(service.exchangeCode('code', 'my-verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
@@ -494,7 +494,7 @@ describe('OAuthProviderService', () => {
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
         codeChallenge: challenge,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
 
       await expect(service.exchangeCode('code', verifier, 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
@@ -521,7 +521,7 @@ describe('OAuthProviderService', () => {
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
         codeChallenge: challenge,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
@@ -552,7 +552,7 @@ describe('OAuthProviderService', () => {
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
         codeChallenge: challenge,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
       mockPrisma.oAuthAccessToken.create.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.create.mockResolvedValue({});
@@ -562,7 +562,7 @@ describe('OAuthProviderService', () => {
       expect(result.access_token).toBeDefined();
       expect(result.refresh_token).toBeDefined();
       expect(result.token_type).toBe('Bearer');
-      expect(result.scope).toBe('fleet:read');
+      expect(result.scope).toBe('platform:read');
     });
   });
 
@@ -591,7 +591,7 @@ describe('OAuthProviderService', () => {
         user: { id: 1, tenantId: 1, role: 'DISPATCHER' },
         userId: 1,
         clientId: 1,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
       });
 
       await expect(service.refreshToken('token', 'c', undefined)).rejects.toThrow(/chain expired/i);
@@ -611,7 +611,7 @@ describe('OAuthProviderService', () => {
           clientSecret: null,
         },
         user: { id: 1, tenantId: 1, role: 'DISPATCHER', tenant: { id: 1 } },
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         userId: 1,
         clientId: 1,
       });
@@ -641,7 +641,7 @@ describe('OAuthProviderService', () => {
           clientSecret: 'hashed-secret',
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         userId: 1,
         clientId: 1,
       });
@@ -662,7 +662,7 @@ describe('OAuthProviderService', () => {
           clientSecret: 'hashed-secret',
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         userId: 1,
         clientId: 1,
       });

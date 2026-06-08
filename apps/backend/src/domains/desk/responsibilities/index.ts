@@ -1,23 +1,40 @@
-import type { ResponsibilityKey } from '@app/shared-types';
-
-import { AR_FOLLOWUP_DEFINITION } from './ar-followup/definition';
-import { CLOSEOUT_REVIEW_DEFINITION } from './closeout-review/definition';
-import { COMING_SOON_RESPONSIBILITIES } from './coming-soon';
 import type { ResponsibilityDefinition } from './definition.types';
-import { DOCUMENT_EXPIRY_DEFINITION } from './document-expiry/definition';
-import { SETTLEMENT_REVIEW_DEFINITION } from './settlement-review/definition';
+import { COMING_SOON_RESPONSIBILITIES } from './coming-soon';
 
 /**
- * Responsibility registry. Code-authored; not user-editable. Seeded into
- * desk_responsibilities rows per tenant (see seeds/).
+ * Responsibility registry — the Desk engine's main extension point.
  *
- * Order matters for UI — index order = card order on /dispatcher/desk.
+ * Code-authored; not user-editable. Seeded into desk_responsibilities rows per
+ * tenant (see seeds/). Order matters for the UI — index order = card order.
+ *
+ * The starter ships ONE generic example responsibility (`welcome`) so the
+ * engine has something concrete to render and seed. It is manual-trigger only
+ * and wires no tools, so it never fans out or calls the LLM on its own.
+ *
+ * To add a real responsibility:
+ *   1. Author its definition under `responsibilities/<key>/definition.ts`.
+ *   2. Register it in this array.
+ *   3. Add a `run<X>ForTenant` method + `runByKey` case in `core/trigger`.
+ *   4. Register its step prompts (perceive/decide/draft) via a prompt registrar.
  */
+
+/** Generic, no-op example responsibility. Replace or delete as you build. */
+const WELCOME_DEFINITION: ResponsibilityDefinition = {
+  key: 'welcome',
+  agentKey: 'assistant',
+  title: 'Welcome',
+  description:
+    'A no-op example responsibility. It demonstrates the registry shape — manual trigger only, no tools, no fan-out. Replace it with your own.',
+  lifecycle: 'AVAILABLE',
+  conditionsSchema: null,
+  conditionsUI: null,
+  defaults: { trustLevel: 'SUPERVISED', conditions: {} },
+  triggers: [{ kind: 'manual' }],
+  tools: [],
+};
+
 export const RESPONSIBILITY_REGISTRY: readonly ResponsibilityDefinition[] = [
-  AR_FOLLOWUP_DEFINITION,
-  CLOSEOUT_REVIEW_DEFINITION,
-  DOCUMENT_EXPIRY_DEFINITION,
-  SETTLEMENT_REVIEW_DEFINITION,
+  WELCOME_DEFINITION,
   ...COMING_SOON_RESPONSIBILITIES,
 ] as const;
 
@@ -25,13 +42,9 @@ export function findResponsibilityDefinition(key: string): ResponsibilityDefinit
   return RESPONSIBILITY_REGISTRY.find((r) => r.key === key);
 }
 
-export function responsibilityKeys(): ResponsibilityKey[] {
+export function responsibilityKeys(): string[] {
   return RESPONSIBILITY_REGISTRY.map((r) => r.key);
 }
 
 export * from './definition.types';
-export { AR_FOLLOWUP_DEFINITION } from './ar-followup/definition';
-export { CLOSEOUT_REVIEW_DEFINITION } from './closeout-review/definition';
-export { DOCUMENT_EXPIRY_DEFINITION } from './document-expiry/definition';
-export { SETTLEMENT_REVIEW_DEFINITION } from './settlement-review/definition';
-export { COMING_SOON_RESPONSIBILITIES } from './coming-soon';
+export { COMING_SOON_RESPONSIBILITIES, stub } from './coming-soon';

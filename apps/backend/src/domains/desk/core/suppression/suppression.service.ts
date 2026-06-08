@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DESK_OUTCOMES } from '../../shared-steps/outcomes';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { SnoozeDuration } from '@app/shared-types';
+import type { SnoozeDuration } from '../types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEvent } from '../../../../infrastructure/events/domain-event';

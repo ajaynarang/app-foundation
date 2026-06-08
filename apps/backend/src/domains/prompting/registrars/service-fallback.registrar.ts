@@ -1,15 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import {
-  ALERT_BRIEFING_FALLBACK,
-  CATCH_ME_UP_FALLBACK,
-  CATEGORIZER_FALLBACK,
-  FUEL_RECEIPT_EXTRACTION_FALLBACK,
-  LOAD_BOARD_SEARCH_PARSER_FALLBACK,
-  RATECON_EXTRACTION_FALLBACK,
-  SHIELD_ANALYST_FALLBACK,
-  SKILL_CLASSIFIER_FALLBACK,
-} from '../prompts/fallbacks';
+import { CATEGORIZER_FALLBACK, SKILL_CLASSIFIER_FALLBACK } from '../prompts/fallbacks';
 import { PromptingService } from '../prompting.service';
 import { PROMPT_NAMES } from '../prompting.types';
 
@@ -20,7 +11,8 @@ import { PROMPT_NAMES } from '../prompting.types';
  *
  * All fallback content lives in `domains/prompting/prompts/fallbacks/`,
  * never inside the consumer service. This is the single place that binds
- * a `PROMPT_NAMES` key to its code-level default.
+ * a `PROMPT_NAMES` key to its code-level default. The starter ships two
+ * generic extraction/analysis prompts as examples — add your own here.
  */
 @Injectable()
 export class ServiceFallbackRegistrar implements OnModuleInit {
@@ -28,14 +20,8 @@ export class ServiceFallbackRegistrar implements OnModuleInit {
 
   onModuleInit() {
     const entries: Array<[string, string]> = [
-      [PROMPT_NAMES.RATECON_PARSER, RATECON_EXTRACTION_FALLBACK],
-      [PROMPT_NAMES.FUEL_RECEIPT_PARSER, FUEL_RECEIPT_EXTRACTION_FALLBACK],
-      [PROMPT_NAMES.SHIELD_ANALYST, SHIELD_ANALYST_FALLBACK],
-      [PROMPT_NAMES.BRIEFING, CATCH_ME_UP_FALLBACK],
-      [PROMPT_NAMES.ALERT_BRIEFING, ALERT_BRIEFING_FALLBACK],
       [PROMPT_NAMES.FEEDBACK_CATEGORIZER, CATEGORIZER_FALLBACK],
       [PROMPT_NAMES.SKILL_CLASSIFIER, SKILL_CLASSIFIER_FALLBACK],
-      [PROMPT_NAMES.LOAD_BOARD_SEARCH_PARSER, LOAD_BOARD_SEARCH_PARSER_FALLBACK],
     ];
     for (const [name, content] of entries) {
       this.promptService.registerFallback(name, content);

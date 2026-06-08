@@ -38,7 +38,7 @@ export class CreateTicketDto {
   @IsEnum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const)
   priority?: string;
 
-  @ApiPropertyOptional({ description: 'Link to Sally AI conversation' })
+  @ApiPropertyOptional({ description: 'Link to an AI assistant conversation' })
   @IsOptional()
   @IsInt()
   conversationId?: number;

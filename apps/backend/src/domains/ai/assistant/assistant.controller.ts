@@ -10,7 +10,7 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { ResumeAgentDto } from './dto/resume-agent.dto';
 import type { Request, Response } from 'express';
 
-@ApiTags('Sally AI Conversations')
+@ApiTags('AI Conversations')
 @Controller('conversations')
 export class SallyAiController {
   constructor(
@@ -19,14 +19,14 @@ export class SallyAiController {
   ) {}
 
   @Post()
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Create a new Sally AI conversation' })
   async createConversation(@CurrentUser() user: any, @Body() dto: CreateConversationDto) {
     return this.service.createConversation(user.userId, user.tenantDbId, dto.userMode);
   }
 
   @Post(':conversationId/messages')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Send a message and stream Sally AI response' })
   async sendMessage(
     @CurrentUser() user: any,
@@ -51,7 +51,7 @@ export class SallyAiController {
   }
 
   @Get()
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'List conversations for the current user' })
   async listConversations(
     @CurrentUser() user: any,
@@ -61,7 +61,7 @@ export class SallyAiController {
   }
 
   @Post(':conversationId/resume')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Resume a suspended Sally AI agent (HITL confirmation)',
   })
@@ -85,7 +85,7 @@ export class SallyAiController {
   }
 
   @Get(':conversationId/messages')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER, UserRole.DRIVER, UserRole.CUSTOMER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Get messages for a conversation (view-only history)',
   })
@@ -94,7 +94,7 @@ export class SallyAiController {
   }
 
   @Get('agents/status')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Get status of all domain agents for the user persona',
   })

@@ -16,37 +16,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
 
-import {
-  BASE_DISPATCH,
-  BASE_BILLING,
-  BASE_COMPLIANCE,
-  BASE_SAFETY,
-  BASE_ROUTE,
-  BASE_PAYROLL,
-  BASE_MAINTENANCE,
-  BASE_FUEL,
-  BASE_DRIVER,
-  BASE_CUSTOMER,
-  BASE_SUPPORT,
-  BASE_PROSPECT,
-} from '../src/domains/prompting/prompts/persona/base-prompts';
-import {
-  ALERT_BRIEFING_FALLBACK,
-  CATCH_ME_UP_FALLBACK,
-  CATEGORIZER_FALLBACK,
-  FUEL_RECEIPT_EXTRACTION_FALLBACK,
-  LOAD_BOARD_SEARCH_PARSER_FALLBACK,
-  RATECON_EXTRACTION_FALLBACK,
-  SHIELD_ANALYST_FALLBACK,
-  SKILL_CLASSIFIER_FALLBACK,
-} from '../src/domains/prompting/prompts/fallbacks';
+import { BASE_ASSISTANT, BASE_SUPPORT } from '../src/domains/prompting/prompts/persona/base-prompts';
+import { CATEGORIZER_FALLBACK, SKILL_CLASSIFIER_FALLBACK } from '../src/domains/prompting/prompts/fallbacks';
 
-// Desk (v3) prompts: registered as in-memory fallbacks on module init, but
-// also seeded to LangFuse here so PromptingService.verifyPromptAvailability()
-// stops warning at boot and operators can edit them in the LangFuse UI.
-import { AR_FOLLOWUP_PERCEIVE_PROMPT } from '../src/domains/desk/responsibilities/ar-followup/prompts/perceive.prompt';
-import { AR_FOLLOWUP_DECIDE_PROMPT } from '../src/domains/desk/responsibilities/ar-followup/prompts/decide.prompt';
-import { AR_FOLLOWUP_DRAFT_PROMPT } from '../src/domains/desk/responsibilities/ar-followup/prompts/draft.prompt';
+// Desk prompts: registered as in-memory fallbacks on module init, but also
+// seeded to LangFuse here so PromptingService.verifyPromptAvailability() stops
+// warning at boot and operators can edit them in the LangFuse UI. The starter
+// ships only the generic memory-extract default; per-responsibility step
+// prompts are seeded by each responsibility as it ships.
 import { DESK_MEMORY_EXTRACT_PROMPT } from '../src/domains/desk/core/memory/prompts/memory-extract.prompt';
 import { AGENT_SYSTEM_PROMPTS } from '../src/domains/desk/responsibilities/agent-system-prompts';
 import { PROMPT_NAMES } from '../src/domains/prompting/prompting.types';
@@ -66,37 +43,18 @@ async function seed() {
     baseUrl: process.env.LANGFUSE_BASE_URL,
   });
 
+  // Generic chat personas. Names match PROMPT_NAMES.
   const personaPrompts: Record<string, string> = {
-    dispatcher: BASE_DISPATCH,
-    billing: BASE_BILLING,
-    compliance: BASE_COMPLIANCE,
-    safety: BASE_SAFETY,
-    route: BASE_ROUTE,
-    payroll: BASE_PAYROLL,
-    maintenance: BASE_MAINTENANCE,
-    fuel: BASE_FUEL,
-    driver: BASE_DRIVER,
-    customer: BASE_CUSTOMER,
-    support: BASE_SUPPORT,
-    prospect: BASE_PROSPECT,
-    owner: BASE_DISPATCH,
-    admin: BASE_DISPATCH,
-    super_admin: BASE_DISPATCH,
+    [PROMPT_NAMES.ASSISTANT]: BASE_ASSISTANT,
+    [PROMPT_NAMES.SUPPORT]: BASE_SUPPORT,
   };
 
   const utilityPrompts: Record<string, string> = {
-    'sally-ratecon-parser': RATECON_EXTRACTION_FALLBACK,
-    'sally-shield-analyst': SHIELD_ANALYST_FALLBACK,
-    'sally-alert-briefing': ALERT_BRIEFING_FALLBACK,
-    'sally-briefing': CATCH_ME_UP_FALLBACK,
-    'sally-fuel-receipt-parser': FUEL_RECEIPT_EXTRACTION_FALLBACK,
-    'sally-feedback-categorizer': CATEGORIZER_FALLBACK,
-    'sally-skill-classifier': SKILL_CLASSIFIER_FALLBACK,
-    'sally-load-board-search-parser': LOAD_BOARD_SEARCH_PARSER_FALLBACK,
+    [PROMPT_NAMES.FEEDBACK_CATEGORIZER]: CATEGORIZER_FALLBACK,
+    [PROMPT_NAMES.SKILL_CLASSIFIER]: SKILL_CLASSIFIER_FALLBACK,
   };
 
-  for (const [mode, prompt] of Object.entries(personaPrompts)) {
-    const name = `sally-${mode}`;
+  for (const [name, prompt] of Object.entries(personaPrompts)) {
     await langfuse.createPrompt({
       name,
       prompt,
@@ -116,12 +74,9 @@ async function seed() {
     console.log(`Created: ${name}`);
   }
 
-  // Desk (v3) — AR Follow-up step prompts + memory-extract default + 12 agent personas.
-  // Names match PROMPT_NAMES + AGENT_SYSTEM_PROMPTS keys (desk.agent.<role>.v1).
+  // Desk — memory-extract default + generic agent personas.
+  // Per-responsibility step prompts are seeded by each responsibility as it ships.
   const deskPrompts: Record<string, string> = {
-    [PROMPT_NAMES.DESK_AR_FOLLOWUP_PERCEIVE]: AR_FOLLOWUP_PERCEIVE_PROMPT,
-    [PROMPT_NAMES.DESK_AR_FOLLOWUP_DECIDE]: AR_FOLLOWUP_DECIDE_PROMPT,
-    [PROMPT_NAMES.DESK_AR_FOLLOWUP_DRAFT]: AR_FOLLOWUP_DRAFT_PROMPT,
     [PROMPT_NAMES.DESK_MEMORY_EXTRACT]: DESK_MEMORY_EXTRACT_PROMPT,
     ...AGENT_SYSTEM_PROMPTS,
   };

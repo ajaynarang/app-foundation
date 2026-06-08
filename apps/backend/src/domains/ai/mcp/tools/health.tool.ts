@@ -5,11 +5,11 @@ import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 
 @Injectable()
 export class HealthTool {
-  @RequiresScope('fleet:read')
+  @RequiresScope('platform:read')
   @Tool({
     name: 'health-check',
     description:
-      'Verify that the Sally AI system is reachable and operational. Use when a user says "are you working?", "is Sally up?", or before diagnosing a connection issue. Returns status, timestamp, and version. Do NOT use as a general ping to test auth — use get-capabilities for that.',
+      'Verify that the AI assistant is reachable and operational. Use when a user asks "are you working?" or before diagnosing a connection issue. Returns status, timestamp, and version.',
     parameters: z.object({}),
     annotations: {
       readOnlyHint: true,

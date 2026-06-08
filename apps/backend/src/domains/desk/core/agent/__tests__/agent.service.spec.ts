@@ -40,10 +40,10 @@ describe('DeskAgentService', () => {
       prisma.deskAgent.findMany.mockResolvedValue([
         {
           id: 1,
-          key: 'sally-billing',
+          key: 'assistant',
           name: 'Billing',
           description: null,
-          supervisor: { id: 42, firstName: 'Ada', lastName: 'Lovelace', role: UserRole.DISPATCHER },
+          supervisor: { id: 42, firstName: 'Ada', lastName: 'Lovelace', role: UserRole.MEMBER },
           responsibilities: [
             { id: 10, lifecycle: 'AVAILABLE', enabled: true, lastRunAt: new Date('2026-04-20T10:00:00Z') },
             { id: 11, lifecycle: 'COMING_SOON', enabled: false, lastRunAt: null },
@@ -59,12 +59,12 @@ describe('DeskAgentService', () => {
       const roster = await service.listForTenant(5);
       expect(roster).toHaveLength(1);
       const row = roster[0];
-      expect(row.key).toBe('sally-billing');
+      expect(row.key).toBe('assistant');
       expect(row.supervisor).toEqual({
         id: 42,
         firstName: 'Ada',
         lastName: 'Lovelace',
-        role: UserRole.DISPATCHER,
+        role: UserRole.MEMBER,
       });
       expect(row.availableResponsibilityCount).toBe(1);
       expect(row.comingSoonResponsibilityCount).toBe(1);
@@ -78,7 +78,7 @@ describe('DeskAgentService', () => {
       prisma.deskAgent.findMany.mockResolvedValue([
         {
           id: 1,
-          key: 'sally-dispatch',
+          key: 'assistant',
           name: 'Dispatch',
           description: null,
           supervisor: null,
@@ -123,7 +123,7 @@ describe('DeskAgentService', () => {
     it('returns detail with persona first line + supervisor', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({
         id: 1,
-        key: 'sally-dispatch',
+        key: 'assistant',
         name: 'Dispatch',
         description: 'Picks the best driver for new loads and watches late ETAs before they become problems.',
         supervisor: { id: 3, firstName: 'Jane', lastName: 'Doe', role: UserRole.ADMIN },
@@ -132,8 +132,8 @@ describe('DeskAgentService', () => {
         ],
       });
 
-      const detail = await service.getDetailForTenant(1, 'sally-dispatch');
-      expect(detail.key).toBe('sally-dispatch');
+      const detail = await service.getDetailForTenant(1, 'assistant');
+      expect(detail.key).toBe('assistant');
       expect(detail.isActive).toBe(false);
       expect(detail.supervisor?.id).toBe(3);
       expect(detail.description?.length ?? 0).toBeGreaterThan(0);
@@ -149,14 +149,14 @@ describe('DeskAgentService', () => {
     it('marks isActive when any AVAILABLE responsibility is enabled', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({
         id: 2,
-        key: 'sally-billing',
+        key: 'assistant',
         name: 'Billing',
         description:
           'Keeps invoices moving — nudges overdue customers, handles close-out review, flags anything unusual for approval.',
         supervisor: null,
         responsibilities: [{ key: 'ar_followup', lifecycle: 'AVAILABLE', enabled: true, trustLevel: 'ASSISTED' }],
       });
-      const detail = await service.getDetailForTenant(1, 'sally-billing');
+      const detail = await service.getDetailForTenant(1, 'assistant');
       expect(detail.isActive).toBe(true);
     });
   });
@@ -171,7 +171,7 @@ describe('DeskAgentService', () => {
     });
 
     it('bulk-enables responsibilities when enabled=true', async () => {
-      const res = await service.updateAgent(1, 'sally-billing', { enabled: true });
+      const res = await service.updateAgent(1, 'assistant', { enabled: true });
       expect(prisma.deskResponsibility.updateMany).toHaveBeenCalledWith({
         where: { agentId: 7, lifecycle: 'AVAILABLE' },
         data: { enabled: true },
@@ -180,9 +180,9 @@ describe('DeskAgentService', () => {
       expect(res.supervisorUpdated).toBe(false);
     });
 
-    it('rebinds supervisor when userId is a valid OWNER/ADMIN/DISPATCHER', async () => {
-      prisma.user.findFirst.mockResolvedValue({ role: UserRole.DISPATCHER });
-      const res = await service.updateAgent(1, 'sally-billing', { supervisorUserId: 42 });
+    it('rebinds supervisor when userId is a valid OWNER/ADMIN/MEMBER', async () => {
+      prisma.user.findFirst.mockResolvedValue({ role: UserRole.MEMBER });
+      const res = await service.updateAgent(1, 'assistant', { supervisorUserId: 42 });
       expect(prisma.deskAgent.update).toHaveBeenCalledWith({
         where: { id: 7 },
         data: { supervisorUserId: 42 },
@@ -191,7 +191,7 @@ describe('DeskAgentService', () => {
     });
 
     it('allows clearing supervisor with null (no user lookup)', async () => {
-      await service.updateAgent(1, 'sally-billing', { supervisorUserId: null });
+      await service.updateAgent(1, 'assistant', { supervisorUserId: null });
       expect(prisma.user.findFirst).not.toHaveBeenCalled();
       expect(prisma.deskAgent.update).toHaveBeenCalledWith({
         where: { id: 7 },
@@ -199,16 +199,16 @@ describe('DeskAgentService', () => {
       });
     });
 
-    it('rejects a driver as supervisor', async () => {
-      prisma.user.findFirst.mockResolvedValue({ role: UserRole.DRIVER });
-      await expect(service.updateAgent(1, 'sally-billing', { supervisorUserId: 77 })).rejects.toBeInstanceOf(
+    it('rejects an ineligible role as supervisor', async () => {
+      prisma.user.findFirst.mockResolvedValue({ role: UserRole.SUPER_ADMIN });
+      await expect(service.updateAgent(1, 'assistant', { supervisorUserId: 77 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
 
     it('rejects a user not in this tenant', async () => {
       prisma.user.findFirst.mockResolvedValue(null);
-      await expect(service.updateAgent(1, 'sally-billing', { supervisorUserId: 77 })).rejects.toBeInstanceOf(
+      await expect(service.updateAgent(1, 'assistant', { supervisorUserId: 77 })).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
@@ -225,7 +225,7 @@ describe('DeskAgentService', () => {
     it('delegates to updateAgent and exposes updatedCount', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ id: 3 });
       prisma.deskResponsibility.updateMany.mockResolvedValue({ count: 5 });
-      const res = await service.bulkSetEnabled(1, 'sally-billing', { enabled: false });
+      const res = await service.bulkSetEnabled(1, 'assistant', { enabled: false });
       expect(res.updatedCount).toBe(5);
     });
   });
@@ -245,7 +245,7 @@ describe('DeskAgentService', () => {
     });
 
     it('returns windowed counts and lastActivityAt', async () => {
-      const stats = await service.getActivity(1, 'sally-billing', '7d');
+      const stats = await service.getActivity(1, 'assistant', '7d');
       expect(stats.episodeCount).toBe(3);
       expect(stats.toolCallCount).toBe(12);
       expect(stats.approvalCount).toBe(1);
@@ -255,7 +255,7 @@ describe('DeskAgentService', () => {
 
     it('returns zero tool calls when no responsibilities', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ id: 5, responsibilities: [] });
-      const stats = await service.getActivity(1, 'sally-billing', '24h');
+      const stats = await service.getActivity(1, 'assistant', '24h');
       expect(stats.toolCallCount).toBe(0);
       expect(prisma.agentInvocationLog.count).not.toHaveBeenCalled();
     });
@@ -266,7 +266,7 @@ describe('DeskAgentService', () => {
     });
 
     it('queries principalKind=desk_responsibility with prefixed audit ids', async () => {
-      await service.getActivity(1, 'sally-billing', '7d');
+      await service.getActivity(1, 'assistant', '7d');
       expect(prisma.agentInvocationLog.count).toHaveBeenCalledWith({
         where: {
           tenantId: 1,
@@ -293,8 +293,8 @@ describe('DeskAgentService', () => {
           windowEnd: '2026-04-22T00:00:00.000Z',
         };
       });
-      await service.getActivity(1, 'sally-billing', '7d');
-      const cached = await service.getActivity(1, 'sally-billing', '7d');
+      await service.getActivity(1, 'assistant', '7d');
+      const cached = await service.getActivity(1, 'assistant', '7d');
       expect(cached.episodeCount).toBe(99);
       expect(prisma.deskEpisode.count).toHaveBeenCalledTimes(1);
     });
@@ -315,7 +315,7 @@ describe('DeskAgentService', () => {
           tenantId: 7,
           isActive: true,
           deletedAt: null,
-          role: { in: [UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER] },
+          role: { in: [UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER] },
         },
         select: { id: true, firstName: true, lastName: true, role: true },
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],

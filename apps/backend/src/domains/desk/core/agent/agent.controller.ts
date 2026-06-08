@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '@app/shared-types';
+import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -27,7 +27,7 @@ const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole
 /**
  * HTTP surface for the Desk Crew tab.
  *
- * Auth: Dispatcher + Admin + Owner + SuperAdmin at the class level.
+ * Auth: Member + Admin + Owner + SuperAdmin at the class level.
  * Mutation routes further narrow via DeskAgentEditGuard (owner/admin or
  * this agent's supervisor). Supervisor reassignment is OWNER/ADMIN-only —
  * enforced inline in `update()`.
@@ -35,7 +35,7 @@ const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole
 @ApiTags('Desk — Agents')
 @ApiBearerAuth()
 @Controller('desk/agents')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskAgentController extends BaseTenantController {
   constructor(
     prisma: PrismaService,
@@ -45,7 +45,7 @@ export class DeskAgentController extends BaseTenantController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List the 12 agents with rollup counts + supervisor for the Crew tab' })
+  @ApiOperation({ summary: 'List agents with rollup counts + supervisor for the Crew tab' })
   async list(@CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.agents.listForTenant(tenantDbId);

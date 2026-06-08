@@ -27,7 +27,7 @@ describe('UserInvitationsController', () => {
   });
 
   it('inviteUser delegates to service', async () => {
-    const dto = { email: 'new@test.com', role: 'DISPATCHER' };
+    const dto = { email: 'new@test.com', role: 'MEMBER' };
     await controller.inviteUser(dto as any, currentUser);
     expect(invitationsService.inviteUser).toHaveBeenCalledWith(dto, currentUser);
   });

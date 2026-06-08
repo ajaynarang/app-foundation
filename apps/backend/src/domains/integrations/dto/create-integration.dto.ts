@@ -1,24 +1,9 @@
-import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
-import type { CreateIntegrationInput } from '@app/shared-types';
+import { IsEnum, IsString, IsOptional, IsObject } from 'class-validator';
+import { IntegrationType, IntegrationVendor } from '@prisma/client';
 
-export enum IntegrationType {
-  TMS = 'TMS',
-  ELD = 'ELD',
-  ACCOUNTING = 'ACCOUNTING',
-  LOAD_BOARD = 'LOAD_BOARD',
-}
+export { IntegrationType, IntegrationVendor };
 
-export enum IntegrationVendor {
-  MCLEOD_TMS = 'MCLEOD_TMS',
-  TMW_TMS = 'TMW_TMS',
-  PROJECT44_TMS = 'PROJECT44_TMS',
-  SAMSARA_ELD = 'SAMSARA_ELD',
-  MOTIVE_ELD = 'MOTIVE_ELD',
-  QUICKBOOKS = 'QUICKBOOKS',
-  DAT_LOAD_BOARD = 'DAT_LOAD_BOARD',
-}
-
-export class CreateIntegrationDto implements CreateIntegrationInput {
+export class CreateIntegrationDto {
   @IsEnum(IntegrationType)
   integrationType: IntegrationType;
 

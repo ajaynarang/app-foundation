@@ -14,7 +14,7 @@ type SupervisorLookup =
  * Server-side enforcement of the Desk agent-edit permission matrix.
  *
  * OWNER / ADMIN / SUPER_ADMIN — always allow (still tenant-scoped).
- * DISPATCHER — allow only if this user is the agent's supervisor.
+ * MEMBER — allow only if this user is the agent's supervisor.
  * Everyone else — deny.
  *
  * The guard resolves the target agent from the URL shape:
@@ -40,7 +40,7 @@ export class DeskAgentEditGuard implements CanActivate {
     if (!user) return false;
 
     if (BYPASS_ROLES.includes(user.role)) return true;
-    if (user.role !== UserRole.DISPATCHER) return false;
+    if (user.role !== UserRole.MEMBER) return false;
     if (!user.tenantId) return false;
 
     // Resolve the user's tenant once — all guard lookups must be scoped to it

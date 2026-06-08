@@ -17,7 +17,6 @@ import { PromptingService } from '../../../../domains/prompting';
 import { SallyRouterService } from '../../orchestrator/sally-router.service';
 import { AgentRegistry } from '../../agents/agent.registry';
 import { AiTelemetryService } from '../../infrastructure/telemetry/ai-telemetry.service';
-import { TimezoneService } from '../../../../shared/services/timezone.service';
 
 describe('SallyAiService', () => {
   let service: SallyAiService;
@@ -116,7 +115,6 @@ describe('SallyAiService', () => {
       mockSallyRouter as unknown as SallyRouterService,
       mockAgentRegistry as unknown as AgentRegistry,
       { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
-      { resolveTenantTimezone: jest.fn().mockResolvedValue('UTC') } as unknown as TimezoneService,
     );
   });
 

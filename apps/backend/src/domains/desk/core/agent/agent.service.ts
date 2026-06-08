@@ -10,7 +10,7 @@ import {
   type EligibleSupervisor,
   type ResponsibilityHeld,
   type UpdateAgentRequest,
-} from '@app/shared-types';
+} from '../types';
 
 import { CACHE_TTL_HOT_60S, CACHE_TTL_WARM_5M } from '../../../../constants/cache.constants';
 import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
@@ -20,7 +20,7 @@ import { RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 
 type SupervisorRoleRow = { role: UserRole };
 
-const SUPERVISOR_ELIGIBLE_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.DISPATCHER];
+const SUPERVISOR_ELIGIBLE_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER];
 
 /**
  * Reads + mutates the agent roster. Agents themselves carry one real piece
@@ -306,7 +306,7 @@ export class DeskAgentService {
 
   /**
    * Users in this tenant eligible to supervise an agent — OWNER/ADMIN/
-   * DISPATCHER, excluding drivers, customers, and deactivated users.
+   * MEMBER, excluding deactivated users.
    */
   async listEligibleSupervisors(tenantId: number): Promise<EligibleSupervisor[]> {
     const cacheKey = buildKey('sally:desk', 'eligible-supervisors', tenantId);

@@ -7,15 +7,16 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 const JOB_STATUS = JobStatusSchema.enum;
 import { CredentialsService } from './credentials/credentials.service';
 import { IntegrationDataService } from './services/integration-data.service';
-import { CreateIntegrationDto, IntegrationType } from './dto/create-integration.dto';
+import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { VENDOR_REGISTRY, getVendorCredentialFields, type ConnectionMethod } from './vendor-registry';
 import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 import { JobService } from '../../infrastructure/queue/job.service';
-import { IntegrationSyncPayload, SyncJobType } from '../../infrastructure/sync/sync-job.types';
-import { routeIntegrationJob } from '../../infrastructure/sync/integration-job-router';
 import { buildJobEnvelope } from '../../infrastructure/queue/job-envelope.helper';
 import { randomUUID } from 'crypto';
+
+/** BullMQ job name for a manually-triggered integration sync. */
+const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';
 
 @Injectable()
 export class IntegrationsService {
@@ -26,10 +27,8 @@ export class IntegrationsService {
     private credentials: CredentialsService,
     private integrationManager: IntegrationDataService,
     private readonly jobService: JobService,
-    @InjectQueue(QUEUE_NAMES.TELEMETRY)
-    private readonly telemetryQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.VENDOR_DATA)
-    private readonly vendorDataQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.BULK_OPS)
+    private readonly bulkOpsQueue: Queue,
   ) {}
 
   /**
@@ -103,20 +102,14 @@ export class IntegrationsService {
       this.prisma.job.findMany({
         where: {
           tenantId,
-          category: { in: ['vendor', 'telemetry'] },
+          category: 'maintenance',
+          type: INTEGRATION_SYNC_JOB_NAME,
           status: { in: [JOB_STATUS.QUEUED, JOB_STATUS.PROCESSING] },
           createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
         },
         select: { type: true, inputData: true, startedAt: true },
       }),
     ]);
-
-    const FLEET_PIPELINE_TYPES = ['TMS', 'ELD'];
-
-    const tms = integrations.find((i) => i.integrationType === 'TMS');
-    const eld = integrations.find((i) => i.integrationType === 'ELD');
-    const fleetPipeline = integrations.filter((i) => FLEET_PIPELINE_TYPES.includes(i.integrationType));
-    const dataFeeds = integrations.filter((i) => !FLEET_PIPELINE_TYPES.includes(i.integrationType));
 
     const formatIntegration = (i: (typeof integrations)[0]) => ({
       id: i.integrationId,
@@ -135,7 +128,8 @@ export class IntegrationsService {
       by: ['type'],
       where: {
         tenantId,
-        category: { in: ['vendor', 'telemetry'] },
+        category: 'maintenance',
+        type: INTEGRATION_SYNC_JOB_NAME,
         status: JOB_STATUS.COMPLETED,
       },
       _max: {
@@ -145,9 +139,6 @@ export class IntegrationsService {
 
     return {
       hasIntegrations: integrations.length > 0,
-      hasFleetPipeline: fleetPipeline.length > 0,
-      tms: tms ? formatIntegration(tms) : null,
-      eld: eld ? formatIntegration(eld) : null,
       activeSyncs: activeJobs.map((j) => ({
         type: (j.inputData as Record<string, any>)?.integrationType ?? 'UNKNOWN',
         vendor: (j.inputData as Record<string, any>)?.integrationName ?? 'UNKNOWN',
@@ -155,8 +146,7 @@ export class IntegrationsService {
         startedAt: j.startedAt?.toISOString() ?? new Date().toISOString(),
       })),
       configuredTypes: integrations.map((i) => i.integrationType),
-      dataFeeds: dataFeeds.map(formatIntegration),
-      unmatchedAssets: 0,
+      integrations: integrations.map(formatIntegration),
       lastSyncByType: Object.fromEntries(
         lastSyncByType.map((entry) => [entry.type?.toUpperCase(), entry._max.completedAt?.toISOString() ?? null]),
       ),
@@ -313,45 +303,39 @@ export class IntegrationsService {
       },
     });
 
-    // Auto-trigger enrichment for ELD integrations
-    if (dto.integrationType === IntegrationType.ELD) {
-      try {
-        const job = await this.jobService.createJob({
-          tenantId: numericTenantId,
-          submittedBy: null,
-          category: 'telemetry',
-          type: 'fleet-sync',
-          inputData: {
-            integrationId: integration.id,
-            integrationName: integration.displayName,
-            integrationType: integration.integrationType,
-            triggerSource: 'auto',
-          },
-        });
-
-        const route = routeIntegrationJob('fleet-sync');
-        const targetQueue = route.queue === QUEUE_NAMES.TELEMETRY ? this.telemetryQueue : this.vendorDataQueue;
-
-        const payload: IntegrationSyncPayload = {
-          jobId: job.id,
-          tenantId: numericTenantId,
+    // Auto-trigger an initial sync on the slow-lane BULK_OPS queue. Register a
+    // handler for INTEGRATION_SYNC_JOB_NAME to do the actual vendor pull.
+    try {
+      const job = await this.jobService.createJob({
+        tenantId: numericTenantId,
+        submittedBy: null,
+        category: 'maintenance',
+        type: INTEGRATION_SYNC_JOB_NAME,
+        inputData: {
           integrationId: integration.id,
           integrationName: integration.displayName,
-          integrationType: 'ELD',
-          type: 'fleet-sync' as SyncJobType,
+          integrationType: integration.integrationType,
           triggerSource: 'auto',
-        };
+        },
+      });
 
-        await targetQueue.add(
-          route.jobName,
-          buildJobEnvelope(payload, { tenantId: String(numericTenantId), source: 'api' }),
-        );
+      await this.bulkOpsQueue.add(
+        INTEGRATION_SYNC_JOB_NAME,
+        buildJobEnvelope(
+          {
+            jobId: job.id,
+            tenantId: numericTenantId,
+            integrationId: integration.id,
+            triggerSource: 'auto' as const,
+          },
+          { tenantId: String(numericTenantId), source: 'api' },
+        ),
+      );
 
-        this.logger.log(`Auto-triggered ELD enrichment for integration ${integration.integrationId}`);
-      } catch (error) {
-        this.logger.warn(`Failed to auto-trigger ELD enrichment: ${(error as Error).message}`);
-        // Non-fatal — scheduled sync or self-healing will catch it
-      }
+      this.logger.log(`Auto-triggered initial sync for integration ${integration.integrationId}`);
+    } catch (error) {
+      this.logger.warn(`Failed to auto-trigger initial sync: ${(error as Error).message}`);
+      // Non-fatal — a manual sync or scheduled job will catch it.
     }
 
     return {

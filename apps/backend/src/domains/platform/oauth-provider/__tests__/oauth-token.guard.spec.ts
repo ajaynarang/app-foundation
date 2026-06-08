@@ -77,7 +77,7 @@ describe('OAuthTokenGuard', () => {
       sub: '1',
       tenantId: 1,
       role: 'DISPATCHER',
-      scopes: ['loads:read', 'loads:write'],
+      scopes: ['documents:read', 'platform:write'],
       clientId: 'client-abc',
     };
     oauthService.validateAccessToken.mockResolvedValue(payload);
@@ -92,7 +92,7 @@ describe('OAuthTokenGuard', () => {
       userId: '1',
       tenantDbId: 1,
       role: 'DISPATCHER',
-      scopes: ['loads:read', 'loads:write'],
+      scopes: ['documents:read', 'platform:write'],
       clientId: 'client-abc',
     });
   });
@@ -102,7 +102,7 @@ describe('OAuthTokenGuard', () => {
       sub: '99',
       tenantId: 7,
       role: 'DISPATCHER',
-      scopes: ['fleet:read', 'invoices:read'],
+      scopes: ['platform:read', 'documents:read'],
       clientId: 'gpt-abc',
     };
     oauthService.validateAccessToken.mockResolvedValue(payload);
@@ -118,7 +118,7 @@ describe('OAuthTokenGuard', () => {
         clientId: 'gpt-abc',
         tenantId: 7,
         onBehalfOfUserId: 99,
-        scopes: ['fleet:read', 'invoices:read'],
+        scopes: ['platform:read', 'documents:read'],
         auditId: 'oauth:gpt-abc',
       }),
     );

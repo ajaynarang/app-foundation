@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DEFAULT_TENANT_TIMEZONE, type DeskScheduleState } from '@app/shared-types';
+import { DEFAULT_TENANT_TIMEZONE } from '@app/shared-types';
+import { type DeskScheduleState } from '../types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 

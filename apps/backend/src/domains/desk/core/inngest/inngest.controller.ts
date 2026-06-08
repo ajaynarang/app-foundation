@@ -4,10 +4,6 @@ import { serve } from 'inngest/express';
 
 import { Public } from '../../../../auth/decorators/public.decorator';
 import { createDeskSchedulerFunction } from '../scheduler/desk-scheduler.function';
-import { createArFollowupFunction } from '../../responsibilities/ar-followup/workflow/ar-followup.function';
-import { createCloseoutReviewFunction } from '../../responsibilities/closeout-review/workflow/closeout-review.function';
-import { createDocumentExpiryFunction } from '../../responsibilities/document-expiry/workflow/document-expiry.function';
-import { createSettlementReviewFunction } from '../../responsibilities/settlement-review/workflow/settlement-review.function';
 import { InngestClientService } from './inngest.client';
 
 /**
@@ -18,11 +14,12 @@ import { InngestClientService } from './inngest.client';
  *   - Introspect functions (GET)
  *
  * Registered functions:
- *   - arFollowupFunction       — listens for sally/desk.ar_followup.run
- *   - closeoutReviewFunction   — listens for sally/desk.closeout_review.run
- *   - documentExpiryFunction   — listens for sally/desk.document_expiry.run
- *   - settlementReviewFunction — listens for sally/desk.settlement_review.run
  *   - deskSchedulerFunction    — cron `* * * * *` (every minute) heartbeat
+ *
+ * The starter ships NO responsibility workflow functions (the registry is
+ * empty). When you add a responsibility, build its Inngest function (one per
+ * responsibility, listening for `<app>/desk.<key>.run`) and push it into the
+ * `responsibilityFunctions` array below.
  *
  * NOTE: path is `inngest` (not `api/inngest`) because main.ts sets a
  * global prefix of `api/v1`. The resulting public URL is `/api/v1/inngest`.
@@ -36,8 +33,8 @@ import { InngestClientService } from './inngest.client';
  *     can run before the service populates its `_client`, yielding
  *     "Cannot read properties of undefined (reading 'createFunction')".
  *   - Lazy first-request init pinned the first-ever function closure onto
- *     the instance, so hot-reload edits (e.g. to ar-followup.function.ts)
- *     were invisible to the Inngest dev server.
+ *     the instance, so hot-reload edits to a responsibility's function were
+ *     invisible to the Inngest dev server.
  *   - `onApplicationBootstrap` fires after all modules have initialized
  *     but before `app.listen()`, so the Inngest client is fully set up
  *     AND the handler is fresh per process start.
@@ -51,13 +48,12 @@ export class InngestController implements OnApplicationBootstrap {
 
   onApplicationBootstrap() {
     const client = this.inngest.client;
-    const functions = [
-      createArFollowupFunction(client),
-      createCloseoutReviewFunction(client),
-      createDocumentExpiryFunction(client),
-      createSettlementReviewFunction(client),
-      createDeskSchedulerFunction(client),
-    ];
+
+    // Register your responsibility workflow functions here, e.g.:
+    //   createWelcomeFunction(client),
+    const responsibilityFunctions: ReturnType<typeof createDeskSchedulerFunction>[] = [];
+
+    const functions = [...responsibilityFunctions, createDeskSchedulerFunction(client)];
 
     // `serveOrigin` is the origin Inngest uses when POSTing back to run
     // a step. In local dev the Inngest dev server runs in Docker, so

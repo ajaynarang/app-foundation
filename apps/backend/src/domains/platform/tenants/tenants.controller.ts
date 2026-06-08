@@ -4,9 +4,6 @@ import { TenantsService } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { SuspendTenantDto } from './dto/suspend-tenant.dto';
-import { SetFactoringDefaultDto } from './dto/set-factoring-default.dto';
-import { SetBundleFormatDto } from './dto/set-bundle-format.dto';
-import { SetDriverPayTimingDto } from './dto/set-driver-pay-timing.dto';
 import { UpdateOrganizationProfileDto } from './dto/update-organization-profile.dto';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
@@ -28,44 +25,8 @@ export class TenantsController extends BaseTenantController {
     super(prisma);
   }
 
-  // ── Current-tenant settings (DISPATCHER + ADMIN + OWNER) ─────────────
+  // ── Current-tenant settings (ADMIN + OWNER) ──────────────────────────
   // Defined before the parameterised routes so the path matcher prefers them.
-
-  @Get('me/settings')
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Get current tenant settings (factoring default, etc.)' })
-  async getMySettings(@CurrentUser() user: any) {
-    const tenantDbId = await this.getTenantDbId(user);
-    return this.tenantsService.getMyTenantSettings(tenantDbId);
-  }
-
-  @Patch('me/factoring-default')
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Pin or unpin the tenant default factoring company' })
-  async setFactoringDefault(@CurrentUser() user: any, @Body() dto: SetFactoringDefaultDto) {
-    const tenantDbId = await this.getTenantDbId(user);
-    return this.tenantsService.setDefaultFactoringCompany(
-      tenantDbId,
-      dto.factoringCompanyId ?? null,
-      user?.userId ?? user?.email ?? 'unknown',
-    );
-  }
-
-  @Patch('me/bundle-format')
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Set the tenant factor bundle format (ADMIN/OWNER only)' })
-  async setBundleFormat(@CurrentUser() user: any, @Body() dto: SetBundleFormatDto) {
-    const tenantDbId = await this.getTenantDbId(user);
-    return this.tenantsService.setBundleFormat(tenantDbId, dto.format);
-  }
-
-  @Patch('me/driver-pay-timing')
-  @Roles(UserRole.ADMIN, UserRole.OWNER)
-  @ApiOperation({ summary: 'Set driver pay timing (ADMIN/OWNER only)' })
-  async setDriverPayTiming(@CurrentUser() user: any, @Body() dto: SetDriverPayTimingDto) {
-    const tenantDbId = await this.getTenantDbId(user);
-    return this.tenantsService.setDriverPayTiming(tenantDbId, dto.timing);
-  }
 
   @Get('me/profile')
   @Roles(UserRole.ADMIN, UserRole.OWNER)

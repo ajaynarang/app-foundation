@@ -1,14 +1,2 @@
 export { makeTenant } from './tenant.factory';
 export { makeUser, makeRequestUser } from './user.factory';
-export { makeDriver } from './driver.factory';
-export { makeVehicle } from './vehicle.factory';
-export { makeCustomer } from './customer.factory';
-export { makeLoad, makeAssignedLoad, makeInTransitLoad, makeDeliveredLoad } from './load.factory';
-export { makeStop, makeLoadStop } from './stop.factory';
-export { makeInvoice, makeInvoiceLineItem } from './invoice.factory';
-export { makeSettlement, makeDriverPayStructure, makeSettlementLineItem } from './settlement.factory';
-export { makePayment } from './payment.factory';
-export { makeDocument } from './document.factory';
-export { makeRoutePlan } from './route-plan.factory';
-export { makeAlert } from './alert.factory';
-export { makeTrailer } from './trailer.factory';

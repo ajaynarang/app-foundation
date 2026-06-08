@@ -117,29 +117,6 @@ export class UserInvitationsService {
       }
     }
 
-    // If driver ID provided, verify driver exists and is not linked
-    let driverIdInt: number | null = null;
-    if (dto.driverId) {
-      const driver = await this.prisma.driver.findUnique({
-        where: { driverId: dto.driverId },
-        include: { user: true },
-      });
-
-      if (!driver) {
-        throw new NotFoundException('Driver not found');
-      }
-
-      if (driver.user) {
-        throw new ConflictException('Driver is already linked to a user account');
-      }
-
-      if (driver.tenantId !== tenantId) {
-        throw new BadRequestException('Driver does not belong to your organization');
-      }
-
-      driverIdInt = driver.id;
-    }
-
     // Create invitation
     const token = nanoid();
     const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
@@ -156,11 +133,6 @@ export class UserInvitationsService {
         invitedByUser: {
           connect: { id: invitingUser.id },
         },
-        ...(driverIdInt && {
-          driver: {
-            connect: { id: driverIdInt },
-          },
-        }),
         ...(dto.email && { email: dto.email }),
         ...(dto.phone && { phone: dto.phone }),
         inviteChannel: inviteChannel as any,
@@ -184,7 +156,7 @@ export class UserInvitationsService {
 
     // Send via appropriate channel
     if (inviteChannel === 'SMS' && dto.phone) {
-      const smsBody = `You've been invited to SALLY Fleet by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
       await this.smsService.sendSms(dto.phone, smsBody);
     } else if (dto.email) {
       await this.emailService.sendUserInvitation(
@@ -232,12 +204,6 @@ export class UserInvitationsService {
             lastName: true,
           },
         },
-        driver: {
-          select: {
-            driverId: true,
-            name: true,
-          },
-        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -277,33 +243,11 @@ export class UserInvitationsService {
           firebaseUid,
           emailVerified: true,
           isActive: true,
-          driverId: invitation.driverId,
-          customerId: invitation.customerId,
         },
         include: {
           tenant: true,
-          driver: true,
-          customer: true,
         },
       });
-
-      // If invitation is linked to a driver, auto-activate if pending
-      if (invitation.driverId) {
-        const driver = await tx.driver.findUnique({
-          where: { id: invitation.driverId },
-        });
-
-        if (driver && driver.status === 'PENDING_ACTIVATION') {
-          await tx.driver.update({
-            where: { id: invitation.driverId },
-            data: {
-              status: 'ACTIVE',
-              activatedAt: new Date(),
-              activatedBy: user.id,
-            },
-          });
-        }
-      }
 
       // Update invitation status
       await tx.userInvitation.update({
@@ -359,28 +303,9 @@ export class UserInvitationsService {
           pinHash,
           isActive: true,
           ...(invitation.email && { email: invitation.email }),
-          ...(invitation.driverId && { driverId: invitation.driverId }),
-          ...(invitation.customerId && { customerId: invitation.customerId }),
         },
-        include: { tenant: true, driver: true },
+        include: { tenant: true },
       });
-
-      // Auto-activate linked driver if pending
-      if (invitation.driverId) {
-        const driver = await tx.driver.findUnique({
-          where: { id: invitation.driverId },
-        });
-        if (driver && driver.status === 'PENDING_ACTIVATION') {
-          await tx.driver.update({
-            where: { id: invitation.driverId },
-            data: {
-              status: 'ACTIVE',
-              activatedAt: new Date(),
-              activatedBy: user.id,
-            },
-          });
-        }
-      }
 
       await tx.userInvitation.update({
         where: { id: invitation.id },
@@ -486,7 +411,7 @@ export class UserInvitationsService {
     const inviteLink = `${frontendUrl}/accept-invitation?token=${newToken}`;
 
     if (invitation.inviteChannel === 'SMS' && invitation.phone) {
-      const smsBody = `You've been invited to SALLY Fleet by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
       await this.smsService.sendSms(invitation.phone, smsBody);
     } else if (invitation.email) {
       await this.emailService.sendUserInvitation(

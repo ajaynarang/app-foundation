@@ -22,9 +22,9 @@ export const HEARTBEAT_CRON = '* * * * *';
  * topology redesign (Phase 5). The rest of Desk already runs on Inngest, so
  * the heartbeat now lives here too — one orchestration runtime, not two.
  *
- * Shape mirrors the event-triggered functions (createArFollowupFunction et al)
- * — same `triggers: [...]` config and `client.createFunction(config, handler)`
- * call — with the event trigger swapped for a `cron` trigger.
+ * Shape mirrors a responsibility's event-triggered Inngest function — same
+ * `triggers: [...]` config and `client.createFunction(config, handler)` call —
+ * with the event trigger swapped for a `cron` trigger.
  *
  * The tick time is resolved inside a step so an Inngest retry replays the
  * original minute rather than re-reading the clock (the per-day idempotency

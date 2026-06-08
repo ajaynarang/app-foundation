@@ -4,23 +4,23 @@ import { RequiresScope, getRequiredScope, REQUIRES_SCOPE_METADATA_KEY } from '..
 describe('@RequiresScope', () => {
   it('attaches scope metadata to a method', () => {
     class Fake {
-      @RequiresScope('fleet:read')
+      @RequiresScope('platform:read')
       read() {
         return 'ok';
       }
     }
     const scope = Reflect.getMetadata(REQUIRES_SCOPE_METADATA_KEY, Fake.prototype, 'read');
-    expect(scope).toBe('fleet:read');
+    expect(scope).toBe('platform:read');
   });
 
   it('getRequiredScope reads metadata from prototype + method name', () => {
     class Fake {
-      @RequiresScope('invoices:write:sensitive')
+      @RequiresScope('platform:write:sensitive')
       voidInvoice() {
         return null;
       }
     }
-    expect(getRequiredScope(Fake.prototype, 'voidInvoice')).toBe('invoices:write:sensitive');
+    expect(getRequiredScope(Fake.prototype, 'voidInvoice')).toBe('platform:write:sensitive');
   });
 
   it('getRequiredScope returns undefined when absent', () => {

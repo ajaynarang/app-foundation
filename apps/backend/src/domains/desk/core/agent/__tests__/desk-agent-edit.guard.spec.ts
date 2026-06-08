@@ -31,7 +31,7 @@ describe('DeskAgentEditGuard', () => {
     const ctx = makeCtx({
       user: { dbId: 1, role, tenantId: 't1' },
       route: { path: '/desk/agents/:key' },
-      params: { key: 'sally-billing' },
+      params: { key: 'assistant' },
     });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(prisma.deskAgent.findUnique).not.toHaveBeenCalled();
@@ -39,28 +39,23 @@ describe('DeskAgentEditGuard', () => {
     expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
   });
 
-  // ─── Unauthorized roles ──────────────────────────────────────────
-
-  it.each([UserRole.DRIVER, UserRole.CUSTOMER])('denies %s outright', async (role) => {
-    const ctx = makeCtx({
-      user: { dbId: 1, role, tenantId: 't1' },
-      route: { path: '/desk/agents/:key' },
-      params: { key: 'sally-billing' },
-    });
-    await expect(guard.canActivate(ctx)).resolves.toBe(false);
-  });
+  // ─── Unauthorized access ─────────────────────────────────────────
+  // With the genericized role set (OWNER/ADMIN/MEMBER/SUPER_ADMIN), OWNER/
+  // ADMIN/SUPER_ADMIN bypass and MEMBER is supervisor-conditional. There is no
+  // flatly-denied-by-role case anymore, so the denial paths exercised below are
+  // "no user", "no tenant", and "not the supervisor".
 
   it('denies when no user on request', async () => {
     const ctx = makeCtx({
       route: { path: '/desk/agents/:key' },
-      params: { key: 'sally-billing' },
+      params: { key: 'assistant' },
     });
     await expect(guard.canActivate(ctx)).resolves.toBe(false);
   });
 
   it('denies DISPATCHER without tenantId', async () => {
     const ctx = makeCtx({
-      user: { dbId: 99, role: UserRole.DISPATCHER },
+      user: { dbId: 99, role: UserRole.MEMBER },
       route: { path: '/desk/agents/:key' },
       params: { key: 'x' },
     });
@@ -71,7 +66,7 @@ describe('DeskAgentEditGuard', () => {
   it('denies when tenant record is missing (defensive)', async () => {
     prisma.tenant.findUnique.mockResolvedValue(null);
     const ctx = makeCtx({
-      user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't-missing' },
+      user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't-missing' },
       route: { path: '/desk/agents/:key' },
       params: { key: 'x' },
     });
@@ -92,9 +87,9 @@ describe('DeskAgentEditGuard', () => {
     it('allows when user is the supervisor', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ supervisorUserId: 42 });
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
-        params: { key: 'sally-billing' },
+        params: { key: 'assistant' },
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });
@@ -102,9 +97,9 @@ describe('DeskAgentEditGuard', () => {
     it('denies when user is a different dispatcher', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ supervisorUserId: 42 });
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
-        params: { key: 'sally-billing' },
+        params: { key: 'assistant' },
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(false);
     });
@@ -112,9 +107,9 @@ describe('DeskAgentEditGuard', () => {
     it('denies when agent has no supervisor assigned', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ supervisorUserId: null });
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
-        params: { key: 'sally-billing' },
+        params: { key: 'assistant' },
       });
       // supervisorUserId null == "unassigned" → denies non-matching
       await expect(guard.canActivate(ctx)).resolves.toBe(false);
@@ -123,7 +118,7 @@ describe('DeskAgentEditGuard', () => {
     it('passes-through (true) when agent not found so service emits the clean 404', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue(null);
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
         params: { key: 'sally-missing' },
       });
@@ -133,7 +128,7 @@ describe('DeskAgentEditGuard', () => {
     it('scopes agent lookup by tenant (regression — no cross-tenant leak)', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue(null);
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
         params: { key: 'exists-in-other-tenant' },
       });
@@ -147,7 +142,7 @@ describe('DeskAgentEditGuard', () => {
 
     it('treats missing :key as not-found and passes through', async () => {
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
         params: {},
       });
@@ -168,7 +163,7 @@ describe('DeskAgentEditGuard', () => {
         agent: { supervisorUserId: 42 },
       });
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key' },
         params: { key: 'ar_followup' },
       });
@@ -184,7 +179,7 @@ describe('DeskAgentEditGuard', () => {
         agent: { supervisorUserId: 42 },
       });
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key/run' },
         params: { key: 'ar_followup' },
       });
@@ -194,7 +189,7 @@ describe('DeskAgentEditGuard', () => {
     it('passes through when responsibility not found', async () => {
       prisma.deskResponsibility.findUnique.mockResolvedValue(null);
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key' },
         params: { key: 'bogus' },
       });
@@ -203,7 +198,7 @@ describe('DeskAgentEditGuard', () => {
 
     it('treats missing :key as not-found and passes through', async () => {
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key' },
         params: {},
       });
@@ -224,7 +219,7 @@ describe('DeskAgentEditGuard', () => {
         agent: { supervisorUserId: 99 },
       });
       const ctx = makeCtx({
-        user: { dbId: 99, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/memories/:id' },
         params: { id: 'mem-1' },
       });
@@ -241,7 +236,7 @@ describe('DeskAgentEditGuard', () => {
         agent: { supervisorUserId: 42 },
       });
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/memories/:memoryId' },
         params: { memoryId: 'abc-123' },
       });
@@ -251,7 +246,7 @@ describe('DeskAgentEditGuard', () => {
     it('passes through when memory not found so service emits clean 404', async () => {
       prisma.deskMemory.findFirst.mockResolvedValue(null);
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/memories/:id' },
         params: { id: 'bogus' },
       });
@@ -260,7 +255,7 @@ describe('DeskAgentEditGuard', () => {
 
     it('treats missing :id as not-found and passes through', async () => {
       const ctx = makeCtx({
-        user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
+        user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/memories/:id' },
         params: {},
       });
@@ -274,7 +269,7 @@ describe('DeskAgentEditGuard', () => {
   it('denies DISPATCHER on an unknown route shape', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     const ctx = makeCtx({
-      user: { dbId: 1, role: UserRole.DISPATCHER, tenantId: 't1' },
+      user: { dbId: 1, role: UserRole.MEMBER, tenantId: 't1' },
       route: { path: '/desk/weird/:key' },
       params: { key: 'x' },
     });
@@ -285,9 +280,9 @@ describe('DeskAgentEditGuard', () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     prisma.deskAgent.findUnique.mockResolvedValue({ supervisorUserId: 42 });
     const ctx = makeCtx({
-      user: { dbId: 42, role: UserRole.DISPATCHER, tenantId: 't1' },
-      url: '/desk/agents/sally-billing',
-      params: { key: 'sally-billing' },
+      user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
+      url: '/desk/agents/assistant',
+      params: { key: 'assistant' },
     });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
   });

@@ -4,23 +4,23 @@ import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { TenantPlan, TenantStatus } from '@prisma/client';
 import { TenantAddOnStatusEnum } from '@app/shared-types';
-import { generateId } from '../../../shared/utils/id-generator';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
-import { FINANCE_JOB_NAMES } from '../../../infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '../../../infrastructure/queue/job-handler.contract';
 
 const TENANT_ADDON_STATUS = TenantAddOnStatusEnum.enum;
 
+/** BullMQ job name owned by this handler. */
+const TRIAL_EXPIRY_JOB_NAME = 'trial-expiry';
+
 /**
- * Owns `trial-expiry` on the `finance` queue. Trial expiry is financially-tied
- * maintenance (cancels gifted add-ons, changes plan state), so it lives on
- * FINANCE rather than the slow-lane BULK_OPS queue. A QueueJobHandler — the
- * single FinanceQueueProcessor dispatcher routes by name. Keeps its service name
- * because `expireTrials()` is also callable directly.
+ * Owns the `trial-expiry` maintenance job. Trial expiry cancels gifted add-ons
+ * and transitions plan state. A QueueJobHandler — the owning queue dispatcher
+ * routes by name. Keeps its service name because `expireTrials()` is also
+ * callable directly.
  */
 @Injectable()
 export class TrialExpiryService implements QueueJobHandler {
-  readonly jobNames = [FINANCE_JOB_NAMES.TRIAL_EXPIRY];
+  readonly jobNames = [TRIAL_EXPIRY_JOB_NAME];
   private readonly logger = new Logger(TrialExpiryService.name);
 
   constructor(private readonly prisma: PrismaService) {}
@@ -96,22 +96,6 @@ export class TrialExpiryService implements QueueJobHandler {
               status: TENANT_ADDON_STATUS.CANCELLED,
               cancelledAt: now,
               cancelledBy: 'system-trial-expiry',
-            },
-          });
-
-          await tx.alert.create({
-            data: {
-              alertId: generateId('alert'),
-              tenantId: tenant.id,
-              // System alert with no associated driver — driverId stays NULL
-              // (Phase 2 Task 10). The old placeholder string 'system' was a
-              // workaround for the previous NOT NULL constraint.
-              alertType: 'TRIAL_EXPIRED',
-              category: 'system',
-              priority: 'HIGH',
-              title: 'Trial Period Has Ended',
-              message: `Your 30-day free trial for ${tenant.companyName} has ended. Upgrade to a paid plan to continue using SALLY and keep all your data.`,
-              recommendedAction: 'Go to Account → Subscription to choose a plan.',
             },
           });
         });

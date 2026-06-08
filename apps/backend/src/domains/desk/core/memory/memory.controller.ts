@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { ListMemoriesQuerySchema } from '@app/shared-types';
+import { ListMemoriesQuerySchema } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -43,7 +43,7 @@ import { UpdateMemoryDto } from './dto/update-memory.dto';
 @ApiTags('Desk — Memory')
 @ApiBearerAuth()
 @Controller('desk/memories')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskMemoryController extends BaseTenantController {
   constructor(
     prisma: PrismaService,

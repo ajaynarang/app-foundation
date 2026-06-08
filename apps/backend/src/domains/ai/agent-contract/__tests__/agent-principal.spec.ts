@@ -9,12 +9,12 @@ import {
 
 describe('AgentPrincipal factories', () => {
   it('fromUser builds a user principal', () => {
-    const p = fromUser({ userId: 42, tenantId: 7, role: 'DISPATCHER' });
+    const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
     expect(p).toEqual({
       kind: 'user',
       userId: 42,
       tenantId: 7,
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       scopes: [],
       authMethod: 'jwt',
       auditId: 'user:42',
@@ -25,15 +25,15 @@ describe('AgentPrincipal factories', () => {
     const p = fromOAuthUser({
       onBehalfOfUserDbId: 99,
       tenantDbId: 7,
-      role: 'DISPATCHER',
-      scopes: ['fleet:read'],
+      role: 'MEMBER',
+      scopes: ['platform:read'],
       clientId: 'gpt-abc',
     });
     expect(p.kind).toBe('oauth_client');
     if (p.kind !== 'oauth_client') throw new Error('narrow');
     expect(p.clientId).toBe('gpt-abc');
     expect(p.onBehalfOfUserId).toBe(99);
-    expect(p.scopes).toEqual(['fleet:read']);
+    expect(p.scopes).toEqual(['platform:read']);
     expect(p.auditId).toBe('oauth:gpt-abc');
   });
 
@@ -61,7 +61,7 @@ describe('AgentPrincipal factories', () => {
       apiKeyId: 123,
       tenantId: 7,
       userId: 42,
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
       ipAllowlist: ['10.0.0.1'],
     });
     expect(p.kind).toBe('api_key');
@@ -75,7 +75,7 @@ describe('AgentPrincipal factories', () => {
     const p = fromDeskResponsibility({
       responsibilityId: 5,
       tenantId: 7,
-      scopes: ['loads:write'],
+      scopes: ['documents:write'],
       enabledByUserId: 42,
     });
     expect(p.kind).toBe('desk_responsibility');
@@ -106,7 +106,7 @@ describe('AgentPrincipal factories', () => {
   });
 
   it('principalAuditLabel is human-readable per kind', () => {
-    expect(principalAuditLabel(fromUser({ userId: 42, tenantId: 7, role: 'DISPATCHER' }))).toBe('user:42');
+    expect(principalAuditLabel(fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' }))).toBe('user:42');
     expect(
       principalAuditLabel(
         fromOAuthUser({

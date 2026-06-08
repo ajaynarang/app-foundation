@@ -32,7 +32,6 @@ import { PromptingService } from '../../../../domains/prompting';
 import { SallyRouterService } from '../../orchestrator/sally-router.service';
 import { AgentRegistry } from '../../agents/agent.registry';
 import { AiTelemetryService } from '../../infrastructure/telemetry/ai-telemetry.service';
-import { TimezoneService } from '../../../../shared/services/timezone.service';
 
 describe('SallyAiService', () => {
   let service: SallyAiService;
@@ -126,7 +125,6 @@ describe('SallyAiService', () => {
       mockSallyRouter as unknown as SallyRouterService,
       mockAgentRegistry as unknown as AgentRegistry,
       { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
-      { resolveTenantTimezone: jest.fn().mockResolvedValue('UTC') } as unknown as TimezoneService,
     );
   });
 
@@ -136,7 +134,7 @@ describe('SallyAiService', () => {
       expect(result.conversationId).toBe('conv_test');
       expect(result.userMode).toBe('dispatcher');
       expect(result.greeting.role).toBe('assistant');
-      expect(result.greeting.content).toContain('SALLY');
+      expect(result.greeting.content).toContain('assistant');
       expect(mockPrisma.conversation.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({

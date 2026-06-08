@@ -29,7 +29,7 @@ function makeUsage(overrides: Partial<AiUsage> = {}): AiUsage {
 function makeContext(overrides: Partial<AiCallContext> = {}): AiCallContext {
   return {
     tenantId: TENANT_ID,
-    surface: 'DOC_RATECON',
+    surface: 'KB_INGEST',
     ...overrides,
   };
 }
@@ -243,7 +243,7 @@ describe('AiTelemetryService', () => {
         TENANT_ID,
         expect.objectContaining({
           invocationId: (row as any).id,
-          surface: 'DOC_RATECON',
+          surface: 'KB_INGEST',
           model: 'claude-sonnet-4-6',
           provider: 'anthropic',
           totalTokens: 1500,
@@ -263,7 +263,7 @@ describe('AiTelemetryService', () => {
       const context: AiCallContext = {
         tenantId: TENANT_ID,
         userId: 7,
-        surface: 'APP_CHAT',
+        surface: 'CHAT',
         agentId: 'sally-loads',
         linkRefType: 'conversation_message',
         linkRefId: 'msg-123',
@@ -288,7 +288,7 @@ describe('AiTelemetryService', () => {
       expect(call.data).toMatchObject({
         tenantId: TENANT_ID,
         userId: 7,
-        surface: 'APP_CHAT',
+        surface: 'CHAT',
         agentId: 'sally-loads',
         model: 'claude-sonnet-4-6',
         provider: 'anthropic',

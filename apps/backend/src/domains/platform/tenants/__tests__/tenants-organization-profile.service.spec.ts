@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { CarrierType, FleetSize } from '@prisma/client';
 
 import { TenantsService } from '../tenants.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../../desk/responsibilities/desk-bootstrap.service';
-import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 
 describe('TenantsService — organization profile', () => {
   let service: TenantsService;
@@ -31,7 +29,6 @@ describe('TenantsService — organization profile', () => {
         { provide: AppCacheService, useValue: cache },
         { provide: NotificationService, useValue: {} },
         { provide: DeskBootstrapService, useValue: {} },
-        { provide: DomainEventService, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -44,10 +41,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: 'ops@acme.com',
         contactPhone: '+15125550123',
-        dotNumber: '1234567',
-        mcNumber: '987654',
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: FleetSize.SIZE_11_50,
         timezone: 'America/Chicago',
       });
 
@@ -55,10 +48,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: 'ops@acme.com',
         contactPhone: '+15125550123',
-        dotNumber: '1234567',
-        mcNumber: '987654',
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: FleetSize.SIZE_11_50,
         timezone: 'America/Chicago',
       });
 
@@ -68,10 +57,6 @@ describe('TenantsService — organization profile', () => {
           companyName: 'Acme',
           contactEmail: 'ops@acme.com',
           contactPhone: '+15125550123',
-          dotNumber: '1234567',
-          mcNumber: '987654',
-          carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-          fleetSize: FleetSize.SIZE_11_50,
           timezone: 'America/Chicago',
         },
         select: expect.any(Object),
@@ -84,10 +69,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: null,
         contactPhone: null,
-        dotNumber: null,
-        mcNumber: null,
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: null,
         timezone: 'UTC',
       });
 
@@ -105,10 +86,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: null,
         contactPhone: null,
-        dotNumber: null,
-        mcNumber: null,
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: null,
         timezone: 'UTC',
       });
 
@@ -132,10 +109,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: 'ops@acme.com',
         contactPhone: '+15125550123',
-        dotNumber: '1234567',
-        mcNumber: '987654',
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: FleetSize.SIZE_11_50,
         timezone: 'America/Chicago',
       });
 
@@ -145,10 +118,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: 'ops@acme.com',
         contactPhone: '+15125550123',
-        dotNumber: '1234567',
-        mcNumber: '987654',
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: FleetSize.SIZE_11_50,
         timezone: 'America/Chicago',
       });
     });
@@ -158,10 +127,6 @@ describe('TenantsService — organization profile', () => {
         companyName: 'Acme',
         contactEmail: null,
         contactPhone: null,
-        dotNumber: null,
-        mcNumber: null,
-        carrierType: CarrierType.FOR_HIRE_INTERSTATE,
-        fleetSize: null,
         timezone: null,
       });
 

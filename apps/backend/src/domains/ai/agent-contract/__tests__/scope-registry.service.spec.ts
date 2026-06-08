@@ -1,17 +1,17 @@
 import { Test } from '@nestjs/testing';
 import { ScopeRegistryService } from '../scope-registry.service';
 import { RequiresScope } from '../requires-scope.decorator';
-import { McpRegistryService } from '@rekog/mcp-nest';
+import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 
 class FleetReadTool {
-  @RequiresScope('fleet:read')
+  @RequiresScope('platform:read')
   queryLoads() {
     return 'ok';
   }
 }
 
 class InvoiceWriteTool {
-  @RequiresScope('invoices:write')
+  @RequiresScope('platform:write')
   sendInvoice() {
     return 'ok';
   }
@@ -43,24 +43,24 @@ describe('ScopeRegistryService', () => {
   it('builds scope→tool map at onApplicationBootstrap', async () => {
     const registry = mockMcpRegistry();
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await svc.onApplicationBootstrap();
-    expect(svc.toolsForScope('fleet:read')).toEqual(['query-loads']);
-    expect(svc.toolsForScope('invoices:write')).toEqual(['send-invoice']);
-    expect(svc.scopeForTool('query-loads')).toBe('fleet:read');
+    expect(svc.toolsForScope('platform:read')).toEqual(['query-loads']);
+    expect(svc.toolsForScope('platform:write')).toEqual(['send-invoice']);
+    expect(svc.scopeForTool('query-loads')).toBe('platform:read');
   });
 
   it('resolveScopesForPrincipal expands tools allowed by granted scopes', async () => {
     const registry = mockMcpRegistry();
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await svc.onApplicationBootstrap();
-    expect(svc.toolsAllowedByScopes(['fleet:read'])).toEqual(new Set(['query-loads']));
-    expect(svc.toolsAllowedByScopes(['fleet:read', 'invoices:write'])).toEqual(
+    expect(svc.toolsAllowedByScopes(['platform:read'])).toEqual(new Set(['query-loads']));
+    expect(svc.toolsAllowedByScopes(['platform:read', 'platform:write'])).toEqual(
       new Set(['query-loads', 'send-invoice']),
     );
   });
@@ -77,7 +77,7 @@ describe('ScopeRegistryService', () => {
       ],
     };
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await expect(svc.onApplicationBootstrap()).rejects.toThrow(/missing @RequiresScope/);
@@ -85,13 +85,13 @@ describe('ScopeRegistryService', () => {
 
   it('throws at boot if two @Tool decorators share the same name', async () => {
     class FirstTool {
-      @RequiresScope('fleet:read')
+      @RequiresScope('platform:read')
       run() {
         return 'ok';
       }
     }
     class SecondTool {
-      @RequiresScope('invoices:read')
+      @RequiresScope('platform:read')
       run() {
         return 'ok';
       }
@@ -120,7 +120,7 @@ describe('ScopeRegistryService', () => {
       ],
     };
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await expect(svc.onApplicationBootstrap()).rejects.toThrow(
@@ -140,7 +140,7 @@ describe('ScopeRegistryService', () => {
       ],
     };
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await expect(svc.onApplicationBootstrap()).rejects.toThrow(/permanently excluded/);
@@ -148,15 +148,15 @@ describe('ScopeRegistryService', () => {
 
   it('toolsForScope expands sensitive → standard → read additively', async () => {
     class InvoicesReadTool {
-      @RequiresScope('invoices:read')
+      @RequiresScope('platform:read')
       x() {}
     }
     class InvoicesWriteTool {
-      @RequiresScope('invoices:write')
+      @RequiresScope('platform:write')
       x() {}
     }
     class InvoicesVoidTool {
-      @RequiresScope('invoices:write:sensitive')
+      @RequiresScope('platform:write:sensitive')
       x() {}
     }
     const registry = {
@@ -180,20 +180,20 @@ describe('ScopeRegistryService', () => {
       ],
     };
     const mod = await Test.createTestingModule({
-      providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+      providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await svc.onApplicationBootstrap();
-    expect(svc.toolsAllowedByScopes(['invoices:write:sensitive'])).toEqual(new Set(['read', 'write', 'void']));
-    expect(svc.toolsAllowedByScopes(['invoices:write'])).toEqual(new Set(['read', 'write']));
-    expect(svc.toolsAllowedByScopes(['invoices:read'])).toEqual(new Set(['read']));
+    expect(svc.toolsAllowedByScopes(['platform:write:sensitive'])).toEqual(new Set(['read', 'write', 'void']));
+    expect(svc.toolsAllowedByScopes(['platform:write'])).toEqual(new Set(['read', 'write']));
+    expect(svc.toolsAllowedByScopes(['platform:read'])).toEqual(new Set(['read']));
   });
 
   describe('getAllTools', () => {
     it('returns MCP-shape descriptors with description + inputSchema', async () => {
       const registry = mockMcpRegistry();
       const mod = await Test.createTestingModule({
-        providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+        providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
       }).compile();
       const svc = mod.get(ScopeRegistryService);
       await svc.onApplicationBootstrap();
@@ -225,7 +225,7 @@ describe('ScopeRegistryService', () => {
         _userId: z.number(),
       });
       class ToolWithSchema {
-        @RequiresScope('fleet:read')
+        @RequiresScope('platform:read')
         run() {}
       }
       const registry = {
@@ -243,7 +243,7 @@ describe('ScopeRegistryService', () => {
         ],
       };
       const mod = await Test.createTestingModule({
-        providers: [ScopeRegistryService, { provide: McpRegistryService, useValue: registry }],
+        providers: [ScopeRegistryService, { provide: McpRegistryDiscoveryService, useValue: registry }],
       }).compile();
       const svc = mod.get(ScopeRegistryService);
       await svc.onApplicationBootstrap();

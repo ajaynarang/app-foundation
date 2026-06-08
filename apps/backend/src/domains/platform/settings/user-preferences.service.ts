@@ -4,7 +4,6 @@ import { AppCacheService } from '../../../infrastructure/cache/app-cache.service
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_10M } from '../../../constants/cache.constants';
 import { UpdateUserPreferencesDto } from './dto/user-preferences.dto';
-import { UpdateDriverPreferencesDto } from './dto/driver-preferences.dto';
 
 @Injectable()
 export class UserPreferencesService {
@@ -65,47 +64,9 @@ export class UserPreferencesService {
   }
 
   /**
-   * Get driver preferences (creates defaults if not exist)
+   * Reset user preferences to defaults
    */
-  async getDriverPreferences(userId: string) {
-    const cacheKey = buildKey('sally:prefs', 'driver', userId);
-    return this.cache.getOrSet(
-      cacheKey,
-      async () => {
-        const dbId = await this.getUserDbId(userId);
-
-        const prefs = await this.prisma.driverPreferences.upsert({
-          where: { userId: dbId },
-          update: {},
-          create: { userId: dbId },
-        });
-
-        return prefs;
-      },
-      CACHE_TTL_COLD_10M,
-    );
-  }
-
-  /**
-   * Update driver preferences
-   */
-  async updateDriverPreferences(userId: string, updates: UpdateDriverPreferencesDto) {
-    const dbId = await this.getUserDbId(userId);
-
-    const prefs = await this.prisma.driverPreferences.upsert({
-      where: { userId: dbId },
-      create: { userId: dbId, ...updates },
-      update: updates,
-    });
-
-    await this.cache.del(buildKey('sally:prefs', 'driver', userId));
-    return prefs;
-  }
-
-  /**
-   * Reset user or driver preferences to defaults
-   */
-  async resetToDefaults(userId: string, scope: 'user' | 'driver') {
+  async resetToDefaults(userId: string, scope: 'user') {
     const dbId = await this.getUserDbId(userId);
 
     if (scope === 'user') {
@@ -118,19 +79,6 @@ export class UserPreferencesService {
         data: { userId: dbId },
       });
       await this.cache.del(buildKey('sally:prefs', 'user', userId));
-      return prefs;
-    }
-
-    if (scope === 'driver') {
-      await this.prisma.driverPreferences
-        .delete({
-          where: { userId: dbId },
-        })
-        .catch(() => {});
-      const prefs = await this.prisma.driverPreferences.create({
-        data: { userId: dbId },
-      });
-      await this.cache.del(buildKey('sally:prefs', 'driver', userId));
       return prefs;
     }
 

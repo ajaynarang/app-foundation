@@ -22,7 +22,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
     name: 'Test Client',
     description: null,
     redirectUris: ['http://localhost:3000/callback'],
-    scopes: ['fleet:read'],
+    scopes: ['platform:read'],
     clientType: 'confidential',
     isActive: true,
     tenantId: 7,
@@ -146,18 +146,18 @@ describe('OAuthClientsService — Phase D admin surface', () => {
 
     it('persists valid scopes and emits SCOPES_UPDATED', async () => {
       const result = await service.updateScopes('sally_abc123', 7, {
-        scopes: ['fleet:read', 'loads:read'],
+        scopes: ['platform:read', 'documents:read'],
       });
       expect(result.clientId).toBe('sally_abc123');
       expect(prisma.oAuthClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { scopes: ['fleet:read', 'loads:read'] },
+          data: { scopes: ['platform:read', 'documents:read'] },
         }),
       );
       expect(events.emit).toHaveBeenCalledWith(
         DOMAIN_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED,
         '7',
-        expect.objectContaining({ scopes: ['fleet:read', 'loads:read'] }),
+        expect.objectContaining({ scopes: ['platform:read', 'documents:read'] }),
       );
     });
   });

@@ -24,7 +24,7 @@ describe('ApprovalController.listPending', () => {
   });
 
   it('dispatcher default → scope=mine with currentUserId', async () => {
-    await controller.listPending({ role: UserRole.DISPATCHER, dbId: 42 });
+    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 });
     expect(approvals.listPending).toHaveBeenCalledWith(7, {
       limit: 50,
       scope: 'mine',
@@ -38,14 +38,14 @@ describe('ApprovalController.listPending', () => {
   });
 
   it('explicit scope=all wins over dispatcher default', async () => {
-    await controller.listPending({ role: UserRole.DISPATCHER, dbId: 42 }, undefined, 'all');
+    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, undefined, 'all');
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ scope: 'all' }));
   });
 
   it('rejects unknown scope', async () => {
-    await expect(
-      controller.listPending({ role: UserRole.DISPATCHER, dbId: 1 }, undefined, 'bogus'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.listPending({ role: UserRole.MEMBER, dbId: 1 }, undefined, 'bogus')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('clamps limit to 1..100', async () => {

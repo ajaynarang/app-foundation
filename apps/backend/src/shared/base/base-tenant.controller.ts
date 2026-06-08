@@ -99,36 +99,4 @@ export abstract class BaseTenantController {
       throw new ForbiddenException('You do not have access to this resource');
     }
   }
-
-  /**
-   * Enforce driver-scoped access — when the caller is a DRIVER, ensure
-   * the resource belongs to them. Non-driver roles skip this check.
-   *
-   * @param user - The authenticated user (from @CurrentUser())
-   * @param resourceDriverId - The driverId on the resource being accessed
-   * @param message - Optional custom error message
-   * @throws ForbiddenException if driver doesn't own the resource
-   */
-  protected assertDriverScopedAccess(
-    user: { role: string; driverId?: string },
-    resourceDriverId: string | null | undefined,
-    message = 'You can only access your own records',
-  ): void {
-    if (user.role === 'DRIVER' && resourceDriverId !== user.driverId) {
-      throw new ForbiddenException(message);
-    }
-  }
-
-  /**
-   * Ensure the caller has a linked driver profile.
-   * Use at the top of driver self-service endpoints.
-   *
-   * @param user - The authenticated user (from @CurrentUser())
-   * @throws ForbiddenException if no driver profile linked
-   */
-  protected assertHasDriverProfile<T extends { driverId?: string }>(user: T): asserts user is T & { driverId: string } {
-    if (!user.driverId) {
-      throw new ForbiddenException('No driver profile linked to this account');
-    }
-  }
 }

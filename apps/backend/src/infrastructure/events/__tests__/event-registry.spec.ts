@@ -4,7 +4,7 @@ import { DOMAIN_EVENTS } from '../sally-events.constants';
 describe('EventRegistry', () => {
   it('every registry entry has required fields', () => {
     for (const def of EVENT_REGISTRY) {
-      expect(def.key).toMatch(/^sally\.[\w-]+\.[\w-]+$/);
+      expect(def.key).toMatch(/^app\.[\w-]+\.[\w-]+$/);
       expect(def.constantName).toBeTruthy();
       expect(def.label).toBeTruthy();
       expect(def.description).toBeTruthy();
@@ -14,15 +14,15 @@ describe('EventRegistry', () => {
   });
 
   it('getEventDefinition returns correct definition', () => {
-    const def = getEventDefinition('sally.load.created');
+    const def = getEventDefinition('app.notification.created');
     expect(def).toBeDefined();
-    expect(def.constantName).toBe('LOAD_CREATED');
-    expect(def.visibility).toBe('external');
-    expect(def.category).toBe('Load');
+    expect(def!.constantName).toBe('NOTIFICATION_CREATED');
+    expect(def!.visibility).toBe('external');
+    expect(def!.category).toBe('Notifications');
   });
 
   it('getEventDefinition returns undefined for unknown events', () => {
-    expect(getEventDefinition('sally.unknown.event')).toBeUndefined();
+    expect(getEventDefinition('app.unknown.event')).toBeUndefined();
   });
 
   it('getExternalEvents excludes internal events', () => {
@@ -44,7 +44,7 @@ describe('EventRegistry', () => {
       expect(cat.label).toBeTruthy();
       expect(cat.events.length).toBeGreaterThan(0);
       for (const event of cat.events) {
-        expect(event.name).toMatch(/^sally\./);
+        expect(event.name).toMatch(/^app\./);
         expect(event.label).toBeTruthy();
         expect(event.description).toBeTruthy();
       }
@@ -61,31 +61,17 @@ describe('EventRegistry', () => {
     }
   });
 
-  it('DOMAIN_EVENTS backward compat — all existing constants preserved', () => {
-    expect(DOMAIN_EVENTS.LOAD_CREATED).toBe('sally.load.created');
-    expect(DOMAIN_EVENTS.LOAD_STATUS_CHANGED).toBe('sally.load.status-changed');
-    expect(DOMAIN_EVENTS.ALERT_FIRED).toBe('sally.alert.fired');
-    expect(DOMAIN_EVENTS.TRIP_CREATED).toBe('sally.trip.created');
-    expect(DOMAIN_EVENTS.TRAILER_CREATED).toBe('sally.trailer.created');
-    expect(DOMAIN_EVENTS.INVOICE_SENT).toBe('sally.invoice.sent');
-    expect(DOMAIN_EVENTS.SYNC_STARTED).toBe('sally.sync.started');
-    expect(DOMAIN_EVENTS.EDI_TENDER_RECEIVED).toBe('sally.edi.tender-received');
-    expect(DOMAIN_EVENTS.EMAIL_INGEST_RECEIVED).toBe('sally.email-ingest.received');
+  it('DOMAIN_EVENTS exposes the generic platform catalog', () => {
+    expect(DOMAIN_EVENTS.NOTIFICATION_CREATED).toBe('app.notification.created');
+    expect(DOMAIN_EVENTS.USER_INVITED).toBe('app.user.invited');
+    expect(DOMAIN_EVENTS.TENANT_UPDATED).toBe('app.tenant.updated');
+    expect(DOMAIN_EVENTS.INTEGRATION_SYNCED).toBe('app.integration.synced');
+    expect(DOMAIN_EVENTS.AI_MESSAGE).toBe('app.ai.message');
   });
 
   it('DOMAIN_EVENTS has literal string types (not widened)', () => {
-    const loadCreated: 'sally.load.created' = DOMAIN_EVENTS.LOAD_CREATED;
-    expect(loadCreated).toBe('sally.load.created');
-  });
-
-  it('DOMAIN_EVENTS includes new events from overhaul', () => {
-    expect(DOMAIN_EVENTS.DRIVER_CREATED).toBe('sally.driver.created');
-    expect(DOMAIN_EVENTS.VEHICLE_CREATED).toBe('sally.vehicle.created');
-    expect(DOMAIN_EVENTS.CUSTOMER_CREATED).toBe('sally.customer.created');
-    expect(DOMAIN_EVENTS.INVOICE_CREATED).toBe('sally.invoice.created');
-    expect(DOMAIN_EVENTS.SETTLEMENT_CREATED).toBe('sally.settlement.created');
-    expect(DOMAIN_EVENTS.DOCUMENT_UPLOADED).toBe('sally.document.uploaded');
-    expect(DOMAIN_EVENTS.CLOSEOUT_COMPLETED).toBe('sally.closeout.completed');
+    const notificationCreated: 'app.notification.created' = DOMAIN_EVENTS.NOTIFICATION_CREATED;
+    expect(notificationCreated).toBe('app.notification.created');
   });
 
   it('no duplicate keys in registry', () => {
@@ -100,24 +86,20 @@ describe('EventRegistry', () => {
 
   it('internal events are classified correctly', () => {
     const internalKeys = [
-      'sally.preferences.updated',
-      'sally.feature-flag.toggled',
-      'sally.trip.route-stale',
-      'sally.sync.started',
-      'sally.sync.completed',
-      'sally.sync.failed',
-      'sally.telematics.updated',
-      'sally.alert.unsnoozed',
-      'sally.user.created',
-      'sally.user.invited',
-      'sally.user.deactivated',
-      'sally.notification.sent',
+      'app.preferences.updated',
+      'app.feature-flag.toggled',
+      'app.sync.started',
+      'app.sync.completed',
+      'app.sync.failed',
+      'app.user.created',
+      'app.user.deactivated',
+      'app.notification.sent',
     ];
 
     for (const key of internalKeys) {
       const def = getEventDefinition(key);
       expect(def).toBeDefined();
-      expect(def.visibility).toBe('internal');
+      expect(def!.visibility).toBe('internal');
     }
   });
 });

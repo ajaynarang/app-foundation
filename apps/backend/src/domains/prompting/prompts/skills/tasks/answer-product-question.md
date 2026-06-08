@@ -1,23 +1,22 @@
 ---
-name: answer-product-question
+name: Answer a product question
 type: task
-description: Answer prospect questions about SALLY capabilities and pricing
-primaryAgent: prospect
+description: Answer a how-to or product question using the knowledge base.
+primaryAgent: assistant
 triggers:
-  - "what can"
-  - "how does"
-  - "does sally"
-  - "can it"
-  - "features"
-  - "pricing"
-  - "cost"
-  - "compare"
-maxSteps: 4
+  - how do I
+  - what is
+  - can I
+maxSteps: 3
 ---
 
-## Procedure: Answer Product Question
+# Answer a product question
 
-1. Identify the specific capability or feature being asked about
-2. Search knowledge base using search-kb for relevant product info
-3. Get detailed product info using get-product-info if needed
-4. Answer clearly, highlighting SALLY's differentiators vs competitors. Offer to schedule a demo for a deeper dive.
+When the user asks how something works or what a feature does:
+
+1. Search the knowledge base with `search-kb` for relevant articles.
+2. Summarize the answer in your own words, citing the most relevant source.
+3. If nothing relevant is found, say so honestly and offer to create a support ticket.
+
+This is a generic starter skill. Add your own task skills as `.md` files in this
+directory — the prompting service loads them automatically on startup.

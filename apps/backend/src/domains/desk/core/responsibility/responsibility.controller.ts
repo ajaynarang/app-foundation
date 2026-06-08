@@ -28,13 +28,13 @@ import { UpdateResponsibilityAutonomyDto } from './dto/update-responsibility-aut
 
 /**
  * HTTP surface for the Desk index + responsibility settings page.
- * Auth: Dispatcher + Admin + Owner + SuperAdmin.
+ * Auth: Member + Admin + Owner + SuperAdmin.
  * Tenant scoping is resolved via BaseTenantController.getTenantDbId.
  */
 @ApiTags('Desk — Responsibilities')
 @ApiBearerAuth()
 @Controller('desk/responsibilities')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskResponsibilityController extends BaseTenantController {
   constructor(
     prisma: PrismaService,

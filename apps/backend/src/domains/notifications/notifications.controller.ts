@@ -1,13 +1,13 @@
 import { Controller, Get, Post, Param, Query, Body, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { Roles } from '../../../auth/decorators/roles.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { InAppNotificationService } from './notifications.service';
 
 @ApiTags('Notifications')
 @Controller('notifications')
-@Roles(UserRole.DRIVER, UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
 export class NotificationsController {
   private readonly logger = new Logger(NotificationsController.name);
 

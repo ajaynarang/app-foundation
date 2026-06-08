@@ -65,7 +65,7 @@ describe('McpServerService', () => {
       tenantDbId: 1,
       clientId: 'client_1',
       role: 'DISPATCHER',
-      scopes: ['fleet:read', 'fleet:write'],
+      scopes: ['platform:read', 'fleet:write'],
     };
 
     let mockReq: any;
@@ -131,7 +131,7 @@ describe('McpServerService', () => {
           name: 'query-loads',
           description: 'List loads',
           inputSchema: { type: 'object', properties: {} },
-          scope: 'fleet:read',
+          scope: 'platform:read',
         },
         {
           name: 'send-invoice',
@@ -145,13 +145,13 @@ describe('McpServerService', () => {
         onBehalfOfUserDbId: Number('1'),
         tenantDbId: 7,
         role: 'ADMIN',
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         clientId: 'c',
       });
 
       const tools = service.listToolsForPrincipal(principal);
 
-      expect(mockScopeRegistry.toolsAllowedByScopes).toHaveBeenCalledWith(['fleet:read']);
+      expect(mockScopeRegistry.toolsAllowedByScopes).toHaveBeenCalledWith(['platform:read']);
       // The service attaches MCP `annotations` (read-only/destructive hints)
       // so clients like Claude.ai can group tools. Verify the shape.
       expect(tools).toHaveLength(1);
@@ -192,7 +192,7 @@ describe('McpServerService — pipeline routing', () => {
     userId: '99',
     tenantDbId: 7,
     role: 'DISPATCHER',
-    scopes: ['fleet:read'],
+    scopes: ['platform:read'],
     clientId: 'gpt-abc',
   };
 

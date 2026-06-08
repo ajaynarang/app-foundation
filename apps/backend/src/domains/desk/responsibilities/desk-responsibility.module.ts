@@ -10,11 +10,11 @@ import { DeskPromptRegistrar } from './desk-prompt.registrar';
  * bootstrap service.
  *
  * Contents:
- *   - DeskPromptRegistrar: registers the 3 AR Follow-up step-prompt
- *     fallbacks + 12 agent-system-prompt fallbacks with PromptingService
- *     at module init.
+ *   - DeskPromptRegistrar: registers the generic agent-system-prompt
+ *     fallback(s) with PromptingService at module init. Register your
+ *     responsibility step prompts here too.
  *   - DeskBootstrapService: on backend boot, sweeps every ACTIVE tenant
- *     and upserts their 12 agents + 10 responsibilities (idempotent).
+ *     and upserts their registered agents + responsibilities (idempotent).
  *     Also exposes bootstrapForTenant(tenantDbId) for TenantsService to
  *     call the moment a tenant is approved.
  *

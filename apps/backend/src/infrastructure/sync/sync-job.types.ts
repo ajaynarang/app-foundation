@@ -1,14 +1,17 @@
 export { SyncAction, SyncActionLog } from './sync-action-log';
 
-export type TelemetryJobType = 'hos' | 'gps' | 'dvir' | 'fleet-sync';
-export type VendorDataJobType = 'drivers' | 'vehicles' | 'loads';
-export type SyncJobType = TelemetryJobType | VendorDataJobType;
+/**
+ * Generic integration sync job type. Apps define their own concrete vendor
+ * job types as plain strings; the router below maps every sync job onto the
+ * shared `events`/`bulk-ops` queue topology.
+ */
+export type SyncJobType = string;
 
 /**
- * Inner payload shape for an integration sync job (TMS or ELD).
+ * Inner payload shape for an integration sync job.
  *
  * Wrapped in a standard `JobEnvelope<IntegrationSyncPayload>` before being
- * pushed to either the TELEMETRY or VENDOR_DATA queue.
+ * pushed to its target queue.
  *
  * Note: `tenantId` here is the numeric DB id (downstream services need it
  * that way); the envelope's `tenantId` is the wire-format slug. Both must
@@ -19,7 +22,8 @@ export interface IntegrationSyncPayload {
   tenantId: number;
   integrationId: number;
   integrationName: string;
-  integrationType: 'TMS' | 'ELD';
+  /** Free-form vendor/integration type — e.g. the IntegrationType enum value. */
+  integrationType: string;
   type: SyncJobType;
   triggerSource: 'scheduled' | 'manual' | 'auto';
 }

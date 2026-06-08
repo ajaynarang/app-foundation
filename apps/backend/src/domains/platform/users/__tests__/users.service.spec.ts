@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { UsersService } from '../users.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { NotificationTriggersService } from '../../../operations/notifications/notification-triggers.service';
+import { NotificationTriggersService } from '../../../notifications/notification-triggers.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -16,7 +16,7 @@ describe('UsersService', () => {
     email: 'john@example.com',
     firstName: 'John',
     lastName: 'Doe',
-    role: 'DISPATCHER',
+    role: 'MEMBER',
     isActive: true,
     emailVerified: true,
     createdAt: new Date('2026-01-01'),
@@ -93,7 +93,7 @@ describe('UsersService', () => {
       const result = await service.getUser('user_1234abcd');
 
       expect(result.userId).toBe('user_1234abcd');
-      expect(result.role).toBe('DISPATCHER');
+      expect(result.role).toBe('MEMBER');
     });
 
     it('should throw NotFoundException if user not found', async () => {
@@ -122,14 +122,14 @@ describe('UsersService', () => {
           email: 'john@example.com',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'DISPATCHER',
+          role: 'MEMBER',
         },
         'tenant_abc',
       );
 
       expect(result.email).toBe('john@example.com');
       expect(prisma.user.create).toHaveBeenCalled();
-      expect(notificationTriggers.userJoined).toHaveBeenCalledWith(1, 'John Doe', 'DISPATCHER');
+      expect(notificationTriggers.userJoined).toHaveBeenCalledWith(1, 'John Doe', 'MEMBER');
     });
 
     it('should throw BadRequestException for non-super-admin without tenant', async () => {
@@ -138,7 +138,7 @@ describe('UsersService', () => {
           email: 'john@example.com',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'DISPATCHER',
+          role: 'MEMBER',
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -169,7 +169,7 @@ describe('UsersService', () => {
             email: 'john@example.com',
             firstName: 'John',
             lastName: 'Doe',
-            role: 'DISPATCHER',
+            role: 'MEMBER',
           },
           'bad_tenant',
         ),

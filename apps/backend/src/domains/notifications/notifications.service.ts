@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_HOT_30S } from '../../../constants/cache.constants';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
+import { buildKey } from '../../infrastructure/cache/cache-key.constants';
+import { CACHE_TTL_HOT_30S } from '../../constants/cache.constants';
 import { NotificationType } from '@prisma/client';
 
 interface ListParams {
@@ -69,7 +69,7 @@ export class InAppNotificationService {
 
   async getUnreadCount(userId: number) {
     return this.cache.getOrSet(
-      buildKey('sally:notifications', 'count', userId),
+      buildKey('app:notifications', 'count', userId),
       async () => {
         const counts = await this.prisma.notification.groupBy({
           by: ['category'],
@@ -104,7 +104,7 @@ export class InAppNotificationService {
     if (result.count === 0) {
       this.logger.warn(`markAsRead: notification ${notificationId} not found for user ${userId}`);
     }
-    await this.cache.del(buildKey('sally:notifications', 'count', userId));
+    await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
   }
 
@@ -116,7 +116,7 @@ export class InAppNotificationService {
     if (result.count === 0) {
       this.logger.warn(`dismiss: notification ${notificationId} not found for user ${userId}`);
     }
-    await this.cache.del(buildKey('sally:notifications', 'count', userId));
+    await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
   }
 
@@ -131,7 +131,7 @@ export class InAppNotificationService {
         readAt: null,
       },
     });
-    await this.cache.del(buildKey('sally:notifications', 'count', userId));
+    await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
   }
 
@@ -143,7 +143,7 @@ export class InAppNotificationService {
       where,
       data: { readAt: new Date() },
     });
-    await this.cache.del(buildKey('sally:notifications', 'count', userId));
+    await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
   }
 
@@ -156,7 +156,7 @@ export class InAppNotificationService {
       },
       data: { dismissedAt: new Date() },
     });
-    await this.cache.del(buildKey('sally:notifications', 'count', userId));
+    await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
   }
 
@@ -245,20 +245,19 @@ export class InAppNotificationService {
       { isolationLevel: 'Serializable' },
     );
 
-    await this.cache.del(buildKey('sally:notifications', 'count', params.recipientId));
+    await this.cache.del(buildKey('app:notifications', 'count', params.recipientId));
 
     return result;
   }
 
   private getGroupLabel(type: string): string {
     const labels: Record<string, string> = {
-      INVOICE_GENERATED: 'invoices generated',
-      INVOICE_SENT: 'invoices sent',
-      PAYMENT_RECEIVED: 'payments received',
       INTEGRATION_SYNC_COMPLETED: 'syncs completed',
       INTEGRATION_SYNC_FAILED: 'sync failures',
-      DRIVER_ACTIVATED: 'drivers activated',
       USER_JOINED: 'users joined',
+      USER_INVITATION: 'invitations sent',
+      ROLE_CHANGED: 'role changes',
+      SETTINGS_UPDATED: 'settings updates',
     };
     return labels[type] ?? 'notifications';
   }

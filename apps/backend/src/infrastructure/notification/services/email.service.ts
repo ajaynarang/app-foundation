@@ -67,7 +67,8 @@ export class EmailService {
   }
 
   async sendEmail(options: SendEmailOptions): Promise<void> {
-    const fromEmail = options.from || this.configService.get<string>('EMAIL_FROM') || 'noreply@appshore.in';
+    const fromEmail =
+      options.from || this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || 'noreply@example.com';
 
     try {
       switch (this.emailProvider) {
@@ -154,7 +155,7 @@ export class EmailService {
     const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
     const acceptUrl = `${appUrl}/accept-invitation?token=${invitationToken}`;
 
-    const subject = `You're invited to join ${companyName} on SALLY`;
+    const subject = `You're invited to join ${companyName} on the platform`;
 
     const html = `
       <!DOCTYPE html>
@@ -180,13 +181,13 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>SALLY</h1>
-              <p>Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+              <h1>App</h1>
+              <p>Your team, organized.</p>
             </div>
             <div class="content">
               <h2>Hi ${firstName} ${lastName},</h2>
-              <p>${invitedBy} has invited you to join <strong>${companyName}</strong> on SALLY.</p>
-              <p>SALLY is a comprehensive dispatch and driver coordination platform that helps manage routes, track drivers, and ensure HOS compliance.</p>
+              <p>${invitedBy} has invited you to join <strong>${companyName}</strong> on the platform.</p>
+              <p>This platform helps your team collaborate and get work done.</p>
               <p>Click the button below to accept the invitation and create your account:</p>
               <div style="text-align: center;">
                 <a href="${acceptUrl}" class="button">Accept Invitation</a>
@@ -200,7 +201,7 @@ export class EmailService {
               </p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 SALLY. All rights reserved.</p>
+              <p>&copy; 2026 App. All rights reserved.</p>
               <p>If you didn't expect this invitation, you can safely ignore this email.</p>
             </div>
           </div>
@@ -211,7 +212,7 @@ export class EmailService {
     const text = `
 Hi ${firstName} ${lastName},
 
-${invitedBy} has invited you to join ${companyName} on SALLY.
+${invitedBy} has invited you to join ${companyName} on the platform.
 
 Accept your invitation by visiting: ${acceptUrl}
 
@@ -220,7 +221,7 @@ This invitation will expire in 7 days.
 If you didn't expect this invitation, you can safely ignore this email.
 
 ---
-SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
+App - Your team, organized.
     `.trim();
 
     await this.sendEmail({ to: email, subject, html, text });
@@ -230,7 +231,7 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
    * Send tenant registration confirmation email
    */
   async sendTenantRegistrationEmail(email: string, firstName: string, companyName: string): Promise<void> {
-    const subject = `Thank you for registering with SALLY`;
+    const subject = `Thank you for registering`;
 
     const html = `
       <!DOCTYPE html>
@@ -247,24 +248,24 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
         <body>
           <div class="container">
             <div class="header">
-              <h1>SALLY</h1>
-              <p>Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+              <h1>App</h1>
+              <p>Your team, organized.</p>
             </div>
             <div class="content">
               <h2>Hi ${firstName},</h2>
-              <p>Thank you for registering <strong>${companyName}</strong> with SALLY!</p>
+              <p>Thank you for registering <strong>${companyName}</strong>!</p>
               <p>We've received your registration and our team is currently reviewing your application. This typically takes <strong>1-2 business days</strong>.</p>
               <h3>What happens next:</h3>
               <ul>
                 <li>Our team will verify your company information</li>
                 <li>You'll receive an email once your account is approved</li>
-                <li>You can then invite your team and start using SALLY</li>
+                <li>You can then invite your team and get started</li>
               </ul>
               <p>If you have any questions, feel free to contact our support team.</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 SALLY. All rights reserved.</p>
-              <p>If you didn't register for SALLY, you can safely ignore this email.</p>
+              <p>&copy; 2026 App. All rights reserved.</p>
+              <p>If you didn't register, you can safely ignore this email.</p>
             </div>
           </div>
         </body>
@@ -274,19 +275,19 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
     const text = `
 Hi ${firstName},
 
-Thank you for registering ${companyName} with SALLY!
+Thank you for registering ${companyName}!
 
 We've received your registration and our team is currently reviewing your application. This typically takes 1-2 business days.
 
 What happens next:
 • Our team will verify your company information
 • You'll receive an email once your account is approved
-• You can then invite your team and start using SALLY
+• You can then invite your team and get started
 
 If you have any questions, feel free to contact our support team.
 
 ---
-SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
+App - Your team, organized.
     `.trim();
 
     await this.sendEmail({ to: email, subject, html, text });
@@ -305,7 +306,7 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
     const displayUrl = this.getDisplayUrl(subdomain);
     const subdomainInstructions = this.getSubdomainInstructionText(subdomain);
 
-    const subject = `Welcome to SALLY - Your account is now active!`;
+    const subject = `Welcome - Your account is now active!`;
 
     const html = `
       <!DOCTYPE html>
@@ -338,15 +339,15 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
         <body>
           <div class="container">
             <div class="header">
-              <h1>SALLY</h1>
-              <p>Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+              <h1>App</h1>
+              <p>Your team, organized.</p>
             </div>
             <div class="content">
               <h2>Congratulations, ${firstName}! 🎉</h2>
               <p>Your account for <strong>${companyName}</strong> has been approved and is now active.</p>
-              <p>You can now access SALLY and start managing your fleet operations.</p>
+              <p>You can now access the platform and get started.</p>
               <div style="text-align: center;">
-                <a href="${loginUrl}" class="button">Login to SALLY</a>
+                <a href="${loginUrl}" class="button">Login</a>
               </div>
               <div class="info-box">
                 <strong>Your team's URL:</strong><br>
@@ -356,15 +357,15 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
               </div>
               <h3>Next steps:</h3>
               <ul>
-                <li>Invite your dispatchers and drivers</li>
-                <li>Set up your first route</li>
+                <li>Invite your teammates</li>
+                <li>Set up your workspace</li>
                 <li>Explore the dashboard and features</li>
               </ul>
               <p>Welcome aboard! If you have any questions, our support team is here to help.</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 SALLY. All rights reserved.</p>
-              <p>Need help? Contact us at sally-support@appshore.in</p>
+              <p>&copy; 2026 App. All rights reserved.</p>
+              <p>Need help? Contact us at support@example.com</p>
             </div>
           </div>
         </body>
@@ -376,19 +377,19 @@ Hi ${firstName},
 
 Congratulations! Your account for ${companyName} has been approved and is now active.
 
-Login to SALLY: ${loginUrl}
+Login: ${loginUrl}
 
 Your team's URL: ${displayUrl}
 
 Next steps:
-• Invite your dispatchers and drivers
-• Set up your first route
+• Invite your teammates
+• Set up your workspace
 • Explore the dashboard and features
 
 Welcome aboard! If you have any questions, our support team is here to help.
 
 ---
-SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
+App - Your team, organized.
     `.trim();
 
     await this.sendEmail({ to: email, subject, html, text });
@@ -403,7 +404,7 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
     companyName: string,
     rejectionReason: string,
   ): Promise<void> {
-    const subject = `Update on your SALLY registration`;
+    const subject = `Update on your registration`;
 
     const html = `
       <!DOCTYPE html>
@@ -435,12 +436,12 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
         <body>
           <div class="container">
             <div class="header">
-              <h1>SALLY</h1>
-              <p>Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+              <h1>App</h1>
+              <p>Your team, organized.</p>
             </div>
             <div class="content">
               <h2>Hi ${firstName},</h2>
-              <p>Thank you for your interest in SALLY.</p>
+              <p>Thank you for your interest.</p>
               <p>After reviewing your registration for <strong>${companyName}</strong>, we're unable to approve your account at this time.</p>
               <div class="reason-box">
                 <strong>Reason:</strong><br>
@@ -448,13 +449,13 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
               </div>
               <p>If you believe this is an error or would like to discuss this further, please don't hesitate to contact our support team.</p>
               <div style="text-align: center;">
-                <a href="mailto:sally-support@appshore.in" class="button">Contact Support</a>
+                <a href="mailto:support@example.com" class="button">Contact Support</a>
               </div>
               <p>We appreciate your understanding.</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 SALLY. All rights reserved.</p>
-              <p>Questions? Email us at sally-support@appshore.in</p>
+              <p>&copy; 2026 App. All rights reserved.</p>
+              <p>Questions? Email us at support@example.com</p>
             </div>
           </div>
         </body>
@@ -464,18 +465,18 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
     const text = `
 Hi ${firstName},
 
-Thank you for your interest in SALLY.
+Thank you for your interest.
 
 After reviewing your registration for ${companyName}, we're unable to approve your account at this time.
 
 Reason: ${rejectionReason}
 
-If you believe this is an error or would like to discuss this further, please don't hesitate to contact our support team at sally-support@appshore.in.
+If you believe this is an error or would like to discuss this further, please don't hesitate to contact our support team at support@example.com.
 
 We appreciate your understanding.
 
 ---
-SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
+App - Your team, organized.
     `.trim();
 
     await this.sendEmail({ to: email, subject, html, text });
@@ -485,14 +486,14 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
    * Get login URL (subdomain-aware or single domain)
    */
   private getLoginUrl(subdomain: string): string {
-    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'sally.appshore.in';
+    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
     const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false; // Default true
 
     if (useSubdomains) {
-      // Multi-tenant: https://acme.sally.appshore.in/login
+      // Multi-tenant: https://acme.app.example.com/login
       return `https://${subdomain}.${baseUrl}/login`;
     } else {
-      // Single domain: https://sally.appshore.in/login
+      // Single domain: https://app.example.com/login
       return `https://${baseUrl}/login`;
     }
   }
@@ -501,7 +502,7 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
    * Get display URL for emails (subdomain or base URL)
    */
   private getDisplayUrl(subdomain: string): string {
-    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'sally.appshore.in';
+    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
     const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false;
 
     if (useSubdomains) {
@@ -515,7 +516,7 @@ SALLY - Smart Routes. Confident Dispatchers. Happy Drivers.
    * Get subdomain instruction text for emails
    */
   private getSubdomainInstructionText(subdomain: string): string {
-    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'sally.appshore.in';
+    const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
     const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false;
 
     if (useSubdomains) {

@@ -10,7 +10,7 @@ import { bootstrapDeskForTenant } from './bootstrap-desk-for-tenant';
  *
  * Two triggers:
  *   1. OnModuleInit — at backend boot, sweep every ACTIVE tenant and
- *      upsert the 12 agents + 10 responsibilities. Safety net for
+ *      upsert the registered agents + responsibilities. Safety net for
  *      tenants that existed before the Desk feature shipped, or that
  *      were approved while this service wasn't running.
  *   2. bootstrapForTenant(tenantDbId) — called by TenantsService.approveTenant

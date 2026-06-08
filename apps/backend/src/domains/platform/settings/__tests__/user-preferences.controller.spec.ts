@@ -22,20 +22,10 @@ describe('UserPreferencesController', () => {
     voiceSpeed: 'normal',
   };
 
-  const fullDriverPrefs = {
-    id: 1,
-    userId: 10,
-    preferredNavApp: 'google_maps',
-    theme: 'dark',
-    pushEnabled: true,
-  };
-
   beforeEach(() => {
     service = {
       getUserPreferences: jest.fn().mockResolvedValue(fullUserPrefs),
       updateUserPreferences: jest.fn(),
-      getDriverPreferences: jest.fn().mockResolvedValue(fullDriverPrefs),
-      updateDriverPreferences: jest.fn(),
       resetToDefaults: jest.fn(),
     };
     controller = new UserPreferencesController(service);
@@ -139,74 +129,6 @@ describe('UserPreferencesController', () => {
     });
   });
 
-  // ── GET /settings/driver ──
-
-  describe('getDriverPreferences', () => {
-    it('passes user.userId to service and returns driver preferences', async () => {
-      const result = await controller.getDriverPreferences(mockUser);
-
-      expect(service.getDriverPreferences).toHaveBeenCalledWith('user_abc123');
-      expect(result).toEqual(fullDriverPrefs);
-      expect(result.preferredNavApp).toBe('google_maps');
-      expect(result.theme).toBe('dark');
-      expect(result.pushEnabled).toBe(true);
-    });
-
-    it('calls getDriverPreferences (not getUserPreferences)', async () => {
-      await controller.getDriverPreferences(mockUser);
-
-      expect(service.getDriverPreferences).toHaveBeenCalledTimes(1);
-      expect(service.getUserPreferences).not.toHaveBeenCalled();
-    });
-
-    it('propagates errors for driver preferences lookup', async () => {
-      service.getDriverPreferences.mockRejectedValue(new NotFoundException('User not found'));
-
-      await expect(controller.getDriverPreferences({ userId: 'nonexistent' })).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  // ── PUT /settings/driver ──
-
-  describe('updateDriverPreferences', () => {
-    it('passes userId and dto to service and returns updated driver prefs', async () => {
-      const dto = { preferredNavApp: 'waze', pushEnabled: false };
-      const updated = {
-        ...fullDriverPrefs,
-        preferredNavApp: 'waze',
-        pushEnabled: false,
-      };
-      service.updateDriverPreferences.mockResolvedValue(updated);
-
-      const result = await controller.updateDriverPreferences(mockUser, dto as any);
-
-      expect(service.updateDriverPreferences).toHaveBeenCalledWith('user_abc123', dto);
-      expect(result.preferredNavApp).toBe('waze');
-      expect(result.pushEnabled).toBe(false);
-      // unchanged field preserved
-      expect(result.theme).toBe('dark');
-    });
-
-    it('calls updateDriverPreferences (not updateUserPreferences)', async () => {
-      service.updateDriverPreferences.mockResolvedValue(fullDriverPrefs);
-
-      await controller.updateDriverPreferences(mockUser, {
-        theme: 'light',
-      } as any);
-
-      expect(service.updateDriverPreferences).toHaveBeenCalledTimes(1);
-      expect(service.updateUserPreferences).not.toHaveBeenCalled();
-    });
-
-    it('propagates errors on driver preference update', async () => {
-      service.updateDriverPreferences.mockRejectedValue(new NotFoundException('User not found'));
-
-      await expect(controller.updateDriverPreferences({ userId: 'ghost' }, {} as any)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
   // ── POST /settings/reset ──
 
   describe('resetToDefaults', () => {
@@ -225,32 +147,6 @@ describe('UserPreferencesController', () => {
       expect(service.resetToDefaults).toHaveBeenCalledWith('user_abc123', 'user');
       expect(result).toEqual(defaultUserPrefs);
       expect((result as any).distanceUnit).toBe('MILES');
-    });
-
-    it('passes userId and scope "driver" to service for driver reset', async () => {
-      const defaultDriverPrefs = {
-        ...fullDriverPrefs,
-        preferredNavApp: 'google_maps',
-      };
-      service.resetToDefaults.mockResolvedValue(defaultDriverPrefs);
-
-      const result = await controller.resetToDefaults(mockUser, {
-        scope: 'driver',
-      });
-
-      expect(service.resetToDefaults).toHaveBeenCalledWith('user_abc123', 'driver');
-      expect(result).toEqual(defaultDriverPrefs);
-      expect((result as any).preferredNavApp).toBe('google_maps');
-    });
-
-    it('user and driver scopes invoke service with different scope arg', async () => {
-      service.resetToDefaults.mockResolvedValue({});
-
-      await controller.resetToDefaults(mockUser, { scope: 'user' });
-      await controller.resetToDefaults(mockUser, { scope: 'driver' });
-
-      expect(service.resetToDefaults).toHaveBeenNthCalledWith(1, 'user_abc123', 'user');
-      expect(service.resetToDefaults).toHaveBeenNthCalledWith(2, 'user_abc123', 'driver');
     });
 
     it('propagates NotFoundException for non-existent user on reset', async () => {

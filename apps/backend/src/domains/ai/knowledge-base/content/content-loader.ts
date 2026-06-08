@@ -6,7 +6,7 @@ export interface KnowledgeEntry {
   title: string;
   content: string;
   documentType: 'faq' | 'feature' | 'use_case' | 'comparison' | 'pricing' | 'guide' | 'reference';
-  audience: 'prospect' | 'dispatcher' | 'driver' | 'all';
+  audience: 'user' | 'all';
   category: string;
   keywords: string[];
 }
@@ -32,7 +32,7 @@ function collectMarkdownFiles(dir: string): string[] {
 }
 
 const VALID_DOC_TYPES = new Set(['faq', 'feature', 'use_case', 'comparison', 'pricing', 'guide', 'reference']);
-const VALID_AUDIENCES = new Set(['prospect', 'dispatcher', 'driver', 'all']);
+const VALID_AUDIENCES = new Set(['user', 'all']);
 
 function parseEntries(dir: string): KnowledgeEntry[] {
   const files = collectMarkdownFiles(dir);
@@ -67,7 +67,7 @@ function parseEntries(dir: string): KnowledgeEntry[] {
   });
 }
 
-/** Load prospect knowledge base entries */
+/** Load knowledge base entries */
 export function loadKnowledgeEntries(): KnowledgeEntry[] {
   return parseEntries(KNOWLEDGE_BASE_DIR);
 }

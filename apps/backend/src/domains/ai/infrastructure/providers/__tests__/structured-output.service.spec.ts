@@ -70,7 +70,7 @@ describe('StructuredOutputService', () => {
   describe('extract — telemetry', () => {
     const baseContext: AiCallContext = {
       tenantId: 7,
-      surface: 'DOC_RATECON',
+      surface: 'KB_INGEST',
       agentId: 'ratecon-parser',
       linkRefType: 'document',
       linkRefId: 'doc-abc',
@@ -233,7 +233,7 @@ describe('StructuredOutputService', () => {
   });
 
   describe('extract — usage extraction shapes', () => {
-    const ctx: AiCallContext = { tenantId: 1, surface: 'APP_CHAT' };
+    const ctx: AiCallContext = { tenantId: 1, surface: 'CHAT' };
 
     it('reads inputTokens/outputTokens variant', async () => {
       (generateText as jest.Mock).mockResolvedValue({
@@ -313,7 +313,7 @@ describe('StructuredOutputService', () => {
   });
 
   describe('extract — budget enforcement', () => {
-    const ctx: AiCallContext = { tenantId: 7, surface: 'DOC_RATECON' };
+    const ctx: AiCallContext = { tenantId: 7, surface: 'KB_INGEST' };
 
     it('does not check budget when enforceBudget is false/absent', async () => {
       (generateText as jest.Mock).mockResolvedValue({

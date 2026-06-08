@@ -15,15 +15,12 @@ import { z } from 'zod';
 export const delegateToAgentTool = createTool({
   id: 'delegate-to-agent',
   description:
-    'Call another Sally specialist agent for domain-specific READ operations. ' +
-    'Use this for compliance checks, pay calculations, status queries — NOT for write operations. ' +
-    'Available agents: dispatch, billing, compliance, safety, route, payroll, maintenance, fuel.',
+    'Call another specialist agent for READ-ONLY work. ' +
+    'Use this for domain-specific lookups and analysis — NOT for write operations.',
   inputSchema: z.object({
-    agentId: z
-      .enum(['dispatch', 'billing', 'compliance', 'safety', 'route', 'payroll', 'maintenance', 'fuel'] as const)
-      .describe('Which specialist agent to call'),
-    action: z.string().describe('What to do, e.g. "check document compliance for load 4521"'),
-    params: z.record(z.unknown()).describe('Parameters like { loadId: "4521" }'),
+    agentId: z.string().describe('Which specialist agent to call'),
+    action: z.string().describe('What to do, e.g. "summarize the latest activity"'),
+    params: z.record(z.unknown()).describe('Parameters for the delegated action'),
   }),
   outputSchema: z.object({
     text: z.string(),

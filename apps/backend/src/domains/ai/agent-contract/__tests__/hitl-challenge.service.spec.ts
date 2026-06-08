@@ -27,11 +27,11 @@ describe('HitlChallengeService', () => {
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 7,
       role: 'ADMIN',
-      scopes: ['invoices:write:sensitive'],
+      scopes: ['platform:write:sensitive'],
       clientId: 'c',
     }),
     toolName: 'void-invoice',
-    scopeRequired: 'invoices:write:sensitive',
+    scopeRequired: 'platform:write:sensitive',
     tier: 'sensitive' as const,
     argsDigest: 'abc',
   };
@@ -51,7 +51,7 @@ describe('HitlChallengeService', () => {
         principalId: 'oauth:c',
         toolName: 'void-invoice',
         argsDigest: 'abc',
-        scopeRequired: 'invoices:write:sensitive',
+        scopeRequired: 'platform:write:sensitive',
         tier: 'sensitive',
         stepUpRequired: true,
         stepUpUserId: 1,
@@ -73,12 +73,12 @@ describe('HitlChallengeService', () => {
     const out = await svc.issue({
       ...baseInput,
       tier: 'standard',
-      scopeRequired: 'invoices:write',
+      scopeRequired: 'platform:write',
       principal: fromOAuthUser({
         onBehalfOfUserDbId: Number('1'),
         tenantDbId: 7,
         role: 'ADMIN',
-        scopes: ['invoices:write'],
+        scopes: ['platform:write'],
         clientId: 'c',
       }),
     });
@@ -94,7 +94,7 @@ describe('HitlChallengeService', () => {
       apiKeyId: 1,
       tenantId: 7,
       userId: 42,
-      scopes: ['invoices:write:sensitive'],
+      scopes: ['platform:write:sensitive'],
     });
     await svc.issue({ ...baseInput, principal });
     const args = prisma.hitlChallenge.create.mock.calls[0][0];

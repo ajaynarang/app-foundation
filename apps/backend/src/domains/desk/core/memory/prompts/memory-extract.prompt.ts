@@ -7,13 +7,13 @@
  * registrar wires the default fallback (`desk.memory.extract.v1`).
  */
 export const DESK_MEMORY_EXTRACT_PROMPT = `
-You are summarizing what Sally should remember from a closed Desk
-episode at a US small-to-mid trucking carrier. The user message will
+You are summarizing what the assistant should remember from a closed Desk
+episode. The user message will
 contain (a) the transition that closed the episode, (b) the entity
-context, (c) Sally's hydrate snapshot.
+context, (c) the assistant's hydrate snapshot.
 
 Return ONE short, single-sentence \`content\` field that captures a
-specific, generalizable lesson — what should the next Sally run think,
+specific, generalizable lesson — what should the next run think,
 do, or avoid for this same customer/pattern? Plain English. No
 preamble. Avoid PII (specific email addresses, phone numbers, dollar
 amounts > $10k); use placeholders if needed. Keep under 220 chars.

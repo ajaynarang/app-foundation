@@ -4,10 +4,10 @@ export function makeUser(overrides?: Record<string, any>) {
   return {
     id: 1,
     userId: 'usr-test-001',
-    email: 'dispatcher@test-trucking.com',
+    email: 'member@test-tenant.com',
     firstName: 'Test',
-    lastName: 'Dispatcher',
-    role: 'DISPATCHER',
+    lastName: 'Member',
+    role: 'MEMBER',
     firebaseUid: 'fb-uid-test-001',
     emailVerified: true,
     phone: '555-000-0010',
@@ -30,8 +30,8 @@ export function makeRequestUser(overrides?: Record<string, any>) {
     userId: 'usr-test-001',
     tenantId: 'tnt-test-001',
     tenantDbId: 1,
-    role: 'DISPATCHER',
-    email: 'dispatcher@test-trucking.com',
+    role: 'MEMBER',
+    email: 'member@test-tenant.com',
     ...overrides,
   };
 }

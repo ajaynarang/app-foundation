@@ -15,7 +15,6 @@ import {
   MANUAL_CATEGORY_TYPES,
   cronToHuman,
 } from './job.types';
-import { QUEUE_NAMES } from './queue.constants';
 import { JobStatusSchema } from '@app/shared-types';
 
 const JOB_STATUS = JobStatusSchema.enum;
@@ -54,35 +53,6 @@ export class JobService {
       },
       orderBy: { completedAt: 'desc' },
     });
-  }
-
-  async findActiveLoadByHash(
-    tenantId: number,
-    category: string,
-    type: string,
-    inputHash: string,
-  ): Promise<{ loadNumber: string } | null> {
-    const job = await this.prisma.job.findFirst({
-      where: { tenantId, category, type, inputHash, status: JOB_STATUS.COMPLETED },
-      orderBy: { completedAt: 'desc' },
-    });
-
-    if (!job?.resultData) return null;
-
-    const result = job.resultData as Record<string, any>;
-    if (!result.loadNumber) return null;
-
-    // Check if the load still exists and isn't cancelled
-    const load = await this.prisma.load.findFirst({
-      where: {
-        loadNumber: result.loadNumber,
-        status: { notIn: ['CANCELLED'] },
-        isActive: true,
-      },
-    });
-
-    if (!load) return null;
-    return { loadNumber: result.loadNumber };
   }
 
   async createJob(params: CreateJobParams) {
@@ -269,69 +239,28 @@ export class JobService {
     for (const [queueName, queue] of Object.entries(queues)) {
       const repeatables = await queue.getRepeatableJobs();
 
-      if (queueName === QUEUE_NAMES.TELEMETRY || queueName === QUEUE_NAMES.VENDOR_DATA) {
-        // Both integration-sync queues map onto a single Job category each:
-        //   telemetry   → JOB_CATEGORIES.telemetry  (hos, gps, dvir, fleet-sync)
-        //   vendor-data → JOB_CATEGORIES.vendor     (drivers, vehicles, loads + other vendor data)
-        // The repeatable job-name is the BullMQ job name (e.g. 'hos',
-        // 'tms-drivers') — we strip the 'tms-' prefix so the UI sees the
-        // bare sync type, matching the old fleet-pipeline behaviour.
-        const category: JobCategory = queueName === QUEUE_NAMES.TELEMETRY ? 'telemetry' : 'vendor';
-        const typeMap = new Map<string, { schedule: string; nextRun: string | null }>();
+      // Queue name = category key. System-wide repeatables show to all tenants.
+      const category = queueName;
+      const entries: ScheduledTypeInfo[] = [];
 
-        for (const job of repeatables) {
-          const rawType = job.name;
-          if (!rawType) continue;
+      for (const job of repeatables) {
+        const type = job.name;
 
-          // Tenant filtering: parse jobId from the key if available
-          if (tenantId !== undefined && job.id) {
-            const match = job.id.match(/tenant-(\d+)/);
-            if (match && parseInt(match[1], 10) !== tenantId) continue;
-          }
-
-          const type = rawType.startsWith('tms-') ? rawType.slice('tms-'.length) : rawType;
-
-          // Keep first match per type (all instances share the same schedule)
-          if (!typeMap.has(type)) {
-            const schedule = cronToHuman(job.pattern, job.every ? Number(job.every) : null);
-            typeMap.set(type, {
-              schedule,
-              nextRun: job.next ? new Date(job.next).toISOString() : null,
-            });
-          }
+        // Tenant filtering: parse jobId from the key if available.
+        if (tenantId !== undefined && job.id) {
+          const match = job.id.match(/tenant-(\d+)/);
+          if (match && parseInt(match[1], 10) !== tenantId) continue;
         }
 
-        const entries: ScheduledTypeInfo[] = [];
-        for (const [type, info] of typeMap) {
-          entries.push({
-            type,
-            schedule: info.schedule,
-            nextRun: info.nextRun,
-          });
-        }
-        if (entries.length) {
-          // Multiple queues may roll up into the same category (none today,
-          // but be defensive): merge entries instead of overwriting.
-          const existing = result.get(category) ?? [];
-          result.set(category, existing.concat(entries));
-        }
-      } else {
-        // Non-sync queues: system-wide, show to all tenants
-        const category = queueName; // queue name = category key
-        const entries: ScheduledTypeInfo[] = [];
-
-        for (const job of repeatables) {
-          const type = job.name;
-          const schedule = cronToHuman(job.pattern, job.every ? Number(job.every) : null);
-          entries.push({
-            type,
-            schedule,
-            nextRun: job.next ? new Date(job.next).toISOString() : null,
-          });
-        }
-
-        if (entries.length) result.set(category, entries);
+        const schedule = cronToHuman(job.pattern, job.every ? Number(job.every) : null);
+        entries.push({
+          type,
+          schedule,
+          nextRun: job.next ? new Date(job.next).toISOString() : null,
+        });
       }
+
+      if (entries.length) result.set(category, entries);
     }
 
     // Add manual-only types (always shown, even if category already has scheduled types)

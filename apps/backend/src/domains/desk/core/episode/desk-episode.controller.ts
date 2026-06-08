@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { APPROVAL_SCOPES, ListDeskEpisodesQuerySchema, ListHandledEpisodesQuerySchema } from '@app/shared-types';
+import { APPROVAL_SCOPES, ListDeskEpisodesQuerySchema, ListHandledEpisodesQuerySchema } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -21,7 +21,7 @@ import { ResolveEpisodeDto } from './dto/resolve-episode.dto';
 @ApiTags('Desk — Episodes')
 @ApiBearerAuth()
 @Controller('desk/episodes')
-@Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+@Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskEpisodeController extends BaseTenantController {
   constructor(
     prisma: PrismaService,
@@ -112,7 +112,7 @@ export class DeskEpisodeController extends BaseTenantController {
    */
   @Patch(':id/resolve')
   @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Resolve an escalated episode (ESCALATED → RESOLVED) with an optional operator note' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   async resolve(

@@ -50,11 +50,11 @@ describe('ToolExecutorService', () => {
     };
     mockModuleRef.get.mockReturnValue(instance);
 
-    const principal = fromUser({ userId: 42, tenantId: 7, role: 'DISPATCHER' });
+    const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
     const result = await svc.execute('query-loads', { status: 'active' }, principal);
 
     // RLS uses the numeric DB id (required for role='driver' bindings)
-    expect(mockAiPrisma.executeWithRlsContext).toHaveBeenCalledWith(7, 42, 'DISPATCHER', expect.any(Function));
+    expect(mockAiPrisma.executeWithRlsContext).toHaveBeenCalledWith(7, 42, 'MEMBER', expect.any(Function));
     // Tools receive the wire-format string userId (what `User.userId`
     // column stores and what VARCHAR audit columns expect), plus the
     // numeric DB id as `_userDbId` for FK joins.
@@ -97,7 +97,7 @@ describe('ToolExecutorService', () => {
     });
     const instance = { run: jest.fn().mockResolvedValue('bare-string') };
     mockModuleRef.get.mockReturnValue(instance);
-    const principal = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
 
     const result = await svc.execute('x', {}, principal);
     expect(result.content[0].text).toBe('bare-string');
@@ -111,7 +111,7 @@ describe('ToolExecutorService', () => {
     });
     const instance = { run: jest.fn().mockRejectedValue(new Error('boom')) };
     mockModuleRef.get.mockReturnValue(instance);
-    const principal = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
 
     const result = await svc.execute('x', {}, principal);
     expect(result.isError).toBe(true);
@@ -120,7 +120,7 @@ describe('ToolExecutorService', () => {
 
   it('returns isError when the tool is unknown and does not touch aiPrisma', async () => {
     mockScopeRegistry.resolveProvider.mockReturnValue(undefined);
-    const principal = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
     const result = await svc.execute('unknown', {}, principal);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Unknown tool/);

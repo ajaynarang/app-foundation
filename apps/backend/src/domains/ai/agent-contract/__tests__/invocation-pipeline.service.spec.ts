@@ -48,13 +48,13 @@ describe('InvocationPipelineService', () => {
   });
 
   it('returns scope_denied when tool scope is not granted', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write:sensitive');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
     const p = fromOAuthUser({
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
       role: 'ADMIN',
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
       clientId: 'c',
     });
     const res = await svc.run(p, 'void-invoice', { id: 1 });
@@ -66,14 +66,14 @@ describe('InvocationPipelineService', () => {
 
   it('returns unknown-tool error when scopeForTool is undefined', async () => {
     mockRegistry.scopeForTool.mockReturnValue(undefined);
-    const p = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
     const res = await svc.run(p, 'nope', {});
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toMatch(/unknown/i);
   });
 
   it('returns hitl_required for third-party standard write and issues a real token', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
     mockChallenges.issue.mockResolvedValue({
@@ -86,7 +86,7 @@ describe('InvocationPipelineService', () => {
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
       role: 'ADMIN',
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       clientId: 'c',
     });
     const res = await svc.run(p, 'send-invoice', { id: 1 });
@@ -100,7 +100,7 @@ describe('InvocationPipelineService', () => {
       expect.objectContaining({
         principal: p,
         toolName: 'send-invoice',
-        scopeRequired: 'invoices:write',
+        scopeRequired: 'platform:write',
         tier: 'standard',
       }),
     );
@@ -108,7 +108,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('happy path: logs pending, executes, logs success, returns result', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('fleet:read');
+    mockRegistry.scopeForTool.mockReturnValue('platform:read');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
     mockHitl.resolveTier.mockReturnValue('none');
     mockLogger.writePending.mockResolvedValue('row-1');
@@ -116,13 +116,13 @@ describe('InvocationPipelineService', () => {
       content: [{ type: 'text', text: 'result' }],
     });
 
-    const p = fromUser({ userId: 42, tenantId: 7, role: 'DISPATCHER' });
+    const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
     const res = await svc.run(p, 'query-loads', { status: 'active' });
 
     expect(mockLogger.writePending).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'query-loads',
-        scopeRequired: 'fleet:read',
+        scopeRequired: 'platform:read',
         hitlTier: 'none',
       }),
     );
@@ -132,7 +132,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('executor error path: logs completeError, returns isError', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('fleet:read');
+    mockRegistry.scopeForTool.mockReturnValue('platform:read');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
     mockHitl.resolveTier.mockReturnValue('none');
     mockLogger.writePending.mockResolvedValue('row-2');
@@ -141,7 +141,7 @@ describe('InvocationPipelineService', () => {
       isError: true,
     });
 
-    const p = fromUser({ userId: 1, tenantId: 1, role: 'DISPATCHER' });
+    const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
     const res = await svc.run(p, 'query-loads', {});
 
     expect(mockLogger.completeError).toHaveBeenCalledWith(
@@ -167,7 +167,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('desk_responsibility on sensitive write skips the hitl_required sentinel and executes', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write:sensitive');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['void-invoice']));
     mockHitl.resolveTier.mockReturnValue('sensitive');
     mockLogger.writePending.mockResolvedValue('row-desk');
@@ -178,7 +178,7 @@ describe('InvocationPipelineService', () => {
     const p = fromDeskResponsibility({
       responsibilityId: 5,
       tenantId: 7,
-      scopes: ['invoices:write:sensitive'],
+      scopes: ['platform:write:sensitive'],
       enabledByUserId: 42,
     });
     const res = await svc.run(p, 'void-invoice', { id: 1 });
@@ -195,7 +195,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('consumes _confirmToken and executes when valid', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
     mockChallenges.consume.mockResolvedValue({ id: 'tok-1', tier: 'standard' });
@@ -208,7 +208,7 @@ describe('InvocationPipelineService', () => {
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
       role: 'ADMIN',
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       clientId: 'c',
     });
     const res = await svc.run(p, 'send-invoice', {
@@ -229,7 +229,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('rejects invalid/expired _confirmToken with hitl_invalid_or_expired', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
     mockChallenges.consume.mockResolvedValue(null);
@@ -238,7 +238,7 @@ describe('InvocationPipelineService', () => {
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
       role: 'ADMIN',
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       clientId: 'c',
     });
     const res = await svc.run(p, 'send-invoice', {
@@ -253,7 +253,7 @@ describe('InvocationPipelineService', () => {
   });
 
   it('does not call challenges.issue/consume for user principals (chat stays on inline-confirm UI path)', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('invoices:write');
+    mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
     mockLogger.writePending.mockResolvedValue('row-1');
@@ -261,7 +261,7 @@ describe('InvocationPipelineService', () => {
       content: [{ type: 'text', text: 'sent' }],
     });
 
-    const p = fromUser({ userId: 42, tenantId: 7, role: 'DISPATCHER' });
+    const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
     await svc.run(p, 'send-invoice', { id: 1 });
 
     expect(mockChallenges.issue).not.toHaveBeenCalled();

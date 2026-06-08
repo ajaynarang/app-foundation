@@ -48,7 +48,6 @@ describe('PlansService', () => {
           trialEndsAt: new Date(Date.now() + 86400000 * 15),
           planAssignedAt: null,
           planAssignedBy: null,
-          fleetLimitWarning: false,
           id: 1,
         }),
         update: jest.fn(),
@@ -57,7 +56,7 @@ describe('PlansService', () => {
         create: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
-      vehicle: { count: jest.fn().mockResolvedValue(5) },
+      user: { count: jest.fn().mockResolvedValue(5) },
       $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
     };
 
@@ -164,10 +163,10 @@ describe('PlansService', () => {
   });
 
   describe('getTenantPlanDetails', () => {
-    it('should return full plan details with vehicle count and trial days', async () => {
+    it('should return full plan details with user count and trial days', async () => {
       const result = await service.getTenantPlanDetails('tenant_abc');
       expect(result.plan).toBe('STARTER');
-      expect(result.vehicleCount).toBe(5);
+      expect(result.userCount).toBe(5);
       expect(result.daysLeftInTrial).toBeGreaterThan(0);
       expect(result.planConfig).toBeDefined();
     });

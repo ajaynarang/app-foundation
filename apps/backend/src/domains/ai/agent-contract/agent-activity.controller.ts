@@ -24,7 +24,7 @@ export class AgentActivityController extends BaseTenantController {
   }
 
   @Get()
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'List agent invocation activity for a principal (redacted args)',
   })

@@ -23,7 +23,7 @@ export class PlansController {
   /**
    * Get the current authenticated tenant's plan details
    */
-  @Roles(UserRole.DISPATCHER, UserRole.ADMIN, UserRole.OWNER)
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @Get('my-plan')
   async getMyPlan(@CurrentUser() user: any) {
     if (!user?.tenantId) {

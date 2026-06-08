@@ -26,7 +26,7 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
     id: 'ak0',
     key: 'sk_live_0',
     name: 'bi',
-    scopes: ['fleet:read'],
+    scopes: ['platform:read'],
     ipAllowlist: [],
     rateLimitPerMinute: 300,
     isWriteEnabled: false,
@@ -46,7 +46,7 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
     await expect(
       svc.create(42, {
         name: 'bi',
-        scopes: ['invoices:write'],
+        scopes: ['platform:write'],
         ipAllowlist: [],
       }),
     ).rejects.toThrow(/IP allowlist is required/);
@@ -56,29 +56,29 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('create accepts 0.0.0.0/0 as the "allow any IP" opt-out', async () => {
     prisma.apiKey.create.mockResolvedValue({
       ...baseRow,
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       ipAllowlist: ['0.0.0.0/0'],
       isWriteEnabled: true,
     });
     const out = await svc.create(42, {
       name: 'bi',
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       ipAllowlist: ['0.0.0.0/0'],
     });
     expect(out.isWriteEnabled).toBe(true);
     expect(out.ipAllowlist).toEqual(['0.0.0.0/0']);
   });
 
-  it('create sets isWriteEnabled=true for a plain :write scope (fleet:write)', async () => {
+  it('create sets isWriteEnabled=true for a plain :write scope (platform:write)', async () => {
     prisma.apiKey.create.mockResolvedValue({
       ...baseRow,
-      scopes: ['fleet:write'],
+      scopes: ['platform:write'],
       isWriteEnabled: true,
       ipAllowlist: ['0.0.0.0/0'],
     });
     const out = await svc.create(42, {
       name: 'rw',
-      scopes: ['fleet:write'],
+      scopes: ['platform:write'],
       ipAllowlist: ['0.0.0.0/0'],
     });
     expect(out.isWriteEnabled).toBe(true);
@@ -102,21 +102,21 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('create persists scopes, ipAllowlist, rateLimitPerMinute, isWriteEnabled', async () => {
     prisma.apiKey.create.mockResolvedValue({
       ...baseRow,
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       ipAllowlist: ['10.0.0.1'],
       rateLimitPerMinute: 120,
       isWriteEnabled: true,
     });
     await svc.create(42, {
       name: 'bi',
-      scopes: ['invoices:write'],
+      scopes: ['platform:write'],
       ipAllowlist: ['10.0.0.1'],
       rateLimitPerMinute: 120,
     });
     expect(prisma.apiKey.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          scopes: ['invoices:write'],
+          scopes: ['platform:write'],
           ipAllowlist: ['10.0.0.1'],
           rateLimitPerMinute: 120,
           isWriteEnabled: true,
@@ -144,7 +144,7 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
     });
     const out = await svc.create(42, {
       name: 'bi',
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
       ipAllowlist: [],
     });
     expect(out.createdAt).toBe('2026-04-18T00:00:00.000Z');
@@ -173,7 +173,7 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
     prisma.apiKey.update.mockResolvedValue({});
     const out = await svc.validateKey('sk_live_x', { ip: '10.0.0.1' });
     expect(out).toBeTruthy();
-    expect(out?.scopes).toEqual(['fleet:read']);
+    expect(out?.scopes).toEqual(['platform:read']);
   });
 
   it('validateKey allows CIDR-match IP', async () => {
