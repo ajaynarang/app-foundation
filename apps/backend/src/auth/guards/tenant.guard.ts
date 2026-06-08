@@ -1,10 +1,15 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { Configuration } from '../../config/configuration';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private configService: ConfigService<Configuration>,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     // Check if route is marked as public
@@ -19,6 +24,15 @@ export class TenantGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
+
+    // Single-tenant mode: short-circuit to the implicit tenant. We never
+    // require a tenant claim — every request resolves to the one seeded
+    // tenant so manual `where: { tenantId }` scoping continues to work.
+    const multiTenancy = this.configService.get('multiTenancy', { infer: true });
+    if (multiTenancy?.enabled === false) {
+      request.tenantId = multiTenancy.implicitTenantId;
+      return true;
+    }
 
     // SUPER_ADMIN users don't have a tenant - skip tenant check for them
     if (user?.role === 'SUPER_ADMIN') {

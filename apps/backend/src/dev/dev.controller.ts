@@ -6,7 +6,6 @@ import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { DevService } from './dev.service';
 import { SwitchUserDto } from './dto/switch-user.dto';
 import { DevAuthGuard } from './guards/dev-auth.guard';
-import { DeskBootstrapService } from '../domains/desk/responsibilities/desk-bootstrap.service';
 
 // DevAuthGuard enforces DEV_AUTH_SECRET header presence and exactness with
 // constant-time comparison. When DEV_AUTH_SECRET is unset (prod), the guard
@@ -17,10 +16,7 @@ import { DeskBootstrapService } from '../domains/desk/responsibilities/desk-boot
 export class DevController {
   private readonly logger = new Logger(DevController.name);
 
-  constructor(
-    private devService: DevService,
-    private deskBootstrap: DeskBootstrapService,
-  ) {}
+  constructor(private devService: DevService) {}
 
   @Public()
   @Get('users')
@@ -43,17 +39,5 @@ export class DevController {
     const ua = req.get('user-agent') ?? null;
     this.logger.log(`dev-switch audit: userId=${dto.userId} ip=${ip ?? 'unknown'} ua="${ua ?? 'unknown'}"`);
     return this.devService.switchToUser(dto.userId, { ip, userAgent: ua });
-  }
-
-  @Public()
-  @Post('desk/bootstrap-sweep')
-  @SkipThrottle()
-  @ApiOperation({
-    summary:
-      '[DEV ONLY] Force a Desk bootstrap sweep — upsert 12 agents + 10 responsibilities for every ACTIVE tenant. Use when agents are missing.',
-  })
-  async runDeskBootstrap() {
-    this.logger.log('dev-desk-bootstrap-sweep: triggered manually');
-    return this.deskBootstrap.sweepActiveTenants();
   }
 }

@@ -106,7 +106,7 @@ describe('JwtStrategy', () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 1,
       userId: 'USR-001',
-      email: 'admin@sally.com',
+      email: 'admin@example.com',
       role: 'SUPER_ADMIN',
       isActive: true,
       tenant: null,
@@ -121,32 +121,6 @@ describe('JwtStrategy', () => {
 
     expect(result.role).toBe('SUPER_ADMIN');
     expect(result.tenantId).toBeUndefined();
-  });
-
-  it('should include driver and customer info when available', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      id: 1,
-      userId: 'USR-001',
-      email: 'driver@test.com',
-      role: 'DRIVER',
-      isActive: true,
-      tenant: {
-        id: 1,
-        tenantId: 'TNT-001',
-        companyName: 'ACME',
-        isActive: true,
-      },
-      driver: { id: 5, driverId: 'DRV-001', name: 'John Doe' },
-      customer: { id: 3, customerId: 'CUST-001', companyName: 'CustomerCo' },
-    });
-
-    const result = await strategy.validate(basePayload);
-
-    expect(result.driverId).toBe('DRV-001');
-    expect(result.driverDbId).toBe(5);
-    expect(result.driverName).toBe('John Doe');
-    expect(result.customerId).toBe('CUST-001');
-    expect(result.customerDbId).toBe(3);
   });
 
   it('should pass authMethod from payload', async () => {

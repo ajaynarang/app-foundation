@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const InviteUserSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['DISPATCHER', 'DRIVER', 'ADMIN', 'OWNER']),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
 });
@@ -16,8 +16,6 @@ export const UserListItemSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string(),
   lastLoginAt: z.string().nullable().optional(),
-  driverId: z.string().optional(),
-  driverName: z.string().optional(),
 });
 
 export const UserListResponseSchema = z.object({
@@ -26,7 +24,7 @@ export const UserListResponseSchema = z.object({
 });
 
 export const UpdateUserRoleSchema = z.object({
-  role: z.enum(['DISPATCHER', 'DRIVER', 'ADMIN', 'OWNER']),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER']),
 });
 
 // Inferred types

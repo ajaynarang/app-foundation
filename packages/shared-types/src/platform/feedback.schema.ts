@@ -7,7 +7,8 @@ export const FeedbackCategoryEnum = z.enum(['bug', 'idea', 'general']);
 export type FeedbackCategory = z.infer<typeof FeedbackCategoryEnum>;
 
 export const FeedbackStatusEnum = z.enum(['NEW', 'REVIEWED', 'RESOLVED']);
-export type FeedbackStatus = z.infer<typeof FeedbackStatusEnum>;
+// `FeedbackStatus` type comes from the generated Prisma mirror — not re-declared
+// here to avoid a barrel re-export collision.
 
 // ---------------------------------------------------------------------------
 // Core feedback schema

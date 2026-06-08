@@ -18,7 +18,7 @@ export const PlanConfigSchema = z.object({
   tagline: z.string(),
   pricePerUnit: z.number().nullable(),
   unitLabel: z.string(),
-  fleetLimit: z.number().nullable(),
+  seatLimit: z.number().nullable(),
   userLimit: z.number().nullable(),
   isPopular: z.boolean(),
   ctaLabel: z.string(),
@@ -44,10 +44,10 @@ export const TenantPlanDetailsSchema = z.object({
   trialEndsAt: z.string().nullable(),
   planAssignedAt: z.string().nullable(),
   planAssignedBy: z.string().nullable(),
-  vehicleCount: z.number(),
-  fleetLimit: z.number().nullable(),
+  seatCount: z.number(),
+  seatLimit: z.number().nullable(),
   daysLeftInTrial: z.number().nullable(),
-  fleetLimitWarning: z.boolean(),
+  seatLimitWarning: z.boolean(),
   planEvents: z.array(PlanEventSchema),
 });
 

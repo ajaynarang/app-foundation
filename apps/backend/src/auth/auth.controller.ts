@@ -41,10 +41,10 @@ export class AuthController {
 
   /** Set refresh token as httpOnly cookie on the response. */
   private setRefreshTokenCookie(response: Response, refreshToken: string): void {
-    // Cookie domain must cover all subdomains (tenant.staging.sally.appshore.in,
-    // api-staging.sally.appshore.in, etc.) so the refresh cookie is sent
-    // on cross-subdomain requests. Without this, browsers treat the cookie as
-    // third-party and block it — causing unexpected logouts after 15m.
+    // When set, the cookie domain should cover all subdomains (e.g. a leading-dot
+    // domain like `.example.com`) so the refresh cookie is sent on cross-subdomain
+    // requests. Without this, browsers may treat the cookie as third-party and
+    // block it — causing unexpected logouts after the access token expires.
     const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
 
     response.cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
@@ -71,7 +71,7 @@ export class AuthController {
 
   @Public()
   @Post('firebase/exchange')
-  @ApiOperation({ summary: 'Exchange Firebase token for SALLY JWT' })
+  @ApiOperation({ summary: 'Exchange Firebase token for app JWT' })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 401 })
   async exchangeFirebaseToken(

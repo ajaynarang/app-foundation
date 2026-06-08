@@ -1,19 +1,19 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { PlansService } from '../../domains/platform/plans/plans.service';
-import { AddOnsService } from '../../domains/platform/add-ons/add-ons.service';
 import { FeatureFlagsService } from '../../domains/platform/feature-flags/feature-flags.service';
 import { FEATURE_KEY } from '../decorators/require-feature.decorator';
 import { TenantPlan } from '@prisma/client';
-import { isAddOnFeature } from '@app/shared-types';
+import { Configuration } from '../../config/configuration';
 
 @Injectable()
 export class PlanGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly plansService: PlansService,
-    private readonly addOnsService: AddOnsService,
     private readonly featureFlagsService: FeatureFlagsService,
+    private readonly configService: ConfigService<Configuration>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,6 +40,11 @@ export class PlanGuard implements CanActivate {
     // 2. SUPER_ADMIN bypasses plan checks
     if (user?.role === 'SUPER_ADMIN') return true;
 
+    // Single-tenant mode: the implicit tenant is treated as top tier, so all
+    // entitlement checks pass.
+    const multiTenancy = this.configService.get('multiTenancy', { infer: true });
+    if (multiTenancy?.enabled === false) return true;
+
     if (!user?.tenantDbId) {
       throw new ForbiddenException({
         code: 'NO_TENANT',
@@ -56,7 +61,7 @@ export class PlanGuard implements CanActivate {
 
     const plan = await this.plansService.getTenantPlan(user.tenantId);
 
-    // 3. ENTERPRISE gets everything (all entitlements + all add-ons)
+    // 3. ENTERPRISE gets everything
     if (plan === TenantPlan.ENTERPRISE) return true;
 
     if (plan === TenantPlan.TRIAL_EXPIRED) {
@@ -73,52 +78,36 @@ export class PlanGuard implements CanActivate {
       });
     }
 
-    // 4. Route check based on feature type
-    if (isAddOnFeature(requiredFeature)) {
-      // Check add-on system
-      const resolution = await this.addOnsService.isFeatureEnabled(user.tenantDbId, requiredFeature);
+    // 4. Check plan entitlement
+    const allowed = await this.plansService.isFeatureEnabled(plan, requiredFeature);
 
-      if (resolution.enabled) return true;
+    if (allowed) return true;
 
-      // Not enabled — throw with add-on info
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'ADD_ON_REQUIRED',
-        featureKey: requiredFeature,
-        message: 'This feature requires the add-on to be purchased',
-      });
-    } else {
-      // Check plan entitlement (core features)
-      const allowed = await this.plansService.isFeatureEnabled(plan, requiredFeature);
-
-      if (allowed) return true;
-
-      // Not allowed — determine which plan is required
-      const requiredPlan = await this.getRequiredPlan(requiredFeature);
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'PLAN_UPGRADE_REQUIRED',
-        featureKey: requiredFeature,
-        requiredPlan,
-        message: `This feature requires the ${requiredPlan} plan or higher`,
-      });
-    }
+    // Not allowed — determine which plan is required
+    const requiredPlan = await this.getRequiredPlan(requiredFeature);
+    throw new ForbiddenException({
+      statusCode: 403,
+      error: 'PLAN_UPGRADE_REQUIRED',
+      featureKey: requiredFeature,
+      requiredPlan,
+      message: `This feature requires the ${requiredPlan} plan or higher`,
+    });
   }
 
   private async getRequiredPlan(feature: string): Promise<string> {
     const plans = [TenantPlan.STARTER, TenantPlan.PROFESSIONAL, TenantPlan.ENTERPRISE];
     const displayNames: Record<string, string> = {
-      STARTER: 'Haul',
-      PROFESSIONAL: 'Fleet',
-      ENTERPRISE: 'Freight Force',
-      TRIAL: 'Haul',
-      TRIAL_EXPIRED: 'Haul',
-      SUSPENDED: 'Haul',
+      STARTER: 'Starter',
+      PROFESSIONAL: 'Professional',
+      ENTERPRISE: 'Enterprise',
+      TRIAL: 'Starter',
+      TRIAL_EXPIRED: 'Starter',
+      SUSPENDED: 'Starter',
     };
     for (const plan of plans) {
       const enabled = await this.plansService.isFeatureEnabled(plan, feature);
-      if (enabled) return displayNames[plan] ?? 'Freight Force';
+      if (enabled) return displayNames[plan] ?? 'Enterprise';
     }
-    return 'Freight Force';
+    return 'Enterprise';
   }
 }

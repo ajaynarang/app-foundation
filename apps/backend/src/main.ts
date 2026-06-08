@@ -103,15 +103,15 @@ async function bootstrap() {
   });
 
   // CORS configuration
-  // Parse CORS origins: supports exact URLs and wildcard patterns like *.sally.appshore.in
+  // Parse CORS origins: supports exact URLs and wildcard patterns like *.example.com
   const parsedCorsOrigins: (string | RegExp)[] = corsOrigins
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
     .map((o) => {
       if (o.includes('*')) {
-        // Convert wildcard pattern to regex: https://*.sally.appshore.in → /^https:\/\/[^/]+\.sally\.appshore\.in$/
-        // Uses [^/]+ (not [^.]+) so wildcard matches multi-level subdomains like console.staging.sally.appshore.in
+        // Convert wildcard pattern to regex: https://*.example.com → /^https:\/\/[^/]+\.example\.com$/
+        // Uses [^/]+ (not [^.]+) so wildcard matches multi-level subdomains
         const escaped = o.replace(/[.+?^${}()|\\[\]]/g, '\\$&').replace(/\*/g, '[^/]+');
         return new RegExp(`^${escaped}$`);
       }
@@ -133,8 +133,8 @@ async function bootstrap() {
 
   // Swagger/OpenAPI documentation
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('SALLY API')
-    .setDescription('Fleet Operations Assistant API')
+    .setTitle('App API')
+    .setDescription('App API')
     .setVersion('1.0.0')
     .addBearerAuth()
     .addBearerAuth(
@@ -142,31 +142,21 @@ async function bootstrap() {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'API Key',
-        description: 'Enter your API key (sk_staging_...)',
+        description: 'Enter your API key (sk_...)',
         name: 'Authorization',
         in: 'header',
       },
       'api-key',
     )
-    .addServer('https://sally-api.apps.appshore.in/api/v1', 'Staging')
     .addServer('http://localhost:8000/api/v1', 'Local Development')
     .addTag('Authentication', 'JWT-based authentication with multi-tenancy')
     .addTag('API Keys', 'API key management for external developers')
-    .addTag('Route Planning', 'Create and manage optimized routes')
-    .addTag('Monitoring', 'Monitor active routes in real-time')
-    .addTag('Alerts', 'Dispatcher alerts and notifications')
-    .addTag('HOS Rules', 'Hours of Service compliance validation')
-    .addTag('Optimization', 'REST optimization recommendations')
-    .addTag('Prediction', 'Drive demand predictions')
-    .addTag('Drivers', 'Driver management')
-    .addTag('Vehicles', 'Vehicle management')
-    .addTag('Loads', 'Load management')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   // OAuth 2.1 server metadata (RFC 8414) — must be at well-known root, not under /api/v1
-  const oauthIssuer = process.env.OAUTH_ISSUER || 'https://api.trysally.com';
+  const oauthIssuer = process.env.OAUTH_ISSUER || `http://localhost:${process.env.PORT || '8000'}`;
   app.use('/.well-known/oauth-authorization-server', (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -227,7 +217,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   console.log('');
-  console.log(`  ✅ SALLY Backend ready on http://localhost:${port}`);
+  console.log(`  ✅ App Backend ready on http://localhost:${port}`);
   console.log(`     API:     http://localhost:${port}/api/v1/`);
   console.log(`     Swagger: http://localhost:${port}/api`);
   console.log('');

@@ -40,7 +40,7 @@ export class AuthService {
     if (lookupDto.phone) where.phone = lookupDto.phone.trim();
     const users = await this.prisma.user.findMany({
       where,
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
       orderBy: [{ tenant: { companyName: 'asc' } }, { role: 'asc' }, { firstName: 'asc' }],
     });
     if (users.length === 0) throw new NotFoundException('No user found with this email or phone');
@@ -53,8 +53,6 @@ export class AuthService {
         role: u.role,
         tenantId: u.tenant.tenantId,
         tenantName: u.tenant.companyName,
-        driverId: u.driver?.driverId,
-        driverName: u.driver?.name,
       })),
       multiTenant: users.length > 1,
     };
@@ -63,7 +61,7 @@ export class AuthService {
   async refreshAccessToken(userId: string, _tokenId: string) {
     const user = await this.prisma.user.findUnique({
       where: { userId },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!user || !user.isActive) throw new UnauthorizedException('User not found or inactive');
     const accessToken = this.jwtTokenService.generateAccessTokenOnly({
@@ -71,7 +69,6 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantId: user.tenant?.tenantId,
-      driverId: user.driver?.driverId,
     });
     return { accessToken, user: this.toUserProfile(user) };
   }
@@ -88,7 +85,7 @@ export class AuthService {
   async getProfile(userId: string): Promise<UserProfileDto> {
     const user = await this.prisma.user.findUnique({
       where: { userId },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return this.toUserProfile(user);
@@ -105,7 +102,7 @@ export class AuthService {
           ...(dto.firstName !== undefined && { firstName: dto.firstName }),
           ...(dto.lastName !== undefined && { lastName: dto.lastName }),
         },
-        include: { tenant: true, driver: true },
+        include: { tenant: true },
       });
       return this.toUserProfile(user);
     } catch (err: any) {
@@ -190,7 +187,6 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.tenantId,
-        driverId: user.driver?.driverId,
       },
       'email_password' satisfies AuthMethod,
     );
@@ -213,8 +209,6 @@ export class AuthService {
         tenantId: user.tenant?.tenantId,
         tenantName: user.tenant?.companyName,
         tenantTimezone: user.tenant?.timezone ?? undefined,
-        subdomain: user.tenant?.subdomain ?? undefined,
-        driverId: user.driver?.driverId,
       },
     };
   }
@@ -222,7 +216,7 @@ export class AuthService {
   async loginWithPhone(dto: PhoneLoginDto): Promise<any> {
     const user = await this.prisma.user.findFirst({
       where: { phone: dto.phone, isActive: true },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!user || !user.phoneVerified) throw new UnauthorizedException('Invalid phone or PIN');
     if (!user.tenant.isActive) throw new UnauthorizedException('Account is not active');
@@ -236,7 +230,6 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant.tenantId,
-        driverId: user.driver?.driverId,
       },
       'phone_pin' satisfies AuthMethod,
     );
@@ -264,7 +257,7 @@ export class AuthService {
     if (!isValid) throw new UnauthorizedException('Invalid or expired verification code');
     const user = await this.prisma.user.findFirst({
       where: { phone: dto.phone, isActive: true },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!user) throw new UnauthorizedException('User not found');
     if (!user.phoneVerified)
@@ -279,7 +272,6 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant.tenantId,
-        driverId: user.driver?.driverId,
       },
       'phone_otp' satisfies AuthMethod,
     );
@@ -336,7 +328,7 @@ export class AuthService {
   async generateTokensForUser(user: any): Promise<any> {
     const fullUser = await this.prisma.user.findUnique({
       where: { id: user.id },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!fullUser) throw new NotFoundException('User not found');
     const tokens = await this.jwtTokenService.generateTokenPair({
@@ -345,7 +337,6 @@ export class AuthService {
       email: fullUser.email,
       role: fullUser.role,
       tenantId: fullUser.tenant?.tenantId,
-      driverId: fullUser.driver?.driverId,
     });
     return {
       accessToken: tokens.accessToken,
@@ -366,9 +357,6 @@ export class AuthService {
       tenantId: user.tenant?.tenantId,
       tenantName: user.tenant?.companyName,
       tenantTimezone: user.tenant?.timezone ?? undefined,
-      subdomain: user.tenant?.subdomain ?? undefined,
-      driverId: user.driver?.driverId,
-      driverName: user.driver?.name,
       isActive: user.isActive,
       phone: user.phone,
       phoneVerified: user.phoneVerified,

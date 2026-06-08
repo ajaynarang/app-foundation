@@ -1,20 +1,11 @@
 import { z } from 'zod';
 
 /**
- * User mode determines which capability set Sally surfaces in the command
- * palette and capability card. Mirrors the frontend's UserMode union — kept
- * here so backend and frontend agree on the API contract.
+ * User mode determines which capability set the assistant surfaces in the
+ * command palette and capability card. Mirrors the frontend's UserMode union —
+ * kept here so backend and frontend agree on the API contract.
  */
-export const SallyUserModeSchema = z.enum([
-  'prospect',
-  'dispatcher',
-  'driver',
-  'owner',
-  'admin',
-  'super_admin',
-  'customer',
-  'support',
-]);
+export const SallyUserModeSchema = z.enum(['prospect', 'member', 'owner', 'admin', 'super_admin', 'support']);
 export type SallyUserMode = z.infer<typeof SallyUserModeSchema>;
 
 /** A single thing the user can ask Sally to do. */

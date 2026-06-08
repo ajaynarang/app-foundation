@@ -99,12 +99,12 @@ describe('LoginActivityEventSchema', () => {
       failReason: 'INVALID_TOKEN' as const,
       user: {
         id: 9,
-        email: 'driver@example.com',
+        email: 'member@example.com',
         firstName: 'Mike',
         lastName: 'Reyes',
-        role: 'DRIVER',
+        role: 'MEMBER',
       },
-      tenant: { id: 3, name: 'Acme Trucking' },
+      tenant: { id: 3, name: 'Acme Inc' },
     };
     const parsed = LoginActivityEventSchema.parse(input);
     expect(parsed).toEqual(input);

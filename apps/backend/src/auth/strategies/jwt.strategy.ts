@@ -42,8 +42,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { userId: payload.sub },
       include: {
         tenant: true,
-        driver: true,
-        customer: true,
       },
     });
 
@@ -65,12 +63,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: user.tenant?.tenantId, // String tenant ID (for display)
       tenantDbId: user.tenant?.id, // Numeric database ID (for queries)
       tenantName: user.tenant?.companyName,
-      driverId: user.driver?.driverId, // String driver ID (for display)
-      driverDbId: user.driver?.id, // Numeric database ID (for queries)
-      driverName: user.driver?.name,
-      customerId: user.customer?.customerId,
-      customerDbId: user.customer?.id,
-      customerName: user.customer?.companyName,
       isActive: user.isActive,
       authMethod: payload.authMethod, // How this session was established
     };

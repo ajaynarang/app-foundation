@@ -347,16 +347,14 @@ describe('AuthService - Phone Auth', () => {
           lastName: 'Doe',
           role: 'ADMIN',
           tenant: { tenantId: 'TNT-001', companyName: 'ACME' },
-          driver: null,
         },
         {
           userId: 'USR-002',
           email: 'test@test.com',
           firstName: 'John',
           lastName: 'Doe',
-          role: 'DISPATCHER',
+          role: 'MEMBER',
           tenant: { tenantId: 'TNT-002', companyName: 'Other' },
-          driver: { driverId: 'DRV-001', name: 'John Doe' },
         },
       ];
       mockPrismaService.user.findMany.mockResolvedValue(users);
@@ -365,7 +363,7 @@ describe('AuthService - Phone Auth', () => {
 
       expect(result.multiTenant).toBe(true);
       expect(result.users).toHaveLength(2);
-      expect(result.users[1].driverId).toBe('DRV-001');
+      expect(result.users[1].tenantId).toBe('TNT-002');
     });
   });
 
@@ -437,7 +435,7 @@ describe('AuthService - Phone Auth', () => {
 
       expect(result.userId).toBe('USR-001');
       expect(result.hasPinSet).toBe(true);
-      expect(result.subdomain).toBe('acme');
+      expect(result.tenantName).toBe('ACME');
     });
 
     it('should throw NotFoundException when user not found', async () => {

@@ -16,13 +16,11 @@ export const UserProfileSchema = z.object({
   emailVerified: z.boolean().optional(),
   firstName: z.string(),
   lastName: z.string(),
-  role: z.enum(['DISPATCHER', 'DRIVER', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
+  role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'SUPER_ADMIN']),
   tenantId: z.string(),
   tenantName: z.string(),
   tenantTimezone: z.string().optional(),
   subdomain: z.string().optional(),
-  driverId: z.string().optional(),
-  driverName: z.string().optional(),
   isActive: z.boolean(),
   phone: z.string().optional(),
   phoneVerified: z.boolean().optional(),
@@ -49,8 +47,6 @@ export const UserSummarySchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   role: z.string(),
-  driverId: z.string().optional(),
-  driverName: z.string().optional(),
 });
 
 export const UserLookupResultSchema = UserSummarySchema.extend({

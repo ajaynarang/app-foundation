@@ -86,4 +86,5 @@ export type TenantAddOnStatusValue = z.infer<typeof TenantAddOnStatusEnum>;
 export type TenantAddOnSourceValue = z.infer<typeof TenantAddOnSourceEnum>;
 export type AddOnStatusSource = z.infer<typeof AddOnStatusSourceEnum>;
 export type AddOnRequest = z.infer<typeof AddOnRequestSchema>;
-export type AddOnRequestStatus = z.infer<typeof AddOnRequestStatusEnum>;
+// `AddOnRequestStatus` type comes from the generated Prisma mirror — not
+// re-declared here to avoid a barrel re-export collision.

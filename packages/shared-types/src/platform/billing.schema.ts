@@ -1,17 +1,21 @@
 import { z } from 'zod';
 import { TenantPlanSchema } from './plans.schema';
 import { WalletSchema } from './wallet.schema';
+import {
+  BillingProviderTypeSchema,
+  BillingSubscriptionStatusSchema,
+  BillingInvoiceStatusSchema,
+  PaymentMethodTypeSchema,
+} from '../generated/prisma-enums';
 
 // ---------------------------------------------------------------------------
-// Enums
+// Enums — sourced from the generated Prisma mirror (single source of truth).
+// Local `*Enum` aliases are kept for in-file readability.
 // ---------------------------------------------------------------------------
-export const BillingProviderTypeEnum = z.enum(['STRIPE']);
-
-export const BillingSubscriptionStatusEnum = z.enum(['ACTIVE', 'PAST_DUE', 'CANCELED', 'SUSPENDED', 'TRIALING']);
-
-export const BillingInvoiceStatusEnum = z.enum(['DRAFT', 'OPEN', 'PAID', 'VOID', 'UNCOLLECTIBLE']);
-
-export const PaymentMethodTypeEnum = z.enum(['CARD', 'US_BANK_ACCOUNT']);
+export const BillingProviderTypeEnum = BillingProviderTypeSchema;
+export const BillingSubscriptionStatusEnum = BillingSubscriptionStatusSchema;
+export const BillingInvoiceStatusEnum = BillingInvoiceStatusSchema;
+export const PaymentMethodTypeEnum = PaymentMethodTypeSchema;
 
 // ---------------------------------------------------------------------------
 // Billing address (embedded object)
@@ -155,10 +159,9 @@ export const BillingOverviewSchema = z.object({
 // ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
-export type BillingProviderType = z.infer<typeof BillingProviderTypeEnum>;
-export type BillingSubscriptionStatus = z.infer<typeof BillingSubscriptionStatusEnum>;
-export type BillingInvoiceStatus = z.infer<typeof BillingInvoiceStatusEnum>;
-export type PaymentMethodType = z.infer<typeof PaymentMethodTypeEnum>;
+// `BillingProviderType`, `BillingSubscriptionStatus`, `BillingInvoiceStatus`,
+// and `PaymentMethodType` types come from the generated Prisma mirror — do not
+// re-declare them here (avoids a barrel re-export collision).
 export type BillingAddress = z.infer<typeof BillingAddressSchema>;
 export type BillingCustomer = z.infer<typeof BillingCustomerSchema>;
 export type BillingSubscription = z.infer<typeof BillingSubscriptionSchema>;

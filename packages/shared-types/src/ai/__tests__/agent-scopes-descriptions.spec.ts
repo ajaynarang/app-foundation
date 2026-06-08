@@ -9,7 +9,7 @@ describe('SCOPE_DESCRIPTIONS', () => {
   });
 
   it('entry shape is { summary, grantsPlainEnglish, hitlTier, sampleTools[] }', () => {
-    const entry = SCOPE_DESCRIPTIONS['loads:write'];
+    const entry = SCOPE_DESCRIPTIONS['documents:write'];
     expect(entry).toEqual(
       expect.objectContaining({
         summary: expect.any(String),

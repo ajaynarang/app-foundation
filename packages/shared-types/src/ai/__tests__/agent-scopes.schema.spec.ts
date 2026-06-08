@@ -9,12 +9,12 @@ import {
 
 describe('AgentScopeSchema', () => {
   it('accepts valid domain:action scopes', () => {
-    expect(AgentScopeSchema.parse('fleet:read')).toBe('fleet:read');
-    expect(AgentScopeSchema.parse('invoices:write')).toBe('invoices:write');
+    expect(AgentScopeSchema.parse('platform:read')).toBe('platform:read');
+    expect(AgentScopeSchema.parse('documents:write')).toBe('documents:write');
   });
 
   it('accepts sensitive tier scopes', () => {
-    expect(AgentScopeSchema.parse('invoices:write:sensitive')).toBe('invoices:write:sensitive');
+    expect(AgentScopeSchema.parse('platform:write:sensitive')).toBe('platform:write:sensitive');
     expect(AgentScopeSchema.parse('comms:send:bulk')).toBe('comms:send:bulk');
   });
 
@@ -28,13 +28,13 @@ describe('AgentScopeSchema', () => {
 
   describe('scopeTier', () => {
     it('returns "read" for *:read', () => {
-      expect(scopeTier('fleet:read')).toBe(SCOPE_TIERS.READ);
+      expect(scopeTier('platform:read')).toBe(SCOPE_TIERS.READ);
     });
     it('returns "standard" for *:write', () => {
-      expect(scopeTier('invoices:write')).toBe(SCOPE_TIERS.STANDARD);
+      expect(scopeTier('documents:write')).toBe(SCOPE_TIERS.STANDARD);
     });
     it('returns "sensitive" for *:write:sensitive', () => {
-      expect(scopeTier('invoices:write:sensitive')).toBe(SCOPE_TIERS.SENSITIVE);
+      expect(scopeTier('platform:write:sensitive')).toBe(SCOPE_TIERS.SENSITIVE);
     });
     it('returns "sensitive" for comms:send:bulk', () => {
       expect(scopeTier('comms:send:bulk')).toBe(SCOPE_TIERS.SENSITIVE);
@@ -48,13 +48,13 @@ describe('AgentScopeSchema', () => {
   });
 
   describe('scopeDomain / scopeAction', () => {
-    it('splits fleet:write correctly', () => {
-      expect(scopeDomain('fleet:write')).toBe('fleet');
-      expect(scopeAction('fleet:write')).toBe('write');
+    it('splits documents:write correctly', () => {
+      expect(scopeDomain('documents:write')).toBe('documents');
+      expect(scopeAction('documents:write')).toBe('write');
     });
-    it('splits invoices:write:sensitive correctly', () => {
-      expect(scopeDomain('invoices:write:sensitive')).toBe('invoices');
-      expect(scopeAction('invoices:write:sensitive')).toBe('write:sensitive');
+    it('splits platform:write:sensitive correctly', () => {
+      expect(scopeDomain('platform:write:sensitive')).toBe('platform');
+      expect(scopeAction('platform:write:sensitive')).toBe('write:sensitive');
     });
     it('splits comms:send:bulk correctly', () => {
       expect(scopeDomain('comms:send:bulk')).toBe('comms');

@@ -6,37 +6,17 @@ import { z } from 'zod';
  * API-layer enum used by OAuth consent screens, API-key mint UI, and Desk responsibility grants.
  */
 export const AgentScopeSchema = z.enum([
-  'fleet:read',
-  'fleet:write',
-  'fleet:write:sensitive',
-  'loads:read',
-  'loads:write',
-  'loads:write:sensitive',
-  'invoices:read',
-  'invoices:write',
-  'invoices:write:sensitive',
-  'settlements:read',
-  'settlements:write',
-  'settlements:write:sensitive',
-  'customers:read',
-  'customers:write',
-  'customers:write:sensitive',
-  'shield:read',
-  'shield:write',
+  'platform:read',
+  'platform:write',
+  'platform:write:sensitive',
+  'comms:send',
+  'comms:send:bulk',
   'documents:read',
   'documents:write',
-  'alerts:read',
-  'alerts:write',
   'integrations:read',
   'integrations:write',
   'integrations:write:sensitive',
-  'comms:send',
-  'comms:send:bulk',
-  'desk:read',
-  'desk:write',
-  'desk:write:sensitive',
-  'platform:read',
-  'platform:write',
+  'knowledge:read',
   'platform:admin',
 ]);
 export type AgentScope = z.infer<typeof AgentScopeSchema>;
@@ -86,207 +66,76 @@ export interface AgentScopeDescription {
  * agent-scopes-descriptions.spec.ts enforces full coverage.
  */
 export const SCOPE_DESCRIPTIONS: Record<AgentScope, AgentScopeDescription> = {
-  'fleet:read': {
-    summary: 'Read drivers, vehicles, and the fleet snapshot',
-    grantsPlainEnglish: 'Lets the agent look up drivers, vehicles, and the live fleet status. Read-only.',
+  'platform:read': {
+    summary: 'Read platform settings and resources',
+    grantsPlainEnglish: 'Lets the agent read platform-level settings and resources in your tenant. Read-only.',
     hitlTier: 'none',
-    sampleTools: ['query-loads', 'get-driver-hos', 'get-fleet-status', 'get-alerts'],
+    sampleTools: ['get-settings', 'list-resources', 'get-status'],
   },
-  'fleet:write': {
-    summary: 'Update drivers and vehicles',
+  'platform:write': {
+    summary: 'Update platform settings and resources',
     grantsPlainEnglish:
-      'Lets the agent update driver and vehicle records, and resolve alerts in your tenant. Requires a one-time confirm for each write.',
+      'Lets the agent create and update platform-level settings and resources. Requires a one-time confirm for each write.',
     hitlTier: 'standard',
-    sampleTools: ['driver-create', 'vehicle-update', 'acknowledge-alert', 'resolve-alert'],
+    sampleTools: ['update-settings', 'create-resource', 'update-resource'],
   },
-  'fleet:write:sensitive': {
-    summary: 'Retire vehicles, terminate drivers',
+  'platform:write:sensitive': {
+    summary: 'Delete and archive platform resources',
     grantsPlainEnglish:
-      'Lets the agent retire vehicles and terminate drivers. Each call requires you to confirm with your PIN.',
+      'Lets the agent delete and archive platform resources. Each call requires you to confirm with your PIN.',
     hitlTier: 'sensitive',
-    sampleTools: ['driver-terminate', 'vehicle-retire'],
+    sampleTools: ['delete-resource', 'archive-resource'],
   },
-  'loads:read': {
-    summary: 'Read loads and assignments',
-    grantsPlainEnglish: 'Lets the agent look up loads, statuses, and stops. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['query-loads', 'get-load-detail', 'get-route-status'],
-  },
-  'loads:write': {
-    summary: 'Create and update loads',
+  'comms:send': {
+    summary: 'Message a single recipient',
     grantsPlainEnglish:
-      'Lets the agent create loads, assign drivers, and update status. Requires a one-time confirm for each write.',
+      'Lets the agent send a message to a single recipient. Requires a one-time confirm for each send.',
     hitlTier: 'standard',
-    sampleTools: ['load-create', 'ratecon-accept', 'plan-route', 'report-delay'],
+    sampleTools: ['send-message', 'send-email'],
   },
-  'loads:write:sensitive': {
-    summary: 'Close-out and reverse delivered loads',
+  'comms:send:bulk': {
+    summary: 'Message many recipients in one shot',
     grantsPlainEnglish:
-      'Lets the agent close out loads (once delivery is confirmed) and reverse close-outs. Each call requires you to confirm with your PIN.',
+      'Lets the agent send one message to many recipients at once. Each bulk send requires you to confirm with your PIN.',
     hitlTier: 'sensitive',
-    sampleTools: ['list-load-charges-for-closeout', 'approve-for-billing'],
-  },
-  'invoices:read': {
-    summary: 'Read invoices and payments',
-    grantsPlainEnglish: 'Lets the agent look up invoices and payment details. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['query-invoices', 'get-invoice-detail', 'get-invoice-summary'],
-  },
-  'invoices:write': {
-    summary: 'Send invoices and record payments',
-    grantsPlainEnglish: 'Lets the agent send invoices and record payments. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: ['send-invoice', 'record-payment', 'generate-invoice'],
-  },
-  'invoices:write:sensitive': {
-    summary: 'Void and factor invoices',
-    grantsPlainEnglish:
-      'Lets the agent void invoices and submit them for factoring. Each call requires you to confirm with your PIN.',
-    hitlTier: 'sensitive',
-    sampleTools: ['void-invoice', 'factor-invoice'],
-  },
-  'settlements:read': {
-    summary: 'Read driver settlements',
-    grantsPlainEnglish: 'Lets the agent look up driver settlements and pay history. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['query-settlements', 'get-settlement-detail', 'get-driver-pay-structure'],
-  },
-  'settlements:write': {
-    summary: 'Create driver settlements',
-    grantsPlainEnglish: 'Lets the agent create driver settlements. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: ['settlement-create'],
-  },
-  'settlements:write:sensitive': {
-    summary: 'Approve and reverse settlements',
-    grantsPlainEnglish:
-      'Lets the agent approve and reverse driver settlements. Each call requires you to confirm with your PIN.',
-    hitlTier: 'sensitive',
-    sampleTools: ['approve-settlement'],
-  },
-  'customers:read': {
-    summary: 'Read customers',
-    grantsPlainEnglish: 'Lets the agent look up customers, contacts, and payment stats. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['query-customers', 'get-customer-detail', 'get-customer-payment-stats'],
-  },
-  'customers:write': {
-    summary: 'Create and update customers',
-    grantsPlainEnglish:
-      'Lets the agent create and update customer records. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: ['customer-create'],
-  },
-  'customers:write:sensitive': {
-    summary: 'Deactivate customers and override credit hold',
-    grantsPlainEnglish:
-      'Lets the agent deactivate customers and override credit holds. Each call requires you to confirm with your PIN.',
-    hitlTier: 'sensitive',
-    sampleTools: ['customer-deactivate'],
-  },
-  'shield:read': {
-    summary: 'Read Shield compliance findings',
-    grantsPlainEnglish: 'Lets the agent read Shield scores and compliance findings. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['get-shield-score', 'get-shield-findings'],
-  },
-  'shield:write': {
-    summary: 'Dispute Shield findings and run audits',
-    grantsPlainEnglish:
-      'Lets the agent dispute Shield findings and trigger compliance audits. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: ['shield-dispute', 'trigger-shield-audit'],
+    sampleTools: ['send-bulk-message'],
   },
   'documents:read': {
-    summary: 'Read documents and compliance state',
-    grantsPlainEnglish: 'Lets the agent look up documents and their compliance state. Read-only.',
+    summary: 'Read documents',
+    grantsPlainEnglish: 'Lets the agent look up documents and their metadata. Read-only.',
     hitlTier: 'none',
-    sampleTools: ['get-document-compliance'],
+    sampleTools: ['get-document', 'list-documents'],
   },
   'documents:write': {
-    summary: 'Accept rate-cons and upload documents',
-    grantsPlainEnglish:
-      'Lets the agent accept parsed rate-confirmations and attach documents. Requires a one-time confirm for each write.',
+    summary: 'Upload and update documents',
+    grantsPlainEnglish: 'Lets the agent upload and update documents. Requires a one-time confirm for each write.',
     hitlTier: 'standard',
-    sampleTools: ['ratecon-accept'],
-  },
-  'alerts:read': {
-    summary: 'Read alerts',
-    grantsPlainEnglish: 'Lets the agent read alerts raised by the command center and Shield. Read-only.',
-    hitlTier: 'none',
-    sampleTools: ['get-alerts'],
-  },
-  'alerts:write': {
-    summary: 'Acknowledge and resolve alerts',
-    grantsPlainEnglish:
-      'Lets the agent acknowledge and resolve operational alerts. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: ['acknowledge-alert', 'resolve-alert'],
+    sampleTools: ['upload-document', 'update-document'],
   },
   'integrations:read': {
     summary: 'Read integration state',
-    grantsPlainEnglish: 'Lets the agent check which integrations (QuickBooks, Samsara, etc.) are connected. Read-only.',
+    grantsPlainEnglish: 'Lets the agent check which integrations are connected and their sync state. Read-only.',
     hitlTier: 'none',
-    sampleTools: [],
+    sampleTools: ['list-integrations', 'get-integration-status'],
   },
   'integrations:write': {
     summary: 'Trigger integration sync',
     grantsPlainEnglish: 'Lets the agent trigger a manual integration sync. Requires a one-time confirm for each write.',
     hitlTier: 'standard',
-    sampleTools: [],
+    sampleTools: ['trigger-sync'],
   },
   'integrations:write:sensitive': {
     summary: 'Connect and disconnect integrations',
     grantsPlainEnglish:
-      'Lets the agent connect or disconnect integrations (QuickBooks, Samsara, etc.). Each call requires you to confirm with your PIN.',
+      'Lets the agent connect or disconnect integrations. Each call requires you to confirm with your PIN.',
     hitlTier: 'sensitive',
-    sampleTools: [],
+    sampleTools: ['connect-integration', 'disconnect-integration'],
   },
-  'comms:send': {
-    summary: 'Message drivers and customers (single)',
-    grantsPlainEnglish:
-      'Lets the agent send a message to a single driver or customer. Requires a one-time confirm for each send.',
-    hitlTier: 'standard',
-    sampleTools: ['comms-driver', 'comms-customer'],
-  },
-  'comms:send:bulk': {
-    summary: 'Message many drivers or customers in one shot',
-    grantsPlainEnglish:
-      'Lets the agent send one message to many drivers or customers at once. Each bulk send requires you to confirm with your PIN.',
-    hitlTier: 'sensitive',
-    sampleTools: ['comms-bulk-drivers'],
-  },
-  'desk:read': {
-    summary: "Read Sally's Desk activity",
-    grantsPlainEnglish: 'Lets the agent read Desk episodes, handoffs, and the review inbox. Read-only.',
+  'knowledge:read': {
+    summary: 'Read the knowledge base',
+    grantsPlainEnglish: 'Lets the agent search and read the knowledge base. Read-only.',
     hitlTier: 'none',
-    sampleTools: [],
-  },
-  'desk:write': {
-    summary: 'Create Desk review items',
-    grantsPlainEnglish:
-      'Lets the agent create Desk review items for a human to look at. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: [],
-  },
-  'desk:write:sensitive': {
-    summary: 'Enable and disable Desk responsibilities',
-    grantsPlainEnglish:
-      'Lets the agent enable or disable Desk responsibilities for your tenant. Each call requires you to confirm with your PIN.',
-    hitlTier: 'sensitive',
-    sampleTools: [],
-  },
-  'platform:read': {
-    summary: 'Read platform settings',
-    grantsPlainEnglish: 'Lets the agent read platform-level settings. Read-only.',
-    hitlTier: 'none',
-    sampleTools: [],
-  },
-  'platform:write': {
-    summary: 'Update platform settings',
-    grantsPlainEnglish: 'Lets the agent update platform-level settings. Requires a one-time confirm for each write.',
-    hitlTier: 'standard',
-    sampleTools: [],
+    sampleTools: ['search-knowledge', 'get-article'],
   },
   'platform:admin': {
     summary: 'Platform admin — never granted to external agents',

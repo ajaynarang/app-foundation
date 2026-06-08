@@ -9,17 +9,14 @@ export interface DevUserDto {
   firstName: string;
   lastName: string;
   role: string;
-  driverId?: string | null;
   phone?: string | null;
 }
 
 const ROLE_ORDER: Record<string, number> = {
   OWNER: 0,
   ADMIN: 1,
-  DISPATCHER: 2,
-  DRIVER: 3,
-  CUSTOMER: 4,
-  SUPER_ADMIN: 5,
+  MEMBER: 2,
+  SUPER_ADMIN: 3,
 };
 
 @Injectable()
@@ -37,7 +34,6 @@ export class DevService {
       where: { isActive: true },
       include: {
         tenant: { select: { tenantId: true, companyName: true } },
-        driver: { select: { driverId: true, name: true } },
       },
       orderBy: [{ role: 'asc' }, { firstName: 'asc' }],
     });
@@ -72,7 +68,6 @@ export class DevService {
         firstName: u.firstName,
         lastName: u.lastName,
         role: u.role,
-        driverId: u.driver?.driverId ?? null,
         phone: u.phone ?? null,
       });
     }
@@ -90,7 +85,7 @@ export class DevService {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { userId },
-      include: { tenant: true, driver: true },
+      include: { tenant: true },
     });
     if (!user) throw new NotFoundException('User not found');
     const tokens = await this.authService.generateTokensForUser(user);

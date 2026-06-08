@@ -35,7 +35,6 @@ export class FirebaseAuthService {
       where: { firebaseUid },
       include: {
         tenant: true,
-        driver: true,
       },
     });
 

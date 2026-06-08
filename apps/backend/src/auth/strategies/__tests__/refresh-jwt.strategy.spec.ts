@@ -72,9 +72,8 @@ describe('RefreshJwtStrategy', () => {
         isActive: true,
         userId: 'u-1',
         email: 'test@test.com',
-        role: 'DISPATCHER',
+        role: 'MEMBER',
         tenant: { isActive: false, tenantId: 't-1', companyName: 'Test' },
-        driver: null,
       },
     });
     await expect(strategy.validate(req, payload)).rejects.toThrow(UnauthorizedException);
@@ -89,15 +88,13 @@ describe('RefreshJwtStrategy', () => {
         isActive: true,
         userId: 'u-1',
         email: 'test@test.com',
-        role: 'DISPATCHER',
+        role: 'MEMBER',
         tenant: { isActive: true, tenantId: 't-1', companyName: 'Test' },
-        driver: { driverId: 'drv-1', name: 'John' },
       },
     });
     const result = await strategy.validate(req, payload);
     expect(result.userId).toBe('u-1');
     expect(result.tenantId).toBe('t-1');
-    expect(result.driverId).toBe('drv-1');
     expect(result.tokenId).toBe('token-1');
   });
 });

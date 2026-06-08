@@ -33,16 +33,10 @@
     "db:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "db:push": "prisma db push",
-    "tenant:reset": "pnpm exec ts-node --transpile-only scripts/tenant-reset/cli.ts",
-    "backfill:factoring-money": "pnpm exec ts-node --transpile-only scripts/backfill-factoring-money.ts",
-    "backfill:relay-delivery-billing": "pnpm exec ts-node --transpile-only scripts/backfill-relay-delivery-billing.ts",
-    "// — Setup & Seeding (see tools/db/migrate.sh for staging)": "",
+    "// — Setup & Seeding": "",
     "setup:base": "ts-node prisma/seeds/index.ts",
     "setup:reset": "prisma migrate reset --force && ts-node prisma/seeds/index.ts",
     "setup:status": "ts-node prisma/seeds/index.ts --status",
-    "setup:demo": "pnpm exec ts-node --transpile-only scripts/demo/index.ts",
-    "setup:demo:reset": "pnpm exec ts-node --transpile-only scripts/demo/index.ts --reset",
-    "demo:today-stops": "pnpm exec ts-node --transpile-only scripts/demo/seed-today-stops.ts",
     "// — AI Seeding (knowledge base, LLM prompts, model pricing)": "",
     "seed:knowledge": "ts-node src/domains/ai/knowledge-base/ingestion.command.ts",
     "seed:langfuse": "tsx scripts/seed-langfuse-prompts.ts",
@@ -194,7 +188,7 @@
     "testRegex": ".*\\.spec\\.ts$",
     "testPathIgnorePatterns": [
       "\\.schema\\.spec\\.ts$",
-      "sally-ai\\.service\\.spec\\.ts$",
+      "assistant\\.service\\.spec\\.ts$",
       "langfuse-prompt\\.service\\.spec\\.ts$",
       "desk/engine/__tests__/invocation\\.service\\.spec\\.ts$"
     ],
@@ -208,10 +202,7 @@
       ]
     },
     "collectCoverageFrom": [
-      "src/**/*.(t|j)s",
-      "scripts/tenant-reset/**/*.(t|j)s",
-      "!scripts/tenant-reset/cli.ts",
-      "!scripts/tenant-reset/index.ts"
+      "src/**/*.(t|j)s"
     ],
     "coverageDirectory": "coverage",
     "testEnvironment": "node"

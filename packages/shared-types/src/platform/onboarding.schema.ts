@@ -10,7 +10,7 @@ export const OnboardingItemSchema = z.object({
   actionType: z.enum(['link', 'chat', 'sheet', 'console']),
 });
 
-export const LoadPathSchema = z.object({
+export const OnboardingPathSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string(),
@@ -25,7 +25,7 @@ export const MilestoneStatusSchema = z.object({
   status: z.enum(['complete', 'in_progress', 'available']),
   unlockMessage: z.string(),
   items: z.array(OnboardingItemSchema),
-  loadPaths: z.array(LoadPathSchema).optional(),
+  paths: z.array(OnboardingPathSchema).optional(),
 });
 
 export const OnboardingStatusResponseSchema = z.object({
@@ -35,8 +35,15 @@ export const OnboardingStatusResponseSchema = z.object({
   milestones: z.array(MilestoneStatusSchema),
 });
 
+/**
+ * Generic onboarding step identifiers. The backend maps each milestone/item to
+ * one of these steps; the frontend renders progress against the same vocabulary.
+ */
+export const OnboardingStepSchema = z.enum(['profile', 'team', 'integrations', 'done']);
+export type OnboardingStep = z.infer<typeof OnboardingStepSchema>;
+
 // Inferred types
 export type OnboardingItem = z.infer<typeof OnboardingItemSchema>;
-export type LoadPath = z.infer<typeof LoadPathSchema>;
+export type OnboardingPath = z.infer<typeof OnboardingPathSchema>;
 export type MilestoneStatus = z.infer<typeof MilestoneStatusSchema>;
 export type OnboardingStatusResponse = z.infer<typeof OnboardingStatusResponseSchema>;

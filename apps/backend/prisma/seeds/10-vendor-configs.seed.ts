@@ -5,13 +5,8 @@ const VENDOR_DEFAULTS: {
   displayOrder: number;
   isAvailable?: boolean;
 }[] = [
-  { vendorId: 'PROJECT44_TMS', displayOrder: 1 },
-  { vendorId: 'MCLEOD_TMS', displayOrder: 2, isAvailable: false },
-  { vendorId: 'TMW_TMS', displayOrder: 3, isAvailable: false },
-  { vendorId: 'SAMSARA_ELD', displayOrder: 1 },
-  { vendorId: 'MOTIVE_ELD', displayOrder: 2, isAvailable: false },
+  // Sample integration vendor. Add more entries here as the catalog grows.
   { vendorId: 'QUICKBOOKS', displayOrder: 1 },
-  { vendorId: 'DAT_LOAD_BOARD', displayOrder: 1 },
 ];
 
 export const seed = {

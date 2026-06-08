@@ -71,7 +71,8 @@ export const WalletTransactionListResponseSchema = z.object({
 // ---------------------------------------------------------------------------
 // Inferred types
 // ---------------------------------------------------------------------------
-export type WalletTransactionType = z.infer<typeof WalletTransactionTypeEnum>;
+// `WalletTransactionType` type comes from the generated Prisma mirror — not
+// re-declared here to avoid a barrel re-export collision.
 export type Wallet = z.infer<typeof WalletSchema>;
 export type WalletTransaction = z.infer<typeof WalletTransactionSchema>;
 export type TopUpRequest = z.infer<typeof TopUpRequestSchema>;

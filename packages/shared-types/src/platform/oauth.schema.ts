@@ -2,39 +2,12 @@ import { z } from 'zod';
 
 // ── Scopes ──────────────────────────────────────────────
 export const OAUTH_SCOPES = [
-  // Fleet
-  'fleet:read',
-  'fleet:write',
-  'fleet:write:sensitive',
-  // Loads
-  'loads:read',
-  'loads:write',
-  'loads:write:sensitive',
-  // Invoices
-  'invoices:read',
-  'invoices:write',
-  'invoices:write:sensitive',
-  // Settlements
-  'settlements:read',
-  'settlements:write',
-  'settlements:write:sensitive',
-  // Customers
-  'customers:read',
-  'customers:write',
-  'customers:write:sensitive',
-  // Billing
-  'billing:read',
-  'billing:write',
-  // Shield (compliance)
-  'shield:read',
-  'shield:write',
   // Documents
   'documents:read',
   'documents:write',
-  // Alerts
-  'alerts:read',
-  'alerts:write',
-  // Integrations (EDI etc.)
+  // Knowledge base
+  'knowledge:read',
+  // Integrations
   'integrations:read',
   'integrations:write',
   'integrations:write:sensitive',
@@ -42,9 +15,7 @@ export const OAUTH_SCOPES = [
   'comms:send',
   'comms:send:bulk',
   // EXCLUDED (deliberate, not an oversight):
-  //   desk:*        — internal agent orchestration; external agents should
-  //                   not be able to enable/disable other Sally agents.
-  //   platform:*    — tenant config, billing, invites; UI-only.
+  //   platform:*     — tenant config, billing, invites; UI-only.
   //   platform:admin — never grantable to any non-user principal.
 ] as const;
 
@@ -147,43 +118,16 @@ export type ConsentChallenge = z.infer<typeof ConsentChallengeSchema>;
 
 // ── Scope Descriptions (for consent page) ───────────────
 export const OAUTH_SCOPE_DESCRIPTIONS: Record<string, string> = {
-  // Fleet
-  'fleet:read': 'View fleet data (drivers, vehicles, trailers)',
-  'fleet:write': 'Create and update drivers, vehicles, and trailers',
-  'fleet:write:sensitive': 'Terminate drivers, retire vehicles (requires PIN approval)',
-  // Loads
-  'loads:read': 'View loads, stops, and dispatch board',
-  'loads:write': 'Create, assign, and update loads',
-  'loads:write:sensitive': 'Cancel or void loads (requires PIN approval)',
-  // Invoices
-  'invoices:read': 'View invoices and AR aging',
-  'invoices:write': 'Create and send invoices',
-  'invoices:write:sensitive': 'Void invoices (requires PIN approval)',
-  // Settlements
-  'settlements:read': 'View settlements and driver pay',
-  'settlements:write': 'Create and approve settlements',
-  'settlements:write:sensitive': 'Void approved settlements (requires PIN approval)',
-  // Customers
-  'customers:read': 'View customer information',
-  'customers:write': 'Create and update customers',
-  'customers:write:sensitive': 'Deactivate customers (requires PIN approval)',
-  // Billing
-  'billing:read': 'View billing readiness and charges',
-  'billing:write': 'Approve loads for billing',
-  // Shield (compliance)
-  'shield:read': 'View compliance scores and findings',
-  'shield:write': 'Dispute compliance findings',
   // Documents
-  'documents:read': 'View document compliance status',
-  'documents:write': 'Upload load documents (BOL, POD, rate-con)',
-  // Alerts
-  'alerts:read': 'View operational alerts',
-  'alerts:write': 'Acknowledge, resolve, and create alerts',
-  // Integrations (EDI etc.)
-  'integrations:read': 'View EDI tenders and trading partners',
-  'integrations:write': 'Accept, decline, or counter EDI tenders',
-  'integrations:write:sensitive': 'Manage auto-accept rules (requires PIN approval)',
+  'documents:read': 'View documents and their metadata',
+  'documents:write': 'Upload and update documents',
+  // Knowledge base
+  'knowledge:read': 'Search and read the knowledge base',
+  // Integrations
+  'integrations:read': 'View connected integrations and sync state',
+  'integrations:write': 'Trigger integration syncs',
+  'integrations:write:sensitive': 'Connect or disconnect integrations (requires PIN approval)',
   // Outbound comms
-  'comms:send': 'Send messages to a single driver or customer',
+  'comms:send': 'Send a message to a single recipient',
   'comms:send:bulk': 'Send bulk broadcasts to many recipients',
 };

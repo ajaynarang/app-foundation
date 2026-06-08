@@ -34,35 +34,35 @@ describe('RolesGuard', () => {
 
   it('should allow when no roles are required', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
-    const ctx = createMockContext({ role: 'DRIVER' });
+    const ctx = createMockContext({ role: 'MEMBER' });
 
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
   it('should allow when user has a required role', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['DISPATCHER', 'ADMIN']);
-    const ctx = createMockContext({ role: 'DISPATCHER' });
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['MEMBER', 'ADMIN']);
+    const ctx = createMockContext({ role: 'MEMBER' });
 
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
   it('should deny when user lacks the required role', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
-    const ctx = createMockContext({ role: 'DRIVER' });
+    const ctx = createMockContext({ role: 'MEMBER' });
 
     expect(guard.canActivate(ctx)).toBe(false);
   });
 
   it('should handle multiple required roles (user matches one)', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['DISPATCHER', 'ADMIN', 'SUPER_ADMIN']);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['MEMBER', 'ADMIN', 'SUPER_ADMIN']);
     const ctx = createMockContext({ role: 'SUPER_ADMIN' });
 
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
   it('should deny when user matches none of multiple required roles', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['DISPATCHER', 'ADMIN']);
-    const ctx = createMockContext({ role: 'CUSTOMER' });
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN', 'OWNER']);
+    const ctx = createMockContext({ role: 'MEMBER' });
 
     expect(guard.canActivate(ctx)).toBe(false);
   });

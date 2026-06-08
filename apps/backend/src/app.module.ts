@@ -17,21 +17,13 @@ import { getActiveTraceContext } from './infrastructure/logging/trace-context';
 import { buildPinoTransport } from './infrastructure/logging/pino-transport';
 
 // Domain Modules
-import { FleetModule } from './domains/fleet/fleet.module';
 import { PlatformModule } from './domains/platform/platform.module';
 import { IntegrationsModule } from './domains/integrations/integrations.module';
-import { LoadBoardModule } from './domains/integrations/load-board/load-board.module';
-import { OperationsModule } from './domains/operations/operations.module';
-import { RoutingModule } from './domains/routing/routing.module';
-import { FinancialsModule } from './domains/financials/financials.module';
 import { AiModule } from './domains/ai/ai.module';
-import { PlatformServicesModule } from './domains/platform-services/platform-services.module';
 import { AdminJobsModule } from './domains/admin/admin-jobs.module';
 import { AdminEventsModule } from './domains/admin/admin-events.module';
 import { AdminAiSpendModule } from './domains/admin/admin-ai-spend.module';
-import { AnalyticsModule } from './domains/analytics/analytics.module';
 import { BillingModule } from './domains/billing/billing.module';
-import { HomeModule } from './domains/home/home.module';
 import { DeskModule } from './domains/desk/desk.module';
 
 // Infrastructure Modules
@@ -42,16 +34,10 @@ import { SseModule } from './infrastructure/sse/sse.module';
 import { PushModule } from './infrastructure/push/push.module';
 import { SmsModule } from './infrastructure/sms/sms.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
-import { DocumentsQueueModule } from './infrastructure/queue/dispatchers/documents-queue.module';
-import { SafetyDetectQueueModule } from './infrastructure/queue/dispatchers/safety-detect-queue.module';
-import { GeoComputeQueueModule } from './infrastructure/queue/dispatchers/geo-compute-queue.module';
 import { NotificationsQueueModule } from './infrastructure/queue/dispatchers/notifications-queue.module';
 import { BulkOpsQueueModule } from './infrastructure/queue/dispatchers/bulk-ops-queue.module';
-import { FinanceQueueModule } from './infrastructure/queue/dispatchers/finance-queue.module';
-import { VendorDataQueueModule } from './infrastructure/queue/dispatchers/vendor-data-queue.module';
 import { DataRetentionModule } from './infrastructure/queue/data-retention.module';
 import { HealthModule } from './health/health.module';
-import { WebhookModule } from './infrastructure/webhooks/webhook.module';
 import { EventBusModule } from './infrastructure/events/event-bus.module';
 import { OutboundWebhooksModule } from './infrastructure/outbound-webhooks/outbound-webhooks.module';
 import { DevModule } from './dev/dev.module';
@@ -125,35 +111,21 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     NotificationModule,
     SseModule,
     QueueModule,
-    DocumentsQueueModule,
-    SafetyDetectQueueModule,
-    GeoComputeQueueModule,
     NotificationsQueueModule,
     BulkOpsQueueModule,
-    FinanceQueueModule,
-    VendorDataQueueModule,
     PromptingModule,
     EventBusModule,
     HealthModule,
     PushModule,
     SmsModule,
-    FleetModule,
     PlatformModule,
     IntegrationsModule,
-    LoadBoardModule,
-    OperationsModule,
-    RoutingModule,
-    FinancialsModule,
     AiModule,
-    PlatformServicesModule,
     AdminJobsModule,
     AdminEventsModule,
     AdminAiSpendModule,
-    AnalyticsModule,
     BillingModule,
-    HomeModule,
     DeskModule,
-    WebhookModule,
     OutboundWebhooksModule,
     DataRetentionModule,
     ...(getEnvType() !== 'production' ? [DevModule] : []),

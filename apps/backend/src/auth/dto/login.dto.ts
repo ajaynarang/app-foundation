@@ -42,12 +42,6 @@ export class UserLookupResultDto {
 
   @ApiProperty()
   tenantName: string;
-
-  @ApiProperty({ required: false })
-  driverId?: string;
-
-  @ApiProperty({ required: false })
-  driverName?: string;
 }
 
 export class UserLookupResponseDto {
@@ -78,7 +72,7 @@ export class UserProfileDto {
   lastName: string;
 
   @ApiProperty({
-    enum: ['DISPATCHER', 'DRIVER', 'ADMIN', 'OWNER', 'CUSTOMER', 'SUPER_ADMIN'],
+    enum: ['OWNER', 'ADMIN', 'MEMBER', 'SUPER_ADMIN'],
   })
   role: string;
 
@@ -93,18 +87,6 @@ export class UserProfileDto {
     description: 'Tenant IANA timezone — display fallback when the user has no timezone preference',
   })
   tenantTimezone?: string;
-
-  @ApiProperty({
-    required: false,
-    description: 'Tenant subdomain slug for URL routing',
-  })
-  subdomain?: string;
-
-  @ApiProperty({ required: false })
-  driverId?: string;
-
-  @ApiProperty({ required: false })
-  driverName?: string;
 
   @ApiProperty()
   isActive: boolean;

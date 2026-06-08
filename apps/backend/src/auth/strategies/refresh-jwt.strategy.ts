@@ -45,7 +45,6 @@ export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         user: {
           include: {
             tenant: true,
-            driver: true,
           },
         },
       },
@@ -69,8 +68,6 @@ export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       role: tokenRecord.user.role,
       tenantId: tokenRecord.user.tenant.tenantId,
       tenantName: tokenRecord.user.tenant.companyName,
-      driverId: tokenRecord.user.driver?.driverId,
-      driverName: tokenRecord.user.driver?.name,
       tokenId: payload.tokenId,
       isActive: tokenRecord.user.isActive,
     };

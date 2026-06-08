@@ -37,49 +37,25 @@ export const CACHE_TTL_FROZEN_24H = 86_400_000;
 
 // ---------------------------------------------------------------------------
 // Cache namespaces for admin flush
+//
+// Generic platform namespaces. The `app:` prefix is the convention; add a
+// namespace here when a service introduces a new cache family so the admin
+// cache console can flush it.
 // ---------------------------------------------------------------------------
 
 export const CACHE_NAMESPACES = [
-  'sally:plans',
-  'sally:addons',
-  'sally:cmdcenter',
-  'sally:analytics',
-  'sally:alerts',
-  'sally:eld',
-  'sally:monitoring',
-  'sally:health',
-  'sally:oauth',
-  'sally:loadboard',
-  'sally:flags',
-  'sally:dispatch',
-  'sally:profitability',
-  'sally:prefs',
-  'sally:onboarding',
-  'sally:closeout',
-  'sally:invoicing',
-  'sally:shield',
-  'sally:notifications',
-  'sally:settings',
-  'sally:reference',
-  'sally:loads',
-  'sally:tenants',
-  'sally:announcements',
-  'sally:customers',
-  'sally:custom-fields',
-  'sally:home',
-  'sally:desk',
-  'sally:tower',
-  'sally:agent',
-  'sally:comms',
-  'sally:ai-telemetry',
+  'app:plans',
+  'app:flags',
+  'app:oauth',
+  'app:prefs',
+  'app:onboarding',
+  'app:notifications',
+  'app:settings',
+  'app:tenants',
+  'app:announcements',
+  'app:agent',
+  'app:comms',
+  'app:ai-telemetry',
 ] as const;
 
 export type CacheNamespace = (typeof CACHE_NAMESPACES)[number];
-
-/**
- * Tower v3 cache namespace. Tower cache families (`active-loads`, `wire`,
- * `last-risk-band`) key off this prefix. Exposed as a named constant so
- * `buildKey()` callers and the cache-invalidation subscriber's prefix flush
- * share one source of truth instead of scattering the literal.
- */
-export const TOWER_CACHE_NAMESPACE: CacheNamespace = 'sally:tower';

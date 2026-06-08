@@ -44,9 +44,8 @@ describe('JwtTokenService', () => {
       id: 1,
       userId: 'USR-001',
       email: 'test@example.com',
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       tenantId: 10,
-      driverId: null,
     };
 
     it('should generate an access token and refresh token', async () => {
@@ -71,7 +70,7 @@ describe('JwtTokenService', () => {
       const accessPayload = mockJwtService.sign.mock.calls[0][0];
       expect(accessPayload.sub).toBe('USR-001');
       expect(accessPayload.email).toBe('test@example.com');
-      expect(accessPayload.role).toBe('DISPATCHER');
+      expect(accessPayload.role).toBe('MEMBER');
       expect(accessPayload.tenantId).toBe(10);
       expect(accessPayload.authMethod).toBe('email_password');
     });
@@ -124,7 +123,6 @@ describe('JwtTokenService', () => {
         email: 'test@example.com',
         role: 'ADMIN',
         tenantId: 5,
-        driverId: null,
       };
 
       mockJwtService.sign.mockReturnValue('new-access-token');
