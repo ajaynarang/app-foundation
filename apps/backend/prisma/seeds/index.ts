@@ -13,6 +13,7 @@ dotenv.config({ path: '.env.local' });
 // ---------------------------------------------------------------------------
 
 const SEED_LIST = [
+  '00-implicit-tenant',
   '01-super-admin',
   '02-feature-flags',
   '07-plan-config',

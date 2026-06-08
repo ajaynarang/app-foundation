@@ -85,7 +85,7 @@ export function logSeedResult(name: string, result: { created: number; skipped: 
 
 export function logHeader(profile: string, env: Environment): void {
   console.log('');
-  console.log('  SALLY Setup');
+  console.log('  Platform Setup');
   console.log(`  Profile: ${profile}`);
   console.log(`  Environment: ${env}`);
   console.log(`  Database: ${getDatabaseName()}`);
