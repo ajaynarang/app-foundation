@@ -150,13 +150,8 @@ const apiMethods = {
   delete: <T = any>(url: string, options?: ApiClientOptions) => apiClient<T>(url, { ...options, method: 'DELETE' }),
 };
 
-// Import sub-modules
-import { optimization } from '@/features/routing/optimization';
-import { hosRules } from '@/features/routing/hos-compliance';
-
-// Export combined API object
+// Export combined API object.
+// Feature-specific sub-modules can be merged here by the feature that owns them.
 export const api = {
   ...apiMethods,
-  optimization,
-  hos: hosRules,
 };

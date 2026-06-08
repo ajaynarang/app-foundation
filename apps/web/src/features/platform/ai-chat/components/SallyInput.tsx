@@ -11,131 +11,34 @@ import { useVoice } from '../voice/voice-provider';
 import { showError } from '@/shared/lib/toast';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import type { UserMode } from '../engine/types';
-import { matchAction } from '@/features/home/lib/action-matcher';
-import { useHomeSearch } from '@/features/home/hooks/use-home-search';
-import { SearchDropdown } from './SearchDropdown';
-import { SallyActionBar } from './SallyActionBar';
 import { SallyCommandPalette } from './SallyCommandPalette';
 import { MentionPicker } from './MentionPicker';
 import { useMentionSearch } from '../hooks/use-mention-search';
 import { getMentionFragment, buildMentionText } from '../lib/mention';
 import type { SearchApiResult } from '@/shared/lib/search';
 
-// ── Variant ────────────────────────────────────────────────────────────────
-
-export type SallyInputVariant = 'home' | 'panel';
-
 // ── Placeholder questions ──────────────────────────────────────────────────
 
-// Home variant doubles as a search bar — the first entry is a dual-purpose
-// hint ("ask + search") and the rest mix Sally questions with entity lookups.
-// Panel variant is chat-only (copilot) — the first entry should read as a
-// pure "ask Sally" prompt with no search framing.
-const PLACEHOLDER_QUESTIONS: Record<UserMode, string[]> = {
-  prospect: [
-    'Ask Sally anything about the platform…',
-    '"What is SALLY?"',
-    '"How does route planning work?"',
-    '"What integrations do you support?"',
-    '"Can I see pricing plans?"',
-    '"Book a demo"',
-  ],
-  dispatcher: [
-    'Ask Sally or search loads, drivers, invoices…',
-    '"Show me all active alerts"',
-    '"Who\'s available for a Dallas pickup?"',
-    'Load SL-10294',
-    'Driver Marcus Chen',
-    '"Run a Shield compliance audit"',
-    '"Generate invoice for load L-1045"',
-  ],
-  driver: [
-    'Ask Sally or search your loads…',
-    '"How much drive time do I have?"',
-    '"What\'s my next stop?"',
-    '"I\'m at the shipper"',
-    '"Report a delay"',
-    '"Show my settlement"',
-  ],
-  owner: [
-    'Ask Sally or search loads, drivers, invoices…',
-    '"What needs my attention right now?"',
-    '"Who\'s available for a pickup?"',
-    'Invoice INV-8821',
-    '"Show overdue invoices over $5,000"',
-    '"Approve pending settlements"',
-    '"Run a compliance audit"',
-  ],
-  admin: [
-    'Ask Sally or search loads, drivers, invoices…',
-    '"Show fleet status overview"',
-    '"Any HOS violations today?"',
-    '"What loads are ready to invoice?"',
-    'Driver Marcus Chen',
-    '"Show active alerts"',
-  ],
-  super_admin: [
-    'Ask Sally or search the platform…',
-    '"System status overview"',
-    '"Show fleet status"',
-    '"Any active alerts?"',
-    '"Driver HOS compliance check"',
-    '"Platform metrics"',
-  ],
-  customer: [
-    'Ask Sally or search shipments, invoices…',
-    '"Where are my shipments?"',
-    '"Track my latest delivery"',
-    '"Find my documents"',
-    '"View my invoices"',
-    '"What do I owe?"',
-  ],
-  support: [
-    'Ask Sally or search tickets…',
-    '"Check my ticket status"',
-    '"I need help with billing"',
-    '"Report a technical issue"',
-    '"Request a feature"',
-    '"Contact support"',
-  ],
+// Copilot side-panel — chat-only. The "@ to mention" suffix advertises the
+// entity picker so the affordance is discoverable on an empty input.
+const MENTION_HINT = '  ·  @ to mention';
+const PLACEHOLDERS: Record<UserMode, string> = {
+  prospect: 'Ask anything…',
+  member: `Ask anything…${MENTION_HINT}`,
+  owner: `Ask anything…${MENTION_HINT}`,
+  admin: `Ask anything…${MENTION_HINT}`,
+  super_admin: `Ask anything…${MENTION_HINT}`,
+  support: 'Ask anything…',
 };
-
-// Panel (copilot side-panel) — chat-only. The "@ to mention" suffix advertises
-// the entity picker so the affordance is discoverable on an empty input.
-const PANEL_MENTION_HINT = '  ·  @ to mention a load, driver, invoice…';
-const PANEL_PLACEHOLDERS: Record<UserMode, string> = {
-  prospect: 'Ask Sally anything…',
-  dispatcher: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  driver: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  owner: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  admin: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  super_admin: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  customer: `Ask Sally anything…${PANEL_MENTION_HINT}`,
-  support: 'Ask Sally anything…',
-};
-
-// ── Props ──────────────────────────────────────────────────────────────────
-
-export interface SallyInputProps {
-  variant?: SallyInputVariant;
-  /** Home variant only — called when matchAction or chip wants to navigate. */
-  onNavigate?: (href: string) => void;
-  /** Home variant only — called when input falls through to chat. */
-  onEnterChat?: (message: string) => void;
-}
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: SallyInputProps) {
+export function SallyInput() {
   const [input, setInput] = useState('');
-  const [searchSelectedIndex, setSearchSelectedIndex] = useState(-1);
-  const [searchDismissed, setSearchDismissed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const isHome = variant === 'home';
 
   const { orbState, isExpanded, userMode, sendMessage, stopGeneration, draftInput, setDraftInput } = useSallyStore();
 
@@ -153,68 +56,27 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
   const { hasEntitlement } = usePlan();
   const voiceEntitled = hasEntitlement('voice_mode');
 
-  // useHomeSearch internally gates on empty query, so passing '' makes the
-  // panel variant a no-op fetch-wise.
-  const { results: searchResults, hasQuery: searchHasQuery } = useHomeSearch(isHome ? input : '');
-  const showSearchDropdown = isHome && searchHasQuery && searchResults.length > 0 && !searchDismissed;
-
-  // @-mention picker — panel (chat) variant only. The home variant has its own
-  // search/navigation dropdown above, so we never run both at once.
+  // @-mention picker — entity references inside the chat input.
   const {
     results: mentionResults,
     isLoading: mentionLoading,
     hasQuery: mentionHasQuery,
   } = useMentionSearch(mentionQuery ?? '');
-  const mentionOpen = !isHome && mentionQuery !== null;
+  const mentionOpen = mentionQuery !== null;
 
   const isThinking = orbState === 'thinking';
-  const placeholder = isHome
-    ? (PLACEHOLDER_QUESTIONS[userMode] ?? PLACEHOLDER_QUESTIONS.dispatcher)[0]
-    : (PANEL_PLACEHOLDERS[userMode] ?? PANEL_PLACEHOLDERS.dispatcher);
+  const placeholder = PLACEHOLDERS[userMode] ?? PLACEHOLDERS.member;
 
-  // One-shot typewriter on the home variant — adds a subtle sense of life to
-  // the input on first paint, then stays static (no distracting rotation).
-  const [typedPlaceholder, setTypedPlaceholder] = useState(isHome ? '' : placeholder);
+  // Auto-focus when panel opens
   useEffect(() => {
-    if (!isHome) {
-      setTypedPlaceholder(placeholder);
-      return;
-    }
-    setTypedPlaceholder('');
-    let i = 0;
-    const tick = () => {
-      i += 1;
-      setTypedPlaceholder(placeholder.slice(0, i));
-      if (i < placeholder.length) {
-        // Slight jitter (50–70ms) mimics natural cadence — pure uniformity
-        // reads as mechanical. Spaces pause a touch longer, like a human.
-        const isSpace = placeholder[i - 1] === ' ';
-        const delay = isSpace ? 90 : 50 + Math.random() * 20;
-        timer = setTimeout(tick, delay);
-      }
-    };
-    let timer = setTimeout(tick, 320); // a beat of stillness first
-    return () => clearTimeout(timer);
-  }, [isHome, placeholder]);
-
-  // Auto-focus when panel opens (panel variant only)
-  useEffect(() => {
-    if (isHome) return;
     if (isExpanded && !isVoiceActive) {
       const timer = setTimeout(() => inputRef.current?.focus(), 300);
       return () => clearTimeout(timer);
     }
-  }, [isHome, isExpanded, isVoiceActive]);
+  }, [isExpanded, isVoiceActive]);
 
-  // Auto-focus on mount (home variant)
+  // Pick up prefilled draft
   useEffect(() => {
-    if (!isHome) return;
-    inputRef.current?.focus();
-  }, [isHome]);
-
-  // Pick up prefilled draft (panel variant only — home doesn't share this state)
-  useEffect(() => {
-    if (isHome) return;
     if (draftInput) {
       setInput(draftInput);
       setDraftInput(null);
@@ -226,7 +88,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
         }
       }, 350);
     }
-  }, [isHome, draftInput, setDraftInput]);
+  }, [draftInput, setDraftInput]);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -236,22 +98,14 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }, [input]);
 
-  // Reset search dropdown state on query change
-  useEffect(() => {
-    if (!isHome) return;
-    setSearchSelectedIndex(-1);
-    setSearchDismissed(false);
-  }, [isHome, input]);
-
   // Voice errors
   useEffect(() => {
     if (!voiceError) return;
     showError(voiceError);
   }, [voiceError]);
 
-  // V key shortcut (panel variant — home is competing with typing)
+  // V key shortcut
   useEffect(() => {
-    if (isHome) return;
     if (!isExpanded || !isVoiceAvailable) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'v' || e.key === 'V') {
@@ -263,38 +117,22 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isHome, toggleVoice, isExpanded, isVoiceAvailable]);
+  }, [toggleVoice, isExpanded, isVoiceAvailable]);
 
-  const handleSearchSelect = useCallback(
-    (result: SearchApiResult) => {
-      if (!onNavigate) return;
-      setInput('');
-      const url = new URL(result.href, 'http://placeholder');
-      url.searchParams.set('entityType', result.type);
-      url.searchParams.set('entityId', result.id);
-      onNavigate(`${url.pathname}${url.search}`);
-    },
-    [onNavigate],
-  );
-
-  // Recompute the active @-mention fragment from the live caret (panel only).
+  // Recompute the active @-mention fragment from the live caret.
   // Only reset the highlighted row when the QUERY actually changes — otherwise
   // a caret-sync fired on every keyup would slam the selection back to 0 and
   // break Arrow navigation. We compare against a ref (no extra render).
   const mentionQueryRef = useRef<string | null>(null);
-  const syncMention = useCallback(
-    (el: HTMLTextAreaElement) => {
-      if (isHome) return;
-      const frag = getMentionFragment(el.value, el.selectionStart ?? el.value.length);
-      const nextQuery = frag ? frag.query : null;
-      if (nextQuery !== mentionQueryRef.current) {
-        mentionQueryRef.current = nextQuery;
-        setMentionQuery(nextQuery);
-        setMentionIndex(0);
-      }
-    },
-    [isHome],
-  );
+  const syncMention = useCallback((el: HTMLTextAreaElement) => {
+    const frag = getMentionFragment(el.value, el.selectionStart ?? el.value.length);
+    const nextQuery = frag ? frag.query : null;
+    if (nextQuery !== mentionQueryRef.current) {
+      mentionQueryRef.current = nextQuery;
+      setMentionQuery(nextQuery);
+      setMentionIndex(0);
+    }
+  }, []);
 
   const closeMention = useCallback(() => {
     mentionQueryRef.current = null;
@@ -330,44 +168,11 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
     const text = input.trim();
     if (!text || isThinking) return;
 
-    if (isHome) {
-      // Tier 1: matchAction (instant route)
-      const action = matchAction(text);
-      if (action?.href && onNavigate) {
-        setInput('');
-        onNavigate(action.href);
-        return;
-      }
-
-      // Tier 2: search dropdown selection
-      if (showSearchDropdown && searchSelectedIndex >= 0 && searchSelectedIndex < searchResults.length) {
-        handleSearchSelect(searchResults[searchSelectedIndex]);
-        return;
-      }
-
-      // Tier 3: chat fallback
-      setInput('');
-      onEnterChat?.(text);
-      return;
-    }
-
-    // Panel variant — always chat
     sendMessage(text, 'text');
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     inputRef.current?.focus();
-  }, [
-    input,
-    isThinking,
-    isHome,
-    onNavigate,
-    onEnterChat,
-    showSearchDropdown,
-    searchSelectedIndex,
-    searchResults,
-    handleSearchSelect,
-    sendMessage,
-  ]);
+  }, [input, isThinking, sendMessage]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -417,34 +222,8 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
         handleSend();
         return;
       }
-      if (!isHome) return;
-      if (e.key === 'Escape' && showSearchDropdown) {
-        setSearchDismissed(true);
-        setSearchSelectedIndex(-1);
-        return;
-      }
-      if (showSearchDropdown && searchResults.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setSearchSelectedIndex((prev) => (prev < searchResults.length - 1 ? prev + 1 : 0));
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setSearchSelectedIndex((prev) => (prev > 0 ? prev - 1 : searchResults.length - 1));
-        }
-      }
     },
-    [
-      handleSend,
-      input.length,
-      isHome,
-      showSearchDropdown,
-      searchResults.length,
-      mentionOpen,
-      mentionResults,
-      mentionIndex,
-      handleMentionSelect,
-      closeMention,
-    ],
+    [handleSend, input.length, mentionOpen, mentionResults, mentionIndex, handleMentionSelect, closeMention],
   );
 
   const handleMicTap = useCallback(() => {
@@ -452,21 +231,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
     toggleVoice();
   }, [isVoiceAvailable, toggleVoice]);
 
-  // Palette picked a prompt while we're the home variant. Fill our local
-  // textarea directly — the home page hides the floating Sally panel, so
-  // setDraftInput + expandStrip (the panel-variant default) would silently
-  // drop the prompt. Defer focus past the dialog's onCloseAutoFocus.
-  const handleHomePalettePick = useCallback((text: string) => {
-    setInput(text);
-    setTimeout(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    }, 0);
-  }, []);
-
-  // ── Voice-active replacement UI (both variants) ──────────────────────────
+  // ── Voice-active replacement UI ──────────────────────────────────────────
 
   const orbColor =
     voiceState === 'speaking'
@@ -481,14 +246,14 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
       : voiceState === 'listening'
         ? 'Listening...'
         : voiceState === 'speaking'
-          ? 'Sally is speaking...'
+          ? 'Speaking...'
           : voiceState === 'processing'
             ? 'Thinking...'
             : '';
 
   if (isVoiceActive) {
     return (
-      <div className={isHome ? '' : 'p-3'}>
+      <div className="p-3">
         <div className="rounded-2xl bg-muted/80 backdrop-blur-sm border border-foreground/20">
           <div className="flex items-center gap-3 px-3 py-2.5">
             <motion.div
@@ -572,41 +337,15 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
 
   return (
     <>
-      <div className={isHome ? 'w-full max-w-3xl mx-auto px-4 sm:px-0' : 'p-3'}>
-        {/* Ask Sally suggestions — same component as the chat experience.
-          Reusing SallyActionBar means home and chat surface the same set of
-          capability questions per role; updating one updates both. */}
-        {isHome && (
-          <div className="mb-3 -mx-3 sm:mx-0">
-            <SallyActionBar onSelect={(text) => onEnterChat?.(text)} hideTopBorder />
-          </div>
-        )}
-
+      <div className="p-3">
         <div className="relative">
-          {/* Search dropdown — home variant only */}
-          {isHome && (
-            <SearchDropdown
-              results={searchResults}
-              query={input}
-              selectedIndex={searchSelectedIndex}
-              onSelect={handleSearchSelect}
-              onHover={setSearchSelectedIndex}
-              visible={showSearchDropdown}
-            />
-          )}
-
           <div className="sally-input-glow rounded-2xl p-[1.5px]">
             <div className="rounded-[calc(1rem-1.5px)] bg-background border border-border/20">
               {/* Textarea + static placeholder */}
               <div className="relative">
                 {!input && (
                   <div className="absolute left-3 right-3 top-[9px] pointer-events-none leading-5">
-                    <span className="text-sm text-muted-foreground/40 block leading-5">
-                      {typedPlaceholder}
-                      {isHome && typedPlaceholder.length < placeholder.length && (
-                        <span className="ml-0.5 inline-block w-[1px] h-3 bg-muted-foreground/40 animate-pulse align-middle" />
-                      )}
-                    </span>
+                    <span className="text-sm text-muted-foreground/40 block leading-5">{placeholder}</span>
                   </div>
                 )}
                 {/* @-mention picker — panel variant only, anchored above the input */}
@@ -633,7 +372,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
                   disabled={isThinking}
                   rows={2}
                   onKeyDown={handleKeyDown}
-                  aria-label="Ask Sally anything"
+                  aria-label="Ask anything"
                 />
               </div>
 
@@ -651,7 +390,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
                         className={`shrink-0 h-8 w-8 rounded-full ${!isVoiceAvailable || !voiceEntitled ? 'opacity-35' : ''}`}
                         aria-label={
                           !voiceEntitled
-                            ? 'Voice Mode requires the Fleet plan'
+                            ? 'Voice Mode requires an upgraded plan'
                             : isVoiceAvailable
                               ? 'Start voice mode (V)'
                               : 'Voice mode is not available'
@@ -677,7 +416,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
                     </TooltipTrigger>
                     {(!isVoiceAvailable || !voiceEntitled) && (
                       <TooltipContent side="top">
-                        {!voiceEntitled ? 'Voice Mode requires the Fleet plan' : 'Voice mode is not available'}
+                        {!voiceEntitled ? 'Voice Mode requires an upgraded plan' : 'Voice mode is not available'}
                       </TooltipContent>
                     )}
                   </Tooltip>
@@ -690,7 +429,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
                         size="sm"
                         onClick={() => setPaletteOpen(true)}
                         className="shrink-0 h-8 px-2 gap-1.5 rounded-full text-muted-foreground hover:text-foreground"
-                        aria-label="Ask Sally — see what she can do"
+                        aria-label="See what the assistant can do"
                       >
                         <span className="text-xs">Ask</span>
                         <kbd className="hidden sm:inline-flex h-4 items-center px-1 ml-0.5 text-2xs font-mono rounded border border-border bg-muted text-muted-foreground">
@@ -698,20 +437,18 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
                         </kbd>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top">See what Sally can do (/)</TooltipContent>
+                    <TooltipContent side="top">See what the assistant can do (/)</TooltipContent>
                   </Tooltip>
 
                   {/* Persistent @-mention affordance — mirrors the "Ask /" chip
                       so it reads as a real shortcut, and stays visible after the
-                      placeholder is gone (panel variant only). */}
-                  {!isHome && (
-                    <span className="hidden sm:inline-flex items-center gap-1 ml-0.5 text-xs text-muted-foreground select-none">
-                      <kbd className="inline-flex h-4 items-center px-1 text-2xs font-mono rounded border border-border bg-muted text-muted-foreground">
-                        @
-                      </kbd>
-                      mention
-                    </span>
-                  )}
+                      placeholder is gone. */}
+                  <span className="hidden sm:inline-flex items-center gap-1 ml-0.5 text-xs text-muted-foreground select-none">
+                    <kbd className="inline-flex h-4 items-center px-1 text-2xs font-mono rounded border border-border bg-muted text-muted-foreground">
+                      @
+                    </kbd>
+                    mention
+                  </span>
                 </div>
 
                 {isThinking ? (
@@ -762,11 +499,7 @@ export function SallyInput({ variant = 'panel', onNavigate, onEnterChat }: Sally
           </div>
         </div>
       </div>
-      <SallyCommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        onPickPrompt={isHome ? handleHomePalettePick : undefined}
-      />
+      <SallyCommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </>
   );
 }

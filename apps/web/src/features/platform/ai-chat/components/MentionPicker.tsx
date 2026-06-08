@@ -6,18 +6,12 @@ import { Command, CommandGroup, CommandItem, CommandList } from '@app/ui/compone
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import type { SearchApiResult } from '@/shared/lib/search';
 
-// Display order + heading labels. Keys match the backend `type` discriminators.
-const GROUPS: { type: string; label: string }[] = [
-  { type: 'load', label: 'Loads' },
-  { type: 'driver', label: 'Drivers' },
-  { type: 'customer', label: 'Customers' },
-  { type: 'invoice', label: 'Invoices' },
-  { type: 'settlement', label: 'Settlements' },
-  { type: 'vehicle', label: 'Vehicles' },
-  { type: 'trip', label: 'Trips' },
-  { type: 'trailer', label: 'Trailers' },
-  { type: 'lane', label: 'Recurring Lanes' },
-];
+/** Title-case a backend entity `type` discriminator into a group heading. */
+function groupLabel(type: string): string {
+  if (!type) return 'Results';
+  const titled = type.charAt(0).toUpperCase() + type.slice(1);
+  return titled.endsWith('s') ? titled : `${titled}s`;
+}
 
 export interface MentionPickerProps {
   results: SearchApiResult[];
@@ -30,8 +24,17 @@ export interface MentionPickerProps {
 }
 
 export function MentionPicker({ results, isLoading, hasQuery, activeIndex, onSelect, onHover }: MentionPickerProps) {
-  // Stable flat order so the keyboard index lines up with grouped rendering.
-  const ordered = useMemo(() => GROUPS.flatMap((g) => results.filter((r) => r.type === g.type)), [results]);
+  // Group dynamically by whatever entity `type`s the backend returns, in the
+  // order they first appear. Stable flat order so the keyboard index lines up
+  // with grouped rendering.
+  const groups = useMemo(() => {
+    const seen: string[] = [];
+    for (const r of results) {
+      if (!seen.includes(r.type)) seen.push(r.type);
+    }
+    return seen;
+  }, [results]);
+  const ordered = useMemo(() => groups.flatMap((t) => results.filter((r) => r.type === t)), [groups, results]);
 
   const activeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -58,7 +61,7 @@ export function MentionPicker({ results, isLoading, hasQuery, activeIndex, onSel
           {showHint ? (
             <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
               <Search className="h-3.5 w-3.5 shrink-0" />
-              <span>Type to search loads, drivers, customers, invoices, trucks…</span>
+              <span>Type to search…</span>
             </div>
           ) : showSkeleton ? (
             <div className="space-y-2 p-3" aria-busy="true">
@@ -70,14 +73,14 @@ export function MentionPicker({ results, isLoading, hasQuery, activeIndex, onSel
               ))}
             </div>
           ) : showEmpty ? (
-            <div className="px-3 py-3 text-xs text-muted-foreground">No matches — try a name, load #, or PO.</div>
+            <div className="px-3 py-3 text-xs text-muted-foreground">No matches.</div>
           ) : (
             <>
-              {GROUPS.map((group) => {
-                const rows = results.filter((r) => r.type === group.type);
+              {groups.map((type) => {
+                const rows = results.filter((r) => r.type === type);
                 if (rows.length === 0) return null;
                 return (
-                  <CommandGroup key={group.type} heading={group.label}>
+                  <CommandGroup key={type} heading={groupLabel(type)}>
                     {rows.map((row) => {
                       const index = ordered.indexOf(row);
                       const isActive = index === activeIndex;

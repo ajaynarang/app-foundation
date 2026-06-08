@@ -4,7 +4,23 @@ import { useRouter } from 'next/navigation';
 import { Activity } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
-import { useJobHealth } from '@/features/system-activity/hooks/use-job-health';
+
+interface JobHealth {
+  hasCritical: boolean;
+  hasWarning: boolean;
+  criticalCount: number;
+  warningCount: number;
+}
+
+/**
+ * Background-job health is a super-admin concern. The trucking app had a
+ * `system-activity` feature feeding this; the generic starter ships an inert
+ * indicator (renders nothing) that the platform can wire to its own health
+ * source by replacing this hook.
+ */
+function useJobHealth(): JobHealth {
+  return { hasCritical: false, hasWarning: false, criticalCount: 0, warningCount: 0 };
+}
 
 export function JobHealthIndicator() {
   const router = useRouter();

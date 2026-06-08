@@ -27,28 +27,11 @@ export function getMentionFragment(value: string, caret: number): MentionFragmen
 /**
  * Clean plain-text reference inserted into the message on select.
  * Never contains '@' — the picker is a lookup affordance, not message content.
+ *
+ * Generic by design: it prefixes the entity `type` (as returned by the backend
+ * `/search` endpoint) before its label, e.g. `project "Acme rollout"`. Add
+ * special-cased formatting per entity type as your product grows.
  */
 export function buildMentionText(result: SearchApiResult): string {
-  switch (result.type) {
-    case 'load':
-      return result.referenceNumber ? `load ${result.id} (${result.referenceNumber})` : `load ${result.id}`;
-    case 'driver':
-      return `driver ${result.label}`;
-    case 'customer':
-      return `customer ${result.label}`;
-    case 'invoice':
-      return `invoice ${result.id}`;
-    case 'settlement':
-      return `settlement ${result.id}`;
-    case 'vehicle':
-      return `unit ${result.label.replace(/^Unit\s+/i, '')}`;
-    case 'trip':
-      return `trip ${result.id}`;
-    case 'trailer':
-      return `trailer ${result.id}`;
-    case 'lane':
-      return `lane "${result.label}"`;
-    default:
-      return result.label;
-  }
+  return result.type ? `${result.type} ${result.label}` : result.label;
 }

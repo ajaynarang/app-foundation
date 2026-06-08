@@ -3,6 +3,7 @@ export { useSallyStore } from './store';
 
 // Components
 export { AppAIProvider } from './components/AppAIProvider';
+export { RichCardRenderer } from './components/cards/RichCardRenderer';
 export { SallyStrip } from './components/SallyStrip';
 export { SallyOrb } from './components/SallyOrb';
 export { SallyChat } from './components/SallyChat';

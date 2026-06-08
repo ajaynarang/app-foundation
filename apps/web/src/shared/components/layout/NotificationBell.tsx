@@ -3,7 +3,7 @@
 import { Bell } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
-import { useNotificationCount } from '@/features/operations/notifications';
+import { useNotificationCount } from './use-notifications';
 
 interface NotificationBellProps {
   onClick: () => void;

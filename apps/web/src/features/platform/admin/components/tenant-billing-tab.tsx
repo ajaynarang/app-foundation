@@ -65,9 +65,9 @@ interface TenantPlanBillingTabProps {
     plan: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     planConfig: any;
-    vehicleCount: number;
-    fleetLimit: number | null;
-    fleetLimitWarning: boolean;
+    seatCount: number;
+    seatLimit: number | null;
+    seatLimitWarning: boolean;
     planAssignedAt: string | null;
     planAssignedBy: string | null;
     planEvents: Array<{
@@ -282,10 +282,10 @@ export function TenantPlanBillingTab({
     });
   };
 
-  // --- Fleet usage ---
-  const vehicleCount = planData?.vehicleCount ?? 0;
-  const fleetLimit = planData?.fleetLimit;
-  const fleetPct = fleetLimit && fleetLimit > 0 ? Math.min(Math.round((vehicleCount / fleetLimit) * 100), 100) : 0;
+  // --- Seat usage ---
+  const seatCount = planData?.seatCount ?? 0;
+  const seatLimit = planData?.seatLimit;
+  const seatPct = seatLimit && seatLimit > 0 ? Math.min(Math.round((seatCount / seatLimit) * 100), 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -313,20 +313,20 @@ export function TenantPlanBillingTab({
             )}
           </div>
 
-          {/* Fleet usage progress bar */}
-          {fleetLimit !== null && fleetLimit !== undefined && (
+          {/* Seat usage progress bar */}
+          {seatLimit !== null && seatLimit !== undefined && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Fleet Usage</span>
+                <span>Seat Usage</span>
                 <span>
-                  {vehicleCount} / {fleetLimit} vehicles
+                  {seatCount} / {seatLimit} seats
                 </span>
               </div>
-              <Progress value={fleetPct} className="h-2" />
-              {planData?.fleetLimitWarning && (
+              <Progress value={seatPct} className="h-2" />
+              {planData?.seatLimitWarning && (
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
-                  Approaching fleet limit
+                  Approaching seat limit
                 </p>
               )}
             </div>

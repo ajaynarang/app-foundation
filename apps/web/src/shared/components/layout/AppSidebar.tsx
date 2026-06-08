@@ -47,11 +47,8 @@ import { useOnboardingStore } from '@/features/platform/onboarding';
 import { CheckCircle2 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { FontSizeControl } from './FontSizeControl';
-import { useCloseOutSummary } from '@/features/financials/close-out';
 import { TourTriggerButton } from '@/features/platform/tour';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
-import { usePendingEmailCount } from '@/features/email-intake/hooks';
-import { FeedbackDialog } from '@/features/feedback/components/feedback-dialog';
 import { WorkspaceSwitcherPopover } from './WorkspaceSwitcherPopover';
 import { CommandPaletteTrigger } from '@/shared/components/command-palette/CommandPalette';
 
@@ -60,21 +57,14 @@ interface AppSidebarProps {
   onClose: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  alertCount: number;
 }
 
-export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, alertCount }: AppSidebarProps) {
+export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuthStore();
   const { status, milestone1Complete, milestone2Complete, milestone1IncompleteCount } = useOnboardingStore();
   const { hasFeature } = usePlan();
-  const hasEmailIngest = hasFeature('email_intake');
-  const pendingEmailCount = usePendingEmailCount(hasEmailIngest);
-  const { data: closeOutSummary } = useCloseOutSummary();
-  const closeOutCount = closeOutSummary?.total ?? 0;
-  const hasOverduePods = (closeOutSummary?.overduePods ?? 0) > 0;
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   // Get navigation items from centralized config
@@ -117,8 +107,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
   };
 
   const getRoleLabel = (role: string | undefined) => {
-    if (role === 'DISPATCHER') return 'Dispatcher';
-    if (role === 'DRIVER') return 'Driver';
+    if (role === 'MEMBER') return 'Member';
     if (role === 'ADMIN') return 'Admin';
     if (role === 'OWNER') return 'Owner';
     if (role === 'SUPER_ADMIN') return 'Super Admin';
@@ -130,43 +119,14 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
     router.push('/');
   };
 
-  // Get badge for nav items (alerts, close-out)
-  const getNavItemBadge = (navItem: NavItem) => {
-    if (navItem.href === '/dispatcher/alerts' && alertCount > 0) {
-      if (isCollapsed) {
-        return <div className="h-2 w-2 rounded-full bg-critical" />;
-      }
-      return (
-        <Badge variant="destructive" className="h-5 min-w-5 px-1 text-xs">
-          {alertCount > 99 ? '99+' : alertCount}
-        </Badge>
-      );
-    }
-    if (navItem.href === '/dispatcher/inbox' && pendingEmailCount > 0) {
-      return <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />;
-    }
-    if (navItem.href === '/dispatcher/close-out' && closeOutCount > 0) {
-      if (isCollapsed) {
-        return <div className={`h-2 w-2 rounded-full ${hasOverduePods ? 'bg-caution' : 'bg-foreground'}`} />;
-      }
-      return (
-        <Badge variant={hasOverduePods ? 'caution' : 'muted'} className="h-5 min-w-5 px-1 text-xs">
-          {closeOutCount > 99 ? '99+' : closeOutCount}
-        </Badge>
-      );
-    }
-    return null;
-  };
+  // Per-item badges are derived from feature state; the generic starter ships
+  // none. Kept as a hook so features can opt back in without re-plumbing.
+  const getNavItemBadge = (_navItem: NavItem): React.ReactNode => null;
 
   // Navigate back to main sidebar from sub-panel
   const handleBackToMain = () => {
     // Navigate to the default route for the role to exit sub-panel
-    const defaultRoute =
-      user?.role === 'CUSTOMER'
-        ? '/customer/dashboard'
-        : user?.role === 'SUPER_ADMIN'
-          ? '/admin/tenants'
-          : '/dispatcher';
+    const defaultRoute = user?.role === 'SUPER_ADMIN' ? '/admin/tenants' : '/';
     router.push(defaultRoute);
   };
 
@@ -195,8 +155,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out',
-          'border-r border-border flex flex-col',
-          user?.role === 'DRIVER' ? 'bg-muted' : 'bg-background',
+          'border-r border-border flex flex-col bg-background',
           // Mobile: overlay slide-in
           isOpen ? 'translate-x-0' : '-translate-x-full',
           // Desktop: static in flex layout (not fixed)
@@ -217,13 +176,12 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
               href="/"
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               title="Go to Home"
-              data-sally-logo
+              data-app-logo
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/sally-logo-dark.svg" alt="SALLY" className="h-7 w-7 dark:block hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/sally-logo-light.svg" alt="SALLY" className="h-7 w-7 dark:hidden block" />
-              <span className="text-xl font-bold tracking-tight font-space-grotesk">SALLY</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background text-sm font-bold">
+                A
+              </span>
+              <span className="text-xl font-bold tracking-tight">App</span>
             </Link>
           )}
           {isCollapsed && (
@@ -232,10 +190,9 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
               className="hidden md:flex items-center justify-center"
               title="Expand sidebar"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/sally-logo-dark.svg" alt="S" className="h-6 w-6 dark:block hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/sally-logo-light.svg" alt="S" className="h-6 w-6 dark:hidden block" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background text-xs font-bold">
+                A
+              </span>
             </button>
           )}
           {!isCollapsed && (
@@ -250,7 +207,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
         </div>
 
         {/* Zone 1: Search / command palette trigger — hidden in sub-panel */}
-        {!activeSubPanel && user?.role !== 'DRIVER' && user?.role !== 'CUSTOMER' && (
+        {!activeSubPanel && (
           <div className="border-b border-border px-3 py-3">
             <CommandPaletteTrigger collapsed={isCollapsed} />
           </div>
@@ -316,16 +273,13 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
                     const hasSubPanel = !!navItem.subPanel;
                     const isSubPanelActive = hasSubPanel && activeSubPanel === navItem.subPanel;
                     const settingsPrefix = '/settings';
-                    const accountPrefix = '/dispatcher/account';
                     const isActive = hasSubPanel
                       ? isSubPanelActive
                       : navItem.exact
                         ? pathname === navItem.href
                         : navItem.href.startsWith(settingsPrefix)
                           ? pathname?.startsWith(settingsPrefix)
-                          : navItem.href.startsWith(accountPrefix)
-                            ? pathname?.startsWith(accountPrefix)
-                            : pathname === navItem.href || pathname?.startsWith(navItem.href + '/');
+                          : pathname === navItem.href || pathname?.startsWith(navItem.href + '/');
                     const Icon = navItem.icon;
                     const isSetupHub = navItem.href === '/setup-hub';
                     const showSetupBadge = isSetupHub && (user?.role === 'OWNER' || user?.role === 'ADMIN');
@@ -366,7 +320,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
                       >
                         <Icon className={cn('h-5 w-5 flex-shrink-0', isCollapsed && 'mx-auto')} />
                         {!isCollapsed && <span className="flex-1">{navItem.label}</span>}
-                        {!isCollapsed && navItem.exact && navItem.href === '/dispatcher' && (
+                        {!isCollapsed && navItem.exact && navItem.href === '/' && (
                           <kbd
                             className="pointer-events-none ml-auto h-5 select-none items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-muted-foreground hidden sm:flex flex-shrink-0"
                             title="Press G then H"
@@ -411,8 +365,8 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
           </AnimatePresence>
         </ScrollArea>
 
-        {/* Zone 3: Show Me Around — hidden for CUSTOMER and SUPER_ADMIN */}
-        {user?.role !== 'CUSTOMER' && user?.role !== 'SUPER_ADMIN' && !activeSubPanel && (
+        {/* Zone 3: Show Me Around — hidden for SUPER_ADMIN */}
+        {user?.role !== 'SUPER_ADMIN' && !activeSubPanel && (
           <div className="border-t border-border px-3 py-2">
             <TourTriggerButton isCollapsed={isCollapsed} />
           </div>
@@ -424,7 +378,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
             <WorkspaceSwitcherPopover
               isCollapsed={isCollapsed}
               onClose={onClose}
-              onOpenFeedback={() => setFeedbackOpen(true)}
+              onOpenFeedback={() => router.push('/settings/support')}
               onExpand={onToggleCollapse}
             />
           </div>
@@ -550,7 +504,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
                         className="flex items-center gap-3 w-full px-3 py-1.5 rounded-md text-xs hover:bg-muted transition-colors text-muted-foreground"
                       >
                         <BookOpen className="h-3.5 w-3.5" />
-                        <span>Learn SALLY</span>
+                        <span>Documentation</span>
                       </button>
                     </>
                   )}
@@ -587,8 +541,6 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse, ale
           )}
         </div>
       </aside>
-
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </TooltipProvider>
   );
 }

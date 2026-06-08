@@ -5,7 +5,6 @@ import { Button } from '@app/ui/components/ui/button';
 import { useSallyStore } from '../store';
 import { SallyOrb } from './SallyOrb';
 import { SallyChat } from './SallyChat';
-import { SallyOverlay } from '@/features/fleet/drivers/components/SallyOverlay';
 import { VoiceProvider } from '../voice/voice-provider';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { STORAGE_KEYS } from '@/shared/constants';
@@ -395,7 +394,9 @@ export function SallyStrip({ hideOrb }: { hideOrb?: boolean } = {}) {
               </div>
 
               {/* Chat — wrapped with VoiceProvider for voice session context */}
-              <VoiceProvider>{userMode === 'driver' ? <SallyOverlay /> : <SallyChat />}</VoiceProvider>
+              <VoiceProvider>
+                <SallyChat />
+              </VoiceProvider>
             </div>
             {/* end float glow inner / flex wrapper */}
           </motion.div>
@@ -410,7 +411,7 @@ export function SallyStrip({ hideOrb }: { hideOrb?: boolean } = {}) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className={`fixed right-6 z-50 ${userMode === 'driver' ? 'bottom-24' : 'bottom-6'}`}
+              className="fixed right-6 z-50 bottom-6"
             >
               <SallyOrb state={orbState} size="lg" onClick={expandStrip} hasUnread={hasUnreadAsync} showHint />
             </motion.div>

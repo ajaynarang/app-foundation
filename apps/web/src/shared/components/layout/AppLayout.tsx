@@ -9,12 +9,6 @@ import { TrialBanner, PlanBlockedScreen } from '@/features/platform/plans';
 import { usePlan } from '@/features/platform/plans';
 import { useAuthStore } from '@/features/auth';
 import { useOnboardingStore } from '@/features/platform/onboarding';
-import { useQuery } from '@tanstack/react-query';
-import { listAlerts } from '@/features/operations/alerts';
-import { useAlertStream } from '@/features/operations/alerts/hooks/use-alert-stream';
-import { useNotificationStream } from '@/features/operations/notifications/hooks/use-notification-stream';
-import { useLoadMessageStream } from '@/features/fleet/loads/hooks/use-load-message-stream';
-import { useShieldAsyncStream } from '@/features/operations/shield/hooks/use-shield-async-stream';
 import { PlatformTour } from '@/features/platform/tour';
 import { PageTransition } from '@/shared/lib/motion';
 import { CommandPalette } from '@/shared/components/command-palette/CommandPalette';
@@ -42,21 +36,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Global hotkeys: ⌘K opens palette, g-h navigates Home
   useAppHotkeys();
 
-  // Fetch alert count
-  const { data: alerts = [] } = useQuery({
-    queryKey: ['alerts', 'active'],
-    queryFn: () => listAlerts({ status: 'active' }),
-    enabled: isAuthenticated,
-  });
-
-  const alertCount = alerts.length;
-  const _criticalCount = alerts.filter((a) => a.priority === 'CRITICAL' && a.status === 'ACTIVE').length;
-
-  // Real-time side effects (the SSE connection itself is owned by SseProvider)
-  useAlertStream();
-  useNotificationStream();
-  useLoadMessageStream();
-  useShieldAsyncStream();
+  // Real-time cache invalidation is owned by SseProvider via SSE_INVALIDATION_MAP;
+  // feature-specific stream side effects live in their own features.
 
   // Initialize onboarding store for OWNER/ADMIN
   useEffect(() => {
@@ -80,17 +61,16 @@ export function AppLayout({ children }: AppLayoutProps) {
     setBannerDismissed(true);
   };
 
-  // Only show onboarding banner on top-level dispatcher dashboard, not on work pages
-  const onboardingBannerPages = ['/dispatcher', '/dispatcher/home', '/admin'];
+  // Only show onboarding banner on the top-level landing page, not on work pages
+  const onboardingBannerPages = ['/', '/admin'];
   const showOnboardingBanner =
     !bannerDismissed &&
     !milestone1Complete &&
     (user?.role === 'OWNER' || user?.role === 'ADMIN') &&
-    pathname !== '/setup-hub' &&
     onboardingBannerPages.some((p) => pathname === p || pathname === p + '/');
 
   // Allow account/subscription pages even when trial expired so users can upgrade
-  const isAccountPage = pathname?.startsWith('/dispatcher/account');
+  const isAccountPage = pathname?.startsWith('/settings/subscription') || pathname?.startsWith('/settings/billing');
 
   if (!isAuthenticated) {
     return null;
@@ -108,7 +88,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           onClose={() => setSidebarOpen(false)}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          alertCount={alertCount}
         />
 
         {/* Content area: header + banners + scrollable main */}

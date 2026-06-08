@@ -76,7 +76,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   }, [user, loadAllPreferences]);
 
   const formatters = useMemo<Formatters>(() => {
-    const du = (userPreferences?.distanceUnit as 'MILES' | 'KILOMETERS') || 'MILES';
+    // `distanceUnit` was a trucking-era preference; the generic preferences
+    // shape no longer carries it, so the formatter defaults to MILES.
+    const du: 'MILES' | 'KILOMETERS' = 'MILES';
     const tf = (userPreferences?.timeFormat as '12H' | '24H') || '12H';
     const df = userPreferences?.dateFormat || 'MM/DD/YYYY';
     const tz = userPreferences?.timezone || user?.tenantTimezone || DEFAULT_TENANT_TIMEZONE;
@@ -99,13 +101,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       dateFormat: df,
       timezone: tz,
     };
-  }, [
-    userPreferences?.distanceUnit,
-    userPreferences?.timeFormat,
-    userPreferences?.dateFormat,
-    userPreferences?.timezone,
-    user?.tenantTimezone,
-  ]);
+  }, [userPreferences?.timeFormat, userPreferences?.dateFormat, userPreferences?.timezone, user?.tenantTimezone]);
 
   return <PreferencesContext.Provider value={formatters}>{children}</PreferencesContext.Provider>;
 }

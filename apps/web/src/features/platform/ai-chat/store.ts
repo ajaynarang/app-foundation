@@ -134,19 +134,12 @@ async function initConversationViaApi(mode: UserMode): Promise<{ sessionId: stri
 function createFallbackGreeting(mode: UserMode): ChatMessage {
   const greetings: Record<UserMode, string> = {
     prospect:
-      "Hi! I'm SALLY. I can tell you about our fleet operations platform, pricing, integrations, or set up a demo. What would you like to know?",
-    dispatcher:
-      "Hi! I'm SALLY. I can check alerts, look up drivers, query routes, and manage your fleet. What do you need?",
-    driver: "Hey! I'm SALLY. I can show your route, check HOS, report delays, or find fuel. What's up?",
-    owner:
-      "Hi! I'm SALLY. I can give you a full view of your fleet — alerts, loads, driver status, routes. What do you need?",
-    admin:
-      "Hi! I'm SALLY. I can check fleet alerts, driver status, loads, and routes across your operation. What do you need?",
-    super_admin:
-      "Hi! I'm SALLY. I can check system status, fleet operations, alerts, and driver HOS across the platform. What do you need?",
-    customer:
-      "Hi! I'm SALLY. I can help you track shipments, request quotes, and connect with your dispatcher. What do you need?",
-    support: "Hi! I'm SALLY. I can help you with your support request. What do you need assistance with?",
+      "Hi! I'm your AI assistant. I can tell you about the product, pricing, integrations, or help you get started. What would you like to know?",
+    member: "Hi! I'm your AI assistant. Ask me anything or tell me what you'd like to get done.",
+    owner: "Hi! I'm your AI assistant. I can help you across your workspace — what do you need?",
+    admin: "Hi! I'm your AI assistant. I can help you manage your workspace. What do you need?",
+    super_admin: "Hi! I'm your AI assistant. I can help you across the platform. What do you need?",
+    support: "Hi! I'm your AI assistant. I can help with your support request. What do you need assistance with?",
   };
   return {
     id: 'initial',

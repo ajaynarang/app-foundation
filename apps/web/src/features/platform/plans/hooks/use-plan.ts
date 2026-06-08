@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth';
 import { plansApi } from '../api';
-import { addOnsApi } from '@/features/add-ons/api';
 import { featureFlagsApi } from '@/features/platform/feature-flags/api';
 import { QUERY_TIERS } from '@/shared/config/query-tiers';
 import { queryKeys } from '@/shared/constants';
@@ -20,20 +19,11 @@ export function usePlan() {
   const { user, isAuthenticated } = useAuthStore();
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  // Drivers and customers don't have access to plan/add-on endpoints
-  const isNonAdminRole = user?.role === 'DRIVER' || user?.role === 'CUSTOMER';
-  const canFetchPlan = isAuthenticated && !isSuperAdmin && !isNonAdminRole;
+  const canFetchPlan = isAuthenticated && !isSuperAdmin;
 
   const { data: planDetails, isLoading } = useQuery({
     queryKey: queryKeys.plans.root,
     queryFn: () => plansApi.getMyPlan(),
-    enabled: canFetchPlan,
-    ...QUERY_TIERS.STATIC,
-  });
-
-  const { data: myAddOns } = useQuery({
-    queryKey: queryKeys.addOns.myAddOns,
-    queryFn: () => addOnsApi.listMyAddOns(),
     enabled: canFetchPlan,
     ...QUERY_TIERS.STATIC,
   });
@@ -64,11 +54,17 @@ export function usePlan() {
     return entitlement?.enabled ?? false;
   }
 
-  /** Check if tenant has an active add-on by slug or feature key */
-  function hasAddOn(key: string): boolean {
+  /**
+   * Check if the tenant has an active add-on by slug or feature key.
+   *
+   * The starter does not ship an add-on subscription endpoint in this hook —
+   * wire one up (a `listMyAddOns()` query) and check it here when you add a
+   * purchasable add-on catalog. Until then, add-ons resolve to plan
+   * entitlements via the unified `hasFeature` check.
+   */
+  function hasAddOn(_key: string): boolean {
     if (isLoading || isSuperAdmin) return true;
-    if (!myAddOns) return false;
-    return myAddOns.some((sub) => (sub.addOn.slug === key || sub.addOn.featureKey === key) && sub.status === 'ACTIVE');
+    return false;
   }
 
   /**
@@ -98,10 +94,10 @@ export function usePlan() {
 
   /**
    * Returns the minimum plan display name required for an entitlement.
-   * Used by upgrade prompts to show "Requires Fleet plan".
+   * Used by upgrade prompts to show "Requires Enterprise plan".
    */
   function getRequiredPlan(entitlementKey: string): string {
-    return upgradeRegistry[entitlementKey]?.requiredPlan ?? 'Freight Force';
+    return upgradeRegistry[entitlementKey]?.requiredPlan ?? 'Enterprise';
   }
 
   const isTrialExpired = plan === 'TRIAL_EXPIRED';
@@ -121,8 +117,8 @@ export function usePlan() {
     isOnTrial,
     daysLeftInTrial: planDetails?.daysLeftInTrial ?? null,
     trialEndsAt: planDetails?.trialEndsAt ?? null,
-    vehicleCount: planDetails?.vehicleCount ?? 0,
-    fleetLimit: planDetails?.fleetLimit ?? null,
-    fleetLimitWarning: planDetails?.fleetLimitWarning ?? false,
+    seatCount: planDetails?.seatCount ?? 0,
+    seatLimit: planDetails?.seatLimit ?? null,
+    seatLimitWarning: planDetails?.seatLimitWarning ?? false,
   };
 }

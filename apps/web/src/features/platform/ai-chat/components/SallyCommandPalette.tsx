@@ -15,17 +15,16 @@ import { Sparkles } from 'lucide-react';
 import { useSallyStore } from '../store';
 import { useSallyCapabilities } from '../hooks/use-sally-capabilities';
 
-const CHAT_INPUT_LABEL = 'Ask Sally anything';
+const CHAT_INPUT_LABEL = 'Ask anything';
 
 interface SallyCommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /**
    * How to deliver a picked prompt back to the surface that opened the
-   * palette. Defaults to setDraftInput + expandStrip, which is correct for
-   * the floating Sally panel. The home variant passes its own handler so
-   * the prompt fills the inline home input instead of opening a floating
-   * panel that would not render on /dispatcher.
+   * palette. Defaults to setDraftInput + expandStrip, which fills the chat
+   * input and opens the floating panel. Pass a handler to deliver the prompt
+   * to a different surface instead.
    */
   onPickPrompt?: (text: string) => void;
 }
@@ -71,7 +70,7 @@ export function SallyCommandPalette({ open, onOpenChange, onPickPrompt }: SallyC
 
   return (
     <CommandDialog open={open} onOpenChange={handleOpenChange}>
-      <CommandInput placeholder="Search what Sally can do…" />
+      <CommandInput placeholder="Search what the assistant can do…" />
       <CommandList>
         <CommandEmpty>{isLoading ? 'Loading…' : 'No matches. Try a different word.'}</CommandEmpty>
 

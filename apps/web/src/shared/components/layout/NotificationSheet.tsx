@@ -16,8 +16,8 @@ import {
   useDismissNotification,
   useMarkAllRead,
   useMarkAsUnread,
-} from '@/features/operations/notifications';
-import type { Notification } from '@/features/operations/notifications/types';
+  type Notification,
+} from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
 import { openConsole } from '@/shared/lib/console-url';
 

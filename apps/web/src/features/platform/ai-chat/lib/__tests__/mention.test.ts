@@ -29,7 +29,7 @@ describe('getMentionFragment', () => {
 
 describe('buildMentionText', () => {
   const r = (over: Partial<SearchApiResult>): SearchApiResult => ({
-    type: 'load',
+    type: 'project',
     id: 'X',
     label: 'X',
     description: '',
@@ -37,47 +37,13 @@ describe('buildMentionText', () => {
     ...over,
   });
 
-  it('load with ref → load <id> (<ref>)', () => {
-    expect(buildMentionText(r({ type: 'load', id: 'LD-2026-001', referenceNumber: 'PO-88421' }))).toBe(
-      'load LD-2026-001 (PO-88421)',
-    );
+  it('prefixes the entity type before its label', () => {
+    expect(buildMentionText(r({ type: 'project', label: 'Acme rollout' }))).toBe('project Acme rollout');
   });
-  it('load without ref → load <id>', () => {
-    expect(buildMentionText(r({ type: 'load', id: 'LD-2026-001' }))).toBe('load LD-2026-001');
+  it('handles a different entity type', () => {
+    expect(buildMentionText(r({ type: 'user', label: 'Jane Doe' }))).toBe('user Jane Doe');
   });
-  it('driver → driver <label>', () => {
-    expect(buildMentionText(r({ type: 'driver', id: 'DRV-1', label: 'Mike Rodriguez' }))).toBe('driver Mike Rodriguez');
-  });
-  it('customer → customer <label>', () => {
-    expect(buildMentionText(r({ type: 'customer', label: 'Walmart Distribution' }))).toBe(
-      'customer Walmart Distribution',
-    );
-  });
-  it('invoice → invoice <id>', () => {
-    expect(buildMentionText(r({ type: 'invoice', id: 'INV-8821', label: 'INV-8821' }))).toBe('invoice INV-8821');
-  });
-  it('settlement → settlement <id>', () => {
-    expect(buildMentionText(r({ type: 'settlement', id: 'STL-2026-014', label: 'STL-2026-014' }))).toBe(
-      'settlement STL-2026-014',
-    );
-  });
-  it('vehicle → unit <unitNumber> (stripped from label)', () => {
-    expect(buildMentionText(r({ type: 'vehicle', id: 'VEH-1', label: 'Unit 204' }))).toBe('unit 204');
-  });
-  it('trip → trip <id>', () => {
-    expect(buildMentionText(r({ type: 'trip', id: 'TRIP-0308-001', label: 'TRIP-0308-001' }))).toBe(
-      'trip TRIP-0308-001',
-    );
-  });
-  it('trailer → trailer <id>', () => {
-    expect(buildMentionText(r({ type: 'trailer', id: 'TR-28', label: 'TR-28' }))).toBe('trailer TR-28');
-  });
-  it('lane → lane "<name>"', () => {
-    expect(buildMentionText(r({ type: 'lane', id: 'Walmart Denver', label: 'Walmart Denver' }))).toBe(
-      'lane "Walmart Denver"',
-    );
-  });
-  it('unknown type falls back to the label', () => {
-    expect(buildMentionText(r({ type: 'mystery', label: 'Thing' }))).toBe('Thing');
+  it('falls back to the bare label when type is empty', () => {
+    expect(buildMentionText(r({ type: '', label: 'Thing' }))).toBe('Thing');
   });
 });
