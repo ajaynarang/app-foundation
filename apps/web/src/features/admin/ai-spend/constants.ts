@@ -8,14 +8,8 @@ import type { AiSurface as AiSurfaceType } from './types';
  * until labelled.
  */
 export const SURFACE_LABELS: Record<AiSurfaceType, { label: string; className: string }> = {
-  [AiSurface.APP_CHAT]: { label: 'Sally Chat', className: 'bg-blue-500/10 text-blue-500' },
+  [AiSurface.CHAT]: { label: 'Chat', className: 'bg-blue-500/10 text-blue-500' },
   [AiSurface.DESK_STEP]: { label: 'Desk Step', className: 'bg-blue-500/10 text-blue-500' },
-  [AiSurface.DOC_RATECON]: { label: 'Rate-Con Parse', className: 'bg-gray-500/10 text-muted-foreground' },
-  [AiSurface.DOC_FUEL_RECEIPT]: {
-    label: 'Fuel Receipt',
-    className: 'bg-gray-500/10 text-muted-foreground',
-  },
-  [AiSurface.ALERT_BRIEFING]: { label: 'Alert Briefing', className: 'bg-yellow-500/10 text-yellow-600' },
   [AiSurface.MEMORY_EXTRACT]: { label: 'Memory Extract', className: 'bg-gray-500/10 text-muted-foreground' },
   [AiSurface.EMBEDDING]: { label: 'Embedding', className: 'bg-gray-500/10 text-muted-foreground' },
   [AiSurface.KB_INGEST]: { label: 'KB Ingest', className: 'bg-gray-500/10 text-muted-foreground' },

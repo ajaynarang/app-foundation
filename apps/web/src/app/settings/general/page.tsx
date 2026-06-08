@@ -103,33 +103,17 @@ export default function GeneralSettingsPage() {
         <p className="text-sm text-muted-foreground">Make SALLY yours</p>
       </div>
 
-      {/* Units & Formats */}
+      {/* Display Formats */}
       <Card>
         <CardHeader>
-          <CardTitle>Units & Formats</CardTitle>
-          <CardDescription>Choose measurement units and display formats used throughout Sally.</CardDescription>
+          <CardTitle>Display Formats</CardTitle>
+          <CardDescription>Choose the date, time, and timezone formats used throughout the app.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <Label>Distance Unit</Label>
-              <p className="text-xs text-muted-foreground">How distances are shown on routes and trip summaries.</p>
-            </div>
-            <Select value={formData.distanceUnit || 'MILES'} onValueChange={(v) => handleChange('distanceUnit', v)}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MILES">Miles</SelectItem>
-                <SelectItem value="KILOMETERS">Kilometers</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
               <Label>Time Format</Label>
-              <p className="text-xs text-muted-foreground">Applies to ETAs, schedules, and alert timestamps.</p>
+              <p className="text-xs text-muted-foreground">Applies to schedules and timestamps.</p>
             </div>
             <Select value={formData.timeFormat || '12H'} onValueChange={(v) => handleChange('timeFormat', v)}>
               <SelectTrigger className="w-full md:w-48">

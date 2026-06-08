@@ -23,10 +23,9 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   const { plan, displayName, isOnTrial, daysLeftInTrial } = usePlan();
 
   const getRoleView = () => {
-    if (user?.role === 'DISPATCHER') return 'Dispatcher View';
-    if (user?.role === 'DRIVER') return 'Driver View';
     if (user?.role === 'ADMIN' || user?.role === 'OWNER') return 'Admin View';
-    return 'SALLY';
+    if (user?.role === 'MEMBER') return 'Member View';
+    return 'Home';
   };
 
   const getPlanLabel = () => {

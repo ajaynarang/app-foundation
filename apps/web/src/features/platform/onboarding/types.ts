@@ -1,1 +1,1 @@
-export type { OnboardingItem, LoadPath, MilestoneStatus, OnboardingStatusResponse } from '@app/shared-types';
+export type { OnboardingItem, OnboardingPath, MilestoneStatus, OnboardingStatusResponse } from '@app/shared-types';

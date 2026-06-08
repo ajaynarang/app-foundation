@@ -17,7 +17,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { isExpanded, chatLayout } = useSallyStore();
-  const { isAuthenticated, _hasHydrated, user } = useAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAuthStore();
 
   const requiresAuth = pathname ? isProtectedRoute(pathname) : false;
 
@@ -41,19 +41,11 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Driver routes use their own DriverLayout via app/driver/layout.tsx
-  const isDriverRoute = pathname?.startsWith('/driver') && user?.role === 'DRIVER';
   // OAuth consent uses a standalone layout (no nav chrome, like Google/GitHub consent)
   const isOAuthRoute = pathname?.startsWith('/oauth');
 
   // Render layout based on route type
-  const Layout = isOAuthRoute
-    ? PassthroughLayout
-    : requiresAuth && !isDriverRoute
-      ? AppLayout
-      : isDriverRoute
-        ? PassthroughLayout
-        : PublicLayout;
+  const Layout = isOAuthRoute ? PassthroughLayout : requiresAuth ? AppLayout : PublicLayout;
 
   return (
     <ProgressProvider height="2px" color="hsl(var(--foreground))" options={{ showSpinner: false }} shallowRouting>

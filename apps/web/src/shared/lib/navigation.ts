@@ -12,7 +12,6 @@ import {
   Key,
   Link2,
   LucideIcon,
-  Plug,
   Radio,
   Receipt,
   Settings,
@@ -99,18 +98,7 @@ export const settingsSubPanel: SubPanelSection[] = [
       { label: 'Invitations', href: '/settings/invitations', icon: Send },
       { label: 'Subscription', href: '/settings/subscription', icon: CreditCard },
       { label: 'Billing', href: '/settings/billing', icon: Receipt },
-      {
-        label: 'Login Activity',
-        href: '/settings/security',
-        icon: History,
-        entitlement: 'login_activity',
-      },
     ],
-    roles: ['ADMIN', 'OWNER'],
-  },
-  {
-    label: 'Integrations',
-    items: [{ label: 'Connections', href: '/settings/integrations', icon: Plug }],
     roles: ['ADMIN', 'OWNER'],
   },
   {
@@ -122,11 +110,6 @@ export const settingsSubPanel: SubPanelSection[] = [
       { label: 'AI Assistants', href: '/settings/ai-integrations', icon: Bot },
       { label: 'API Docs', href: `${CONSOLE_URL}/docs`, icon: BookOpen, external: true },
     ],
-    roles: ['ADMIN', 'OWNER'],
-  },
-  {
-    label: 'Activity',
-    items: [{ label: 'System Activity', href: '/settings/system-activity', icon: Activity }],
     roles: ['ADMIN', 'OWNER'],
   },
 ];
@@ -141,8 +124,6 @@ export const workspaceDrawerSections: SubPanelSection[] = [
     items: [
       { label: 'Organization', href: '/settings/organization', icon: Building2 },
       { label: 'Billing', href: '/settings/billing', icon: Receipt },
-      { label: 'Integrations', href: '/settings/integrations', icon: Plug },
-      { label: 'Activity', href: '/settings/system-activity', icon: Activity },
       { label: 'Developer Tools', href: '/settings/api-keys', icon: Key },
     ],
   },

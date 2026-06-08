@@ -2,15 +2,7 @@
 export * from './api';
 
 // Hooks
-export {
-  useUserPreferences,
-  useUpdateUserPreferences,
-  useOperationsSettings,
-  useUpdateOperationsSettings,
-  useDriverPreferences,
-  useUpdateDriverPreferences,
-  useResetPreferences,
-} from './hooks/use-settings';
+export { useUserPreferences, useUpdateUserPreferences, useResetPreferences } from './hooks/use-settings';
 
 // Organization profile
 export { useOrganization, useUpdateOrganization, organizationApi } from './use-organization';

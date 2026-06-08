@@ -7,8 +7,6 @@ import { Label } from '@app/ui/components/ui/label';
 import { Button } from '@app/ui/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
 import {
-  CarrierType,
-  FleetSize,
   type OrganizationProfile,
   type UpdateOrganizationProfileInput,
   UpdateOrganizationProfileSchema,
@@ -16,7 +14,7 @@ import {
 
 import { extractFieldErrors } from '@/shared/lib/error-utils';
 
-import { CARRIER_TYPE_OPTIONS, FLEET_SIZE_OPTIONS, TIMEZONE_OPTIONS } from '../organization-constants';
+import { TIMEZONE_OPTIONS } from '../organization-constants';
 
 interface OrganizationFormProps {
   profile: OrganizationProfile;
@@ -30,10 +28,6 @@ type FormState = {
   companyName: string;
   contactEmail: string;
   contactPhone: string;
-  dotNumber: string;
-  mcNumber: string;
-  carrierType: CarrierType;
-  fleetSize: FleetSize | '';
   timezone: string;
 };
 
@@ -45,19 +39,15 @@ function profileToFormState(profile: OrganizationProfile): FormState {
     companyName: profile.companyName,
     contactEmail: profile.contactEmail ?? '',
     contactPhone: profile.contactPhone ?? '',
-    dotNumber: profile.dotNumber ?? '',
-    mcNumber: profile.mcNumber ?? '',
-    carrierType: profile.carrierType,
-    fleetSize: profile.fleetSize ?? '',
     timezone: profile.timezone,
   };
 }
 
 /**
- * Editable company-profile form (OWNER/ADMIN). Eight fields written through
- * the canonical tenant-settings service via `PATCH /tenants/me`. The timezone
- * Select preserves the saved value even when it falls outside the curated US
- * list. Empty strings on optional text fields are omitted from the payload.
+ * Editable company-profile form (OWNER/ADMIN) written through the canonical
+ * tenant-settings service via `PATCH /tenants/me`. The timezone Select
+ * preserves the saved value even when it falls outside the curated list.
+ * Empty strings on optional text fields are omitted from the payload.
  */
 export function OrganizationForm({ profile, isSubmitting, onSubmit, submitError }: OrganizationFormProps) {
   const [form, setForm] = useState<FormState>(() => profileToFormState(profile));
@@ -96,10 +86,6 @@ export function OrganizationForm({ profile, isSubmitting, onSubmit, submitError 
       companyName: form.companyName.trim(),
       contactEmail: form.contactEmail.trim() || undefined,
       contactPhone: form.contactPhone.trim() || undefined,
-      dotNumber: form.dotNumber.trim() || undefined,
-      mcNumber: form.mcNumber.trim() || undefined,
-      carrierType: form.carrierType,
-      fleetSize: form.fleetSize || undefined,
       timezone: form.timezone,
     };
 
@@ -159,70 +145,6 @@ export function OrganizationForm({ profile, isSubmitting, onSubmit, submitError 
           <FieldError message={fieldErrors.contactPhone} />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="org-dot-number">DOT Number</Label>
-          <Input
-            id="org-dot-number"
-            value={form.dotNumber}
-            onChange={(e) => set('dotNumber', e.target.value)}
-            aria-invalid={!!fieldErrors.dotNumber}
-          />
-          {fieldErrors.dotNumber ? (
-            <FieldError message={fieldErrors.dotNumber} />
-          ) : (
-            <p className="text-xs text-muted-foreground">Digits only — no &quot;USDOT&quot; prefix.</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="org-mc-number">MC Number</Label>
-          <Input
-            id="org-mc-number"
-            value={form.mcNumber}
-            onChange={(e) => set('mcNumber', e.target.value)}
-            aria-invalid={!!fieldErrors.mcNumber}
-          />
-          {fieldErrors.mcNumber ? (
-            <FieldError message={fieldErrors.mcNumber} />
-          ) : (
-            <p className="text-xs text-muted-foreground">Digits only — no &quot;MC-&quot; prefix.</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="org-carrier-type">Carrier Type</Label>
-          <Select value={form.carrierType} onValueChange={(v) => set('carrierType', v as CarrierType)}>
-            <SelectTrigger id="org-carrier-type">
-              <SelectValue placeholder="Select carrier type" />
-            </SelectTrigger>
-            <SelectContent>
-              {CARRIER_TYPE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldError message={fieldErrors.carrierType} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="org-fleet-size">Fleet Size</Label>
-          <Select value={form.fleetSize} onValueChange={(v) => set('fleetSize', v as FleetSize)}>
-            <SelectTrigger id="org-fleet-size">
-              <SelectValue placeholder="Select fleet size" />
-            </SelectTrigger>
-            <SelectContent>
-              {FLEET_SIZE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldError message={fieldErrors.fleetSize} />
-        </div>
-
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="org-timezone">Timezone</Label>
           <Select value={form.timezone} onValueChange={(v) => set('timezone', v)}>
@@ -238,7 +160,7 @@ export function OrganizationForm({ profile, isSubmitting, onSubmit, submitError 
             </SelectContent>
           </Select>
           <FieldError message={fieldErrors.timezone} />
-          <p className="text-xs text-muted-foreground">Scheduled Sally tasks run in this timezone.</p>
+          <p className="text-xs text-muted-foreground">Scheduled tasks run in this timezone.</p>
         </div>
       </div>
 

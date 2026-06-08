@@ -28,8 +28,7 @@ export const useAuth = () => {
     // Convenience checks
     isOwner: user?.role === 'OWNER',
     isAdmin: user?.role === 'ADMIN',
-    isDispatcher: user?.role === 'DISPATCHER',
-    isDriver: user?.role === 'DRIVER',
+    isMember: user?.role === 'MEMBER',
     isSuperAdmin: user?.role === 'SUPER_ADMIN',
   };
 };

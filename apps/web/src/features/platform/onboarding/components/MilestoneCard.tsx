@@ -8,7 +8,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { cn } from '@app/ui';
 import { useRouter } from 'next/navigation';
 import { openConsole } from '@/shared/lib/console-url';
-import type { MilestoneStatus, OnboardingItem } from '../types';
+import type { MilestoneStatus, OnboardingItem, OnboardingPath } from '../types';
 
 interface MilestoneCardProps {
   milestone: MilestoneStatus;
@@ -84,12 +84,12 @@ export function MilestoneCard({ milestone, milestoneNumber, defaultExpanded = fa
 
       {expanded && (
         <CardContent className="space-y-3 pt-0">
-          {/* Load path cards for milestone 2 */}
-          {milestone.loadPaths && milestone.loadPaths.length > 0 && (
+          {/* Path cards for milestones that offer alternative setup routes */}
+          {milestone.paths && milestone.paths.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">How do you want to bring loads into SALLY?</p>
+              <p className="text-sm font-medium text-muted-foreground">How would you like to get started?</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {milestone.loadPaths.map((path) => (
+                {milestone.paths.map((path: OnboardingPath) => (
                   <Button
                     key={path.id}
                     variant="outline"

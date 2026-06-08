@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import Link from 'next/link';
-import { Check, Lock, AlertTriangle, Puzzle, Sparkles, Crown, ArrowRight } from 'lucide-react';
+import { Check, Lock, AlertTriangle, Sparkles, Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@app/ui/components/ui/card';
 import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
@@ -23,9 +22,6 @@ import {
 } from '@app/ui/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/shared/components/ui/sheet';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
-import { useAddOnCatalog, useMyAddOns, ADD_ONS_QUERY_KEYS } from '@/features/add-ons/hooks';
-import { addOnsApi } from '@/features/add-ons/api';
-import { ActiveAddOnCard } from '@/features/add-ons/components/active-add-on-card';
 import { plansApi } from '@/features/platform/plans/api';
 import {
   useBillingOverview,
@@ -37,12 +33,10 @@ import {
 } from '@/features/billing/hooks/use-billing';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
 import { formatCents } from '@/shared/lib/utils/formatters';
-import { showSuccess, showError } from '@app/ui';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { PlanConfig, TenantPlan } from '@app/shared-types';
 import { cn } from '@app/ui';
 import { mailto } from '@/shared/lib/contacts';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,7 +103,7 @@ function SubscriptionSkeleton() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Subscription</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your plan and add-ons.</p>
+        <p className="text-sm text-muted-foreground mt-1">Manage your plan and billing.</p>
       </div>
       <Skeleton className="h-48 w-full rounded-lg" />
       <Skeleton className="h-28 w-full rounded-lg" />
@@ -119,59 +113,13 @@ function SubscriptionSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Cancel add-on button with AlertDialog
-// ---------------------------------------------------------------------------
-function CancelAddOnButton({ slug, name }: { slug: string; name: string }) {
-  const queryClient = useQueryClient();
-  const { mutate: cancel, isPending } = useMutation({
-    mutationFn: () => addOnsApi.cancelAddOn(slug),
-    onSuccess: () => {
-      showSuccess(`${name} has been cancelled.`);
-      queryClient.invalidateQueries({ queryKey: ADD_ONS_QUERY_KEYS.myAddOns });
-    },
-    onError: (error: Error) => showError('Failed to cancel', extractErrorMessage(error)),
-  });
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive">
-          Cancel
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Cancel {name}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will immediately deactivate {name} for your organization. You can re-activate it anytime from the
-            Add-ons section.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep Active</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => cancel()}
-            disabled={isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Yes, Cancel
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-// ActiveAddOnCard is now a shared component from @/features/add-ons/components/active-add-on-card
-
-// ---------------------------------------------------------------------------
 // Plan Selector Sheet
 // ---------------------------------------------------------------------------
 function PlanSelectorSheet({
   open,
   onOpenChange,
   currentPlan,
-  vehicleCount,
+  seatCount,
   isBillingEnabled,
   isTrialUser,
   hasActiveSubscription,
@@ -179,7 +127,7 @@ function PlanSelectorSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentPlan?: TenantPlan;
-  vehicleCount: number;
+  seatCount: number;
   isBillingEnabled: boolean;
   isTrialUser: boolean;
   hasActiveSubscription: boolean;
@@ -191,7 +139,7 @@ function PlanSelectorSheet({
   });
 
   const [selectedPlan, setSelectedPlan] = useState<PlanConfig | null>(null);
-  const [truckCount, setTruckCount] = useState<number>(vehicleCount || 1);
+  const [seatQuantity, setSeatQuantity] = useState<number>(seatCount || 1);
 
   const { mutate: startCheckout, isPending: checkoutPending } = useCreateCheckout();
   const { mutate: upgradePlan, isPending: upgradePending } = useUpgradePlan();
@@ -210,14 +158,14 @@ function PlanSelectorSheet({
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setSelectedPlan(null);
-      setTruckCount(vehicleCount || 1);
+      setSeatQuantity(seatCount || 1);
     }
     onOpenChange(next);
   };
 
   const canSelfServePlan = !!selectedPlan?.providerPriceId;
   const isEnterprise = selectedPlan?.plan === 'ENTERPRISE';
-  const totalCents = selectedPlan?.pricePerUnit != null ? selectedPlan.pricePerUnit * truckCount : null;
+  const totalCents = selectedPlan?.pricePerUnit != null ? selectedPlan.pricePerUnit * seatQuantity : null;
 
   const handlePlanAction = () => {
     if (!selectedPlan) return;
@@ -227,7 +175,7 @@ function PlanSelectorSheet({
       // New subscription — redirect to Stripe Checkout
       startCheckout({
         plan: selectedPlan.plan,
-        quantity: truckCount,
+        quantity: seatQuantity,
         successUrl: `${window.location.origin}/settings/subscription?checkout=success`,
         cancelUrl: `${window.location.origin}/settings/subscription?checkout=cancel`,
       });
@@ -235,7 +183,7 @@ function PlanSelectorSheet({
       // Existing subscriber upgrading — use upgrade endpoint
       upgradePlan(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { newPlan: selectedPlan.plan as any, newQuantity: truckCount },
+        { newPlan: selectedPlan.plan as any, newQuantity: seatQuantity },
         { onSuccess: () => onOpenChange(false) },
       );
     } else if (action === 'downgrade') {
@@ -260,7 +208,7 @@ function PlanSelectorSheet({
       >
         <SheetHeader>
           <SheetTitle>{isTrialUser ? 'Choose a Plan' : 'Change Plan'}</SheetTitle>
-          <SheetDescription>Select a plan that fits your fleet operations.</SheetDescription>
+          <SheetDescription>Select a plan that fits your team.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 flex-1 overflow-y-auto min-h-0 space-y-4">
@@ -332,8 +280,8 @@ function PlanSelectorSheet({
                       </div>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      {p.fleetLimit != null && <span>Up to {p.fleetLimit} vehicles</span>}
-                      {p.fleetLimit == null && <span>Unlimited vehicles</span>}
+                      {p.seatLimit != null && <span>Up to {p.seatLimit} seats</span>}
+                      {p.seatLimit == null && <span>Unlimited seats</span>}
                       {p.userLimit != null && <span>{p.userLimit} users</span>}
                       {p.userLimit == null && <span>Unlimited users</span>}
                     </div>
@@ -341,23 +289,23 @@ function PlanSelectorSheet({
                 );
               })}
 
-              {/* Truck count + summary — only shown for self-serve plans with Stripe prices */}
+              {/* Seat count + summary — only shown for self-serve plans with Stripe prices */}
               {selectedPlan && canSelfServePlan && (
                 <div className="space-y-3 pt-2 border-t border-border">
                   <div className="space-y-1.5">
-                    <Label htmlFor="truck-count">Number of Trucks</Label>
+                    <Label htmlFor="seat-count">Number of Seats</Label>
                     <Input
-                      id="truck-count"
+                      id="seat-count"
                       type="number"
                       min={1}
-                      value={truckCount}
-                      onChange={(e) => setTruckCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      value={seatQuantity}
+                      onChange={(e) => setSeatQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     />
                   </div>
                   {totalCents != null && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {truckCount} truck{truckCount !== 1 ? 's' : ''} x {formatCents(selectedPlan.pricePerUnit!)}/
+                        {seatQuantity} seat{seatQuantity !== 1 ? 's' : ''} x {formatCents(selectedPlan.pricePerUnit!)}/
                         {selectedPlan.unitLabel}
                       </span>
                       <span className="font-semibold text-foreground">{formatCents(totalCents)}/mo</span>
@@ -409,9 +357,9 @@ export default function SubscriptionPage() {
     displayName,
     planDetails,
     isLoading: planLoading,
-    vehicleCount,
-    fleetLimit,
-    fleetLimitWarning,
+    seatCount,
+    seatLimit,
+    seatLimitWarning,
     isTrialExpired,
     isOnTrial,
     daysLeftInTrial,
@@ -419,43 +367,20 @@ export default function SubscriptionPage() {
   } = usePlan();
 
   const { data: billingOverview, isLoading: billingLoading } = useBillingOverview();
-  const { data: myAddOns, isLoading: addOnsLoading } = useMyAddOns();
-  const { data: catalog, isLoading: catalogLoading } = useAddOnCatalog();
   const { mutate: cancelSub, isPending: cancelPending } = useCancelSubscription();
   const { mutate: reactivate, isPending: reactivatePending } = useReactivateSubscription();
   const { data: billingEnabled, isSuccess: flagLoaded } = useFeatureFlagEnabled('payment_system');
   const isBillingEnabled = flagLoaded && billingEnabled === true;
-  const queryClient = useQueryClient();
 
   const [planSheetOpen, setPlanSheetOpen] = useState(false);
 
-  const isLoading = planLoading || billingLoading || addOnsLoading || catalogLoading;
+  const isLoading = planLoading || billingLoading;
 
-  const usagePercent = fleetLimit && fleetLimit > 0 ? Math.min((vehicleCount / fleetLimit) * 100, 100) : 0;
+  const usagePercent = seatLimit && seatLimit > 0 ? Math.min((seatCount / seatLimit) * 100, 100) : 0;
 
   const subscription = billingOverview?.subscription;
   const hasActiveSubscription =
     !!subscription && subscription.status !== 'CANCELED' && subscription.status !== 'SUSPENDED';
-
-  // Active add-ons keyed by addOn slug for quick lookup
-  const activeAddOns = useMemo(() => myAddOns?.filter((s) => s.status === 'ACTIVE') ?? [], [myAddOns]);
-
-  const activeAddOnSlugs = useMemo(() => new Set(activeAddOns.map((s) => s.addOn.slug)), [activeAddOns]);
-
-  const inactiveCount = useMemo(
-    () => (catalog ?? []).filter((a) => a.isActive && !activeAddOnSlugs.has(a.slug)).length,
-    [catalog, activeAddOnSlugs],
-  );
-
-  // Overage toggle mutation
-  const { mutate: toggleOverage } = useMutation({
-    mutationFn: ({ slug, enabled }: { slug: string; enabled: boolean }) => addOnsApi.toggleOverage(slug, enabled),
-    onSuccess: () => {
-      showSuccess('Overage setting updated');
-      queryClient.invalidateQueries({ queryKey: ADD_ONS_QUERY_KEYS.myAddOns });
-    },
-    onError: (error: Error) => showError('Could not update overage', extractErrorMessage(error)),
-  });
 
   const isTrialUser = !plan || plan === 'TRIAL' || plan === 'TRIAL_EXPIRED';
 
@@ -483,7 +408,7 @@ export default function SubscriptionPage() {
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {isTrialExpired
-                    ? 'Your trial has ended. Subscribe to a plan to continue using SALLY.'
+                    ? 'Your trial has ended. Subscribe to a plan to continue.'
                     : 'Your account has been suspended due to payment issues. Please update your payment method.'}
                 </p>
                 <Button size="sm" className="mt-3" onClick={() => setPlanSheetOpen(true)}>
@@ -608,30 +533,28 @@ export default function SubscriptionPage() {
               </div>
             )}
 
-            {/* Fleet Usage */}
-            {fleetLimit !== null && (
+            {/* Seat Usage */}
+            {seatLimit !== null && (
               <div className="space-y-2 pt-2 border-t border-border">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
-                    Fleet Usage
-                    {fleetLimitWarning && (
-                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />
-                    )}
+                    Seat Usage
+                    {seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />}
                   </span>
                   <span
                     className={
-                      fleetLimitWarning
+                      seatLimitWarning
                         ? 'font-semibold text-yellow-700 dark:text-yellow-400'
                         : 'font-medium text-foreground'
                     }
                   >
-                    {vehicleCount} / {fleetLimit} vehicles
+                    {seatCount} / {seatLimit} seats
                   </span>
                 </div>
                 <Progress value={usagePercent} className="h-2 bg-gray-200 dark:bg-gray-800" />
-                {fleetLimitWarning && (
+                {seatLimitWarning && (
                   <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                    Approaching fleet limit. Contact sales to upgrade.
+                    Approaching seat limit. Contact sales to upgrade.
                   </p>
                 )}
               </div>
@@ -697,70 +620,12 @@ export default function SubscriptionPage() {
         )}
       </section>
 
-      {/* Section 2: Add-Ons */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Add-Ons</h2>
-          {activeAddOns.length > 0 && inactiveCount > 0 && (
-            <Link
-              href="/dispatcher/add-ons"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Browse {inactiveCount} more
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
-        </div>
-
-        {activeAddOns.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Puzzle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-foreground mb-1">No active add-ons</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Extend SALLY with powerful capabilities for your fleet.
-              </p>
-              <Link href="/dispatcher/add-ons">
-                <Button variant="outline" size="sm">
-                  Explore Add-ons
-                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {activeAddOns.map((sub) => (
-              <ActiveAddOnCard
-                key={sub.id}
-                sub={sub}
-                onToggleOverage={(slug, enabled) => toggleOverage({ slug, enabled })}
-                onCancel={<CancelAddOnButton slug={sub.addOn.slug} name={sub.addOn.name} />}
-              />
-            ))}
-
-            {/* Browse more link at bottom when there are inactive add-ons */}
-            {inactiveCount > 0 && (
-              <Link
-                href="/dispatcher/add-ons"
-                className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-lg border border-dashed border-border hover:border-foreground/20"
-              >
-                <Puzzle className="h-4 w-4" />
-                Browse {inactiveCount} more add-on
-                {inactiveCount !== 1 ? 's' : ''}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            )}
-          </div>
-        )}
-      </section>
-
       {/* Plan Selector Sheet */}
       <PlanSelectorSheet
         open={planSheetOpen}
         onOpenChange={setPlanSheetOpen}
         currentPlan={plan}
-        vehicleCount={vehicleCount}
+        seatCount={seatCount}
         isBillingEnabled={isBillingEnabled}
         isTrialUser={isTrialUser}
         hasActiveSubscription={hasActiveSubscription}

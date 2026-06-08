@@ -2,7 +2,7 @@
 export { onboardingApi, getOnboardingStatus } from './api';
 
 // Types
-export type { OnboardingItem, OnboardingStatusResponse, MilestoneStatus, LoadPath } from './types';
+export type { OnboardingItem, OnboardingStatusResponse, MilestoneStatus, OnboardingPath } from './types';
 
 // Hooks
 export { useOnboardingStatus } from './hooks/use-onboarding';

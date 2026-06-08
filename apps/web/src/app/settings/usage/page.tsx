@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { Card, CardContent } from '@app/ui/components/ui/card';
 import { Badge } from '@app/ui/components/ui/badge';
@@ -8,7 +8,6 @@ import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
-import { useMyAddOns } from '@/features/add-ons/hooks';
 import {
   useBillingInvoices,
   useWalletTransactions,
@@ -18,14 +17,12 @@ import { formatCents } from '@/shared/lib/utils/formatters';
 import {
   getInvoiceStatusVariant,
   getTransactionTypeVariant,
-  getUsageColor,
   formatTransactionType,
   formatInvoiceStatus,
 } from '@/features/billing/utils';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { formatTimestampDate, DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
 import { cn } from '@app/ui';
-import type { TenantAddOn } from '@app/shared-types';
 
 // ---------------------------------------------------------------------------
 // Skeleton
@@ -37,10 +34,6 @@ function UsageSkeleton() {
         <h1 className="text-2xl font-bold text-foreground">Usage & Invoices</h1>
         <p className="text-sm text-muted-foreground mt-1">What you&apos;ve used and what it costs</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Skeleton className="h-32 w-full rounded-lg" />
-        <Skeleton className="h-32 w-full rounded-lg" />
-      </div>
       <Skeleton className="h-64 w-full rounded-lg" />
       <Skeleton className="h-64 w-full rounded-lg" />
     </div>
@@ -48,70 +41,9 @@ function UsageSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Usage Card
-// ---------------------------------------------------------------------------
-function UsageCard({ sub }: { sub: TenantAddOn }) {
-  const hasUsage = sub.usageLimit !== null && sub.usageLimit > 0 && sub.usageLimitUnit !== null;
-  const usagePercent = hasUsage ? Math.min(Math.round((sub.currentUsage / sub.usageLimit!) * 100), 100) : null;
-  const remaining = hasUsage ? sub.usageLimit! - sub.currentUsage : null;
-
-  // Calculate days until period reset (approximate — end of month)
-  const now = new Date();
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const daysUntilReset = Math.max(0, Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-
-  return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">{sub.addOn.name}</h3>
-          <span className="text-xs text-muted-foreground">
-            Resets in {daysUntilReset} day{daysUntilReset !== 1 ? 's' : ''}
-          </span>
-        </div>
-
-        {hasUsage && usagePercent !== null ? (
-          <>
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {sub.currentUsage} of {sub.usageLimit} {sub.usageLimitUnit} used
-                  {remaining !== null && remaining > 0 && <span className="ml-1">({remaining} remaining)</span>}
-                </span>
-                <span>{usagePercent}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={cn('h-full rounded-full transition-all', getUsageColor(sub.currentUsage, sub.usageLimit!))}
-                  style={{ width: `${usagePercent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Overage info */}
-            {sub.addOn.overageRateCents !== null &&
-              sub.addOn.overageRateCents !== undefined &&
-              sub.currentUsage > (sub.usageLimit ?? 0) && (
-                <p className="text-xs text-red-600 dark:text-red-400">
-                  Overage: {sub.currentUsage - (sub.usageLimit ?? 0)} unit
-                  {sub.currentUsage - (sub.usageLimit ?? 0) !== 1 ? 's' : ''} (
-                  {formatCents((sub.currentUsage - (sub.usageLimit ?? 0)) * sub.addOn.overageRateCents)})
-                </p>
-              )}
-          </>
-        ) : (
-          <p className="text-xs text-muted-foreground">Unlimited usage</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function UsagePage() {
-  const { data: myAddOns, isLoading: addOnsLoading } = useMyAddOns();
   const [invoiceStatus, setInvoiceStatus] = useState<string | undefined>();
   const [invoiceCursor, setInvoiceCursor] = useState<string | undefined>();
   const [txType, setTxType] = useState<string | undefined>();
@@ -131,20 +63,7 @@ export default function UsagePage() {
 
   const { timezone } = useFormatters();
 
-  const isLoading = addOnsLoading || invoicesLoading || txLoading;
-
-  const activeAddOns = useMemo(() => myAddOns?.filter((s) => s.status === 'ACTIVE') ?? [], [myAddOns]);
-
-  // Total overage this cycle
-  const totalOverageCents = useMemo(() => {
-    let total = 0;
-    for (const sub of activeAddOns) {
-      if (sub.usageLimit !== null && sub.currentUsage > sub.usageLimit && sub.addOn.overageRateCents) {
-        total += (sub.currentUsage - sub.usageLimit) * sub.addOn.overageRateCents;
-      }
-    }
-    return total;
-  }, [activeAddOns]);
+  const isLoading = invoicesLoading || txLoading;
 
   if (isLoading) {
     return <UsageSkeleton />;
@@ -157,33 +76,7 @@ export default function UsagePage() {
         <p className="text-sm text-muted-foreground mt-1">What you&apos;ve used and what it costs</p>
       </div>
 
-      {/* Section 1: Usage Dashboard */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Usage This Cycle</h2>
-          {totalOverageCents > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              Overage: {formatCents(totalOverageCents)}
-            </Badge>
-          )}
-        </div>
-
-        {activeAddOns.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <p className="text-sm text-muted-foreground">No active add-ons to track usage for.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {activeAddOns.map((sub) => (
-              <UsageCard key={sub.id} sub={sub} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Section 2: Invoice History */}
+      {/* Section 1: Invoice History */}
       <section className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Invoice History</h2>
 
