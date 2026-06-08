@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { LoadStopStatusSchema, formatLoadLabel } from '@sally/shared-types';
+import { LoadStopStatusSchema, formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { errorResponse } from '../utils/entity-resolver';
 import { LoadsService } from '../../../../fleet/loads/services/loads.service';

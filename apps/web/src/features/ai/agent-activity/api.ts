@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/lib/api';
-import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@sally/shared-types';
+import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@app/shared-types';
 
 export interface AgentActivityQueryParams {
   principalKind: AgentPrincipalKind;

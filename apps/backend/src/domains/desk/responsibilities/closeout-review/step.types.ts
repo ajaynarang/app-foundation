@@ -1,4 +1,4 @@
-import type { CloseoutReview } from '@sally/shared-types';
+import type { CloseoutReview } from '@app/shared-types';
 
 import type { HydrateMemoryItem, HydratePreflightResult } from '../../shared-steps/step.types';
 

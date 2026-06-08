@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-import { showSuccess } from '@sally/ui';
+import { showSuccess } from '@app/ui';
 
 interface CopyButtonProps {
   value: string;

@@ -1,4 +1,4 @@
-import type { AgentKey } from '@sally/shared-types';
+import type { AgentKey } from '@app/shared-types';
 
 import type { ResponsibilityDefinition } from './definition.types';
 

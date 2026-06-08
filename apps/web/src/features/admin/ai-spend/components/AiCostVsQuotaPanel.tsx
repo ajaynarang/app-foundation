@@ -1,6 +1,6 @@
 'use client';
 
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 
 import { formatUsdPrecise } from '@/shared/lib/utils/formatters';
 

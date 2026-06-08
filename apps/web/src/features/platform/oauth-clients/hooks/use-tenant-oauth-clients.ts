@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AgentScope } from '@sally/shared-types';
-import { showSuccess, showError } from '@sally/ui';
+import type { AgentScope } from '@app/shared-types';
+import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@/shared/constants';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 import { oauthClientsApi } from '../api';

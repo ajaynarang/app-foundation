@@ -11,9 +11,9 @@ import {
   CommandInput,
   CommandList,
   CommandSeparator,
-} from '@sally/ui/components/ui/command';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
-import { cn } from '@sally/ui';
+} from '@app/ui/components/ui/command';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
+import { cn } from '@app/ui';
 import { usePaletteItems } from './use-palette-items';
 import { PaletteItemRow } from './PaletteItem';
 

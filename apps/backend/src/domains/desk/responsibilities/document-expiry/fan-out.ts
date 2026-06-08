@@ -1,5 +1,5 @@
 import { ShieldAuditStatus, ShieldFindingCategory } from '@prisma/client';
-import { DocumentExpiry } from '@sally/shared-types';
+import { DocumentExpiry } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 

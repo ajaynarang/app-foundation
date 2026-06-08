@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ApprovalDecision, DeskEpisodeStatus, DeskEpisodeStepKind, Prisma, UserRole } from '@prisma/client';
-import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '@sally/shared-types';
+import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '@app/shared-types';
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';

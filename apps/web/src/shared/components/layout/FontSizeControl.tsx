@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
 
 const BASE_FONT_SIZE = 13;

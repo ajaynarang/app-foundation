@@ -1,4 +1,4 @@
-import { ArFollowup } from '@sally/shared-types';
+import { ArFollowup } from '@app/shared-types';
 
 import type { ConditionsEvaluator, ConditionsResult } from '../definition.types';
 

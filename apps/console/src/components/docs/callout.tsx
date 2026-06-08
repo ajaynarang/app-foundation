@@ -1,4 +1,4 @@
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import { Info, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react';
 
 interface CalloutProps {

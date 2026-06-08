@@ -1,4 +1,4 @@
-import { AiSurface } from '@sally/shared-types';
+import { AiSurface } from '@app/shared-types';
 
 import type { AiSurface as AiSurfaceType } from './types';
 
@@ -8,7 +8,7 @@ import type { AiSurface as AiSurfaceType } from './types';
  * until labelled.
  */
 export const SURFACE_LABELS: Record<AiSurfaceType, { label: string; className: string }> = {
-  [AiSurface.SALLY_CHAT]: { label: 'Sally Chat', className: 'bg-blue-500/10 text-blue-500' },
+  [AiSurface.APP_CHAT]: { label: 'Sally Chat', className: 'bg-blue-500/10 text-blue-500' },
   [AiSurface.DESK_STEP]: { label: 'Desk Step', className: 'bg-blue-500/10 text-blue-500' },
   [AiSurface.DOC_RATECON]: { label: 'Rate-Con Parse', className: 'bg-gray-500/10 text-muted-foreground' },
   [AiSurface.DOC_FUEL_RECEIPT]: {

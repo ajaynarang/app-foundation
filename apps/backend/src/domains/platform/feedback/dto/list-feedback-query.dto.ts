@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsInt, IsDateString, IsIn, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { FeedbackStatusEnum, type FeedbackStatus } from '@sally/shared-types';
+import { FeedbackStatusEnum, type FeedbackStatus } from '@app/shared-types';
 
 const FEEDBACK_STATUSES = FeedbackStatusEnum.options;
 

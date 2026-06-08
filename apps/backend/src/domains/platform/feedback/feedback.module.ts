@@ -3,7 +3,7 @@ import { FeedbackController } from './feedback.controller';
 import { FeedbackAdminController } from './feedback-admin.controller';
 import { FeedbackService } from './feedback.service';
 import { PrismaModule } from '../../../infrastructure/database/prisma.module';
-import { SallyAiModule } from '../../ai/sally-ai/sally-ai.module';
+import { SallyAiModule } from '../../ai/assistant/assistant.module';
 
 @Module({
   imports: [PrismaModule, forwardRef(() => SallyAiModule)],

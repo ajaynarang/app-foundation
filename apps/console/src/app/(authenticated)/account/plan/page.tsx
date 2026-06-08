@@ -2,11 +2,11 @@
 
 import { mailto } from '@/lib/contacts';
 import { Check, Lock, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/plans/use-plan';
 import { useFormatters, DISPLAY_FORMATS } from '@/shared/lib/formatters';
 

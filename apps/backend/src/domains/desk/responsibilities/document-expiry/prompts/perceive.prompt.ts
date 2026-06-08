@@ -3,7 +3,7 @@
  *
  * Fast-tier LLM (Haiku). Classifies the urgency of a driver-credential
  * expiry that Shield already detected. Structured output enforced by
- * DocumentExpiryPerceiveSchema in @sally/shared-types.
+ * DocumentExpiryPerceiveSchema in @app/shared-types.
  *
  * Keep it short — this is a classification call, not reasoning.
  */

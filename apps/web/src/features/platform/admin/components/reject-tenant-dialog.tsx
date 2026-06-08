@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
+import { Button } from '@app/ui/components/ui/button';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
+} from '@app/ui/components/ui/dialog';
 
 interface RejectTenantDialogProps {
   open: boolean;

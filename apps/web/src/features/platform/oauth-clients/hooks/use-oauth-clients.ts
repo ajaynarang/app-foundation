@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createOAuthClient } from '../api';
-import type { CreateOAuthClientInput } from '@sally/shared-types';
-import { showSuccess, showError } from '@sally/ui';
+import type { CreateOAuthClientInput } from '@app/shared-types';
+import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@/shared/constants';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 

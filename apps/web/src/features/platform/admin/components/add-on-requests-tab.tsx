@@ -2,14 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@sally/ui/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
+} from '@app/ui/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { Check, X, Clock, Package, Ban, Info } from 'lucide-react';
 import { apiClient } from '@/shared/lib/api';
 import { showSuccess, showError } from '@/shared/lib/toast';

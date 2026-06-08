@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { Activity } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { Button } from '@app/ui/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 import { useJobHealth } from '@/features/system-activity/hooks/use-job-health';
 
 export function JobHealthIndicator() {

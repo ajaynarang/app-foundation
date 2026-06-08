@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
-import type { AddPlaybookRuleRequest, AgentKey } from '@sally/shared-types';
+import type { AddPlaybookRuleRequest, AgentKey } from '@app/shared-types';
 
 export class AddPlaybookRuleDto implements AddPlaybookRuleRequest {
   @ApiProperty({ description: 'Agent the rule applies to (e.g. sally-billing)' })

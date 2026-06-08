@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { AiInvocationStatus, AiSurface } from '@prisma/client';
 
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
-import { MastraProvider } from '../sally-ai/mastra/mastra.provider';
+import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from '../infrastructure/providers/ai-provider';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
@@ -48,7 +48,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
    *
    * AI cost telemetry: Mastra's stream response exposes `usage` once the
    * stream drains. After yielding all chunks we read it and record one
-   * `AiInvocation` row (surface SALLY_CHAT). If the client disconnects
+   * `AiInvocation` row (surface APP_CHAT). If the client disconnects
    * mid-stream the generator is abandoned and usage may be unavailable —
    * `recordChatUsage` records a partial/ERROR row in that case rather than
    * losing the cost entirely. Recording never throws into the chat path.
@@ -73,7 +73,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
     // the AI Spend deep-link resolves. Same session shape as the cost ledger.
     const { sessionId, userId, tags } = buildLangfuseSession({
       tenantId: ctx.tenantId,
-      surface: AiSurface.SALLY_CHAT,
+      surface: AiSurface.APP_CHAT,
       agentId: this.mastraAgentId,
       linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
       linkRefId: ctx.conversationId,
@@ -204,7 +204,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
         {
           tenantId: ctx.tenantId,
           userId: ctx.userDbId ?? undefined,
-          surface: AiSurface.SALLY_CHAT,
+          surface: AiSurface.APP_CHAT,
           agentId: this.mastraAgentId,
           linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
           linkRefId: ctx.conversationId,
@@ -239,7 +239,7 @@ export abstract class AbstractBaseAgent implements SallyAgent {
 
     const { sessionId, userId, tags } = buildLangfuseSession({
       tenantId: ctx.tenantId,
-      surface: AiSurface.SALLY_CHAT,
+      surface: AiSurface.APP_CHAT,
       agentId: this.mastraAgentId,
       linkRefType: AI_LINK_REF_TYPES.CONVERSATION_MESSAGE,
       linkRefId: ctx.conversationId,

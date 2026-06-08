@@ -10,13 +10,13 @@ const cookieClearFlags = `path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSit
 
 function setAuthCookie() {
   if (typeof document !== 'undefined') {
-    document.cookie = `sally-auth=1; ${cookieFlags}`;
+    document.cookie = `app-auth=1; ${cookieFlags}`;
   }
 }
 
 function clearAuthCookie() {
   if (typeof document !== 'undefined') {
-    document.cookie = `sally-auth=; ${cookieClearFlags}`;
+    document.cookie = `app-auth=; ${cookieClearFlags}`;
   }
 }
 
@@ -184,7 +184,7 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
-        // If auth data was restored from localStorage, re-set the sally-auth cookie
+        // If auth data was restored from localStorage, re-set the app-auth cookie
         // so Edge middleware sees it on page reload (cookie may have expired)
         if (state?.isAuthenticated && state?.accessToken) {
           setAuthCookie();

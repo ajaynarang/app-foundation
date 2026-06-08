@@ -1,4 +1,4 @@
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 export type TrustTier = 'first_party' | 'third_party';
 

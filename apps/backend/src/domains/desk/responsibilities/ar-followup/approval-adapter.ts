@@ -1,4 +1,4 @@
-import type { ApprovalArtifact, ApprovalDecisionHeader, ArFollowup as ArFollowupTypes } from '@sally/shared-types';
+import type { ApprovalArtifact, ApprovalDecisionHeader, ArFollowup as ArFollowupTypes } from '@app/shared-types';
 
 import type { DraftOutput, HydrateOutput, PerceiveOutput } from './step.types';
 

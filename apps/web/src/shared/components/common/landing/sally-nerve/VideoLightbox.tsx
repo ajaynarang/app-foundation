@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Dialog, DialogContent, DialogTitle } from '@sally/ui/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@app/ui/components/ui/dialog';
 import { X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 

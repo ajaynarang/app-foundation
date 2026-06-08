@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo } from 'react';
 import { cn } from '@/shared/lib/utils';
-import { Button } from '@sally/ui/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { Button } from '@app/ui/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 import { useSheetSizeStore, SHEET_SIZE_MODE_OPTIONS, type SheetSizeMode } from '@/shared/stores/sheet-size.store';
-import { useSheetContext } from '@sally/ui/components/ui/sheet';
+import { useSheetContext } from '@app/ui/components/ui/sheet';
 
 interface SheetSizeControlsProps {
   entityType: string;

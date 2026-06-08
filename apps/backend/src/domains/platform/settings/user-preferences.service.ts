@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_10M } from '../../../constants/cache.constants';
 import { UpdateUserPreferencesDto } from './dto/user-preferences.dto';
@@ -12,7 +12,7 @@ export class UserPreferencesService {
 
   constructor(
     private prisma: PrismaService,
-    private cache: SallyCacheService,
+    private cache: AppCacheService,
   ) {}
 
   private async getUserDbId(userId: string): Promise<number> {

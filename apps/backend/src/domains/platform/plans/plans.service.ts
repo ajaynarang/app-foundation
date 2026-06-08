@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { TenantPlan } from '@prisma/client';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M, CACHE_TTL_COLD_10M } from '../../../constants/cache.constants';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
@@ -12,7 +12,7 @@ export class PlansService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   async getAllPlanConfigs() {

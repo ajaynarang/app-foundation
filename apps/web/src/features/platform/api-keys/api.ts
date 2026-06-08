@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/lib/api';
-import type { ApiKeyResponse, AgentScope } from '@sally/shared-types';
+import type { ApiKeyResponse, AgentScope } from '@app/shared-types';
 
 /**
  * Tenant-level admin view row (extended via Phase D). Adds keyMasked

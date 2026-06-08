@@ -1,7 +1,7 @@
 /**
  * Cache TTL constants used across all backend services.
  *
- * All values are in MILLISECONDS — that's what `SallyCacheService.set(key, value, ttlMs)`
+ * All values are in MILLISECONDS — that's what `AppCacheService.set(key, value, ttlMs)`
  * expects (it forwards to `redis.set(... 'PX', ttlMs)`).
  *
  * Tier guide:

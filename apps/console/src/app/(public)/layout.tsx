@@ -9,7 +9,7 @@ const isDocsOnly = process.env.NEXT_PUBLIC_DOCS_ONLY_MODE === 'true';
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
-  const isAuthenticated = !!cookieStore.get('sally-auth')?.value;
+  const isAuthenticated = !!cookieStore.get('app-auth')?.value;
 
   return (
     <div className="min-h-screen bg-background">

@@ -5,7 +5,7 @@ import { useOnborda } from 'onborda';
 import { useTourStore } from '../store';
 import { useUpdateTourStatus } from './use-tour-status';
 import { TOUR_ID } from '../tour-steps';
-import { showSuccess } from '@sally/ui';
+import { showSuccess } from '@app/ui';
 
 export function useTour() {
   const { isActive, stopTour, tourStatus } = useTourStore();

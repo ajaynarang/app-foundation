@@ -1,4 +1,4 @@
-import { AgentScopeSchema } from '@sally/shared-types';
+import { AgentScopeSchema } from '@app/shared-types';
 import { scopesForRole } from '../role-scopes';
 
 describe('scopesForRole', () => {

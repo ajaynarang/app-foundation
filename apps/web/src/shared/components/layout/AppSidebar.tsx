@@ -22,17 +22,17 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import { duration, easing } from '@/shared/lib/motion';
 import { useAuthStore } from '@/features/auth';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { ScrollArea } from '@sally/ui/components/ui/scroll-area';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Avatar, AvatarFallback } from '@sally/ui/components/ui/avatar';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@sally/ui/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { Badge } from '@app/ui/components/ui/badge';
+import { ScrollArea } from '@app/ui/components/ui/scroll-area';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Avatar, AvatarFallback } from '@app/ui/components/ui/avatar';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@app/ui/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 import {
   getNavigationForRole,
   getActiveSubPanel,

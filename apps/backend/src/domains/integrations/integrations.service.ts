@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JobStatusSchema } from '@sally/shared-types';
+import { JobStatusSchema } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 const JOB_STATUS = JobStatusSchema.enum;

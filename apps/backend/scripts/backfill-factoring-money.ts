@@ -9,7 +9,7 @@
  * verification banner can flag them for the dispatcher.
  *
  * Usage:
- *   pnpm --filter @sally/backend backfill:factoring-money [--dry-run] [--tenant-id <slug>] [--days <N>]
+ *   pnpm --filter @app/backend backfill:factoring-money [--dry-run] [--tenant-id <slug>] [--days <N>]
  */
 import { PrismaClient } from '@prisma/client';
 

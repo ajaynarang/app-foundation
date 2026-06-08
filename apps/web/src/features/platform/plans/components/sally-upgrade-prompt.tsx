@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { upgradeRegistry } from '../config/upgrade-registry';
 import { Sparkles } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { apiClient } from '@/shared/lib/api';
 import { showSuccess, showError } from '@/shared/lib/toast';
 import { useUpgradeUrl } from '../hooks/use-upgrade-url';

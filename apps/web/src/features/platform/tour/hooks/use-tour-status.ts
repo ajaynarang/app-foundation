@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTourStatus, updateTourStatus } from '../api';
 import { useTourStore } from '../store';
-import { showError } from '@sally/ui';
+import { showError } from '@app/ui';
 import { queryKeys } from '@/shared/constants';
 import { useEffect } from 'react';
 import type { TourStatus } from '../types';

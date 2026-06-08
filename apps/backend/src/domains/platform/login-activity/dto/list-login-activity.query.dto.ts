@@ -15,7 +15,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { LoginEventStatusSchema, type LoginEventStatus, type ListLoginActivityQuery } from '@sally/shared-types';
+import { LoginEventStatusSchema, type LoginEventStatus, type ListLoginActivityQuery } from '@app/shared-types';
 import { LOGIN_ACTIVITY } from '../constants';
 
 const MS_PER_DAY = 86_400_000;

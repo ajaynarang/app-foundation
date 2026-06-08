@@ -1,5 +1,5 @@
 // Mock mastra modules that cause ESM issues in Jest
-jest.mock('../../../../domains/ai/sally-ai/mastra/mastra.provider', () => ({}));
+jest.mock('../../../../domains/ai/assistant/mastra/mastra.provider', () => ({}));
 jest.mock('../../../../domains/ai/infrastructure/providers/structured-output.service', () => ({
   StructuredOutputService: jest.fn(),
 }));
@@ -16,7 +16,7 @@ import { EmailThreadTrackerService } from '../services/email-thread-tracker.serv
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DOCUMENTS_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 const mockPrisma = {
   emailIngestAttachment: { update: jest.fn() },
@@ -168,7 +168,7 @@ describe('EmailIntakeJobHandler', () => {
 
       // Step 6: Event
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.EMAIL_INGEST_PARSED,
+        DOMAIN_EVENTS.EMAIL_INGEST_PARSED,
         expect.any(Number),
         expect.objectContaining({
           threadId: 'thread-1',
@@ -232,7 +232,7 @@ describe('EmailIntakeJobHandler', () => {
         }),
       );
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.EMAIL_INGEST_FAILED,
+        DOMAIN_EVENTS.EMAIL_INGEST_FAILED,
         expect.any(Number),
         expect.objectContaining({
           threadId: 'thread-1',

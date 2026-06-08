@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiInvocationStatus } from '@prisma/client';
 import { embed, embedMany } from 'ai';
-import type { AiCallContext } from '@sally/shared-types';
+import type { AiCallContext } from '@app/shared-types';
 
 import { aiEmbedding, EMBEDDING_MODEL_ID, EMBEDDING_PROVIDER_LABEL } from './ai-provider';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';

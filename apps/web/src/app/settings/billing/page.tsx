@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { CreditCard, Plus, Trash2, Star, Wallet, RefreshCw } from 'lucide-react';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Switch } from '@sally/ui/components/ui/switch';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Switch } from '@app/ui/components/ui/switch';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,8 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+} from '@app/ui/components/ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { FormSheet } from '@/shared/components/ui/form-sheet';
 import {
   useWalletBalance,
@@ -35,7 +35,7 @@ import {
 } from '@/features/billing/hooks/use-billing';
 import { formatCents } from '@/shared/lib/utils/formatters';
 import { formatTransactionType, getTransactionTypeVariant } from '@/features/billing/utils';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 
 // ---------------------------------------------------------------------------
 // Skeleton

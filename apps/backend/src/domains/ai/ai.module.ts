@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AiInfrastructureModule } from './infrastructure/ai-infrastructure.module';
 import { DocumentIntelligenceModule } from './document-intelligence/document-intelligence.module';
-import { SallyAiModule } from './sally-ai/sally-ai.module';
+import { SallyAiModule } from './assistant/assistant.module';
 import { McpToolsModule } from './mcp/mcp-tools.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { ModerationModule } from './moderation/moderation.module';

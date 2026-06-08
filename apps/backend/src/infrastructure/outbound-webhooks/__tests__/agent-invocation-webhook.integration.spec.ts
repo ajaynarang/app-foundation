@@ -8,7 +8,7 @@ import { DomainEventService } from '../../events/domain-event.service';
 import { WebhookDispatcher } from '../dispatcher.service';
 import { QUEUE_NAMES } from '../../queue/queue.constants';
 import { DomainEvent } from '../../events/domain-event';
-import { SALLY_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
 
 /**
  * Integration smoke: AgentInvocationLoggerService → DomainEventService
@@ -79,7 +79,7 @@ describe('sally.agent.invocation-completed webhook integration', () => {
         id: 'sub-1',
         tenantId: 7,
         url: 'https://example.test/hook',
-        events: ['sally.agent.*', SALLY_EVENTS.AGENT_INVOCATION_COMPLETED],
+        events: ['sally.agent.*', DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED],
         active: true,
       },
     ]);
@@ -110,7 +110,7 @@ describe('sally.agent.invocation-completed webhook integration', () => {
     emitter = module.get(EventEmitter2);
 
     // Wire the dispatcher to listen for the event (mirrors real runtime wiring).
-    emitter.on(SALLY_EVENTS.AGENT_INVOCATION_COMPLETED, async (event: DomainEvent) => {
+    emitter.on(DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED, async (event: DomainEvent) => {
       await dispatcher.dispatchEvent(event);
     });
   });
@@ -129,7 +129,7 @@ describe('sally.agent.invocation-completed webhook integration', () => {
     expect(mockPrisma.webhookDeliveryLog.create).toHaveBeenCalledTimes(1);
     const createCall = mockPrisma.webhookDeliveryLog.create.mock.calls[0][0];
     expect(createCall.data.subscriptionId).toBe('sub-1');
-    expect(createCall.data.event).toBe(SALLY_EVENTS.AGENT_INVOCATION_COMPLETED);
+    expect(createCall.data.event).toBe(DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED);
     // Enriched fields present
     expect(createCall.data.payload.data).toEqual(
       expect.objectContaining({

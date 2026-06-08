@@ -11,7 +11,7 @@ import {
   updateDriverPreferences,
   resetToDefaults as resetToDefaultsAPI,
 } from '@/features/platform/settings';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 
 interface PreferencesState {

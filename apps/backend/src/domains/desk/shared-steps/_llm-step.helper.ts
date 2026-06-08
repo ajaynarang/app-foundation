@@ -1,6 +1,6 @@
 import type { DeskEpisodeStepKind } from '@prisma/client';
 import type { ZodSchema } from 'zod';
-import type { ModelAlias } from '@sally/shared-types';
+import type { ModelAlias } from '@app/shared-types';
 
 import { AiSurface } from '@prisma/client';
 

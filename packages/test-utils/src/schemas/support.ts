@@ -1,7 +1,7 @@
 /**
  * API contracts for Support domain endpoints (tenant + super-admin).
  *
- * `@sally/shared-types/operations/support.schema.ts` provides most of the
+ * `@app/shared-types/operations/support.schema.ts` provides most of the
  * coverage. Two drifts observed during Phase 3 Group 3a (finding #28):
  *
  *   1. `TicketMessage` wire shape includes a `ticketId: string` key the
@@ -19,7 +19,7 @@ import {
   SupportTicketDetailSchema as SharedSupportTicketDetailSchema,
   PaginatedTicketsSchema as SharedPaginatedTicketsSchema,
   TicketMessageSchema as SharedTicketMessageSchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 /** Single ticket (list + create response). */
 export const SupportTicketSchema = SharedSupportTicketSchema;

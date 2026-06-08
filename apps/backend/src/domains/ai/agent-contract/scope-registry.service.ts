@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 import { getRequiredScope } from './requires-scope.decorator';
 import { PERMANENTLY_EXCLUDED_TOOL_NAMES, SCOPE_IMPLICATIONS } from './scope-registry.constants';
 

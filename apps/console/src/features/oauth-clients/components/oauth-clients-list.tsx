@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,8 +13,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+} from '@app/ui/components/ui/alert-dialog';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { KeyRound, Plus, Trash2 } from 'lucide-react';
 import { useOAuthClients, useRevokeOAuthClient } from '../use-oauth-clients';
 import { CreateOAuthClientSheet } from './create-oauth-client-sheet';

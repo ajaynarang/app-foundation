@@ -36,10 +36,10 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('VOICE_AGENT_SECRET not set — using dev default. Set a real secret in production.');
     }
 
-    // Set SALLY_API_URL for the forked process (defaults to localhost)
-    if (!process.env.SALLY_API_URL) {
+    // Set APP_API_URL for the forked process (defaults to localhost)
+    if (!process.env.APP_API_URL) {
       const port = this.config.get<number>('PORT', 8001);
-      process.env.SALLY_API_URL = `http://localhost:${port}`;
+      process.env.APP_API_URL = `http://localhost:${port}`;
     }
 
     await this.startWorker();
@@ -114,7 +114,7 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
 
       const server = new AgentServer(serverOpts);
       this.workerProcess = server;
-      this.logger.log(`Voice agent worker started — SALLY_API_URL=${process.env.SALLY_API_URL}`);
+      this.logger.log(`Voice agent worker started — APP_API_URL=${process.env.APP_API_URL}`);
 
       // Catch both the run() promise rejection and any unhandled errors
       // from forked child processes to prevent crashing the main NestJS process.

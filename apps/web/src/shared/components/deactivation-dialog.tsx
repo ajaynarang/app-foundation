@@ -12,9 +12,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Label } from '@sally/ui/components/ui/label';
+} from '@app/ui/components/ui/alert-dialog';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Label } from '@app/ui/components/ui/label';
 
 interface DeactivationDialogProps {
   open: boolean;

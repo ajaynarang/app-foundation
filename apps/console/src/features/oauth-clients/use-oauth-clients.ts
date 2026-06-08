@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listOAuthClients, createOAuthClient, revokeOAuthClient } from './api';
-import type { CreateOAuthClientInput } from '@sally/shared-types';
-import { showSuccess, showError } from '@sally/ui';
+import type { CreateOAuthClientInput } from '@app/shared-types';
+import { showSuccess, showError } from '@app/ui';
 
 const OAUTH_CLIENTS_KEY = ['oauth-clients'] as const;
 

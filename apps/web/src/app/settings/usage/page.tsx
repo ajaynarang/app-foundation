@@ -2,12 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import { Download, FileText } from 'lucide-react';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { useMyAddOns } from '@/features/add-ons/hooks';
 import {
   useBillingInvoices,
@@ -24,8 +24,8 @@ import {
 } from '@/features/billing/utils';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { formatTimestampDate, DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
-import { cn } from '@sally/ui';
-import type { TenantAddOn } from '@sally/shared-types';
+import { cn } from '@app/ui';
+import type { TenantAddOn } from '@app/shared-types';
 
 // ---------------------------------------------------------------------------
 // Skeleton

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '@sally/shared-types';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '@app/shared-types';
 import { useAgentActivity } from '@/features/ai/agent-activity';
 import { ScopeChip } from '@/features/ai/agent-scope-ui';
 import { DateRangeFilter, HISTORY_PRESETS } from '@/shared/components/ui/date-range-filter';

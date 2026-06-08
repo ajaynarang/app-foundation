@@ -11,7 +11,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { initializeFirebase } from './config/firebase.config';
 import { Logger } from 'nestjs-pino';
-import { OAUTH_SCOPES } from '@sally/shared-types';
+import { OAUTH_SCOPES } from '@app/shared-types';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
 
 async function bootstrap() {

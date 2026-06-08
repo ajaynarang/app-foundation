@@ -2,7 +2,7 @@
  * API Contracts for Customer endpoints.
  *
  * Matches the actual backend `CustomersService.formatResponse` +
- * `formatResponseWithAccess` output. Do NOT rely on `@sally/shared-types`
+ * `formatResponseWithAccess` output. Do NOT rely on `@app/shared-types`
  * `CustomerSchema` directly — it types `email` as `z.string().optional()` but
  * the backend returns `null` for unset optional strings, which breaks strict
  * parsing. These schemas reflect reality.

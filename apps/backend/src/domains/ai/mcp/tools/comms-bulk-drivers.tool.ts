@@ -4,10 +4,10 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { SmsService } from '../../../../infrastructure/sms/sms.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { errorResponse } from './utils/entity-resolver';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 import { ToolNames } from '../../agent-contract/tool-names.constants';
@@ -48,7 +48,7 @@ export class CommsBulkDriversTool {
   constructor(
     private readonly prisma: PrismaService,
     private readonly smsService: SmsService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     private readonly events: DomainEventService,
   ) {}
 
@@ -83,7 +83,7 @@ export class CommsBulkDriversTool {
     if (args._confirmToken) {
       const ok = await this.consumeBulkToken(args._confirmToken, args._tenantId, user.id, argsDigest);
       if (!ok) return errorResponse('Bulk confirmation token invalid or expired.');
-      await this.events.emit(SALLY_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(args._tenantId), {
+      await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(args._tenantId), {
         token: args._confirmToken,
         toolName: ToolNames.BULK_BROADCAST_DRIVERS,
       });
@@ -91,7 +91,7 @@ export class CommsBulkDriversTool {
       const preflight = await this.bulkPrecheck(args._tenantId, user.id, eligible.length, args._principalKind);
       if (preflight.requiresConfirm) {
         const token = await this.issueBulkToken(args._tenantId, user.id, argsDigest);
-        await this.events.emit(SALLY_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(args._tenantId), {
+        await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(args._tenantId), {
           token,
           toolName: ToolNames.BULK_BROADCAST_DRIVERS,
           tier: 'standard',

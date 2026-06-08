@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DOCUMENT_TYPES } from '@sally/shared-types';
+import { DOCUMENT_TYPES } from '@app/shared-types';
 import { FleetOperationsSettings } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '../../../constants/cache.constants';
 import { UpdateOperationsSettingsDto } from './dto/operations-settings.dto';
@@ -33,7 +33,7 @@ export class OperationsSettingsService {
 
   constructor(
     private prisma: PrismaService,
-    private cache: SallyCacheService,
+    private cache: AppCacheService,
   ) {}
 
   /**

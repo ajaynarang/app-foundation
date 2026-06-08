@@ -3,8 +3,8 @@ import { useAuthStore } from '../../lib/auth-store';
 import { plansApi } from './api';
 import { addOnsApi } from '../add-ons/api';
 import { QUERY_TIERS } from '../../shared/config/query-tiers';
-import type { TenantPlan } from '@sally/shared-types';
-import { isAddOnFeature } from '@sally/shared-types';
+import type { TenantPlan } from '@app/shared-types';
+import { isAddOnFeature } from '@app/shared-types';
 
 const PLAN_QUERY_KEY = ['my-plan'] as const;
 const MY_ADD_ONS_QUERY_KEY = ['add-ons', 'my-add-ons'] as const;

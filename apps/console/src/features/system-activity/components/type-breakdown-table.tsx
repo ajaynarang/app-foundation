@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { CheckCircle2, XCircle, AlertTriangle, Minus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { CategorySummary, TypeSummary } from '../types';

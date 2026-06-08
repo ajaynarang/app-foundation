@@ -12,12 +12,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@sally/ui/components/ui/dialog';
-import { Button } from '@sally/ui/components/ui/button';
-import { Label } from '@sally/ui/components/ui/label';
+} from '@app/ui/components/ui/dialog';
+import { Button } from '@app/ui/components/ui/button';
+import { Label } from '@app/ui/components/ui/label';
 import { PasswordInput } from './password-input';
 import { PasswordStrengthMeter } from './password-strength-meter';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { authApi } from '@/features/auth/api';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 

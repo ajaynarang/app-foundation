@@ -1,7 +1,7 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subject } from 'rxjs';
 import { DomainEvent } from '../../events/domain-event';
-import { SALLY_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
 import { SSE_EVENTS } from '../sse-events.constants';
 import { SseService } from '../sse.service';
 import { DomainEventSseBridge } from '../domain-event-sse-bridge.service';
@@ -33,8 +33,8 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     sse.addClient('user-correct', 7, subject);
 
     emitter.emit(
-      SALLY_EVENTS.NOTIFICATION_SENT,
-      new DomainEvent(SALLY_EVENTS.NOTIFICATION_SENT, '7', {
+      DOMAIN_EVENTS.NOTIFICATION_SENT,
+      new DomainEvent(DOMAIN_EVENTS.NOTIFICATION_SENT, '7', {
         notificationId: 'n-1',
         title: 'X',
         message: 'Y',
@@ -59,8 +59,8 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
 
     // But the producer (incorrectly) used a firebaseUid value as the recipient id
     emitter.emit(
-      SALLY_EVENTS.NOTIFICATION_SENT,
-      new DomainEvent(SALLY_EVENTS.NOTIFICATION_SENT, '7', {
+      DOMAIN_EVENTS.NOTIFICATION_SENT,
+      new DomainEvent(DOMAIN_EVENTS.NOTIFICATION_SENT, '7', {
         notificationId: 'n-1',
         title: 'X',
         message: 'Y',
@@ -83,8 +83,8 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     sse.addClient('user-B', 7, subjB);
 
     emitter.emit(
-      SALLY_EVENTS.ALERT_FIRED,
-      new DomainEvent(SALLY_EVENTS.ALERT_FIRED, '7', {
+      DOMAIN_EVENTS.ALERT_FIRED,
+      new DomainEvent(DOMAIN_EVENTS.ALERT_FIRED, '7', {
         alertId: 'a-1',
         priority: 'critical',
         title: 'X',
@@ -108,7 +108,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     sse.addClient('user-1', 7, subj1);
     sse.addClient('user-2', 7, subj2);
 
-    emitter.emit(SALLY_EVENTS.LOAD_CREATED, new DomainEvent(SALLY_EVENTS.LOAD_CREATED, '7', { loadId: 'L-1' }));
+    emitter.emit(DOMAIN_EVENTS.LOAD_CREATED, new DomainEvent(DOMAIN_EVENTS.LOAD_CREATED, '7', { loadId: 'L-1' }));
 
     expect(recv1).toHaveLength(1);
     expect(recv2).toHaveLength(1);

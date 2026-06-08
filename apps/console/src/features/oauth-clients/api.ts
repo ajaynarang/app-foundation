@@ -1,5 +1,5 @@
 import { apiClient } from '../../lib/api-client';
-import type { OAuthClientResponse, OAuthClientCreatedResponse, CreateOAuthClientInput } from '@sally/shared-types';
+import type { OAuthClientResponse, OAuthClientCreatedResponse, CreateOAuthClientInput } from '@app/shared-types';
 
 export type { OAuthClientResponse, OAuthClientCreatedResponse };
 

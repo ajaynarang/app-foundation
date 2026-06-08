@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');

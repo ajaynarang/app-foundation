@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { Sparkles, AlertTriangle, ShieldOff } from 'lucide-react';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
+import { Card, CardContent } from '@app/ui/components/ui/card';
 import { usePlan } from '../features/plans/use-plan';
 
 /**

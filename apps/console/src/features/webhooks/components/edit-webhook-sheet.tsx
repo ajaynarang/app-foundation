@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
 import {
   Sheet,
   SheetContent,
@@ -12,7 +12,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '@sally/ui/components/ui/sheet';
+} from '@app/ui/components/ui/sheet';
 import { useUpdateWebhook, type WebhookSubscription } from '../use-webhooks';
 import { EventPicker } from './event-picker';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
 import { captureError } from '@/shared/lib/sentry';
 

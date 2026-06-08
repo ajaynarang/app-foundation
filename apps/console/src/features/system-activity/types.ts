@@ -1,4 +1,4 @@
-export type { JobStatus, Job, TypeSummary, CategorySummary, PaginatedJobs } from '@sally/shared-types';
+export type { JobStatus, Job, TypeSummary, CategorySummary, PaginatedJobs } from '@app/shared-types';
 
 export const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   tms: 'Fleet Sync',

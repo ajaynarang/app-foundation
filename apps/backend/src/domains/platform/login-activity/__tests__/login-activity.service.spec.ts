@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { LoginActivityService } from '../login-activity.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { createMockPrisma, createMockCache } from '../../../../test/mocks';
 import { LOGIN_ACTIVITY } from '../constants';
 import { loginActivityCacheKeys, rolesKey } from '../login-activity.cache';
@@ -26,7 +26,7 @@ describe('LoginActivityService', () => {
       providers: [
         LoginActivityService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
       ],
     }).compile();
 

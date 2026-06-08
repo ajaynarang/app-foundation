@@ -36,8 +36,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // All non-public routes require auth — check sally-auth cookie
-  const authCookie = request.cookies.get('sally-auth');
+  // All non-public routes require auth — check app-auth cookie
+  const authCookie = request.cookies.get('app-auth');
   if (!authCookie?.value) {
     return NextResponse.redirect(getAppLoginUrl(request, pathname));
   }

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { LoadStatus } from '@prisma/client';
-import { AlertStatusSchema, formatLoadLabel } from '@sally/shared-types';
+import { AlertStatusSchema, formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 

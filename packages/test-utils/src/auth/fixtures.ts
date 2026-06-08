@@ -7,10 +7,10 @@ import type { AuthState } from './auth-state.js';
 const AUTH_STATE_FILENAME = 'auth-state.json';
 
 function resolveAuthStateDir(): string {
-  const d = process.env.SALLY_QA_AUTH_STATE_DIR;
+  const d = process.env.APP_QA_AUTH_STATE_DIR;
   if (!d) {
     throw new Error(
-      'SALLY_QA_AUTH_STATE_DIR env var is not set. ' + 'The Playwright global-setup must export it before tests run.',
+      'APP_QA_AUTH_STATE_DIR env var is not set. ' + 'The Playwright global-setup must export it before tests run.',
     );
   }
   return d;

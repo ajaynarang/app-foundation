@@ -1,5 +1,5 @@
 /**
- * Integration test for SallyCacheService against a real Redis instance.
+ * Integration test for AppCacheService against a real Redis instance.
  *
  * Guards the regression that motivated this entire refactor: writes through
  * the cache facade must produce literal `sally:*` keys in Redis (no Keyv
@@ -11,7 +11,7 @@
  * Skipped when Redis is unreachable so unit-test runs don't block on infra.
  */
 import Redis from 'ioredis';
-import { SallyCacheService } from '../sally-cache.service';
+import { AppCacheService } from '../app-cache.service';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
 const TEST_PREFIX = 'sally:itest';
@@ -29,16 +29,16 @@ async function isRedisReachable(): Promise<boolean> {
   }
 }
 
-describe('SallyCacheService (integration, real Redis)', () => {
+describe('AppCacheService (integration, real Redis)', () => {
   let redis: Redis; // service-side client
   let probe: Redis; // separate verification client — proves writes actually hit Redis
-  let service: SallyCacheService;
+  let service: AppCacheService;
   let available: boolean;
 
   beforeAll(async () => {
     available = await isRedisReachable();
     if (!available) {
-      console.warn(`Skipping SallyCacheService integration: Redis at ${REDIS_URL} unreachable`);
+      console.warn(`Skipping AppCacheService integration: Redis at ${REDIS_URL} unreachable`);
     }
   });
 
@@ -47,7 +47,7 @@ describe('SallyCacheService (integration, real Redis)', () => {
     redis = new Redis(REDIS_URL);
     probe = new Redis(REDIS_URL);
     // Inject the service-side client (matches what the Nest DI container produces).
-    service = new SallyCacheService(redis);
+    service = new AppCacheService(redis);
     service.onModuleInit();
 
     // Clean slate for our test prefix only — never touch foreign keys.

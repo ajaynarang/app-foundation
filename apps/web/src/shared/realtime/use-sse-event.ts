@@ -1,7 +1,7 @@
 'use client';
 
 import { useContext, useEffect, useRef } from 'react';
-import type { SseEventType, SsePayloadFor } from '@sally/shared-types';
+import type { SseEventType, SsePayloadFor } from '@app/shared-types';
 import { SseBusContext } from './sse-context';
 
 /**

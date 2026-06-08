@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Label } from '@sally/ui/components/ui/label';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
-import { Input } from '@sally/ui/components/ui/input';
-import { Button } from '@sally/ui/components/ui/button';
-import { Switch } from '@sally/ui/components/ui/switch';
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Label } from '@app/ui/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
+import { Input } from '@app/ui/components/ui/input';
+import { Button } from '@app/ui/components/ui/button';
+import { Switch } from '@app/ui/components/ui/switch';
+import { Badge } from '@app/ui/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,16 +17,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { useAuthStore } from '@/features/auth';
 import { usePreferencesStore } from '@/features/settings';
 import type { OperationsSettings } from '@/features/settings';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
 import { Save, RotateCcw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getActiveFuelCardTypes, type FuelCardType } from '@/features/fuel-cards/api';
-import { getComplianceDocumentTypes } from '@sally/shared-types';
+import { getComplianceDocumentTypes } from '@app/shared-types';
 
 export default function OperationsSettingsPage() {
   const { user } = useAuthStore();

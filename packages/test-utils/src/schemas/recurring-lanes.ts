@@ -1,7 +1,7 @@
 /**
  * API Contracts for Recurring Lanes endpoints.
  *
- * Shared-types `@sally/shared-types/fleet/recurring-lane.schema.ts` exports
+ * Shared-types `@app/shared-types/fleet/recurring-lane.schema.ts` exports
  * `RecurringLaneSchema`, but it omits a handful of fields that the backend
  * actually emits via `formatLaneResponse`:
  *

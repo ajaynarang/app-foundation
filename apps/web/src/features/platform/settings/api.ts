@@ -1,7 +1,7 @@
 import { apiClient } from '@/shared/lib/api';
 import type { PreferencesResetResponse } from './types';
 
-// Re-export domain types from @sally/shared-types
+// Re-export domain types from @app/shared-types
 export type {
   UserPreferences,
   OperationsSettings,
@@ -11,9 +11,9 @@ export type {
   GroupingConfig,
   ChannelConfig,
   AlertConfiguration,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
-import type { UserPreferences, OperationsSettings, DriverPreferences, AlertConfiguration } from '@sally/shared-types';
+import type { UserPreferences, OperationsSettings, DriverPreferences, AlertConfiguration } from '@app/shared-types';
 
 // ============================================================================
 // USER PREFERENCES

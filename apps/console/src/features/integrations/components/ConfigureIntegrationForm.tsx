@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
 import {
   type IntegrationConfig,
   type IntegrationType,

@@ -1,6 +1,6 @@
 import { Injectable, Logger, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M } from '../../../constants/cache.constants';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -24,11 +24,11 @@ import {
   type DriverPayTiming as DriverPayTimingType,
   type OrganizationProfile,
   type UpdateOrganizationProfileInput,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../desk/responsibilities/desk-bootstrap.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 
 /** Prisma select for the editable organization-profile field set. */
 const ORGANIZATION_PROFILE_SELECT = {
@@ -49,7 +49,7 @@ export class TenantsService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     private readonly deskBootstrap: DeskBootstrapService,
     private readonly events: DomainEventService,
   ) {}
@@ -717,7 +717,7 @@ export class TenantsService {
     });
 
     if (previous.defaultFactoringCompanyId !== factoringCompanyId) {
-      await this.events.emit(SALLY_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED, tenantDbId, {
+      await this.events.emit(DOMAIN_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED, tenantDbId, {
         entityId: String(tenantDbId),
         entityType: 'tenant',
         previousFactoringCompanyId: previous.defaultFactoringCompanyId,

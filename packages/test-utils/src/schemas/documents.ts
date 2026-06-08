@@ -1,7 +1,7 @@
 /**
  * API Contracts for Documents endpoints.
  *
- * Hand-written because `@sally/shared-types/fleet/document.schema.ts`
+ * Hand-written because `@app/shared-types/fleet/document.schema.ts`
  * drifts from the actual controller/service responses:
  *
  *   - Shared types `DocumentSchema` declares `documentId: string`,

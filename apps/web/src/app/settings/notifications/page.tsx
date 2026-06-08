@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Label } from '@sally/ui/components/ui/label';
-import { Input } from '@sally/ui/components/ui/input';
-import { Button } from '@sally/ui/components/ui/button';
-import { Switch } from '@sally/ui/components/ui/switch';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Label } from '@app/ui/components/ui/label';
+import { Input } from '@app/ui/components/ui/input';
+import { Button } from '@app/ui/components/ui/button';
+import { Switch } from '@app/ui/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,11 +15,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { useAuthStore } from '@/features/auth';
 import { usePreferencesStore } from '@/features/platform/settings';
 import type { UserPreferences } from '@/features/platform/settings';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save, RotateCcw } from 'lucide-react';
 
 const CATEGORIES = [

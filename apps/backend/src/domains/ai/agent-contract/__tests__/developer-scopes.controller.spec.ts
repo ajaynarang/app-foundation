@@ -1,4 +1,4 @@
-import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@sally/shared-types';
+import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 import { DeveloperScopesController } from '../developer-scopes.controller';
 
 describe('DeveloperScopesController', () => {

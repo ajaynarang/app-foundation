@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { formatDistanceToNow } from 'date-fns';
 import { useWebhooks, type WebhookSubscription } from '../use-webhooks';
 import { CreateWebhookSheet } from './create-webhook-sheet';

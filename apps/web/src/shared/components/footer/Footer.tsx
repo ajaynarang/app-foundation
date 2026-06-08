@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { mailto } from '@/shared/lib/contacts';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NEVER_EXTERNAL_SCOPES } from '@sally/shared-types';
+import { NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 import { ScopeRegistryService } from './scope-registry.service';
 import { HitlPolicyService } from './hitl-policy.service';
 import { ToolExecutorService, ToolResult } from './tool-executor.service';

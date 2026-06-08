@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Label } from '@sally/ui/components/ui/label';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
-import { Button } from '@sally/ui/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Label } from '@app/ui/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
+import { Button } from '@app/ui/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,11 +14,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { useAuthStore } from '@/features/auth';
 import { usePreferencesStore } from '@/features/platform/settings';
 import type { UserPreferences } from '@/features/platform/settings';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save, RotateCcw } from 'lucide-react';
 
 export default function GeneralSettingsPage() {

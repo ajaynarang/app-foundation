@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { requestContextStorage } from '../logging/request-context.middleware';
 
 interface BuildOpts {

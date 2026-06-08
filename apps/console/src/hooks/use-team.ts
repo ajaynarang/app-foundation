@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiClient } from '../lib/api-client';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 export interface TeamMember {
   userId: string;

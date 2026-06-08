@@ -2,7 +2,7 @@
  * API Contracts for the Customer Portal load endpoints
  * (`/customer/loads` + `/customer/loads/:id` + `/customer/loads/request`).
  *
- * Hand-written. `@sally/shared-types/fleet/customer.schema.ts` exports
+ * Hand-written. `@app/shared-types/fleet/customer.schema.ts` exports
  * `CustomerLoadSchema` and `CustomerLoadDetailSchema`, but both drift from
  * the backend responses:
  *

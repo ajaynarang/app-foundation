@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import type { Prisma } from '@prisma/client';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../database/prisma.service';
 import { TenantIdResolver } from '../events/tenant-id-resolver.service';
 import { generateUuidV7 } from '../../shared/utils/uuidv7';

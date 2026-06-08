@@ -11,7 +11,7 @@ import {
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { JobStatus, UserRole } from '@prisma/client';
-import { JobStatusSchema } from '@sally/shared-types';
+import { JobStatusSchema } from '@app/shared-types';
 import { JobService } from '../../infrastructure/queue/job.service';
 import { ALL_CATEGORIES } from '../../infrastructure/queue/job.types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';

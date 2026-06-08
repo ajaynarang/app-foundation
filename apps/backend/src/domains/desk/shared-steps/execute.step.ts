@@ -1,6 +1,6 @@
 import { DeskEpisodeStepKind } from '@prisma/client';
-import type { AgentScope } from '@sally/shared-types';
-import { scopeTier } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
+import { scopeTier } from '@app/shared-types';
 
 import { nestApp } from '../core/inngest/nest-context';
 import { fromDeskResponsibility } from '../../ai/agent-contract/agent-principal';

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { AlertStatusSchema } from '@sally/shared-types';
+import { AlertStatusSchema } from '@app/shared-types';
 
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { McpToolService } from '../mcp/mcp-tool.service';
-import { MastraProvider } from '../sally-ai/mastra/mastra.provider';
+import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { PromptingService } from '../../../domains/prompting';
 import { AgentDefinition } from './agent.types';

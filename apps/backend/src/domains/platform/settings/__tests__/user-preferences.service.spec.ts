@@ -1,7 +1,7 @@
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { UserPreferencesService } from '../user-preferences.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('UserPreferencesService', () => {
   let service: UserPreferencesService;
@@ -38,7 +38,7 @@ describe('UserPreferencesService', () => {
       del: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new UserPreferencesService(prisma as unknown as PrismaService, cache as unknown as SallyCacheService);
+    service = new UserPreferencesService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
   });
 
   describe('getUserPreferences', () => {

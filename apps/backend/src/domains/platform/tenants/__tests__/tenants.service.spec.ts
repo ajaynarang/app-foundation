@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, BadRequestException } from '@nestjs/common';
 import { TenantsService } from '../tenants.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../../desk/responsibilities/desk-bootstrap.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
@@ -59,7 +59,7 @@ describe('TenantsService', () => {
       providers: [
         TenantsService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: SallyCacheService, useValue: mockCache },
+        { provide: AppCacheService, useValue: mockCache },
         { provide: NotificationService, useValue: mockNotification },
         { provide: DeskBootstrapService, useValue: mockDeskBootstrap },
         { provide: DomainEventService, useValue: { emit: jest.fn().mockResolvedValue(undefined) } },

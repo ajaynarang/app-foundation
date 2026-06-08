@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 /**
  * Feature flags — operational kill-switches for every feature key.
- * Maps 1:1 with FEATURE_KEYS from @sally/shared-types.
+ * Maps 1:1 with FEATURE_KEYS from @app/shared-types.
  * All enabled=true by default (the add-on/entitlement system gates access, not flags).
  */
 const flags = [

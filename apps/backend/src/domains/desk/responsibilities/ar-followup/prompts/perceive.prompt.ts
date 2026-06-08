@@ -3,7 +3,7 @@
  *
  * Fast-tier LLM (Haiku). Asked to classify the invoice state and
  * summarize context. Structured output enforced by Zod
- * (ArFollowupPerceiveSchema in @sally/shared-types).
+ * (ArFollowupPerceiveSchema in @app/shared-types).
  *
  * Keep it short — this is a classification call, not reasoning.
  */

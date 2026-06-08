@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth/store';
 import { resolvePostLoginRedirect } from '@/shared/lib/navigation';
 import { buildTenantRedirectUrl, buildTenantUrl } from '@/shared/lib/tenant-url';
-import { showError } from '@sally/ui';
+import { showError } from '@app/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SESSION_KEYS } from '@/shared/constants';
 

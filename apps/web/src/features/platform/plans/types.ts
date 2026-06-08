@@ -5,4 +5,4 @@ export type {
   PlanEvent,
   TenantPlanDetails,
   AssignPlanRequest,
-} from '@sally/shared-types';
+} from '@app/shared-types';

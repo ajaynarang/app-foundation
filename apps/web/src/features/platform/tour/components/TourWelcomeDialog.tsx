@@ -1,9 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@sally/ui/components/ui/dialog';
-import { Button } from '@sally/ui/components/ui/button';
-import { SallyOrb } from '@/features/platform/sally-ai/components/SallyOrb';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@app/ui/components/ui/dialog';
+import { Button } from '@app/ui/components/ui/button';
+import { SallyOrb } from '@/features/platform/ai-chat/components/SallyOrb';
 import { useTour } from '../hooks/use-tour';
 
 interface TourWelcomeDialogProps {

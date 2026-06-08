@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import { useCommandCenterOverview } from '@/features/operations/tower/hooks/use-command-center';
 import { useHomePulse } from '@/features/home/hooks/use-home-pulse';
 import { formatCents } from '@/shared/lib/utils/formatters';

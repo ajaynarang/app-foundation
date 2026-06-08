@@ -10,7 +10,7 @@ import type {
   AiBudget,
   UpdateAiBudgetInput,
   AiCostVsQuota,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 /**
  * Reads from the SQL views introduced by the AI Spend views migration:

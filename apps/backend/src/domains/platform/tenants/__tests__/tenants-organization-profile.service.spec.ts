@@ -4,7 +4,7 @@ import { CarrierType, FleetSize } from '@prisma/client';
 
 import { TenantsService } from '../tenants.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../../desk/responsibilities/desk-bootstrap.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
@@ -28,7 +28,7 @@ describe('TenantsService — organization profile', () => {
       providers: [
         TenantsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
         { provide: NotificationService, useValue: {} },
         { provide: DeskBootstrapService, useValue: {} },
         { provide: DomainEventService, useValue: { emit: jest.fn() } },

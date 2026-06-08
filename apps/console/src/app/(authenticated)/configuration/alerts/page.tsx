@@ -1,21 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Label } from '@sally/ui/components/ui/label';
-import { Input } from '@sally/ui/components/ui/input';
-import { Button } from '@sally/ui/components/ui/button';
-import { Switch } from '@sally/ui/components/ui/switch';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Label } from '@app/ui/components/ui/label';
+import { Input } from '@app/ui/components/ui/input';
+import { Button } from '@app/ui/components/ui/button';
+import { Switch } from '@app/ui/components/ui/switch';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
 import { useAuthStore } from '@/features/auth';
 import { getAlertConfig, updateAlertConfig } from '@/features/settings/api';
 import type { AlertConfiguration } from '@/features/settings/api';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save, Lock } from 'lucide-react';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 // ============================================================================
 // Alert type metadata — labels, descriptions, threshold units, grouping

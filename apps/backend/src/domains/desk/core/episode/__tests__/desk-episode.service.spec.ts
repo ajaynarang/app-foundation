@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
 
 import { ApprovalEnrichmentService } from '../../approval/approval-enrichment.service';
@@ -1090,7 +1090,7 @@ describe('DeskEpisodeService', () => {
       expect(updateArgs.data.closedAt).toBeUndefined();
       // Emits the change event with the tenant + episode + new status.
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.DESK_EPISODE_CHANGED,
+        DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
         10,
         expect.objectContaining({ episodeId: 'ep-esc', status: 'RESOLVED' }),
         expect.anything(),

@@ -1,8 +1,8 @@
 'use client';
 
 import { CONTACTS, mailto } from '@/lib/contacts';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@sally/ui/components/ui/card';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
 import { useOrganization } from '../../../../hooks/use-account';
 
 interface OrgField {

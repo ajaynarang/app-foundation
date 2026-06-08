@@ -56,7 +56,7 @@ interface AuthState {
 }
 
 /**
- * Set or clear the `sally-auth` presence cookie on the parent domain.
+ * Set or clear the `app-auth` presence cookie on the parent domain.
  *
  * Uses SameSite=Lax (not Strict) so the cookie is sent on cross-subdomain
  * top-level navigations (e.g., redirect from staging.sally.appshore.in to
@@ -66,18 +66,18 @@ function setAuthCookie(authenticated: boolean, role?: string) {
   if (typeof document === 'undefined') return;
   const domainPart = getCookieDomain() ? `; domain=${getCookieDomain()}` : '';
   // Secure flag only on non-localhost — browsers reject Secure cookies over http://
-  // Note: sally-auth is intentionally NOT HttpOnly — it's a presence flag (value "1"),
+  // Note: app-auth is intentionally NOT HttpOnly — it's a presence flag (value "1"),
   // not a secret. It must be set via document.cookie because the auth flow is client-side.
-  // sally-role stores the user role for middleware route-level access enforcement.
+  // app-role stores the user role for middleware route-level access enforcement.
   const securePart = isLocalhost() ? '' : '; Secure';
   if (authenticated) {
-    document.cookie = `sally-auth=1; path=/${domainPart}; Max-Age=86400; SameSite=Lax${securePart}`;
+    document.cookie = `app-auth=1; path=/${domainPart}; Max-Age=86400; SameSite=Lax${securePart}`;
     if (role) {
-      document.cookie = `sally-role=${role}; path=/${domainPart}; Max-Age=86400; SameSite=Lax${securePart}`;
+      document.cookie = `app-role=${role}; path=/${domainPart}; Max-Age=86400; SameSite=Lax${securePart}`;
     }
   } else {
-    document.cookie = `sally-auth=; path=/${domainPart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${securePart}`;
-    document.cookie = `sally-role=; path=/${domainPart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${securePart}`;
+    document.cookie = `app-auth=; path=/${domainPart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${securePart}`;
+    document.cookie = `app-role=; path=/${domainPart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${securePart}`;
   }
 }
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Button } from '@sally/ui/components/ui/button';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sally/ui/components/ui/collapsible';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Button } from '@app/ui/components/ui/button';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@app/ui/components/ui/collapsible';
 import { RefreshCw, Ban, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 import { useFormatters, DISPLAY_FORMATS } from '../../../shared/lib/formatters';
 import { JobStatusBadge } from './job-status-badge';

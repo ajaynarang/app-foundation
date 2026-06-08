@@ -612,7 +612,7 @@ export const OAUTH_PKCE_CHALLENGE = PKCE_CODE_CHALLENGE;
 
 /**
  * POST /oauth/clients body — matches `CreateOAuthClientSchema` in
- * `@sally/shared-types/platform/oauth.schema.ts`. camelCase.
+ * `@app/shared-types/platform/oauth.schema.ts`. camelCase.
  *
  * Default emits a confidential client (the common case — the service also
  * accepts `public` which omits the client_secret on RFC 7591 but on the

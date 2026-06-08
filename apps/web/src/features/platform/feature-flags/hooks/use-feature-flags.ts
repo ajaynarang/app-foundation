@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { featureFlagsApi } from '../api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@/shared/constants';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 

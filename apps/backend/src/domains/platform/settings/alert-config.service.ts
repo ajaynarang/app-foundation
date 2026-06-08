@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AlertPriority } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '../../../constants/cache.constants';
 import { UpdateAlertConfigDto } from './dto/alert-config.dto';
@@ -12,7 +12,7 @@ export class AlertConfigService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   getDefaults() {

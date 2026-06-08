@@ -17,7 +17,7 @@ jest.mock('../ai-provider', () => ({
 import { StructuredOutputService } from '../structured-output.service';
 import { generateText } from 'ai';
 import { z } from 'zod';
-import type { AiCallContext } from '@sally/shared-types';
+import type { AiCallContext } from '@app/shared-types';
 
 describe('StructuredOutputService', () => {
   let service: StructuredOutputService;
@@ -233,7 +233,7 @@ describe('StructuredOutputService', () => {
   });
 
   describe('extract — usage extraction shapes', () => {
-    const ctx: AiCallContext = { tenantId: 1, surface: 'SALLY_CHAT' };
+    const ctx: AiCallContext = { tenantId: 1, surface: 'APP_CHAT' };
 
     it('reads inputTokens/outputTokens variant', async () => {
       (generateText as jest.Mock).mockResolvedValue({

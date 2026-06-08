@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@sally/ui/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { SheetKeyboardHint } from '@sally/ui/components/ui/form-sheet';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Separator } from '@sally/ui/components/ui/separator';
+import { Button } from '@app/ui/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@app/ui/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { SheetKeyboardHint } from '@app/ui/components/ui/form-sheet';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Separator } from '@app/ui/components/ui/separator';
 import {
   type IntegrationConfig,
   type IntegrationType,
@@ -22,8 +22,8 @@ import {
   getSyncHistory,
   type UnifiedSyncLog,
 } from '../';
-import { Switch } from '@sally/ui/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { Switch } from '@app/ui/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 import {
   Loader2,
   Plus,
@@ -42,7 +42,7 @@ import {
   XCircle,
   UploadCloud,
 } from 'lucide-react';
-import { showSuccess, showError, showSuccessWithLink } from '@sally/ui';
+import { showSuccess, showError, showSuccessWithLink } from '@app/ui';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,7 +52,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { ConfigureIntegrationForm } from './ConfigureIntegrationForm';
 import { JobDetailSheet, systemActivityApi, type Job } from '../../system-activity';
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useDeveloperScopes } from '@/features/developer-scopes/use-scopes';
 import { ScopesTable } from '@/features/developer-scopes/components/scopes-table';
 

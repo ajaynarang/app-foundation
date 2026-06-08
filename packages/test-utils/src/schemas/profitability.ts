@@ -9,7 +9,7 @@
  *
  * Response shape emitted by `ProfitabilityService.calculateForLoad` /
  * `calculateForTenant` matches `LoadProfitabilitySchema` in
- * `@sally/shared-types/financials/profitability.schema.ts` verbatim:
+ * `@app/shared-types/financials/profitability.schema.ts` verbatim:
  *   `{ loadId, loadNumber, revenueCents, driverCostCents, fuelCostCents,
  *      marginCents, marginPercent }`
  *
@@ -24,7 +24,7 @@
  * List endpoint returns a raw array (no envelope).
  */
 import { z } from 'zod';
-import { LoadProfitabilitySchema } from '@sally/shared-types';
+import { LoadProfitabilitySchema } from '@app/shared-types';
 
 /** GET /profitability/loads/:load_id — single-load P&L. */
 export const ProfitabilityResponseSchema = LoadProfitabilitySchema;

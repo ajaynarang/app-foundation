@@ -1,7 +1,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { DomainEvent } from './domain-event';
 import { DurableEventJobData } from './durable-event.types';
 import { EventPersistenceSubscriber } from './event-persistence.subscriber';

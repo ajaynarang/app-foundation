@@ -7,7 +7,7 @@ import { useAuthStore } from './auth-store';
 
 /**
  * Reads #token=...&user=... hash fragment relayed by the main app's login page.
- * Sets Zustand auth state + sally-auth cookie so middleware won't redirect again.
+ * Sets Zustand auth state + app-auth cookie so middleware won't redirect again.
  * Returns true if a token relay was consumed (so onAuthStateChanged can skip clearAuth).
  */
 function consumeTokenRelay(): boolean {
@@ -27,7 +27,7 @@ function consumeTokenRelay(): boolean {
     const { setTokens, setUser, setInitialized } = useAuthStore.getState();
 
     setTokens(token);
-    setUser(user); // also sets sally-auth cookie + isAuthenticated
+    setUser(user); // also sets app-auth cookie + isAuthenticated
     setInitialized(true);
 
     // Clean up URL: remove hash and ?sso=1 query param

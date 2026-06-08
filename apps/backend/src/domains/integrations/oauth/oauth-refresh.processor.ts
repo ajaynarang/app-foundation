@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { VENDOR_DATA_JOB_NAMES } from '../../../infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '../../../infrastructure/queue/job-handler.contract';
 import { VendorCircuitBreakerService } from '../../../infrastructure/queue/vendor-circuit-breaker.service';

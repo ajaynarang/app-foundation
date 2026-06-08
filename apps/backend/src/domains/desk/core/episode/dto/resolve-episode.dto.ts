@@ -1,11 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { ResolveEpisodeRequest } from '@sally/shared-types';
+import type { ResolveEpisodeRequest } from '@app/shared-types';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * PATCH /desk/episodes/:id/resolve body.
  *
- * Mirrors `ResolveEpisodeRequestSchema` in @sally/shared-types. Using
+ * Mirrors `ResolveEpisodeRequestSchema` in @app/shared-types. Using
  * class-validator (project convention — no `createZodDto` in this codebase).
  *
  * The note is optional by design — the human dealing with the escalation is

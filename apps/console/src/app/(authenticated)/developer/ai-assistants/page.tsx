@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import { MessageSquare, Bot, Globe, ExternalLink, Monitor, BookOpen, Rocket } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@sally/ui/components/ui/button';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { UrlRow } from '@sally/ui/components/ui/url-row';
+import { Button } from '@app/ui/components/ui/button';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Separator } from '@app/ui/components/ui/separator';
+import { UrlRow } from '@app/ui/components/ui/url-row';
 import { getApiBaseUrl, getEnvironmentLabel, getMcpBaseUrl } from '@/shared/lib/access-environments';
 
 const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';

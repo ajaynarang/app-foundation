@@ -1,4 +1,4 @@
-import type { CloseoutReview as CloseoutReviewTypes } from '@sally/shared-types';
+import type { CloseoutReview as CloseoutReviewTypes } from '@app/shared-types';
 
 import type { CloseoutHydrateOutput } from '../step.types';
 import { buildCloseoutReviewApprovalPayload } from '../approval-adapter';

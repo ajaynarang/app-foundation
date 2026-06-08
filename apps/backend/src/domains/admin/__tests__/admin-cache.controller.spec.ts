@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AdminCacheController } from '../admin-cache.controller';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { CACHE_NAMESPACES } from '../../../constants/cache.constants';
 
 describe('AdminCacheController', () => {
@@ -19,7 +19,7 @@ describe('AdminCacheController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminCacheController],
-      providers: [{ provide: SallyCacheService, useValue: cacheService }],
+      providers: [{ provide: AppCacheService, useValue: cacheService }],
     }).compile();
 
     controller = module.get<AdminCacheController>(AdminCacheController);

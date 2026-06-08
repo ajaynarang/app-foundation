@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { LeadStatusSchema } from '@sally/shared-types';
+import { LeadStatusSchema } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { generateId } from '../../../../shared/utils/id-generator';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';

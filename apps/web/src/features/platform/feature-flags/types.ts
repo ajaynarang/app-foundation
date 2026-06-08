@@ -1,1 +1,1 @@
-export type { FeatureFlag, FeatureFlagsResponse, FeatureFlagEnabledResponse } from '@sally/shared-types';
+export type { FeatureFlag, FeatureFlagsResponse, FeatureFlagEnabledResponse } from '@app/shared-types';

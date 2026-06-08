@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@sally/ui/components/ui/button';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
+import { Button } from '@app/ui/components/ui/button';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
+} from '@app/ui/components/ui/dialog';
 
 interface ReactivateTenantDialogProps {
   open: boolean;

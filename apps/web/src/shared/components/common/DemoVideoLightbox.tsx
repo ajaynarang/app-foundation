@@ -2,8 +2,8 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Dialog, DialogContent, DialogTitle } from '@sally/ui/components/ui/dialog';
-import { Button } from '@sally/ui/components/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '@app/ui/components/ui/dialog';
+import { Button } from '@app/ui/components/ui/button';
 import { Play, X } from 'lucide-react';
 
 /**

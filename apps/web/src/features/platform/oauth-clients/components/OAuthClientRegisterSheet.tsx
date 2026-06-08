@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { FormSheet } from '@sally/ui/components/ui/form-sheet';
-import type { AgentScope } from '@sally/shared-types';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
+import type { AgentScope } from '@app/shared-types';
 import { ScopeMultiSelect } from '@/features/ai/agent-scope-ui';
 import { useCreateOAuthClient } from '../hooks/use-oauth-clients';
 import { SecretCopyDialog } from '@/features/ai/agent-detail-sheet';

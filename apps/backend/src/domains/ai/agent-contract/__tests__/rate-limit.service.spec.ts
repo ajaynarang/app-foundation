@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { RateLimitService } from '../rate-limit.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { fromUser, fromOAuthUser, fromApiKey, fromDeskResponsibility } from '../agent-principal';
 
 describe('RateLimitService', () => {
@@ -10,7 +10,7 @@ describe('RateLimitService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const mod = await Test.createTestingModule({
-      providers: [RateLimitService, { provide: SallyCacheService, useValue: cache }],
+      providers: [RateLimitService, { provide: AppCacheService, useValue: cache }],
     }).compile();
     svc = mod.get(RateLimitService);
   });

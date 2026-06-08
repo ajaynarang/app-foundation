@@ -2,11 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { TenantsService } from '../tenants.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
 import { DeskBootstrapService } from '../../../desk/responsibilities/desk-bootstrap.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 describe('TenantsService — factoring default', () => {
   let service: TenantsService;
@@ -30,7 +30,7 @@ describe('TenantsService — factoring default', () => {
       providers: [
         TenantsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
         { provide: NotificationService, useValue: { sendTenantRegistrationConfirmation: jest.fn() } },
         { provide: DeskBootstrapService, useValue: { bootstrapForTenant: jest.fn() } },
         { provide: DomainEventService, useValue: events },
@@ -55,7 +55,7 @@ describe('TenantsService — factoring default', () => {
         select: { id: true, defaultFactoringCompanyId: true },
       });
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED,
+        DOMAIN_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED,
         1,
         expect.objectContaining({ previousFactoringCompanyId: null, newFactoringCompanyId: 7, changedBy: 'user_42' }),
       );
@@ -75,7 +75,7 @@ describe('TenantsService — factoring default', () => {
         select: { id: true, defaultFactoringCompanyId: true },
       });
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED,
+        DOMAIN_EVENTS.TENANT_FACTORING_DEFAULT_CHANGED,
         1,
         expect.objectContaining({ previousFactoringCompanyId: 7, newFactoringCompanyId: null }),
       );

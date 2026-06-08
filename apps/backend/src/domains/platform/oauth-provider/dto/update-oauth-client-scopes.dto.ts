@@ -1,6 +1,6 @@
 import { IsArray, IsString, ArrayNotEmpty, ArrayMaxSize } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 /**
  * Payload for PATCH /oauth/clients/:client_id/scopes.

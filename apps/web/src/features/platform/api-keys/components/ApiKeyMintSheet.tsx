@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { FormSheet } from '@sally/ui/components/ui/form-sheet';
-import { showSuccess, showError } from '@sally/ui';
-import type { AgentScope } from '@sally/shared-types';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
+import { showSuccess, showError } from '@app/ui';
+import type { AgentScope } from '@app/shared-types';
 import { ScopeMultiSelect } from '@/features/ai/agent-scope-ui';
 import { SecretCopyDialog } from '@/features/ai/agent-detail-sheet';
 import { apiClient } from '@/shared/lib/api';

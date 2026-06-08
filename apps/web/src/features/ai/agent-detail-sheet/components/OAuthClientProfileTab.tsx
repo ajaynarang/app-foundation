@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { showSuccess } from '@sally/ui';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { showSuccess } from '@app/ui';
 import { Copy } from 'lucide-react';
 import { useOAuthClientDetail } from '@/features/platform/oauth-clients/hooks/use-tenant-oauth-clients';
 

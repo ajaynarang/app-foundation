@@ -1,4 +1,4 @@
-import { SettlementReview } from '@sally/shared-types';
+import { SettlementReview } from '@app/shared-types';
 
 type SettlementAnomalySignals = SettlementReview.SettlementAnomalySignals;
 

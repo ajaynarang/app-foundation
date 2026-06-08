@@ -1,8 +1,8 @@
 'use client';
 
 import { AlertTriangle, Clock, ShieldOff } from 'lucide-react';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
-import { Button } from '@sally/ui/components/ui/button';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
+import { Button } from '@app/ui/components/ui/button';
 import { mailto } from '@/shared/lib/contacts';
 import { usePlan } from '../hooks/use-plan';
 import { useUpgradeUrl } from '../hooks/use-upgrade-url';

@@ -3,7 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { BillingReadinessService } from '../../../financials/close-out/billing-readiness.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { DOCUMENT_TYPES, formatLoadLabel, getDocumentTypeLabel, DocumentStatusSchema } from '@sally/shared-types';
+import { DOCUMENT_TYPES, formatLoadLabel, getDocumentTypeLabel, DocumentStatusSchema } from '@app/shared-types';
 
 const DOCUMENT_STATUS = DocumentStatusSchema.enum;
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';

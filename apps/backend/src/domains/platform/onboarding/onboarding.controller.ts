@@ -7,7 +7,7 @@ import { Roles } from '../../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { TenantDbId } from '../../../auth/decorators/tenant-db-id.decorator';
 import { OnboardingStatusResponse } from './dto/onboarding-status.dto';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_HOT_30S } from '../../../constants/cache.constants';
 
@@ -18,7 +18,7 @@ export class OnboardingController {
 
   constructor(
     private readonly onboardingService: OnboardingService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   @Get('status')

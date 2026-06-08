@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '../../../constants/cache.constants';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 import { FeatureFlagDto } from './dto/feature-flag.dto';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class FeatureFlagsService {
 
   constructor(
     private prisma: PrismaService,
-    private cache: SallyCacheService,
+    private cache: AppCacheService,
     private events: DomainEventService,
   ) {}
 
@@ -97,7 +97,7 @@ export class FeatureFlagsService {
     this.logger.log(`Feature flag '${key}' ${enabled ? 'enabled' : 'disabled'}`);
 
     // Cache invalidation handled by CacheInvalidationSubscriber via event
-    await this.events.emit(SALLY_EVENTS.FEATURE_FLAG_TOGGLED, 'global', {
+    await this.events.emit(DOMAIN_EVENTS.FEATURE_FLAG_TOGGLED, 'global', {
       entityId: key,
       entityType: 'feature-flag',
       key,

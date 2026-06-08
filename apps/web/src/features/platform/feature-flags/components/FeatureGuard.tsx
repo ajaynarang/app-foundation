@@ -6,7 +6,7 @@ import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { SallyUpgradePrompt } from '@/features/platform/plans/components/sally-upgrade-prompt';
 import { ComingSoonBanner } from './ComingSoonBanner';
 import { comingSoonContent } from '@/shared/config/comingSoonContent';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 
 export interface FeatureGuardProps {
   featureKey: string; // Feature flag key (kill-switch)

@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '@sally/shared-types';
+import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '@app/shared-types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';

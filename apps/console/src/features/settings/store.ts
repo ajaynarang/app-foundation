@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { OperationsSettings } from '@sally/shared-types';
+import type { OperationsSettings } from '@app/shared-types';
 import { getOperationsSettings, updateOperationsSettings, resetToDefaults as resetToDefaultsAPI } from './api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 interface PreferencesState {
   operationsSettings: OperationsSettings | null;

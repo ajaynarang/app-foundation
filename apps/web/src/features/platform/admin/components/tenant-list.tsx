@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { STORAGE_KEYS } from '@/shared/constants';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { showSuccess, showError } from '@sally/ui';
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { showSuccess, showError } from '@app/ui';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
+} from '@app/ui/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +26,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Label } from '@sally/ui/components/ui/label';
+} from '@app/ui/components/ui/alert-dialog';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Label } from '@app/ui/components/ui/label';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
 import { useAuth } from '@/features/auth';

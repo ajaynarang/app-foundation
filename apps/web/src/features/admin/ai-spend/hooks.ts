@@ -6,7 +6,7 @@
  * fetch a tenant's breakdown until its row is expanded.
  */
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 import { queryKeys } from '@/shared/constants/query-keys';
 import { QUERY_TIERS } from '@/shared/config/query-tiers';

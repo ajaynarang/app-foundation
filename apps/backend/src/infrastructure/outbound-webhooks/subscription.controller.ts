@@ -17,7 +17,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { WebhookSubscriptionService } from './subscription.service';
 import { WebhookDispatcher } from './dispatcher.service';
-import { SALLY_EVENTS } from '../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../events/sally-events.constants';
 import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 
@@ -127,7 +127,7 @@ export class SubscriptionController {
   })
   async test(@CurrentUser() user: any, @Param('id') id: string) {
     await this.subscriptionService.findOne(user.tenantDbId, id);
-    await this.dispatcher.deliverToSubscription(id, SALLY_EVENTS.LOAD_CREATED, {
+    await this.dispatcher.deliverToSubscription(id, DOMAIN_EVENTS.LOAD_CREATED, {
       test: true,
       message: 'This is a test delivery from SALLY',
     });

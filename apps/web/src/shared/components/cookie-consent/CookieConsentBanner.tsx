@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Cookie, ChevronDown, ChevronUp, X } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { Switch } from '@/shared/components/ui/switch';
 import { useCookieConsent } from './useCookieConsent';
 

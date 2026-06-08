@@ -1,5 +1,5 @@
 import { EmbeddingService } from '../embedding.service';
-import type { AiCallContext } from '@sally/shared-types';
+import type { AiCallContext } from '@app/shared-types';
 
 const mockEmbed = jest.fn();
 const mockEmbedMany = jest.fn();

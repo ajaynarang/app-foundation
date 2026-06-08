@@ -8,7 +8,7 @@ import {
   type CloseoutReview as CloseoutReviewTypes,
   type DocumentExpiry as DocumentExpiryTypes,
   type SettlementReview as SettlementReviewTypes,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 import { buildArFollowupApprovalPayload } from '../../responsibilities/ar-followup/approval-adapter';
 import type { DraftOutput, HydrateOutput, PerceiveOutput } from '../../responsibilities/ar-followup/step.types';

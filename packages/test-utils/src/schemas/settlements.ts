@@ -7,7 +7,7 @@
  *   - apps/backend/src/domains/financials/settlements/controllers/settlements.controller.ts
  *   - packages/shared-types/src/financials/settlement.schema.ts
  *
- * Why hand-written + not `@sally/shared-types`:
+ * Why hand-written + not `@app/shared-types`:
  *   - shared-types' `SettlementSchema` bakes in fields the wire doesn't always
  *     emit (`updatedAt` is absent on some mutations; `driver.payStructures`
  *     is present on detail but not on list projections; `approvedAt` /
@@ -129,7 +129,7 @@ export const SettlementResponseSchema = z.object({
   tenantId: dbId,
   externalBillId: z.string().nullable(),
   // Drift note: `externalSyncVersion` is on the Prisma model but not on the
-  // `@sally/shared-types` Settlement schema. Hand-wire it here.
+  // `@app/shared-types` Settlement schema. Hand-wire it here.
   externalSyncVersion: z.string().nullable(),
   externalSyncedAt: nullableIsoDate,
   externalSyncError: z.string().nullable(),

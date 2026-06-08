@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { generateText } from 'ai';
-import { FeedbackStatusEnum } from '@sally/shared-types';
+import { FeedbackStatusEnum } from '@app/shared-types';
 import { ai } from '../../ai/infrastructure/providers/ai-provider';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PromptingService, PROMPT_NAMES } from '../../../domains/prompting';

@@ -1,6 +1,6 @@
 import { IsBoolean, IsIn, IsObject, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type { TrustLevel } from '@sally/shared-types';
+import type { TrustLevel } from '@app/shared-types';
 
 /**
  * PATCH /desk/responsibilities/:key — all fields optional. At least one

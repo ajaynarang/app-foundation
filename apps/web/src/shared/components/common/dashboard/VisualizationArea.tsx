@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
 
 export function VisualizationArea() {
   return (

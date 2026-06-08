@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { cn } from '@sally/ui';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { cn } from '@app/ui';
 
 import { formatUsdPrecise } from '@/shared/lib/utils/formatters';
 

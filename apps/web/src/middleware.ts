@@ -89,13 +89,13 @@ const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost:3000';
 /**
  * Route-level role guard (UX convenience layer, NOT a security boundary).
  *
- * The sally-role cookie is set client-side and is therefore spoofable.
+ * The app-role cookie is set client-side and is therefore spoofable.
  * The real RBAC enforcement happens at the backend via JWT-embedded roles
  * and @Roles() decorators on each controller/endpoint. This middleware
  * guard exists solely to redirect wrong-role users to their default route
  * instead of showing a broken page with 403 API errors.
  */
-// Role constants — duplicated from @sally/shared-types because middleware
+// Role constants — duplicated from @app/shared-types because middleware
 // runs on Edge Runtime where workspace package imports are unreliable.
 const ROLES = {
   DISPATCHER: 'DISPATCHER',
@@ -220,7 +220,7 @@ export async function middleware(request: NextRequest) {
 
   // Only enforce auth on explicitly protected routes
   if (isProtectedRoute(pathname)) {
-    const authCookie = request.cookies.get('sally-auth');
+    const authCookie = request.cookies.get('app-auth');
 
     if (!authCookie?.value) {
       // If on a subdomain, redirect to main domain login preserving the return URL
@@ -239,7 +239,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Role-based route enforcement — redirect wrong-role users to their default route
-    const roleCookie = request.cookies.get('sally-role');
+    const roleCookie = request.cookies.get('app-role');
     const roleRedirect = getRoleRedirect(pathname, roleCookie?.value);
     if (roleRedirect) {
       return NextResponse.redirect(new URL(roleRedirect, request.url));

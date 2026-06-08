@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Button } from '@sally/ui/components/ui/button';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Button } from '@app/ui/components/ui/button';
 
 import { AiSpendSurfaceBreakdown } from './AiSpendSurfaceBreakdown';
 import { AiSpendInvocationList } from './AiSpendInvocationList';

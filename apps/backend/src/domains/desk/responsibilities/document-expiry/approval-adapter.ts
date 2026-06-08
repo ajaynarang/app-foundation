@@ -2,7 +2,7 @@ import type {
   ApprovalArtifact,
   ApprovalDecisionHeader,
   DocumentExpiry as DocumentExpiryTypes,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 import type { DocumentExpiryDecideOutput, DocumentExpiryDraftOutput, DocumentExpiryHydrateOutput } from './step.types';
 

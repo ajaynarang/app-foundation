@@ -21,7 +21,7 @@ import { arFollowupHandler } from './ar-followup.function';
 
 import type { CloseOutput, GateStepOutput } from '../../../shared-steps/step.types';
 import type { HydrateOutput } from '../step.types';
-import type { ArFollowup as ArFollowupTypes } from '@sally/shared-types';
+import type { ArFollowup as ArFollowupTypes } from '@app/shared-types';
 
 const hydrateMock = hydrateStep as jest.MockedFunction<typeof hydrateStep>;
 const perceiveMock = perceiveStep as jest.MockedFunction<typeof perceiveStep>;

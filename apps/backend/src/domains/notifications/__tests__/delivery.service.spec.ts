@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationDeliveryService } from '../delivery.service';
 import { InAppNotificationService } from '../notifications.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { PushService } from '../../../../infrastructure/push/push.service';
 import { SmsService } from '../../../../infrastructure/sms/sms.service';
 import { EmailService } from '../../../../infrastructure/notification/services/email.service';
@@ -55,9 +55,9 @@ describe('NotificationDeliveryService', () => {
 
       expect(mockInApp.create).toHaveBeenCalled();
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.NOTIFICATION_SENT,
+        DOMAIN_EVENTS.NOTIFICATION_SENT,
         expect.objectContaining({
-          event: SALLY_EVENTS.NOTIFICATION_SENT,
+          event: DOMAIN_EVENTS.NOTIFICATION_SENT,
           tenantId: '1',
           data: expect.objectContaining({
             notificationId: 'ntf-1',

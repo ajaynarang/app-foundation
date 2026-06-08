@@ -1,4 +1,4 @@
-import { CarrierType, FleetSize, DEFAULT_TENANT_TIMEZONE } from '@sally/shared-types';
+import { CarrierType, FleetSize, DEFAULT_TENANT_TIMEZONE } from '@app/shared-types';
 
 /** Carrier-type select options, keyed off the shared-types enum (no literals). */
 export const CARRIER_TYPE_OPTIONS: ReadonlyArray<{ value: CarrierType; label: string }> = [

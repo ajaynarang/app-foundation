@@ -16,7 +16,7 @@ import {
   cronToHuman,
 } from './job.types';
 import { QUEUE_NAMES } from './queue.constants';
-import { JobStatusSchema } from '@sally/shared-types';
+import { JobStatusSchema } from '@app/shared-types';
 
 const JOB_STATUS = JobStatusSchema.enum;
 

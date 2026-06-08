@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { FormSheet } from '@sally/ui/components/ui/form-sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
-import type { AgentScope } from '@sally/shared-types';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
+import type { AgentScope } from '@app/shared-types';
 import { useTenantApiKeys } from '@/features/platform/api-keys';
 import { useOAuthClientDetail } from '@/features/platform/oauth-clients/hooks/use-tenant-oauth-clients';
 import { ScopesTab } from './ScopesTab';

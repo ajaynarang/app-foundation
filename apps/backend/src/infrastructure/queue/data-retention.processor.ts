@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { JobStatusSchema, type JobEnvelope } from '@sally/shared-types';
+import { JobStatusSchema, type JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../database/prisma.service';
 import { BULK_OPS_JOB_NAMES } from './queue.constants';
 import type { QueueJobHandler } from './job-handler.contract';

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { NotificationType, NotificationChannel, NotificationStatus } from '@prisma/client';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { FileStorageService } from '../../../../infrastructure/storage/file-storage.service';
 import { NotificationService } from '../../../../infrastructure/notification/notification.service';
@@ -11,7 +11,7 @@ import { EmailThreadTrackerService } from '../services/email-thread-tracker.serv
 import { DOCUMENTS_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '../../../../infrastructure/queue/job-handler.contract';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 export interface ParseAttachmentJobData {
   tenantId: number;
@@ -130,7 +130,7 @@ export class EmailIntakeJobHandler implements QueueJobHandler {
       });
 
       // Step 6: Emit success event
-      await this.events.emit(SALLY_EVENTS.EMAIL_INGEST_PARSED, tenantId, {
+      await this.events.emit(DOMAIN_EVENTS.EMAIL_INGEST_PARSED, tenantId, {
         entityId: String(threadId),
         entityType: 'email-ingest',
         threadId,
@@ -161,7 +161,7 @@ export class EmailIntakeJobHandler implements QueueJobHandler {
           data: { parseStatus: 'FAILED' },
         });
 
-        await this.events.emit(SALLY_EVENTS.EMAIL_INGEST_FAILED, tenantId, {
+        await this.events.emit(DOMAIN_EVENTS.EMAIL_INGEST_FAILED, tenantId, {
           entityId: String(threadId),
           entityType: 'email-ingest',
           threadId,

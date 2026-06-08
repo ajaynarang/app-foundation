@@ -9,7 +9,7 @@
  * helpers are kept as scaffolding for the future Tier-2 cutover that
  * does the conversion in lockstep across the 47 reference sites.
  *
- * Distinct from `apps/backend/src/domains/ai/sally-ai/lib/time-of-day.ts`
+ * Distinct from `apps/backend/src/domains/ai/assistant/lib/time-of-day.ts`
  * which classifies time-of-day for AI prompting (morning/midday/evening).
  */
 

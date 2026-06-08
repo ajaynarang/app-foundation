@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listApiKeys, createApiKey, revokeApiKey, type CreateApiKeyRequest, type ApiKey } from './api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 const API_KEYS_KEY = ['api-keys'] as const;
 

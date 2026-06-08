@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { DeadLetterService } from '../dead-letter.service';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantIdResolver } from '../../events/tenant-id-resolver.service';

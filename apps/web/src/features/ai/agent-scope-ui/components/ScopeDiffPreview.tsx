@@ -1,7 +1,7 @@
 'use client';
 
-import { SCOPE_DESCRIPTIONS } from '@sally/shared-types';
-import type { AgentScope } from '@sally/shared-types';
+import { SCOPE_DESCRIPTIONS } from '@app/shared-types';
+import type { AgentScope } from '@app/shared-types';
 import { ScopeChip } from './ScopeChip';
 
 interface ScopeDiffPreviewProps {

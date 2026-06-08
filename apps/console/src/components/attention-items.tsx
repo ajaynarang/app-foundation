@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { CheckCircle2, AlertTriangle, Key, UserPlus, CreditCard } from 'lucide-react';
-import { cn } from '@sally/ui';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { cn } from '@app/ui';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/plans/use-plan';
 import { useIntegrationHealth } from '@/hooks/use-integrations';
 import { useInvitations } from '@/hooks/use-team';

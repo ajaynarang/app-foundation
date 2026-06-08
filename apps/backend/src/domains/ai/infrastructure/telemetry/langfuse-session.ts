@@ -1,4 +1,4 @@
-import type { AiCallContext } from '@sally/shared-types';
+import type { AiCallContext } from '@app/shared-types';
 
 /**
  * Langfuse trace attribution derived from the AI call context. The SAME shape

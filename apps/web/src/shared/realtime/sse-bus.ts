@@ -1,4 +1,4 @@
-import type { SseEventType, SsePayloadFor } from '@sally/shared-types';
+import type { SseEventType, SsePayloadFor } from '@app/shared-types';
 
 type Handler<T extends SseEventType> = (payload: SsePayloadFor<T>) => void;
 

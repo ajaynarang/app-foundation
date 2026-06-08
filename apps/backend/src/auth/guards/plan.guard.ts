@@ -5,7 +5,7 @@ import { AddOnsService } from '../../domains/platform/add-ons/add-ons.service';
 import { FeatureFlagsService } from '../../domains/platform/feature-flags/feature-flags.service';
 import { FEATURE_KEY } from '../decorators/require-feature.decorator';
 import { TenantPlan } from '@prisma/client';
-import { isAddOnFeature } from '@sally/shared-types';
+import { isAddOnFeature } from '@app/shared-types';
 
 @Injectable()
 export class PlanGuard implements CanActivate {

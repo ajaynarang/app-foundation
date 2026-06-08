@@ -7,8 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
 import { auth } from '@/shared/lib/firebase';
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { PasswordInput } from '@/features/auth/components/password-input';
 import { PasswordStrengthMeter } from '@/features/auth/components/password-strength-meter';
 

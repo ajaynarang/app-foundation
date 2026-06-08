@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { XCircle, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORY_DISPLAY_NAMES, TYPE_DISPLAY_NAMES } from '../types';

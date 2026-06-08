@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
+} from '@app/ui/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,15 +21,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+} from '@app/ui/components/ui/alert-dialog';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { AlertCircle, Key, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { CopyButton } from '@sally/ui/components/ui/copy-button';
-import { UrlRow } from '@sally/ui/components/ui/url-row';
+import { CopyButton } from '@app/ui/components/ui/copy-button';
+import { UrlRow } from '@app/ui/components/ui/url-row';
 import { useApiKeys, useCreateApiKey, useRevokeApiKey, type ApiKey } from '@/features/api-keys/use-api-keys';
 import { ConsoleFeatureGuard } from '@/components/feature-guard';
 import { getApiBaseUrl, getEnvironmentLabel } from '@/shared/lib/access-environments';

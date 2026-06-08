@@ -18,7 +18,7 @@
  *   - apps/backend/src/domains/admin/dto/update-schedule.dto.ts
  *   - apps/backend/src/constants/cache.constants.ts (CACHE_NAMESPACES)
  *
- * No `@sally/shared-types` coverage exists for these surfaces today —
+ * No `@app/shared-types` coverage exists for these surfaces today —
  * the admin/* response shapes are not exported. Phase 9 follow-up:
  * promote the stable ones to shared-types once admin UI stabilises.
  */

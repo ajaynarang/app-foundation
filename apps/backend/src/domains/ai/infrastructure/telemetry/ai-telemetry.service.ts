@@ -1,19 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AiInvocation, ModelPricing, TenantAiBudget } from '@prisma/client';
-import type { AiBudgetState, AiCallContext, AiUsage } from '@sally/shared-types';
+import type { AiBudgetState, AiCallContext, AiUsage } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M, CACHE_TTL_HOT_60S } from '../../../../constants/cache.constants';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
 import { ZeroRetentionUnavailable } from '../redaction/zero-retention-unavailable.error';
 import { ZDR_ELIGIBLE_TIERS } from '../providers/ai-provider';
-import type { ModelAlias } from '@sally/shared-types';
+import type { ModelAlias } from '@app/shared-types';
 
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
@@ -44,7 +44,7 @@ export class AiTelemetryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     private readonly events: DomainEventService,
   ) {}
 
@@ -190,7 +190,7 @@ export class AiTelemetryService {
     void this.invalidateSpentCache(row.tenantId).catch(() => {});
 
     try {
-      await this.events.emit(SALLY_EVENTS.AI_INVOCATION_RECORDED, row.tenantId, {
+      await this.events.emit(DOMAIN_EVENTS.AI_INVOCATION_RECORDED, row.tenantId, {
         invocationId: row.id,
         surface: row.surface,
         model: row.model,
@@ -223,7 +223,7 @@ export class AiTelemetryService {
     if (!requiresZdr) return;
     if (!ZDR_ELIGIBLE_TIERS.has(tier)) {
       void this.events
-        .emit(SALLY_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE, tenantId, { tier })
+        .emit(DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE, tenantId, { tier })
         .catch((e) => this.logger.warn(`zdr-unavailable event emit failed: ${e.message}`));
       throw new ZeroRetentionUnavailable(tier);
     }
@@ -300,13 +300,13 @@ export class AiTelemetryService {
 
     if (state.state === 'hard') {
       void this.events
-        .emit(SALLY_EVENTS.AI_BUDGET_HARD_BREACHED, tenantId, { ...state })
+        .emit(DOMAIN_EVENTS.AI_BUDGET_HARD_BREACHED, tenantId, { ...state })
         .catch((e) => this.logger.warn(`budget-hard event emit failed: ${e.message}`));
       throw new AiBudgetExceededError(tenantId, state);
     }
     if (state.state === 'soft') {
       void this.events
-        .emit(SALLY_EVENTS.AI_BUDGET_SOFT_BREACHED, tenantId, { ...state })
+        .emit(DOMAIN_EVENTS.AI_BUDGET_SOFT_BREACHED, tenantId, { ...state })
         .catch((e) => this.logger.warn(`budget-soft event emit failed: ${e.message}`));
     }
     return state;

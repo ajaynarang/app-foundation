@@ -7,7 +7,7 @@ import {
   type EmbeddingModel,
 } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import type { ModelAlias } from '@sally/shared-types';
+import type { ModelAlias } from '@app/shared-types';
 
 // Pin Anthropic-model traffic to the Anthropic provider only.
 // Without this, AI Gateway's default routing falls back to Bedrock/Vertex when

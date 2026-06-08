@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 
-import { SallyCacheService } from '../../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
 
@@ -27,7 +27,7 @@ describe('DeskAgentService', () => {
       providers: [
         DeskAgentService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
       ],
     }).compile();
     service = moduleRef.get(DeskAgentService);

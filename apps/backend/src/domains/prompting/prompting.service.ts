@@ -7,7 +7,7 @@ import * as path from 'path';
 
 import { CACHE_TTL_COLD_30M } from '../../constants/cache.constants';
 import { buildKey } from '../../infrastructure/cache/cache-key.constants';
-import { SallyCacheService } from '../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { PROMPT_NAMES, ParsedSkill, SkillMetadata } from './prompting.types';
 
 const LANGFUSE_CACHE_TTL_SECONDS = 60;
@@ -31,7 +31,7 @@ export class PromptingService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {
     this.promptLabel = this.configService.get('PROMPT_LABEL', 'production');
 

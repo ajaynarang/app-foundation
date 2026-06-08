@@ -1,8 +1,8 @@
 'use client';
 
 import { MessageCircle } from 'lucide-react';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
 
 interface SallyAiCalloutProps {
   onOpenChat: () => void;

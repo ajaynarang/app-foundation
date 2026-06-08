@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiSurface, MemoryPolarity, MemoryScope, Prisma } from '@prisma/client';
-import { MemoryExtractSchema, type AiCallContext } from '@sally/shared-types';
+import { MemoryExtractSchema, type AiCallContext } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';

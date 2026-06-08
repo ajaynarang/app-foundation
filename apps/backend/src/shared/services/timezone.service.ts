@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_TENANT_TIMEZONE } from '@sally/shared-types';
+import { DEFAULT_TENANT_TIMEZONE } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '../../constants/cache.constants';
 import { isIanaTimezone } from '../validators/is-iana-timezone.validator';
@@ -16,7 +16,7 @@ import { isIanaTimezone } from '../validators/is-iana-timezone.validator';
 export class TimezoneService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   /** Tenant's IANA tz, validated; falls back to UTC. Cached (COLD — rarely changes). */

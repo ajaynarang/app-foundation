@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DESK_OUTCOMES } from '../../shared-steps/outcomes';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EpisodeStatusSchema, OPEN_EPISODE_STATUSES } from '@sally/shared-types';
+import { EpisodeStatusSchema, OPEN_EPISODE_STATUSES } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 

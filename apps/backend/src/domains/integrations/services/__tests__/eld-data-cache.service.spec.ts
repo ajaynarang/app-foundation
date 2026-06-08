@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { EldDataCacheService } from '../eld-data-cache.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 const TENANT_ID = 1;
 
@@ -25,7 +25,7 @@ describe('EldDataCacheService', () => {
     const module = await Test.createTestingModule({
       providers: [
         EldDataCacheService,
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -63,7 +63,7 @@ describe('EldDataCacheService', () => {
         where: { driverId: 'd1', tenantId: TENANT_ID },
         select: { hosData: true, hosDataSyncedAt: true },
       });
-      // Verify tenant-scoped Redis backfill — object passed through, SallyCacheService handles serialization.
+      // Verify tenant-scoped Redis backfill — object passed through, AppCacheService handles serialization.
       expect(cache.set).toHaveBeenCalledWith(
         'sally:eld:hos:1:d1',
         expect.objectContaining({ driverId: 'd1' }),

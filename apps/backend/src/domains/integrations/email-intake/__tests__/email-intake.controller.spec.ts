@@ -4,7 +4,7 @@ import { EmailIntakeController } from '../controllers/email-intake.controller';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 import { EmailIntakeService } from '../services/email-intake.service';
 import { LoadsService } from '../../../fleet/loads/services/loads.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 const USER = { tenantDbId: 5, dbId: 10 };
 
@@ -122,7 +122,7 @@ describe('EmailIntakeController', () => {
       expect(mockEmailIntakeService.confirmThread).toHaveBeenCalled();
       expect(mockEmailIntakeService.linkLoadToThread).toHaveBeenCalled();
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.EMAIL_INGEST_CONFIRMED,
+        DOMAIN_EVENTS.EMAIL_INGEST_CONFIRMED,
         expect.any(Number),
         expect.objectContaining({ threadId: 1 }),
       );

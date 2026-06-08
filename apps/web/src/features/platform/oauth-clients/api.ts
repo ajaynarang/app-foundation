@@ -4,7 +4,7 @@ import type {
   OAuthClientCreatedResponse,
   CreateOAuthClientInput,
   AgentScope,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 export type { OAuthClientResponse, OAuthClientCreatedResponse };
 

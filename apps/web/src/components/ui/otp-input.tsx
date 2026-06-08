@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Input } from '@sally/ui/components/ui/input';
-import { cn } from '@sally/ui';
+import { Input } from '@app/ui/components/ui/input';
+import { cn } from '@app/ui';
 
 interface OtpInputProps {
   length?: number;

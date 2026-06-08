@@ -50,7 +50,7 @@ import {
   OnboardingStatusResponseSchema as SharedOnboardingStatusResponseSchema,
   DriverPreferencesSchema as SharedDriverPreferencesSchema,
   AgentScopeSchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 import { dbId, stringId, isoDateString } from './helpers.js';
 
 // Note: `SuperAdminPreferencesSchema` is NOT exported from shared-types —
@@ -488,7 +488,7 @@ export const UserMessageResponseSchema = z
 // There is NO `GET /invitations/:id` detail endpoint. The `/link` route
 // is the closest thing to "get by id" and returns only the link string.
 //
-// Shared-types `@sally/shared-types/platform/user.schema.ts::InviteUserSchema`
+// Shared-types `@app/shared-types/platform/user.schema.ts::InviteUserSchema`
 // covers only the request-side body (4 fields); no response schemas exist.
 
 /** Core Prisma row — shared by every invitation response. */
@@ -690,7 +690,7 @@ export const UserInvitationLinkSchema = z
 //   - `key` is returned ONLY on create (full secret, one-time), never on list.
 //   - All other fields are stable + typed per shared-types `ApiKeyResponseSchema`.
 //
-// The live response matches `@sally/shared-types` ApiKeyResponseSchema 1:1 —
+// The live response matches `@app/shared-types` ApiKeyResponseSchema 1:1 —
 // we hand-write here (instead of re-exporting) so we can layer the
 // `.strict()` rule at call sites AND express the list variant (no `key`
 // possible) as a distinct shape. Shared-types models `key` as `optional()`,

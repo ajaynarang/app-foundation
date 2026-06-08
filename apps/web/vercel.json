@@ -3,5 +3,5 @@
     "deploymentEnabled": false
   },
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @sally/shared-types build && cd apps/web && next build"
+  "buildCommand": "cd ../.. && pnpm --filter @app/shared-types build && cd apps/web && next build"
 }

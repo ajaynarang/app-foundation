@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Validate } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import type { LoginActivitySummaryQuery } from '@sally/shared-types';
+import type { LoginActivitySummaryQuery } from '@app/shared-types';
 import { RangeNotOver90Days } from './list-login-activity.query.dto';
 
 export class LoginActivitySummaryQueryDto implements LoginActivitySummaryQuery {

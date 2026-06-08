@@ -78,8 +78,8 @@ export const ALL_CATEGORIES = Object.keys(JOB_CATEGORIES) as JobCategory[];
 export const TENANT_VISIBLE_CATEGORIES = ALL_CATEGORIES.filter((c) => JOB_CATEGORIES[c].tenantVisible);
 
 // --- Type Display Names ---
-// Single source of truth lives in @sally/shared-types — shared with the web admin UI.
-export { TYPE_DISPLAY_NAMES, CATEGORY_DISPLAY_NAMES } from '@sally/shared-types';
+// Single source of truth lives in @app/shared-types — shared with the web admin UI.
+export { TYPE_DISPLAY_NAMES, CATEGORY_DISPLAY_NAMES } from '@app/shared-types';
 
 // --- Manual-only types (no repeatable schedule) ---
 

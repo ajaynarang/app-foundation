@@ -1,5 +1,5 @@
-import { SCOPE_DESCRIPTIONS, scopeDomain } from '@sally/shared-types';
-import type { AgentScope } from '@sally/shared-types';
+import { SCOPE_DESCRIPTIONS, scopeDomain } from '@app/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 /** Dark-mode-safe Tailwind utility for the scope chip, keyed by HITL tier. */
 export function scopeChipClass(scope: AgentScope): string {

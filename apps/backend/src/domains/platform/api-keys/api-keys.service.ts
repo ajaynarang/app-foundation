@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 import { nanoid } from 'nanoid';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
 import { TenantApiKeyListItemDto } from './dto/list-api-keys.dto';
 import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
-import { AgentScope, NEVER_EXTERNAL_SCOPES } from '@sally/shared-types';
+import { AgentScope, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 
 /**
  * IPv4 CIDR containment check. Returns true when `ip` is inside `cidr`.
@@ -143,7 +143,7 @@ export class ApiKeysService {
       where: { id: apiKey.id },
       data: { revokedAt: new Date(), isActive: false },
     });
-    await this.events.emit(SALLY_EVENTS.API_KEY_REVOKED, String(tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.API_KEY_REVOKED, String(tenantId), {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
@@ -159,7 +159,7 @@ export class ApiKeysService {
       where: { id: apiKey.id },
       data: { isActive: false },
     });
-    await this.events.emit(SALLY_EVENTS.API_KEY_PAUSED, String(tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.API_KEY_PAUSED, String(tenantId), {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
@@ -174,7 +174,7 @@ export class ApiKeysService {
       where: { id: apiKey.id },
       data: { isActive: true },
     });
-    await this.events.emit(SALLY_EVENTS.API_KEY_RESUMED, String(tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.API_KEY_RESUMED, String(tenantId), {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
@@ -212,7 +212,7 @@ export class ApiKeysService {
       }),
     ]);
 
-    await this.events.emit(SALLY_EVENTS.API_KEY_ROTATED, String(tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.API_KEY_ROTATED, String(tenantId), {
       oldApiKeyId: existing.id,
       newApiKeyId: created.id,
       name: existing.name,
@@ -255,7 +255,7 @@ export class ApiKeysService {
       },
     });
 
-    await this.events.emit(SALLY_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
       apiKeyId: updated.id,
       name: updated.name,
       scopes: dto.scopes,

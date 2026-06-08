@@ -4,13 +4,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sally/ui/components/ui/tabs';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Input } from '@sally/ui/components/ui/input';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@app/ui/components/ui/tabs';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Input } from '@app/ui/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/shared/components/ui/sheet';
 import {
   Headset,
@@ -28,13 +28,13 @@ import {
 
 import { formatRelativeTime } from '@/shared/lib/utils/formatters';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@sally/ui/components/ui/dialog';
-import { Label } from '@sally/ui/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@app/ui/components/ui/dialog';
+import { Label } from '@app/ui/components/ui/label';
 import { useMyTickets, useTicketDetail, useAddTicketMessage, useCreateTicket } from '@/features/support';
 import type { SupportTicket } from '@/features/support';
 import { STATUS_VARIANTS, PRIORITY_VARIANTS, CATEGORY_LABELS } from '@/features/support/constants';
 import { CONSOLE_URL } from '@/shared/lib/navigation';
-import { createConversation, getStreamingUrl, getAuthHeaders } from '@/features/platform/sally-ai/api';
+import { createConversation, getStreamingUrl, getAuthHeaders } from '@/features/platform/ai-chat/api';
 
 // ─── Help Center topics ───
 

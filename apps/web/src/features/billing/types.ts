@@ -14,7 +14,7 @@ export type {
   DowngradePlanRequest,
   UpdateQuantityRequest,
   CancelSubscriptionRequest,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 export type {
   Wallet,
@@ -24,4 +24,4 @@ export type {
   AutoReloadSettings,
   WalletBalanceResponse,
   WalletTransactionListResponse,
-} from '@sally/shared-types';
+} from '@app/shared-types';

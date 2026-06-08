@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AgentScope, scopeTier, SCOPE_TIERS } from '@sally/shared-types';
+import { AgentScope, scopeTier, SCOPE_TIERS } from '@app/shared-types';
 import { AgentPrincipal } from './agent-principal';
 
 export type HitlTier = 'none' | 'standard' | 'sensitive';

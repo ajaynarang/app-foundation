@@ -3,7 +3,7 @@ import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { AlertPriority, AlertScope } from '@prisma/client';
-import { AlertStatusSchema, formatLoadLabel } from '@sally/shared-types';
+import { AlertStatusSchema, formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { errorResponse } from '../utils/entity-resolver';
 import { RequiresScope } from '../../../agent-contract/requires-scope.decorator';

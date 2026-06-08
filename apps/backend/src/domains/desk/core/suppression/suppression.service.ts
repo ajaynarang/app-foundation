@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DESK_OUTCOMES } from '../../shared-steps/outcomes';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { SnoozeDuration } from '@sally/shared-types';
+import type { SnoozeDuration } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEvent } from '../../../../infrastructure/events/domain-event';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { closeStep } from '../../shared-steps/close.step';
 
 /**
@@ -151,8 +151,8 @@ export class SuppressionService {
     // 6. Emit the DomainEvent. Wildcard subscribers pick this up for cache
     //    invalidation + SSE broadcast (Desk UI re-renders without polling).
     this.events.emit(
-      SALLY_EVENTS.DESK_EPISODE_SNOOZED,
-      new DomainEvent(SALLY_EVENTS.DESK_EPISODE_SNOOZED, String(input.tenantId), {
+      DOMAIN_EVENTS.DESK_EPISODE_SNOOZED,
+      new DomainEvent(DOMAIN_EVENTS.DESK_EPISODE_SNOOZED, String(input.tenantId), {
         episodeId: episode.id,
         suppressionId: suppression.id,
         suppressUntil: suppression.suppressUntil ? suppression.suppressUntil.toISOString() : null,
@@ -189,8 +189,8 @@ export class SuppressionService {
     });
 
     this.events.emit(
-      SALLY_EVENTS.DESK_SUPPRESSION_CLEARED,
-      new DomainEvent(SALLY_EVENTS.DESK_SUPPRESSION_CLEARED, String(tenantId), {
+      DOMAIN_EVENTS.DESK_SUPPRESSION_CLEARED,
+      new DomainEvent(DOMAIN_EVENTS.DESK_SUPPRESSION_CLEARED, String(tenantId), {
         suppressionId: row.id,
       }),
     );

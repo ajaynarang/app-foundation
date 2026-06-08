@@ -1,9 +1,9 @@
 'use client';
 
 import { CheckCircle2, Circle, Rocket } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
 import { useRouter } from 'next/navigation';
 import type { OnboardingStatusResponse } from '../types';
 

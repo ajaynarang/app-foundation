@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { systemActivityApi } from './api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { QUERY_TIERS } from '../../shared/config/query-tiers';
 
 // Query keys

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import type { OAuthClientResponse } from '@sally/shared-types';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import type { OAuthClientResponse } from '@app/shared-types';
 import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
 import { useTenantOAuthClients } from '../hooks/use-tenant-oauth-clients';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';

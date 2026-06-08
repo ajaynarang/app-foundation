@@ -7,7 +7,7 @@ import { useAuthStore } from '@/features/auth';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useQuery } from '@tanstack/react-query';
 import { useRecents, ICON_MAP } from './use-recents';
-import { isAddOnFeature } from '@sally/shared-types';
+import { isAddOnFeature } from '@app/shared-types';
 import { defaultProviders, searchEntities, searchResultsToPaletteItems } from './command-registry';
 import type { PaletteItem } from './command-registry';
 

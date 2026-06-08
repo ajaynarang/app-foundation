@@ -1,7 +1,7 @@
 'use client';
 
 import { ScrollReveal } from './ScrollReveal';
-import { Card } from '@sally/ui/components/ui/card';
+import { Card } from '@app/ui/components/ui/card';
 
 // Reusable chat interface component
 function ChatMockup({

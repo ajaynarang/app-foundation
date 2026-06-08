@@ -1,6 +1,6 @@
 import { AnnouncementsService } from '../announcements.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('AnnouncementsService', () => {
   let service: AnnouncementsService;
@@ -41,7 +41,7 @@ describe('AnnouncementsService', () => {
       getOrSet: jest.fn().mockImplementation((_key: string, factory: () => any) => factory()),
     };
 
-    service = new AnnouncementsService(prisma as unknown as PrismaService, cache as unknown as SallyCacheService);
+    service = new AnnouncementsService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
   });
 
   describe('findAll', () => {

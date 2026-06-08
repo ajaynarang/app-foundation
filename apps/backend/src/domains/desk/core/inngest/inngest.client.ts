@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Inngest } from 'inngest';
 
-import type { ApprovalDecision } from '@sally/shared-types';
+import type { ApprovalDecision } from '@app/shared-types';
 
 /**
  * Typed event vocabulary for Sally's Desk — single source of truth.

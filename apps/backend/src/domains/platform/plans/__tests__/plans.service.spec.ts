@@ -1,6 +1,6 @@
 import { PlansService } from '../plans.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('PlansService', () => {
   let service: PlansService;
@@ -66,7 +66,7 @@ describe('PlansService', () => {
       del: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new PlansService(prisma as unknown as PrismaService, cache as unknown as SallyCacheService);
+    service = new PlansService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
   });
 
   describe('getAllPlanConfigs', () => {

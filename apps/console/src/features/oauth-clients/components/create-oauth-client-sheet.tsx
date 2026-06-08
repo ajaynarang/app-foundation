@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import {
   Sheet,
   SheetContent,
@@ -14,11 +14,11 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '@sally/ui/components/ui/sheet';
+} from '@app/ui/components/ui/sheet';
 import { Copy, AlertCircle } from 'lucide-react';
 import { useCreateOAuthClient } from '../use-oauth-clients';
-import { OAUTH_SCOPES, OAUTH_SCOPE_DESCRIPTIONS } from '@sally/shared-types';
-import type { OAuthClientCreatedResponse, OAuthScope } from '@sally/shared-types';
+import { OAUTH_SCOPES, OAUTH_SCOPE_DESCRIPTIONS } from '@app/shared-types';
+import type { OAuthClientCreatedResponse, OAuthScope } from '@app/shared-types';
 
 interface Props {
   open: boolean;

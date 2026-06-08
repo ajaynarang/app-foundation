@@ -1,9 +1,9 @@
 'use client';
 
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@sally/ui/components/ui/card';
-import { USER_ROLES, type UserRoleValue } from '@sally/shared-types';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
+import { USER_ROLES, type UserRoleValue } from '@app/shared-types';
 
 import { mailto, CONTACTS } from '@/shared/lib/contacts';
 import { useAuthStore } from '@/features/auth';

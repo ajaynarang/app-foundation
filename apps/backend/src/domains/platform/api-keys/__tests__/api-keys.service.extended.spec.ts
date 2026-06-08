@@ -4,7 +4,7 @@ import { ApiKeysService } from '../api-keys.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 /**
  * Phase D — extended API-keys service surface: list-for-tenant, rotate,
@@ -84,7 +84,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       expect(result.plaintextKey).toMatch(/^sk_live_/);
       expect(result.apiKey.id).toBe(502);
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.API_KEY_ROTATED,
+        DOMAIN_EVENTS.API_KEY_ROTATED,
         '7',
         expect.objectContaining({ oldApiKeyId: 501, newApiKeyId: 502 }),
       );
@@ -116,7 +116,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
         }),
       );
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.API_KEY_PAUSED,
+        DOMAIN_EVENTS.API_KEY_PAUSED,
         '7',
         expect.objectContaining({ apiKeyId: 501 }),
       );
@@ -126,7 +126,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       prisma.apiKey.findFirst.mockResolvedValue(baseRow);
       prisma.apiKey.update.mockResolvedValue({});
       await svc.resume(501, 7);
-      expect(events.emit).toHaveBeenCalledWith(SALLY_EVENTS.API_KEY_RESUMED, '7', expect.any(Object));
+      expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.API_KEY_RESUMED, '7', expect.any(Object));
     });
 
     it('pause on a revoked key is a BadRequest', async () => {
@@ -147,7 +147,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       expect(call.data.isActive).toBe(false);
       expect(call.data.revokedAt).toBeInstanceOf(Date);
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.API_KEY_REVOKED,
+        DOMAIN_EVENTS.API_KEY_REVOKED,
         '7',
         expect.objectContaining({ apiKeyId: 501 }),
       );
@@ -203,7 +203,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
         }),
       );
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.API_KEY_SCOPES_UPDATED,
+        DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED,
         '7',
         expect.objectContaining({ apiKeyId: 501 }),
       );

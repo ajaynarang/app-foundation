@@ -1,7 +1,7 @@
 import { apiClient } from '../../lib/api-client';
-import type { AddOn, TenantAddOn, AddOnStatus } from '@sally/shared-types';
+import type { AddOn, TenantAddOn, AddOnStatus } from '@app/shared-types';
 
-export type { AddOn, TenantAddOn, AddOnStatus } from '@sally/shared-types';
+export type { AddOn, TenantAddOn, AddOnStatus } from '@app/shared-types';
 
 const BASE = '/add-ons';
 

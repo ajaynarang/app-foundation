@@ -1,7 +1,7 @@
 import { FullConfig } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fetchDevUsers, switchToUser, type AuthState, type DevUsersResponse } from '@sally/test-utils/auth';
+import { fetchDevUsers, switchToUser, type AuthState, type DevUsersResponse } from '@app/test-utils/auth';
 import { ENV } from './test-env.js';
 import { detectCapabilities, buildCapabilitiesJson } from './detect-capabilities.js';
 
@@ -78,9 +78,9 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
 
   fs.writeFileSync(AUTH_STATE_PATH, JSON.stringify(state, null, 2));
 
-  // Expose the directory so @sally/test-utils auth fixtures can find auth-state.json.
+  // Expose the directory so @app/test-utils auth fixtures can find auth-state.json.
   // Playwright workers inherit this env var from the global-setup process.
-  process.env.SALLY_QA_AUTH_STATE_DIR = path.dirname(AUTH_STATE_PATH);
+  process.env.APP_QA_AUTH_STATE_DIR = path.dirname(AUTH_STATE_PATH);
 
   // Write tenant capabilities for @requires:plan-X test filtering. The super-admin
   // token is already available so we reuse it via a second fetch rather than
@@ -89,7 +89,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     const caps = await detectCapabilities(baseUrl, tenant.tenantId);
     const capsJson = buildCapabilitiesJson(tenant.tenantId, tenant.tenantName, caps);
     fs.writeFileSync(CAPABILITIES_PATH, JSON.stringify(capsJson, null, 2));
-    process.env.SALLY_QA_TENANT_CAPABILITIES_PATH = CAPABILITIES_PATH;
+    process.env.APP_QA_TENANT_CAPABILITIES_PATH = CAPABILITIES_PATH;
     console.log(`[QA] Tenant capabilities written: ${caps.enabled.size} enabled, ${caps.disabled.size} disabled.`);
   } catch (err) {
     // Non-fatal — capability detection failing should not block the test run.

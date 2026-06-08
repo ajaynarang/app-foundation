@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
-import { SallyOrb } from '@/features/platform/sally-ai/components/SallyOrb';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
+import { SallyOrb } from '@/features/platform/ai-chat/components/SallyOrb';
 import { useTour } from '../hooks/use-tour';
 import { getStepsForRole } from '../tour-steps';
 import { useAuthStore } from '@/features/auth';

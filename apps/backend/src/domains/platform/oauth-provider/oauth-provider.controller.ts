@@ -17,7 +17,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthProviderService } from './oauth-provider.service';
 import { OAuthClientsService } from './oauth-clients.service';
-import { OAUTH_SCOPES } from '@sally/shared-types';
+import { OAUTH_SCOPES } from '@app/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 
 /**

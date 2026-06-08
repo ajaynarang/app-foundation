@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { factoringApi } from './api';
 
 const FACTORING_COMPANIES_KEY = ['factoring-companies'] as const;

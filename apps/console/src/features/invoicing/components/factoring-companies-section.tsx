@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Label } from '@sally/ui/components/ui/label';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Label } from '@app/ui/components/ui/label';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { Pencil, Trash2, Plus, Star, X, Save } from 'lucide-react';
 import {
   useFactoringCompanies,

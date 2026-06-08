@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useWebhookLogs, type WebhookSubscription, type WebhookDeliveryLog } from '../use-webhooks';

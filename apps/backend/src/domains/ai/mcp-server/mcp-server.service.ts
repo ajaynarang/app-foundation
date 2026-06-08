@@ -6,7 +6,7 @@ import { InvocationPipelineService, PipelineError } from '../agent-contract/invo
 import { ScopeRegistryService } from '../agent-contract/scope-registry.service';
 import { fromOAuthUser } from '../agent-contract/agent-principal';
 import type { AgentPrincipal } from '../agent-contract/agent-principal';
-import { scopeTier, SCOPE_TIERS, type AgentScope } from '@sally/shared-types';
+import { scopeTier, SCOPE_TIERS, type AgentScope } from '@app/shared-types';
 import type { OAuthUser } from '../../platform/oauth-provider/oauth-token.guard';
 import type { Request, Response } from 'express';
 

@@ -1,6 +1,6 @@
 import { DeskEpisodeStepKind, MemoryPolarity, SettlementStatus } from '@prisma/client';
 import { DESK_OUTCOMES } from '../../../shared-steps/outcomes';
-import { SettlementReview } from '@sally/shared-types';
+import { SettlementReview } from '@app/shared-types';
 
 import { nestApp } from '../../../core/inngest/nest-context';
 import { DeskStepWriter } from '../../../core/episode/desk-step-writer.service';

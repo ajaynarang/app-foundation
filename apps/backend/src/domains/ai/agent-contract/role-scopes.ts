@@ -1,4 +1,4 @@
-import { AgentScopeSchema, type AgentScope } from '@sally/shared-types';
+import { AgentScopeSchema, type AgentScope } from '@app/shared-types';
 
 /**
  * Role → AgentScope set for first-party Sally principals (user principals

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { AgentScope, AgentScopeSchema } from '@sally/shared-types';
+import { AgentScope, AgentScopeSchema } from '@app/shared-types';
 
 export const REQUIRES_SCOPE_METADATA_KEY = 'sally:requires-scope';
 

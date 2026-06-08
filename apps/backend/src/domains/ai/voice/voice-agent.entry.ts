@@ -21,7 +21,7 @@ const dgPlugin = require('@livekit/agents-plugin-deepgram');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const cartesiaPlugin = require('@livekit/agents-plugin-cartesia');
 
-const SALLY_API_URL = process.env.SALLY_API_URL || 'http://localhost:8001';
+const APP_API_URL = process.env.APP_API_URL || 'http://localhost:8001';
 const VOICE_AGENT_SECRET = process.env.VOICE_AGENT_SECRET || '';
 
 /**
@@ -46,7 +46,7 @@ async function callSallyApi(
   userId: string,
   tenantId: number,
 ): Promise<ReadableStream<string>> {
-  const url = `${SALLY_API_URL}/api/v1/voice/internal/respond`;
+  const url = `${APP_API_URL}/api/v1/voice/internal/respond`;
 
   // 30-second timeout for the initial connection — voice must be responsive
   const controller = new AbortController();

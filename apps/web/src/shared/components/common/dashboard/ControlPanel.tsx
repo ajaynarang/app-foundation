@@ -1,9 +1,9 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
 
 interface ControlPanelProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

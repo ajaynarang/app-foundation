@@ -3,10 +3,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, Home } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import { useAuthStore } from '../lib/auth-store';
 import { usePlan } from '../features/plans/use-plan';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { ThemeToggle } from './theme-toggle';
 
 function getRoleView(role: string | undefined): string {

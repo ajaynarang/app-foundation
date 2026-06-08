@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { APPROVAL_SCOPES, ListDeskEpisodesQuerySchema, ListHandledEpisodesQuerySchema } from '@sally/shared-types';
+import { APPROVAL_SCOPES, ListDeskEpisodesQuerySchema, ListHandledEpisodesQuerySchema } from '@app/shared-types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';

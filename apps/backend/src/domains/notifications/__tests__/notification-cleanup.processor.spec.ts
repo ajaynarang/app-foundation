@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import type { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { NotificationJobsHandler } from '../notification-cleanup.processor';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { NotificationTriggersService } from '../notification-triggers.service';

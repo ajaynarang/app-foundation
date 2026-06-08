@@ -1,12 +1,12 @@
 'use client';
 
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
-import { showMutationError } from '@sally/ui';
+import { showMutationError } from '@app/ui';
 import { useState } from 'react';
 import { AuthProvider } from '@/shared/components/common/providers/auth-provider';
 import { PreferencesProvider } from '@/shared/providers/PreferencesProvider';
 import { SseProvider } from '@/shared/realtime';
-import { TooltipProvider } from '@sally/ui/components/ui/tooltip';
+import { TooltipProvider } from '@app/ui/components/ui/tooltip';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(

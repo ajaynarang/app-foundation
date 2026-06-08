@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { EDIMessageStatus } from '@prisma/client';
-import { formatLoadLabel } from '@sally/shared-types';
+import { formatLoadLabel } from '@app/shared-types';
 import { EDIMessageService } from '../../../integrations/edi/services/edi-message.service';
 import { EDIPartnerService } from '../../../integrations/edi/services/edi-partner.service';
 import { TenderRulesService } from '../../../integrations/edi/tender/tender-rules.service';

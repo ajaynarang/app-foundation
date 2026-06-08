@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import type { AgentScope } from '@sally/shared-types';
+import { Button } from '@app/ui/components/ui/button';
+import type { AgentScope } from '@app/shared-types';
 import { ScopeChip, ScopeMultiSelect, ScopeDiffPreview } from '@/features/ai/agent-scope-ui';
 import { useUpdateApiKeyScopes } from '@/features/platform/api-keys';
 import { useUpdateOAuthClientScopes } from '@/features/platform/oauth-clients/hooks/use-tenant-oauth-clients';

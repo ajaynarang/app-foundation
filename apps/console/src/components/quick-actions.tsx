@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { UserPlus, Plug, Key } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 
 const actions = [
   { label: 'Invite Team Member', href: '/team/invitations', icon: UserPlus },

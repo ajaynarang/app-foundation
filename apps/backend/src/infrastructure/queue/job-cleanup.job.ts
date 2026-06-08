@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JobStatusSchema } from '@sally/shared-types';
+import { JobStatusSchema } from '@app/shared-types';
 import { PrismaService } from '../database/prisma.service';
 
 const JOB_STATUS = JobStatusSchema.enum;

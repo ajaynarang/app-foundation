@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 /**
  * Tenant-wide API-key list entry. Never exposes the plaintext key.

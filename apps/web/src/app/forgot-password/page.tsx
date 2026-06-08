@@ -5,9 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useAuthStore } from '@/features/auth';
 
 function ForgotPasswordInner() {

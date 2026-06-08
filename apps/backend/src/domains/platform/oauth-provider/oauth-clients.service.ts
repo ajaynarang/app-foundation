@@ -1,21 +1,21 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M } from '../../../constants/cache.constants';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
-import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@sally/shared-types';
+import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 import type {
   AgentScope,
   CreateOAuthClientInput,
   UpdateOAuthClientInput,
   OAuthClientResponse,
   OAuthClientCreatedResponse,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
 
 @Injectable()
@@ -24,7 +24,7 @@ export class OAuthClientsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     private readonly events: DomainEventService,
   ) {}
 
@@ -162,7 +162,7 @@ export class OAuthClientsService {
     ]);
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(SALLY_EVENTS.OAUTH_CLIENT_REVOKED, String(tenantId ?? 'global'), {
+    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_REVOKED, String(tenantId ?? 'global'), {
       clientId: client.clientId,
       name: client.name,
     });
@@ -180,7 +180,7 @@ export class OAuthClientsService {
       data: { isActive: false },
     });
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(SALLY_EVENTS.OAUTH_CLIENT_PAUSED, String(tenantId ?? 'global'), {
+    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_PAUSED, String(tenantId ?? 'global'), {
       clientId: client.clientId,
       name: client.name,
     });
@@ -197,7 +197,7 @@ export class OAuthClientsService {
       data: { isActive: true },
     });
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(SALLY_EVENTS.OAUTH_CLIENT_RESUMED, String(tenantId ?? 'global'), {
+    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_RESUMED, String(tenantId ?? 'global'), {
       clientId: client.clientId,
       name: client.name,
     });
@@ -226,7 +226,7 @@ export class OAuthClientsService {
     });
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(SALLY_EVENTS.OAUTH_CLIENT_ROTATED, String(tenantId ?? 'global'), {
+    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_ROTATED, String(tenantId ?? 'global'), {
       clientId: client.clientId,
       name: client.name,
     });
@@ -259,7 +259,7 @@ export class OAuthClientsService {
     });
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(SALLY_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED, String(tenantId ?? 'global'), {
+    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED, String(tenantId ?? 'global'), {
       clientId: client.clientId,
       name: client.name,
       scopes: dto.scopes,

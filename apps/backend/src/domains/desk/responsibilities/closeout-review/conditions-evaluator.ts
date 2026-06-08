@@ -1,4 +1,4 @@
-import { CloseoutReview } from '@sally/shared-types';
+import { CloseoutReview } from '@app/shared-types';
 
 import type { ConditionsEvaluator, ConditionsResult } from '../definition.types';
 

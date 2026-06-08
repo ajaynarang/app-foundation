@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Body, BadRequestException, Logger } from '@nestjs/common';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
-import { SallyCacheService } from '../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { CACHE_NAMESPACES, CacheNamespace } from '../../constants/cache.constants';
 
 @Controller('admin/cache')
@@ -9,7 +9,7 @@ import { CACHE_NAMESPACES, CacheNamespace } from '../../constants/cache.constant
 export class AdminCacheController {
   private readonly logger = new Logger(AdminCacheController.name);
 
-  constructor(private readonly cacheService: SallyCacheService) {}
+  constructor(private readonly cacheService: AppCacheService) {}
 
   @Get('health')
   async getHealth() {

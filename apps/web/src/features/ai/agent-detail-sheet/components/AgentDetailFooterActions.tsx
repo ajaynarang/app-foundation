@@ -1,14 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@sally/ui/components/ui/dropdown-menu';
+} from '@app/ui/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { MoreHorizontal, Pause, Play, RefreshCw, Ban } from 'lucide-react';
 import { useTenantApiKeys } from '@/features/platform/api-keys';
 import { useRotateApiKey, usePauseApiKey, useResumeApiKey, useRevokeApiKeyAdmin } from '@/features/platform/api-keys';

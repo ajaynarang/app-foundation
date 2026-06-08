@@ -1,9 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OAuthClientsService } from '../oauth-clients.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('$2b$10$mocked'),
@@ -54,7 +54,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
 
     service = new OAuthClientsService(
       prisma as unknown as PrismaService,
-      cache as unknown as SallyCacheService,
+      cache as unknown as AppCacheService,
       events as unknown as DomainEventService,
     );
   });
@@ -72,7 +72,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
       expect(prisma.oAuthAccessToken.updateMany).not.toHaveBeenCalled();
       expect(prisma.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.OAUTH_CLIENT_ROTATED,
+        DOMAIN_EVENTS.OAUTH_CLIENT_ROTATED,
         '7',
         expect.objectContaining({ clientId: 'sally_abc123' }),
       );
@@ -93,7 +93,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
           data: { isActive: false },
         }),
       );
-      expect(events.emit).toHaveBeenCalledWith(SALLY_EVENTS.OAUTH_CLIENT_PAUSED, '7', expect.any(Object));
+      expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.OAUTH_CLIENT_PAUSED, '7', expect.any(Object));
     });
 
     it('resume sets isActive=true when paused', async () => {
@@ -103,7 +103,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
       });
       await service.resume('sally_abc123', 7);
       expect(prisma.oAuthClient.update).toHaveBeenCalledWith(expect.objectContaining({ data: { isActive: true } }));
-      expect(events.emit).toHaveBeenCalledWith(SALLY_EVENTS.OAUTH_CLIENT_RESUMED, '7', expect.any(Object));
+      expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.OAUTH_CLIENT_RESUMED, '7', expect.any(Object));
     });
 
     it('pause is a BadRequest when already paused', async () => {
@@ -121,7 +121,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       const ops = prisma.$transaction.mock.calls[0][0];
       expect(ops).toHaveLength(3);
-      expect(events.emit).toHaveBeenCalledWith(SALLY_EVENTS.OAUTH_CLIENT_REVOKED, '7', expect.any(Object));
+      expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.OAUTH_CLIENT_REVOKED, '7', expect.any(Object));
     });
   });
 
@@ -155,7 +155,7 @@ describe('OAuthClientsService — Phase D admin surface', () => {
         }),
       );
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED,
+        DOMAIN_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED,
         '7',
         expect.objectContaining({ scopes: ['fleet:read', 'loads:read'] }),
       );

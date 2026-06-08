@@ -1,5 +1,5 @@
 import { DeskEpisodeStepKind } from '@prisma/client';
-import { CloseoutReview } from '@sally/shared-types';
+import { CloseoutReview } from '@app/shared-types';
 
 import { PromptingService } from '../../../../prompting/prompting.service';
 import { StructuredOutputService } from '../../../../ai/infrastructure/providers/structured-output.service';

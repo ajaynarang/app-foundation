@@ -57,9 +57,9 @@ describe('buildIdempotencyKey', () => {
   });
 
   it('collapses missing linkRef parts to "na" so the key stays well-formed', () => {
-    const key = buildIdempotencyKey({ surface: 'SALLY_CHAT' as const }, 'primary', 'c');
+    const key = buildIdempotencyKey({ surface: 'APP_CHAT' as const }, 'primary', 'c');
     const parts = key.split(':');
-    expect(parts[0]).toBe('SALLY_CHAT');
+    expect(parts[0]).toBe('APP_CHAT');
     expect(parts[1]).toBe('na');
     expect(parts[2]).toBe('na');
   });

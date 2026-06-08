@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, Min, IsOptional, IsString, MaxLength } from 'class-validator';
-import type { UpdateAiBudgetInput } from '@sally/shared-types';
+import type { UpdateAiBudgetInput } from '@app/shared-types';
 
 /**
  * Budget update payload. Cross-field validation (hard ≥ soft, monthly ≥

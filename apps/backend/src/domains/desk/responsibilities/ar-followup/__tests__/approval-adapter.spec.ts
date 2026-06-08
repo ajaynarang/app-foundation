@@ -1,5 +1,5 @@
 import type { HydrateOutput } from '../step.types';
-import type { ArFollowup as ArFollowupTypes } from '@sally/shared-types';
+import type { ArFollowup as ArFollowupTypes } from '@app/shared-types';
 
 import { buildArFollowupApprovalPayload } from '../approval-adapter';
 

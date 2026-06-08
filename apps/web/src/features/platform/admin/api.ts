@@ -5,7 +5,7 @@ import type {
   PaymentMethod,
   Wallet,
   WalletTransaction,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 // ---------- Billing Admin Types ----------
 

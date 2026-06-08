@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { LoadStatus } from '@prisma/client';
-import { formatLoadLabel } from '@sally/shared-types';
+import { formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DriverToolUtils } from './driver-tool.utils';
 import { SettlementsService } from '../../../financials/settlements/services/settlements.service';

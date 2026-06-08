@@ -19,7 +19,7 @@
  *
  * Schema strategy:
  *   - `CloseOutSummarySchema`, `CloseOutLoadSchema`, `BillingReadinessResultSchema`
- *     are re-exported from `@sally/shared-types/financials/close-out.schema.ts`
+ *     are re-exported from `@app/shared-types/financials/close-out.schema.ts`
  *     unchanged — the shared-types schemas are byte-for-byte alignment with the
  *     services above. Strict parse is safe.
  *   - `CloseOutListResponseSchema` is hand-written here: shared-types does not
@@ -39,7 +39,7 @@ import {
   BillingReadinessItemSchema as SharedBillingReadinessItemSchema,
   CloseOutLoadSchema as SharedCloseOutLoadSchema,
   CloseOutSummarySchema as SharedCloseOutSummarySchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 // ── Re-exports from shared-types ──────────────────────────────────────
 

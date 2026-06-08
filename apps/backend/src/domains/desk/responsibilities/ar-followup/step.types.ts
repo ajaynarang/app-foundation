@@ -1,4 +1,4 @@
-import type { ArFollowup } from '@sally/shared-types';
+import type { ArFollowup } from '@app/shared-types';
 
 import type { HydrateMemoryItem, HydratePreflightResult, SharedHydrateOutput } from '../../shared-steps/step.types';
 

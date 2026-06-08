@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
-import { EpisodeStatusSchema, OPEN_EPISODE_STATUSES, ResponsibilityKeySchema } from '@sally/shared-types';
+import { EpisodeStatusSchema, OPEN_EPISODE_STATUSES, ResponsibilityKeySchema } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
 import { findOverdueInvoicesForTenant } from '../../responsibilities/ar-followup/fan-out';
@@ -691,7 +691,7 @@ export class TriggerService {
     // emitted no cache/SSE signal. Best-effort — never fail the trigger on a
     // dropped event.
     await this.events
-      .emit(SALLY_EVENTS.DESK_EPISODE_CHANGED, input.tenantId, {
+      .emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, input.tenantId, {
         tenantId: input.tenantId,
         episodeId: created.id,
         status: EPISODE_STATUS.RUNNING,

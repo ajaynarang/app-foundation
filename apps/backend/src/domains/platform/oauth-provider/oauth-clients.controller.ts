@@ -5,7 +5,7 @@ import { Roles } from '../../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
-import type { CreateOAuthClientInput, UpdateOAuthClientInput } from '@sally/shared-types';
+import type { CreateOAuthClientInput, UpdateOAuthClientInput } from '@app/shared-types';
 
 @ApiTags('OAuth Clients')
 @Controller('oauth/clients')

@@ -1,4 +1,4 @@
-import type { ResponsibilityKey } from '@sally/shared-types';
+import type { ResponsibilityKey } from '@app/shared-types';
 
 import { AR_FOLLOWUP_DEFINITION } from './ar-followup/definition';
 import { CLOSEOUT_REVIEW_DEFINITION } from './closeout-review/definition';

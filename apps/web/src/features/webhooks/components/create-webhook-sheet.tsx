@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '@sally/ui/components/ui/sheet';
+} from '@app/ui/components/ui/sheet';
 import { Copy, AlertCircle, Check } from 'lucide-react';
 import { useCreateWebhook, type WebhookCreatedResponse } from '../use-webhooks';
 import { EventPicker } from './event-picker';

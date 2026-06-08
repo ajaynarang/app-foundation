@@ -1,5 +1,5 @@
 import type { QueryKey } from '@tanstack/react-query';
-import { SSE_EVENTS, type SseEventType } from '@sally/shared-types';
+import { SSE_EVENTS, type SseEventType } from '@app/shared-types';
 import { queryKeys } from '@/shared/constants/query-keys';
 
 /**

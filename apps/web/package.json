@@ -1,5 +1,5 @@
 {
-  "name": "@sally/web",
+  "name": "@app/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -40,8 +40,8 @@
     "@radix-ui/react-switch": "1.2.6",
     "@radix-ui/react-tabs": "1.1.13",
     "@radix-ui/react-tooltip": "1.2.8",
-    "@sally/shared-types": "workspace:*",
-    "@sally/ui": "workspace:*",
+    "@app/shared-types": "workspace:*",
+    "@app/ui": "workspace:*",
     "@tanstack/react-query": "^5.62.9",
     "@tanstack/react-virtual": "^3.13.23",
     "@tremor/react": "^3.18.3",

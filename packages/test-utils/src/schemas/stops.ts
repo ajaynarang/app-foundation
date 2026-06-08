@@ -1,7 +1,7 @@
 /**
  * API Contracts for Stops endpoints.
  *
- * Hand-written because `@sally/shared-types/fleet/stop.schema.ts` only exports
+ * Hand-written because `@app/shared-types/fleet/stop.schema.ts` only exports
  * `StopSearchResultSchema` + `StopSearchResponseSchema` — neither covers the
  * `/stops` list endpoint (paginated `{ items, total, page, limit, totalPages }`)
  * nor the detail endpoint (raw Prisma-ish row + `loadCount` + `isEditable`).

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Map, Radio, User, type LucideIcon } from 'lucide-react';
-import { cn } from '@sally/ui';
-import { useSallyStore } from '@/features/platform/sally-ai/store';
+import { cn } from '@app/ui';
+import { useSallyStore } from '@/features/platform/ai-chat/store';
 
 interface Tab {
   label: string;

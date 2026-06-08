@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsString } from 'class-validator';
-import { DriverPayTimingSchema, type SetDriverPayTimingInput } from '@sally/shared-types';
+import { DriverPayTimingSchema, type SetDriverPayTimingInput } from '@app/shared-types';
 
 const TIMINGS = DriverPayTimingSchema.options;
 

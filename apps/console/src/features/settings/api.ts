@@ -1,8 +1,8 @@
 import { apiClient } from '../../lib/api-client';
 
-export type { OperationsSettings, AlertConfiguration } from '@sally/shared-types';
+export type { OperationsSettings, AlertConfiguration } from '@app/shared-types';
 
-import type { OperationsSettings, AlertConfiguration } from '@sally/shared-types';
+import type { OperationsSettings, AlertConfiguration } from '@app/shared-types';
 
 export async function getOperationsSettings(): Promise<OperationsSettings> {
   return apiClient<OperationsSettings>('/settings/operations');

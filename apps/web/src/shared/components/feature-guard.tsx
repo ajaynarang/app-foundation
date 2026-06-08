@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { Sparkles, AlertTriangle, ShieldOff } from 'lucide-react';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
+import { Card, CardContent } from '@app/ui/components/ui/card';
 import { mailto } from '@/shared/lib/contacts';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useUpgradeUrl } from '@/features/platform/plans/hooks/use-upgrade-url';

@@ -1,4 +1,4 @@
-import type { DocumentExpiry } from '@sally/shared-types';
+import type { DocumentExpiry } from '@app/shared-types';
 
 import type { HydrateMemoryItem, HydratePreflightResult } from '../../shared-steps/step.types';
 

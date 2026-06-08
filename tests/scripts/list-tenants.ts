@@ -2,12 +2,12 @@
 
 /**
  * Lists available tenants from the dev-switcher endpoint.
- * Uses @sally/test-utils/auth which enforces the x-dev-auth-secret header.
+ * Uses @app/test-utils/auth which enforces the x-dev-auth-secret header.
  *
  * Reads API_BASE_URL from config/test-env.ts (single source of truth).
  * Requires DEV_AUTH_SECRET env var (injected by Doppler locally).
  */
-import { fetchDevUsers } from '@sally/test-utils/auth';
+import { fetchDevUsers } from '@app/test-utils/auth';
 import { ENV } from '../config/test-env.js';
 
 const baseUrl = ENV.apiBaseUrl;

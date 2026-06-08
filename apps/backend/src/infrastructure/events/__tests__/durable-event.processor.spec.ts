@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { DurableEventProcessor } from '../durable-event.processor';
 import { EventPersistenceSubscriber } from '../event-persistence.subscriber';
 import { WebhookDispatcher } from '../../outbound-webhooks/dispatcher.service';

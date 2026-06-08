@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { upgradeRegistry } from '@/features/platform/plans/config/upgrade-registry';
 import { apiClient } from '@/shared/lib/api';

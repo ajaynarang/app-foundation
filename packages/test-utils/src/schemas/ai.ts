@@ -14,7 +14,7 @@
  *                                         POST /conversations/:id/resume (streaming)
  *
  * All schemas are hand-written under `.strict()` and pinned against the
- * live service projection on `apps/backend/src/domains/ai/sally-ai/sally-ai.service.ts`
+ * live service projection on `apps/backend/src/domains/ai/assistant/assistant.service.ts`
  * (probed against `demo-northstar-2026`, backend :8011, 2026-04-24).
  *
  * Streaming protocol — the AI SDK data-stream protocol
@@ -25,7 +25,7 @@
  *   `<prefix>:<json>\n`
  *
  * where `<prefix>` is a single character from `{0, 8, 9, a}`
- * (sally-ai.service.ts lines 415–427 + pipe-agent-response.ts lines 66/79/89/105):
+ * (assistant.service.ts lines 415–427 + pipe-agent-response.ts lines 66/79/89/105):
  *
  *   0 : <JSON string>         — text-delta chunk (model token / block text)
  *   8 : <JSON object>         — tool-emitted card metadata
@@ -46,7 +46,7 @@ import { isoDateString, stringId } from './helpers.js';
 // ── CONVERSATION ROW (POST /conversations) ───────────────────────────
 
 /**
- * POST /conversations response — see `sally-ai.service.ts::createConversation`
+ * POST /conversations response — see `assistant.service.ts::createConversation`
  * (lines 131–143). Projection:
  *   { conversationId, userMode, createdAt, greeting: {...} }
  *
@@ -82,7 +82,7 @@ export const ConversationRowSchema = z
 // ── CONVERSATION LIST (GET /conversations) ───────────────────────────
 
 /**
- * GET /conversations response — `sally-ai.service.ts::listConversations`
+ * GET /conversations response — `assistant.service.ts::listConversations`
  * lines 530–540. Each row is:
  *   { conversationId, userMode, title, messageCount, lastMessageAt, createdAt }
  *
@@ -115,7 +115,7 @@ export const ConversationListSchema = z
 // ── MESSAGE ROW (GET /conversations/:id/messages) ────────────────────
 
 /**
- * Single message row from `sally-ai.service.ts::getMessages` (lines 586–597).
+ * Single message row from `assistant.service.ts::getMessages` (lines 586–597).
  * Projection includes these columns from `ConversationMessage`:
  *   messageId, role, content, inputMode, intent, card, action, speakText, createdAt
  *
@@ -139,7 +139,7 @@ export const MessageRowSchema = z
   .strict();
 
 /**
- * GET /conversations/:id/messages envelope — `sally-ai.service.ts:582-598`.
+ * GET /conversations/:id/messages envelope — `assistant.service.ts:582-598`.
  * `{ conversationId, userMode, title, messages: [...] }`.
  */
 export const MessageListSchema = z
@@ -161,7 +161,7 @@ export const MessageListSchema = z
  *     nextRun?: string }
  *
  * The controller wraps each into `{id, displayName, status}`
- * (sally-ai.controller.ts lines 102–109). `id` is an AGENT_IDS value
+ * (assistant.controller.ts lines 102–109). `id` is an AGENT_IDS value
  * — modelled `z.string()` (not a strict enum) because new agents can
  * land without requiring a test-utils bump.
  */
@@ -183,7 +183,7 @@ export const AgentStatusItemSchema = z
 
 /**
  * GET /conversations/agents/status — `{ agents: [...] }`
- * (sally-ai.controller.ts line 110). Only OWNER/ADMIN/DISPATCHER are
+ * (assistant.controller.ts line 110). Only OWNER/ADMIN/DISPATCHER are
  * routed; the returned list is filtered by `agent.personas.includes(userMode)`
  * (agent.registry.ts line 61) so DISPATCHER persona sees all 12 agents
  * (every agent declares DISPATCHER in `personas`).

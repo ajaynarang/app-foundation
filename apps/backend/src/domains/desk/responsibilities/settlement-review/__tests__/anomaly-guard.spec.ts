@@ -1,4 +1,4 @@
-import type { SettlementReview } from '@sally/shared-types';
+import type { SettlementReview } from '@app/shared-types';
 
 import { enforceAnomalyGuard } from '../anomaly-guard';
 import type { SettlementReviewDecideOutput } from '../step.types';

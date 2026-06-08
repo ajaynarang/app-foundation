@@ -1,6 +1,6 @@
 import { IsArray, IsString, ArrayNotEmpty, ArrayMaxSize, IsOptional, IsInt, Min, Max, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 const CIDR_REGEX = /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/;
 

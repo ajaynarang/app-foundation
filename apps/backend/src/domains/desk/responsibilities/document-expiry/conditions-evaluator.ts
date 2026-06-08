@@ -1,4 +1,4 @@
-import { DocumentExpiry } from '@sally/shared-types';
+import { DocumentExpiry } from '@app/shared-types';
 
 import type { ConditionsEvaluator, ConditionsResult } from '../definition.types';
 import type { DocumentExpiryHydrateOutput } from './step.types';

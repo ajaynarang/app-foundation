@@ -1,6 +1,6 @@
 import { IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { FeedbackStatusEnum, type FeedbackStatus } from '@sally/shared-types';
+import { FeedbackStatusEnum, type FeedbackStatus } from '@app/shared-types';
 
 const FEEDBACK_STATUSES = FeedbackStatusEnum.options;
 

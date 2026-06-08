@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { ApiKeysService } from '../api-keys.service';
 import { fromApiKey } from '../../../ai/agent-contract/agent-principal';
 import type { AgentPrincipal } from '../../../ai/agent-contract/agent-principal';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 interface AgentPrincipalRequest extends Request {
   agentPrincipal?: AgentPrincipal;

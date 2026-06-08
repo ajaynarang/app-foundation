@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AiCallContext } from '@sally/shared-types';
+import type { AiCallContext } from '@app/shared-types';
 
 /**
  * Build a stable idempotency key for an AI invocation so retries of the SAME

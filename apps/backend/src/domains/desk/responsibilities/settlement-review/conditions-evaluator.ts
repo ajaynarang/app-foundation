@@ -1,4 +1,4 @@
-import { SettlementReview } from '@sally/shared-types';
+import { SettlementReview } from '@app/shared-types';
 
 import type { ConditionsEvaluator, ConditionsResult } from '../definition.types';
 

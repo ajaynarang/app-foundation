@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { formatLoadLabel } from '@sally/shared-types';
+import { formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { errorResponse } from '../utils/entity-resolver';
 import { RequiresScope } from '../../../agent-contract/requires-scope.decorator';

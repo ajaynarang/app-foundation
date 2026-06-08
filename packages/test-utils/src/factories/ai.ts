@@ -7,7 +7,7 @@
  *   - buildResumeAgent         → POST /conversations/:id/resume (ResumeAgentDto)
  *
  * Each factory matches the class-validator DTO on
- * `apps/backend/src/domains/ai/sally-ai/dto/*` exactly — missing required
+ * `apps/backend/src/domains/ai/assistant/dto/*` exactly — missing required
  * fields or out-of-enum values trip the DTO layer with a 400 before the
  * service runs.
  *

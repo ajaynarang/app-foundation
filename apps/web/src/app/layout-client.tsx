@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ProgressProvider } from '@bprogress/next/app';
 import { AppLayout } from '@/shared/components/layout/AppLayout';
 import { PublicLayout } from '@/shared/components/layout/PublicLayout';
-import { SallyGlobalProvider, useSallyStore } from '@/features/platform/sally-ai';
+import { AppAIProvider, useSallyStore } from '@/features/platform/ai-chat';
 import { useAuthStore } from '@/features/auth';
 import { isProtectedRoute } from '@/shared/lib/navigation';
 
@@ -60,7 +60,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
       <div className={`sally-main-content ${isExpanded ? `sally-layout-${chatLayout}` : ''}`}>
         <Layout>{children}</Layout>
       </div>
-      <SallyGlobalProvider />
+      <AppAIProvider />
     </ProgressProvider>
   );
 }

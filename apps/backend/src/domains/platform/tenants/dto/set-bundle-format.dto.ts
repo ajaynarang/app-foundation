@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsString } from 'class-validator';
-import { BundleFormatSchema, type SetTenantBundleFormatInput } from '@sally/shared-types';
+import { BundleFormatSchema, type SetTenantBundleFormatInput } from '@app/shared-types';
 
 const BUNDLE_FORMATS = BundleFormatSchema.options;
 

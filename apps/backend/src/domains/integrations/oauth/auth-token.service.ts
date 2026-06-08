@@ -11,7 +11,7 @@ import Redis from 'ioredis';
 import crypto, { randomUUID } from 'crypto';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { CredentialsService } from '../credentials/credentials.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { REDIS_CLIENT } from '../../../infrastructure/cache/redis-client.provider';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_10M } from '../../../constants/cache.constants';
@@ -25,9 +25,9 @@ export class AuthTokenService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly credentialsService: CredentialsService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     // Raw Redis client only for the fenced distributed lock below (SET NX EX + UUID-checked GET/DEL).
-    // SallyCacheService.getOrSet uses a simple lock that does not fence by holder identity, so it
+    // AppCacheService.getOrSet uses a simple lock that does not fence by holder identity, so it
     // cannot replace this. All other Redis ops in this file go through `cache`.
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}

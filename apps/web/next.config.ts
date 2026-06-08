@@ -113,7 +113,7 @@ const nextConfig: NextConfig = {
   },
 
   // Optimize for Turborepo — workspace packages must be listed here
-  transpilePackages: ['@sally/shared-types'],
+  transpilePackages: ['@app/shared-types'],
 
   webpack: (config) => {
     // pdfjs-dist optional canvas dependency — not available in browser

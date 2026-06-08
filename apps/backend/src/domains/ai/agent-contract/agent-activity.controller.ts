@@ -6,7 +6,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AgentActivityService } from './agent-activity.service';
-import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@sally/shared-types';
+import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@app/shared-types';
 
 const VALID_PRINCIPAL_KINDS: AgentPrincipalKind[] = ['user', 'desk_responsibility', 'oauth_client', 'api_key'];
 

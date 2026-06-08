@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AlertConfigService } from '../alert-config.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('AlertConfigService', () => {
   let service: AlertConfigService;
@@ -25,7 +25,7 @@ describe('AlertConfigService', () => {
       providers: [
         AlertConfigService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
       ],
     }).compile();
 

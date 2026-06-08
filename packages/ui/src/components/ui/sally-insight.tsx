@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
-interface SallyInsightProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AppInsightProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-function SallyInsight({ className, children, ...props }: SallyInsightProps) {
+function AppInsight({ className, children, ...props }: AppInsightProps) {
   return (
     <div className={cn('flex items-start gap-3 rounded-xl border border-border bg-card p-3', className)} {...props}>
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm text-primary">
@@ -16,7 +16,7 @@ function SallyInsight({ className, children, ...props }: SallyInsightProps) {
   );
 }
 
-function SallyInsightMessage({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function AppInsightMessage({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn('flex-1 text-sm text-muted-foreground', className)} {...props}>
       {children}
@@ -24,7 +24,7 @@ function SallyInsightMessage({ className, children, ...props }: React.HTMLAttrib
   );
 }
 
-function SallyInsightActions({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function AppInsightActions({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn('flex shrink-0 items-center gap-2', className)} {...props}>
       {children}
@@ -32,7 +32,7 @@ function SallyInsightActions({ className, children, ...props }: React.HTMLAttrib
   );
 }
 
-SallyInsight.Message = SallyInsightMessage;
-SallyInsight.Actions = SallyInsightActions;
+AppInsight.Message = AppInsightMessage;
+AppInsight.Actions = AppInsightActions;
 
-export { SallyInsight };
+export { AppInsight };

@@ -18,8 +18,8 @@
  * against a production database.
  *
  * Usage:
- *   pnpm --filter @sally/backend demo:today-stops             # re-date demo loads
- *   pnpm --filter @sally/backend demo:today-stops -- --dry-run # preview only
+ *   pnpm --filter @app/backend demo:today-stops             # re-date demo loads
+ *   pnpm --filter @app/backend demo:today-stops -- --dry-run # preview only
  */
 import dotenv from 'dotenv';
 import path from 'path';

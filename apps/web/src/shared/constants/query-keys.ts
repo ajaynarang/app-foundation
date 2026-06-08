@@ -391,8 +391,8 @@ export const queryKeys = {
 
   // ─── Sally AI ──────────────────────────────────────────────────────────
   sallyAi: {
-    root: ['sally-ai'] as const,
-    capabilities: (mode: string) => ['sally-ai', 'capabilities', mode] as const,
-    mentionSearch: (query: string) => ['sally-ai', 'mention-search', query] as const,
+    root: ['ai'] as const,
+    capabilities: (mode: string) => ['ai', 'capabilities', mode] as const,
+    mentionSearch: (query: string) => ['ai', 'mention-search', query] as const,
   },
 } as const;

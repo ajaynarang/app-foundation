@@ -3,7 +3,7 @@
  *
  * Hand-written against the real `formatLoadResponse` in
  * `apps/backend/src/domains/fleet/loads/utils/format-load-response.ts` because
- * `@sally/shared-types/fleet/load.schema.ts` `LoadSchema` drifts from the
+ * `@app/shared-types/fleet/load.schema.ts` `LoadSchema` drifts from the
  * backend's actual output in several ways:
  *
  *   1. `vehicleId` (numeric FK) is emitted by `formatLoadResponse` but missing

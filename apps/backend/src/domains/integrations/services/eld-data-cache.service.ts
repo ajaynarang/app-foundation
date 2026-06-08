@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 
 export interface HOSCacheData {
@@ -36,7 +36,7 @@ export class EldDataCacheService {
   private readonly logger = new Logger(EldDataCacheService.name);
 
   constructor(
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
     private prisma: PrismaService,
   ) {}
 

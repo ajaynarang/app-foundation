@@ -1,21 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FormSheet } from '@sally/ui/components/ui/form-sheet';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@sally/ui/components/ui/dropdown-menu';
+} from '@app/ui/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +25,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { MoreHorizontal, Play, Pencil, Trash2, RotateCw, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {

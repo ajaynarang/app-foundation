@@ -1,5 +1,5 @@
 import { EVENT_REGISTRY, getEventDefinition, getExternalEvents, getExternalEventsByCategory } from '../event-registry';
-import { SALLY_EVENTS } from '../sally-events.constants';
+import { DOMAIN_EVENTS } from '../sally-events.constants';
 
 describe('EventRegistry', () => {
   it('every registry entry has required fields', () => {
@@ -61,31 +61,31 @@ describe('EventRegistry', () => {
     }
   });
 
-  it('SALLY_EVENTS backward compat — all existing constants preserved', () => {
-    expect(SALLY_EVENTS.LOAD_CREATED).toBe('sally.load.created');
-    expect(SALLY_EVENTS.LOAD_STATUS_CHANGED).toBe('sally.load.status-changed');
-    expect(SALLY_EVENTS.ALERT_FIRED).toBe('sally.alert.fired');
-    expect(SALLY_EVENTS.TRIP_CREATED).toBe('sally.trip.created');
-    expect(SALLY_EVENTS.TRAILER_CREATED).toBe('sally.trailer.created');
-    expect(SALLY_EVENTS.INVOICE_SENT).toBe('sally.invoice.sent');
-    expect(SALLY_EVENTS.SYNC_STARTED).toBe('sally.sync.started');
-    expect(SALLY_EVENTS.EDI_TENDER_RECEIVED).toBe('sally.edi.tender-received');
-    expect(SALLY_EVENTS.EMAIL_INGEST_RECEIVED).toBe('sally.email-ingest.received');
+  it('DOMAIN_EVENTS backward compat — all existing constants preserved', () => {
+    expect(DOMAIN_EVENTS.LOAD_CREATED).toBe('sally.load.created');
+    expect(DOMAIN_EVENTS.LOAD_STATUS_CHANGED).toBe('sally.load.status-changed');
+    expect(DOMAIN_EVENTS.ALERT_FIRED).toBe('sally.alert.fired');
+    expect(DOMAIN_EVENTS.TRIP_CREATED).toBe('sally.trip.created');
+    expect(DOMAIN_EVENTS.TRAILER_CREATED).toBe('sally.trailer.created');
+    expect(DOMAIN_EVENTS.INVOICE_SENT).toBe('sally.invoice.sent');
+    expect(DOMAIN_EVENTS.SYNC_STARTED).toBe('sally.sync.started');
+    expect(DOMAIN_EVENTS.EDI_TENDER_RECEIVED).toBe('sally.edi.tender-received');
+    expect(DOMAIN_EVENTS.EMAIL_INGEST_RECEIVED).toBe('sally.email-ingest.received');
   });
 
-  it('SALLY_EVENTS has literal string types (not widened)', () => {
-    const loadCreated: 'sally.load.created' = SALLY_EVENTS.LOAD_CREATED;
+  it('DOMAIN_EVENTS has literal string types (not widened)', () => {
+    const loadCreated: 'sally.load.created' = DOMAIN_EVENTS.LOAD_CREATED;
     expect(loadCreated).toBe('sally.load.created');
   });
 
-  it('SALLY_EVENTS includes new events from overhaul', () => {
-    expect(SALLY_EVENTS.DRIVER_CREATED).toBe('sally.driver.created');
-    expect(SALLY_EVENTS.VEHICLE_CREATED).toBe('sally.vehicle.created');
-    expect(SALLY_EVENTS.CUSTOMER_CREATED).toBe('sally.customer.created');
-    expect(SALLY_EVENTS.INVOICE_CREATED).toBe('sally.invoice.created');
-    expect(SALLY_EVENTS.SETTLEMENT_CREATED).toBe('sally.settlement.created');
-    expect(SALLY_EVENTS.DOCUMENT_UPLOADED).toBe('sally.document.uploaded');
-    expect(SALLY_EVENTS.CLOSEOUT_COMPLETED).toBe('sally.closeout.completed');
+  it('DOMAIN_EVENTS includes new events from overhaul', () => {
+    expect(DOMAIN_EVENTS.DRIVER_CREATED).toBe('sally.driver.created');
+    expect(DOMAIN_EVENTS.VEHICLE_CREATED).toBe('sally.vehicle.created');
+    expect(DOMAIN_EVENTS.CUSTOMER_CREATED).toBe('sally.customer.created');
+    expect(DOMAIN_EVENTS.INVOICE_CREATED).toBe('sally.invoice.created');
+    expect(DOMAIN_EVENTS.SETTLEMENT_CREATED).toBe('sally.settlement.created');
+    expect(DOMAIN_EVENTS.DOCUMENT_UPLOADED).toBe('sally.document.uploaded');
+    expect(DOMAIN_EVENTS.CLOSEOUT_COMPLETED).toBe('sally.closeout.completed');
   });
 
   it('no duplicate keys in registry', () => {

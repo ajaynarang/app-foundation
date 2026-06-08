@@ -2,8 +2,8 @@ import type {
   ApprovalArtifact,
   ApprovalDecisionHeader,
   SettlementReview as SettlementReviewTypes,
-} from '@sally/shared-types';
-import { SettlementReview } from '@sally/shared-types';
+} from '@app/shared-types';
+import { SettlementReview } from '@app/shared-types';
 
 import type { SettlementReviewHydrateOutput } from './step.types';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent } from '@sally/ui/components/ui/card';
+import { Card, CardContent } from '@app/ui/components/ui/card';
 import { ExternalLink, ArrowRight } from 'lucide-react';
 import { openConsole } from '@/shared/lib/console-url';
 

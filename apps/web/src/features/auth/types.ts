@@ -9,4 +9,4 @@ export type {
   UserLookupInput as UserLookupRequest,
   SendOtpInput as SendOtpRequest,
   VerifyOtpInput as VerifyOtpRequest,
-} from '@sally/shared-types';
+} from '@app/shared-types';

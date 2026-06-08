@@ -6,7 +6,7 @@ import type {
   AgentActivityRow,
   AgentPrincipalKind,
   AgentScope,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 100;

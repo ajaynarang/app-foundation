@@ -1,5 +1,5 @@
 /**
- * Re-export from canonical source. Use `@sally/ui` directly in new code.
+ * Re-export from canonical source. Use `@app/ui` directly in new code.
  * This file exists for backward compatibility with existing importers.
  */
 export {
@@ -10,4 +10,4 @@ export {
   dismissToast,
   showMutationError,
   toast,
-} from '@sally/ui';
+} from '@app/ui';

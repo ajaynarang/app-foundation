@@ -1,9 +1,9 @@
 'use client';
 
-import { cn } from '@sally/ui';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
-import { SCOPE_DESCRIPTIONS } from '@sally/shared-types';
-import type { AgentScope } from '@sally/shared-types';
+import { cn } from '@app/ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
+import { SCOPE_DESCRIPTIONS } from '@app/shared-types';
+import type { AgentScope } from '@app/shared-types';
 import { scopeChipClass } from '../utils/scope-copy';
 
 interface ScopeChipProps {

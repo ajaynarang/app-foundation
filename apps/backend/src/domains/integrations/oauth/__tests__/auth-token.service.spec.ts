@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthTokenService } from '../auth-token.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { CredentialsService } from '../../credentials/credentials.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { REDIS_CLIENT } from '../../../../infrastructure/cache/redis-client.provider';
 
 // Mock fetch globally
@@ -61,7 +61,7 @@ describe('AuthTokenService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
         { provide: CredentialsService, useValue: mockCredentials },
-        { provide: SallyCacheService, useValue: mockCache },
+        { provide: AppCacheService, useValue: mockCache },
         { provide: REDIS_CLIENT, useValue: mockRedis },
       ],
     }).compile();

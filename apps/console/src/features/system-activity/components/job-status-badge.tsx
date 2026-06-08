@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Badge } from '@app/ui/components/ui/badge';
 import { Loader2, CheckCircle2, XCircle, Clock, Ban } from 'lucide-react';
 import type { JobStatus } from '../types';
 

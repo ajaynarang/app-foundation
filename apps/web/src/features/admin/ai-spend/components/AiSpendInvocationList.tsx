@@ -2,11 +2,11 @@
 
 import { ExternalLink } from 'lucide-react';
 
-import { AiInvocationStatus } from '@sally/shared-types';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { AiInvocationStatus } from '@app/shared-types';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 
 import { formatRelativeTime, formatUsdPrecise } from '@/shared/lib/utils/formatters';
 

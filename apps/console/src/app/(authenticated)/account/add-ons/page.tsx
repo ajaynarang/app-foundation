@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Switch } from '@sally/ui/components/ui/switch';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Switch } from '@app/ui/components/ui/switch';
 import { usePlan } from '@/features/plans/use-plan';
 import { useAddOnCatalog, useMyAddOns, ADD_ONS_QUERY_KEYS } from '@/features/add-ons/hooks';
 import { type AddOn, type TenantAddOn } from '@/features/add-ons/api';
 import { apiClient } from '@/lib/api-client';
-import { formatPriceCents } from '@sally/shared-types';
-import type { AddOnRequest } from '@sally/shared-types';
+import { formatPriceCents } from '@app/shared-types';
+import type { AddOnRequest } from '@app/shared-types';
 import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------

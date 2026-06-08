@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@sally/ui/components/ui/card';
-import { Label } from '@sally/ui/components/ui/label';
-import { Input } from '@sally/ui/components/ui/input';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Button } from '@sally/ui/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@app/ui/components/ui/card';
+import { Label } from '@app/ui/components/ui/label';
+import { Input } from '@app/ui/components/ui/input';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Button } from '@app/ui/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save } from 'lucide-react';
 import { useInvoiceSettings, useUpdateInvoiceSettings } from '@/features/financials/invoicing/use-invoice-settings';
 import type { InvoiceSettings } from '@/features/financials/invoicing';

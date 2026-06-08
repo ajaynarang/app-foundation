@@ -111,13 +111,13 @@ jobs:
         run: pnpm --filter=backend exec prisma generate
 
       - name: Lint
-        run: pnpm --filter=@sally/web lint
+        run: pnpm --filter=@app/web lint
 
       - name: Type-check
-        run: pnpm --filter=@sally/web type-check
+        run: pnpm --filter=@app/web type-check
 
       - name: Build (verify compilation)
-        run: pnpm --filter=@sally/web build
+        run: pnpm --filter=@app/web build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
@@ -153,13 +153,13 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Lint
-        run: pnpm --filter=@sally/console lint
+        run: pnpm --filter=@app/console lint
 
       - name: Type-check
-        run: pnpm --filter=@sally/console type-check
+        run: pnpm --filter=@app/console type-check
 
       - name: Build (verify compilation)
-        run: pnpm --filter=@sally/console build
+        run: pnpm --filter=@app/console build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
@@ -192,7 +192,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm --filter=@sally/ui lint
+        run: pnpm --filter=@app/ui lint
 
       - name: Type-check
-        run: pnpm --filter=@sally/ui type-check
+        run: pnpm --filter=@app/ui type-check

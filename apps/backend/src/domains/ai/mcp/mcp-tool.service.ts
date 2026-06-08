@@ -5,7 +5,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { McpRegistryService } from '@rekog/mcp-nest';
 import { getPersonaConfig, PERSONA_CONFIGS } from '../../../domains/prompting/prompts/persona/persona.config';
 import { AiPrismaService } from '../rls/ai-prisma.service';
-import { confirmActionTool } from '../sally-ai/mastra/tools/confirm-action.tool';
+import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
 import { fromUser } from '../agent-contract/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';

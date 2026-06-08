@@ -1,11 +1,11 @@
 'use client';
 
 import { CONTACTS, mailto } from '@/lib/contacts';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
 import { AlertTriangle } from 'lucide-react';
 import { usePlan } from '@/features/plans/use-plan';
 

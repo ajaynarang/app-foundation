@@ -126,7 +126,7 @@ export class OnboardingService {
         actionType: 'console',
       },
       {
-        id: 'sally-ai',
+        id: 'ai',
         title: 'Meet Your AI Assistant',
         description: 'Ask SALLY anything about routes, HOS, or fleet status',
         complete: sallyAiResult.hasUsed,

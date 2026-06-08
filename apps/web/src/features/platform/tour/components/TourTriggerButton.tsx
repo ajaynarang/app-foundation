@@ -1,8 +1,8 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { Button } from '@app/ui/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 import { useTour } from '../hooks/use-tour';
 
 interface TourTriggerButtonProps {

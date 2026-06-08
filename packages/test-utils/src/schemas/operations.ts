@@ -27,7 +27,7 @@ import {
   ShieldCustomRuleSchema as SharedShieldCustomRuleSchema,
   TriggerAuditResponseSchema as SharedTriggerAuditResponseSchema,
   AuditHistoryResponseSchema as SharedAuditHistoryResponseSchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 // ── ALERTS (legacy, keep for pre-Phase-3 callers) ─────────────────────────────
 

@@ -18,12 +18,12 @@ import {
   type Priority,
   type ResponsibilityKey,
   type StepRecord,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import { ApprovalEnrichmentService } from '../approval/approval-enrichment.service';
 
 /**
@@ -102,7 +102,7 @@ export class DeskEpisodeService {
     });
 
     await this.events.emit(
-      SALLY_EVENTS.DESK_EPISODE_CHANGED,
+      DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
       tenantId,
       { tenantId, episodeId: updated.id, status: updated.status },
       { id: String(userId), type: 'user' },

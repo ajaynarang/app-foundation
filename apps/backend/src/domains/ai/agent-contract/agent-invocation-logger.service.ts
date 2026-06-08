@@ -2,12 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, AgentInvocationLog } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
 import { AgentPrincipal, principalAuditLabel } from './agent-principal';
 import { HitlTier } from './hitl-policy.service';
 import { redactArgs, digestArgs } from './arg-redactor';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 export interface WritePendingInput {
   principal: AgentPrincipal;
@@ -82,7 +82,7 @@ export class AgentInvocationLoggerService {
         piiReadFlag: input.piiReadFlag ?? false,
       },
     });
-    await this.events.emit(SALLY_EVENTS.AGENT_INVOCATION_COMPLETED, String(input.tenantId), this.toWebhookPayload(row));
+    await this.events.emit(DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED, String(input.tenantId), this.toWebhookPayload(row));
   }
 
   async completeError(input: CompleteErrorInput): Promise<void> {
@@ -95,7 +95,7 @@ export class AgentInvocationLoggerService {
         error: input.error,
       },
     });
-    await this.events.emit(SALLY_EVENTS.AGENT_INVOCATION_COMPLETED, String(input.tenantId), this.toWebhookPayload(row));
+    await this.events.emit(DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED, String(input.tenantId), this.toWebhookPayload(row));
   }
 
   /**

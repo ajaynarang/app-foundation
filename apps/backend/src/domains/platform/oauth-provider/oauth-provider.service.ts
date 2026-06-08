@@ -6,7 +6,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { OAUTH_CONFIG } from './constants/oauth.constants';
-import type { AuthorizationRequest, ConsentChallenge } from '@sally/shared-types';
+import type { AuthorizationRequest, ConsentChallenge } from '@app/shared-types';
 
 /** RFC 6749 Section 5.1 token response (snake_case per spec). */
 export interface OAuthTokenResponse {

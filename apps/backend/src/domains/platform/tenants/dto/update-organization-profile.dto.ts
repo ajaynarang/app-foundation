@@ -1,7 +1,7 @@
 import { IsString, IsEmail, IsOptional, IsEnum, Matches, MinLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { FleetSize, CarrierType } from '@prisma/client';
-import type { UpdateOrganizationProfileInput } from '@sally/shared-types';
+import type { UpdateOrganizationProfileInput } from '@app/shared-types';
 
 import { IsIanaTimezone } from '../../../../shared/validators/is-iana-timezone.validator';
 

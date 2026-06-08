@@ -8,7 +8,7 @@
  *   pnpm qa:enable-features [--tenant <id>] [--dry-run]
  */
 
-import { fetchDevUsers, switchToUser } from '@sally/test-utils/auth';
+import { fetchDevUsers, switchToUser } from '@app/test-utils/auth';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

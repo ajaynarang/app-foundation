@@ -1,5 +1,5 @@
 {
-  "name": "@sally/console",
+  "name": "@app/console",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,8 +19,8 @@
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.1.6",
-    "@sally/shared-types": "workspace:*",
-    "@sally/ui": "workspace:*",
+    "@app/shared-types": "workspace:*",
+    "@app/ui": "workspace:*",
     "@scalar/api-reference-react": "^0.3.0",
     "@tanstack/react-query": "^5.62.9",
     "firebase": "12.8.0",

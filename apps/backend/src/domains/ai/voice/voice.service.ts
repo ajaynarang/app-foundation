@@ -22,7 +22,7 @@ export class VoiceService {
    */
   private async getSallyAiService() {
     if (!this.sallyAiService) {
-      const { SallyAiService } = await import('../sally-ai/sally-ai.service' as string);
+      const { SallyAiService } = await import('../assistant/assistant.service' as string);
       this.sallyAiService = this.moduleRef.get(SallyAiService, {
         strict: false,
       });

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@sally/ui/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@app/ui/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,9 +12,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { useAuth } from '@/features/auth';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { TenantTable } from './tenant-table';
 import { RejectTenantDialog } from './reject-tenant-dialog';
 import { SuspendTenantDialog } from './suspend-tenant-dialog';

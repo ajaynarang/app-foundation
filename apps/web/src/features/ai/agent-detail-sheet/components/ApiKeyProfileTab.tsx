@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useTenantApiKeys } from '@/features/platform/api-keys';
 
 interface ApiKeyProfileTabProps {

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { formatLoadLabel } from '@sally/shared-types';
+import { formatLoadLabel } from '@app/shared-types';
 import { BillingReadinessService } from '../../../financials/close-out/billing-readiness.service';
 import { CloseOutService } from '../../../financials/close-out/close-out.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';

@@ -2,14 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronLeft, ChevronRight, Plus, Sparkles, X } from 'lucide-react';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Card, CardContent } from '@sally/ui/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Switch } from '@sally/ui/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Card, CardContent } from '@app/ui/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Switch } from '@app/ui/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
 import {
   useEdiPartners,
   useTogglePartnerStatus,

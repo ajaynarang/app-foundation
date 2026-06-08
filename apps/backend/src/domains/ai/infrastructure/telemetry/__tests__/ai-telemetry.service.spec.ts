@@ -2,11 +2,11 @@ import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
 import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
 import { AiTelemetryService } from '../ai-telemetry.service';
-import type { AiCallContext, AiUsage } from '@sally/shared-types';
+import type { AiCallContext, AiUsage } from '@app/shared-types';
 
 const TENANT_ID = 42;
 
@@ -103,7 +103,7 @@ describe('AiTelemetryService', () => {
       providers: [
         AiTelemetryService,
         { provide: PrismaService, useValue: prisma },
-        { provide: SallyCacheService, useValue: cache },
+        { provide: AppCacheService, useValue: cache },
         { provide: DomainEventService, useValue: events },
       ],
     }).compile();
@@ -239,7 +239,7 @@ describe('AiTelemetryService', () => {
       const row = await service.record(makeUsage(), makeContext());
 
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.AI_INVOCATION_RECORDED,
+        DOMAIN_EVENTS.AI_INVOCATION_RECORDED,
         TENANT_ID,
         expect.objectContaining({
           invocationId: (row as any).id,
@@ -263,7 +263,7 @@ describe('AiTelemetryService', () => {
       const context: AiCallContext = {
         tenantId: TENANT_ID,
         userId: 7,
-        surface: 'SALLY_CHAT',
+        surface: 'APP_CHAT',
         agentId: 'sally-loads',
         linkRefType: 'conversation_message',
         linkRefId: 'msg-123',
@@ -288,7 +288,7 @@ describe('AiTelemetryService', () => {
       expect(call.data).toMatchObject({
         tenantId: TENANT_ID,
         userId: 7,
-        surface: 'SALLY_CHAT',
+        surface: 'APP_CHAT',
         agentId: 'sally-loads',
         model: 'claude-sonnet-4-6',
         provider: 'anthropic',
@@ -415,7 +415,7 @@ describe('AiTelemetryService', () => {
       const state = await service.assertBudget(TENANT_ID);
       expect(state.state).toBe('soft');
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.AI_BUDGET_SOFT_BREACHED,
+        DOMAIN_EVENTS.AI_BUDGET_SOFT_BREACHED,
         TENANT_ID,
         expect.objectContaining({ state: 'soft' }),
       );
@@ -427,7 +427,7 @@ describe('AiTelemetryService', () => {
         tenantId: TENANT_ID,
       });
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.AI_BUDGET_HARD_BREACHED,
+        DOMAIN_EVENTS.AI_BUDGET_HARD_BREACHED,
         TENANT_ID,
         expect.objectContaining({ state: 'hard' }),
       );
@@ -476,7 +476,7 @@ describe('AiTelemetryService', () => {
       prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: true });
       await service.assertZeroRetention(TENANT_ID, 'fast').catch(() => undefined);
       expect(events.emit).toHaveBeenCalledWith(
-        SALLY_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE,
+        DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE,
         TENANT_ID,
         expect.objectContaining({ tier: 'fast' }),
       );

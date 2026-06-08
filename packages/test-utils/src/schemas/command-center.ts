@@ -19,7 +19,7 @@ import {
   ActiveLoadViewSchema as SharedActiveLoadViewSchema,
   RiskScoreSchema as SharedRiskScoreSchema,
   WireItemSchema as SharedWireItemSchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 /** `GET /command-center/overview`. */
 export const CommandCenterOverviewSharedSchema = SharedCommandCenterOverviewSchema;

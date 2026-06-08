@@ -1,5 +1,5 @@
 import type { MemoryPolarity, MemoryScope } from '@prisma/client';
-import type { SettlementReview } from '@sally/shared-types';
+import type { SettlementReview } from '@app/shared-types';
 
 /**
  * Input/output shapes that flow between Inngest steps within the Settlement

@@ -142,7 +142,7 @@ services:
   #   ports:
   #     - "3000:3000"
   #   volumes:
-  #     # Mount full monorepo so pnpm workspace symlinks (@sally/ui, @sally/shared-types) resolve.
+  #     # Mount full monorepo so pnpm workspace symlinks (@app/ui, @app/shared-types) resolve.
   #     # Anonymous volumes below shadow host node_modules with container-built ones.
   #     - ./:/workspace
   #     - /workspace/node_modules

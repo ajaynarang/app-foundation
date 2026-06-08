@@ -2,9 +2,9 @@
 
 import { forwardRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Input } from '@sally/ui/components/ui/input';
-import { Button } from '@sally/ui/components/ui/button';
-import { cn } from '@sally/ui';
+import { Input } from '@app/ui/components/ui/input';
+import { Button } from '@app/ui/components/ui/button';
+import { cn } from '@app/ui';
 
 interface PasswordInputProps extends Omit<React.ComponentPropsWithoutRef<typeof Input>, 'type'> {
   showToggle?: boolean;

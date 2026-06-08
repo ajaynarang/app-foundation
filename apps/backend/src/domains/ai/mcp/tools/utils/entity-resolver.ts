@@ -1,4 +1,4 @@
-import { RecurringLaneStatusSchema } from '@sally/shared-types';
+import { RecurringLaneStatusSchema } from '@app/shared-types';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 
 const RECURRING_LANE_STATUS = RecurringLaneStatusSchema.enum;

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { formatLoadLabel } from '@sally/shared-types';
+import { formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { EntityResolver, errorResponse } from '../utils/entity-resolver';
 import { RecurringLanesService } from '../../../../fleet/recurring-lanes/services/recurring-lanes.service';

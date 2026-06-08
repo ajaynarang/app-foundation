@@ -14,7 +14,7 @@ import {
   type WebhookCreatedResponse,
   type WebhookDeliveryLog,
 } from './api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 
 const WEBHOOKS_KEY = ['webhooks'] as const;
 const webhookLogsKey = (id: string) => ['webhooks', id, 'logs'] as const;

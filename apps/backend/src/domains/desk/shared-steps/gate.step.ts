@@ -1,5 +1,5 @@
 import { DeskEpisodeStepKind } from '@prisma/client';
-import { scopeTier } from '@sally/shared-types';
+import { scopeTier } from '@app/shared-types';
 
 import { nestApp } from '../core/inngest/nest-context';
 import { ScopeRegistryService } from '../../ai/agent-contract/scope-registry.service';

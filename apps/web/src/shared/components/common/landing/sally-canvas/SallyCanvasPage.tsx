@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { useAuthStore } from '@/features/auth';
 import { getDefaultRouteForRole } from '@/shared/lib/navigation';
 import { AmbientCanvas } from './AmbientCanvas';

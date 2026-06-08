@@ -10,13 +10,13 @@ export const STORAGE_KEYS = {
   AUTH_STORAGE: 'auth-storage',
 
   /** Sally AI chat layout preference (side | bottom | floating) */
-  SALLY_CHAT_LAYOUT: 'sally-chat-layout',
+  APP_CHAT_LAYOUT: 'sally-chat-layout',
 
   /** Sally AI side panel width in pixels */
-  SALLY_SIDE_WIDTH: 'sally-side-width',
+  APP_SIDE_WIDTH: 'sally-side-width',
 
   /** Prospect (unauthenticated) Sally AI session token */
-  SALLY_PROSPECT_TOKEN: 'sally-prospect-session-token',
+  APP_PROSPECT_TOKEN: 'sally-prospect-session-token',
 
   /** Active theme (light | dark) */
   THEME: 'theme',
@@ -60,7 +60,7 @@ export const STORAGE_KEYS = {
   LOADS_TABLE_COLUMNS: 'sally:loads-table-columns',
 
   /** Display font-size scale percentage (80–120) */
-  FONT_SIZE_SCALE: 'sally:font-size-scale',
+  FONT_SIZE_SCALE: 'app:font-size-scale',
 
   /** One-time toast announcing ⌘K and g-h shortcuts */
   HOTKEY_INTRO_SHOWN: 'sally:hotkey-intro-shown',

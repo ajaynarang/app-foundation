@@ -3,13 +3,13 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Check, Lock, AlertTriangle, Puzzle, Sparkles, Crown, ArrowRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/shared/components/ui/sheet';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useAddOnCatalog, useMyAddOns, ADD_ONS_QUERY_KEYS } from '@/features/add-ons/hooks';
@@ -37,10 +37,10 @@ import {
 } from '@/features/billing/hooks/use-billing';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
 import { formatCents } from '@/shared/lib/utils/formatters';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { PlanConfig, TenantPlan } from '@sally/shared-types';
-import { cn } from '@sally/ui';
+import type { PlanConfig, TenantPlan } from '@app/shared-types';
+import { cn } from '@app/ui';
 import { mailto } from '@/shared/lib/contacts';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 
 import { FormSheet } from '@/shared/components/ui/form-sheet';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
 
 import { useAiBudget, useUpdateAiBudget } from '../hooks';
 import type { AiSpendTenantSummary } from '../types';

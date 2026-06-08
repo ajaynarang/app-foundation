@@ -1,4 +1,4 @@
-import { ArFollowup } from '@sally/shared-types';
+import { ArFollowup } from '@app/shared-types';
 
 import type { ResponsibilityDefinition } from '../definition.types';
 

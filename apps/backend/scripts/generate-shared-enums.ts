@@ -1,5 +1,5 @@
 /**
- * Codegen: Prisma enums → @sally/shared-types Zod mirrors.
+ * Codegen: Prisma enums → @app/shared-types Zod mirrors.
  *
  * Reads `apps/backend/prisma/schema.prisma`, finds every `enum X { ... }`
  * block, and writes `packages/shared-types/src/generated/prisma-enums.ts`
@@ -13,7 +13,7 @@
  * without regenerating fails the build.
  *
  * Single source of truth: schema.prisma. Backend imports from
- * `@prisma/client`; frontend imports from `@sally/shared-types`. Same
+ * `@prisma/client`; frontend imports from `@app/shared-types`. Same
  * names, same values, structurally guaranteed.
  */
 import * as fs from 'fs';

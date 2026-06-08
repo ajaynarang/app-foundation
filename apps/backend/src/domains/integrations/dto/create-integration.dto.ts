@@ -1,5 +1,5 @@
 import { IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
-import type { CreateIntegrationInput } from '@sally/shared-types';
+import type { CreateIntegrationInput } from '@app/shared-types';
 
 export enum IntegrationType {
   TMS = 'TMS',

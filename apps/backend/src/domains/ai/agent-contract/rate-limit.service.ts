@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { AgentPrincipal } from './agent-principal';
 import { AGENT_RATE_LIMIT_DEFAULTS, AGENT_RATE_LIMIT_WINDOW_SECONDS } from './agent-rate-limit.constants';
@@ -17,7 +17,7 @@ export interface ConsumeResult {
 
 @Injectable()
 export class RateLimitService {
-  constructor(private readonly cache: SallyCacheService) {}
+  constructor(private readonly cache: AppCacheService) {}
 
   async consume(principal: AgentPrincipal, cost = 1, overrides: ConsumeOverrides = {}): Promise<ConsumeResult> {
     const defaultLimit = AGENT_RATE_LIMIT_DEFAULTS[principal.kind];

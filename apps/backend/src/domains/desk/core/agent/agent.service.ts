@@ -10,11 +10,11 @@ import {
   type EligibleSupervisor,
   type ResponsibilityHeld,
   type UpdateAgentRequest,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 import { CACHE_TTL_HOT_60S, CACHE_TTL_WARM_5M } from '../../../../constants/cache.constants';
 import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 
@@ -34,7 +34,7 @@ const SUPERVISOR_ELIGIBLE_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole
 export class DeskAgentService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   // ─── Roster ────────────────────────────────────────────────────────────

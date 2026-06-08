@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ChevronRight, ChevronLeft, BookOpen, Search, X, Code2, BookMarked } from 'lucide-react';
-import { cn } from '@sally/ui';
-import { ScrollArea } from '@sally/ui/components/ui/scroll-area';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
+import { cn } from '@app/ui';
+import { ScrollArea } from '@app/ui/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
 
 type DocsNavItem = {
   label: string;
@@ -220,11 +220,11 @@ const manualNavigation: DocsNavSection[] = [
   {
     label: 'Sally AI',
     items: [
-      { label: 'What is Sally?', href: '/docs/manual/sally-ai/what-is-sally' },
-      { label: 'Asking Questions', href: '/docs/manual/sally-ai/asking-questions' },
-      { label: 'Actions', href: '/docs/manual/sally-ai/sally-actions' },
-      { label: 'Voice Mode', href: '/docs/manual/sally-ai/voice-mode' },
-      { label: 'Doc Intelligence', href: '/docs/manual/sally-ai/document-intelligence' },
+      { label: 'What is Sally?', href: '/docs/manual/assistant/what-is-sally' },
+      { label: 'Asking Questions', href: '/docs/manual/assistant/asking-questions' },
+      { label: 'Actions', href: '/docs/manual/assistant/sally-actions' },
+      { label: 'Voice Mode', href: '/docs/manual/assistant/voice-mode' },
+      { label: 'Doc Intelligence', href: '/docs/manual/assistant/document-intelligence' },
     ],
   },
   {

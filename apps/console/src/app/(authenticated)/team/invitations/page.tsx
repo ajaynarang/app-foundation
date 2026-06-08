@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@sally/ui/components/ui/table';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@app/ui/components/ui/table';
 import { useInvitations, useCancelInvitation, useResendInvitation } from '../../../../hooks/use-team';
 
 function SkeletonTable() {

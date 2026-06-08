@@ -2,16 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import { useDevSwitcher } from './use-dev-switcher';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@sally/ui/components/ui/dialog';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@sally/ui/components/ui/tooltip';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { ScrollArea } from '@sally/ui/components/ui/scroll-area';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@app/ui/components/ui/dialog';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { ScrollArea } from '@app/ui/components/ui/scroll-area';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { ExternalLink, Loader2, RefreshCw, Search, Building2, Shield } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 
 const ROLE_BADGE_VARIANT: Record<string, 'default' | 'muted' | 'outline'> = {
   OWNER: 'default',

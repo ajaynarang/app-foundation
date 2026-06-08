@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import type { CardComponentProps } from 'onborda';
-import { Button } from '@sally/ui/components/ui/button';
-import { Progress } from '@sally/ui/components/ui/progress';
-import { SallyOrb } from '@/features/platform/sally-ai/components/SallyOrb';
-import { cn } from '@sally/ui';
+import { Button } from '@app/ui/components/ui/button';
+import { Progress } from '@app/ui/components/ui/progress';
+import { SallyOrb } from '@/features/platform/ai-chat/components/SallyOrb';
+import { cn } from '@app/ui';
 import { useTour } from '../hooks/use-tour';
 
 const TYPEWRITER_SPEED = 25;

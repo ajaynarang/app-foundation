@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { RouteSegmentStatus } from '@prisma/client';
-import { HOS_CONSTANTS } from '@sally/shared-types';
+import { HOS_CONSTANTS } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DriverToolUtils } from './driver-tool.utils';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';

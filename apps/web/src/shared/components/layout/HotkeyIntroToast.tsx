@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { toast } from '@sally/ui';
+import { toast } from '@app/ui';
 import { STORAGE_KEYS } from '@/shared/constants';
 
 const TOAST_DELAY_MS = 1500;

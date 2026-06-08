@@ -1,14 +1,14 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { Prisma, LoginEventStatus, type UserRole } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import type {
   ListLoginActivityQuery,
   ListLoginActivityResponse,
   LoginActivityEvent,
   LoginActivitySummary,
   LoginActivitySummaryQuery,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 import { LOGIN_ACTIVITY, parseDeviceLabel } from './constants';
 import { loginActivityCacheKeys, rolesKey } from './login-activity.cache';
 
@@ -37,7 +37,7 @@ export class LoginActivityService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cache: SallyCacheService,
+    private readonly cache: AppCacheService,
   ) {}
 
   // ─── public API ──────────────────────────────────────────────────────

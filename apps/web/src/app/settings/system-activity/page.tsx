@@ -13,7 +13,7 @@ import {
   useJob,
 } from '@/features/system-activity';
 import type { Job } from '@/features/system-activity';
-import { JobStatus } from '@sally/shared-types';
+import { JobStatus } from '@app/shared-types';
 
 export default function SystemActivityPage() {
   const router = useRouter();

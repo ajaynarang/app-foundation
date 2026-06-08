@@ -12,15 +12,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
+} from '@app/ui/components/ui/dialog';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { useAuth } from '@/features/auth';
 import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 
 const inviteSchema = z.object({

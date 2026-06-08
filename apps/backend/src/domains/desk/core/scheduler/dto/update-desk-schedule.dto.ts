@@ -1,6 +1,6 @@
 import { IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import type { UpdateDeskScheduleRequest } from '@sally/shared-types';
+import type { UpdateDeskScheduleRequest } from '@app/shared-types';
 
 /**
  * PATCH /desk/schedule — flips the tenant-wide master switch for autonomous

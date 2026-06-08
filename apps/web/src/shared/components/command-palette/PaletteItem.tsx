@@ -1,8 +1,8 @@
 'use client';
 
-import { CommandItem } from '@sally/ui/components/ui/command';
+import { CommandItem } from '@app/ui/components/ui/command';
 import { Sparkles } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import type { PaletteItem as PaletteItemType } from './command-registry';
 
 interface PaletteItemProps {

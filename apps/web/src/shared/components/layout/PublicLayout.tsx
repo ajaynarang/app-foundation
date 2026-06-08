@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Menu, X, LogIn, LogOut, ArrowRight, UserPlus, ExternalLink, Settings } from 'lucide-react';
 import { useAuthStore } from '@/features/auth';
-import { Button } from '@sally/ui/components/ui/button';
-import { Avatar, AvatarFallback } from '@sally/ui/components/ui/avatar';
+import { Button } from '@app/ui/components/ui/button';
+import { Avatar, AvatarFallback } from '@app/ui/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@sally/ui/components/ui/dropdown-menu';
+} from '@app/ui/components/ui/dropdown-menu';
 import { ThemeToggle } from './ThemeToggle';
 import { DevSwitcherTrigger } from '@/shared/components/common';
 import { getDefaultRouteForRole } from '@/shared/lib/navigation';

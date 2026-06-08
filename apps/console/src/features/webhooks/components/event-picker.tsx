@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useEventCatalog } from '../use-webhooks';
 
 interface EventPickerProps {

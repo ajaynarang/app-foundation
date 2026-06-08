@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 import { AgentPrincipal } from './agent-principal';
 import { HitlTier } from './hitl-policy.service';
 
@@ -77,7 +77,7 @@ export class HitlChallengeService {
 
     const token = String(row.id);
 
-    await this.events.emit(SALLY_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(input.principal.tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(input.principal.tenantId), {
       token,
       toolName: input.toolName,
       tier: input.tier,
@@ -113,7 +113,7 @@ export class HitlChallengeService {
       data: { consumedAt: new Date() },
     });
 
-    await this.events.emit(SALLY_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(row.tenantId), {
+    await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(row.tenantId), {
       token,
       toolName: row.toolName,
     });

@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
+} from '@app/ui/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,9 +18,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
-import { Button } from '@sally/ui/components/ui/button';
-import { showSuccess } from '@sally/ui';
+} from '@app/ui/components/ui/alert-dialog';
+import { Button } from '@app/ui/components/ui/button';
+import { showSuccess } from '@app/ui';
 import { Copy } from 'lucide-react';
 
 interface SecretCopyDialogProps {

@@ -1,6 +1,6 @@
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { FeedbackStatusEnum } from '@sally/shared-types';
+import { FeedbackStatusEnum } from '@app/shared-types';
 import { ListFeedbackQueryDto } from '../dto/list-feedback-query.dto';
 
 describe('ListFeedbackQueryDto', () => {

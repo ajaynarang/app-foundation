@@ -8,11 +8,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
-import { Button } from '@sally/ui/components/ui/button';
-import { Checkbox } from '@sally/ui/components/ui/checkbox';
-import { Label } from '@sally/ui/components/ui/label';
-import { UrlRow } from '@sally/ui/components/ui/url-row';
+} from '@app/ui/components/ui/dialog';
+import { Button } from '@app/ui/components/ui/button';
+import { Checkbox } from '@app/ui/components/ui/checkbox';
+import { Label } from '@app/ui/components/ui/label';
+import { UrlRow } from '@app/ui/components/ui/url-row';
 import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
 
 const DEFAULT_MCP_URL = 'https://api.sally.app/mcp';

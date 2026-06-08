@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiInvocationStatus } from '@prisma/client';
 import { generateText, Output, type LanguageModel } from 'ai';
 import type { ZodSchema } from 'zod';
-import type { AiCallContext, ModelAlias } from '@sally/shared-types';
+import type { AiCallContext, ModelAlias } from '@app/shared-types';
 import { ai, MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from './ai-provider';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { redactMessages } from '../redaction/pii-redactor';

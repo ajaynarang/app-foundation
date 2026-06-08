@@ -3,7 +3,7 @@ import { AiSurface, AiSurfaceSchema, AiInvocationStatus, AiInvocationStatusSchem
 
 // Re-export the generated AI enums (both value + Zod schema) through the
 // package root so frontend code can `import { AiSurface } from
-// '@sally/shared-types'` — same convention load.schema.ts uses for
+// '@app/shared-types'` — same convention load.schema.ts uses for
 // LoadStatus. Without this, only the Schema leaks out, not the value.
 export { AiSurface, AiSurfaceSchema, AiInvocationStatus, AiInvocationStatusSchema };
 

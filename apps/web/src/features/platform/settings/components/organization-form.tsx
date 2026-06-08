@@ -2,17 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Button } from '@sally/ui/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@sally/ui/components/ui/select';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Button } from '@app/ui/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@app/ui/components/ui/select';
 import {
   CarrierType,
   FleetSize,
   type OrganizationProfile,
   type UpdateOrganizationProfileInput,
   UpdateOrganizationProfileSchema,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 import { extractFieldErrors } from '@/shared/lib/error-utils';
 

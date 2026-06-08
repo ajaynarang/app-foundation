@@ -72,8 +72,8 @@ jobs:
           cp coverage/coverage-summary.json ../../tests/reports/unit-coverage-summary.json 2>/dev/null || true
         continue-on-error: true
 
-      - name: Run @sally/test-utils unit tests
-        run: pnpm --filter @sally/test-utils test
+      - name: Run @app/test-utils unit tests
+        run: pnpm --filter @app/test-utils test
         continue-on-error: true
 
       - name: RBAC gap audit

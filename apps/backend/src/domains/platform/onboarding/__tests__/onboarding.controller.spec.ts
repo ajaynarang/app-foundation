@@ -1,5 +1,5 @@
 import { OnboardingController } from '../onboarding.controller';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('OnboardingController', () => {
   let controller: OnboardingController;
@@ -21,7 +21,7 @@ describe('OnboardingController', () => {
     cache = {
       getOrSet: jest.fn(async (_key: string, factory: () => Promise<unknown>) => factory()),
     };
-    controller = new OnboardingController(service as any, cache as unknown as SallyCacheService);
+    controller = new OnboardingController(service as any, cache as unknown as AppCacheService);
   });
 
   describe('getOnboardingStatus', () => {

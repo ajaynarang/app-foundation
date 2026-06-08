@@ -1,6 +1,6 @@
 import { Logger, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { ITMSAdapter, LoadData, VehicleData, DriverData } from './tms-adapter.interface';
-import { EARTH_RADIUS_MILES } from '@sally/shared-types';
+import { EARTH_RADIUS_MILES } from '@app/shared-types';
 import { MOCK_TMS } from '../../../../infrastructure/mock/mock.config';
 
 /**

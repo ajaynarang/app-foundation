@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { TenantPlan, TenantStatus } from '@prisma/client';
-import { TenantAddOnStatusEnum } from '@sally/shared-types';
+import { TenantAddOnStatusEnum } from '@app/shared-types';
 import { generateId } from '../../../shared/utils/id-generator';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
 import { FINANCE_JOB_NAMES } from '../../../infrastructure/queue/queue.constants';

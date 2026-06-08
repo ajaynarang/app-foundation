@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { DevSwitcherTrigger } from '@/shared/components/common';
 import { JobHealthIndicator } from '@/shared/components/job-health-indicator';
 import { NotificationBell } from './NotificationBell';

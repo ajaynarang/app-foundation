@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { createHmac } from 'crypto';
 import axios from 'axios';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../database/prisma.service';
 import { QUEUE_NAMES } from '../queue/queue.constants';
 import { DeadLetterService } from '../queue/dead-letter.service';

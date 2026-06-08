@@ -15,7 +15,7 @@ import {
   Fuel,
   type LucideIcon,
 } from 'lucide-react';
-import { FEATURE_KEYS } from '@sally/shared-types';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 export interface UpgradeFeatureConfig {
   displayName: string;
@@ -174,7 +174,7 @@ export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
       'Natural language commands',
     ],
   },
-  [FEATURE_KEYS.SALLY_AI_ACTIONS]: {
+  [FEATURE_KEYS.APP_AI_ACTIONS]: {
     displayName: 'Sally AI Actions',
     description: 'Let Sally take actions on your behalf — plan routes, generate invoices, and more.',
     requiredPlan: 'Fleet',

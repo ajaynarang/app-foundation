@@ -9,12 +9,12 @@ import { FeatureFlagsService } from '../../../domains/platform/feature-flags/fea
 // Mock isAddOnFeature from shared-types. Other named exports needed by the
 // add-ons service (TenantAddOnStatusEnum / AddOnRequestStatusEnum) are
 // preserved via requireActual so module-level enum constants resolve.
-jest.mock('@sally/shared-types', () => ({
-  ...jest.requireActual('@sally/shared-types'),
+jest.mock('@app/shared-types', () => ({
+  ...jest.requireActual('@app/shared-types'),
   isAddOnFeature: jest.fn().mockReturnValue(false),
 }));
 
-import { isAddOnFeature } from '@sally/shared-types';
+import { isAddOnFeature } from '@app/shared-types';
 
 describe('PlanGuard', () => {
   let guard: PlanGuard;

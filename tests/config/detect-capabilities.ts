@@ -6,7 +6,7 @@
  * On any failure, defaults to "no capabilities known" so tests run without filtering.
  */
 
-import { fetchDevUsers, switchToUser } from '@sally/test-utils/auth';
+import { fetchDevUsers, switchToUser } from '@app/test-utils/auth';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

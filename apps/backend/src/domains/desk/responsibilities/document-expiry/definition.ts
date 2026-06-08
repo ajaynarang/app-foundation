@@ -1,4 +1,4 @@
-import { DocumentExpiry } from '@sally/shared-types';
+import { DocumentExpiry } from '@app/shared-types';
 
 import type { ResponsibilityDefinition } from '../definition.types';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useMemo, useEffect } from 'react';
-import { DEFAULT_TENANT_TIMEZONE } from '@sally/shared-types';
+import { DEFAULT_TENANT_TIMEZONE } from '@app/shared-types';
 import { usePreferencesStore } from '@/features/platform/settings';
 import { useAuthStore } from '@/features/auth';
 import {

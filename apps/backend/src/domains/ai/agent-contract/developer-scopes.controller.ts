@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { AgentScopeSchema, SCOPE_DESCRIPTIONS, NEVER_EXTERNAL_SCOPES, type AgentScope } from '@sally/shared-types';
+import { AgentScopeSchema, SCOPE_DESCRIPTIONS, NEVER_EXTERNAL_SCOPES, type AgentScope } from '@app/shared-types';
 import { ScopeRegistryService } from './scope-registry.service';
 
 export interface DeveloperScopeEntry {

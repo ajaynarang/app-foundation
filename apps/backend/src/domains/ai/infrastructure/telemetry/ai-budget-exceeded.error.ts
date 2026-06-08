@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { AiBudgetState } from '@sally/shared-types';
+import type { AiBudgetState } from '@app/shared-types';
 
 /**
  * Thrown by `AiTelemetryService.assertBudget()` when a tenant has hit its

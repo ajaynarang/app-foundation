@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { WebhookDeliveryProcessor, WebhookDeliveryPayload } from '../delivery.processor';
 import { PrismaService } from '../../database/prisma.service';
 import { DeadLetterService } from '../../queue/dead-letter.service';

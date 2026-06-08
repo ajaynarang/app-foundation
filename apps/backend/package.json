@@ -1,5 +1,5 @@
 {
-  "name": "@sally/backend",
+  "name": "@app/backend",
   "version": "0.1.0",
   "description": "SALLY Node.js/TypeScript Backend",
   "author": "SALLY Team",
@@ -92,7 +92,7 @@
     "@prisma/adapter-pg": "7.3.0",
     "@prisma/client": "7.3.0",
     "@rekog/mcp-nest": "^1.9.4",
-    "@sally/shared-types": "workspace:*",
+    "@app/shared-types": "workspace:*",
     "@types/nodemailer": "7.0.9",
     "ai": "^6.0.86",
     "archiver": "^7.0.1",

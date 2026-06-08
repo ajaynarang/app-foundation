@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Send, X } from 'lucide-react';
-import { cn } from '@sally/ui';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
+import { cn } from '@app/ui';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
 
 interface MessageComposerProps {
   /** The driver's active load numbers — the @-mention picker options. */

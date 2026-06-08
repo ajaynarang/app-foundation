@@ -46,7 +46,7 @@ const ALLOW_LIST: string[] = [
   // (z.enum(['success','failed','unsupported','not_configured'])).
   'app/(super-admin)/admin/platform-health/page.tsx',
   // Sally-AI engine simulation types — local lowercase unions, not DB enums.
-  'features/platform/sally-ai/engine/',
+  'features/platform/ai-chat/engine/',
   // Client-only UI state machines (upload/extract phases, lifecycle rails,
   // tracking timeline, ghost-import cards). These never compare a DB-backed
   // status; they drive local animation/step state and are lowercase by
@@ -177,7 +177,7 @@ describe('Web status-casing conventions', () => {
       const more = violations.length > 30 ? `\n… and ${violations.length - 30} more` : '';
       throw new Error(
         `Found ${violations.length} web status-casing violation(s). The API returns the ` +
-          `UPPER_SNAKE Prisma enum value; compare against the enum from @sally/shared-types ` +
+          `UPPER_SNAKE Prisma enum value; compare against the enum from @app/shared-types ` +
           `(e.g. DocumentStatus.CONFIRMED), not a lowercase literal. If a field is genuinely a ` +
           `lowercase-by-design schema, add its file to ALLOW_LIST with a justification.\n${preview}${more}`,
       );

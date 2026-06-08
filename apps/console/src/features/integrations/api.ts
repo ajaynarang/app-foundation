@@ -1,13 +1,13 @@
 import { apiClient } from '../../lib/api-client';
 
-export type { IntegrationType, VendorMetadata, IntegrationConfig, UnifiedSyncLog } from '@sally/shared-types';
+export type { IntegrationType, VendorMetadata, IntegrationConfig, UnifiedSyncLog } from '@app/shared-types';
 
 // Re-export vendor as string alias for frontend flexibility
 export type IntegrationVendor = string;
 
 // Request types (kept local — only used in this file)
 export interface CreateIntegrationRequest {
-  integrationType: import('@sally/shared-types').IntegrationType;
+  integrationType: import('@app/shared-types').IntegrationType;
   vendor: IntegrationVendor;
   displayName: string;
   credentials?: Record<string, unknown>;
@@ -22,8 +22,8 @@ export interface UpdateIntegrationRequest {
 /**
  * List all integration configurations for the current tenant
  */
-export async function listIntegrations(): Promise<import('@sally/shared-types').IntegrationConfig[]> {
-  return apiClient<import('@sally/shared-types').IntegrationConfig[]>('/integrations', { method: 'GET' });
+export async function listIntegrations(): Promise<import('@app/shared-types').IntegrationConfig[]> {
+  return apiClient<import('@app/shared-types').IntegrationConfig[]>('/integrations', { method: 'GET' });
 }
 
 /**
@@ -31,8 +31,8 @@ export async function listIntegrations(): Promise<import('@sally/shared-types').
  */
 export async function createIntegration(
   data: CreateIntegrationRequest,
-): Promise<import('@sally/shared-types').IntegrationConfig> {
-  return apiClient<import('@sally/shared-types').IntegrationConfig>('/integrations', {
+): Promise<import('@app/shared-types').IntegrationConfig> {
+  return apiClient<import('@app/shared-types').IntegrationConfig>('/integrations', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -44,8 +44,8 @@ export async function createIntegration(
 export async function updateIntegration(
   integrationId: string,
   data: UpdateIntegrationRequest,
-): Promise<import('@sally/shared-types').IntegrationConfig> {
-  return apiClient<import('@sally/shared-types').IntegrationConfig>(`/integrations/${integrationId}`, {
+): Promise<import('@app/shared-types').IntegrationConfig> {
+  return apiClient<import('@app/shared-types').IntegrationConfig>(`/integrations/${integrationId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
@@ -63,8 +63,8 @@ export async function deleteIntegration(integrationId: string): Promise<void> {
  */
 export async function testConnection(
   integrationId: string,
-): Promise<import('@sally/shared-types').TestConnectionResponse> {
-  return apiClient<import('@sally/shared-types').TestConnectionResponse>(`/integrations/${integrationId}/test`, {
+): Promise<import('@app/shared-types').TestConnectionResponse> {
+  return apiClient<import('@app/shared-types').TestConnectionResponse>(`/integrations/${integrationId}/test`, {
     method: 'POST',
   });
 }
@@ -72,8 +72,8 @@ export async function testConnection(
 /**
  * Trigger a manual sync for this integration
  */
-export async function triggerSync(integrationId: string): Promise<import('@sally/shared-types').SyncResponse> {
-  return apiClient<import('@sally/shared-types').SyncResponse>(`/integrations/${integrationId}/sync`, {
+export async function triggerSync(integrationId: string): Promise<import('@app/shared-types').SyncResponse> {
+  return apiClient<import('@app/shared-types').SyncResponse>(`/integrations/${integrationId}/sync`, {
     method: 'POST',
   });
 }
@@ -85,8 +85,8 @@ export async function getSyncHistory(
   integrationId: string,
   limit: number = 50,
   offset: number = 0,
-): Promise<import('@sally/shared-types').UnifiedSyncLog[]> {
-  return apiClient<import('@sally/shared-types').UnifiedSyncLog[]>(
+): Promise<import('@app/shared-types').UnifiedSyncLog[]> {
+  return apiClient<import('@app/shared-types').UnifiedSyncLog[]>(
     `/integrations/${integrationId}/sync-history?limit=${limit}&offset=${offset}`,
     {
       method: 'GET',
@@ -97,8 +97,8 @@ export async function getSyncHistory(
 /**
  * Get vendor registry metadata
  */
-export async function getVendorRegistry(): Promise<import('@sally/shared-types').VendorMetadata[]> {
-  return apiClient<import('@sally/shared-types').VendorMetadata[]>('/integrations/vendors', { method: 'GET' });
+export async function getVendorRegistry(): Promise<import('@app/shared-types').VendorMetadata[]> {
+  return apiClient<import('@app/shared-types').VendorMetadata[]>('/integrations/vendors', { method: 'GET' });
 }
 
 /**

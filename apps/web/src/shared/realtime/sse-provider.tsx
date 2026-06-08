@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { SSE_EVENTS, type SseEventType, getSsePayloadSchema } from '@sally/shared-types';
+import { SSE_EVENTS, type SseEventType, getSsePayloadSchema } from '@app/shared-types';
 import { useAuthStore } from '@/features/auth';
 import { captureError } from '@/shared/lib/sentry';
 import { SseBus } from './sse-bus';

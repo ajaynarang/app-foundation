@@ -3,7 +3,7 @@
  *
  * Fast-tier LLM (Haiku). Summarizes a DRAFT driver settlement and reports
  * which anomaly signals tripped. Structured output enforced by
- * SettlementReviewPerceiveSchema in @sally/shared-types.
+ * SettlementReviewPerceiveSchema in @app/shared-types.
  *
  * The anomaly signals are computed deterministically upstream (hydrate) — the
  * LLM is asked to MIRROR them and write a human-readable summary, NOT to

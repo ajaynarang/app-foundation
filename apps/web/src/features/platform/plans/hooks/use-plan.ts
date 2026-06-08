@@ -7,7 +7,7 @@ import { QUERY_TIERS } from '@/shared/config/query-tiers';
 import { queryKeys } from '@/shared/constants';
 import type { TenantPlan } from '../types';
 import { upgradeRegistry } from '../config/upgrade-registry';
-import { isAddOnFeature } from '@sally/shared-types';
+import { isAddOnFeature } from '@app/shared-types';
 
 /**
  * Hook that returns the current tenant's plan details and feature-gating helpers.

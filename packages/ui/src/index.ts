@@ -11,4 +11,4 @@ export {
 } from './lib/toast';
 
 // Components
-export { SallyInsight } from './components/ui/sally-insight';
+export { AppInsight } from './components/ui/sally-insight';

@@ -1,6 +1,6 @@
 import type { ZodSchema } from 'zod';
 
-import type { AgentKey, ConditionsUISpec, Lifecycle, ResponsibilityKey, TrustLevel } from '@sally/shared-types';
+import type { AgentKey, ConditionsUISpec, Lifecycle, ResponsibilityKey, TrustLevel } from '@app/shared-types';
 
 import type { ReinforcementJudge } from '../core/memory/reinforcement.types';
 

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
-import type { SetTenantFactoringDefaultInput } from '@sally/shared-types';
+import type { SetTenantFactoringDefaultInput } from '@app/shared-types';
 
 /**
  * Body for `PATCH /api/v1/tenants/me/factoring-default`. Pass `null` to unpin.

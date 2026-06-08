@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Button } from '@sally/ui/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
+import { Button } from '@app/ui/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { ChevronLeft } from 'lucide-react';
 import { DateRangeFilter } from '@/shared/components/ui/date-range-filter';
 import {

@@ -7,7 +7,7 @@ import { DeskMemoryReinforcer } from '../core/memory/desk-memory-reinforcer.serv
 import { DeskMemoryWriterService } from '../core/memory/desk-memory-writer.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
 
 import { TERMINAL_STATUS_BY_OUTCOME, type DeskOutcome } from './outcomes';
 import type { CloseInput, CloseOutput, SharedHydrateOutput } from './step.types';
@@ -113,7 +113,7 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
     // lists and the handoff counts live (SSE). Best-effort: a failed emit must
     // never break the operational close path.
     await events
-      .emit(SALLY_EVENTS.DESK_EPISODE_CHANGED, episode.tenantId, {
+      .emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, episode.tenantId, {
         tenantId: episode.tenantId,
         episodeId: episode.id,
         status: terminalStatus,

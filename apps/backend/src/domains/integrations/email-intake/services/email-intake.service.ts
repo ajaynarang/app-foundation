@@ -11,7 +11,7 @@ import { ResendInboundService } from './resend-inbound.service';
 import { QUEUE_NAMES, DOCUMENTS_JOB_NAMES } from '../../../../infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '../../../../infrastructure/queue/job-envelope.helper';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 import type { ResendInboundEmailDataDto } from '../dto/resend-inbound-webhook.dto';
 import type { ListEmailThreadsDto } from '../dto/list-email-threads.dto';
 
@@ -151,7 +151,7 @@ export class EmailIntakeService {
     });
 
     // Emit received event
-    await this.events.emit(SALLY_EVENTS.EMAIL_INGEST_RECEIVED, tenantId, {
+    await this.events.emit(DOMAIN_EVENTS.EMAIL_INGEST_RECEIVED, tenantId, {
       entityId: String(thread.id),
       entityType: 'email-ingest',
       threadId: thread.id,

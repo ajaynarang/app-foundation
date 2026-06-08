@@ -2,17 +2,17 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Progress } from '@sally/ui/components/ui/progress';
-import { Separator } from '@sally/ui/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sally/ui/components/ui/collapsible';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Progress } from '@app/ui/components/ui/progress';
+import { Separator } from '@app/ui/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@app/ui/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import {
   AlertTriangle,
   Calendar,
@@ -35,7 +35,7 @@ import {
   Play,
   Plus,
 } from 'lucide-react';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { queryKeys } from '@/shared/constants';
 import { plansApi } from '@/features/platform/plans/api';

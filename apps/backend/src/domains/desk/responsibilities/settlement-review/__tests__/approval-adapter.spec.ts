@@ -1,4 +1,4 @@
-import type { SettlementReview as SettlementReviewTypes } from '@sally/shared-types';
+import type { SettlementReview as SettlementReviewTypes } from '@app/shared-types';
 
 import { buildSettlementReviewApprovalPayload } from '../approval-adapter';
 import type { SettlementReviewHydrateOutput } from '../step.types';

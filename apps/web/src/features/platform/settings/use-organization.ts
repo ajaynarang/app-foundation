@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { showSuccess, showError } from '@sally/ui';
-import type { OrganizationProfile, UpdateOrganizationProfileInput } from '@sally/shared-types';
+import { showSuccess, showError } from '@app/ui';
+import type { OrganizationProfile, UpdateOrganizationProfileInput } from '@app/shared-types';
 
 import { apiClient } from '@/shared/lib/api';
 import { extractErrorMessage } from '@/shared/lib/error-utils';

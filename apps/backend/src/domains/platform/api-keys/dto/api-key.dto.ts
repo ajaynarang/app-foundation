@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { ApiKeyResponse, AgentScope } from '@sally/shared-types';
+import type { ApiKeyResponse, AgentScope } from '@app/shared-types';
 
 export class ApiKeyDto implements ApiKeyResponse {
   @ApiProperty()

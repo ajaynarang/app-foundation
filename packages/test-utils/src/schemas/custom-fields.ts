@@ -1,7 +1,7 @@
 /**
  * API Contracts for Custom Fields endpoints.
  *
- * `@sally/shared-types/fleet/custom-field.schema.ts` exposes
+ * `@app/shared-types/fleet/custom-field.schema.ts` exposes
  * `CustomFieldDefinitionSchema` which is close to the backend response,
  * but differs:
  *

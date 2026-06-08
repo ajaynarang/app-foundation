@@ -1,10 +1,10 @@
 'use client';
 
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
-import { Alert, AlertDescription } from '@sally/ui/components/ui/alert';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
+import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import type { TenantPlan } from '@/features/platform/plans';
 

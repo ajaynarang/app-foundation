@@ -1,7 +1,7 @@
 'use client';
 
 import { X, AlertTriangle } from 'lucide-react';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface OnboardingBannerProps {

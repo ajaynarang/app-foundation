@@ -10,7 +10,7 @@ import { REDIS_CLIENT } from '../cache/redis-client.provider';
  * {@link OPEN_COOLDOWN_SECONDS} before automatically resetting (key TTL).
  *
  * Key prefix is `circuit:` — intentionally NOT `_lock:`. The `_lock:` prefix is
- * reserved for cache-lock keys that `SallyCacheService.flushAll()` wipes, and
+ * reserved for cache-lock keys that `AppCacheService.flushAll()` wipes, and
  * we never want a cache flush to silently re-arm a circuit that is mid-cooldown.
  */
 @Injectable()

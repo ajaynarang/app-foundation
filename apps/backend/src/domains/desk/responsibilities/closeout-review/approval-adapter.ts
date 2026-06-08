@@ -2,7 +2,7 @@ import type {
   ApprovalArtifact,
   ApprovalDecisionHeader,
   CloseoutReview as CloseoutReviewTypes,
-} from '@sally/shared-types';
+} from '@app/shared-types';
 
 import type { CloseoutHydrateOutput } from './step.types';
 

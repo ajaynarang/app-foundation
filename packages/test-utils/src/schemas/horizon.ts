@@ -85,7 +85,7 @@ const SallySuggestionSchema = z
   })
   .strict();
 
-const SallyInsightSchema = z
+const AppInsightSchema = z
   .object({
     message: z.string(),
     suggestions: z.array(SallySuggestionSchema),
@@ -101,7 +101,7 @@ export const HorizonGridSchema = z
     weekEnd: dateOnlyString,
     drivers: z.array(HorizonDriverRowSchema),
     stats: HorizonStatsSchema,
-    sallyInsight: SallyInsightSchema.nullable(),
+    sallyInsight: AppInsightSchema.nullable(),
   })
   .strict();
 export type HorizonGrid = z.infer<typeof HorizonGridSchema>;

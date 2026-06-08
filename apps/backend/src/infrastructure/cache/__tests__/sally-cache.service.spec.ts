@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SallyCacheService } from '../sally-cache.service';
+import { AppCacheService } from '../app-cache.service';
 import { REDIS_CLIENT } from '../redis-client.provider';
 
 const mockRedis = {
@@ -14,8 +14,8 @@ const mockRedis = {
   options: { host: 'localhost', port: 6379, tls: undefined },
 };
 
-describe('SallyCacheService', () => {
-  let service: SallyCacheService;
+describe('AppCacheService', () => {
+  let service: AppCacheService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -23,9 +23,9 @@ describe('SallyCacheService', () => {
     mockRedis.get.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SallyCacheService, { provide: REDIS_CLIENT, useValue: mockRedis }],
+      providers: [AppCacheService, { provide: REDIS_CLIENT, useValue: mockRedis }],
     }).compile();
-    service = module.get<SallyCacheService>(SallyCacheService);
+    service = module.get<AppCacheService>(AppCacheService);
     service.onModuleInit();
   });
 
@@ -43,7 +43,7 @@ describe('SallyCacheService', () => {
     });
 
     it('should unwrap null sentinel to null', async () => {
-      mockRedis.get.mockResolvedValue('__SALLY_NULL__');
+      mockRedis.get.mockResolvedValue('__APP_NULL__');
       const result = await service.get('sally:test:key');
       expect(result).toBeNull();
     });
@@ -74,12 +74,12 @@ describe('SallyCacheService', () => {
 
     it('should store null sentinel for null values', async () => {
       await service.set('sally:test:key', null, 60000);
-      expect(mockRedis.set).toHaveBeenCalledWith('sally:test:key', '__SALLY_NULL__', 'PX', 60000);
+      expect(mockRedis.set).toHaveBeenCalledWith('sally:test:key', '__APP_NULL__', 'PX', 60000);
     });
 
     it('should store null sentinel for undefined values', async () => {
       await service.set('sally:test:key', undefined, 60000);
-      expect(mockRedis.set).toHaveBeenCalledWith('sally:test:key', '__SALLY_NULL__', 'PX', 60000);
+      expect(mockRedis.set).toHaveBeenCalledWith('sally:test:key', '__APP_NULL__', 'PX', 60000);
     });
   });
 

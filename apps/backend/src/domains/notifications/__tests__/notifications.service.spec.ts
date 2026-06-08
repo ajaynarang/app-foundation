@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { InAppNotificationService } from '../notifications.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 
 describe('InAppNotificationService', () => {
   let service: InAppNotificationService;
@@ -24,7 +24,7 @@ describe('InAppNotificationService', () => {
         InAppNotificationService,
         { provide: PrismaService, useValue: prisma },
         {
-          provide: SallyCacheService,
+          provide: AppCacheService,
           useValue: {
             get: jest.fn().mockResolvedValue(null),
             set: jest.fn().mockResolvedValue(undefined),

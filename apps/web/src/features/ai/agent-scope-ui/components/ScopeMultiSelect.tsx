@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES, SCOPE_DESCRIPTIONS } from '@sally/shared-types';
-import type { AgentScope } from '@sally/shared-types';
-import { Button } from '@sally/ui/components/ui/button';
+import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES, SCOPE_DESCRIPTIONS } from '@app/shared-types';
+import type { AgentScope } from '@app/shared-types';
+import { Button } from '@app/ui/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -11,10 +11,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@sally/ui/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@sally/ui/components/ui/popover';
+} from '@app/ui/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@app/ui/components/ui/popover';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
-import { cn } from '@sally/ui';
+import { cn } from '@app/ui';
 import { ScopeChip } from './ScopeChip';
 import { groupScopesByDomain } from '../utils/scope-copy';
 

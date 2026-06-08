@@ -1,5 +1,5 @@
 {
-  "name": "@sally/qa",
+  "name": "@app/qa",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
     "qa:enable-features": "tsx scripts/enable-qa-features.ts"
   },
   "dependencies": {
-    "@sally/test-utils": "workspace:*"
+    "@app/test-utils": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

@@ -7,4 +7,4 @@ export type {
   AiCostVsQuota,
   UpdateAiBudgetInput,
   AiSurface,
-} from '@sally/shared-types';
+} from '@app/shared-types';

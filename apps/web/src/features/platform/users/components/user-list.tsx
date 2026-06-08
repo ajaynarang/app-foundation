@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,10 +16,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import { useAuth } from '@/features/auth';
 import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
 import { UserPlus, Copy } from 'lucide-react';

@@ -1,7 +1,7 @@
 /**
  * API Contracts for Trip endpoints.
  *
- * `@sally/shared-types/fleet/trip.schema.ts` already exports:
+ * `@app/shared-types/fleet/trip.schema.ts` already exports:
  *   - `TripSchema`        (flat trip row)
  *   - `TripDetailSchema`  (`TripSchema.extend({ driverName, …, loads, routePlanId })`)
  *   - `TripListItemSchema` (list-view projection)
@@ -33,7 +33,7 @@
  * it.
  */
 import { z } from 'zod';
-import { TripDetailSchema, TripListItemSchema, TripStatusSchema } from '@sally/shared-types';
+import { TripDetailSchema, TripListItemSchema, TripStatusSchema } from '@app/shared-types';
 
 // ── Re-export shared-types entity schemas (no drift) ────────────────
 

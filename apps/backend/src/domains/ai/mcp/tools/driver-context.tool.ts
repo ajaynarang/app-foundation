@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
-import { AlertStatusSchema, LoadStopStatusSchema, formatLoadLabel } from '@sally/shared-types';
+import { AlertStatusSchema, LoadStopStatusSchema, formatLoadLabel } from '@app/shared-types';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 import { DRIVER_CONVERSATION_USER_MODE } from '../../../fleet/loads/driver-messages.constants';

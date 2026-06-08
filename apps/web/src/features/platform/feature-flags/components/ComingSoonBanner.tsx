@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
 import { Rocket, Clock, Sparkles } from 'lucide-react';
 
 export interface ComingSoonBannerProps {

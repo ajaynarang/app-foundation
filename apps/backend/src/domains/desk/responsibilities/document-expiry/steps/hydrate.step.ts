@@ -1,6 +1,6 @@
 import { DeskEpisodeStepKind, MemoryPolarity, ShieldFindingCategory } from '@prisma/client';
 import { DESK_OUTCOMES } from '../../../shared-steps/outcomes';
-import { DocumentExpiry } from '@sally/shared-types';
+import { DocumentExpiry } from '@app/shared-types';
 
 import { nestApp } from '../../../core/inngest/nest-context';
 import { DeskStepWriter } from '../../../core/episode/desk-step-writer.service';

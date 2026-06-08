@@ -3,7 +3,7 @@
  *
  * Fast-tier LLM (Haiku). Classifies whether a delivered-but-uninvoiced load
  * is billable yet or blocked, and summarizes the gap. Structured output
- * enforced by CloseoutReviewPerceiveSchema in @sally/shared-types.
+ * enforced by CloseoutReviewPerceiveSchema in @app/shared-types.
  *
  * Keep it short — this is a classification call, not reasoning.
  */

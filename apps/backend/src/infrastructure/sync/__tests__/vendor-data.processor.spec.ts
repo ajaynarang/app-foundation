@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { VendorDataJobHandler } from '../vendor-data.processor';
 import { JobService } from '../../queue/job.service';
 import { PrismaService } from '../../database/prisma.service';

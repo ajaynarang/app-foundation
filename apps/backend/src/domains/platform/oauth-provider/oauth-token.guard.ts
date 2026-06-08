@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logge
 import { OAuthProviderService } from './oauth-provider.service';
 import { fromOAuthUser } from '../../ai/agent-contract/agent-principal';
 import type { AgentPrincipal } from '../../ai/agent-contract/agent-principal';
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 export interface OAuthUser {
   userId: string;

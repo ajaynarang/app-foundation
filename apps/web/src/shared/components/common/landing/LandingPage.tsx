@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Button } from '@sally/ui/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import { ScrollReveal } from './ScrollReveal';
 import { HeroRouteBackground } from './AnimatedRoute';
 import { ROICalculator } from './ROICalculator';

@@ -15,7 +15,7 @@ console.log(
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   pageExtensions: ['ts', 'tsx', 'md', 'mdx'],
-  transpilePackages: ['@sally/ui'],
+  transpilePackages: ['@app/ui'],
 };
 
 const withMDX = createMDX({

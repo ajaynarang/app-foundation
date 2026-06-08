@@ -7,7 +7,7 @@ import { LoadsService } from '../../../fleet/loads/services/loads.service';
 import { ListEmailThreadsDto } from '../dto/list-email-threads.dto';
 import { ConfirmEmailLoadDto } from '../dto/confirm-email-load.dto';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { SALLY_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
 
 @ApiTags('Email Intake')
 @Controller('integrations/email-intake')
@@ -133,7 +133,7 @@ export class EmailIntakeController {
     await this.emailIntakeService.linkLoadToThread(threadId, load.loadNumber);
 
     // Emit confirmed event
-    await this.events.emit(SALLY_EVENTS.EMAIL_INGEST_CONFIRMED, tenantId, {
+    await this.events.emit(DOMAIN_EVENTS.EMAIL_INGEST_CONFIRMED, tenantId, {
       entityId: String(threadId),
       entityType: 'email-ingest',
       threadId,

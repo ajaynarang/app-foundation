@@ -2,10 +2,10 @@
 
 import { CheckCircle2, Circle, Lock, Unlock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { cn } from '@sally/ui';
+import { Card, CardContent, CardHeader } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { cn } from '@app/ui';
 import { useRouter } from 'next/navigation';
 import { openConsole } from '@/shared/lib/console-url';
 import type { MilestoneStatus, OnboardingItem } from '../types';

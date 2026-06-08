@@ -1,7 +1,7 @@
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { OAuthClientsService } from '../oauth-clients.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 
 jest.mock('nanoid', () => ({
@@ -50,7 +50,7 @@ describe('OAuthClientsService', () => {
 
     service = new OAuthClientsService(
       prisma as unknown as PrismaService,
-      cache as unknown as SallyCacheService,
+      cache as unknown as AppCacheService,
       events as unknown as DomainEventService,
     );
   });

@@ -1,5 +1,5 @@
 import { DeskEpisodeStepKind } from '@prisma/client';
-import { DocumentExpiry } from '@sally/shared-types';
+import { DocumentExpiry } from '@app/shared-types';
 
 import { PromptingService } from '../../../../prompting/prompting.service';
 import { StructuredOutputService } from '../../../../ai/infrastructure/providers/structured-output.service';

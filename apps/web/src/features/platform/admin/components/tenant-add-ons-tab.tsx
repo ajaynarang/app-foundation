@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Button } from '@sally/ui/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Button } from '@app/ui/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +15,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@sally/ui/components/ui/alert-dialog';
+} from '@app/ui/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -23,14 +23,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@sally/ui/components/ui/dialog';
-import { Input } from '@sally/ui/components/ui/input';
-import { Label } from '@sally/ui/components/ui/label';
-import { Textarea } from '@sally/ui/components/ui/textarea';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@sally/ui/components/ui/collapsible';
+} from '@app/ui/components/ui/dialog';
+import { Input } from '@app/ui/components/ui/input';
+import { Label } from '@app/ui/components/ui/label';
+import { Textarea } from '@app/ui/components/ui/textarea';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@app/ui/components/ui/collapsible';
 import { Check, ChevronDown, Clock, ExternalLink, Puzzle, X } from 'lucide-react';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
 import { adminAddOnsApi } from '../api';

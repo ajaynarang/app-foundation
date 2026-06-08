@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { FeatureFlagsService } from '../feature-flags.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { SallyCacheService } from '../../../../infrastructure/cache/sally-cache.service';
+import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 
 describe('FeatureFlagsService', () => {
@@ -37,7 +37,7 @@ describe('FeatureFlagsService', () => {
 
     service = new FeatureFlagsService(
       prisma as unknown as PrismaService,
-      cache as unknown as SallyCacheService,
+      cache as unknown as AppCacheService,
       eventEmitter as unknown as DomainEventService,
     );
   });

@@ -1,4 +1,4 @@
-import type { AgentScope } from '@sally/shared-types';
+import type { AgentScope } from '@app/shared-types';
 
 /**
  * Tool names that are permanently excluded from MCP / external agent exposure.

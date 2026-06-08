@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@sally/ui/components/ui/table';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import type { DeveloperScopeEntry } from '../api';
 
 export interface ScopesTableProps {

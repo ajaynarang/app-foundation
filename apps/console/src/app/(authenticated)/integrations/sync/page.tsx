@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@sally/ui/components/ui/card';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@sally/ui/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sally/ui/components/ui/select';
+import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
+import { Badge } from '@app/ui/components/ui/badge';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@app/ui/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { useSyncHistory, useIntegrations } from '../../../../hooks/use-integrations';
 import { ConsoleFeatureGuard } from '@/components/feature-guard';
 

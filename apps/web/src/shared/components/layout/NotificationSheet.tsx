@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Settings, Users, DollarSign, Check, CheckCheck, ChevronDown, ChevronRight, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sally/ui/components/ui/sheet';
-import { Button } from '@sally/ui/components/ui/button';
-import { Badge } from '@sally/ui/components/ui/badge';
-import { ScrollArea } from '@sally/ui/components/ui/scroll-area';
-import { Tabs, TabsList, TabsTrigger } from '@sally/ui/components/ui/tabs';
-import { Skeleton } from '@sally/ui/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
+import { Button } from '@app/ui/components/ui/button';
+import { Badge } from '@app/ui/components/ui/badge';
+import { ScrollArea } from '@app/ui/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger } from '@app/ui/components/ui/tabs';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import {
   useNotifications,
   useNotificationCount,
@@ -18,7 +18,7 @@ import {
   useMarkAsUnread,
 } from '@/features/operations/notifications';
 import type { Notification } from '@/features/operations/notifications/types';
-import { showSuccess, showError } from '@sally/ui';
+import { showSuccess, showError } from '@app/ui';
 import { openConsole } from '@/shared/lib/console-url';
 
 interface NotificationSheetProps {

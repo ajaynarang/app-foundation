@@ -101,7 +101,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('sally:font-size-scale');if(s){document.documentElement.style.fontSize=(13*Number(s)/100)+'px'}}catch(e){}})()`,
+            __html: `(function(){try{var s=localStorage.getItem('app:font-size-scale');if(s){document.documentElement.style.fontSize=(13*Number(s)/100)+'px'}}catch(e){}})()`,
           }}
         />
       </head>

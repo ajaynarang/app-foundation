@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { JobEnvelope } from '@sally/shared-types';
+import type { JobEnvelope } from '@app/shared-types';
 import { OAuthRefreshJobHandler } from '../oauth-refresh.processor';
 import { AuthTokenService } from '../auth-token.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
