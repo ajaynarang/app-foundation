@@ -1,4 +1,4 @@
-# Contributing to SALLY
+# Contributing to app-foundation
 
 ## Contributor Agreement & IP Assignment
 

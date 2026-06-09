@@ -1,4 +1,4 @@
-name: "Quality Gate"
+name: 'Quality Gate'
 
 # Manual-dispatch only. No PR/push/schedule triggers in this round.
 # Click "Run workflow" in GitHub Actions to trigger.
@@ -6,21 +6,21 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "API base URL"
+        description: 'API base URL'
         required: true
-        default: "https://sally-api-staging.appshore.in/api/v1"
+        default: 'https://api-staging.example.com/api/v1'
       web_target:
-        description: "Frontend base URL (browser tests)"
+        description: 'Frontend base URL (browser tests)'
         required: true
-        default: "https://staging.sally.appshore.in"
+        default: 'https://staging.example.com'
       tenant:
-        description: "Tenant ID to test against"
+        description: 'Tenant ID to test against'
         required: true
       suite:
-        description: "Test suite to run"
+        description: 'Test suite to run'
         required: true
         type: choice
-        default: "all"
+        default: 'all'
         options:
           - all
           - unit
@@ -134,7 +134,7 @@ jobs:
       - name: Validate DEV_AUTH_SECRET present
         run: |
           if [ -z "$DEV_AUTH_SECRET" ]; then
-            echo "::error::DEV_AUTH_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions (match the value in Doppler sally-backend/stg or /qa)."
+            echo "::error::DEV_AUTH_SECRET repo secret is not set. Add it in Settings → Secrets and variables → Actions (match the value in Doppler app-backend/stg or /qa)."
             exit 1
           fi
 
@@ -187,7 +187,7 @@ jobs:
         if: always()
         working-directory: tests
         run: |
-          echo "## SALLY Confidence Matrix" >> $GITHUB_STEP_SUMMARY
+          echo "## Confidence Matrix" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Suite:** ${{ inputs.suite }} | **Target:** ${{ env.API_BASE_URL }} | **Tenant:** ${{ env.TENANT_ID }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

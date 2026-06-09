@@ -155,7 +155,7 @@ services:
   #   command: pnpm run dev
 
   # ─────────────────────────────────────────────────────────────
-  # Inngest dev server — durable workflow engine for Sally's Desk
+  # Inngest dev server — durable workflow engine for the Desk workflow engine
   # UI: http://localhost:8288
   #
   # Points at the backend running on the host via host.docker.internal.

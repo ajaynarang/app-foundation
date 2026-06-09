@@ -1,80 +1,102 @@
-# SALLY - Your Fleet Operations Assistant
+# app-foundation
 
-SALLY is an intelligent fleet operations platform that optimizes route planning, ensures HOS compliance, and keeps dispatchers informed with proactive alerts.
+A **domain-free, full-stack platform starter**. Clone it, drop in your business domain, and you
+start with authentication, multi-tenancy, billing, a working AI assistant, background jobs,
+observability, and cloud infrastructure already built and wired together.
 
-## What SALLY Does
+It runs **multi-tenant** (the default) or **single-tenant** from the _same codebase_ — flip one
+environment variable.
 
-- **SALLY AI** - Conversational AI assistant for fleet operations — ask questions, get insights, and manage routes through natural language
-- **Route Planning** - Optimized stop sequencing with TSP/VRP algorithms
-- **HOS Compliance** - Automatic rest stop insertion where regulations require
-- **Fuel Optimization** - Smart fuel stop placement based on range and pricing
-- **Continuous Monitoring** - 14 trigger types monitored 24/7 with dynamic re-planning
-- **Dispatcher Alerts** - Proactive notifications for HOS violations, delays, and driver events
+> This is a template. Use GitHub's **"Use this template"** button (or fork) to start a new app.
 
-## Tech Stack
+---
 
-| Layer | Technologies |
-|-------|-------------|
-| **Backend** | NestJS 11, TypeScript 5.9, PostgreSQL 16, Redis 7, Prisma 7.3 |
-| **Frontend** | Next.js 15 (App Router), TypeScript, Zustand, React Query, Tailwind CSS, Shadcn/ui |
-| **Infrastructure** | Docker, Turborepo, pnpm |
+## What you get for free
 
-## Getting Started
+| Capability           | Included                                                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth**             | JWT + refresh tokens, Firebase exchange, phone PIN/OTP, login-event tracking, OAuth provider                                                                                      |
+| **Multi-tenancy**    | Tenant-scoped data, global guard chain, subdomain resolution — toggle to single-tenant with one env var                                                                           |
+| **AI**               | Streaming chat assistant (Mastra + AI SDK + Anthropic), Langfuse tracing, moderation, per-tenant AI budgets, human-in-the-loop, and an **empty MCP toolset** ready for your tools |
+| **Billing**          | Stripe subscriptions, wallet, plan entitlements, add-ons                                                                                                                          |
+| **Jobs & workflows** | BullMQ queues, Inngest "Desk" durable workflow engine (empty registry)                                                                                                            |
+| **Realtime**         | Server-Sent Events bus with per-tenant/user routing                                                                                                                               |
+| **Storage & comms**  | S3 file storage, email, SMS, web push                                                                                                                                             |
+| **Observability**    | OpenTelemetry, pino logging, Loki + Tempo + Grafana                                                                                                                               |
+| **Infra**            | Docker Compose (dev), Terraform for AWS (ECS, RDS, ElastiCache, S3, ALB, CloudWatch)                                                                                              |
+| **DX**               | Turborepo, pnpm workspaces, shared Zod types with Prisma-enum codegen, architecture fitness tests, CI workflows                                                                   |
+
+There is **no business domain** — that's the point. You add yours.
+
+---
+
+## Quick start
 
 ```bash
-# Clone and install
-git clone <repository-url>
-cd sally
+# 1. Infra (Postgres+pgvector on :5499, Redis on :6399)
+docker compose up -d postgres redis
+
+# 2. Install + build shared types
 pnpm install
+pnpm --filter @app/shared-types build
 
-# Run with Docker (recommended)
-pnpm run docker:up
+# 3. Configure backend secrets
+cd apps/backend && cp .env.example .env
+#    set DATABASE_URL=postgresql://postgres:postgres@localhost:5499/app?schema=public
+#    set ANTHROPIC_API_KEY=... (for the AI assistant)
 
-# Or run with Turborepo
-pnpm run dev
+# 4. Migrate + seed
+pnpm prisma:migrate:deploy && pnpm db:seed
+
+# 5. Run everything (backend :8000, web :3000, console :3002)
+cd ../.. && pnpm dev
 ```
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
+---
 
-## Staging URL
-[https:/sally.staging.appshore.in](https://staging.sally.appshore.in/)
+## Multi-tenant vs single-tenant
 
-## Documentation
+The same code runs either way — choose at boot:
 
-Full internal developer documentation, architecture guides:
-**[https://app-shore.github.io/sally/](https://app-shore.github.io/sally)**
+|                   | Multi-tenant (default)          | Single-tenant                                 |
+| ----------------- | ------------------------------- | --------------------------------------------- |
+| Backend env       | `MULTI_TENANT=true`             | `MULTI_TENANT=false` + `IMPLICIT_TENANT_ID=1` |
+| Web env           | `NEXT_PUBLIC_MULTI_TENANT=true` | `NEXT_PUBLIC_MULTI_TENANT=false`              |
+| Tenant resolution | from subdomain                  | one implicit tenant, no subdomain             |
+| Login             | tenant-scoped                   | plain origin                                  |
+| Self-registration | enabled                         | hidden                                        |
 
-Partner/Build with sally documentation are available at:
-**[https://build.staging.sally.appshore.in](https://build.staging.sally.appshore.in/)**
+Tenant data isolation works identically in both modes (every query is tenant-scoped; single-tenant
+just resolves to the one implicit tenant). No query rewrites — only guard/strategy short-circuits.
 
+---
 
-## Project Structure
+## Where you plug in your domain
+
+| To add…                  | Do this                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| A backend domain         | New module under `apps/backend/src/domains/<domain>/` + models in `prisma/schema.prisma` |
+| A frontend feature       | New folder under `apps/web/src/features/<domain>/`                                       |
+| AI tools                 | Register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`      |
+| Workflow automation      | Add to the registry in `apps/backend/src/domains/desk/responsibilities/`                 |
+| An integration connector | Add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`                     |
+| AI knowledge             | Drop Markdown in `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`       |
+
+---
+
+## Structure
 
 ```
-sally/
-├── apps/
-│   ├── backend/       # NestJS API server
-│   ├── web/           # Next.js dashboard
-│   └── console/       # SALLY Console — platform management & API docs
-├── packages/
-│   ├── ui/            # Shared Shadcn UI components (@sally/ui)
-│   └── shared-types/  # Shared Zod schemas
-├── docker-compose.yml
-├── turbo.json
-└── package.json
+apps/{backend,web,console}   packages/{ui,shared-types,test-utils}
+infra/{terraform,observability}   tests/   docker-compose.yml
 ```
 
-## Contributing
+See [`CLAUDE.md`](./CLAUDE.md) for conventions and the full domain map, and
+[`docs/superpowers/specs/`](./docs/superpowers/specs/) for the design spec and the platform/domain
+seam report this starter was built from.
 
-Contributions to this repository are subject to the Appshore LLP Contributor Agreement and IP assignment. By submitting a pull request or otherwise contributing code, you agree that all intellectual property rights in your contributions are assigned to Appshore LLP. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+---
 
 ## License
 
-Copyright (c) 2024-2026 Appshore LLP. All rights reserved.
-
-This software is proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software, via any medium, is strictly prohibited without the express written permission of Appshore LLP.
-
-See [LICENSE](LICENSE) for the full license text.
+MIT
