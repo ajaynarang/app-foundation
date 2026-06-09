@@ -32,3 +32,4 @@ firebase-admin-sdk.json
 .vercel
 playwright-report/
 test-results/
+.screenshots/
