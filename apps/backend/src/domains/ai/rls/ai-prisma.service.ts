@@ -17,10 +17,7 @@ export class AiPrismaService {
       // Set tenant context (transaction-scoped via set_config with is_local=true)
       await tx.$executeRaw`SELECT set_config('app.current_tenant_id', ${String(tenantId)}, true)`;
       await tx.$executeRaw`SELECT set_config('app.current_user_role', ${role}, true)`;
-
-      if (role === 'driver') {
-        await tx.$executeRaw`SELECT set_config('app.current_driver_id', ${String(userId)}, true)`;
-      }
+      await tx.$executeRaw`SELECT set_config('app.current_user_id', ${String(userId)}, true)`;
 
       // Switch to ai_reader role so RLS policies are enforced.
       // The default Prisma connection role (table owner) bypasses RLS.

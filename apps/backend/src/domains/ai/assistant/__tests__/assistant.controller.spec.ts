@@ -31,7 +31,7 @@ describe('AssistantAiController', () => {
     mockService = {
       createConversation: jest.fn().mockResolvedValue({
         conversationId: 'conv_1',
-        userMode: 'dispatcher',
+        userMode: 'owner',
         greeting: { messageId: 'msg_1', role: 'assistant', content: 'Hi' },
       }),
       streamMessage: jest.fn().mockResolvedValue(undefined),
@@ -61,8 +61,8 @@ describe('AssistantAiController', () => {
   describe('createConversation', () => {
     it('delegates to service with user context', async () => {
       const user = { userId: 'user_1', tenantDbId: 1 };
-      await controller.createConversation(user, { userMode: 'dispatcher' });
-      expect(mockService.createConversation).toHaveBeenCalledWith('user_1', 1, 'dispatcher');
+      await controller.createConversation(user, { userMode: 'owner' });
+      expect(mockService.createConversation).toHaveBeenCalledWith('user_1', 1, 'owner');
     });
   });
 
@@ -107,7 +107,7 @@ describe('AssistantAiController', () => {
 
   describe('getAgentStatuses', () => {
     it('returns status of agents for persona', async () => {
-      const user = { userId: 'user_1', tenantDbId: 1, userMode: 'dispatcher' };
+      const user = { userId: 'user_1', tenantDbId: 1, userMode: 'owner' };
       const result = await controller.getAgentStatuses(user);
       expect(result.agents).toHaveLength(1);
       expect(result.agents[0]).toEqual(

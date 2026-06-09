@@ -72,12 +72,7 @@ export class ModerationService {
       return { blocked: true, events };
     }
 
-    let piiAction: 'pass' | 'flag';
-    if (persona === 'prospect') {
-      piiAction = 'pass';
-    } else {
-      piiAction = piiResult.detected ? 'flag' : 'pass';
-    }
+    const piiAction: 'pass' | 'flag' = piiResult.detected ? 'flag' : 'pass';
     events.push({
       guard: 'pii',
       result: piiAction,

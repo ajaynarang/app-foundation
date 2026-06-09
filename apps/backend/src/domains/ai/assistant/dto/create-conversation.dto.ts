@@ -1,7 +1,8 @@
 import { IsNotEmpty, IsIn } from 'class-validator';
+import type { UserMode } from '../../agents/agent.types';
 
 export class CreateConversationDto {
   @IsNotEmpty()
-  @IsIn(['prospect', 'dispatcher', 'driver', 'owner', 'admin', 'super_admin', 'support'])
-  userMode: string;
+  @IsIn(['owner', 'admin', 'member', 'super_admin'])
+  userMode: UserMode;
 }
