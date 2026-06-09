@@ -9,30 +9,17 @@ import type { NextRequest } from 'next/server';
 // Note: this list is intentionally a superset of protectedRoutePatterns in
 // navigation.ts — /onboarding and /super-admin are protected here but not
 // surfaced in the nav config because they are not sidebar destinations.
-const PROTECTED_PREFIXES = [
-  '/dispatcher',
-  '/driver',
-  '/admin',
-  '/customer',
-  '/settings',
-  '/onboarding',
-  '/setup-hub',
-  '/notifications',
-  '/super-admin',
-];
+const PROTECTED_PREFIXES = ['/settings', '/onboarding', '/notifications'];
 
 // Routes that are always public
 const PUBLIC_PREFIXES = [
   '/login',
   '/register',
-  '/track',
-  '/pricing',
-  '/product',
+  '/forgot-password',
+  '/reset-password',
   '/accept-invitation',
-  '/assistant-canvas',
-  '/assistant-nerve',
-  '/assistant-default',
-  '/rest-optimizer',
+  '/oauth',
+  '/maintenance',
   '/_next',
   '/api',
   '/favicon',
@@ -98,32 +85,21 @@ const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost:3000';
 // Role constants — duplicated from @app/shared-types because middleware
 // runs on Edge Runtime where workspace package imports are unreliable.
 const ROLES = {
-  DISPATCHER: 'DISPATCHER',
-  DRIVER: 'DRIVER',
+  MEMBER: 'MEMBER',
   ADMIN: 'ADMIN',
   OWNER: 'OWNER',
-  CUSTOMER: 'CUSTOMER',
   SUPER_ADMIN: 'SUPER_ADMIN',
 } as const;
 
-const FLEET_MGMT_ROLES = [ROLES.DISPATCHER, ROLES.ADMIN, ROLES.OWNER];
-
 const ROUTE_ROLE_MAP: Record<string, string[]> = {
-  '/dispatcher': FLEET_MGMT_ROLES,
-  '/driver': [ROLES.DRIVER],
-  '/customer': [ROLES.CUSTOMER],
-  '/super-admin': [ROLES.SUPER_ADMIN],
-  '/admin': [ROLES.SUPER_ADMIN],
-  // /settings, /onboarding, /setup-hub, /notifications — accessible to all authenticated roles
+  // /settings, /onboarding, /notifications — accessible to all authenticated roles
 };
 
 const ROLE_DEFAULT_ROUTES: Record<string, string> = {
-  [ROLES.DISPATCHER]: '/dispatcher',
-  [ROLES.ADMIN]: '/dispatcher',
-  [ROLES.OWNER]: '/dispatcher',
-  [ROLES.DRIVER]: '/driver/home',
-  [ROLES.CUSTOMER]: '/customer/dashboard',
-  [ROLES.SUPER_ADMIN]: '/admin/tenants',
+  [ROLES.MEMBER]: '/settings',
+  [ROLES.ADMIN]: '/settings',
+  [ROLES.OWNER]: '/settings',
+  [ROLES.SUPER_ADMIN]: '/settings',
 };
 
 function isPublicRoute(pathname: string): boolean {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePaletteStore } from '@/shared/components/command-palette/CommandPalette';
 
 const CHORD_WINDOW_MS = 1000;
-const HOME_HREF = '/dispatcher';
+const HOME_HREF = '/settings';
 
 /**
  * Global keyboard shortcuts for the authenticated app shell.

@@ -58,7 +58,7 @@ export function OnboardingWidget({ status }: OnboardingWidgetProps) {
           </div>
         )}
 
-        <Button onClick={() => router.push('/setup-hub')} className="w-full" variant="outline">
+        <Button onClick={() => router.push('/onboarding')} className="w-full" variant="outline">
           Continue Setup →
         </Button>
       </CardContent>

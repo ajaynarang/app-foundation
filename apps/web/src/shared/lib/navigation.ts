@@ -30,8 +30,7 @@ import {
 export const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';
 
 /**
- * Generic platform roles. The trucking-specific DISPATCHER / DRIVER / CUSTOMER
- * roles were removed; tenant members map to MEMBER.
+ * Generic platform roles. Tenant members map to MEMBER.
  */
 export type UserRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'SUPER_ADMIN';
 

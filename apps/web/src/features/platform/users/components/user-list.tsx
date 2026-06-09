@@ -35,10 +35,8 @@ const getRoleBadgeVariant = (role: string) => {
     case 'OWNER':
     case 'ADMIN':
       return 'default' as const;
-    case 'DISPATCHER':
+    case 'MEMBER':
       return 'muted' as const;
-    case 'DRIVER':
-      return 'outline' as const;
     default:
       return 'muted' as const;
   }
@@ -231,11 +229,9 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
     }
   };
 
-  // Filter users by role
+  // All team members
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const staffUsers = users?.filter((u: any) => u.role !== 'DRIVER') || [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const driverUsers = users?.filter((u: any) => u.role === 'DRIVER') || [];
+  const staffUsers = (users as any[]) || [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pendingInvitations = invitations?.filter((i: any) => i.status === 'PENDING') || [];
 
@@ -257,9 +253,6 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
           <TabsList>
             <TabsTrigger value="staff" className="text-xs sm:text-sm">
               Staff ({staffUsers.length})
-            </TabsTrigger>
-            <TabsTrigger value="drivers" className="text-xs sm:text-sm">
-              Drivers ({driverUsers.length})
             </TabsTrigger>
             <TabsTrigger value="invitations" className="text-xs sm:text-sm">
               <span className="hidden sm:inline">Invitations</span>
@@ -354,90 +347,6 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </TabsContent>
-
-          {/* Drivers Tab */}
-          <TabsContent value="drivers" className="mt-4">
-            {usersLoading ? (
-              <div className="text-muted-foreground">Loading drivers...</div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="hidden sm:table-cell">Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="hidden md:table-cell">Last Login</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {driverUsers.map((user: any) => {
-                        const isCurrentUser = user.userId === currentUser?.userId;
-                        const canManage = currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN';
-                        const userName = `${user.firstName} ${user.lastName}`;
-                        return (
-                          <TableRow key={user.userId}>
-                            <TableCell className="font-medium">
-                              {userName}
-                              <div className="sm:hidden text-xs text-muted-foreground font-normal">{user.email}</div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                            <TableCell>
-                              <Badge variant={user.isActive ? 'default' : 'muted'}>
-                                {user.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              {user.lastLoginAt ? formatTimestamp(user.lastLoginAt, DISPLAY_FORMATS.FRIENDLY) : 'Never'}
-                            </TableCell>
-                            <TableCell>
-                              {canManage && (
-                                <div className="flex gap-1 sm:gap-2">
-                                  <a href="/dispatcher/fleet" rel="noopener noreferrer">
-                                    <Button size="sm" variant="outline">
-                                      <span className="hidden sm:inline">View in Fleet</span>
-                                      <span className="sm:hidden">Fleet</span>
-                                    </Button>
-                                  </a>
-                                  {user.isActive && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDeactivateUser(user.userId, userName)}
-                                      loading={deactivateUserMutation.isPending}
-                                      disabled={isCurrentUser}
-                                    >
-                                      Deactivate
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {driverUsers.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No driver accounts yet
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                <p className="text-sm text-muted-foreground mt-4">
-                  To invite more drivers, go to{' '}
-                  <a href="/dispatcher/fleet" className="underline hover:text-foreground">
-                    Fleet Management
-                  </a>
-                </p>
-              </>
             )}
           </TabsContent>
 

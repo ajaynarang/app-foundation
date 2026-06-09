@@ -343,9 +343,7 @@ function AccountCard() {
   const roleLabel: Record<string, string> = {
     OWNER: 'Owner',
     ADMIN: 'Admin',
-    DISPATCHER: 'Dispatcher',
-    DRIVER: 'Driver',
-    CUSTOMER: 'Customer',
+    MEMBER: 'Member',
     SUPER_ADMIN: 'Super Admin',
   };
 

@@ -27,7 +27,7 @@ const inviteSchema = z.object({
   email: z.string().email('Please enter a valid email address').optional().or(z.literal('')),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  role: z.enum(['ADMIN', 'DISPATCHER']),
+  role: z.enum(['ADMIN', 'MEMBER']),
 });
 
 type InviteFormData = z.infer<typeof inviteSchema>;
@@ -128,7 +128,7 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
                 </SelectTrigger>
                 <SelectContent>
                   {isOwner && <SelectItem value="ADMIN">Admin</SelectItem>}
-                  <SelectItem value="DISPATCHER">Dispatcher</SelectItem>
+                  <SelectItem value="MEMBER">Member</SelectItem>
                 </SelectContent>
               </Select>
               {errors.role && <p className="text-sm text-red-500 dark:text-red-400 mt-1">{errors.role.message}</p>}

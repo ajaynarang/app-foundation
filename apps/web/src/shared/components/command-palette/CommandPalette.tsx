@@ -57,7 +57,7 @@ export function CommandPalette() {
       setOpen(false);
       setQuery('');
       if (isGated) {
-        router.push('/dispatcher/add-ons');
+        router.push('/settings/subscription');
       } else {
         onSelect();
       }

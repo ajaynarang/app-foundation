@@ -40,12 +40,9 @@ export const STORAGE_KEYS = {
   COOKIE_CONSENT: 'app-cookie-consent',
 
   /** Command palette recent commands (suffixed with role).
-   *  v2: prior versions collapsed all /dispatcher/* visits into Home. */
+   *  v2: prior versions collapsed all app-route visits into Home. */
   CMD_PALETTE_RECENTS_PREFIX: 'app:cmd-palette:recents:v2',
   cmdPaletteRecents: (role: string) => `app:cmd-palette:recents:v2:${role.toLowerCase()}` as const,
-
-  /** Driver onboarding completion flag */
-  DRIVER_ONBOARDING_COMPLETE: 'driver_onboarding_complete',
 
   /** Sheet pinned state */
   SHEET_PINNED: 'sheet-pinned-default',

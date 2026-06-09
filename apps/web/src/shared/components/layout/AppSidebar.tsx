@@ -281,7 +281,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                           ? pathname?.startsWith(settingsPrefix)
                           : pathname === navItem.href || pathname?.startsWith(navItem.href + '/');
                     const Icon = navItem.icon;
-                    const isSetupHub = navItem.href === '/setup-hub';
+                    const isSetupHub = navItem.href === '/onboarding';
                     const showSetupBadge = isSetupHub && (user?.role === 'OWNER' || user?.role === 'ADMIN');
                     const navBadge = getNavItemBadge(navItem);
                     const isGated = (() => {

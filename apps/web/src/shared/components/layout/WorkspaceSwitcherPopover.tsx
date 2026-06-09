@@ -21,8 +21,8 @@ interface WorkspaceSwitcherPopoverProps {
   onExpand: () => void;
 }
 
-const SETUP_HUB_HREF = '/setup-hub';
-const ADD_ONS_HREF = '/dispatcher/add-ons';
+const SETUP_HUB_HREF = '/onboarding';
+const ADD_ONS_HREF = '/settings/subscription';
 
 /**
  * Bottom-rail row shown above the profile row for OWNER and ADMIN.

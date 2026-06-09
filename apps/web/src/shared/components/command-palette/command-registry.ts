@@ -120,30 +120,30 @@ export const quickActionsProvider: PaletteProvider = (ctx, _query) => {
 
   const actions: PaletteItem[] = [];
 
-  // Create Load — available to dispatcher-like roles
-  if (['DISPATCHER', 'ADMIN', 'OWNER'].includes(role)) {
+  // Invite Member — available to admins
+  if (['ADMIN', 'OWNER'].includes(role)) {
     actions.push({
-      id: 'action:create-load',
-      label: 'Create Load',
-      description: 'Create a new load',
+      id: 'action:invite-member',
+      label: 'Invite Member',
+      description: 'Invite someone to your workspace',
       icon: Plus,
       kind: 'action',
-      keywords: ['create', 'load', 'new', 'add'],
-      onSelect: () => router.push('/dispatcher/loads?action=create'),
+      keywords: ['invite', 'member', 'user', 'add', 'team'],
+      onSelect: () => router.push('/settings/members'),
       priority: -10,
     });
   }
 
-  // Generate Invoice — available to dispatcher-like roles
-  if (['DISPATCHER', 'ADMIN', 'OWNER'].includes(role)) {
+  // Billing — available to admins
+  if (['ADMIN', 'OWNER'].includes(role)) {
     actions.push({
-      id: 'action:generate-invoice',
-      label: 'Generate Invoice',
-      description: 'Generate an invoice for a load',
+      id: 'action:billing',
+      label: 'Billing & Plans',
+      description: 'Manage your subscription and usage',
       icon: FileText,
       kind: 'action',
-      keywords: ['generate', 'invoice', 'billing', 'create'],
-      onSelect: () => router.push('/dispatcher/billing?action=generate'),
+      keywords: ['billing', 'plan', 'subscription', 'usage'],
+      onSelect: () => router.push('/settings/billing'),
       priority: -5,
     });
   }

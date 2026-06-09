@@ -12,7 +12,7 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  if (pathname === '/setup-hub') {
+  if (pathname === '/onboarding') {
     return null;
   }
 
@@ -29,7 +29,7 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => router.push('/setup-hub')}
+            onClick={() => router.push('/onboarding')}
             className="border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
           >
             Complete Setup

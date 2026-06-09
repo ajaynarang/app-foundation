@@ -11,7 +11,7 @@ import { mailto } from '@/shared/lib/contacts';
  * When payment_system is ON: links to the self-service subscription page.
  * When payment_system is OFF: links to a mailto (manual/sales-led flow).
  *
- * Only ADMIN and OWNER can manage billing. DISPATCHER/DRIVER see a
+ * Only ADMIN and OWNER can manage billing. Other members see a
  * "Contact your admin" message instead of upgrade CTAs.
  */
 export function useUpgradeUrl() {

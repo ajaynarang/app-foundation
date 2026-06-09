@@ -16,27 +16,21 @@ import { cn } from '@app/ui';
 const ROLE_BADGE_VARIANT: Record<string, 'default' | 'muted' | 'outline'> = {
   OWNER: 'default',
   ADMIN: 'default',
-  DISPATCHER: 'muted',
-  DRIVER: 'outline',
-  CUSTOMER: 'outline',
+  MEMBER: 'muted',
   SUPER_ADMIN: 'default',
 };
 
 const ROLE_ABBREV: Record<string, string> = {
   OWNER: 'OWNR',
   ADMIN: 'ADMN',
-  DISPATCHER: 'DISP',
-  DRIVER: 'DRIV',
-  CUSTOMER: 'CUST',
+  MEMBER: 'MEMB',
   SUPER_ADMIN: 'S.AD',
 };
 
 const ROLE_COLOR: Record<string, string> = {
   OWNER: 'bg-amber-600',
   ADMIN: 'bg-blue-600',
-  DISPATCHER: 'bg-emerald-600',
-  DRIVER: 'bg-purple-600',
-  CUSTOMER: 'bg-cyan-600',
+  MEMBER: 'bg-emerald-600',
   SUPER_ADMIN: 'bg-red-600',
 };
 

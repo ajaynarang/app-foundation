@@ -25,7 +25,9 @@ export interface RecentItem {
   href: string;
   label: string;
   iconName: string; // Lucide icon name — serializable to localStorage
-  type: 'page' | 'load' | 'invoice' | 'driver' | 'vehicle' | 'customer' | 'settlement';
+  // 'page' for nav destinations; add your own entity types alongside the
+  // ENTITY_PATTERNS you register below.
+  type: 'page' | (string & {});
   timestamp: number;
 }
 
@@ -67,14 +69,10 @@ interface EntityPattern {
   iconName: string;
 }
 
-const ENTITY_PATTERNS: EntityPattern[] = [
-  { pattern: /\/loads\/([^/]+)$/, type: 'load', labelPrefix: 'Load #', iconName: 'ClipboardList' },
-  { pattern: /\/fleet\/drivers\/([^/]+)$/, type: 'driver', labelPrefix: 'Driver #', iconName: 'User' },
-  { pattern: /\/fleet\/vehicles\/([^/]+)$/, type: 'vehicle', labelPrefix: 'Vehicle #', iconName: 'Truck' },
-  { pattern: /\/fleet\/customers\/([^/]+)$/, type: 'customer', labelPrefix: 'Customer #', iconName: 'Users' },
-  { pattern: /\/billing\/([^/]+)$/, type: 'invoice', labelPrefix: 'Invoice #', iconName: 'Receipt' },
-  { pattern: /\/pay\/([^/]+)$/, type: 'settlement', labelPrefix: 'Settlement #', iconName: 'Wallet' },
-];
+// Register URL patterns for your own entity detail pages here so the command
+// palette can surface recently-visited records. Example:
+//   { pattern: /\/widgets\/([^/]+)$/, type: 'widget', labelPrefix: 'Widget #', iconName: 'Box' },
+const ENTITY_PATTERNS: EntityPattern[] = [];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,7 +114,7 @@ function matchEntity(pathname: string): { type: RecentItem['type']; label: strin
 
 function findNavItem(pathname: string, role: UserRole | undefined): NavItem | undefined {
   const items = getNavigationForRole(role).filter((i): i is NavItem => !('type' in i));
-  // Match longest href first so /dispatcher/loads doesn't collapse into Home (/dispatcher)
+  // Match longest href first so nested routes don't collapse into their parent
   const sorted = [...items].sort((a, b) => b.href.length - a.href.length);
   for (const item of sorted) {
     if (item.exact) {

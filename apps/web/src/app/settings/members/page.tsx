@@ -57,10 +57,8 @@ function getRoleBadgeVariant(role: string) {
     case 'OWNER':
     case 'ADMIN':
       return 'default' as const;
-    case 'DISPATCHER':
+    case 'MEMBER':
       return 'muted' as const;
-    case 'DRIVER':
-      return 'outline' as const;
     default:
       return 'muted' as const;
   }
@@ -197,7 +195,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
                 </SelectTrigger>
                 <SelectContent>
                   {isOwner && <SelectItem value="ADMIN">Admin</SelectItem>}
-                  <SelectItem value="DISPATCHER">Dispatcher</SelectItem>
+                  <SelectItem value="MEMBER">Member</SelectItem>
                 </SelectContent>
               </Select>
               {!isOwner && (
@@ -258,8 +256,8 @@ export default function MembersPage() {
     onError: (e: Error) => showError('Failed to activate user', extractErrorMessage(e)),
   });
 
-  // Filter to staff only (non-drivers)
-  const staffUsers = useMemo(() => users?.filter((u) => u.role !== 'DRIVER') ?? [], [users]);
+  // All team members
+  const staffUsers = useMemo(() => users ?? [], [users]);
 
   const handleConfirmAction = () => {
     if (!confirmAction) return;
