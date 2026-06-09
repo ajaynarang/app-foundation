@@ -245,8 +245,8 @@ resource "aws_iam_role_policy" "github_deploy" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::sally-terraform-state",
-          "arn:aws:s3:::sally-terraform-state/*"
+          "arn:aws:s3:::__PROJECT__-terraform-state",
+          "arn:aws:s3:::__PROJECT__-terraform-state/*"
         ]
       },
       {

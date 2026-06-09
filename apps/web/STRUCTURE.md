@@ -1,4 +1,4 @@
-# Frontend Architecture - SALLY Web App
+# Frontend Architecture - the platform Web App
 
 **Last Updated:** February 5, 2026
 **Architecture:** Domain-Driven Design (DDD) with Feature-Sliced Architecture
@@ -8,6 +8,7 @@
 ## Overview
 
 The frontend mirrors the backend's domain structure for consistency and developer experience. We use a hybrid architecture:
+
 - **`features/`** - Domain-aligned business logic (mirrors backend domains)
 - **`app/`** - Next.js App Router pages (route-based organization)
 - **`shared/`** - Cross-cutting concerns and utilities
@@ -140,9 +141,9 @@ apps/web/src/
 │       │   └── index.ts
 │       └── chat/
 │           ├── components/
-│           │   ├── FloatingSallyButton.tsx
-│           │   ├── GlobalSallyChat.tsx
-│           │   └── SallyChatPanel.tsx
+│           │   ├── Floatingthe platformButton.tsx
+│           │   ├── Globalthe platformChat.tsx
+│           │   └── the platformChatPanel.tsx
 │           ├── store.ts
 │           └── index.ts
 │
@@ -203,18 +204,18 @@ apps/web/src/
 
 **Frontend domains mirror backend domains:**
 
-| Frontend Feature | Backend Domain | Purpose |
-|-----------------|----------------|---------|
-| `features/auth` | `auth/` | Authentication & authorization |
-| `features/integrations` | `domains/platform/integrations` | External system integrations |
-| `features/fleet/drivers` | `domains/fleet/drivers` | Driver management |
-| `features/fleet/vehicles` | `domains/fleet/vehicles` | Vehicle fleet |
-| `features/fleet/loads` | `domains/fleet/loads` | Load management |
-| `features/routing/route-planning` | `domains/routing/route-planning` | TSP/VRP optimization |
-| `features/routing/optimization` | `domains/routing/optimization` | REST optimization |
-| `features/routing/hos-compliance` | `domains/routing/hos-compliance` | HOS validation |
-| `features/operations/alerts` | `domains/operations/alerts` | Dispatcher alerts |
-| `features/platform/preferences` | `domains/platform/preferences` | User settings |
+| Frontend Feature                  | Backend Domain                   | Purpose                        |
+| --------------------------------- | -------------------------------- | ------------------------------ |
+| `features/auth`                   | `auth/`                          | Authentication & authorization |
+| `features/integrations`           | `domains/platform/integrations`  | External system integrations   |
+| `features/fleet/drivers`          | `domains/fleet/drivers`          | Driver management              |
+| `features/fleet/vehicles`         | `domains/fleet/vehicles`         | Vehicle fleet                  |
+| `features/fleet/loads`            | `domains/fleet/loads`            | Load management                |
+| `features/routing/route-planning` | `domains/routing/route-planning` | TSP/VRP optimization           |
+| `features/routing/optimization`   | `domains/routing/optimization`   | REST optimization              |
+| `features/routing/hos-compliance` | `domains/routing/hos-compliance` | HOS validation                 |
+| `features/operations/alerts`      | `domains/operations/alerts`      | Dispatcher alerts              |
+| `features/platform/preferences`   | `domains/platform/preferences`   | User settings                  |
 
 ### 2. Feature Module Pattern
 
@@ -232,31 +233,24 @@ feature-name/
 ```
 
 **Barrel Export Pattern:**
+
 ```typescript
 // features/fleet/drivers/index.ts
 
 // API
 export {
-  driversApi,          // Modern: object with methods
-  listDrivers,         // Legacy: direct function (backwards compat)
+  driversApi, // Modern: object with methods
+  listDrivers, // Legacy: direct function (backwards compat)
   getDriver,
   createDriver,
   // ... more legacy exports
 } from './api';
 
 // Types
-export type {
-  Driver,
-  CreateDriverRequest,
-  UpdateDriverRequest,
-} from './types';
+export type { Driver, CreateDriverRequest, UpdateDriverRequest } from './types';
 
 // Hooks
-export {
-  useDrivers,
-  useDriverById,
-  useCreateDriver,
-} from './hooks/use-drivers';
+export { useDrivers, useDriverById, useCreateDriver } from './hooks/use-drivers';
 
 // Components
 export { default as DriverList } from './components/driver-list';
@@ -265,18 +259,21 @@ export { default as DriverList } from './components/driver-list';
 ### 3. Data Fetching Strategy
 
 **React Query for ALL server state:**
+
 - ✅ Feature flags: React Query hooks only (removed duplicate Zustand store)
 - ✅ Drivers, vehicles, loads: React Query
 - ✅ Routes, HOS, optimization: React Query
 - ✅ Alerts, preferences: React Query
 
 **Zustand for UI/client state only:**
+
 - Auth state (user session, tokens)
 - Route planning form state
 - Chat panel state (open/closed)
 - Onboarding progress
 
 **Why this matters:**
+
 - React Query handles caching, refetching, synchronization
 - Zustand only for ephemeral UI state
 - No duplication of server data
@@ -344,6 +341,7 @@ import { Button, Card, Input, Label } from '@/shared/components/ui';
 ### Common Components (`shared/components/common/`)
 
 **Shared across features:**
+
 - ThemeProvider
 - Dashboard widgets (ControlPanel, ResizableSidebar, VisualizationArea)
 - Landing page components
@@ -370,18 +368,16 @@ features/routing/route-planning/components/
 ### React Query (Server State)
 
 **For all API data:**
+
 - Automatic caching with stale-while-revalidate
 - Background refetching
 - Optimistic updates
 - Request deduplication
 
 **Query keys convention:**
+
 ```typescript
-['feature-flags']                    // List
-['feature-flags', flagKey]          // Detail
-['drivers']                         // List
-['drivers', driverId]               // Detail
-['vehicles']                        // List
+['feature-flags'][('feature-flags', flagKey)]['drivers'][('drivers', driverId)]['vehicles']; // List // Detail // List // Detail // List
 ```
 
 ### Zustand (Client State)
@@ -407,6 +403,7 @@ features/platform/onboarding/store.ts
 ```
 
 **Stores export hooks:**
+
 ```typescript
 export const useAuthStore = create<AuthState>((set) => ({...}));
 ```
@@ -430,6 +427,7 @@ export const useAuthStore = create<AuthState>((set) => ({...}));
 ```
 
 **Strict mode enabled:**
+
 - No implicit any
 - Strict null checks
 - Strict function types
@@ -449,6 +447,7 @@ features/fleet/drivers/
 ```
 
 **Shared test utilities:**
+
 ```
 shared/lib/test-utils/
 ├── render.tsx        # Custom render with providers
@@ -463,6 +462,7 @@ shared/lib/test-utils/
 ### From Old to New Structure
 
 **Old:**
+
 ```typescript
 import { listDrivers } from '@/lib/api/drivers';
 import { Driver } from '@/lib/types/driver';
@@ -470,18 +470,20 @@ import DriverList from '@/components/drivers/driver-list';
 ```
 
 **New:**
+
 ```typescript
 import {
-  driversApi,      // or listDrivers (legacy)
-  useDrivers,      // React Query hook
-  DriverList,      // Component
-  type Driver,     // Type
+  driversApi, // or listDrivers (legacy)
+  useDrivers, // React Query hook
+  DriverList, // Component
+  type Driver, // Type
 } from '@/features/fleet/drivers';
 ```
 
 ### Removed Directories
 
 The following have been **removed** and replaced:
+
 - ❌ `src/components/` (except re-exports - now in `shared/components/`)
 - ❌ `src/lib/api/` (now in feature `api.ts` files)
 - ❌ `src/lib/types/` (now in feature `types.ts` files)
@@ -499,6 +501,7 @@ The following have been **removed** and replaced:
 **Now:** React Query only
 
 **Reasoning:**
+
 - React Query provides all needed features (caching, loading, error states)
 - Eliminates code duplication
 - Better type safety
@@ -508,6 +511,7 @@ The following have been **removed** and replaced:
 ### 2. Auth & Integrations: Top-Level
 
 **Structure:**
+
 ```
 features/
 ├── auth/              # NOT platform/auth
@@ -523,12 +527,14 @@ features/
 ### 3. Shared vs Features
 
 **Shared:**
+
 - UI components (Shadcn)
 - Layout components
 - Utilities (cn, formatters, validation)
 - Hooks used across 3+ features
 
 **Features:**
+
 - Domain-specific logic
 - API clients
 - Business components
@@ -541,29 +547,31 @@ features/
 ### Code Splitting
 
 **Automatic route-based splitting:**
+
 - Each `app/` page is a separate chunk
 - Feature components lazy-loaded when needed
 
 **Manual splitting for large features:**
+
 ```typescript
-const RouteTimeline = lazy(() =>
-  import('@/features/routing/route-planning/components/timeline')
-);
+const RouteTimeline = lazy(() => import('@/features/routing/route-planning/components/timeline'));
 ```
 
 ### React Query Configuration
 
 **Default settings:**
+
 - `staleTime: 0` - Always refetch on mount
 - `cacheTime: 5 minutes` - Keep in cache for 5 min
 - `refetchOnWindowFocus: true` - Refetch on tab focus
 
 **Override per query:**
+
 ```typescript
 useQuery({
   queryKey: ['drivers'],
   queryFn: driversApi.list,
-  staleTime: 30000,  // 30 seconds
+  staleTime: 30000, // 30 seconds
 });
 ```
 
@@ -574,12 +582,14 @@ useQuery({
 ### When to Create a New Feature
 
 **Create a new feature when:**
+
 1. It maps to a backend domain/subdomain
 2. It has 3+ components AND API endpoints
 3. It has distinct types and business logic
 4. Multiple pages will consume it
 
 **Don't create a feature for:**
+
 1. Single-use components (put in `app/` page)
 2. Pure UI utilities (put in `shared/`)
 3. Helpers with no domain logic
@@ -589,6 +599,7 @@ useQuery({
 **Current:** Apps in `apps/web/`
 
 **Future:** Extract shared logic
+
 ```
 packages/
 ├── ui/              # Shadcn components
@@ -611,6 +622,7 @@ touch src/features/domain/feature-name/index.ts
 ```
 
 **Feature barrel template:**
+
 ```typescript
 // API
 export { featureApi, ...legacyExports } from './api';

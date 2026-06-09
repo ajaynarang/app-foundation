@@ -320,7 +320,7 @@ CREATE TABLE "integration_entity_mappings" (
     "tenant_id" INTEGER NOT NULL,
     "integration_id" VARCHAR(50) NOT NULL,
     "entity_type" VARCHAR(50) NOT NULL,
-    "sally_entity_id" VARCHAR(50) NOT NULL,
+    "internal_entity_id" VARCHAR(50) NOT NULL,
     "external_id" VARCHAR(100),
     "external_name" VARCHAR(500),
     "match_confidence" DOUBLE PRECISION,
@@ -1439,7 +1439,7 @@ CREATE UNIQUE INDEX "integration_external_entities_integration_id_entity_type_ex
 CREATE INDEX "integration_entity_mappings_tenant_id_idx" ON "integration_entity_mappings"("tenant_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "iem_integration_type_sally_unique" ON "integration_entity_mappings"("integration_id", "entity_type", "sally_entity_id");
+CREATE UNIQUE INDEX "iem_integration_type_internal_unique" ON "integration_entity_mappings"("integration_id", "entity_type", "internal_entity_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "integration_configs_integration_id_key" ON "integration_configs"("integration_id");

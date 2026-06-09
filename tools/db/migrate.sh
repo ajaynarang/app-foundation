@@ -24,15 +24,15 @@ set -euo pipefail
 # --- Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CLUSTER="sally-staging-ecs-cluster"
-RDS_HOST="sally-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
+CLUSTER="app-staging-ecs-cluster"
+RDS_HOST="app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
 RDS_PORT="5432"
 TUNNEL_PORT="5433"
 PREFERRED_CONTAINER="worker"
 BACKEND_DIR="$(cd "$TOOLS_DIR/../apps/backend" && pwd)"
 
 # Local DB config (from apps/backend/.env)
-LOCAL_DB_URL="postgresql://sally_user:sally_password@localhost:5432/sally"
+LOCAL_DB_URL="postgresql://app_user:app_password@localhost:5432/app"
 
 # --- State ---
 TUNNEL_PID=""
@@ -158,7 +158,7 @@ port_ready() {
 header() {
   echo ""
   echo "=========================================="
-  echo "  SALLY — Database Migration"
+  echo "  the platform — Database Migration"
   echo "=========================================="
   echo "  Environment: ${ENV}"
   echo "  Mode:        ${MODE}"
@@ -166,7 +166,7 @@ header() {
     echo "  RDS:         ${RDS_HOST}"
     echo "  Tunnel:      localhost:${TUNNEL_PORT}"
   else
-    echo "  Database:    localhost:5432/sally"
+    echo "  Database:    localhost:5432/app"
   fi
   echo "=========================================="
   echo ""

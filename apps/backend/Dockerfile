@@ -44,17 +44,17 @@ RUN pnpm run build
 
 # Use pnpm deploy to create a self-contained production bundle (no symlinks)
 WORKDIR /workspace
-RUN pnpm --filter @sally/backend deploy /production --prod
+RUN pnpm --filter @app/backend deploy /production --prod
 
 # Copy Prisma client into the production bundle
 RUN cp -r /workspace/node_modules/.pnpm/@prisma+client*/node_modules/.prisma /production/node_modules/.prisma 2>/dev/null || true
 RUN cp -r /workspace/node_modules/.pnpm/@prisma+client*/node_modules/@prisma /production/node_modules/@prisma 2>/dev/null || true
 
 # Copy shared-types built output into production node_modules
-RUN rm -rf /production/node_modules/@sally/shared-types && \
-    mkdir -p /production/node_modules/@sally/shared-types && \
-    cp -r /workspace/packages/shared-types/dist /production/node_modules/@sally/shared-types/dist && \
-    cp /workspace/packages/shared-types/package.json /production/node_modules/@sally/shared-types/package.json
+RUN rm -rf /production/node_modules/@app/shared-types && \
+    mkdir -p /production/node_modules/@app/shared-types && \
+    cp -r /workspace/packages/shared-types/dist /production/node_modules/@app/shared-types/dist && \
+    cp /workspace/packages/shared-types/package.json /production/node_modules/@app/shared-types/package.json
 
 # Production stage - minimal image
 FROM node:20-slim AS production

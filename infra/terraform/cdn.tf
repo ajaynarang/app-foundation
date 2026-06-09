@@ -3,10 +3,10 @@
 # Only rendered video outputs go here — not source files.
 #
 # Usage:
-#   aws s3 cp out/sally-master.mp4 s3://${bucket}/videos/sally-demo.mp4
-#   aws s3 cp out/sally-trailer.mp4 s3://${bucket}/videos/sally-launch.mp4
+#   aws s3 cp out/master.mp4 s3://${bucket}/videos/demo.mp4
+#   aws s3 cp out/trailer.mp4 s3://${bucket}/videos/launch.mp4
 #
-# Files served at: https://cdn.${domain}/videos/sally-demo.mp4
+# Files served at: https://cdn.${domain}/videos/demo.mp4
 
 # ─── S3 Bucket ───
 
@@ -182,8 +182,8 @@ resource "aws_cloudfront_response_headers_policy" "cdn_cors" {
     access_control_allow_origins {
       items = [
         "https://*.${var.domain}",
-        "https://staging.sally.appshore.in",
-        "https://sally.appshore.in",
+        "https://staging.example.com",
+        "https://example.com",
         "http://localhost:3000",
       ]
     }
@@ -218,7 +218,7 @@ output "cdn_domain_name" {
 output "cdn_video_urls" {
   description = "Full URLs for the marketing videos"
   value = {
-    demo   = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/sally-demo.mp4"
-    launch = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/sally-launch.mp4"
+    demo   = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/demo.mp4"
+    launch = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/launch.mp4"
   }
 }

@@ -19,7 +19,7 @@
         {
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
-          "expr": "sum by (levelName) (count_over_time({service=\"sally-backend\"} | json | label_format levelName=`{{if eq .level \"60\"}}fatal{{else if eq .level \"50\"}}error{{else if eq .level \"40\"}}warn{{else if eq .level \"30\"}}info{{else if eq .level \"20\"}}debug{{else if eq .level \"10\"}}trace{{else}}other{{end}}` [1m]))",
+          "expr": "sum by (levelName) (count_over_time({service=\"app-backend\"} | json | label_format levelName=`{{if eq .level \"60\"}}fatal{{else if eq .level \"50\"}}error{{else if eq .level \"40\"}}warn{{else if eq .level \"30\"}}info{{else if eq .level \"20\"}}debug{{else if eq .level \"10\"}}trace{{else}}other{{end}}` [1m]))",
           "refId": "A"
         }
       ],
@@ -44,7 +44,7 @@
         {
           "datasource": { "type": "loki", "uid": "loki" },
           "editorMode": "code",
-          "expr": "{service=\"sally-backend\"} | json | level=~\"$level\" | tenantId=~\"$tenantId\" | jobName=~\"$jobName\" | label_format levelName=`{{if eq .level \"60\"}}FATAL{{else if eq .level \"50\"}}ERROR{{else if eq .level \"40\"}}WARN{{else if eq .level \"30\"}}INFO{{else if eq .level \"20\"}}DEBUG{{else if eq .level \"10\"}}TRACE{{else}}{{.level}}{{end}}` | line_format \"{{.levelName}} [{{.context}}] {{.msg}}{{if .tenantId}} t={{.tenantId}}{{end}}{{if .jobName}} job={{.jobName}}{{end}}{{if .traceId}} trace={{.traceId}}{{end}}\"",
+          "expr": "{service=\"app-backend\"} | json | level=~\"$level\" | tenantId=~\"$tenantId\" | jobName=~\"$jobName\" | label_format levelName=`{{if eq .level \"60\"}}FATAL{{else if eq .level \"50\"}}ERROR{{else if eq .level \"40\"}}WARN{{else if eq .level \"30\"}}INFO{{else if eq .level \"20\"}}DEBUG{{else if eq .level \"10\"}}TRACE{{else}}{{.level}}{{end}}` | line_format \"{{.levelName}} [{{.context}}] {{.msg}}{{if .tenantId}} t={{.tenantId}}{{end}}{{if .jobName}} job={{.jobName}}{{end}}{{if .traceId}} trace={{.traceId}}{{end}}\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -55,7 +55,7 @@
   ],
   "refresh": "5s",
   "schemaVersion": 39,
-  "tags": ["sally", "logs"],
+  "tags": ["app", "logs"],
   "templating": {
     "list": [
       {
@@ -96,8 +96,8 @@
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Sally · Logs",
-  "uid": "sally-logs",
+  "title": "App · Logs",
+  "uid": "app-logs",
   "version": 1,
   "weekStart": ""
 }

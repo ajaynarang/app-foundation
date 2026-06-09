@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Sync SALLY project memory, rules, and root docs into the Obsidian wiki's Sources/ layer.
+# Sync the platform project memory, rules, and root docs into the Obsidian wiki's Sources/ layer.
 # Idempotent. Run after any update to memory files, CLAUDE.md, or design docs.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VAULT_DIR="$REPO_ROOT/Obsidian Vault/SALLY"
-MEMORY_DIR="/Users/ajay-admin/.claude/projects/-Users-ajay-admin-sally/memory"
+VAULT_DIR="$REPO_ROOT/Obsidian Vault/the platform"
+MEMORY_DIR="/Users/ajay-admin/.claude/projects/-Users-ajay-admin-app/memory"
 
 mkdir -p "$VAULT_DIR/Sources/Memory" "$VAULT_DIR/Sources/Rules" "$VAULT_DIR/Sources/Docs"
 

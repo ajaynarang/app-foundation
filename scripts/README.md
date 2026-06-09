@@ -4,10 +4,10 @@ Repo-data utilities: scripts that read source/repo data and emit derived artifac
 
 ## Files
 
-| Script                  | What it does                                                                                                                        |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `sync-vault.sh`         | Mirrors project memory + root docs into `Obsidian Vault/SALLY/Sources/`. Run after editing memory files, CLAUDE.md, or design docs. |
-| `export-scope-vocab.ts` | Emits a wiki-readable snapshot of the scope vocabulary from `packages/shared-types/`. Invoked via `pnpm docs:scope-vocab`.          |
+| Script                  | What it does                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sync-vault.sh`         | Mirrors project memory + root docs into `Obsidian Vault/the platform/Sources/`. Run after editing memory files, CLAUDE.md, or design docs. |
+| `export-scope-vocab.ts` | Emits a wiki-readable snapshot of the scope vocabulary from `packages/shared-types/`. Invoked via `pnpm docs:scope-vocab`.                 |
 
 ## What goes here
 

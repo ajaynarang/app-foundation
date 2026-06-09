@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# sally-dev.sh — run backend + web + console side-by-side with custom ports.
+# app-dev.sh — run backend + web + console side-by-side with custom ports.
 #
 # Opens iTerm2 with 3 tabs (backend / web / console), each running its
 # app under Doppler. Env vars are auto-wired so the frontends call the
 # right backend and CORS allows the chosen frontend ports.
 #
 # Usage:
-#   tools/dev/sally-dev.sh                          # defaults: 8001 / 3001 / 3002
-#   tools/dev/sally-dev.sh --offset 3               # shifts all three by +3
-#   tools/dev/sally-dev.sh --backend 8004 --web 3010 --console 3012
-#   tools/dev/sally-dev.sh --backend 8004 --web 3010 --no-console
-#   tools/dev/sally-dev.sh --stop                   # kill whatever is on default ports
-#   tools/dev/sally-dev.sh --stop --backend 8004 --web 3010 --console 3012
+#   tools/dev/app-dev.sh                          # defaults: 8001 / 3001 / 3002
+#   tools/dev/app-dev.sh --offset 3               # shifts all three by +3
+#   tools/dev/app-dev.sh --backend 8004 --web 3010 --console 3012
+#   tools/dev/app-dev.sh --backend 8004 --web 3010 --no-console
+#   tools/dev/app-dev.sh --stop                   # kill whatever is on default ports
+#   tools/dev/app-dev.sh --stop --backend 8004 --web 3010 --console 3012
 #
 # Flags:
 #   --backend <port>   backend port (default 8001)
@@ -79,7 +79,7 @@ GIT_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo
 
 # ---- --stop mode ----
 if [[ $STOP_MODE -eq 1 ]]; then
-  echo "${C_BOLD}Sally dev — stopping${C_RST}"
+  echo "${C_BOLD}App dev — stopping${C_RST}"
   kill_port() {
     local port="$1"; local label="$2"
     local pids
@@ -139,7 +139,7 @@ CORS_ORIGINS_VALUE=$(IFS=, ; echo "${cors_parts[*]}")
 
 # ---- banner ----
 echo
-echo "${C_BOLD}Sally dev — side-by-side stack${C_RST}"
+echo "${C_BOLD}App dev — side-by-side stack${C_RST}"
 echo "${C_DIM}─────────────────────────────────${C_RST}"
 [[ $RUN_BACKEND -eq 1 ]] && echo "  ${C_BLU}backend${C_RST}  http://localhost:${C_BOLD}${BACKEND_PORT}${C_RST}"
 [[ $RUN_WEB     -eq 1 ]] && echo "  ${C_GRN}web    ${C_RST}  http://localhost:${C_BOLD}${WEB_PORT}${C_RST}"
@@ -164,7 +164,7 @@ FIRST_TAB_OPENED=0
 
 # Temp dir for per-tab bootstrap scripts. NOT trap-cleaned — the iTerm
 # tabs launch asynchronously, so we'd race them. /tmp is cleaned by macOS.
-TAB_SCRIPT_DIR=$(mktemp -d -t sally-dev-XXXXXX)
+TAB_SCRIPT_DIR=$(mktemp -d -t app-dev-XXXXXX)
 
 TAB_COUNTER=0
 
@@ -235,23 +235,23 @@ DOPPLER_PRESERVE="--preserve-env=PORT,NEXT_PUBLIC_API_URL,CORS_ORIGINS"
 if [[ $RUN_BACKEND -eq 1 ]]; then
   open_tab "backend :${BACKEND_PORT} [${GIT_BRANCH}]" "$REPO_ROOT/apps/backend" \
     "env PORT=${BACKEND_PORT} CORS_ORIGINS='${CORS_ORIGINS_VALUE}' doppler run ${DOPPLER_PRESERVE} -- pnpm run dev" \
-    "$(make_banner 'sally-backend' "$BACKEND_PORT" "$C_BLU")"
+    "$(make_banner 'app-backend' "$BACKEND_PORT" "$C_BLU")"
 fi
 
 # Web: NEXT_PUBLIC_API_URL is the single source of truth for all frontend modules.
 if [[ $RUN_WEB -eq 1 ]]; then
   open_tab "web :${WEB_PORT} [${GIT_BRANCH}]" "$REPO_ROOT/apps/web" \
     "env PORT=${WEB_PORT} NEXT_PUBLIC_API_URL='${API_URL}' doppler run ${DOPPLER_PRESERVE} -- pnpm run dev" \
-    "$(make_banner 'sally-web    ' "$WEB_PORT" "$C_GRN")"
+    "$(make_banner 'app-web    ' "$WEB_PORT" "$C_GRN")"
 fi
 
 # Console: its package.json dev script hardcodes `-p 3002`, so we bypass it.
 if [[ $RUN_CONSOLE -eq 1 ]]; then
   open_tab "console :${CONSOLE_PORT} [${GIT_BRANCH}]" "$REPO_ROOT/apps/console" \
     "env NEXT_PUBLIC_API_URL='${API_URL}' doppler run ${DOPPLER_PRESERVE} -- pnpm exec next dev -p ${CONSOLE_PORT}" \
-    "$(make_banner 'sally-console' "$CONSOLE_PORT" "$C_MAG")"
+    "$(make_banner 'app-console' "$CONSOLE_PORT" "$C_MAG")"
 fi
 
 echo "${C_GRN}Done.${C_RST} Tabs opened in iTerm2."
 echo "${C_DIM}Stop everything later with:${C_RST}"
-echo "  ${C_BOLD}./tools/dev/sally-dev.sh --stop --backend ${BACKEND_PORT} --web ${WEB_PORT} --console ${CONSOLE_PORT}${C_RST}"
+echo "  ${C_BOLD}./tools/dev/app-dev.sh --stop --backend ${BACKEND_PORT} --web ${WEB_PORT} --console ${CONSOLE_PORT}${C_RST}"

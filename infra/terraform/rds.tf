@@ -14,13 +14,13 @@ resource "aws_db_instance" "postgres" {
   instance_class = var.rds_instance_class
 
   db_name  = var.rds_db_name
-  username = "sally_user"
+  username = "${var.project}_user"
   password = var.rds_password
   # Static password — managed via Terraform variable (stored in terraform.tfvars or CI secrets).
-  # Rotation disabled to keep sally-staging-secret-db-url in sync.
+  # Rotation disabled to keep ${var.project}-${var.env}-secret-db-url in sync.
   # Previously used manage_master_user_password = true, but auto-rotation caused
   # the ECS container's DATABASE_URL secret to go stale (RDS rotates its own
-  # secret but not our app-level sally-staging-secret-db-url).
+  # secret but not our app-level ${var.project}-${var.env}-secret-db-url).
   # Note: manage_master_user_password omitted — AWS provider v5 conflicts when
   # both `password` and `manage_master_user_password = false` are set.
 

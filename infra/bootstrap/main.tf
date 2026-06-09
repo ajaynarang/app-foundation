@@ -23,14 +23,14 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "sally-terraform-state"
+  bucket = "__PROJECT__-terraform-state"
 
   lifecycle {
     prevent_destroy = true
   }
 
   tags = {
-    Project   = "sally"
+    Project   = "app"
     ManagedBy = "terraform-bootstrap"
   }
 }

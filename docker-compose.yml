@@ -96,7 +96,7 @@ services:
   #   pnpm doppler:console     # http://localhost:3002
   #
   # Or run multiple instances side-by-side with different ports:
-  #   ./scripts/sally-dev.sh --backend 8004 --web 3010 --console 3012
+  #   ./scripts/app-dev.sh --backend 8004 --web 3010 --console 3012
   #
   # The services below are only useful for testing the production image
   # locally. They DO NOT use Doppler secrets and will not work for full

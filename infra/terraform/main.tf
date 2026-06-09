@@ -11,7 +11,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "sally-terraform-state"
+    bucket       = "__PROJECT__-terraform-state"
     region       = "us-east-1"
     encrypt      = true
     use_lockfile = true # S3 native locking — no DynamoDB table required

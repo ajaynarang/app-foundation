@@ -13,14 +13,14 @@
 # Staging creates the ECR repository.
 resource "aws_ecr_repository" "backend" {
   count                = var.env == "staging" ? 1 : 0
-  name                 = "sally-ecr-backend"
+  name                 = "${var.project}-ecr-backend"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
-  tags = { Name = "sally-ecr-backend" }
+  tags = { Name = "${var.project}-ecr-backend" }
 }
 
 resource "aws_ecr_lifecycle_policy" "backend" {
@@ -44,7 +44,7 @@ resource "aws_ecr_lifecycle_policy" "backend" {
 # Production reads the repository that staging created.
 data "aws_ecr_repository" "backend" {
   count = var.env == "production" ? 1 : 0
-  name  = "sally-ecr-backend"
+  name  = "${var.project}-ecr-backend"
 }
 
 # Unified local — works identically in both environments.

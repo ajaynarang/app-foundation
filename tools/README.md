@@ -1,6 +1,6 @@
 # tools/
 
-Operator scripts and dev utilities. Not application code — these are invoked by humans (or CI) to set up, debug, deploy, or maintain Sally.
+Operator scripts and dev utilities. Not application code — these are invoked by humans (or CI) to set up, debug, deploy, or maintain the platform.
 
 ## Layout
 
@@ -40,7 +40,7 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 | Script              | What it does                                                        |
 | ------------------- | ------------------------------------------------------------------- |
-| `dev/sally-dev.sh`  | Open iTerm2 tabs running backend + web + console with custom ports. |
+| `dev/app-dev.sh`    | Open iTerm2 tabs running backend + web + console with custom ports. |
 | `dev/install.sh`    | One-time project bootstrap (run from repo root).                    |
 | `dev/setup-osrm.sh` | Download US road data for OSRM (route planner). One-time setup.     |
 | `dev/kill-port.sh`  | Kill the process holding a given port.                              |

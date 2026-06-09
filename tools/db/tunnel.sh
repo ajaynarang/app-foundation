@@ -18,8 +18,8 @@
 set -euo pipefail
 
 # --- Configuration (change these if infra changes) ---
-CLUSTER="sally-staging-ecs-cluster"
-RDS_HOST="sally-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
+CLUSTER="app-staging-ecs-cluster"
+RDS_HOST="app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
 RDS_PORT="5432"
 LOCAL_PORT="5433"
 PREFERRED_CONTAINER="worker"  # worker or api — either works as a jump host

@@ -20,7 +20,7 @@
               "operator": "=",
               "scope": "resource",
               "tag": "service.name",
-              "value": ["sally-backend"],
+              "value": ["app-backend"],
               "valueType": "string"
             }
           ],
@@ -30,19 +30,19 @@
           "tableType": "traces"
         }
       ],
-      "title": "Recent traces (service=sally-backend)",
+      "title": "Recent traces (service=app-backend)",
       "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["sally", "traces"],
+  "tags": ["app", "traces"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Sally · Traces",
-  "uid": "sally-traces",
+  "title": "App · Traces",
+  "uid": "app-traces",
   "version": 1,
   "weekStart": ""
 }

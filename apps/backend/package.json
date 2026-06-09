@@ -1,8 +1,8 @@
 {
   "name": "@app/backend",
   "version": "0.1.0",
-  "description": "SALLY Node.js/TypeScript Backend",
-  "author": "SALLY Team",
+  "description": "Platform Node.js/TypeScript Backend",
+  "author": "Platform Team",
   "private": true,
   "license": "MIT",
   "scripts": {

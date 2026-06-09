@@ -2,13 +2,13 @@ import { PrismaClient } from '@prisma/client';
 
 /**
  * Model pricing catalog — per-million-token rates for every provider/model
- * pair Sally currently routes traffic through. Used by `AiTelemetryService`
+ * pair the platform currently routes traffic through. Used by `AiTelemetryService`
  * to compute USD cost per invocation at write time.
  *
  * ──────────────────────────────────────────────────────────────────────────
  * TODO: Pricing values BELOW need human verification before staging deploy.
  * ──────────────────────────────────────────────────────────────────────────
- * Open question #1 from `.docs/plans/06-sally-ai/2026-05-27-ai-cost-telemetry-and-budgets-implementation.md`:
+ * Open question #1 from `.docs/plans/06-assistant-ai/2026-05-27-ai-cost-telemetry-and-budgets-implementation.md`:
  *
  *   "Implementer must verify each entry against the current Anthropic +
  *    OpenAI pricing pages and the AI Gateway markup (if any) before running

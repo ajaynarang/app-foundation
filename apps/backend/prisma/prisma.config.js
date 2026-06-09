@@ -1,7 +1,7 @@
 module.exports = {
   datasources: {
     db: {
-      url: process.env.DATABASE_URL || 'postgresql://sally_user:sally_password@localhost:5432/sally',
+      url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app',
     },
   },
 };

@@ -3,7 +3,7 @@
 variable "project" {
   description = "Project name prefix for all resources"
   type        = string
-  default     = "sally"
+  default     = "app"
 }
 
 variable "env" {
@@ -106,7 +106,7 @@ variable "rds_allocated_storage" {
 variable "rds_db_name" {
   description = "Name of the database"
   type        = string
-  default     = "sally"
+  default     = "app"
 }
 
 variable "rds_password" {
@@ -118,7 +118,7 @@ variable "rds_password" {
 
 # GitHub OIDC
 variable "github_repo" {
-  description = "GitHub repo in owner/repo format (e.g. myorg/sally)"
+  description = "GitHub repo in owner/repo format (e.g. myorg/app)"
   type        = string
 }
 
@@ -134,7 +134,7 @@ variable "console_url" {
 }
 
 variable "cors_origins" {
-  description = "Comma-separated CORS origins for the backend. Supports wildcard patterns like https://*.sally.appshore.in"
+  description = "Comma-separated CORS origins for the backend. Supports wildcard patterns like https://*.example.com"
   type        = string
 }
 

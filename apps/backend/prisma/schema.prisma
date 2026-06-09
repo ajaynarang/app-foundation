@@ -519,7 +519,7 @@ model IntegrationEntityMapping {
   tenant          Tenant    @relation(fields: [tenantId], references: [id])
   integrationId   String    @map("integration_id") @db.VarChar(50)
   entityType      String    @map("entity_type") @db.VarChar(50)
-  sallyEntityId   String    @map("sally_entity_id") @db.VarChar(50)
+  internalEntityId   String    @map("internal_entity_id") @db.VarChar(50)
   externalId      String?   @map("external_id") @db.VarChar(100)
   externalName    String?   @map("external_name") @db.VarChar(500)
   matchConfidence Float?    @map("match_confidence")
@@ -527,7 +527,7 @@ model IntegrationEntityMapping {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@unique([integrationId, entityType, sallyEntityId], map: "iem_integration_type_sally_unique")
+  @@unique([integrationId, entityType, internalEntityId], map: "iem_integration_type_internal_unique")
   @@index([tenantId])
   @@map("integration_entity_mappings")
 }

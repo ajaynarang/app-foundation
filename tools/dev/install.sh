@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# SALLY Installation Script
-# This script automates the initial setup of the SALLY project
+# the platform Installation Script
+# This script automates the initial setup of the the platform project
 
 set -e  # Exit on error
 
 echo "========================================="
-echo "  SALLY Installation Script"
+echo "  the platform Installation Script"
 echo "========================================="
 echo ""
 

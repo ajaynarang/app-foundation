@@ -72,9 +72,9 @@ const nextConfig: NextConfig = {
     // Include both wildcard patterns and the explicit virtual-hosted-style URL
     // (some browsers don't match multi-level wildcards in CSP host-source).
     const s3Origins =
-      'https://*.s3.*.amazonaws.com https://*.s3.amazonaws.com https://sally-documents.s3.us-east-1.amazonaws.com https://sally-staging-documents.s3.us-east-1.amazonaws.com https://sally-production-documents.s3.us-east-1.amazonaws.com';
+      'https://*.s3.*.amazonaws.com https://*.s3.amazonaws.com https://app-documents.s3.us-east-1.amazonaws.com https://app-staging-documents.s3.us-east-1.amazonaws.com https://app-production-documents.s3.us-east-1.amazonaws.com';
     const cdnOrigins =
-      'https://sally-staging-cdn.s3.us-east-1.amazonaws.com https://sally-production-cdn.s3.us-east-1.amazonaws.com https://*.cloudfront.net';
+      'https://app-staging-cdn.s3.us-east-1.amazonaws.com https://app-production-cdn.s3.us-east-1.amazonaws.com https://*.cloudfront.net';
 
     const cspDirectives = [
       "default-src 'self'",

@@ -2,8 +2,8 @@
 # Development stage
 #
 # Used with the `apps` profile in docker-compose.yml. The compose
-# file mounts the entire repo at /workspace (so @sally/ui and
-# @sally/shared-types workspace symlinks resolve) and shadows
+# file mounts the entire repo at /workspace (so @app/ui and
+# @app/shared-types workspace symlinks resolve) and shadows
 # node_modules with anonymous volumes so host/container installs
 # don't collide.
 #
@@ -24,7 +24,7 @@ COPY apps/console/package.json ./apps/console/
 COPY apps/backend/package.json ./apps/backend/
 COPY packages ./packages
 
-# Install full workspace so @sally/ui and @sally/shared-types are linked.
+# Install full workspace so @app/ui and @app/shared-types are linked.
 RUN pnpm install --frozen-lockfile
 
 # Source for apps/web is mounted at runtime via docker-compose volumes.
@@ -45,7 +45,7 @@ WORKDIR /workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY turbo.json* ./
 
-# Copy workspace packages (needed for @sally/ui, @sally/shared-types)
+# Copy workspace packages (needed for @app/ui, @app/shared-types)
 COPY packages ./packages
 COPY apps/web/package.json ./apps/web/
 
@@ -56,7 +56,7 @@ RUN pnpm install --frozen-lockfile
 COPY apps/web ./apps/web
 
 # Build shared-types first (web depends on it)
-RUN pnpm --filter @sally/shared-types build
+RUN pnpm --filter @app/shared-types build
 
 # Build web
 WORKDIR /workspace/apps/web

@@ -1,6 +1,6 @@
 # Email Service Setup
 
-The SALLY backend includes an email service for sending user invitations and other notifications.
+The the platform backend includes an email service for sending user invitations and other notifications.
 
 ## Email Providers
 
@@ -25,6 +25,7 @@ APP_URL=https://yourdomain.com
 ```
 
 **Benefits:**
+
 - ✅ Simple setup
 - ✅ Great deliverability
 - ✅ Free tier: 100 emails/day
@@ -77,7 +78,7 @@ EMAIL (Console Mode)
 ========================================
 From: noreply@appshore.in
 To: user@example.com
-Subject: You're invited to join Acme Corp on SALLY
+Subject: You're invited to join Acme Corp on the platform
 ----------------------------------------
 HTML Content:
 [Full email HTML here]
@@ -101,6 +102,7 @@ Send a test invitation:
 ### User Invitation Email
 
 Includes:
+
 - Professional branded header
 - Company name and inviter information
 - Accept invitation button with link
@@ -110,17 +112,20 @@ Includes:
 ## Troubleshooting
 
 ### Emails not sending (Resend)
+
 - ✅ Check API key is correct
 - ✅ Verify domain is verified in Resend dashboard
 - ✅ Check Resend logs for errors
 
 ### Emails not sending (SMTP)
+
 - ✅ Check SMTP credentials
 - ✅ Enable "Less secure app access" (Gmail)
 - ✅ Use App Password instead of regular password (Gmail)
 - ✅ Check firewall isn't blocking port 587/465
 
 ### Emails going to spam
+
 - ✅ Verify your sending domain (SPF, DKIM records)
 - ✅ Use a professional from address
 - ✅ Warm up your sending domain gradually

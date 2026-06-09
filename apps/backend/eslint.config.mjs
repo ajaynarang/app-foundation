@@ -58,7 +58,7 @@ export default tseslint.config(
       //
       // 2. Cache facade — `@nestjs/cache-manager` and the legacy
       //    cache-manager adapter packages are banned. Every cache read/write
-      //    must go through SallyCacheService (which sits on a single ioredis
+      //    must go through the platformCacheService (which sits on a single ioredis
       //    client). See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md
       //    for the incident that motivated this guard. Plans drift; lint doesn't.
       'no-restricted-imports': [
@@ -68,20 +68,20 @@ export default tseslint.config(
             {
               name: '@nestjs/cache-manager',
               message:
-                'Banned. Inject SallyCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
+                'Banned. Inject the platformCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
             },
             {
               name: 'cache-manager',
               message:
-                'Banned. Inject SallyCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
+                'Banned. Inject the platformCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
             },
             {
               name: 'cache-manager-redis-yet',
-              message: 'Removed dep. Use SallyCacheService.',
+              message: 'Removed dep. Use the platformCacheService.',
             },
             {
               name: 'cache-manager-ioredis',
-              message: 'Removed dep. Use SallyCacheService.',
+              message: 'Removed dep. Use the platformCacheService.',
             },
           ],
           patterns: [

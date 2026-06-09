@@ -1,4 +1,4 @@
-# SALLY Infrastructure
+# the platform Infrastructure
 
 > **New to Terraform?** Start here. This explains what every file does, why it exists, and how they fit together — before you touch anything.
 
@@ -60,7 +60,7 @@ That's it. Everything else is just configuration inside those blocks.
 This creates the S3 bucket that stores Terraform's memory (called "state"). Terraform needs somewhere to remember what it has already created. Without this, it would try to recreate everything from scratch every time.
 
 ```
-S3 bucket: sally-terraform-state
+S3 bucket: app-terraform-state
   └── staging/terraform.tfstate    ← Terraform's memory for staging
   └── production/terraform.tfstate ← Terraform's memory for production (when ready)
 ```
@@ -79,7 +79,7 @@ Three jobs:
 
 1. **Declares the AWS provider** — tells Terraform to use AWS (not Azure/GCP)
 2. **Points at the state backend** — "store your memory in that S3 bucket"
-3. **Defines the `local.prefix` shortcut** — `sally-staging` or `sally-production`, used in every resource name so you can tell them apart in the AWS console
+3. **Defines the `local.prefix` shortcut** — `app-staging` or `app-production`, used in every resource name so you can tell them apart in the AWS console
 
 You never need to edit this file.
 
@@ -105,21 +105,24 @@ The actual values come from `environments/staging.tfvars` or `environments/produ
 These are the only files you regularly edit. They set the actual values for the variables declared above.
 
 **Staging** is intentionally small and cheap:
+
 - 1 Availability Zone (single data center — if it goes down, staging goes down)
 - `db.t3.micro` — smallest RDS instance
 - 256 CPU / 512 MB memory — minimal Fargate task
 - 1 API task, 1 worker task
 
 **Production** is sized for real traffic:
+
 - 2 Availability Zones (if one data center fails, the other keeps running)
 - `db.t3.small` — one step up
 - 512 CPU / 1024 MB memory
 - 2 API tasks (so deploys don't take the app down — one task stays up while the other restarts)
 
 **Before your first apply, you must update these two lines in both files:**
+
 ```hcl
 domain      = "yourdomain.com"   # REPLACE with your actual domain
-github_repo = "myorg/sally"      # REPLACE with your GitHub org/repo
+github_repo = "myorg/app"      # REPLACE with your GitHub org/repo
 ```
 
 ---
@@ -145,6 +148,7 @@ Private Subnets           ← ECS tasks, RDS, Redis live here — not visible to
 ```
 
 **Security groups** (the four door locks):
+
 - `alb` — allows port 443 (HTTPS) and 80 (HTTP redirect) from anywhere
 - `ecs` — allows port 8000 only from the ALB (not from the internet directly)
 - `rds` — allows port 5432 only from ECS tasks
@@ -171,7 +175,8 @@ Lifecycle policy: keeps the last 20 images, deletes older ones automatically. Pr
 Creates a managed PostgreSQL 16 database. "Managed" means AWS handles backups, patching, and failover — you just connect to it.
 
 Key settings:
-- **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from a separate Secrets Manager secret (`sally-staging-secret-db-url`) which doesn't auto-sync with RDS rotation.
+
+- **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from a separate Secrets Manager secret (`app-staging-secret-db-url`) which doesn't auto-sync with RDS rotation.
 - **`publicly_accessible = false`** — cannot be reached from the internet, only from inside the VPC
 - **`storage_encrypted = true`** — data on disk is encrypted
 - **Staging:** no final snapshot on destroy (cheap teardowns), 1-day backups, no deletion protection
@@ -192,15 +197,18 @@ Serverless Redis — you don't provision capacity upfront, it scales automatical
 IAM is AWS's permission system. Three roles are created:
 
 **ECS Execution Role** — used by AWS (not your code) to:
+
 - Pull your Docker image from ECR
 - Inject secrets from Secrets Manager into containers as environment variables
 - Write logs to CloudWatch
 
 **ECS Task Role** — used by your running app code to:
+
 - Read secrets from Secrets Manager at runtime (if needed)
 - Use ECS Exec (SSH-like access into a running container for migrations/debugging)
 
 **GitHub Deploy Role** — used by GitHub Actions to:
+
 - Push Docker images to ECR
 - Register new task definitions
 - Update ECS services
@@ -226,6 +234,7 @@ Browser → https://api-staging.yourdomain.com
 ```
 
 This file also handles:
+
 - **ACM certificate** — free SSL cert from AWS, validated via DNS. Once you add the validation CNAME in Hostinger, it auto-renews forever — you never touch it again.
 - **HTTP → HTTPS redirect** — port 80 redirects to 443 automatically
 - **Health checks** — ALB pings `/api/v1/health/live` every 30 seconds; containers that fail 3 checks are replaced
@@ -233,10 +242,12 @@ This file also handles:
 **After `terraform apply`, two manual steps in Hostinger:**
 
 1. Add the SSL cert validation CNAME (printed by Terraform after apply):
+
    ```bash
    terraform output acm_validation_cname
    # Prints: Name, Type, Value — paste these exactly into Hostinger DNS
    ```
+
    Do this once. The cert then auto-renews forever with no action needed.
 
 2. Add a CNAME pointing your API subdomain at the ALB:
@@ -254,13 +265,14 @@ That's it — no Route 53, no DNS migration. Your domain stays at Hostinger.
 ### `terraform/cloudwatch.tf` — Logs
 
 Creates two log groups:
-- `/sally/staging/api` — everything your API container prints to stdout/stderr
-- `/sally/staging/worker` — same for the worker container
+
+- `/app/staging/api` — everything your API container prints to stdout/stderr
+- `/app/staging/worker` — same for the worker container
 
 Staging logs kept 7 days, production 30 days. View them in AWS Console → CloudWatch → Log Groups, or via CLI:
 
 ```bash
-aws logs tail /sally/staging/api --follow
+aws logs tail /app/staging/api --follow
 ```
 
 ---
@@ -271,21 +283,21 @@ Creates empty slots in AWS Secrets Manager — one per secret. **Does not set va
 
 ```bash
 aws secretsmanager put-secret-value \
-  --secret-id sally-staging-secret-db-url \
+  --secret-id app-staging-secret-db-url \
   --secret-string "postgresql://..."
 ```
 
 The secrets created:
 
-| Secret name | What goes in it |
-|---|---|
-| `sally-staging-secret-db-url` | PostgreSQL connection string |
-| `sally-staging-secret-redis-url` | Redis connection string (use `rediss://`) |
-| `sally-staging-secret-jwt-access` | JWT access token secret (run: `openssl rand -hex 32`) |
-| `sally-staging-secret-jwt-refresh` | JWT refresh token secret |
-| `sally-staging-secret-jwt-secret` | General secret key |
-| `sally-staging-secret-anthropic-key` | Your Anthropic API key |
-| `sally-staging-secret-resend-key` | Your Resend API key |
+| Secret name                        | What goes in it                                       |
+| ---------------------------------- | ----------------------------------------------------- |
+| `app-staging-secret-db-url`        | PostgreSQL connection string                          |
+| `app-staging-secret-redis-url`     | Redis connection string (use `rediss://`)             |
+| `app-staging-secret-jwt-access`    | JWT access token secret (run: `openssl rand -hex 32`) |
+| `app-staging-secret-jwt-refresh`   | JWT refresh token secret                              |
+| `app-staging-secret-jwt-secret`    | General secret key                                    |
+| `app-staging-secret-anthropic-key` | Your Anthropic API key                                |
+| `app-staging-secret-resend-key`    | Your Resend API key                                   |
 
 ECS injects these as environment variables into your containers at startup — your app reads them as `process.env.DATABASE_URL` etc. The values never appear in your code or logs.
 
@@ -295,11 +307,12 @@ ECS injects these as environment variables into your containers at startup — y
 
 ECS (Elastic Container Service) runs your Docker containers without you managing servers.
 
-**Cluster** — a logical grouping, like a folder. Yours is called `sally-staging-ecs-cluster`.
+**Cluster** — a logical grouping, like a folder. Yours is called `app-staging-ecs-cluster`.
 
 **Task Definition** — a blueprint describing a container: which image, how much CPU/memory, which environment variables, which secrets, which ports. Like a `docker run` command written as config.
 
 Two task definitions:
+
 - `api` — runs your NestJS backend, exposed on port 8000, behind the ALB
 - `worker` — runs background jobs, no public port
 
@@ -308,9 +321,10 @@ Two task definitions:
 **Circuit breaker** — if a new deploy fails health checks repeatedly, ECS automatically rolls back to the previous version. You don't have to do anything.
 
 **ECS Exec** — lets you run commands inside a running container (for migrations, debugging). Like SSH but for containers:
+
 ```bash
 aws ecs execute-command \
-  --cluster sally-staging-ecs-cluster \
+  --cluster app-staging-ecs-cluster \
   --task <task-arn> \
   --container api \
   --interactive \
@@ -325,11 +339,11 @@ aws ecs execute-command \
 
 Saves ~$15-20/month by scaling staging to zero containers at night and back up in the morning:
 
-| Time (UTC) | Action |
-|---|---|
+| Time (UTC)      | Action                              |
+| --------------- | ----------------------------------- |
 | 8:00 AM Mon–Fri | Start (set desired count back to 1) |
-| 8:00 PM Mon–Fri | Stop (set desired count to 0) |
-| Weekends | Stays off |
+| 8:00 PM Mon–Fri | Stop (set desired count to 0)       |
+| Weekends        | Stays off                           |
 
 The database (RDS) keeps running 24/7 — stopping it would be more complex and the savings are smaller.
 
@@ -344,13 +358,14 @@ After `terraform apply` succeeds, these values are printed to your terminal:
 ```
 Outputs:
 
-alb_dns_name          = "sally-staging-alb-api-123456.us-east-1.elb.amazonaws.com"
-ecr_repository_url    = "123456789.dkr.ecr.us-east-1.amazonaws.com/sally-ecr-backend"
-ecs_cluster_name      = "sally-staging-ecs-cluster"
-github_oidc_role_arn  = "arn:aws:iam::123456789:role/sally-staging-iam-role-github-deploy"
+alb_dns_name          = "app-staging-alb-api-123456.us-east-1.elb.amazonaws.com"
+ecr_repository_url    = "123456789.dkr.ecr.us-east-1.amazonaws.com/app-ecr-backend"
+ecs_cluster_name      = "app-staging-ecs-cluster"
+github_oidc_role_arn  = "arn:aws:iam::123456789:role/app-staging-iam-role-github-deploy"
 ```
 
 You need these values to:
+
 - Push your first Docker image (use `ecr_repository_url`)
 - Add GitHub secrets (use `github_oidc_role_arn`)
 
@@ -437,15 +452,15 @@ terraform state show aws_ecs_service.api
 
 ## Estimated Monthly Cost (Staging)
 
-| What | Why | Cost |
-|---|---|---|
-| ECS Fargate (2 tasks) | Runs your app containers | ~$8 |
-| RDS PostgreSQL | Database | ~$15 |
-| ElastiCache Redis | Cache | ~$5 |
-| ALB | Load balancer | ~$16 |
-| NAT Gateway | Outbound internet for private subnet | ~$5 |
-| ECR, Route 53, S3 | Registry, DNS, state storage | ~$2 |
-| **Total** | | **~$51/mo** |
+| What                  | Why                                  | Cost        |
+| --------------------- | ------------------------------------ | ----------- |
+| ECS Fargate (2 tasks) | Runs your app containers             | ~$8         |
+| RDS PostgreSQL        | Database                             | ~$15        |
+| ElastiCache Redis     | Cache                                | ~$5         |
+| ALB                   | Load balancer                        | ~$16        |
+| NAT Gateway           | Outbound internet for private subnet | ~$5         |
+| ECR, Route 53, S3     | Registry, DNS, state storage         | ~$2         |
+| **Total**             |                                      | **~$51/mo** |
 
 With the nightly shutoff scheduler: **~$35/mo** (ECS and NAT costs drop significantly).
 
@@ -461,16 +476,17 @@ Applies all Prisma migrations to create the schema (including pgvector extension
 
 ```bash
 aws ecs run-task \
-  --cluster sally-staging-ecs-cluster \
-  --task-definition sally-staging-ecs-taskdef-api \
+  --cluster app-staging-ecs-cluster \
+  --task-definition app-staging-ecs-taskdef-api \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[PRIVATE_SUBNET_1,PRIVATE_SUBNET_2],securityGroups=[ECS_SG],assignPublicIp=DISABLED}" \
   --overrides '{"containerOverrides":[{"name":"api","command":["/bin/sh","apply-migration.sh"]}]}'
 ```
 
 Wait for it to stop, then check exit code is 0:
+
 ```bash
-aws ecs describe-tasks --cluster sally-staging-ecs-cluster \
+aws ecs describe-tasks --cluster app-staging-ecs-cluster \
   --tasks <TASK_ARN> \
   --query "tasks[0].containers[0].exitCode" --output text
 ```
@@ -478,6 +494,7 @@ aws ecs describe-tasks --cluster sally-staging-ecs-cluster \
 Get subnets and SG from: `terraform output` / AWS console → VPC.
 
 Staging values:
+
 - Subnets: `subnet-006269cf8658ccdb0`, `subnet-0b2cd0939cb6038c8`
 - Security Group: `sg-0ce4743d31c340698`
 
@@ -487,14 +504,14 @@ Seeds super admin, feature flags, truck stops, reference data, plan config. Requ
 
 ```bash
 # Update .env to point at RDS via tunnel (IMPORTANT: update .env not .env.local — dotenv loads .env with priority)
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://sally_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/sally?sslmode=no-verify|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/app?sslmode=no-verify|' \
   apps/backend/.env
 
 # Run seed
 cd apps/backend && pnpm run db:seed
 
 # Restore .env
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://sally_user:sally_password@localhost:5432/sally|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@localhost:5432/app|' \
   apps/backend/.env
 ```
 
@@ -503,20 +520,21 @@ sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://sally_user:sally_password
 Seeds 41 product knowledge documents (143 chunks) with OpenAI embeddings into pgvector for the AI chat feature.
 
 Requires:
+
 - SSM tunnel open on port 5433
 - Both `.env` and `.env.local` updated with RDS URL (same as Step 2)
 - `OPENAI_API_KEY` set in `.env` (already there for local dev)
 
 ```bash
 # Update .env to point at RDS via tunnel (IMPORTANT: update .env not .env.local — dotenv loads .env with priority)
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://sally_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/sally?sslmode=no-verify|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/app?sslmode=no-verify|' \
   apps/backend/.env
 
 # Run knowledge seed
 cd apps/backend && pnpm run seed:knowledge
 
 # Restore .env
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://sally_user:sally_password@localhost:5432/sally|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@localhost:5432/app|' \
   apps/backend/.env
 ```
 
@@ -540,31 +558,32 @@ RDS is in a private subnet — not reachable from the internet. Use SSM port for
 
 ```bash
 # Get current task details
-TASK_ARN=$(aws ecs list-tasks --cluster sally-staging-ecs-cluster --service-name sally-staging-ecs-service-api --query 'taskArns[0]' --output text)
+TASK_ARN=$(aws ecs list-tasks --cluster app-staging-ecs-cluster --service-name app-staging-ecs-service-api --query 'taskArns[0]' --output text)
 TASK_ID=$(echo $TASK_ARN | cut -d'/' -f3)
-RUNTIME_ID=$(aws ecs describe-tasks --cluster sally-staging-ecs-cluster --tasks $TASK_ARN --query 'tasks[0].containers[0].runtimeId' --output text)
+RUNTIME_ID=$(aws ecs describe-tasks --cluster app-staging-ecs-cluster --tasks $TASK_ARN --query 'tasks[0].containers[0].runtimeId' --output text)
 
 # Start tunnel — forwards local port 5433 → RDS port 5432
 aws ssm start-session \
-  --target "ecs:sally-staging-ecs-cluster_${TASK_ID}_${RUNTIME_ID}" \
+  --target "ecs:app-staging-ecs-cluster_${TASK_ID}_${RUNTIME_ID}" \
   --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters '{"host":["sally-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}'
+  --parameters '{"host":["app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}'
 ```
 
 You'll see: `Port 5433 opened for sessionId ... Waiting for connections...` — keep this tab open.
 
 **Step 2: Connect TablePlus**
 
-| Field | Value |
-|-------|-------|
-| Host | `127.0.0.1` |
-| Port | `5433` |
-| User | `sally_user` |
+| Field    | Value                                                |
+| -------- | ---------------------------------------------------- |
+| Host     | `127.0.0.1`                                          |
+| Port     | `5433`                                               |
+| User     | `app_user`                                           |
 | Password | (raw password from `rds!` secret in Secrets Manager) |
-| Database | `sally` |
-| SSL | **On** (required by RDS) |
+| Database | `app`                                                |
+| SSL      | **On** (required by RDS)                             |
 
 To get the password:
+
 ```bash
 RDS_ARN=$(aws secretsmanager list-secrets --output json | python3 -c "import sys,json; [print(s['ARN']) for s in json.load(sys.stdin)['SecretList'] if 'rds' in s['Name'].lower()]")
 aws secretsmanager get-secret-value --secret-id "$RDS_ARN" --query SecretString --output text
@@ -591,7 +610,7 @@ cp apps/backend/.env apps/backend/.env.local-backup
 python3 -c "import urllib.parse; print(urllib.parse.quote('YOUR_RAW_PASSWORD', safe=''))"
 
 # Then update .env:
-# DATABASE_URL=postgresql://sally_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/sally?sslmode=no-verify
+# DATABASE_URL=postgresql://app_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/app?sslmode=no-verify
 ```
 
 **Step 2: Run the seed**
@@ -624,6 +643,7 @@ Issues hit during first staging deploy and how to fix them. **Read this before d
 **Error:** `image Manifest does not contain descriptor matching platform 'linux/amd64'`
 
 **Fix:** Always build with `--platform linux/amd64`:
+
 ```bash
 docker build --platform linux/amd64 -f apps/backend/Dockerfile -t $ECR_URL:latest .
 ```
@@ -649,12 +669,15 @@ docker build --platform linux/amd64 -f apps/backend/Dockerfile -t $ECR_URL:lates
 **Error:** `PrismaClientKnownRequestError: Invalid URL`
 
 **Fix:** URL-encode the password before putting it in the secret:
+
 ```bash
 python3 -c "import urllib.parse; print(urllib.parse.quote('YOUR_PASSWORD', safe=''))"
 ```
+
 Then use the encoded value in the connection string:
+
 ```
-postgresql://sally_user:ENCODED_PASSWORD@host:5432/sally?sslmode=no-verify
+postgresql://app_user:ENCODED_PASSWORD@host:5432/app?sslmode=no-verify
 ```
 
 ---
@@ -668,7 +691,7 @@ postgresql://sally_user:ENCODED_PASSWORD@host:5432/sally?sslmode=no-verify
 **Fix:** Add `?sslmode=no-verify` to the DATABASE_URL. This encrypts the connection but skips certificate validation — acceptable inside a private VPC where you trust the network.
 
 ```
-postgresql://sally_user:PASSWORD@host:5432/sally?sslmode=no-verify
+postgresql://app_user:PASSWORD@host:5432/app?sslmode=no-verify
 ```
 
 > For production you could bundle the AWS RDS CA cert into the Docker image and use `sslmode=verify-full` for stricter security.
@@ -680,14 +703,16 @@ postgresql://sally_user:PASSWORD@host:5432/sally?sslmode=no-verify
 **Problem:** `pnpm deploy --prod` creates a self-contained bundle but doesn't include the Prisma CLI binary (only the Prisma Client). Running `npx prisma migrate deploy` or `node_modules/.bin/prisma` fails.
 
 **Fix:** Use `apply-migration.sh` (already in the image) which uses `psql` directly:
+
 ```bash
 aws ecs run-task \
-  --cluster sally-staging-ecs-cluster \
-  --task-definition sally-staging-ecs-taskdef-api \
+  --cluster app-staging-ecs-cluster \
+  --task-definition app-staging-ecs-taskdef-api \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[PRIVATE_SUBNET_1,PRIVATE_SUBNET_2],securityGroups=[ECS_SG],assignPublicIp=DISABLED}" \
   --overrides '{"containerOverrides":[{"name":"api","command":["/bin/sh","apply-migration.sh"]}]}'
 ```
+
 Get subnet and SG IDs from `terraform output` / AWS console.
 
 ---
@@ -699,8 +724,9 @@ Get subnet and SG IDs from `terraform output` / AWS console.
 **Error:** `ResourceNotFoundException: Secrets Manager can't find the specified secret value for staging label: AWSCURRENT`
 
 **Fix:** All 13 secrets must have a value set before the first deploy. If a secret is unused (e.g. Anthropic key when using AI gateway instead), set a dummy value:
+
 ```bash
-aws secretsmanager put-secret-value --secret-id sally-staging-secret-anthropic-key --secret-string "unused"
+aws secretsmanager put-secret-value --secret-id app-staging-secret-anthropic-key --secret-string "unused"
 ```
 
 ---
@@ -710,6 +736,7 @@ aws secretsmanager put-secret-value --secret-id sally-staging-secret-anthropic-k
 **Problem:** Secret names with `!` (like `rds!db-xxx`) cause zsh history expansion errors.
 
 **Fix:** Use single quotes or the ARN instead:
+
 ```bash
 # Single quotes prevent zsh expansion
 aws secretsmanager get-secret-value --secret-id 'rds!db-xxx' ...
@@ -725,15 +752,18 @@ aws secretsmanager get-secret-value --secret-id "$RDS_ARN" ...
 ### 8. ECS Exec requires SSM plugin + enableExecuteCommand
 
 **Problem:** `aws ecs execute-command` requires:
+
 1. `session-manager-plugin` installed locally (`brew install --cask session-manager-plugin`)
 2. Service must have `enableExecuteCommand = true`
 
 **Fix:** Enable it:
+
 ```bash
-aws ecs update-service --cluster sally-staging-ecs-cluster \
-  --service sally-staging-ecs-service-api \
+aws ecs update-service --cluster app-staging-ecs-cluster \
+  --service app-staging-ecs-service-api \
   --enable-execute-command --force-new-deployment
 ```
+
 Wait for new task, then exec into it. Note: even with this, ECS Exec may fail in private subnets without VPC endpoints for SSM — use the one-off task approach for migrations instead (see lesson 5).
 
 ---
@@ -743,6 +773,7 @@ Wait for new task, then exec into it. Note: even with this, ECS Exec may fail in
 **Problem:** AWS CLI pipes long output through `less`, showing `(END)` which blocks the terminal.
 
 **Fix:** Add to `~/.zshrc`:
+
 ```bash
 export AWS_PAGER=""
 ```
@@ -752,7 +783,7 @@ export AWS_PAGER=""
 ### Final working DATABASE_URL format
 
 ```
-postgresql://sally_user:URL_ENCODED_PASSWORD@RDS_ENDPOINT:5432/sally?sslmode=no-verify
+postgresql://app_user:URL_ENCODED_PASSWORD@RDS_ENDPOINT:5432/app?sslmode=no-verify
 ```
 
 ### Final working REDIS_URL format
