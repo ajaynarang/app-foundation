@@ -1,10 +1,10 @@
 import { RegistrationForm } from '@/features/auth';
 
 const valueProps = [
-  { number: '$185K+', description: 'saved annually per 50-truck fleet' },
-  { number: '520', description: 'dispatcher hours recovered per year' },
-  { number: '100%', description: 'HOS compliant. Every route. Every time.' },
-  { number: '1 click', description: 'optimized route — stops, fuel, rest, HOS. Done.' },
+  { number: '$185K+', description: 'saved annually per team' },
+  { number: '520', description: 'hours recovered per year' },
+  { number: '100%', description: 'on top of every task. Every time.' },
+  { number: '1 click', description: 'automated workflows — set up in seconds. Done.' },
   { number: '24/7', description: 'continuous monitoring, zero manual checks' },
 ];
 

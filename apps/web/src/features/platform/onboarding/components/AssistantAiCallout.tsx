@@ -19,7 +19,7 @@ export function AssistantAiCallout({ onOpenChat }: AssistantAiCalloutProps) {
           <div>
             <h3 className="text-sm font-semibold text-foreground">The Assistant is here to help</h3>
             <p className="text-sm text-muted-foreground">
-              Your AI fleet assistant can answer questions, explain HOS rules, and help you navigate the platform.
+              Your AI assistant can answer questions, explain how things work, and help you navigate the platform.
             </p>
           </div>
         </div>

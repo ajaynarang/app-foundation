@@ -149,7 +149,7 @@ function PlatformDetailSheet({
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">6.</span> Start chatting -- ask Claude about
-                    your loads, fleet status, invoices, and more
+                    your data, records, invoices, and more
                   </li>
                 </ol>
               )}
@@ -206,7 +206,7 @@ export default function AiAssistantsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">AI Assistants</h2>
-        <p className="text-sm text-muted-foreground">Give AI assistants access to your fleet data via MCP</p>
+        <p className="text-sm text-muted-foreground">Give AI assistants access to your workspace data via MCP</p>
       </div>
 
       <Alert>

@@ -10,9 +10,9 @@ import type { TenantPlan } from '@/features/platform/plans';
 
 // Display names for plans
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
-  STARTER: 'Haul',
-  PROFESSIONAL: 'Fleet',
-  ENTERPRISE: 'Freight Force',
+  STARTER: 'Starter',
+  PROFESSIONAL: 'Professional',
+  ENTERPRISE: 'Enterprise',
   TRIAL: 'Trial',
   TRIAL_EXPIRED: 'Trial Expired',
   SUSPENDED: 'Suspended',

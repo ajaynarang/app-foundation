@@ -7,7 +7,6 @@ import { Card, CardContent, CardFooter } from '@app/ui/components/ui/card';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Checkbox } from '@app/ui/components/ui/checkbox';
 import {
-  Truck,
   DollarSign,
   Users,
   ShieldCheck,
@@ -45,13 +44,12 @@ interface ScopeRow {
   id: string;
   label: string;
   tier: Tier;
-  /** Domain prefix (fleet, loads, ...) — used for grouping inside the standard bucket. */
+  /** Domain prefix (records, invoices, ...) — used for grouping inside the standard bucket. */
   domain: string;
 }
 
 const DOMAIN_META: Record<string, { label: string; icon: LucideIcon }> = {
-  fleet: { label: 'Fleet', icon: Truck },
-  loads: { label: 'Loads', icon: Package },
+  records: { label: 'Records', icon: Package },
   invoices: { label: 'Invoices', icon: DollarSign },
   settlements: { label: 'Settlements', icon: DollarSign },
   billing: { label: 'Billing', icon: DollarSign },

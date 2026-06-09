@@ -499,7 +499,7 @@ export default function SubscriptionPage() {
                     Your plan will change to{' '}
                     <span className="font-semibold">
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {(subscription as any).pendingDowngradePlan === 'STARTER' ? 'Haul' : 'Fleet'}
+                      {(subscription as any).pendingDowngradePlan === 'STARTER' ? 'Starter' : 'Professional'}
                     </span>{' '}
                     at the end of the current billing period (
                     {new Date(subscription.currentPeriodEnd).toLocaleDateString()}

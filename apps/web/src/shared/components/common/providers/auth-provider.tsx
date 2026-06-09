@@ -14,7 +14,7 @@
 
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/shared/lib/firebase';
+import { auth, isFirebaseConfigured } from '@/shared/lib/firebase';
 import { useAuthStore } from '@/features/auth';
 
 const SSO_RELAY_PREFIX = '#sso-relay=';
@@ -44,8 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }, []);
 
-  // Firebase auth state sync
+  // Firebase auth state sync — skipped until Firebase is configured so a fresh
+  // clone of the starter renders without crashing.
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setFirebaseUser(firebaseUser);
     });

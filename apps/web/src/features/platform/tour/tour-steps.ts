@@ -7,12 +7,11 @@ const ADMIN_ROLES = ['ADMIN', 'OWNER'];
 const ALL_TMS_ROLES = ['DISPATCHER', 'ADMIN', 'OWNER', 'DRIVER'];
 
 /**
- * Tour narrative arc — a new operator's first day:
+ * Tour narrative arc — a new user's first visit:
  *
- *   Act I  — Set up:  Workspace → Fleet
- *   Act II — Operate: Assistant's Desk → Inbox → Loads → Horizon → Smart Routes
- *                     → Tower → Alerts → Shield
- *   Act III — Get paid: Close Out → Billing → Pay → IFTA → Insights
+ *   Act I  — Set up:  Workspace → Members
+ *   Act II — Operate: Assistant's Desk → Activity → Notifications
+ *   Act III — Configure: Billing → Integrations → Insights
  *   Epilogue — Make it yours: Settings
  *
  * Steps are filtered by role AND entitlement/feature-flag visibility.
@@ -32,9 +31,9 @@ export const tourSteps: TourStepConfig[] = [
   },
   {
     icon: null,
-    title: 'Fleet',
+    title: 'Members',
     content:
-      'Your people and machines. Add drivers, trucks, and trailers. Connect your ELD. This is the ground truth for everything else Assistant does.',
+      'Your team. Invite people, assign roles, and manage who can access what. This is the ground truth for everything else the Assistant does.',
     selector: '#tour-nav-fleet',
     side: 'right',
     route: '/dispatcher/fleet',
@@ -46,7 +45,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: "Assistant's Desk",
     content:
-      'Your AI agents at work — drafting dispatch, chasing documents, flagging risk. You approve, override, or let them run. Think of it as a team of employees that never sleeps.',
+      'Your AI agents at work — drafting replies, chasing tasks, flagging things that need attention. You approve, override, or let them run. Think of it as a team of employees that never sleeps.',
     selector: '#tour-nav-assistant-s-desk',
     side: 'right',
     route: '/dispatcher/desk',
@@ -57,7 +56,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Inbox',
     content:
-      'Find your next haul. Search DAT, match inbound EDI tenders, read broker emails — one place for every load coming your way.',
+      'Everything coming your way in one place. Read messages, triage requests, and act on what matters — without switching tools.',
     selector: '#tour-nav-inbox',
     side: 'right',
     route: '/dispatcher/inbox',
@@ -66,9 +65,9 @@ export const tourSteps: TourStepConfig[] = [
   },
   {
     icon: null,
-    title: 'Loads',
+    title: 'Records',
     content:
-      'The heart of your operation. Create a load, assign a driver, track it from pickup to POD. Everything connects back here.',
+      'The heart of your workspace. Create a record, assign an owner, and track it through to completion. Everything connects back here.',
     selector: '#tour-nav-loads',
     side: 'right',
     route: '/dispatcher/loads',
@@ -78,7 +77,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Horizon',
     content:
-      'Capacity a week out. See which drivers are free, which lanes are hot, and where you risk dead miles before they happen.',
+      'A look ahead. See what is coming up, where capacity is tight, and where problems may surface before they happen.',
     selector: '#tour-nav-horizon',
     side: 'right',
     route: '/dispatcher/horizon',
@@ -87,9 +86,9 @@ export const tourSteps: TourStepConfig[] = [
   },
   {
     icon: null,
-    title: 'Smart Routes',
+    title: 'Smart Plans',
     content:
-      'Plan multi-stop runs with HOS built in. Assistant picks fuel stops, sleeper splits, and detours — so miles roll with fewer surprises.',
+      'Plan multi-step work with the Assistant. It suggests the order, the handoffs, and the next move — so things run with fewer surprises.',
     selector: '#tour-nav-smart-routes',
     side: 'right',
     route: '/dispatcher/smart-routes',
@@ -100,7 +99,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Tower',
     content:
-      'Your fleet, right now. Live positions, active loads, and anything that needs attention — one screen. This is where your day lives once the wheels are rolling.',
+      'Your workspace, right now. Live status, active work, and anything that needs attention — one screen. This is where your day lives once things are moving.',
     selector: '#tour-nav-tower',
     side: 'right',
     route: '/dispatcher/tower',
@@ -111,7 +110,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Alerts',
     content:
-      'Things go sideways — late arrivals, expiring HOS, maintenance overdue. Alerts catch them before they become expensive.',
+      'Things go sideways — overdue tasks, approaching deadlines, items that need a follow-up. Alerts catch them before they become expensive.',
     selector: '#tour-nav-alerts',
     side: 'right',
     route: '/dispatcher/alerts',
@@ -122,7 +121,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Shield',
     content:
-      'Your compliance scorecard. Surfaces safety and HOS issues early, then points you at the fix. Runs in the background so audits never surprise you.',
+      'Your health scorecard. Surfaces issues early, then points you at the fix. Runs in the background so reviews never surprise you.',
     selector: '#tour-nav-shield',
     side: 'right',
     route: '/dispatcher/shield',
@@ -135,7 +134,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Close Out',
     content:
-      'Load delivered? Verify the paperwork — POD, signatures, accessorials. This is your quality gate before the invoice goes out.',
+      'Work done? Verify the details — documents, sign-off, approvals. This is your quality gate before the invoice goes out.',
     selector: '#tour-nav-close-out',
     side: 'right',
     route: '/dispatcher/close-out',
@@ -144,8 +143,7 @@ export const tourSteps: TourStepConfig[] = [
   {
     icon: null,
     title: 'Billing',
-    content:
-      'Get paid. Generate invoices, track aging, chase overdue customers, sync to QuickBooks. Factoring too, if you use it.',
+    content: 'Get paid. Generate invoices, track aging, chase overdue customers, and sync to your accounting tools.',
     selector: '#tour-nav-billing',
     side: 'right',
     route: '/dispatcher/billing',
@@ -155,7 +153,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Pay',
     content:
-      'Pay your drivers. Settlements calculate earnings — per mile, percentage, flat rate, accessorials — and push straight to accounting.',
+      'Pay your team. Settlements calculate earnings — hourly, percentage, flat rate, bonuses — and push straight to accounting.',
     selector: '#tour-nav-pay',
     side: 'right',
     route: '/dispatcher/pay',
@@ -163,9 +161,9 @@ export const tourSteps: TourStepConfig[] = [
   },
   {
     icon: null,
-    title: 'IFTA',
+    title: 'Tax',
     content:
-      'Fuel tax reporting without the spreadsheet. Assistant tracks mileage by jurisdiction as you operate, so quarterly filings take minutes.',
+      'Tax reporting without the spreadsheet. The Assistant tracks the numbers as you operate, so quarterly filings take minutes.',
     selector: '#tour-nav-ifta',
     side: 'right',
     route: '/dispatcher/ifta',
@@ -176,7 +174,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Insights',
     content:
-      'The bigger picture. Revenue trends, driver performance, lane profitability — the numbers that shape smarter decisions next month.',
+      'The bigger picture. Revenue trends, team performance, profitability — the numbers that shape smarter decisions next month.',
     selector: '#tour-nav-insights',
     side: 'right',
     route: '/dispatcher/insights',

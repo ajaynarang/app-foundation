@@ -272,7 +272,7 @@ export function TenantDetailsSheet({
                         id="edit-subdomain"
                         value={form.subdomain}
                         onChange={(e) => updateField('subdomain', e.target.value.toLowerCase())}
-                        placeholder="acme-trucking"
+                        placeholder="acme"
                         className="rounded-r-none"
                       />
                       <span className="inline-flex h-9 items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">

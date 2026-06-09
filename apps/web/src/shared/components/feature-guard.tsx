@@ -14,22 +14,22 @@ const featureDescriptions: Record<string, { label: string; description: string; 
   api_keys: {
     label: 'API Keys',
     description: 'Create server-to-server API keys for programmatic access to the platform.',
-    requiredPlan: 'Freight Force',
+    requiredPlan: 'Enterprise',
   },
   webhooks: {
     label: 'Webhooks',
     description: 'Receive real-time event notifications via HTTP callbacks.',
-    requiredPlan: 'Freight Force',
+    requiredPlan: 'Enterprise',
   },
   oauth_clients: {
     label: 'OAuth Clients',
     description: 'Register OAuth applications for user-authorized integrations.',
-    requiredPlan: 'Freight Force',
+    requiredPlan: 'Enterprise',
   },
   samsara_integration: {
     label: 'Integrations',
-    description: 'Connect Samsara, QuickBooks, and external TMS systems to sync fleet data.',
-    requiredPlan: 'Fleet',
+    description: 'Connect external systems and tools to sync your workspace data.',
+    requiredPlan: 'Professional',
   },
 };
 
@@ -52,7 +52,7 @@ export function FeatureGuard({ entitlementKey, children }: FeatureGuardProps) {
   }
 
   const featureInfo = featureDescriptions[entitlementKey];
-  const requiredPlan = featureInfo?.requiredPlan ?? 'Freight Force';
+  const requiredPlan = featureInfo?.requiredPlan ?? 'Enterprise';
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">

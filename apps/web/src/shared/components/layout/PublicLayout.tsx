@@ -72,7 +72,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               <span className="text-lg sm:text-xl font-bold text-foreground font-space-grotesk">Platform</span>
             </Link>
             <span className="hidden sm:inline text-xs text-gray-400">|</span>
-            <p className="hidden sm:block text-xs text-gray-500">Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+            <p className="hidden sm:block text-xs text-gray-500">Your platform, ready to build on.</p>
           </div>
 
           {/* Desktop Navigation */}

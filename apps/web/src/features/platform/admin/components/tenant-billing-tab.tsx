@@ -90,16 +90,16 @@ interface TenantPlanBillingTabProps {
 const PLAN_OPTIONS = [
   { value: 'TRIAL', label: 'Trial' },
   { value: 'TRIAL_EXPIRED', label: 'Trial Expired' },
-  { value: 'STARTER', label: 'Haul (Starter)' },
-  { value: 'PROFESSIONAL', label: 'Fleet (Professional)' },
-  { value: 'ENTERPRISE', label: 'Freight Force (Enterprise)' },
+  { value: 'STARTER', label: 'Starter' },
+  { value: 'PROFESSIONAL', label: 'Professional' },
+  { value: 'ENTERPRISE', label: 'Enterprise' },
   { value: 'SUSPENDED', label: 'Suspended' },
 ];
 
 const SUBSCRIBABLE_PLANS = [
-  { value: 'STARTER', label: 'Haul (Starter)' },
-  { value: 'PROFESSIONAL', label: 'Fleet (Professional)' },
-  { value: 'ENTERPRISE', label: 'Freight Force (Enterprise)' },
+  { value: 'STARTER', label: 'Starter' },
+  { value: 'PROFESSIONAL', label: 'Professional' },
+  { value: 'ENTERPRISE', label: 'Enterprise' },
 ];
 
 const STATUS_VARIANTS: Record<string, 'default' | 'destructive' | 'muted' | 'outline'> = {

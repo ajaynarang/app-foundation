@@ -203,7 +203,7 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
               {!isOwner && (
                 <p className="text-sm text-muted-foreground mt-1">Only the tenant owner can invite admin users</p>
               )}
-              <p className="text-sm text-muted-foreground mt-1">To add drivers, use Fleet Management</p>
+              <p className="text-sm text-muted-foreground mt-1">Members can be managed from this page once invited</p>
             </div>
           </div>
           <DialogFooter className="mt-6">

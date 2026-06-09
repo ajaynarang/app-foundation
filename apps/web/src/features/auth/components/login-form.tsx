@@ -362,7 +362,7 @@ export function LoginForm({
         ) : (
           <>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Sign In</h1>
-            <p className="text-sm text-muted-foreground mt-2">Smart Routes. Confident Dispatchers. Happy Drivers.</p>
+            <p className="text-sm text-muted-foreground mt-2">Your platform, ready to build on.</p>
           </>
         )}
       </motion.div>
@@ -662,12 +662,12 @@ export function LoginForm({
             className="text-center mt-8 pt-8 border-t border-border"
           >
             <p className="text-sm text-muted-foreground">
-              Running a fleet?{' '}
+              New here?{' '}
               <Link
                 href="/register"
                 className="text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
               >
-                Set up the platform →
+                Create an account →
               </Link>
             </p>
           </motion.div>

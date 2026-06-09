@@ -58,8 +58,7 @@ export function TourWelcomeDialog({ open, onOpenChange }: TourWelcomeDialogProps
           >
             <DialogTitle className="text-2xl font-bold text-foreground tracking-tight">Meet the Assistant</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-              Your AI-powered fleet operations platform. Let me walk you through everything — it&apos;ll take less than
-              2 minutes.
+              Your AI-powered platform. Let me walk you through everything — it&apos;ll take less than 2 minutes.
             </DialogDescription>
           </motion.div>
 

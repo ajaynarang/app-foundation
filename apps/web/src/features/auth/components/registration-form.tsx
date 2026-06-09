@@ -387,7 +387,7 @@ export function RegistrationForm() {
                     <Input
                       id="subdomain"
                       {...register('subdomain')}
-                      placeholder="acme-trucking"
+                      placeholder="acme"
                       onBlur={(e) => checkSubdomain(e.target.value)}
                       disabled={isLoading}
                       autoComplete="off"
@@ -405,7 +405,7 @@ export function RegistrationForm() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-sm text-muted-foreground mt-2 ml-2"
                     >
-                      Your unique URL (e.g., acme-trucking.{APP_DOMAIN})
+                      Your unique URL (e.g., acme.{APP_DOMAIN})
                     </motion.p>
                   )}
 
