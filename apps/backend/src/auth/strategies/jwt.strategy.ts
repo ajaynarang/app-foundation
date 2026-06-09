@@ -10,7 +10,6 @@ export interface JwtPayload {
   email?: string; // Optional — phone-only users may not have one
   role: string;
   tenantId?: string; // Optional - SUPER_ADMIN has no tenant
-  driverId?: string;
   authMethod?: 'email_password' | 'phone_pin' | 'phone_otp';
   iat: number;
   exp: number;
@@ -52,6 +51,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Check tenant is active (skip for SUPER_ADMIN who has no tenant)
     if (user.tenant && !user.tenant.isActive) {
       throw new UnauthorizedException('Tenant is inactive');
+    }
+
+    // Single-tenant mode: stamp the implicit tenant onto every non-SUPER_ADMIN
+    // user so downstream `where: { tenantId }` scoping resolves to the one
+    // seeded tenant — even for users created without a tenant relation.
+    const multiTenancy = this.configService.get<{ enabled: boolean; implicitTenantId: number }>('multiTenancy');
+    if (multiTenancy?.enabled === false && user.role !== 'SUPER_ADMIN' && !user.tenant) {
+      return {
+        dbId: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: String(multiTenancy.implicitTenantId),
+        tenantDbId: multiTenancy.implicitTenantId,
+        tenantName: 'Default Workspace',
+        isActive: user.isActive,
+        authMethod: payload.authMethod,
+      };
     }
 
     // Return user object that will be attached to request
