@@ -55,7 +55,7 @@ export function getLangfuseTraceUrl(traceId: string | null): string | null {
  * `linkRefType:linkRefId` (e.g. `document:doc_abc`,
  * `conversation_message:conv_xyz`), with a `surface:tenant` fallback when a
  * row has no linkRef. This is the one correlation handle we control
- * end-to-end across chat, ratecon and desk — unlike the trace id, which the
+ * end-to-end across chat, documents and desk — unlike the trace id, which the
  * Mastra and raw-SDK tracing paths derive differently. Keep this in sync with
  * `buildLangfuseTelemetry` on the backend (structured-output.service.ts).
  */

@@ -11,7 +11,6 @@ import { Button } from '@app/ui/components/ui/button';
 import { Checkbox } from '@app/ui/components/ui/checkbox';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { PhoneInput } from '@app/ui/components/ui/phone-input';
 import { isValidE164 } from '@/shared/lib/utils/phone';
 import { Turnstile } from '@marsidev/react-turnstile';
@@ -21,8 +20,6 @@ import { PasswordStrengthMeter } from './password-strength-meter';
 
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'app.appshore.in';
 
-const CARRIER_TYPE_VALUES = ['FOR_HIRE_INTERSTATE', 'INTRASTATE_ONLY', 'PRIVATE_FLEET', 'LEASED_ON'] as const;
-
 const registrationSchema = z
   .object({
     // Company info
@@ -31,19 +28,6 @@ const registrationSchema = z
       .string()
       .min(3, 'Subdomain must be at least 3 characters')
       .regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers, and hyphens'),
-    dotNumber: z
-      .string()
-      .min(1, 'DOT number is required')
-      .max(8, 'DOT number must be 1-8 digits')
-      .regex(/^\d+$/, 'DOT number must be numeric'),
-    carrierType: z.enum(CARRIER_TYPE_VALUES),
-    mcNumber: z
-      .string()
-      .regex(/^\d+$/, 'MC number must be numeric')
-      .max(8, 'MC number must be 1-8 digits')
-      .optional()
-      .or(z.literal('')),
-    fleetSize: z.enum(['SIZE_1_10', 'SIZE_11_50', 'SIZE_51_100', 'SIZE_101_500', 'SIZE_500_PLUS']),
 
     // Admin user info
     firstName: z.string().min(1, 'First name is required'),
@@ -63,19 +47,7 @@ const registrationSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ['confirmPassword'],
-  })
-  .refine(
-    (data) => {
-      if (data.carrierType === 'FOR_HIRE_INTERSTATE') {
-        return !!data.mcNumber && data.mcNumber.length > 0;
-      }
-      return true;
-    },
-    {
-      message: 'MC number is required for For-Hire Interstate carriers',
-      path: ['mcNumber'],
-    },
-  );
+  });
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
 
@@ -105,10 +77,6 @@ export function RegistrationForm() {
     defaultValues: {
       companyName: '',
       subdomain: '',
-      dotNumber: '',
-      carrierType: 'FOR_HIRE_INTERSTATE' as const,
-      mcNumber: '',
-      fleetSize: undefined,
       firstName: '',
       lastName: '',
       email: '',
@@ -142,7 +110,7 @@ export function RegistrationForm() {
     let fieldsToValidate: (keyof RegistrationFormData)[] = [];
 
     if (step === 1) {
-      fieldsToValidate = ['companyName', 'subdomain', 'dotNumber', 'carrierType', 'mcNumber', 'fleetSize'];
+      fieldsToValidate = ['companyName', 'subdomain'];
     } else if (step === 2) {
       fieldsToValidate = ['firstName', 'lastName', 'email', 'phone'];
     } else if (step === 3) {
@@ -156,21 +124,12 @@ export function RegistrationForm() {
   // Check if current step is valid
   const isStepValid = (): boolean => {
     if (currentStep === 1) {
-      const carrierType = watchAllFields.carrierType;
-      const mcValid =
-        carrierType === 'FOR_HIRE_INTERSTATE' ? !!watchAllFields.mcNumber && watchAllFields.mcNumber.length >= 1 : true;
       return !!(
         watchAllFields.companyName &&
         watchAllFields.subdomain &&
-        watchAllFields.dotNumber?.length >= 1 &&
-        watchAllFields.carrierType &&
-        mcValid &&
-        watchAllFields.fleetSize &&
         subdomainAvailable === true &&
         !errors.companyName &&
-        !errors.subdomain &&
-        !errors.dotNumber &&
-        !errors.mcNumber
+        !errors.subdomain
       );
     } else if (currentStep === 2) {
       return !!(
@@ -232,10 +191,6 @@ export function RegistrationForm() {
         body: JSON.stringify({
           companyName: data.companyName,
           subdomain: data.subdomain,
-          dotNumber: data.dotNumber,
-          carrierType: data.carrierType,
-          mcNumber: data.mcNumber || undefined,
-          fleetSize: data.fleetSize,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
@@ -438,143 +393,6 @@ export function RegistrationForm() {
                         className="text-sm text-critical mt-2 ml-2"
                       >
                         {errors.subdomain.message}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* DOT Number */}
-                <div>
-                  <Input
-                    id="dotNumber"
-                    {...register('dotNumber')}
-                    placeholder="12345678"
-                    maxLength={8}
-                    disabled={isLoading}
-                    autoComplete="off"
-                    className="relative w-full text-lg py-5 px-6 border-2 transition-all duration-200 bg-background rounded-lg focus:scale-[1.01] focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-foreground"
-                  />
-
-                  {/* Helper text - always visible when no error */}
-                  {!errors.dotNumber && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-sm text-muted-foreground mt-2 ml-2"
-                    >
-                      US DOT Number (1-8 digits)
-                    </motion.p>
-                  )}
-
-                  <AnimatePresence mode="wait">
-                    {errors.dotNumber && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
-                      >
-                        {errors.dotNumber.message}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Carrier Type */}
-                <div>
-                  <Select
-                    defaultValue="FOR_HIRE_INTERSTATE"
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    onValueChange={(value) => setValue('carrierType', value as any, { shouldValidate: true })}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger className="relative w-full text-lg py-5 px-6 border-2 transition-all duration-200 bg-background rounded-lg focus:scale-[1.01] focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-foreground h-auto">
-                      <SelectValue placeholder="Select Carrier Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FOR_HIRE_INTERSTATE">For-Hire Interstate</SelectItem>
-                      <SelectItem value="INTRASTATE_ONLY">Intrastate Only</SelectItem>
-                      <SelectItem value="PRIVATE_FLEET">Private Fleet</SelectItem>
-                      <SelectItem value="LEASED_ON">Operating Under Another Carrier&apos;s Authority</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <AnimatePresence mode="wait">
-                    {errors.carrierType && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
-                      >
-                        {errors.carrierType.message}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* MC Number */}
-                <div>
-                  <Input
-                    id="mcNumber"
-                    {...register('mcNumber')}
-                    placeholder="MC Number"
-                    maxLength={8}
-                    disabled={isLoading}
-                    autoComplete="off"
-                    className="relative w-full text-lg py-5 px-6 border-2 transition-all duration-200 bg-background rounded-lg focus:scale-[1.01] focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-foreground"
-                  />
-
-                  {/* Helper text */}
-                  {!errors.mcNumber && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-sm text-muted-foreground mt-2 ml-2"
-                    >
-                      {watchAllFields.carrierType === 'FOR_HIRE_INTERSTATE'
-                        ? 'MC Number (Required for For-Hire Interstate)'
-                        : 'MC Number (Optional)'}
-                    </motion.p>
-                  )}
-
-                  <AnimatePresence mode="wait">
-                    {errors.mcNumber && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
-                      >
-                        {errors.mcNumber.message}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Fleet Size */}
-                <div>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <Select onValueChange={(value) => setValue('fleetSize', value as any)} disabled={isLoading}>
-                    <SelectTrigger className="relative w-full text-lg py-5 px-6 border-2 transition-all duration-200 bg-background rounded-lg focus:scale-[1.01] focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 border-border focus:border-foreground h-auto">
-                      <SelectValue placeholder="Select Fleet Size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="SIZE_1_10">1-10 vehicles</SelectItem>
-                      <SelectItem value="SIZE_11_50">11-50 vehicles</SelectItem>
-                      <SelectItem value="SIZE_51_100">51-100 vehicles</SelectItem>
-                      <SelectItem value="SIZE_101_500">101-500 vehicles</SelectItem>
-                      <SelectItem value="SIZE_500_PLUS">500+ vehicles</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <AnimatePresence mode="wait">
-                    {errors.fleetSize && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
-                      >
-                        {errors.fleetSize.message}
                       </motion.p>
                     )}
                   </AnimatePresence>

@@ -23,8 +23,6 @@ interface Tenant {
   tenantId: string;
   companyName: string;
   subdomain: string;
-  dotNumber: string;
-  fleetSize: string;
   contactEmail: string;
   contactPhone: string;
   status: string;
@@ -128,8 +126,6 @@ export function TenantTable({
           <TableRow>
             <TableHead>Company</TableHead>
             <TableHead className="hidden sm:table-cell">Subdomain</TableHead>
-            <TableHead className="hidden lg:table-cell">DOT Number</TableHead>
-            <TableHead className="hidden md:table-cell">Fleet Size</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="hidden md:table-cell">Plan</TableHead>
             <TableHead className="hidden lg:table-cell">Admin User</TableHead>
@@ -144,10 +140,6 @@ export function TenantTable({
               <TableCell className="font-medium">{tenant.companyName}</TableCell>
               <TableCell className="hidden sm:table-cell">
                 <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">{tenant.dotNumber}</TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Badge variant="muted">{tenant.fleetSize?.replace('SIZE_', '')}</Badge>
               </TableCell>
               <TableCell>
                 <Badge variant={tenant.status === 'ACTIVE' ? 'default' : 'muted'}>

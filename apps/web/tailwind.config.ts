@@ -1,15 +1,15 @@
-import type { Config } from "tailwindcss";
-import uiPreset from "@app/ui/tailwind-preset";
+import type { Config } from 'tailwindcss';
+import uiPreset from '@app/ui/tailwind-preset';
 
 const config: Config = {
   presets: [uiPreset as Config],
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/shared/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
-    "./node_modules/@tremor/**/*.{js,ts,jsx,tsx}",
-    "../../packages/ui/src/**/*.{ts,tsx}",
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/shared/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/features/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@tremor/**/*.{js,ts,jsx,tsx}',
+    '../../packages/ui/src/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {
@@ -23,9 +23,9 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         counter: 'counter 1s ease-out forwards',
         // HOS nudge pill animations
-        'hos-attention': 'hos-gentle-pulse 3s ease-in-out infinite',
-        'hos-dot': 'hos-dot-pulse 2s ease-in-out infinite',
-        'hos-shimmer': 'hos-shimmer 2.5s linear infinite',
+        'accent-pulse': 'accent-pulse-gentle 3s ease-in-out infinite',
+        'accent-dot': 'accent-dot-pulse 2s ease-in-out infinite',
+        'accent-shimmer': 'accent-shimmer 2.5s linear infinite',
       },
       keyframes: {
         'draw-path': {
@@ -53,22 +53,22 @@ const config: Config = {
           '100%': { opacity: '1', transform: 'scale(1)' },
         },
         // HOS nudge pill
-        'hos-gentle-pulse': {
+        'accent-pulse-gentle': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.82' },
         },
-        'hos-dot-pulse': {
+        'accent-dot-pulse': {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
           '50%': { opacity: '0.6', transform: 'scale(0.85)' },
         },
-        'hos-shimmer': {
+        'accent-shimmer': {
           '0%': { backgroundPosition: '-200% center' },
           '100%': { backgroundPosition: '200% center' },
         },
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require('tailwindcss-animate')],
 };
 
 export default config;

@@ -51,7 +51,7 @@ export function AiCostVsQuotaPanel({ tenantId, days }: AiCostVsQuotaPanelProps) 
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Quota — feature uses</p>
         {data.quota.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Quota consumption isn&apos;t wired into this view yet. Quota counts feature uses (e.g. ratecons/month); cost
+            Quota consumption isn&apos;t wired into this view yet. Quota counts feature uses (e.g. messages/month); cost
             (left) caps actual dollars. Both fire independently — quota first, then cost budget.
           </p>
         ) : (

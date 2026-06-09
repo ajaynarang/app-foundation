@@ -16,7 +16,7 @@ interface MessageComposerProps {
    * `null` for a general (no-load) message.
    */
   onSend: (content: string, loadNumber: string | null) => void;
-  /** Composer placeholder — defaults to the dispatcher-side wording. */
+  /** Composer placeholder text. */
   placeholder?: string;
 }
 

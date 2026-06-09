@@ -8,7 +8,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { SheetKeyboardHint } from '@app/ui/components/ui/form-sheet';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@app/ui/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
@@ -37,37 +36,11 @@ interface TenantDetailsSheetProps {
 interface EditFormData {
   companyName: string;
   subdomain: string;
-  dotNumber: string;
-  fleetSize: string;
-  carrierType?: string;
-  mcNumber?: string;
   ownerFirstName: string;
   ownerLastName: string;
   ownerEmail: string;
   ownerPhone: string;
 }
-
-const FLEET_SIZE_OPTIONS = [
-  { value: 'SIZE_1_10', label: '1-10 vehicles' },
-  { value: 'SIZE_11_50', label: '11-50 vehicles' },
-  { value: 'SIZE_51_100', label: '51-100 vehicles' },
-  { value: 'SIZE_101_500', label: '101-500 vehicles' },
-  { value: 'SIZE_500_PLUS', label: '500+ vehicles' },
-];
-
-const CARRIER_TYPE_LABELS: Record<string, string> = {
-  FOR_HIRE_INTERSTATE: 'For-Hire Interstate',
-  INTRASTATE_ONLY: 'Intrastate Only',
-  PRIVATE_FLEET: 'Private Fleet',
-  LEASED_ON: 'Under Another Authority',
-};
-
-const CARRIER_TYPE_OPTIONS = [
-  { value: 'FOR_HIRE_INTERSTATE', label: 'For-Hire Interstate' },
-  { value: 'INTRASTATE_ONLY', label: 'Intrastate Only' },
-  { value: 'PRIVATE_FLEET', label: 'Private Fleet' },
-  { value: 'LEASED_ON', label: 'Under Another Authority' },
-];
 
 export function TenantDetailsSheet({
   open,
@@ -89,8 +62,6 @@ export function TenantDetailsSheet({
   const [form, setForm] = useState<EditFormData>({
     companyName: '',
     subdomain: '',
-    dotNumber: '',
-    fleetSize: '',
     ownerFirstName: '',
     ownerLastName: '',
     ownerEmail: '',
@@ -126,10 +97,6 @@ export function TenantDetailsSheet({
     setForm({
       companyName: source.tenant.companyName || '',
       subdomain: source.tenant.subdomain || '',
-      dotNumber: source.tenant.dotNumber || '',
-      fleetSize: source.tenant.fleetSize || '',
-      carrierType: source.tenant.carrierType || '',
-      mcNumber: source.tenant.mcNumber || '',
       ownerFirstName: ownerUser?.firstName || '',
       ownerLastName: ownerUser?.lastName || '',
       ownerEmail: source.tenant.contactEmail || '',
@@ -186,10 +153,6 @@ export function TenantDetailsSheet({
 
     if (form.companyName !== data.tenant.companyName) payload.companyName = form.companyName;
     if (form.subdomain !== data.tenant.subdomain) payload.subdomain = form.subdomain;
-    if (form.dotNumber !== data.tenant.dotNumber) payload.dotNumber = form.dotNumber;
-    if (form.fleetSize !== data.tenant.fleetSize) payload.fleetSize = form.fleetSize;
-    if (form.carrierType !== (data.tenant.carrierType || '')) payload.carrierType = form.carrierType || '';
-    if (form.mcNumber !== (data.tenant.mcNumber || '')) payload.mcNumber = form.mcNumber || '';
     if (form.ownerFirstName !== (ownerUser?.firstName || '')) payload.ownerFirstName = form.ownerFirstName;
     if (form.ownerLastName !== (ownerUser?.lastName || '')) payload.ownerLastName = form.ownerLastName;
     if (form.ownerEmail !== (data.tenant.contactEmail || '')) payload.ownerEmail = form.ownerEmail;
@@ -213,13 +176,10 @@ export function TenantDetailsSheet({
   };
 
   // Validation
-  const isDotNumberValid = /^\d{1,8}$/.test(form.dotNumber);
   const isSubdomainValid = /^[a-z0-9-]+$/.test(form.subdomain);
   const isFormValid =
     form.companyName.length >= 2 &&
     isSubdomainValid &&
-    isDotNumberValid &&
-    !!form.fleetSize &&
     !!form.ownerFirstName &&
     !!form.ownerLastName &&
     !!form.ownerEmail;
@@ -282,63 +242,6 @@ export function TenantDetailsSheet({
                     {form.subdomain && !isSubdomainValid && (
                       <p className="text-sm text-destructive">Only lowercase letters, numbers, and hyphens</p>
                     )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-dotNumber">DOT Number</Label>
-                      <Input
-                        id="edit-dotNumber"
-                        value={form.dotNumber}
-                        onChange={(e) => updateField('dotNumber', e.target.value.replace(/\D/g, ''))}
-                        placeholder="1234567"
-                        maxLength={8}
-                      />
-                      {form.dotNumber && !isDotNumberValid && (
-                        <p className="text-sm text-destructive">Must be 1-8 digits</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-fleetSize">Fleet Size</Label>
-                      <Select value={form.fleetSize} onValueChange={(value) => updateField('fleetSize', value)}>
-                        <SelectTrigger id="edit-fleetSize">
-                          <SelectValue placeholder="Select size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {FLEET_SIZE_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-carrierType">Carrier Type</Label>
-                      <Select value={form.carrierType} onValueChange={(value) => updateField('carrierType', value)}>
-                        <SelectTrigger id="edit-carrierType">
-                          <SelectValue placeholder="Select carrier type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CARRIER_TYPE_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-mcNumber">MC Number</Label>
-                      <Input
-                        id="edit-mcNumber"
-                        value={form.mcNumber || ''}
-                        onChange={(e) => updateField('mcNumber', e.target.value)}
-                        placeholder="MC Number (1-8 digits)"
-                        maxLength={8}
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -479,28 +382,6 @@ export function TenantDetailsSheet({
                       <code className="bg-muted px-1.5 py-0.5 rounded text-xs">
                         {data.tenant.subdomain}.app.example.com
                       </code>
-                    </dd>
-
-                    <dt className="text-muted-foreground">DOT Number</dt>
-                    <dd>{data.tenant.dotNumber}</dd>
-
-                    <dt className="text-muted-foreground">Carrier Type</dt>
-                    <dd>
-                      <Badge variant="muted">
-                        {CARRIER_TYPE_LABELS[data.tenant.carrierType] || data.tenant.carrierType}
-                      </Badge>
-                    </dd>
-
-                    {data.tenant.mcNumber && (
-                      <>
-                        <dt className="text-muted-foreground">MC Number</dt>
-                        <dd>{data.tenant.mcNumber}</dd>
-                      </>
-                    )}
-
-                    <dt className="text-muted-foreground">Fleet Size</dt>
-                    <dd>
-                      <Badge variant="muted">{data.tenant.fleetSize?.replace('SIZE_', '')}</Badge>
                     </dd>
                   </dl>
                 </div>

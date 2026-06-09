@@ -26,7 +26,7 @@ const featureDescriptions: Record<string, { label: string; description: string; 
     description: 'Register OAuth applications for user-authorized integrations.',
     requiredPlan: 'Enterprise',
   },
-  samsara_integration: {
+  external_integration: {
     label: 'Integrations',
     description: 'Connect external systems and tools to sync your workspace data.',
     requiredPlan: 'Professional',

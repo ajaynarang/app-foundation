@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
 import { Button } from '@app/ui/components/ui/button';
-import { Badge } from '@app/ui/components/ui/badge';
 import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
@@ -172,8 +171,6 @@ export function TenantList() {
                   <TableRow>
                     <TableHead>Company</TableHead>
                     <TableHead>Subdomain</TableHead>
-                    <TableHead>DOT Number</TableHead>
-                    <TableHead>Fleet Size</TableHead>
                     <TableHead>Admin User</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Registered</TableHead>
@@ -187,10 +184,6 @@ export function TenantList() {
                       <TableCell className="font-medium">{tenant.companyName}</TableCell>
                       <TableCell>
                         <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
-                      </TableCell>
-                      <TableCell>{tenant.dotNumber}</TableCell>
-                      <TableCell>
-                        <Badge variant="muted">{tenant.fleetSize?.replace('SIZE_', '')}</Badge>
                       </TableCell>
                       <TableCell>
                         {tenant.users?.[0]?.firstName} {tenant.users?.[0]?.lastName}

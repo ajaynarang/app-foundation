@@ -38,18 +38,9 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Legacy URL redirects. Phase A of the workspace ↔ insights split
-  // renamed /dispatcher/insights/ar-aging → /dispatcher/insights/ar-health.
-  // Server-side redirect at the edge avoids the client-side flash that
-  // the previous useEffect-based alias page had.
+  // Add legacy URL redirects here as your routes evolve.
   async redirects() {
-    return [
-      {
-        source: '/dispatcher/insights/ar-aging',
-        destination: '/dispatcher/insights/ar-health',
-        permanent: false, // Soft for now; flip to permanent once we're confident.
-      },
-    ];
+    return [];
   },
 
   // HTTP security headers applied to all routes

@@ -26,8 +26,6 @@ interface Tenant {
   tenantId: string;
   companyName: string;
   subdomain: string;
-  dotNumber: string;
-  fleetSize: string;
   contactEmail: string;
   contactPhone: string;
   status: string;
