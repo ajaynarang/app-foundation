@@ -33,7 +33,7 @@ const EMPTY: FormState = {
 };
 
 /**
- * Edit a tenant's AI cost budget. 5 fields → Sheet (per Sally rules), edit
+ * Edit a tenant's AI cost budget. 5 fields → Sheet (per Assistant rules), edit
  * mode (blocks outside click). Client-side validates the same invariants the
  * server enforces (≥0, hard ≥ soft, monthly ≥ daily) so the operator gets
  * inline feedback before the round-trip.

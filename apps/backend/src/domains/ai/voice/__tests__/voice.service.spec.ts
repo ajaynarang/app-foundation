@@ -161,16 +161,16 @@ describe('VoiceService', () => {
   });
 
   describe('generateVoiceResponse', () => {
-    it('delegates to SallyAiService.generateResponse', async () => {
+    it('delegates to AssistantAiService.generateResponse', async () => {
       async function* mockGen() {
         yield { type: 'text-delta' as const, data: 'Hello' };
         yield { type: 'complete' as const, data: 'Hello' };
       }
 
-      const mockSallyAi = {
+      const mockAssistantAi = {
         generateResponse: jest.fn().mockReturnValue(mockGen()),
       };
-      mockModuleRef.get.mockReturnValue(mockSallyAi);
+      mockModuleRef.get.mockReturnValue(mockAssistantAi);
 
       // Force lazy resolution by accessing the method
       const gen = service.generateVoiceResponse('conv_1', 'hello', 'user_1', 1);

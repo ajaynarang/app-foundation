@@ -117,7 +117,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       return localStorage.getItem(LS_KEY_PINNED) === 'true';
     });
 
-    // Resize state — same pointer events pattern as SallyStrip
+    // Resize state — same pointer events pattern as AssistantStrip
     const [sheetWidth, setSheetWidth] = useState(() => {
       if (defaultWidth) return Math.max(MIN_SHEET_WIDTH, defaultWidth);
       if (typeof window === 'undefined') return DEFAULT_SHEET_WIDTH;

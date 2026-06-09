@@ -21,7 +21,7 @@ function getRoleView(role: string | undefined): string {
     case 'SUPER_ADMIN':
       return 'Super Admin';
     default:
-      return 'SALLY';
+      return 'Console';
   }
 }
 
@@ -53,9 +53,9 @@ export function ConsoleTopbar({ onToggleSidebar }: ConsoleTopbarProps) {
           <Menu className="h-5 w-5" />
         </Button>
         <Link href="/overview" className="flex items-center gap-2 hover:opacity-80 transition-opacity md:hidden">
-          <Image src="/sally-logo-dark.svg" alt="SALLY" width={24} height={24} className="h-6 w-6 dark:block hidden" />
-          <Image src="/sally-logo-light.svg" alt="SALLY" width={24} height={24} className="h-6 w-6 dark:hidden block" />
-          <span className="text-lg font-bold tracking-tight">SALLY Console</span>
+          <Image src="/logo-dark.svg" alt="Console" width={24} height={24} className="h-6 w-6 dark:block hidden" />
+          <Image src="/logo-light.svg" alt="Console" width={24} height={24} className="h-6 w-6 dark:hidden block" />
+          <span className="text-lg font-bold tracking-tight">Console</span>
         </Link>
       </div>
 
@@ -88,14 +88,14 @@ export function ConsoleTopbar({ onToggleSidebar }: ConsoleTopbarProps) {
         )}
       </div>
 
-      {/* Right: SALLY link + theme toggle */}
+      {/* Right: platform link + theme toggle */}
       <div className="flex items-center gap-2">
         <a
           href={appUrl}
           className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors"
         >
           <Home className="h-3.5 w-3.5" />
-          <span>SALLY</span>
+          <span>App</span>
         </a>
         {/* Theme toggle on mobile — desktop has it in sidebar user popover */}
         <div className="md:hidden">

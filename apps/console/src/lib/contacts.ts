@@ -18,9 +18,9 @@ export const CONTACTS = {
 
   // --- Product / customer-facing ---
   /** Sales, enterprise, pricing CTAs, general product contact */
-  sally: `sally@${DOMAIN}`,
+  sales: `sales@${DOMAIN}`,
   /** Product support, billing, AI questions, abuse reports */
-  sallySupport: `sally-support@${DOMAIN}`,
+  appSupport: `app-support@${DOMAIN}`,
 
   // --- Generic (internal aliases) ---
   /** General contact */

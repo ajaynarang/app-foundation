@@ -15,7 +15,7 @@ export function TextCard({ data }: { data: Record<string, unknown> }) {
     <div className="rounded-lg border border-border bg-card p-3 space-y-1.5">
       {card.title && <p className="text-sm font-medium text-foreground">{card.title}</p>}
       {card.body && (
-        <div className="sally-markdown text-sm leading-relaxed text-muted-foreground">
+        <div className="assistant-markdown text-sm leading-relaxed text-muted-foreground">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{card.body}</ReactMarkdown>
         </div>
       )}

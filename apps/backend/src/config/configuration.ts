@@ -19,8 +19,8 @@ const configSchema = z.object({
 
   // JWT Configuration
   jwt: z.object({
-    accessSecret: z.string().default('sally-jwt-access-secret-change-in-production-min-32-chars'),
-    refreshSecret: z.string().default('sally-jwt-refresh-secret-change-in-production-min-32-chars'),
+    accessSecret: z.string().default('app-jwt-access-secret-change-in-production-min-32-chars'),
+    refreshSecret: z.string().default('app-jwt-refresh-secret-change-in-production-min-32-chars'),
     accessExpiry: z.string().default('15m'),
     refreshExpiry: z.string().default('7d'),
   }),

@@ -45,7 +45,7 @@ const ALLOW_LIST: string[] = [
   // Platform-services probe status is lowercase by design
   // (z.enum(['success','failed','unsupported','not_configured'])).
   'app/(super-admin)/admin/platform-health/page.tsx',
-  // Sally-AI engine simulation types — local lowercase unions, not DB enums.
+  // Assistant engine simulation types — local lowercase unions, not DB enums.
   'features/platform/ai-chat/engine/',
   // Client-only UI state machines (upload/extract phases, lifecycle rails,
   // tracking timeline, ghost-import cards). These never compare a DB-backed

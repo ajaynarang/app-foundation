@@ -90,7 +90,7 @@ describe('EmailService', () => {
             provide: ConfigService,
             useValue: {
               get: jest.fn((key: string) => {
-                if (key === 'APP_URL') return 'https://app.sally.com';
+                if (key === 'APP_URL') return 'https://app.example.com';
                 return undefined;
               }),
             },
@@ -136,7 +136,7 @@ describe('EmailService', () => {
             provide: ConfigService,
             useValue: {
               get: jest.fn((key: string) => {
-                if (key === 'TENANT_BASE_URL') return 'sally.appshore.in';
+                if (key === 'TENANT_BASE_URL') return 'app.appshore.in';
                 if (key === 'USE_TENANT_SUBDOMAINS') return true;
                 return undefined;
               }),
@@ -152,7 +152,7 @@ describe('EmailService', () => {
       await service.sendTenantApprovalEmail('owner@acme.com', 'John', 'Acme Freight', 'acme');
 
       const html = sendSpy.mock.calls[0][0].html;
-      expect(html).toContain('acme.sally.appshore.in');
+      expect(html).toContain('acme.app.appshore.in');
     });
   });
 });

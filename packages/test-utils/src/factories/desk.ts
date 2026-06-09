@@ -70,7 +70,7 @@ export function buildDeskMemoryPatch(
  *
  * All fields optional but the underlying Zod refine
  * (`UpdateDeskResponsibilityRequestSchema` in shared-types) requires at
- * least one. Default `notesForSally` echoes a unique [QA-TEST] string so
+ * least one. Default `notesForAssistant` echoes a unique [QA-TEST] string so
  * the persistence assertion can verify the follow-up GET reflects it.
  *
  *   - `enabled`: bool — flips the per-tenant row. Skipped here because
@@ -78,7 +78,7 @@ export function buildDeskMemoryPatch(
  *   - `trustLevel`: SUPERVISED | ASSISTED | AUTONOMOUS.
  *   - `conditions`: typed-per-responsibility JSON. Validated by the
  *     registry's Zod schema in service `updateForTenant` (line 186-192).
- *   - `notesForSally`: ≤2000 chars OR null. Safe to mutate on any
+ *   - `notesForAssistant`: ≤2000 chars OR null. Safe to mutate on any
  *     responsibility — purely operator notes, no side effects.
  *   - `supervisorUserId`: positive int OR null.
  */
@@ -87,12 +87,12 @@ export function buildDeskResponsibilityPatch(
     enabled?: boolean;
     trustLevel?: 'SUPERVISED' | 'ASSISTED' | 'AUTONOMOUS';
     conditions?: Record<string, unknown>;
-    notesForSally?: string | null;
+    notesForAssistant?: string | null;
     supervisorUserId?: number | null;
   } & Record<string, unknown> = {},
 ) {
   return {
-    notesForSally: `[QA-TEST] desk responsibility note ${Date.now()}`,
+    notesForAssistant: `[QA-TEST] desk responsibility note ${Date.now()}`,
     ...overrides,
   };
 }

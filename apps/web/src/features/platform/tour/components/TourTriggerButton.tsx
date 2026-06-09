@@ -26,7 +26,7 @@ export function TourTriggerButton({ isCollapsed }: TourTriggerButtonProps) {
           </Button>
         </TooltipTrigger>
         <TooltipContent side="right" className="text-xs">
-          Sally, Show Me Around
+          Assistant, Show Me Around
         </TooltipContent>
       </Tooltip>
     );
@@ -39,7 +39,7 @@ export function TourTriggerButton({ isCollapsed }: TourTriggerButtonProps) {
       className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full justify-start h-auto"
     >
       <Sparkles className="h-5 w-5 flex-shrink-0" />
-      <span className="flex-1 text-left">Sally, Show Me Around</span>
+      <span className="flex-1 text-left">Assistant, Show Me Around</span>
     </Button>
   );
 }

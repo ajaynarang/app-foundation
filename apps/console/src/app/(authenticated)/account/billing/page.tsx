@@ -5,8 +5,6 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
 import { Button } from '@app/ui/components/ui/button';
-import { Progress } from '@app/ui/components/ui/progress';
-import { AlertTriangle } from 'lucide-react';
 import { usePlan } from '@/features/plans/use-plan';
 
 type BadgeVariant = 'destructive' | 'outline' | 'default' | 'muted';
@@ -19,20 +17,7 @@ function planBadgeVariant(plan?: string): BadgeVariant {
 }
 
 export default function BillingPage() {
-  const {
-    plan,
-    displayName,
-    planDetails,
-    isLoading,
-    vehicleCount,
-    fleetLimit,
-    fleetLimitWarning,
-    isTrialExpired,
-    isOnTrial,
-    daysLeftInTrial,
-  } = usePlan();
-
-  const usagePercent = fleetLimit && fleetLimit > 0 ? Math.min((vehicleCount / fleetLimit) * 100, 100) : 0;
+  const { plan, displayName, planDetails, isLoading, isTrialExpired, isOnTrial, daysLeftInTrial } = usePlan();
 
   if (isLoading) {
     return (
@@ -94,7 +79,7 @@ export default function BillingPage() {
             )}
 
             {plan !== 'ENTERPRISE' && plan !== 'SUSPENDED' && (
-              <a href={mailto('sally')} className="inline-block">
+              <a href={mailto('sales')} className="inline-block">
                 <Button variant="outline" size="sm">
                   Contact Sales to Upgrade
                 </Button>
@@ -102,38 +87,6 @@ export default function BillingPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Fleet Usage Card */}
-        {fleetLimit !== null && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Fleet Usage
-                {fleetLimitWarning && <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Vehicles</span>
-                <span
-                  className={
-                    fleetLimitWarning
-                      ? 'font-semibold text-yellow-700 dark:text-yellow-400'
-                      : 'font-medium text-foreground'
-                  }
-                >
-                  {vehicleCount} / {fleetLimit}
-                </span>
-              </div>
-              <Progress value={usagePercent} className="h-2 bg-gray-200 dark:bg-gray-800" />
-              {fleetLimitWarning && (
-                <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                  You are approaching your fleet limit. Contact sales to upgrade.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Payment Method */}
         <Card>
@@ -145,10 +98,10 @@ export default function BillingPage() {
             <p className="text-sm text-muted-foreground">
               Contact{' '}
               <a
-                href={mailto('sallySupport')}
+                href={mailto('appSupport')}
                 className="text-foreground underline underline-offset-4 hover:text-muted-foreground"
               >
-                {CONTACTS.sallySupport}
+                {CONTACTS.appSupport}
               </a>{' '}
               for billing inquiries.
             </p>

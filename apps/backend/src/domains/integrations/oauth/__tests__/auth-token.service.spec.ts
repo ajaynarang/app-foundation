@@ -82,7 +82,7 @@ describe('AuthTokenService', () => {
       expect(result.authUrl).toContain('response_type=code');
       expect(result.authUrl).toContain('scope=admin%3Aread');
       expect(result.authUrl).toContain('state=');
-      expect(mockCache.set).toHaveBeenCalledWith(expect.stringContaining('sally:oauth:nonce:SAMSARA_ELD:'), 1, 600000);
+      expect(mockCache.set).toHaveBeenCalledWith(expect.stringContaining('app:oauth:nonce:SAMSARA_ELD:'), 1, 600000);
     });
 
     it('should throw if vendor does not support OAuth', async () => {

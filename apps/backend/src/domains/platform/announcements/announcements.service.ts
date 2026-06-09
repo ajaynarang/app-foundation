@@ -41,7 +41,7 @@ export class AnnouncementsService {
 
   private async invalidateAnnouncementCache(): Promise<void> {
     // Announcements target ALL tenants, so use a global key
-    await this.cache.del(buildKey('sally:announcements', 'active', 'global'));
+    await this.cache.del(buildKey('app:announcements', 'active', 'global'));
   }
 
   async create(dto: CreateAnnouncementDto, userId: number) {
@@ -101,7 +101,7 @@ export class AnnouncementsService {
     // Use global key since announcements target all tenants and tenant-specific
     // filtering happens in the query. A per-tenant cache would require invalidating
     // all tenant keys on publish/archive which is impractical.
-    const cacheKey = buildKey('sally:announcements', 'active', 'global');
+    const cacheKey = buildKey('app:announcements', 'active', 'global');
     const allActive = await this.cache.getOrSet(cacheKey, () => this.fetchAllActiveAnnouncements(), CACHE_TTL_COLD_30M);
 
     // Filter for this tenant in-memory
@@ -114,7 +114,7 @@ export class AnnouncementsService {
   }
 
   async findActiveForAllOnly() {
-    const cacheKey = buildKey('sally:announcements', 'active', 'global');
+    const cacheKey = buildKey('app:announcements', 'active', 'global');
     const allActive = await this.cache.getOrSet(cacheKey, () => this.fetchAllActiveAnnouncements(), CACHE_TTL_COLD_30M);
 
     return allActive.filter((a: any) => a.targetType === 'ALL');

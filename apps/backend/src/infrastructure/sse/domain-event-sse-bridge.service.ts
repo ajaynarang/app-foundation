@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DomainEvent } from '../events/domain-event';
-import { DOMAIN_EVENTS } from '../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../events/domain-events.constants';
 import { SseService } from './sse.service';
 import { SSE_EVENTS, SseEventType } from './sse-events.constants';
 

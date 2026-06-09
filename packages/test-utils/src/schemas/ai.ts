@@ -1,7 +1,7 @@
 /**
- * API Contracts for the Sally AI domain (Phase 6 — groups 6a-6f).
+ * API Contracts for the Assistant AI domain (Phase 6 — groups 6a-6f).
  *
- * Group 6a owns the CHAT-surface schemas consumed by `tests/api/ai/sally-ai.spec.ts`:
+ * Group 6a owns the CHAT-surface schemas consumed by `tests/api/ai/assistant-ai.spec.ts`:
  *
  *   - ConversationRowSchema            — POST /conversations
  *   - ConversationListItemSchema,
@@ -10,7 +10,7 @@
  *                                       — GET  /conversations/:id/messages
  *   - AgentStatusItemSchema,
  *     AgentStatusResponseSchema         — GET  /conversations/agents/status
- *   - SallyAiStreamFrameSchema          — POST /conversations/:id/messages
+ *   - AssistantAiStreamFrameSchema          — POST /conversations/:id/messages
  *                                         POST /conversations/:id/resume (streaming)
  *
  * All schemas are hand-written under `.strict()` and pinned against the
@@ -37,7 +37,7 @@
  * `readFirstStreamFrame(res)` from `tests/api/ai/_helpers.ts` which
  * splits the line on the first colon and returns `{ kind, payload }`.
  *
- * `SallyAiStreamFrameSchema` below models that normalised shape (NOT
+ * `AssistantAiStreamFrameSchema` below models that normalised shape (NOT
  * the raw line). A strict discriminated union over the 4 known kinds.
  */
 import { z } from 'zod';
@@ -218,10 +218,10 @@ export const AgentStatusResponseSchema = z
  * Modelled as a discriminated union so test assertions narrow cleanly:
  *
  *   const frame = readFirstStreamFrame(res);
- *   SallyAiStreamFrameSchema.parse(frame);
+ *   AssistantAiStreamFrameSchema.parse(frame);
  *   if (frame.kind === '0') expect(typeof frame.payload).toBe('string');
  */
-export const SallyAiStreamFrameSchema = z.discriminatedUnion('kind', [
+export const AssistantAiStreamFrameSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('0'),
@@ -248,12 +248,12 @@ export const SallyAiStreamFrameSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
-export type SallyAiStreamFrame = z.infer<typeof SallyAiStreamFrameSchema>;
+export type AssistantAiStreamFrame = z.infer<typeof AssistantAiStreamFrameSchema>;
 
 // ── ERROR ENVELOPE (shared for cross-tenant 404 assertion) ───────────
 
 /**
- * SALLY's global exception filter envelope (not the default Nest one).
+ * the platform's global exception filter envelope (not the default Nest one).
  * Live-probed 2026-04-24: backend emits
  *   { statusCode, timestamp, path, method, detail, message }
  * on any thrown `HttpException`. The filter enriches the default Nest
@@ -263,7 +263,7 @@ export type SallyAiStreamFrame = z.infer<typeof SallyAiStreamFrameSchema>;
  *
  * `message` can be a string OR an array of strings (validation errors).
  * `error` is the legacy Nest shorthand; included `.optional()` because
- * the SALLY filter omits it but stock Nest responses retain it.
+ * the platform filter omits it but stock Nest responses retain it.
  */
 export const AiErrorEnvelopeSchema = z
   .object({
@@ -311,7 +311,7 @@ export const RateconBulkJobResponseSchema = z.array(RateconJobResponseSchema);
  * 409 envelope on duplicate-hash detection — `ratecon.controller.ts:160-166`
  * throws `new ConflictException({ statusCode: 409, message, existingLoadId,
  * loadNumber })`. NestJS's `ConflictException(payload)` sends the payload
- * AS the body (not nested under `.response`). The SALLY `HttpExceptionFilter`
+ * AS the body (not nested under `.response`). The platform `HttpExceptionFilter`
  * then enriches with `timestamp`, `path`, `method`, `detail` (same as
  * `AiErrorEnvelopeSchema`).
  *
@@ -684,7 +684,7 @@ export const VoiceTokenSchema = z
 
 /**
  * 503 envelope when voice is unavailable — controller line 44 throws
- * `ServiceUnavailableException('Voice mode not available')`. SALLY's
+ * `ServiceUnavailableException('Voice mode not available')`. the platform's
  * global exception filter wraps it in the standard envelope (same shape
  * as `AiErrorEnvelopeSchema`, but `statusCode` is the literal 503).
  */

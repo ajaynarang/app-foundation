@@ -59,7 +59,7 @@ export function resolveApprovalScope(scope: ApprovalScope | undefined, role: Use
  *                    to wake the waiting workflow
  *   • expire(...)  — nightly cron closes approvals past expiresAt
  *
- * Publishing 'sally/desk.approval.decided' is how we wake the workflow —
+ * Publishing 'app/desk.approval.decided' is how we wake the workflow —
  * arFollowupFunction (P1.7) awaits this event via step.waitForEvent,
  * matching on data.approvalId.
  */
@@ -178,7 +178,7 @@ export class ApprovalService {
     });
 
     // Publish the inngest event so the workflow's step.waitForEvent wakes up
-    await this.inngest.send('sally/desk.approval.decided', {
+    await this.inngest.send('app/desk.approval.decided', {
       approvalId: updated.id,
       episodeId: updated.episodeId,
       decision: updated.decision,
@@ -218,7 +218,7 @@ export class ApprovalService {
           terminateEpisode: true,
         },
       });
-      await this.inngest.send('sally/desk.approval.decided', {
+      await this.inngest.send('app/desk.approval.decided', {
         approvalId: row.id,
         episodeId: row.episodeId,
         decision: 'REJECTED' as ApprovalDecision,
@@ -236,7 +236,7 @@ export class ApprovalService {
   /**
    * Slim list contract (row = episode).
    *
-   * List path returns only what rows render — no artifact, sallysRead,
+   * List path returns only what rows render — no artifact, assistantRead,
    * context, confidence, or decisionHeader. Enrichment runs exclusively on
    * the detail endpoint (`GET /desk/episodes/:id`) so pagination payloads
    * stay ~300 bytes/row instead of ~2KB. See design spec §2.

@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InAppNotificationService } from './notifications.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DomainEvent } from '../../infrastructure/events/domain-event';
-import { DOMAIN_EVENTS } from '../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../infrastructure/events/domain-events.constants';
 import { PushService } from '../../infrastructure/push/push.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';

@@ -53,7 +53,7 @@ export class OAuthClientsController {
     return this.clientsService.revoke(clientId, this.resolveTenantId(req));
   }
 
-  // ─── Phase D: Sally's Desk admin surface ─────────────────────────
+  // ─── Phase D: the Desk admin surface ─────────────────────────
 
   @Post(':clientId/rotate-secret')
   @ApiOperation({

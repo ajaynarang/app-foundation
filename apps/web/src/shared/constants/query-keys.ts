@@ -137,8 +137,8 @@ export const queryKeys = {
     capabilities: (mode: string) => ['ai', 'capabilities', mode] as const,
     mentionSearch: (query: string) => ['ai', 'mention-search', query] as const,
   },
-  // Back-compat alias for the chat feature, which imports `queryKeys.sallyAi`.
-  sallyAi: {
+  // Back-compat alias for the chat feature, which imports `queryKeys.assistantAi`.
+  assistantAi: {
     root: ['ai'] as const,
     capabilities: (mode: string) => ['ai', 'capabilities', mode] as const,
     mentionSearch: (query: string) => ['ai', 'mention-search', query] as const,

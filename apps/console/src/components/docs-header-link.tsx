@@ -15,7 +15,7 @@ const linkClass =
 /**
  * Header navigation for docs pages.
  *
- * Authenticated: "SALLY" (same tab → web app) + "Console" (same tab → dashboard)
+ * Authenticated: "App" (same tab → web app) + "Console" (same tab → dashboard)
  * Not authenticated: "Sign In"
  */
 export function DocsHeaderLinks({ isAuthenticated }: DocsHeaderLinksProps) {
@@ -34,7 +34,7 @@ export function DocsHeaderLinks({ isAuthenticated }: DocsHeaderLinksProps) {
     <div className="flex items-center gap-1">
       <a href={`${appUrl}/dispatcher`} className={linkClass}>
         <Home className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">SALLY</span>
+        <span className="hidden sm:inline">App</span>
       </a>
       <span className="text-border mx-0.5">|</span>
       <Link href="/overview" className={linkClass}>

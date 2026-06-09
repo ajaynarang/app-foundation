@@ -99,7 +99,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): VoiceSess
                 optionsRef.current.onUserTranscript?.(event.text);
                 break;
               case 'processing':
-                // Sally is thinking — show immediate feedback
+                // Assistant is thinking — show immediate feedback
                 updateState('processing');
                 break;
               case 'assistant-transcript':
@@ -117,7 +117,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): VoiceSess
           }
         });
 
-        // 4. Handle agent audio track (Sally speaking)
+        // 4. Handle agent audio track (Assistant speaking)
         // Pre-create audio element during user gesture (mic tap) so
         // browser autoplay policy allows playback without interaction.
         if (!audioElementRef.current) {

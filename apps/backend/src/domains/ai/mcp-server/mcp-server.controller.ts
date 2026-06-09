@@ -30,7 +30,7 @@ export class McpServerController {
 
   /**
    * POST /mcp/apikey — MCP Streamable HTTP endpoint for API-key principals.
-   * Bearer is a Sally API key (sk_live_…), not an OAuth access token.
+   * Bearer is a the assistant API key (sk_live_…), not an OAuth access token.
    */
   @Post('apikey')
   @Public()

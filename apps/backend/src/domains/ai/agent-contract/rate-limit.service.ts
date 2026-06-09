@@ -25,7 +25,7 @@ export class RateLimitService {
 
     const windowSeconds = AGENT_RATE_LIMIT_WINDOW_SECONDS;
     const windowBucket = Math.floor(Date.now() / 1000 / windowSeconds);
-    const key = buildKey('sally:agent', 'rate', principal.auditId, windowBucket);
+    const key = buildKey('app:agent', 'rate', principal.auditId, windowBucket);
 
     const count = await this.cache.increment(key, cost, windowSeconds);
     const remaining = Math.max(0, limit - count);

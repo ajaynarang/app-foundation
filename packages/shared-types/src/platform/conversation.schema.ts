@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// ── Conversation Types (Sally AI) ──
+// ── Conversation Types (Assistant AI) ──
 
 export const ConversationGreetingSchema = z.object({
   messageId: z.string(),

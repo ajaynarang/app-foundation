@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { SallyAiService } from './assistant.service';
+import { AssistantAiService } from './assistant.service';
 import { AgentRegistry } from '../agents/agent.registry';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -12,22 +12,22 @@ import type { Request, Response } from 'express';
 
 @ApiTags('AI Conversations')
 @Controller('conversations')
-export class SallyAiController {
+export class AssistantAiController {
   constructor(
-    private readonly service: SallyAiService,
+    private readonly service: AssistantAiService,
     private readonly agentRegistry: AgentRegistry,
   ) {}
 
   @Post()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
-  @ApiOperation({ summary: 'Create a new Sally AI conversation' })
+  @ApiOperation({ summary: 'Create a new assistant conversation' })
   async createConversation(@CurrentUser() user: any, @Body() dto: CreateConversationDto) {
     return this.service.createConversation(user.userId, user.tenantDbId, dto.userMode);
   }
 
   @Post(':conversationId/messages')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
-  @ApiOperation({ summary: 'Send a message and stream Sally AI response' })
+  @ApiOperation({ summary: 'Send a message and stream assistant response' })
   async sendMessage(
     @CurrentUser() user: any,
     @Param('conversationId') conversationId: string,
@@ -63,7 +63,7 @@ export class SallyAiController {
   @Post(':conversationId/resume')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
-    summary: 'Resume a suspended Sally AI agent (HITL confirmation)',
+    summary: 'Resume a suspended assistant agent (HITL confirmation)',
   })
   async resumeAgent(
     @CurrentUser() user: any,

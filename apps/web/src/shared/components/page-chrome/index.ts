@@ -5,7 +5,7 @@
  * Filter bar (FilterBar) · Data (page-owned). Composition wrappers over the local
  * @/shared/components/ui primitives — no new design primitives.
  *
- * See sally-frontend-patterns §15.4 (Page Chrome) for the full pattern and rules.
+ * See app-frontend-patterns §15.4 (Page Chrome) for the full pattern and rules.
  */
 export { PageShell, type PageShellProps } from './page-shell';
 export { PageHeader, type PageHeaderProps } from './page-header';

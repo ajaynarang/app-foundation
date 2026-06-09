@@ -7,7 +7,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 @Injectable()
 export class VoiceService {
   private readonly logger = new Logger(VoiceService.name);
-  private sallyAiService: any = null;
+  private assistantAiService: any = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -16,18 +16,18 @@ export class VoiceService {
   ) {}
 
   /**
-   * Lazily resolve SallyAiService via ModuleRef to avoid circular dependency.
-   * VoiceModule is registered inside AiModule alongside SallyAiModule,
-   * so SallyAiService is available in the injection scope.
+   * Lazily resolve AssistantAiService via ModuleRef to avoid circular dependency.
+   * VoiceModule is registered inside AiModule alongside AssistantAiModule,
+   * so AssistantAiService is available in the injection scope.
    */
-  private async getSallyAiService() {
-    if (!this.sallyAiService) {
-      const { SallyAiService } = await import('../assistant/assistant.service' as string);
-      this.sallyAiService = this.moduleRef.get(SallyAiService, {
+  private async getAssistantAiService() {
+    if (!this.assistantAiService) {
+      const { AssistantAiService } = await import('../assistant/assistant.service' as string);
+      this.assistantAiService = this.moduleRef.get(AssistantAiService, {
         strict: false,
       });
     }
-    return this.sallyAiService;
+    return this.assistantAiService;
   }
 
   /** Check if voice mode is available (feature flag + all vendor keys configured). */
@@ -106,9 +106,9 @@ export class VoiceService {
       canSubscribe: true,
     });
 
-    // Dispatch the sally-voice agent to this room when participant joins
+    // Dispatch the app-voice agent to this room when participant joins
     token.roomConfig = new RoomConfiguration({
-      agents: [new RoomAgentDispatch({ agentName: 'sally-voice' })],
+      agents: [new RoomAgentDispatch({ agentName: 'app-voice' })],
     });
 
     const jwt = await token.toJwt();
@@ -118,10 +118,10 @@ export class VoiceService {
     // explicit dispatch via API rather than token-based dispatch)
     try {
       const dispatchClient = new AgentDispatchClient(url, apiKey, apiSecret);
-      await dispatchClient.createDispatch(roomName, 'sally-voice', {
+      await dispatchClient.createDispatch(roomName, 'app-voice', {
         metadata: identity,
       });
-      this.logger.log(`Dispatched sally-voice agent to room=${roomName}`);
+      this.logger.log(`Dispatched app-voice agent to room=${roomName}`);
     } catch (dispatchError) {
       this.logger.warn(
         `Agent dispatch failed for room=${roomName} — agent may join via token roomConfig instead`,
@@ -135,9 +135,9 @@ export class VoiceService {
   }
 
   /**
-   * Stream Sally's response for a voice transcript.
+   * Stream the assistant's response for a voice transcript.
    *
-   * Delegates to SallyAiService.generateResponse() — the exact same
+   * Delegates to AssistantAiService.generateResponse() — the exact same
    * pipeline used by text chat (moderation, Mastra agent, MCP tools, audit).
    * Voice is just a different input/output layer.
    */
@@ -150,7 +150,7 @@ export class VoiceService {
     type: 'text-delta' | 'card' | 'suspend' | 'blocked' | 'complete';
     data: string;
   }> {
-    const sallyAi = await this.getSallyAiService();
-    yield* sallyAi.generateResponse(conversationId, text, 'voice', userId, tenantId);
+    const assistantAi = await this.getAssistantAiService();
+    yield* assistantAi.generateResponse(conversationId, text, 'voice', userId, tenantId);
   }
 }

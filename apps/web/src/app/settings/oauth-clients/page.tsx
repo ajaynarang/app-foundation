@@ -20,7 +20,7 @@ export default function OAuthClientsSettingsPage() {
       <div>
         <h2 className="text-xl font-semibold text-foreground">OAuth Clients</h2>
         <p className="text-sm text-muted-foreground">
-          Apps and AI agents that connect to SALLY on behalf of your users
+          Apps and AI agents that connect to the platform on behalf of your users
         </p>
       </div>
 

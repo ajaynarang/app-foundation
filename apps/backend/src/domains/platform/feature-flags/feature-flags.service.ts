@@ -4,7 +4,7 @@ import { AppCacheService } from '../../../infrastructure/cache/app-cache.service
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '../../../constants/cache.constants';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
 import { FeatureFlagDto } from './dto/feature-flag.dto';
 
 @Injectable()
@@ -22,7 +22,7 @@ export class FeatureFlagsService {
    */
   async getAllFlags(): Promise<FeatureFlagDto[]> {
     return this.cache.getOrSet<FeatureFlagDto[]>(
-      buildKey('sally:flags', 'all'),
+      buildKey('app:flags', 'all'),
       async () => {
         const flags = await this.prisma.featureFlag.findMany({
           orderBy: { category: 'asc' },
@@ -64,7 +64,7 @@ export class FeatureFlagsService {
    */
   async isEnabled(key: string): Promise<boolean> {
     return this.cache.getOrSet<boolean>(
-      buildKey('sally:flags', 'enabled', key),
+      buildKey('app:flags', 'enabled', key),
       async () => {
         const flag = await this.prisma.featureFlag.findUnique({
           where: { key },

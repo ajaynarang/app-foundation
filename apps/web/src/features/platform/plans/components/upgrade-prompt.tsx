@@ -33,7 +33,7 @@ export function UpgradePrompt({ feature, requiredPlan, description, className }:
         {description && <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">{description}</p>}
 
         {/* CTA button */}
-        <a href={mailto('sally')}>
+        <a href={mailto('app')}>
           <Button variant="outline" size="sm">
             Contact Sales to Upgrade
           </Button>

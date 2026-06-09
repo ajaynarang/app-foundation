@@ -110,7 +110,7 @@ export class DeskResponsibilityService {
   /**
    * Full detail for one responsibility — adds conditions to the list
    * shape. Supervisor is agent-level — fetch via DeskAgentService.
-   * Free-form operator guidance previously stored on `notesForSally` now
+   * Free-form operator guidance previously stored on `notesForAssistant` now
    * lives as operator-authored playbook memories — see DeskMemoryService.
    */
   async getForTenant(tenantId: number, key: string): Promise<DeskResponsibilityDetail> {

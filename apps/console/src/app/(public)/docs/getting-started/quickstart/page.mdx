@@ -4,34 +4,34 @@ Get from zero to a working API call in under 5 minutes.
 
 ## 1. Get your API key
 
-Go to **[API Keys](/docs/keys)** and sign in with your SALLY account. Click **Generate Key**, give it a name, and copy the key. It starts with `sk_staging_`.
+Go to **[API Keys](/docs/keys)** and sign in with your Platform account. Click **Generate Key**, give it a name, and copy the key. It starts with `sk_staging_`.
 
 Store it as an environment variable:
 
 ```bash
-export SALLY_API_KEY="sk_staging_your_key_here"
+export APP_API_KEY="sk_staging_your_key_here"
 ```
 
-Don't have an account? [Sign up at sally.appshore.in](https://sally.appshore.in).
+Don't have an account? [Sign up at app.appshore.in](https://app.appshore.in).
 
 ## 2. Make your first request
 
 Let's list the drivers in your tenant to verify your key works:
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/drivers \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/drivers \
+  -H "Authorization: Bearer $APP_API_KEY"
 ```
 
 You should get a `200 OK` response with a JSON array (empty if no drivers exist yet — that's fine).
 
 ## 3. Plan a route
 
-This is where SALLY shines. Send an origin, a destination, and a driver — SALLY returns an optimized, HOS-compliant route with automatic rest and fuel stops.
+This is where Platform shines. Send an origin, a destination, and a driver — Platform returns an optimized, HOS-compliant route with automatic rest and fuel stops.
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "driverId": "YOUR_DRIVER_ID",
@@ -55,11 +55,11 @@ No driver or vehicle yet? See [Manage Your Fleet](/docs/getting-started/manage-f
 
 ## 4. What you get back
 
-SALLY returns a route plan with:
+Platform returns a route plan with:
 
 - **Optimized stop sequence** — stops reordered for shortest travel time
 - **HOS-compliant segments** — drive time validated against federal Hours of Service rules
-- **Rest stops inserted automatically** — if the driver needs a 10-hour break, SALLY adds it
+- **Rest stops inserted automatically** — if the driver needs a 10-hour break, Platform adds it
 - **Fuel stops optimized by price** — cheapest fuel along the route within range
 
 ```json

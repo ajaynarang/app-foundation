@@ -1,6 +1,6 @@
-# @sally/qa — SALLY QA Suite
+# @app/qa — QA Suite
 
-Playwright-based QA for the SALLY fleet platform. One framework, one package, all cross-cutting tests (smoke, RBAC, API workflows, browser, loadtest, AI evals scaffold).
+Playwright-based QA for the platform. One framework, one package, all cross-cutting tests (smoke, RBAC, API workflows, browser, loadtest, AI evals scaffold).
 
 Spec: `.docs/plans/2026-04-17-qa-coverage/architecture-spec.md`
 Plan: `.docs/plans/2026-04-17-qa-coverage/architecture-plan.md`
@@ -8,14 +8,14 @@ Phase roadmap: `.docs/plans/2026-04-17-qa-coverage/00-overview.md`
 
 ## Suites
 
-| Suite | Tag | What it tests | Speed |
-|-------|-----|---------------|-------|
-| smoke | `@smoke` | Health, auth, critical reads, security headers | ~30s |
-| rbac | `@rbac` | Every endpoint × every role → expected status | ~2min |
-| api | `@workflow` / `@contract` | Multi-step domain chains (fleet, financials, operations, platform, ai) | ~3min |
-| browser | `@browser` | Login, dashboard, page navigation, no JS errors | ~2min |
-| loadtest | — | Baseline perf (50 concurrent users × top 10 endpoints) | ~5min |
-| evals | — | **Scaffold only** — not active (see `tests/evals/README.md`) | — |
+| Suite    | Tag                       | What it tests                                                          | Speed |
+| -------- | ------------------------- | ---------------------------------------------------------------------- | ----- |
+| smoke    | `@smoke`                  | Health, auth, critical reads, security headers                         | ~30s  |
+| rbac     | `@rbac`                   | Every endpoint × every role → expected status                          | ~2min |
+| api      | `@workflow` / `@contract` | Multi-step domain chains (fleet, financials, operations, platform, ai) | ~3min |
+| browser  | `@browser`                | Login, dashboard, page navigation, no JS errors                        | ~2min |
+| loadtest | —                         | Baseline perf (50 concurrent users × top 10 endpoints)                 | ~5min |
+| evals    | —                         | **Scaffold only** — not active (see `tests/evals/README.md`)           | —     |
 
 ## Directory layout
 
@@ -23,7 +23,7 @@ Phase roadmap: `.docs/plans/2026-04-17-qa-coverage/00-overview.md`
 tests/
   smoke/                     — health + security-headers + auth
   rbac/                      — role × endpoint matrix (generated + hand-curated)
-  api/                       — workflow + contract tests grouped by SALLY backend domain
+  api/                       — workflow + contract tests grouped by backend domain
     fleet/                   — drivers, vehicles, loads, trailers, recurring lanes, docs
     financials/              — invoicing, settlements, close-out, IFTA, lumper
     operations/              — alerts, command center, routing, convoy, smart routes
@@ -33,7 +33,7 @@ tests/
   browser/                   — Playwright UI critical paths
   evals/                     — AI evals scaffold (inactive)
   loadtest/                  — autocannon baselines
-  fixtures/                  — thin re-exports to @sally/test-utils
+  fixtures/                  — thin re-exports to @app/test-utils
   config/                    — global-setup, test-env
   scripts/                   — RBAC matrix gen, gap audit, confidence matrix
 ```
@@ -42,7 +42,7 @@ tests/
 
 ### Local (Doppler-injected, no .env files)
 
-Requires `doppler login` once per machine. Secrets come from `sally-backend/dev` — no local config files to keep in sync.
+Requires `doppler login` once per machine. Secrets come from `app-backend/dev` — no local config files to keep in sync.
 
 ```bash
 pnpm qa:list-tenants                     # discover valid TENANT_ID
@@ -60,39 +60,39 @@ TENANT_ID=<id> pnpm test:browser:local
 ```bash
 DEV_AUTH_SECRET=<stg-secret> \
 TENANT_ID=<id> \
-API_BASE_URL=https://sally-api-staging.appshore.in/api/v1 \
-WEB_BASE_URL=https://staging.sally.appshore.in \
+API_BASE_URL=https://app-api-staging.appshore.in/api/v1 \
+WEB_BASE_URL=https://staging.app.appshore.in \
 pnpm test:qa
 ```
 
 ### Individual suites
 
 ```bash
-pnpm --filter @sally/qa test:smoke
-pnpm --filter @sally/qa test:rbac
-pnpm --filter @sally/qa test:api
-pnpm --filter @sally/qa test:contracts
-pnpm --filter @sally/qa test:browser
+pnpm --filter @app/qa test:smoke
+pnpm --filter @app/qa test:rbac
+pnpm --filter @app/qa test:api
+pnpm --filter @app/qa test:contracts
+pnpm --filter @app/qa test:browser
 ```
 
 ## Authentication
 
 Tests authenticate via `/dev/users` + `/dev/switch` on the backend. Both endpoints are gated by `DevAuthGuard` which enforces the `x-dev-auth-secret` header with `crypto.timingSafeEqual`, plus a hard-block if `NODE_ENV === 'production'`.
 
-- **Local**: injected by `doppler run --project sally-backend --config dev --` (via `pnpm test:qa:local`). No `.env.test` file.
-- **CI**: `DEV_AUTH_SECRET` is a GitHub Actions repo secret (mirrors Doppler `sally-backend/stg`).
-- **Production**: hard-blocked by NODE_ENV check + secret unset in Doppler `sally-backend/prd`.
+- **Local**: injected by `doppler run --project app-backend --config dev --` (via `pnpm test:qa:local`). No `.env.test` file.
+- **CI**: `DEV_AUTH_SECRET` is a GitHub Actions repo secret (mirrors Doppler `app-backend/stg`).
+- **Production**: hard-blocked by NODE_ENV check + secret unset in Doppler `app-backend/prd`.
 
 The UI flag `NEXT_PUBLIC_ENABLE_DEV_SWITCHER` is independent — it only toggles the UI button visibility.
 
 ## Fixtures + factories
 
-All from `@sally/test-utils`. Never re-invent.
+All from `@app/test-utils`. Never re-invent.
 
 ```ts
-import { test, expect } from '@sally/test-utils/auth';
-import { buildDriver } from '@sally/test-utils/factories';
-import { DriverSchemas, expectContract } from '@sally/test-utils/schemas';
+import { test, expect } from '@app/test-utils/auth';
+import { buildDriver } from '@app/test-utils/factories';
+import { DriverSchemas, expectContract } from '@app/test-utils/schemas';
 
 test('dispatcher creates a driver @workflow', async ({ asDispatcher }) => {
   const res = await asDispatcher.post('/drivers', buildDriver());
@@ -105,12 +105,12 @@ Available fixtures: `asDispatcher`, `asAdmin`, `asOwner`, `asDriver`, `asCustome
 
 ## Adding new tests — use slash commands
 
-- `/sally-qa-add-api <desc>` — scaffold API test
-- `/sally-qa-add-browser <desc>` — scaffold browser E2E
-- `/sally-qa-add-smoke <desc>` — scaffold smoke
-- `/sally-qa-run [suite]` — run suite + publish report
-- `/sally-qa-fix` — triage last-run failures
-- `/sally-qa-review` — audit PR for missing coverage
+- `/app-qa-add-api <desc>` — scaffold API test
+- `/app-qa-add-browser <desc>` — scaffold browser E2E
+- `/app-qa-add-smoke <desc>` — scaffold smoke
+- `/app-qa-run [suite]` — run suite + publish report
+- `/app-qa-fix` — triage last-run failures
+- `/app-qa-review` — audit PR for missing coverage
 
 ## Reports
 
@@ -127,6 +127,7 @@ open tests/reports/confidence-matrix.html       # confidence dashboard
 Trigger: GitHub Actions → "Quality Gate" → Run workflow → pick suite + tenant.
 
 Artifacts per run:
+
 - `qa-report-<n>` — reports + Playwright HTML + JUnit (30-day retention).
 - `qa-traces-<n>` — traces, videos, screenshots (7-day retention).
 - `unit-results-<n>` — unit test JSON + coverage summary (30-day retention).
@@ -136,10 +137,10 @@ Artifacts per run:
 1. Never modify application code — this package is tests only.
 2. Always run against real API — no mocks, no stubs.
 3. `TENANT_ID` is mandatory. Use `pnpm qa:list-tenants` if unsure.
-4. Regenerate RBAC on every material change: `pnpm --filter @sally/qa generate:rbac`.
-5. Run RBAC gap audit before PR: `pnpm --filter @sally/qa exec tsx scripts/audit-rbac-gaps.ts`.
+4. Regenerate RBAC on every material change: `pnpm --filter @app/qa generate:rbac`.
+5. Run RBAC gap audit before PR: `pnpm --filter @app/qa exec tsx scripts/audit-rbac-gaps.ts`.
 6. Tag tests: `@smoke`, `@rbac`, `@workflow`, `@contract`, `@browser`.
-7. Use `@sally/test-utils` — never copy-paste factories or auth helpers.
+7. Use `@app/test-utils` — never copy-paste factories or auth helpers.
 8. Feature-gated endpoints: tag with `@requires:plan-<feature>`. Never use `test.skip()` at runtime.
 
 ---
@@ -149,7 +150,7 @@ Artifacts per run:
 Every new or rewritten API test MUST satisfy all 9 criteria. A PR that adds a test
 failing any criterion is rejected.
 
-### Criterion 1 — Use role fixture from `@sally/test-utils/auth`
+### Criterion 1 — Use role fixture from `@app/test-utils/auth`
 
 No raw tokens. Always use a named fixture.
 
@@ -164,7 +165,7 @@ test('dispatcher lists loads @workflow', async ({ asDispatcher }) => {
 });
 ```
 
-### Criterion 2 — Use factory from `@sally/test-utils/factories`
+### Criterion 2 — Use factory from `@app/test-utils/factories`
 
 No inline JSON for mutations.
 
@@ -173,7 +174,7 @@ No inline JSON for mutations.
 await asDispatcher.post('/drivers', { firstName: 'John', lastName: 'Smith', email: 'j@s.com', licenseNumber: 'DL123' });
 
 // ✅ Do
-import { buildDriver } from '@sally/test-utils/factories';
+import { buildDriver } from '@app/test-utils/factories';
 await asDispatcher.post('/drivers', buildDriver());
 ```
 
@@ -191,7 +192,7 @@ expect(res.status()).toBe(201);
 
 ### Criterion 4 — Assert response schema via `expectContract`
 
-Import from `@sally/shared-types` where available. Always use `.strict()`.
+Import from `@app/shared-types` where available. Always use `.strict()`.
 
 ```ts
 // ❌ Don't
@@ -199,8 +200,8 @@ const body = await res.json();
 expect(body.id).toBeTruthy();
 
 // ✅ Do
-import { expectContract } from '@sally/test-utils/schemas';
-import { DriverSchema } from '@sally/shared-types';
+import { expectContract } from '@app/test-utils/schemas';
+import { DriverSchema } from '@app/shared-types';
 expectContract(DriverSchema.strict(), await res.json());
 ```
 
@@ -331,7 +332,7 @@ tenant capabilities. Use this when:
 - name: Run full QA suite (all features must be enabled on demo-northstar)
   env:
     TENANT_ID: demo-northstar-2026
-    ENABLE_ALL_TESTS: "1"
+    ENABLE_ALL_TESTS: '1'
     DEV_AUTH_SECRET: ${{ secrets.DEV_AUTH_SECRET }}
   run: pnpm test:qa:local
 ```
@@ -396,10 +397,10 @@ pnpm qa:enable-features --tenant demo-northstar-2026
 
 ## Adding a New Test
 
-Use the `/sally-qa-add-api` slash command for API tests:
+Use the `/app-qa-add-api` slash command for API tests:
 
 ```
-/sally-qa-add-api Create and assign a load
+/app-qa-add-api Create and assign a load
 ```
 
 The command will scaffold a test file following the 9-criteria rubric. After scaffolding,
@@ -450,7 +451,7 @@ Possible causes:
 
 1. **`DEV_AUTH_SECRET` not set** — check that Doppler is injecting it:
    ```bash
-   doppler run --project sally-backend --config dev -- env | grep DEV_AUTH_SECRET
+   doppler run --project app-backend --config dev -- env | grep DEV_AUTH_SECRET
    ```
 2. **Backend not running** — start it with `pnpm doppler:backend` from the repo root.
 3. **Super-admin user doesn't exist** — run `pnpm setup:base` in `apps/backend/`.

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { OnbordaProvider, Onborda } from 'onborda';
 import { useAuthStore } from '@/features/auth';
-import { SallyTourCard } from './SallyTourCard';
+import { AssistantTourCard } from './AssistantTourCard';
 import { MobileTourSheet } from './MobileTourSheet';
 import { TourWelcomeDialog } from './TourWelcomeDialog';
 import { useTourStore } from '../store';
@@ -66,7 +66,7 @@ export function PlatformTour({ children }: PlatformTourProps) {
           showOnborda={isActive}
           shadowRgb="0,0,0"
           shadowOpacity="0.5"
-          cardComponent={SallyTourCard}
+          cardComponent={AssistantTourCard}
           cardTransition={{ type: 'spring', stiffness: 200, damping: 25 }}
         >
           {children}

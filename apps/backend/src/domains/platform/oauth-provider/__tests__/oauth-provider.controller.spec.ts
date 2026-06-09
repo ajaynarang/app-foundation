@@ -22,7 +22,7 @@ describe('OAuthProviderController', () => {
 
     oauthClientsService = {
       create: jest.fn().mockResolvedValue({
-        clientId: 'sally_new',
+        clientId: 'app_new',
         clientSecret: 'raw_secret',
         name: 'TestClient',
         description: null,
@@ -175,7 +175,7 @@ describe('OAuthProviderController', () => {
   describe('register (DCR)', () => {
     it('should register a public client', async () => {
       oauthClientsService.create.mockResolvedValue({
-        clientId: 'sally_new',
+        clientId: 'app_new',
         clientSecret: null,
         name: 'Claude Desktop',
         description: null,
@@ -195,7 +195,7 @@ describe('OAuthProviderController', () => {
         mockReq,
       );
 
-      expect(result.client_id).toBe('sally_new');
+      expect(result.client_id).toBe('app_new');
       expect(result.client_secret).toBeUndefined();
       expect(result.token_endpoint_auth_method).toBe('none');
     });
@@ -210,7 +210,7 @@ describe('OAuthProviderController', () => {
         mockReq,
       );
 
-      expect(result.client_id).toBe('sally_new');
+      expect(result.client_id).toBe('app_new');
       expect(result.client_secret).toBe('raw_secret');
       expect(result.client_secret_expires_at).toBe(0);
     });

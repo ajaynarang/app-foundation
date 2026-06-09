@@ -276,7 +276,7 @@ export function TenantDetailsSheet({
                         className="rounded-r-none"
                       />
                       <span className="inline-flex h-9 items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
-                        .sally.com
+                        .app.example.com
                       </span>
                     </div>
                     {form.subdomain && !isSubdomainValid && (
@@ -415,7 +415,7 @@ export function TenantDetailsSheet({
         >
           <SheetTitle>{tenantName}</SheetTitle>
           <SheetDescription>
-            {data?.tenant?.subdomain}.sally.com
+            {data?.tenant?.subdomain}.app.example.com
             {status && (
               <Badge className="ml-2" variant={status === 'ACTIVE' ? 'default' : 'muted'}>
                 {status.replace('_', ' ')}
@@ -476,7 +476,9 @@ export function TenantDetailsSheet({
 
                     <dt className="text-muted-foreground">Subdomain</dt>
                     <dd>
-                      <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{data.tenant.subdomain}.sally.com</code>
+                      <code className="bg-muted px-1.5 py-0.5 rounded text-xs">
+                        {data.tenant.subdomain}.app.example.com
+                      </code>
                     </dd>
 
                     <dt className="text-muted-foreground">DOT Number</dt>

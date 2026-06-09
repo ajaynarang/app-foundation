@@ -15,7 +15,7 @@ import { unique } from './common.js';
  */
 export function buildUserInvitation(overrides: Record<string, unknown> = {}) {
   return {
-    email: `invite-${unique('inv')}@test.sally.dev`,
+    email: `invite-${unique('inv')}@test.example.com`,
     role: 'DISPATCHER',
     firstName: 'Test',
     lastName: 'Invite',
@@ -25,7 +25,7 @@ export function buildUserInvitation(overrides: Record<string, unknown> = {}) {
 
 export function buildWebhookSubscription(overrides: Record<string, unknown> = {}) {
   return {
-    url: `https://test.sally.dev/webhooks/${unique('wh')}`,
+    url: `https://test.example.com/webhooks/${unique('wh')}`,
     events: ['load.created', 'load.updated'],
     ...overrides,
   };
@@ -204,7 +204,7 @@ export function buildTenantRegistration(overrides: Record<string, unknown> = {})
     fleetSize: 'SIZE_1_10',
     firstName: 'QA',
     lastName: 'Probe',
-    email: `qa-test-${nonce}@test.sally.dev`,
+    email: `qa-test-${nonce}@test.example.com`,
     firebaseUid: `qa-test-fb-${nonce}`,
     phone: '5555550100',
     ...overrides,
@@ -274,7 +274,7 @@ export function buildTenantReject(overrides: Record<string, unknown> = {}) {
  */
 export function buildUser(overrides: Record<string, unknown> = {}) {
   return {
-    email: `qa-user-${unique('usr')}@test.sally.dev`,
+    email: `qa-user-${unique('usr')}@test.example.com`,
     firstName: 'QA',
     lastName: 'User',
     role: 'DISPATCHER',

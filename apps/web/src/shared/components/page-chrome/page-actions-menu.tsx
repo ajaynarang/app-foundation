@@ -37,7 +37,7 @@ export interface PageActionsMenuProps {
  * PageActionsMenu — the "⋯ More" overflow for a page's secondary actions (Zone 2,
  * rightmost in the control-bar cluster). Universal 3-dot signal, mouse-first. This is
  * distinct from the GLOBAL ⌘K command palette (navigate + search anything) — see
- * sally-frontend-patterns §16 (Page Chrome) and §24 (Command Palette).
+ * app-frontend-patterns §16 (Page Chrome) and §24 (Command Palette).
  *
  * Returns null when there are no items.
  */

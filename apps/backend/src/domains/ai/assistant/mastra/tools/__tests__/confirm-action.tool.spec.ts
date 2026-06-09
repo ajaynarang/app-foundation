@@ -84,7 +84,7 @@ describe('confirmActionTool', () => {
     consoleSpy.mockRestore();
   });
 
-  // Bug C4: Spec §7.3 — Sally's Desk handles HITL at the episode level
+  // Bug C4: Spec §7.3 — the Desk handles HITL at the episode level
   // (human approve/reject before Act runs). Per-tool-call confirmations
   // would double-prompt, so Desk invocations must bypass this tool.
   describe('_invocationSource bypass (desk vs chat)', () => {

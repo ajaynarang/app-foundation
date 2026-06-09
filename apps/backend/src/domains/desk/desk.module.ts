@@ -12,9 +12,9 @@ import { DeskTriggerModule } from './core/trigger/trigger.module';
 import { DeskResponsibilityModule } from './responsibilities/desk-responsibility.module';
 
 /**
- * Sally's Desk (v3) — top-level module.
+ * the Desk (v3) — top-level module.
  *
- * Folder layout (see .docs/plans/06-sally-ai/2026-04-20-desk-architecture-v3.md §8):
+ * Folder layout (see .docs/plans/06-assistant/2026-04-20-desk-architecture-v3.md §8):
  *   core/             — generic Desk infra (inngest client/controller,
  *                       approval, episode step-writer, memory, trigger,
  *                       gate algorithm)

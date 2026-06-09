@@ -15,7 +15,7 @@ export interface PageEmptyStateProps {
 
 /**
  * PageEmptyState — consistent empty state for the data zone. Centered, muted, with an
- * optional icon, description, and CTA. See sally-frontend-patterns §16 (Page Chrome).
+ * optional icon, description, and CTA. See app-frontend-patterns §16 (Page Chrome).
  */
 export function PageEmptyState({ icon: Icon, title, description, action, className }: PageEmptyStateProps) {
   return (

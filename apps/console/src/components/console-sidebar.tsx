@@ -31,7 +31,6 @@ import {
   Scale,
   SunMoon,
   Sparkles,
-  Puzzle,
   ListChecks,
   type LucideIcon,
 } from 'lucide-react';
@@ -163,9 +162,8 @@ const navigationItems: NavItemConfig[] = [
     label: 'Plan & Usage',
     href: '/account/plan',
     icon: CreditCard,
-    hint: 'Tier, fleet limits, entitlements',
+    hint: 'Tier, usage, entitlements',
   },
-  { type: 'link', label: 'Add-ons', href: '/account/add-ons', icon: Puzzle, hint: 'Enable extra capabilities' },
   { type: 'link', label: 'Billing', href: '/account/billing', icon: Receipt, hint: 'Payment method, invoices' },
   {
     type: 'link',
@@ -388,43 +386,31 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
                 className="hidden md:flex items-center justify-center"
                 title="Expand sidebar"
               >
-                <Image
-                  src="/sally-logo-dark.svg"
-                  alt="S"
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 dark:block hidden"
-                />
-                <Image
-                  src="/sally-logo-light.svg"
-                  alt="S"
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 dark:hidden block"
-                />
+                <Image src="/logo-dark.svg" alt="S" width={24} height={24} className="h-6 w-6 dark:block hidden" />
+                <Image src="/logo-light.svg" alt="S" width={24} height={24} className="h-6 w-6 dark:hidden block" />
               </button>
             ) : (
               <>
                 <Link
                   href="/overview"
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                  title="SALLY Console"
+                  title="Console"
                 >
                   <Image
-                    src="/sally-logo-dark.svg"
-                    alt="SALLY"
+                    src="/logo-dark.svg"
+                    alt="Console"
                     width={28}
                     height={28}
                     className="h-7 w-7 dark:block hidden"
                   />
                   <Image
-                    src="/sally-logo-light.svg"
-                    alt="SALLY"
+                    src="/logo-light.svg"
+                    alt="Console"
                     width={28}
                     height={28}
                     className="h-7 w-7 dark:hidden block"
                   />
-                  <span className="text-xl font-bold tracking-tight">SALLY Console</span>
+                  <span className="text-xl font-bold tracking-tight">Console</span>
                 </Link>
                 <button
                   onClick={onToggleCollapse}
@@ -458,7 +444,7 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
           </nav>
         </ScrollArea>
 
-        {/* Zone 3: SALLY link */}
+        {/* Zone 3: platform link */}
         <div className="border-t border-border px-3 py-2">
           {isCollapsed ? (
             <Tooltip delayDuration={0}>
@@ -471,7 +457,7 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
                 </a>
               </TooltipTrigger>
               <TooltipContent side="right" className="text-xs">
-                SALLY
+                App
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -480,7 +466,7 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
               className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <Home className="h-5 w-5 flex-shrink-0" />
-              <span className="flex-1">SALLY</span>
+              <span className="flex-1">App</span>
             </a>
           )}
         </div>

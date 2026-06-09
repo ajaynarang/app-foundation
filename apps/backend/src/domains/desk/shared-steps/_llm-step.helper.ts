@@ -28,7 +28,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
  *   5. Return the validated object
  *
  * LLM call transport is direct (AI SDK via StructuredOutputService) — same
- * as Sally chat today. When InvocationPipelineService gains a runLlm()
+ * as the assistant chat today. When InvocationPipelineService gains a runLlm()
  * surface we migrate here; for now tool calls go via pipeline, LLM calls
  * go direct. Design-doc §4.2 captures this split.
  */

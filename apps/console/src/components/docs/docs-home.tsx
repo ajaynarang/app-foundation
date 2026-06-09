@@ -75,7 +75,7 @@ export function DocsHome() {
           Staging &middot; v1
         </div>
         <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
-          Build with SALLY
+          Build with the platform
         </h1>
         <p className="mb-8 max-w-xl text-base text-muted-foreground md:text-lg">
           Route planning, HOS compliance, real-time alerts, and webhook events — all via REST API. Ship fleet

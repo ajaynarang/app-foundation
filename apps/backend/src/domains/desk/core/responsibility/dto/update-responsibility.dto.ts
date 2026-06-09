@@ -8,7 +8,7 @@ import type { TrustLevel } from '@app/shared-types';
  * shared-types so the two surfaces agree.
  *
  * Supervisor lives on DeskAgent as of 2026-04-23 — use PATCH /desk/agents/:key.
- * Free-form rules previously stored on `notesForSally` now live as
+ * Free-form rules previously stored on `notesForAssistant` now live as
  * operator-authored playbook memories — POST /desk/memories/playbook.
  */
 export class UpdateResponsibilityDto {

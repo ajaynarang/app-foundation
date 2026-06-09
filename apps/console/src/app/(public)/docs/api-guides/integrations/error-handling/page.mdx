@@ -1,10 +1,10 @@
 # Error Handling
 
-This guide covers how to handle errors from the SALLY API, implement effective retry strategies, and stay within rate limits. Building resilient integrations means planning for failures from the start.
+This guide covers how to handle errors from the Platform API, implement effective retry strategies, and stay within rate limits. Building resilient integrations means planning for failures from the start.
 
 ## HTTP Status Codes
 
-SALLY uses standard HTTP status codes:
+Platform uses standard HTTP status codes:
 
 | Code | Meaning | When You See It |
 |---|---|---|
@@ -19,7 +19,7 @@ SALLY uses standard HTTP status codes:
 | `429` | Too Many Requests | Rate limit exceeded |
 | `500` | Internal Server Error | Server-side error (retry may help) |
 | `502` | Bad Gateway | Upstream service unavailable |
-| `503` | Service Unavailable | SALLY is temporarily down (retry) |
+| `503` | Service Unavailable | Platform is temporarily down (retry) |
 
 ## Error Response Format
 
@@ -149,7 +149,7 @@ You have exceeded the allowed request rate.
 
 ### Server Errors (500/502/503)
 
-These indicate a problem on SALLY's side. Retry with backoff.
+These indicate a problem on Platform's side. Retry with backoff.
 
 ```json
 {
@@ -184,7 +184,7 @@ async function fetchWithRetry(url, options, maxRetries = 5) {
       // Do not retry client errors (except 429)
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         const error = await response.json();
-        throw new SallyApiError(response.status, error.message, error.details);
+        throw new AppApiError(response.status, error.message, error.details);
       }
 
       // Rate limited -- wait for reset
@@ -202,7 +202,7 @@ async function fetchWithRetry(url, options, maxRetries = 5) {
       if (response.status >= 500) {
         if (attempt === maxRetries) {
           const error = await response.json();
-          throw new SallyApiError(response.status, error.message);
+          throw new AppApiError(response.status, error.message);
         }
         const delay = calculateBackoff(attempt);
         console.log(`Server error ${response.status}. Retrying in ${delay}ms...`);
@@ -212,7 +212,7 @@ async function fetchWithRetry(url, options, maxRetries = 5) {
 
       return response;
     } catch (error) {
-      if (error instanceof SallyApiError) throw error;
+      if (error instanceof AppApiError) throw error;
 
       // Network error -- retry with backoff
       if (attempt === maxRetries) throw error;
@@ -235,7 +235,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-class SallyApiError extends Error {
+class AppApiError extends Error {
   constructor(statusCode, message, details) {
     super(message);
     this.statusCode = statusCode;
@@ -251,8 +251,8 @@ import time
 import random
 import requests
 
-class SallyClient:
-    def __init__(self, api_key, base_url="https://sally-api-staging.appshore.in/api/v1"):
+class AppClient:
+    def __init__(self, api_key, base_url="https://api-staging.appshore.in/api/v1"):
         self.api_key = api_key
         self.base_url = base_url
         self.session = requests.Session()
@@ -271,7 +271,7 @@ class SallyClient:
 
                 # Client error (do not retry, except 429)
                 if 400 <= response.status_code < 500 and response.status_code != 429:
-                    raise SallyApiError(response.status_code, response.json())
+                    raise AppApiError(response.status_code, response.json())
 
                 # Rate limited
                 if response.status_code == 429:
@@ -283,7 +283,7 @@ class SallyClient:
 
                 # Server error
                 if attempt == max_retries:
-                    raise SallyApiError(response.status_code, response.json())
+                    raise AppApiError(response.status_code, response.json())
 
                 delay = min(2 ** attempt + random.random(), 30)
                 print(f"Server error {response.status_code}. Retrying in {delay:.1f}s...")
@@ -329,7 +329,7 @@ Content-Type: application/json
 
 ## Timeout Handling
 
-SALLY API endpoints have the following timeout characteristics:
+Platform API endpoints have the following timeout characteristics:
 
 | Endpoint Type | Timeout | Notes |
 |---|---|---|
@@ -367,10 +367,10 @@ try {
 Here is a complete, production-ready JavaScript client that handles all error cases:
 
 ```javascript
-class SallyClient {
+class AppClient {
   constructor(apiKey) {
     this.apiKey = apiKey;
-    this.baseUrl = "https://sally-api-staging.appshore.in/api/v1";
+    this.baseUrl = "https://api-staging.appshore.in/api/v1";
   }
 
   async request(method, path, { body, params, timeout = 10000, maxRetries = 3 } = {}) {
@@ -412,7 +412,7 @@ class SallyClient {
   }
 
   // Usage examples:
-  // const client = new SallyClient(process.env.SALLY_API_KEY);
+  // const client = new AppClient(process.env.APP_API_KEY);
   // const drivers = await client.get("/drivers", { status: "ACTIVE" });
   // const route = await client.post("/routes/plan", routeData, { timeout: 30000 });
 }

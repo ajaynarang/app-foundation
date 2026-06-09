@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Load Test Baseline — SALLY API
+ * Load Test Baseline — Platform API
  *
  * Hits the top 10 most-used endpoints with 50 concurrent users for 30 seconds.
  * Purpose: catch performance regressions (N+1 queries, slow joins, missing indexes).
@@ -9,7 +9,7 @@
  * NOT a full load/stress test. Run monthly or before releases.
  *
  * Usage:
- *   API_BASE_URL=https://staging.sally.appshore.in/api/v1 \
+ *   API_BASE_URL=https://staging.appshore.in/api/v1 \
  *   AUTH_TOKEN=<jwt> \
  *   node loadtest/run.mjs
  *
@@ -45,7 +45,7 @@ const ENDPOINTS = [
 const DURATION_SECONDS = 30;
 const CONNECTIONS = 50;
 
-console.log(`\n⚡ SALLY Load Test Baseline`);
+console.log(`\n⚡ Platform Load Test Baseline`);
 console.log(`   Target: ${BASE_URL}`);
 console.log(`   Connections: ${CONNECTIONS}`);
 console.log(`   Duration: ${DURATION_SECONDS}s per endpoint`);

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 
 /**
- * Normalizes the heterogeneous `tenantId` strings that Sally services pass
+ * Normalizes the heterogeneous `tenantId` strings that platform services pass
  * to the event bus into the canonical wire-format slug, and (separately)
  * resolves a slug to its numeric DB id.
  *

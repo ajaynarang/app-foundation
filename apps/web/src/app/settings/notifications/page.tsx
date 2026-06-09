@@ -141,7 +141,7 @@ export default function NotificationsSettingsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">Notifications</h2>
-        <p className="text-sm text-muted-foreground">How and when SALLY gets your attention</p>
+        <p className="text-sm text-muted-foreground">How and when the Assistant gets your attention</p>
       </div>
 
       {/* Notification Channels — table grid like alerts page */}

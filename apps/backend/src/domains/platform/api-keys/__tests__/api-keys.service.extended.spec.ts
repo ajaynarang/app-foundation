@@ -4,7 +4,7 @@ import { ApiKeysService } from '../api-keys.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
 import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 
 /**
  * Phase D — extended API-keys service surface: list-for-tenant, rotate,

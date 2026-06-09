@@ -1,13 +1,13 @@
 # Glossary
 
-This glossary covers trucking industry terminology, regulatory acronyms, and SALLY-specific concepts. If you are building on or integrating with SALLY, these definitions will help you understand the domain.
+This glossary covers trucking industry terminology, regulatory acronyms, and platform-specific concepts. If you are building on or integrating with Platform, these definitions will help you understand the domain.
 
 ---
 
 ## A
 
 ### Alert
-A system-generated notification about an operational event that may require dispatcher attention. SALLY defines 20 alert types across six categories (HOS Compliance, Route Progress, Driver Behavior, Vehicle State, External Conditions, System). Alerts follow a lifecycle: **Active** then **Acknowledged** then **Resolved**.
+A system-generated notification about an operational event that may require dispatcher attention. Platform defines 20 alert types across six categories (HOS Compliance, Route Progress, Driver Behavior, Vehicle State, External Conditions, System). Alerts follow a lifecycle: **Active** then **Acknowledged** then **Resolved**.
 
 ---
 
@@ -21,10 +21,10 @@ A legal document issued by the carrier that details the type, quantity, and dest
 ## C
 
 ### Carrier
-A company that operates commercial trucks and employs drivers to transport freight. In SALLY, each carrier is a tenant with its own fleet, drivers, and route data.
+A company that operates commercial trucks and employs drivers to transport freight. In Platform, each carrier is a tenant with its own fleet, drivers, and route data.
 
 ### CDL (Commercial Driver's License)
-A license required by the FMCSA to operate commercial motor vehicles. CDL classes (A, B, C) determine what vehicle types a driver can operate. Class A covers tractor-trailers, which is the primary vehicle type SALLY plans routes for.
+A license required by the FMCSA to operate commercial motor vehicles. CDL classes (A, B, C) determine what vehicle types a driver can operate. Class A covers tractor-trailers, which is the primary vehicle type Platform plans routes for.
 
 ### CMV (Commercial Motor Vehicle)
 Any vehicle used in interstate commerce that weighs over 10,001 pounds, is designed to transport more than 8 passengers for compensation, or transports hazardous materials. HOS regulations apply to CMV drivers.
@@ -37,10 +37,10 @@ Any vehicle used in interstate commerce that weighs over 10,001 pounds, is desig
 Driving a truck without a load (empty miles). Deadheading generates fuel cost without revenue. Dispatchers try to minimize deadhead by finding backhaul loads or positioning drivers efficiently.
 
 ### Dispatcher
-The person at a carrier who coordinates drivers, assigns loads, plans routes, and monitors fleet operations. Dispatchers are a primary user of SALLY. They use the dashboard to plan routes, manage alerts, and communicate with drivers.
+The person at a carrier who coordinates drivers, assigns loads, plans routes, and monitors fleet operations. Dispatchers are a primary user of Platform. They use the dashboard to plan routes, manage alerts, and communicate with drivers.
 
 ### Dock time
-Time a driver spends at a shipper or receiver facility for loading or unloading. Dock time counts as on-duty (not driving) time under HOS rules. SALLY's route planner accounts for dock time when simulating HOS clocks, and can leverage long dock times as partial rest.
+Time a driver spends at a shipper or receiver facility for loading or unloading. Dock time counts as on-duty (not driving) time under HOS rules. Platform's route planner accounts for dock time when simulating HOS clocks, and can leverage long dock times as partial rest.
 
 ### DOT (Department of Transportation)
 The US federal agency responsible for transportation policy and regulation. The DOT oversees the FMCSA, which directly regulates trucking.
@@ -55,31 +55,31 @@ Short-distance freight transport, typically the movement of containers from a po
 The portion of a driver's on-duty time spent behind the wheel with the vehicle in motion. ELDs automatically track drive time. Under HOS rules, a driver may accumulate a maximum of 11 hours of drive time after 10 consecutive hours off duty.
 
 ### Dwell time
-The total time a truck spends at a facility, including waiting time before loading or unloading begins. Dwell time is often longer than dock time because it includes queuing. Excessive dwell time triggers alerts in SALLY.
+The total time a truck spends at a facility, including waiting time before loading or unloading begins. Dwell time is often longer than dock time because it includes queuing. Excessive dwell time triggers alerts in Platform.
 
 ---
 
 ## E
 
 ### ELD (Electronic Logging Device)
-A device installed in a CMV that automatically records driving time and HOS data by connecting to the vehicle's engine. ELDs replaced paper logs under the 2017 federal mandate. SALLY reads HOS data from ELD platforms like Samsara and Motive.
+A device installed in a CMV that automatically records driving time and HOS data by connecting to the vehicle's engine. ELDs replaced paper logs under the 2017 federal mandate. Platform reads HOS data from ELD platforms like Samsara and Motive.
 
 ---
 
 ## F
 
 ### FMCSA (Federal Motor Carrier Safety Administration)
-The agency within the DOT that regulates the trucking industry and enforces HOS rules. The FMCSA issues MC numbers, conducts safety audits, and sets the HOS limits that SALLY validates against.
+The agency within the DOT that regulates the trucking industry and enforces HOS rules. The FMCSA issues MC numbers, conducts safety audits, and sets the HOS limits that Platform validates against.
 
 ### Fuel stop
-A planned stop for refueling. SALLY's route planner automatically inserts fuel stops when the vehicle's projected fuel level drops below a safe threshold. Stop selection optimizes for fuel price along the route using data from services like GasBuddy.
+A planned stop for refueling. Platform's route planner automatically inserts fuel stops when the vehicle's projected fuel level drops below a safe threshold. Stop selection optimizes for fuel price along the route using data from services like GasBuddy.
 
 ---
 
 ## H
 
 ### HOS (Hours of Service)
-Federal regulations enforced by the FMCSA that limit how long a CMV driver can drive and work before mandatory rest. HOS compliance is the core constraint that SALLY's route planner enforces. The key limits are:
+Federal regulations enforced by the FMCSA that limit how long a CMV driver can drive and work before mandatory rest. HOS compliance is the core constraint that Platform's route planner enforces. The key limits are:
 
 | Rule | Limit | Description |
 |---|---|---|
@@ -98,10 +98,10 @@ Federal regulations enforced by the FMCSA that limit how long a CMV driver can d
 A regularly traveled route between two geographic points (for example, Dallas to Chicago). Carriers track lane frequency and profitability. A "headhaul lane" is the revenue-generating direction; the return is often a "backhaul lane."
 
 ### Load
-A shipment of freight being transported. In SALLY, a load has an origin, destination, one or more stops with appointment windows, and is assigned to a driver and vehicle. Synonymous with "shipment."
+A shipment of freight being transported. In Platform, a load has an origin, destination, one or more stops with appointment windows, and is assigned to a driver and vehicle. Synonymous with "shipment."
 
 ### LTL (Less Than Truckload)
-A shipping method where a trailer carries freight from multiple shippers. Each shipper pays for the portion of the trailer their freight occupies. Contrasts with FTL (Full Truckload), where one shipper books the entire trailer. SALLY primarily handles FTL routing.
+A shipping method where a trailer carries freight from multiple shippers. Each shipper pays for the portion of the trailer their freight occupies. Contrasts with FTL (Full Truckload), where one shipper books the entire trailer. Platform primarily handles FTL routing.
 
 ---
 
@@ -111,7 +111,7 @@ A shipping method where a trailer carries freight from multiple shippers. Each s
 A Motor Carrier authority number issued by the FMCSA. Required for carriers operating as for-hire transporters in interstate commerce. Used alongside the DOT number to identify a carrier.
 
 ### Motive
-A fleet management and ELD platform (formerly KeepTruckin). Provides telematics, HOS tracking, and compliance tools. One of the ELD platforms SALLY integrates with.
+A fleet management and ELD platform (formerly KeepTruckin). Provides telematics, HOS tracking, and compliance tools. One of the ELD platforms Platform integrates with.
 
 ---
 
@@ -121,7 +121,7 @@ A fleet management and ELD platform (formerly KeepTruckin). Provides telematics,
 All time a driver is working, including both driving and non-driving tasks such as vehicle inspections, loading/unloading, paperwork, and fueling. On-duty time accumulates toward the 14-hour duty window and the 60/70-hour cycle limit.
 
 ### OTR (Over The Road)
-Long-haul trucking that involves routes spanning multiple days and hundreds or thousands of miles. OTR drivers typically sleep in their truck's sleeper berth. SALLY's HOS simulation and rest stop insertion are especially important for OTR routes.
+Long-haul trucking that involves routes spanning multiple days and hundreds or thousands of miles. OTR drivers typically sleep in their truck's sleeper berth. Platform's HOS simulation and rest stop insertion are especially important for OTR routes.
 
 ---
 
@@ -138,13 +138,13 @@ Documentation confirming that freight was delivered to the consignee. May includ
 A refrigerated trailer used to transport temperature-sensitive freight (produce, pharmaceuticals, frozen goods). Reefer units have their own fuel supply and require monitoring.
 
 ### Rest stop
-A planned break inserted into a route for HOS compliance. SALLY automatically determines where rest stops are needed and what type of rest is appropriate:
+A planned break inserted into a route for HOS compliance. Platform automatically determines where rest stops are needed and what type of rest is appropriate:
 - **30-minute break** -- Satisfies the 8-hour driving break requirement.
 - **Full rest (10 hours)** -- Resets the 11-hour driving and 14-hour duty clocks.
 - **Split sleeper** -- Splits the required rest into two periods (7/3 or 8/2 hours) using the sleeper berth provision.
 
 ### Route plan
-A complete, validated route produced by SALLY's planning engine. A route plan contains an ordered sequence of segments (DRIVE, REST, FUEL, DOCK) with ETAs, HOS state at each point, and fuel projections. Route plans are versioned -- when conditions change, SALLY generates a new version rather than mutating the existing plan.
+A complete, validated route produced by Platform's planning engine. A route plan contains an ordered sequence of segments (DRIVE, REST, FUEL, DOCK) with ETAs, HOS state at each point, and fuel projections. Route plans are versioned -- when conditions change, Platform generates a new version rather than mutating the existing plan.
 
 ### Route segment
 One leg of a route plan. Each segment has a type, start location, end location, duration, and distance. Segment types:
@@ -158,13 +158,13 @@ One leg of a route plan. Each segment has a type, start location, end location, 
 ## S
 
 ### Samsara
-A leading telematics and ELD platform that provides real-time GPS tracking, HOS data, vehicle diagnostics, and driver safety monitoring. SALLY integrates with the Samsara API to read driver HOS clocks and duty status.
+A leading telematics and ELD platform that provides real-time GPS tracking, HOS data, vehicle diagnostics, and driver safety monitoring. Platform integrates with the Samsara API to read driver HOS clocks and duty status.
 
 ### Sleeper berth
 The sleeping compartment in a truck cab, typically behind the driver and passenger seats. Time spent in the sleeper berth counts as off-duty time under HOS rules, enabling multi-day OTR operations without needing a hotel.
 
 ### Split sleeper
-An HOS provision that allows a driver to split the required 10-hour off-duty period into two separate periods, provided one period is at least 7 hours in the sleeper berth and the other is at least 2 hours (either off-duty or sleeper berth). Neither period counts against the 14-hour duty window. SALLY's HOS simulation supports split sleeper calculations.
+An HOS provision that allows a driver to split the required 10-hour off-duty period into two separate periods, provided one period is at least 7 hours in the sleeper berth and the other is at least 2 hours (either off-duty or sleeper berth). Neither period counts against the 14-hour duty window. Platform's HOS simulation supports split sleeper calculations.
 
 ### Stop
 A location the driver must visit during a route. Stop types include pickup, delivery, fuel, and rest. Each stop has a location, an optional appointment window, and an estimated service time.
@@ -177,17 +177,17 @@ A location the driver must visit during a route. Stop types include pickup, deli
 A combination of two trailers pulled by a single tractor (also called "doubles"). Subject to length and weight restrictions that vary by state.
 
 ### Telematics
-Technology that combines GPS tracking, vehicle diagnostics, and communication to provide real-time visibility into fleet operations. Telematics platforms (Samsara, Motive) are a primary data source for SALLY.
+Technology that combines GPS tracking, vehicle diagnostics, and communication to provide real-time visibility into fleet operations. Telematics platforms (Samsara, Motive) are a primary data source for Platform.
 
 ### TMS (Transportation Management System)
-Enterprise software for managing the lifecycle of freight shipments -- load booking, carrier selection, dispatch, tracking, and settlement. SALLY integrates with TMS platforms like McLeod and Project44 to sync loads, stops, and appointment windows.
+Enterprise software for managing the lifecycle of freight shipments -- load booking, carrier selection, dispatch, tracking, and settlement. Platform integrates with TMS platforms like McLeod and Project44 to sync loads, stops, and appointment windows.
 
 ### TSP (Traveling Salesman Problem)
-A combinatorial optimization problem: given a set of locations, find the shortest route that visits each location exactly once and returns to the starting point. SALLY uses TSP algorithms to determine the optimal stop sequence within a route.
+A combinatorial optimization problem: given a set of locations, find the shortest route that visits each location exactly once and returns to the starting point. Platform uses TSP algorithms to determine the optimal stop sequence within a route.
 
 ---
 
 ## V
 
 ### VRP (Vehicle Routing Problem)
-A generalization of the TSP for multiple vehicles. Given a fleet of vehicles and a set of delivery locations, find optimal routes for all vehicles that minimize total distance or time while respecting constraints (capacity, time windows, driver hours). SALLY solves constrained VRP instances where HOS compliance is the primary constraint.
+A generalization of the TSP for multiple vehicles. Given a fleet of vehicles and a set of delivery locations, find optimal routes for all vehicles that minimize total distance or time while respecting constraints (capacity, time windows, driver hours). Platform solves constrained VRP instances where HOS compliance is the primary constraint.

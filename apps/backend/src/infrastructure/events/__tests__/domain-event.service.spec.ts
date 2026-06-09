@@ -25,28 +25,28 @@ describe('DomainEventService', () => {
   });
 
   it('emits to EventEmitter2 (hot path) and BullMQ (durable path)', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {
+    await service.emit('app.load.created', 'tenant-1', {
       entityId: 'LD-1',
       entityType: 'load',
     });
 
     // Hot path
     expect(eventEmitter.emit).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
-        event: 'sally.load.created',
+        event: 'app.load.created',
         tenantId: 'tenant-1',
       }),
     );
 
     // Durable path — envelope-wrapped
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         tenantId: 'tenant-1',
         metadata: expect.objectContaining({ source: 'event', version: 1 }),
         payload: expect.objectContaining({
-          event: 'sally.load.created',
+          event: 'app.load.created',
           tenantId: 'tenant-1',
           data: { entityId: 'LD-1', entityType: 'load' },
         }),
@@ -56,11 +56,11 @@ describe('DomainEventService', () => {
   });
 
   it('normalizes numeric tenantId to string', async () => {
-    await service.emit('sally.load.created', 42, { entityId: 'LD-1' });
+    await service.emit('app.load.created', 42, { entityId: 'LD-1' });
 
-    expect(eventEmitter.emit).toHaveBeenCalledWith('sally.load.created', expect.objectContaining({ tenantId: '42' }));
+    expect(eventEmitter.emit).toHaveBeenCalledWith('app.load.created', expect.objectContaining({ tenantId: '42' }));
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         tenantId: '42',
         payload: expect.objectContaining({ tenantId: '42' }),
@@ -71,10 +71,10 @@ describe('DomainEventService', () => {
 
   it('includes explicit actor in both paths', async () => {
     const actor = { id: 'u-1', type: 'user' as const, label: 'John' };
-    await service.emit('sally.load.created', 'tenant-1', {}, actor);
+    await service.emit('app.load.created', 'tenant-1', {}, actor);
 
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         payload: expect.objectContaining({
           actor: { id: 'u-1', type: 'user', label: 'John' },
@@ -85,10 +85,10 @@ describe('DomainEventService', () => {
   });
 
   it('sets null actor when none provided', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         payload: expect.objectContaining({ actor: null }),
       }),
@@ -97,13 +97,13 @@ describe('DomainEventService', () => {
   });
 
   it('includes correlationId and causationId on payload and envelope', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {}, undefined, {
+    await service.emit('app.load.created', 'tenant-1', {}, undefined, {
       correlationId: 'corr-1',
       causationId: 'cause-1',
     });
 
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         correlationId: 'corr-1',
         causationId: 'cause-1',
@@ -119,7 +119,7 @@ describe('DomainEventService', () => {
   it('hot path still fires when BullMQ add fails', async () => {
     queue.add.mockRejectedValue(new Error('Redis down'));
 
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     // Hot path should have been called before queue.add
     expect(eventEmitter.emit).toHaveBeenCalled();
@@ -127,8 +127,8 @@ describe('DomainEventService', () => {
   });
 
   it('generates unique event IDs', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {});
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     const call1 = queue.add.mock.calls[0][1];
     const call2 = queue.add.mock.calls[1][1];
@@ -136,10 +136,10 @@ describe('DomainEventService', () => {
   });
 
   it('sets version to 1 on payload', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     expect(queue.add).toHaveBeenCalledWith(
-      'sally.load.created',
+      'app.load.created',
       expect.objectContaining({
         payload: expect.objectContaining({ version: 1 }),
       }),
@@ -148,17 +148,17 @@ describe('DomainEventService', () => {
   });
 
   it('includes timestamp as ISO string', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     const envelope = queue.add.mock.calls[0][1];
     expect(envelope.payload.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('sets a deterministic jobId for dedup', async () => {
-    await service.emit('sally.load.created', 'tenant-1', {});
+    await service.emit('app.load.created', 'tenant-1', {});
 
     const opts = queue.add.mock.calls[0][2];
     const envelope = queue.add.mock.calls[0][1];
-    expect(opts.jobId).toBe(`sally.load.created-${envelope.payload.id}`);
+    expect(opts.jobId).toBe(`app.load.created-${envelope.payload.id}`);
   });
 });

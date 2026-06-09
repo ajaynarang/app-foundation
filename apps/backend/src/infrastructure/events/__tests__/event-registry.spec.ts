@@ -1,5 +1,5 @@
 import { EVENT_REGISTRY, getEventDefinition, getExternalEvents, getExternalEventsByCategory } from '../event-registry';
-import { DOMAIN_EVENTS } from '../sally-events.constants';
+import { DOMAIN_EVENTS } from '../domain-events.constants';
 
 describe('EventRegistry', () => {
   it('every registry entry has required fields', () => {

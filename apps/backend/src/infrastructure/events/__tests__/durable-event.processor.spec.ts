@@ -62,7 +62,7 @@ describe('DurableEventProcessor', () => {
 
   const sampleJobData: DurableEventJobData = {
     id: 'evt-1',
-    event: 'sally.load.created',
+    event: 'app.load.created',
     tenantId: 'tenant-1',
     data: { entityId: 'LD-1', entityType: 'load' },
     actor: { id: 'u-1', type: 'user', label: 'John' },
@@ -77,13 +77,13 @@ describe('DurableEventProcessor', () => {
 
     expect(persistence.persistEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: 'sally.load.created',
+        event: 'app.load.created',
         tenantId: 'tenant-1',
       }),
     );
     expect(webhookDispatcher.dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        event: 'sally.load.created',
+        event: 'app.load.created',
       }),
     );
   });
@@ -160,7 +160,7 @@ describe('DurableEventProcessor', () => {
     it('records permanent failure to DLQ on final attempt', async () => {
       const job: any = {
         id: 'job-9',
-        name: 'sally.load.created',
+        name: 'app.load.created',
         attemptsMade: 3,
         opts: { attempts: 3 },
         data: makeEnvelope(sampleJobData),
@@ -175,7 +175,7 @@ describe('DurableEventProcessor', () => {
     it('does not record DLQ on intermediate failures', async () => {
       const job: any = {
         id: 'job-9',
-        name: 'sally.load.created',
+        name: 'app.load.created',
         attemptsMade: 1,
         opts: { attempts: 3 },
         data: makeEnvelope(sampleJobData),

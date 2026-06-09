@@ -355,7 +355,7 @@ function detectGaps(endpoints: EndpointAudit[], testedRoutes: Set<string>): Audi
 
 function printReport(report: AuditReport): void {
   console.log('\n' + '='.repeat(70));
-  console.log('  SALLY RBAC Gap Audit Report');
+  console.log('  Platform RBAC Gap Audit Report');
   console.log('  ' + report.timestamp);
   console.log('='.repeat(70));
 

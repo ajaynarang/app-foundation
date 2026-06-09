@@ -2,7 +2,7 @@ import { Callout } from "@/components/docs/callout"
 
 # Any MCP Client
 
-SALLY implements the **Model Context Protocol (MCP)** with Streamable HTTP transport. Any MCP-compatible client can connect to SALLY's MCP server.
+Platform implements the **Model Context Protocol (MCP)** with Streamable HTTP transport. Any MCP-compatible client can connect to Platform's MCP server.
 
 ## Server Details
 
@@ -17,28 +17,28 @@ SALLY implements the **Model Context Protocol (MCP)** with Streamable HTTP trans
 
 | Environment | Server URL | OAuth Metadata |
 |-------------|-----------|----------------|
-| **Production** | `https://api.trysally.com` | `https://api.trysally.com/.well-known/oauth-authorization-server` |
-| **Staging** | `https://sally-api.apps.appshore.in` | `https://sally-api.apps.appshore.in/.well-known/oauth-authorization-server` |
+| **Production** | `https://api.example.com` | `https://api.example.com/.well-known/oauth-authorization-server` |
+| **Staging** | `https://api.apps.appshore.in` | `https://api.apps.appshore.in/.well-known/oauth-authorization-server` |
 | **Local** | `http://localhost:8000` | `http://localhost:8000/.well-known/oauth-authorization-server` |
 
 ## Authentication Flow
 
-SALLY uses **OAuth 2.1 with PKCE** (no client secrets required):
+Platform uses **OAuth 2.1 with PKCE** (no client secrets required):
 
 ### 1. Discover OAuth Metadata
 
 ```bash
-curl https://api.trysally.com/.well-known/oauth-authorization-server
+curl https://api.example.com/.well-known/oauth-authorization-server
 ```
 
 Response:
 ```json
 {
-  "issuer": "https://api.trysally.com",
-  "authorization_endpoint": "https://api.trysally.com/api/v1/oauth/authorize",
-  "token_endpoint": "https://api.trysally.com/api/v1/oauth/token",
-  "registration_endpoint": "https://api.trysally.com/api/v1/oauth/register",
-  "revocation_endpoint": "https://api.trysally.com/api/v1/oauth/revoke",
+  "issuer": "https://api.example.com",
+  "authorization_endpoint": "https://api.example.com/api/v1/oauth/authorize",
+  "token_endpoint": "https://api.example.com/api/v1/oauth/token",
+  "registration_endpoint": "https://api.example.com/api/v1/oauth/register",
+  "revocation_endpoint": "https://api.example.com/api/v1/oauth/revoke",
   "response_types_supported": ["code"],
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "code_challenge_methods_supported": ["S256"],
@@ -48,10 +48,10 @@ Response:
 
 ### 2. Register Your Client (Optional)
 
-SALLY supports **Dynamic Client Registration** (RFC 7591):
+Platform supports **Dynamic Client Registration** (RFC 7591):
 
 ```bash
-curl -X POST https://api.trysally.com/api/v1/oauth/register \
+curl -X POST https://api.example.com/api/v1/oauth/register \
   -H "Content-Type: application/json" \
   -d '{
     "client_name": "My MCP Client",
@@ -67,7 +67,7 @@ curl -X POST https://api.trysally.com/api/v1/oauth/register \
 Generate a code verifier and challenge, then redirect the user:
 
 ```
-GET https://api.trysally.com/api/v1/oauth/authorize
+GET https://api.example.com/api/v1/oauth/authorize
   ?response_type=code
   &client_id={client_id}
   &redirect_uri={redirect_uri}
@@ -77,12 +77,12 @@ GET https://api.trysally.com/api/v1/oauth/authorize
   &state={random_state}
 ```
 
-The user signs in on SALLY's consent page and is redirected back with an authorization code.
+The user signs in on Platform's consent page and is redirected back with an authorization code.
 
 ### 4. Token Exchange
 
 ```bash
-curl -X POST https://api.trysally.com/api/v1/oauth/token \
+curl -X POST https://api.example.com/api/v1/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=authorization_code&code={auth_code}&redirect_uri={redirect_uri}&client_id={client_id}&code_verifier={verifier}"
 ```
@@ -101,7 +101,7 @@ Response:
 ### 5. Refresh Tokens
 
 ```bash
-curl -X POST https://api.trysally.com/api/v1/oauth/token \
+curl -X POST https://api.example.com/api/v1/oauth/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=refresh_token&refresh_token={refresh_token}&client_id={client_id}"
 ```
@@ -113,7 +113,7 @@ Send JSON-RPC 2.0 requests to the server URL with the Bearer token:
 ### List Available Tools
 
 ```bash
-curl -X POST https://api.trysally.com \
+curl -X POST https://api.example.com \
   -H "Authorization: Bearer {access_token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -127,7 +127,7 @@ curl -X POST https://api.trysally.com \
 ### Call a Tool
 
 ```bash
-curl -X POST https://api.trysally.com \
+curl -X POST https://api.example.com \
   -H "Authorization: Bearer {access_token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -186,16 +186,16 @@ Confirmation tokens expire after **5 minutes**.
 
 ## Protected Resource Metadata
 
-SALLY also exposes RFC 9728 metadata:
+Platform also exposes RFC 9728 metadata:
 
 ```bash
-curl https://api.trysally.com/.well-known/oauth-protected-resource
+curl https://api.example.com/.well-known/oauth-protected-resource
 ```
 
 ```json
 {
-  "resource": "https://api.trysally.com",
-  "authorization_servers": ["https://api.trysally.com"],
+  "resource": "https://api.example.com",
+  "authorization_servers": ["https://api.example.com"],
   "scopes_supported": ["fleet:read", "fleet:write", "invoices:read", ...]
 }
 ```

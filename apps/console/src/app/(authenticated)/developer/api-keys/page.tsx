@@ -70,7 +70,7 @@ export default function ApiKeysPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">API Keys</h1>
-          <p className="text-muted-foreground mt-1">Create keys for server-to-server access to SALLY APIs.</p>
+          <p className="text-muted-foreground mt-1">Create keys for server-to-server access to the platform APIs.</p>
         </div>
 
         {/* Current environment */}

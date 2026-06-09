@@ -21,7 +21,7 @@ export interface AgentContext {
    * Resolved numeric DB id (`User.id`). Needed for `AgentPrincipal`
    * construction when tools route through `InvocationPipelineService`,
    * and for the RLS session user for role='driver'. Callers resolve via
-   * `BaseTenantController.getUserDbId` (or `SallyAiService.getUserDbId`)
+   * `BaseTenantController.getUserDbId` (or `AssistantAiService.getUserDbId`)
    * before entering agent.chat().
    */
   userDbId: number;
@@ -47,7 +47,7 @@ export interface AgentStatus {
   nextRun?: string;
 }
 
-export interface SallyAgent {
+export interface AssistantAgentContract {
   readonly id: AgentId;
   readonly displayName: string;
   readonly mastraAgentId: string;

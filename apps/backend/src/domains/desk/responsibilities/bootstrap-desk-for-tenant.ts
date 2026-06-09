@@ -113,7 +113,7 @@ export async function bootstrapDeskForTenant(
         //     seeds never touch on update.
         //   • supervisor is on DeskAgent now (lifted 2026-04-23),
         //     not per-responsibility.
-        //   • notesForSally retired (2026-04-27) — operator free-form
+        //   • notesForAssistant retired (2026-04-27) — operator free-form
         //     rules now live as playbook memories.
         title: def.title,
         description: def.description,

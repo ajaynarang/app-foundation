@@ -7,7 +7,7 @@ import { DeskMemoryReinforcer } from '../core/memory/desk-memory-reinforcer.serv
 import { DeskMemoryWriterService } from '../core/memory/desk-memory-writer.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
 
 import { TERMINAL_STATUS_BY_OUTCOME, type DeskOutcome } from './outcomes';
 import type { CloseInput, CloseOutput, SharedHydrateOutput } from './step.types';
@@ -86,7 +86,7 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
         })
         .catch((err) => logger.warn(`memory.write failed for ${episode.id}: ${describeError(err)}`));
 
-      // Reinforce the memories Sally actually used this run.
+      // Reinforce the memories the assistant actually used this run.
       if (episode.retrievedMemoryIds.length > 0) {
         await reinforcer
           .reinforce({

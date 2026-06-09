@@ -11,7 +11,7 @@ import { usePlan } from '../features/plans/use-plan';
 const featureDescriptions: Record<string, { label: string; description: string; requiredPlan: string }> = {
   api_keys: {
     label: 'API Keys',
-    description: 'Create server-to-server API keys for programmatic access to SALLY.',
+    description: 'Create server-to-server API keys for programmatic access to the platform.',
     requiredPlan: 'Freight Force',
   },
   webhooks: {
@@ -61,7 +61,7 @@ export function ConsoleFeatureGuard({ entitlementKey, children }: ConsoleFeature
           </h2>
           {featureInfo && <p className="text-sm text-muted-foreground">{featureInfo.description}</p>}
           <a
-            href="mailto:sally@appshore.in?subject=Plan Upgrade Inquiry"
+            href="mailto:sales@appshore.in?subject=Plan Upgrade Inquiry"
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors mt-2"
           >
             Contact Sales
@@ -99,7 +99,7 @@ export function ConsolePlanBlockedScreen() {
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
           {isSuspended
             ? 'Your account has been suspended. Please contact support to resolve this issue.'
-            : 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using SALLY.'}
+            : 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using the platform.'}
         </p>
         {isTrialExpired && (
           <p className="text-xs text-muted-foreground">Your data is safe — it will be available once you upgrade.</p>
@@ -114,7 +114,7 @@ export function ConsolePlanBlockedScreen() {
             </a>
           )}
           <a
-            href={`mailto:${isSuspended ? 'support' : 'sally'}@appshore.in`}
+            href={`mailto:${isSuspended ? 'support' : 'sales'}@appshore.in`}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 border border-input bg-background hover:bg-muted transition-colors"
           >
             {isSuspended ? 'Contact Support' : 'Contact Sales'}

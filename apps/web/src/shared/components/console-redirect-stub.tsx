@@ -21,7 +21,7 @@ export function ConsoleRedirectStub({ title, consolePath }: ConsoleRedirectStubP
           </div>
           <h2 className="text-lg font-semibold text-foreground">{title} moved to Console</h2>
           <p className="text-sm text-muted-foreground">
-            This page is now managed in SALLY Console. You can always access Console from the sidebar menu.
+            This page is now managed in the Platform Console. You can always access Console from the sidebar menu.
           </p>
           <button
             onClick={() => openConsole(consolePath)}

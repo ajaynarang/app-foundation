@@ -56,7 +56,7 @@ describe('DomainEvent + EventContext integration', () => {
     const actor: EventActor = { id: 'u-1', type: 'user', label: 'Auto' };
 
     EventContext.run(actor, () => {
-      const event = new DomainEvent('sally.load.created', 'tenant-1', {
+      const event = new DomainEvent('app.load.created', 'tenant-1', {
         loadId: 'LD-1',
       });
       expect(event.actor).toEqual(actor);
@@ -72,13 +72,13 @@ describe('DomainEvent + EventContext integration', () => {
     };
 
     EventContext.run(contextActor, () => {
-      const event = new DomainEvent('sally.load.created', 'tenant-1', { loadId: 'LD-1' }, explicitActor);
+      const event = new DomainEvent('app.load.created', 'tenant-1', { loadId: 'LD-1' }, explicitActor);
       expect(event.actor).toEqual(explicitActor);
     });
   });
 
   it('actor is undefined when no context and none provided', () => {
-    const event = new DomainEvent('sally.load.created', 'tenant-1', {
+    const event = new DomainEvent('app.load.created', 'tenant-1', {
       loadId: 'LD-1',
     });
     expect(event.actor).toBeUndefined();

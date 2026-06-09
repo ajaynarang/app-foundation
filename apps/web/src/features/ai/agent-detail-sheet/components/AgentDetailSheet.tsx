@@ -10,7 +10,7 @@ import { ScopesTab } from './ScopesTab';
 import { ActivityTab } from './ActivityTab';
 import { OAuthClientProfileTab } from './OAuthClientProfileTab';
 import { ApiKeyProfileTab } from './ApiKeyProfileTab';
-import { SallyInternalsSection } from './SallyInternalsSection';
+import { AssistantInternalsSection } from './AssistantInternalsSection';
 import { AgentDetailFooterActions } from './AgentDetailFooterActions';
 
 interface AgentDetailSheetProps {
@@ -27,7 +27,7 @@ interface AgentDetailSheetProps {
 /**
  * Shared detail sheet for both External agents (OAuth clients) and API
  * keys tabs. Three inner tabs: Profile, Scopes, Activity.
- * SUPER_ADMIN users also see the inline Sally Internals panel.
+ * SUPER_ADMIN users also see the inline Assistant Internals panel.
  */
 export function AgentDetailSheet({ open, onOpenChange, kind, entityId }: AgentDetailSheetProps) {
   const { data: apiKeys } = useTenantApiKeys();
@@ -111,7 +111,7 @@ export function AgentDetailSheet({ open, onOpenChange, kind, entityId }: AgentDe
           <ActivityTab principalKind={kind} principalId={String(entityId)} />
         </TabsContent>
       </Tabs>
-      <SallyInternalsSection kind={kind} entityId={String(entityId)} rateLimitPerMinute={rateLimitPerMinute} />
+      <AssistantInternalsSection kind={kind} entityId={String(entityId)} rateLimitPerMinute={rateLimitPerMinute} />
     </FormSheet>
   );
 }

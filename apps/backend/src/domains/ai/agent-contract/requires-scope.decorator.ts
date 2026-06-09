@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { AgentScope, AgentScopeSchema } from '@app/shared-types';
 
-export const REQUIRES_SCOPE_METADATA_KEY = 'sally:requires-scope';
+export const REQUIRES_SCOPE_METADATA_KEY = 'app:requires-scope';
 
 /**
  * Declares the single AgentScope required to call a tool method.

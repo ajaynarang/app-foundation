@@ -217,7 +217,7 @@ export class DeskAgentService {
     }
 
     // Invalidate caches dependent on this agent.
-    await this.cache.del(buildKey('sally:desk', 'eligible-supervisors', tenantId));
+    await this.cache.del(buildKey('app:desk', 'eligible-supervisors', tenantId));
     return { updatedResponsibilityCount, supervisorUpdated };
   }
 
@@ -242,7 +242,7 @@ export class DeskAgentService {
    * the requested window, plus lifetime lastActivityAt. Cached WARM.
    */
   async getActivity(tenantId: number, agentKey: string, window: AgentActivityWindow): Promise<AgentActivityStats> {
-    const cacheKey = buildKey('sally:desk', 'agent-activity', tenantId, agentKey, window);
+    const cacheKey = buildKey('app:desk', 'agent-activity', tenantId, agentKey, window);
     return this.cache.getOrSet(cacheKey, () => this.computeActivity(tenantId, agentKey, window), CACHE_TTL_WARM_5M);
   }
 
@@ -309,7 +309,7 @@ export class DeskAgentService {
    * MEMBER, excluding deactivated users.
    */
   async listEligibleSupervisors(tenantId: number): Promise<EligibleSupervisor[]> {
-    const cacheKey = buildKey('sally:desk', 'eligible-supervisors', tenantId);
+    const cacheKey = buildKey('app:desk', 'eligible-supervisors', tenantId);
     return this.cache.getOrSet(cacheKey, () => this.fetchEligibleSupervisors(tenantId), CACHE_TTL_HOT_60S);
   }
 

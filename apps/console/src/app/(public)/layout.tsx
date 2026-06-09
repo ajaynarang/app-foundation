@@ -16,22 +16,10 @@ export default async function PublicLayout({ children }: { children: React.React
       <header className="h-14 border-b border-border bg-background sticky top-0 z-30">
         <div className="h-full flex items-center justify-between px-6">
           <Link href="/docs" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <Image
-              src="/sally-logo-dark.svg"
-              alt="SALLY"
-              width={28}
-              height={28}
-              className="h-7 w-7 dark:block hidden"
-            />
-            <Image
-              src="/sally-logo-light.svg"
-              alt="SALLY"
-              width={28}
-              height={28}
-              className="h-7 w-7 dark:hidden block"
-            />
+            <Image src="/logo-dark.svg" alt="Console" width={28} height={28} className="h-7 w-7 dark:block hidden" />
+            <Image src="/logo-light.svg" alt="Console" width={28} height={28} className="h-7 w-7 dark:hidden block" />
             <span className="text-xl font-bold tracking-tight font-space-grotesk text-foreground">
-              {isDocsOnly ? 'SALLY Docs' : 'SALLY Console'}
+              {isDocsOnly ? 'Docs' : 'Console'}
             </span>
           </Link>
           {isDocsOnly ? <DocsOnlyHeaderLinks /> : <DocsHeaderLinks isAuthenticated={isAuthenticated} />}

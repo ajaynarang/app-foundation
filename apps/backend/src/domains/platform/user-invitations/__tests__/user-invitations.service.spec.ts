@@ -346,7 +346,7 @@ describe('UserInvitationsService', () => {
 
       await service.resendInvitation('inv_sms', 'tenant_abc');
 
-      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('SALLY Fleet'));
+      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('the platform'));
     });
 
     it('should throw when tenant not found', async () => {
@@ -554,7 +554,7 @@ describe('UserInvitationsService', () => {
         { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
       );
 
-      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('SALLY Fleet'));
+      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('the platform'));
       expect(mockEmailService.sendUserInvitation).not.toHaveBeenCalled();
     });
   });

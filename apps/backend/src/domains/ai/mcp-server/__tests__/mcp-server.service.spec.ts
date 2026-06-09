@@ -85,7 +85,7 @@ describe('McpServerService', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
       expect(Server).toHaveBeenCalledWith(
-        { name: 'sally-fleet-ops', version: '1.0.0' },
+        { name: 'assistant-fleet-ops', version: '1.0.0' },
         { capabilities: { tools: {} } },
       );
     });

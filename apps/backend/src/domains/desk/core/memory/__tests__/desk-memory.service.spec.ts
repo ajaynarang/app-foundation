@@ -76,7 +76,7 @@ describe('DeskMemoryService — listForUI', () => {
   it('filters by scope and polarity (uppercase Prisma enum values)', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       scope: SCOPE.PLAYBOOK,
       polarity: POL.REINFORCE,
       activeOnly: true,
@@ -90,7 +90,7 @@ describe('DeskMemoryService — listForUI', () => {
   it('omits scope/polarity filters when not provided', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       activeOnly: true,
       limit: 50,
     });
@@ -102,7 +102,7 @@ describe('DeskMemoryService — listForUI', () => {
   it('Rules-tab filter — authoredByOperatorOnly=true → authoredByUserId NOT NULL', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       authoredByOperatorOnly: true,
       activeOnly: true,
       limit: 50,
@@ -114,7 +114,7 @@ describe('DeskMemoryService — listForUI', () => {
   it('Memory-tab filter — authoredByOperatorOnly=false → authoredByUserId IS NULL', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       authoredByOperatorOnly: false,
       activeOnly: true,
       limit: 50,
@@ -126,17 +126,17 @@ describe('DeskMemoryService — listForUI', () => {
   it('omits authored filter when undefined (admin view)', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       activeOnly: true,
       limit: 50,
     });
     expect(prisma.deskMemory.findMany.mock.calls[0][0].where.authoredByUserId).toBeUndefined();
   });
 
-  it('still scopes by sourceEpisodeId when provided (legacy "Sally learned from this" card)', async () => {
+  it('still scopes by sourceEpisodeId when provided (legacy "assistant learned from this" card)', async () => {
     await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       sourceEpisodeId: 'ep-1',
       activeOnly: true,
       limit: 50,
@@ -148,12 +148,12 @@ describe('DeskMemoryService — listForUI', () => {
     prisma.deskMemory.findMany.mockResolvedValue([
       {
         ...buildRow({ scope: SCOPE.PLAYBOOK, polarity: POL.REINFORCE, authoredByUserId: 7 }),
-        agent: { key: 'sally-billing' },
+        agent: { key: 'assistant-billing' },
       },
     ]);
     const rows = await service.listForUI({
       tenantId: 1,
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       activeOnly: true,
       limit: 50,
     });

@@ -7,7 +7,7 @@ import { extractErrorMessage } from '@/shared/lib/error-utils';
 
 /**
  * Create a new OAuth client. Used by {@link OAuthClientRegisterSheet} to
- * register an app/agent that will call SALLY APIs on behalf of a user. The
+ * register an app/agent that will call platform APIs on behalf of a user. The
  * list/revoke flow for tenant admins lives in `use-tenant-oauth-clients.ts`.
  */
 export function useCreateOAuthClient() {

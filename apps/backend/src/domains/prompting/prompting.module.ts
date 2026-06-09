@@ -9,7 +9,7 @@ import { ServiceFallbackRegistrar } from './registrars/service-fallback.registra
 /**
  * Global prompt management. Any domain can inject {@link PromptingService}
  * without importing this module — removes the old forwardRef cycle between
- * SkillsModule and SallyAiModule.
+ * SkillsModule and AssistantAiModule.
  *
  * NOTE: DeskPromptRegistrar removed during v3 rewrite. AR Follow-up prompts
  * are registered by the backend-worker's AR Follow-up responsibility module

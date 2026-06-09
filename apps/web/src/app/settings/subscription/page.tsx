@@ -324,7 +324,7 @@ function PlanSelectorSheet({
             Cancel
           </Button>
           {selectedPlan && (!canSelfServePlan || !isBillingEnabled) ? (
-            <a href={mailto('sally', isEnterprise ? 'Enterprise Plan Inquiry' : 'Plan Subscription')}>
+            <a href={mailto('app', isEnterprise ? 'Enterprise Plan Inquiry' : 'Plan Subscription')}>
               <Button>
                 {isEnterprise && <Crown className="h-4 w-4 mr-1.5" />}
                 Contact Sales

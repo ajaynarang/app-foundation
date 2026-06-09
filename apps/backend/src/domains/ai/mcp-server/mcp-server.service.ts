@@ -58,7 +58,7 @@ export class McpServerService implements OnModuleInit {
    * by scopes, wires up tools/list and tools/call handlers, then handles transport.
    */
   private async handleMcpStreamable(req: Request, res: Response, principal: AgentPrincipal): Promise<void> {
-    const server = new Server({ name: 'sally-fleet-ops', version: '1.0.0' }, { capabilities: { tools: {} } });
+    const server = new Server({ name: 'assistant-fleet-ops', version: '1.0.0' }, { capabilities: { tools: {} } });
 
     // tools/list — registry-driven, filtered by principal scopes
     server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -129,7 +129,7 @@ export class McpServerService implements OnModuleInit {
             destructiveHint: isSensitive,
             // Reads are idempotent; writes generally aren't.
             idempotentHint: isRead,
-            // Sally is a closed-world tenant API — no open internet calls.
+            // The platform is a closed-world tenant API — no open internet calls.
             openWorldHint: false,
           },
         };

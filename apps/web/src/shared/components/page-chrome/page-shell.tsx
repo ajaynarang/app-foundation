@@ -24,7 +24,7 @@ export interface PageShellProps {
  * NO state — header/toolbar/filters are slots, children is the page's data zone.
  * Pages may skip it and place <PageHeader> directly inside their own
  * `<div className="space-y-6">` when they need bespoke structure (KPI strips,
- * banners, DnD boards). See sally-frontend-patterns §16 (Page Chrome).
+ * banners, DnD boards). See app-frontend-patterns §16 (Page Chrome).
  */
 export function PageShell({ header, toolbar, filters, children, padForFloatingBar = true, className }: PageShellProps) {
   return (

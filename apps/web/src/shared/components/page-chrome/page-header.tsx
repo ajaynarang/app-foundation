@@ -48,7 +48,7 @@ export interface PageHeaderProps {
  *
  * Always renders a title + subtitle. Optionally a settings gear (top-right of identity)
  * and, for no-tabs pages, a right-aligned action cluster on the same row.
- * See sally-frontend-patterns §16 (Page Chrome).
+ * See app-frontend-patterns §16 (Page Chrome).
  */
 export function PageHeader({
   title,

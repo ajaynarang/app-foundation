@@ -43,7 +43,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       >
         <div style={{ textAlign: 'center', maxWidth: '28rem', padding: '0 1.5rem' }}>
           <div style={{ fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.025em', marginBottom: '0.5rem' }}>
-            SALLY
+            Platform
           </div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 600, marginTop: '1.5rem', marginBottom: '0.5rem' }}>
             Something went wrong

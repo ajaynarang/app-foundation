@@ -6,7 +6,7 @@ export class ReplayWebhookDto {
   @IsDateString()
   since: string;
 
-  @ApiProperty({ required: false, example: ['sally.load.created'] })
+  @ApiProperty({ required: false, example: ['app.load.created'] })
   @IsArray()
   @IsOptional()
   events?: string[];

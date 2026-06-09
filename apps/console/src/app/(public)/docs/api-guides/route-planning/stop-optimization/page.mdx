@@ -1,6 +1,6 @@
 # Stop Optimization
 
-When a route has multiple stops, SALLY uses a Travelling Salesman Problem (TSP) solver to find the optimal sequence that minimizes total drive time while respecting appointment time windows.
+When a route has multiple stops, Platform uses a Travelling Salesman Problem (TSP) solver to find the optimal sequence that minimizes total drive time while respecting appointment time windows.
 
 ---
 
@@ -53,7 +53,7 @@ This combination produces good solutions quickly:
 
 ### Phase 2 (Planned): OR-Tools VRP Solver
 
-For fleet-wide optimization with multiple drivers and vehicles, SALLY will upgrade to Google OR-Tools:
+For fleet-wide optimization with multiple drivers and vehicles, Platform will upgrade to Google OR-Tools:
 
 - **Vehicle Routing Problem (VRP)** — Assign stops to multiple drivers
 - **Capacity constraints** — Respect truck weight/volume limits

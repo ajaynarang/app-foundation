@@ -45,7 +45,7 @@ export class OAuthProviderService {
     const baseSecret = this.configService.get<string>('secretKey');
     this.oauthSecret = explicit || `${baseSecret}-oauth`;
 
-    this.issuer = this.configService.get<string>('OAUTH_ISSUER') || 'https://api.trysally.com';
+    this.issuer = this.configService.get<string>('OAUTH_ISSUER') || 'https://api.example.com';
   }
 
   /**

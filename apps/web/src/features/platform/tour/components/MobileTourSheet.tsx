@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
 import { Button } from '@app/ui/components/ui/button';
 import { Progress } from '@app/ui/components/ui/progress';
-import { SallyOrb } from '@/features/platform/ai-chat/components/SallyOrb';
+import { AssistantOrb } from '@/features/platform/ai-chat/components/AssistantOrb';
 import { useTour } from '../hooks/use-tour';
 import { getStepsForRole } from '../tour-steps';
 import { useAuthStore } from '@/features/auth';
@@ -96,8 +96,8 @@ export function MobileTourSheet({ open, onOpenChange }: MobileTourSheetProps) {
           <SheetHeader className="px-5 pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <SallyOrb state="idle" size="sm" />
-                <SheetTitle className="text-sm font-semibold">Sally&apos;s Tour</SheetTitle>
+                <AssistantOrb state="idle" size="sm" />
+                <SheetTitle className="text-sm font-semibold">Assistant&apos;s Tour</SheetTitle>
               </div>
               <span className="text-xs text-muted-foreground">
                 {currentStep + 1} of {steps.length}

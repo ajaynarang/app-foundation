@@ -19,7 +19,7 @@ import type { DomainEventService } from '../../../../infrastructure/events/domai
  * pipeline is always on. Skipped when local Postgres is unreachable or no
  * tenant is seeded.
  */
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://sally_user:sally_password@localhost:5432/sally';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://app_user:app_password@localhost:5432/app';
 
 class TestFleetReadTool {
   @RequiresScope('platform:read')

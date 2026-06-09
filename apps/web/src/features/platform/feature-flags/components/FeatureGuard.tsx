@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 import { useFeatureFlagEnabled, useFeatureFlag } from '@/features/platform/feature-flags';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
-import { SallyUpgradePrompt } from '@/features/platform/plans/components/sally-upgrade-prompt';
+import { AssistantUpgradePrompt } from '@/features/platform/plans/components/assistant-upgrade-prompt';
 import { ComingSoonBanner } from './ComingSoonBanner';
 import { comingSoonContent } from '@/shared/config/comingSoonContent';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
@@ -19,7 +19,7 @@ export interface FeatureGuardProps {
  * Component that conditionally renders children based on feature flag AND entitlement status.
  *
  * - Flag OFF → ComingSoonBanner (maintenance / not-yet-launched)
- * - Flag ON + not entitled → SallyUpgradePrompt
+ * - Flag ON + not entitled → AssistantUpgradePrompt
  * - Flag ON + entitled → children
  * - Error → fail open (show children)
  */
@@ -59,9 +59,9 @@ export function FeatureGuard({ featureKey, entitlementKey, children, loadingFall
     );
   }
 
-  // Flag ON but not entitled / no active add-on → Sally Upgrade Prompt
+  // Flag ON but not entitled / no active add-on → Assistant Upgrade Prompt
   if (!hasFeature(effectiveEntitlementKey)) {
-    return <SallyUpgradePrompt feature={effectiveEntitlementKey} />;
+    return <AssistantUpgradePrompt feature={effectiveEntitlementKey} />;
   }
 
   return <>{children}</>;

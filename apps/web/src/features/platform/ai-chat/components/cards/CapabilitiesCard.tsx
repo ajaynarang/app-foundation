@@ -3,14 +3,14 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@app/ui/components/ui/accordion';
 import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
-import { useSallyCapabilities } from '../../hooks/use-sally-capabilities';
-import { useSallyStore } from '../../store';
+import { useAssistantCapabilities } from '../../hooks/use-assistant-capabilities';
+import { useAssistantStore } from '../../store';
 
 export function CapabilitiesCard({ data: _data }: { data: Record<string, unknown> }) {
-  const { data, isLoading } = useSallyCapabilities();
+  const { data, isLoading } = useAssistantCapabilities();
 
   const handleExampleClick = (example: string) => {
-    useSallyStore.getState().sendMessage(example, 'text');
+    useAssistantStore.getState().sendMessage(example, 'text');
   };
 
   if (isLoading || !data) {

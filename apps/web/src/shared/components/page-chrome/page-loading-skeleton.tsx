@@ -12,7 +12,7 @@ export interface PageLoadingSkeletonProps {
 
 /**
  * PageLoadingSkeleton — shaped placeholder for the data zone while loading. Matches the
- * shape of the eventual content (NOT a spinner). See sally-frontend-patterns §16.
+ * shape of the eventual content (NOT a spinner). See app-frontend-patterns §16.
  */
 export function PageLoadingSkeleton({ variant, rows, className }: PageLoadingSkeletonProps) {
   if (variant === 'table') {

@@ -29,7 +29,7 @@ describe('NotificationService', () => {
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
-      if (key === 'TENANT_BASE_URL') return 'sally.appshore.in';
+      if (key === 'TENANT_BASE_URL') return 'app.appshore.in';
       if (key === 'USE_TENANT_SUBDOMAINS') return true;
       return null;
     }),

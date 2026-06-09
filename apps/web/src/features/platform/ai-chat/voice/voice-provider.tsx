@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useVoiceSession } from './use-voice-session';
-import { useSallyStore } from '../store';
+import { useAssistantStore } from '../store';
 import { getVoiceStatus } from '../api';
 import { getUserPreferences } from '../../settings/api';
 import { type VoiceState, type VoiceSessionHookResult } from './types';
@@ -17,10 +17,10 @@ interface VoiceContextValue extends VoiceSessionHookResult {
 const VoiceContext = createContext<VoiceContextValue | null>(null);
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
-  const store = useSallyStore();
+  const store = useAssistantStore();
   const { sessionId, setOrbState, setActiveTranscript, userMode } = store;
   const [isVoiceAvailable, setIsVoiceAvailable] = useState(false);
-  const setVoicePrefs = useSallyStore((s) => s.setVoicePrefs);
+  const setVoicePrefs = useAssistantStore((s) => s.setVoicePrefs);
 
   const assistantMsgIdRef = useRef<string | null>(null);
   const pendingUserTranscriptRef = useRef<string>('');
@@ -76,7 +76,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             };
             pendingUserTranscriptRef.current = '';
             setActiveTranscript('');
-            useSallyStore.setState((s) => ({
+            useAssistantStore.setState((s) => ({
               messages: [...s.messages, userMsg],
             }));
           }
@@ -128,14 +128,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           timestamp: new Date(),
         });
 
-        useSallyStore.setState((s) => ({
+        useAssistantStore.setState((s) => ({
           messages: [...s.messages, ...newMessages],
         }));
         return;
       }
 
       // Subsequent chunks — append to existing assistant message
-      useSallyStore.setState((s) => ({
+      useAssistantStore.setState((s) => ({
         messages: s.messages.map((m) => (m.id === assistantMsgIdRef.current ? { ...m, content: m.content + text } : m)),
       }));
     },
@@ -157,8 +157,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     // the mic on home was a silent no-op.
     let conversationId = sessionId;
     if (!conversationId) {
-      await useSallyStore.getState().initSession();
-      conversationId = useSallyStore.getState().sessionId;
+      await useAssistantStore.getState().initSession();
+      conversationId = useAssistantStore.getState().sessionId;
     }
     if (!conversationId) {
       // eslint-disable-next-line no-console

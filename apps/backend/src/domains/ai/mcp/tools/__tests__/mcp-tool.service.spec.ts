@@ -283,12 +283,12 @@ describe('McpToolService', () => {
   });
 
   describe('getToolsetsForPersona', () => {
-    it('should return toolsets object with sally-tools key', async () => {
+    it('should return toolsets object with app-tools key', async () => {
       const service = createService();
       await service.onModuleInit();
       const toolsets = await service.getToolsetsForPersona('prospect');
-      expect(toolsets).toHaveProperty('sally-tools');
-      expect(toolsets['sally-tools']).toBeDefined();
+      expect(toolsets).toHaveProperty('app-tools');
+      expect(toolsets['app-tools']).toBeDefined();
     });
 
     it('should include confirm-action tool for dispatcher persona', async () => {
@@ -300,14 +300,14 @@ describe('McpToolService', () => {
         userDbId: 1,
       });
       // Dispatcher has write tools, so confirm-action should be injected
-      expect(toolsets['sally-tools']).toHaveProperty('confirm-action');
+      expect(toolsets['app-tools']).toHaveProperty('confirm-action');
     });
 
     it('should NOT include confirm-action tool for prospect persona', async () => {
       const service = createService();
       await service.onModuleInit();
       const toolsets = await service.getToolsetsForPersona('prospect');
-      expect(toolsets['sally-tools']).not.toHaveProperty('confirm-action');
+      expect(toolsets['app-tools']).not.toHaveProperty('confirm-action');
     });
 
     it('should pass cardAccumulator through to getToolsForPersona', async () => {
@@ -317,7 +317,7 @@ describe('McpToolService', () => {
       const service = createService();
       await service.onModuleInit();
       const toolsets = await service.getToolsetsForPersona('prospect', undefined, accumulator);
-      expect(toolsets['sally-tools']).toBeDefined();
+      expect(toolsets['app-tools']).toBeDefined();
     });
   });
 });

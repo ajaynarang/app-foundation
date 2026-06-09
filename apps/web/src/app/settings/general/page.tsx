@@ -100,7 +100,7 @@ export default function GeneralSettingsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">General</h2>
-        <p className="text-sm text-muted-foreground">Make SALLY yours</p>
+        <p className="text-sm text-muted-foreground">Make the platform yours</p>
       </div>
 
       {/* Display Formats */}
@@ -129,7 +129,9 @@ export default function GeneralSettingsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <Label>Timezone</Label>
-              <p className="text-xs text-muted-foreground">All times in Sally will be displayed in this timezone.</p>
+              <p className="text-xs text-muted-foreground">
+                All times in Assistant will be displayed in this timezone.
+              </p>
             </div>
             <Select value={formData.timezone || 'America/New_York'} onValueChange={(v) => handleChange('timezone', v)}>
               <SelectTrigger className="w-full md:w-48">
@@ -149,7 +151,7 @@ export default function GeneralSettingsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <Label>Date Format</Label>
-              <p className="text-xs text-muted-foreground">How dates appear throughout Sally.</p>
+              <p className="text-xs text-muted-foreground">How dates appear throughout Assistant.</p>
             </div>
             <Select value={formData.dateFormat || 'MM/DD/YYYY'} onValueChange={(v) => handleChange('dateFormat', v)}>
               <SelectTrigger className="w-full md:w-48">
@@ -165,18 +167,18 @@ export default function GeneralSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Sally AI Voice */}
+      {/* Assistant AI Voice */}
       <Card>
         <CardHeader>
-          <CardTitle>Sally AI Voice</CardTitle>
-          <CardDescription>Configure how Sally sounds when using voice mode.</CardDescription>
+          <CardTitle>Assistant AI Voice</CardTitle>
+          <CardDescription>Configure how Assistant sounds when using voice mode.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <Label>Voice Mode</Label>
               <p className="text-xs text-muted-foreground">
-                Manual requires pressing a button to talk. Auto activates voice when Sally detects silence.
+                Manual requires pressing a button to talk. Auto activates voice when Assistant detects silence.
               </p>
             </div>
             <Select value={formData.voiceMode || 'manual'} onValueChange={(v) => handleChange('voiceMode', v)}>
@@ -193,7 +195,7 @@ export default function GeneralSettingsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <Label>Voice</Label>
-              <p className="text-xs text-muted-foreground">Choose the tone Sally uses when speaking.</p>
+              <p className="text-xs text-muted-foreground">Choose the tone Assistant uses when speaking.</p>
             </div>
             <Select value={formData.voiceId || 'warm'} onValueChange={(v) => handleChange('voiceId', v)}>
               <SelectTrigger className="w-full md:w-48">
@@ -210,7 +212,7 @@ export default function GeneralSettingsPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <Label>Voice Speed</Label>
-              <p className="text-xs text-muted-foreground">How fast Sally speaks.</p>
+              <p className="text-xs text-muted-foreground">How fast Assistant speaks.</p>
             </div>
             <Select value={formData.voiceSpeed || 'normal'} onValueChange={(v) => handleChange('voiceSpeed', v)}>
               <SelectTrigger className="w-full md:w-48">

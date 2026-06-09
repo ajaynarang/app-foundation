@@ -22,7 +22,7 @@ export default function OAuthClientsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">OAuth Clients</h1>
           <p className="text-muted-foreground mt-1">
-            Register apps that need users to sign in and approve access before reading or writing SALLY data.
+            Register apps that need users to sign in and approve access before reading or writing platform data.
           </p>
         </div>
 

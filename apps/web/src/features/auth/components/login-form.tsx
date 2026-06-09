@@ -667,7 +667,7 @@ export function LoginForm({
                 href="/register"
                 className="text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
               >
-                Set up SALLY →
+                Set up the platform →
               </Link>
             </p>
           </motion.div>

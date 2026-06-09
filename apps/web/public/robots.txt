@@ -16,4 +16,4 @@ Allow: /register
 Allow: /
 
 # Sitemap
-Sitemap: https://sally.com/sitemap.xml
+Sitemap: https://app.example.com/sitemap.xml

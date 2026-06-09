@@ -5,7 +5,7 @@ import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from './mastra/mastra.provider';
 import { ModerationService } from '../moderation/moderation.service';
 import { PromptingService } from '../../../domains/prompting';
-import { SallyRouterService } from '../orchestrator/sally-router.service';
+import { AssistantRouterService } from '../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../agents/agent.registry';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
@@ -20,8 +20,8 @@ const VOICE_MODE_INSTRUCTIONS =
   'Avoid markdown, lists, and long enumerations.';
 
 @Injectable()
-export class SallyAiService {
-  private readonly logger = new Logger(SallyAiService.name);
+export class AssistantAiService {
+  private readonly logger = new Logger(AssistantAiService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -29,7 +29,7 @@ export class SallyAiService {
     private readonly mastra: MastraProvider,
     private readonly moderationService: ModerationService,
     private readonly promptService: PromptingService,
-    private readonly sallyRouter: SallyRouterService,
+    private readonly assistantRouter: AssistantRouterService,
     private readonly agentRegistry: AgentRegistry,
     private readonly aiTelemetry: AiTelemetryService,
   ) {}
@@ -214,7 +214,7 @@ export class SallyAiService {
 
     // 4b. AI cost budget — block chat if the tenant is over its hard cap.
     // assertBudget fails open (allows on its own infra error), so this only
-    // throws on a genuine hard breach. We answer Sally-style rather than
+    // throws on a genuine hard breach. We answer assistant-style rather than
     // surfacing a raw 402 mid-stream, and persist it like the moderation
     // block so the conversation history is coherent.
     try {
@@ -239,7 +239,7 @@ export class SallyAiService {
     }
 
     // 5. Route to domain agent
-    const routeResult = await this.sallyRouter.route(content, conversation.userMode as UserMode);
+    const routeResult = await this.assistantRouter.route(content, conversation.userMode as UserMode);
 
     // 6. Get domain agent and stream via chat()
     const domainAgent = this.agentRegistry.get(routeResult.agentId);
@@ -442,7 +442,7 @@ export class SallyAiService {
     );
     // Resume targets the persona's default agent (the same agent the streaming
     // turn would have defaulted to). The Mastra agent key equals the agent id.
-    const agentId = this.sallyRouter.defaultAgentFor(conversation.userMode as UserMode);
+    const agentId = this.assistantRouter.defaultAgentFor(conversation.userMode as UserMode);
     const agent = this.mastra.getMastra().getAgent(agentId);
 
     try {

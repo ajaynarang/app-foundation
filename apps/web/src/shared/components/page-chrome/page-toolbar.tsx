@@ -30,7 +30,7 @@ export interface PageToolbarProps {
  * fixed-order action cluster on the right. The fixed order (group → view → secondary →
  * primary → ⋯ in the DOM, which reads ⋯ → primary → secondary → view → group from the
  * right edge) is enforced here so the primary CTA and ⌘K-adjacent overflow land in the
- * same spot on every page. See sally-frontend-patterns §16 (Page Chrome).
+ * same spot on every page. See app-frontend-patterns §16 (Page Chrome).
  */
 export function PageToolbar({
   tabs,

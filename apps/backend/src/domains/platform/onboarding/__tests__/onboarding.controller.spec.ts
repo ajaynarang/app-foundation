@@ -32,7 +32,7 @@ describe('OnboardingController', () => {
       const result = await controller.getOnboardingStatus(42);
 
       expect(result).toEqual(cachedStatus);
-      expect(cache.getOrSet).toHaveBeenCalledWith('sally:onboarding:status:tenant:42', expect.any(Function), 30_000);
+      expect(cache.getOrSet).toHaveBeenCalledWith('app:onboarding:status:tenant:42', expect.any(Function), 30_000);
       // Service is NOT called because the factory was never invoked (cache hit path).
       expect(service.getOnboardingStatus).not.toHaveBeenCalled();
     });
@@ -42,13 +42,13 @@ describe('OnboardingController', () => {
 
       expect(result).toEqual(mockStatus);
       expect(service.getOnboardingStatus).toHaveBeenCalledWith(42);
-      expect(cache.getOrSet).toHaveBeenCalledWith('sally:onboarding:status:tenant:42', expect.any(Function), 30_000);
+      expect(cache.getOrSet).toHaveBeenCalledWith('app:onboarding:status:tenant:42', expect.any(Function), 30_000);
     });
 
     it('should produce per-tenant cache keys', async () => {
       await controller.getOnboardingStatus(99);
 
-      expect(cache.getOrSet).toHaveBeenCalledWith('sally:onboarding:status:tenant:99', expect.any(Function), 30_000);
+      expect(cache.getOrSet).toHaveBeenCalledWith('app:onboarding:status:tenant:99', expect.any(Function), 30_000);
       expect(service.getOnboardingStatus).toHaveBeenCalledWith(99);
     });
   });

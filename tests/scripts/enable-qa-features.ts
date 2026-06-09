@@ -93,7 +93,7 @@ async function main(): Promise<void> {
   const { tenantId, dryRun } = parseArgs();
   const baseUrl = process.env.API_BASE_URL ?? 'http://localhost:8001/api/v1';
 
-  console.log(`\n  SALLY — Enable QA Features`);
+  console.log(`\n  Platform — Enable QA Features`);
   console.log(`  Tenant:  ${tenantId}`);
   console.log(`  Backend: ${baseUrl}`);
   if (dryRun) console.log(`  Mode:    DRY RUN (no changes will be made)`);

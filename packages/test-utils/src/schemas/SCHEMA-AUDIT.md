@@ -1,16 +1,16 @@
-# Schema Audit — `@sally/test-utils/schemas` vs `@sally/shared-types`
+# Schema Audit — `@app/test-utils/schemas` vs `@app/shared-types`
 
 **Date:** 2026-04-17
 **Status:** DOC ONLY — no schemas were modified. Migration is Phase 1+.
-**Purpose:** Identify which hand-written Zod schemas in `@sally/test-utils/schemas/`
-have a direct equivalent in `@sally/shared-types/` so they can be replaced
+**Purpose:** Identify which hand-written Zod schemas in `@app/test-utils/schemas/`
+have a direct equivalent in `@app/shared-types/` so they can be replaced
 incrementally during Phase 1–7 test rewrites.
 
 ---
 
 ## How to read this audit
 
-- ✅ `replaced by @sally/shared-types/<path>` — a semantically equivalent schema
+- ✅ `replaced by @app/shared-types/<path>` — a semantically equivalent schema
   exists in shared-types. When the test using this schema is rewritten (Phase 1+),
   import from shared-types with `.strict()` instead.
 - ⚠️ `no shared-types equivalent, keep hand-written` — shared-types has nothing
@@ -23,119 +23,120 @@ incrementally during Phase 1–7 test rewrites.
 
 ## `schemas/drivers.ts`
 
-| Schema name | Status |
-|---|---|
-| `DriverListItemSchema` | 🔁 partial overlap — `@sally/shared-types/fleet/driver.schema.ts` exports `DriverSchema` but it targets the driver detail shape. The list item shape (with `activeLoadCounts`, `currentHos`, `sallyAccessStatus`) is not separately exported. Keep hand-written until Phase 1 audit confirms the list endpoint response matches `DriverSchema`. |
-| `CreateDriverResponseSchema` | ⚠️ no shared-types equivalent — shared-types has no separate create-response type. The `DriverSchema` in shared-types is a superset but includes optional fields that CREATE doesn't return. Keep hand-written. |
-| `UpdateDriverResponseSchema` | ⚠️ no shared-types equivalent — same reasoning as above. Keep hand-written. |
-| `DriverDetailSchema` | 🔁 partial overlap — `DriverSchema` in `@sally/shared-types/src/fleet/driver.schema.ts` is semantically close. Verify during Phase 1 whether all fields match (especially `hosData`, `upcomingLoads`, `currentLoad`). If confirmed equivalent, replace with `DriverSchema.strict()`. |
+| Schema name                  | Status                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DriverListItemSchema`       | 🔁 partial overlap — `@app/shared-types/fleet/driver.schema.ts` exports `DriverSchema` but it targets the driver detail shape. The list item shape (with `activeLoadCounts`, `currentHos`, `appAccessStatus`) is not separately exported. Keep hand-written until Phase 1 audit confirms the list endpoint response matches `DriverSchema`. |
+| `CreateDriverResponseSchema` | ⚠️ no shared-types equivalent — shared-types has no separate create-response type. The `DriverSchema` in shared-types is a superset but includes optional fields that CREATE doesn't return. Keep hand-written.                                                                                                                             |
+| `UpdateDriverResponseSchema` | ⚠️ no shared-types equivalent — same reasoning as above. Keep hand-written.                                                                                                                                                                                                                                                                 |
+| `DriverDetailSchema`         | 🔁 partial overlap — `DriverSchema` in `@app/shared-types/src/fleet/driver.schema.ts` is semantically close. Verify during Phase 1 whether all fields match (especially `hosData`, `upcomingLoads`, `currentLoad`). If confirmed equivalent, replace with `DriverSchema.strict()`.                                                          |
 
 ---
 
 ## `schemas/vehicles.ts`
 
-| Schema name | Status |
-|---|---|
-| `VehicleListItemSchema` | 🔁 partial overlap — `VehicleSchema` in `@sally/shared-types/src/fleet/vehicle.schema.ts` covers the core fields. List item adds `activeLoadCounts`, `telematics`, `upcomingUnavailability` not in shared-types. Keep hand-written until Phase 1 confirms field alignment. |
-| `CreateVehicleResponseSchema` | ⚠️ no shared-types equivalent — no separate create response type. Keep hand-written. |
-| `UpdateVehicleResponseSchema` | ⚠️ no shared-types equivalent — aliased to CreateVehicleResponseSchema. Keep hand-written. |
+| Schema name                   | Status                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VehicleListItemSchema`       | 🔁 partial overlap — `VehicleSchema` in `@app/shared-types/src/fleet/vehicle.schema.ts` covers the core fields. List item adds `activeLoadCounts`, `telematics`, `upcomingUnavailability` not in shared-types. Keep hand-written until Phase 1 confirms field alignment. |
+| `CreateVehicleResponseSchema` | ⚠️ no shared-types equivalent — no separate create response type. Keep hand-written.                                                                                                                                                                                     |
+| `UpdateVehicleResponseSchema` | ⚠️ no shared-types equivalent — aliased to CreateVehicleResponseSchema. Keep hand-written.                                                                                                                                                                               |
 
 ---
 
 ## `schemas/loads.ts`
 
-| Schema name | Status |
-|---|---|
-| `CreateLoadResponseSchema` | 🔁 partial overlap — `@sally/shared-types/src/fleet/load.schema.ts` exports `LoadSchema` but covers the detail shape. Create response is a subset with `intakeSource`. Verify during Phase 1. |
-| `LoadListItemSchema` | 🔁 partial overlap — `LoadSchema` is the detail type; a separate list-item type is not exported from shared-types. `LoadStatusSchema` and `LoadBillingStatusSchema` can be imported immediately. Keep list-item hand-written. |
-| `LoadDetailSchema` | 🔁 partial overlap — `LoadSchema` in shared-types covers most fields. `LoadStopSchema` in shared-types differs from the test-utils `StopSchema` (different field names: `stopId` as `number` vs `string`, `sequenceOrder` vs `sequence`). Do NOT replace until field drift is resolved in Phase 1. |
-| `LoadStatusChangeSchema` | ⚠️ no shared-types equivalent — no status-change response schema. Keep hand-written. |
+| Schema name                | Status                                                                                                                                                                                                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CreateLoadResponseSchema` | 🔁 partial overlap — `@app/shared-types/src/fleet/load.schema.ts` exports `LoadSchema` but covers the detail shape. Create response is a subset with `intakeSource`. Verify during Phase 1.                                                                                                        |
+| `LoadListItemSchema`       | 🔁 partial overlap — `LoadSchema` is the detail type; a separate list-item type is not exported from shared-types. `LoadStatusSchema` and `LoadBillingStatusSchema` can be imported immediately. Keep list-item hand-written.                                                                      |
+| `LoadDetailSchema`         | 🔁 partial overlap — `LoadSchema` in shared-types covers most fields. `LoadStopSchema` in shared-types differs from the test-utils `StopSchema` (different field names: `stopId` as `number` vs `string`, `sequenceOrder` vs `sequence`). Do NOT replace until field drift is resolved in Phase 1. |
+| `LoadStatusChangeSchema`   | ⚠️ no shared-types equivalent — no status-change response schema. Keep hand-written.                                                                                                                                                                                                               |
 
 ---
 
 ## `schemas/customers.ts`
 
-| Schema name | Status |
-|---|---|
-| (all schemas) | ✅ replaced by `@sally/shared-types/src/fleet/customer.schema.ts` — `CustomerSchema` is available. Verify field completeness during Phase 1 fleet tests, then switch to `CustomerSchema.strict()`. |
+| Schema name   | Status                                                                                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| (all schemas) | ✅ replaced by `@app/shared-types/src/fleet/customer.schema.ts` — `CustomerSchema` is available. Verify field completeness during Phase 1 fleet tests, then switch to `CustomerSchema.strict()`. |
 
 ---
 
 ## `schemas/invoices.ts`
 
-| Schema name | Status |
-|---|---|
-| `InvoiceListItemSchema` | 🔁 partial overlap — `@sally/shared-types/src/financials/invoice.schema.ts` has `InvoiceStatusSchema`, `LineItemTypeSchema` enums + a detail schema. A dedicated list-item schema is not separately exported. Keep hand-written. |
-| `InvoiceDetailSchema` | 🔁 partial overlap — shared-types has an invoice detail schema. Compare during Phase 2 (`paidCents`, `balanceCents` fields may differ from the backend response). |
-| `InvoiceSummarySchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
-| `InvoiceSettingsSchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
+| Schema name             | Status                                                                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `InvoiceListItemSchema` | 🔁 partial overlap — `@app/shared-types/src/financials/invoice.schema.ts` has `InvoiceStatusSchema`, `LineItemTypeSchema` enums + a detail schema. A dedicated list-item schema is not separately exported. Keep hand-written. |
+| `InvoiceDetailSchema`   | 🔁 partial overlap — shared-types has an invoice detail schema. Compare during Phase 2 (`paidCents`, `balanceCents` fields may differ from the backend response).                                                              |
+| `InvoiceSummarySchema`  | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                                                              |
+| `InvoiceSettingsSchema` | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                                                              |
 
 ---
 
 ## `schemas/settlements.ts`
 
-| Schema name | Status |
-|---|---|
-| `SettlementListItemSchema` | 🔁 partial overlap — `@sally/shared-types/src/financials/settlement.schema.ts` has `SettlementStatusSchema` and related enums. No separate list-item response type. Keep hand-written. |
-| `SettlementDetailSchema` | 🔁 partial overlap — verify during Phase 2 whether shared-types settlement schema covers all fields. |
-| `SettlementSummarySchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
-| `PayStructureSchema` | 🔁 partial overlap — `PayStructureTypeSchema` in shared-types covers the enum. Full response shape is not exported. Keep hand-written. |
+| Schema name                | Status                                                                                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SettlementListItemSchema` | 🔁 partial overlap — `@app/shared-types/src/financials/settlement.schema.ts` has `SettlementStatusSchema` and related enums. No separate list-item response type. Keep hand-written. |
+| `SettlementDetailSchema`   | 🔁 partial overlap — verify during Phase 2 whether shared-types settlement schema covers all fields.                                                                                 |
+| `SettlementSummarySchema`  | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                    |
+| `PayStructureSchema`       | 🔁 partial overlap — `PayStructureTypeSchema` in shared-types covers the enum. Full response shape is not exported. Keep hand-written.                                               |
 
 ---
 
 ## `schemas/operations.ts`
 
-| Schema name | Status |
-|---|---|
-| `AlertListItemSchema` | ✅ replaced by `@sally/shared-types/src/operations/alert.schema.ts` — `AlertSchema` is available. Verify `priority`, `category`, `acknowledgedAt` field names match during Phase 3. |
-| `AlertDetailSchema` | 🔁 partial overlap — `AlertSchema` is the base; detail may add `notes`, `childAlerts`, `metadata`. Extend from shared-types during Phase 3. |
-| `AlertStatsSchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
-| `CommandCenterOverviewSchema` | 🔁 partial overlap — `@sally/shared-types/src/operations/command-center.schema.ts` exists. Compare during Phase 3. |
-| `ShiftNoteSchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
-| `ShieldScoreSchema` | 🔁 partial overlap — `@sally/shared-types/src/operations/shield.schema.ts` exists. Verify during Phase 3. |
-| `ShieldAuditSchema` | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written. |
-| `ShieldFindingSchema` | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written. |
-| `ShieldRuleSchema` | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written. |
-| `NotificationSchema` | ⚠️ no shared-types equivalent (monitoring.schema.ts covers monitoring, not notification list items). Keep hand-written. |
-| `NotificationCountSchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
+| Schema name                   | Status                                                                                                                                                                            |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AlertListItemSchema`         | ✅ replaced by `@app/shared-types/src/operations/alert.schema.ts` — `AlertSchema` is available. Verify `priority`, `category`, `acknowledgedAt` field names match during Phase 3. |
+| `AlertDetailSchema`           | 🔁 partial overlap — `AlertSchema` is the base; detail may add `notes`, `childAlerts`, `metadata`. Extend from shared-types during Phase 3.                                       |
+| `AlertStatsSchema`            | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                 |
+| `CommandCenterOverviewSchema` | 🔁 partial overlap — `@app/shared-types/src/operations/command-center.schema.ts` exists. Compare during Phase 3.                                                                  |
+| `ShiftNoteSchema`             | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                 |
+| `ShieldScoreSchema`           | 🔁 partial overlap — `@app/shared-types/src/operations/shield.schema.ts` exists. Verify during Phase 3.                                                                           |
+| `ShieldAuditSchema`           | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written.                                                                                                   |
+| `ShieldFindingSchema`         | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written.                                                                                                   |
+| `ShieldRuleSchema`            | ⚠️ no shared-types equivalent as a standalone response type. Keep hand-written.                                                                                                   |
+| `NotificationSchema`          | ⚠️ no shared-types equivalent (monitoring.schema.ts covers monitoring, not notification list items). Keep hand-written.                                                           |
+| `NotificationCountSchema`     | ⚠️ no shared-types equivalent. Keep hand-written.                                                                                                                                 |
 
 ---
 
 ## `schemas/platform.ts`
 
-| Schema name | Status |
-|---|---|
-| `UserListItemSchema` | ✅ replaced by `@sally/shared-types/src/platform/user.schema.ts` — `UserSchema` is available. Verify during Phase 4. |
-| `UserDetailSchema` | 🔁 partial overlap — `UserSchema` is close; the `driver` and `tenant` nested fields may differ. Verify during Phase 4. |
-| `TenantListItemSchema` | ✅ replaced by `@sally/shared-types/src/platform/tenant.schema.ts` — `TenantSchema` is available. Verify during Phase 4. |
-| `TenantDetailSchema` | 🔁 partial overlap — `TenantSchema` may lack `trialStartedAt`, `trialEndsAt`, `onboardingProgress`. Verify during Phase 4. |
-| `SubdomainCheckSchema` | ⚠️ no shared-types equivalent. Keep hand-written. |
-| `ApiKeySchema` | ⚠️ no shared-types equivalent for the API key response type. Keep hand-written. |
-| `CreateApiKeyResponseSchema` | ⚠️ no shared-types equivalent. Keep hand-written (the full key is only returned on creation). |
+| Schema name                  | Status                                                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `UserListItemSchema`         | ✅ replaced by `@app/shared-types/src/platform/user.schema.ts` — `UserSchema` is available. Verify during Phase 4.         |
+| `UserDetailSchema`           | 🔁 partial overlap — `UserSchema` is close; the `driver` and `tenant` nested fields may differ. Verify during Phase 4.     |
+| `TenantListItemSchema`       | ✅ replaced by `@app/shared-types/src/platform/tenant.schema.ts` — `TenantSchema` is available. Verify during Phase 4.     |
+| `TenantDetailSchema`         | 🔁 partial overlap — `TenantSchema` may lack `trialStartedAt`, `trialEndsAt`, `onboardingProgress`. Verify during Phase 4. |
+| `SubdomainCheckSchema`       | ⚠️ no shared-types equivalent. Keep hand-written.                                                                          |
+| `ApiKeySchema`               | ⚠️ no shared-types equivalent for the API key response type. Keep hand-written.                                            |
+| `CreateApiKeyResponseSchema` | ⚠️ no shared-types equivalent. Keep hand-written (the full key is only returned on creation).                              |
 
 ---
 
 ## `schemas/helpers.ts`
 
-| Export | Status |
-|---|---|
-| `expectContract`, `expectArrayContract`, `expectPaginatedContract` | ⚠️ test-utils utilities — not from shared-types, not candidates for replacement. |
+| Export                                                                   | Status                                                                                           |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `expectContract`, `expectArrayContract`, `expectPaginatedContract`       | ⚠️ test-utils utilities — not from shared-types, not candidates for replacement.                 |
 | `isoDateString`, `dateOnlyString`, `nullableIsoDate`, `nullableDateOnly` | ⚠️ no shared-types equivalent. Keep here as the canonical source for test validation primitives. |
-| `dbId`, `stringId` | ⚠️ no shared-types equivalent. Keep here. |
+| `dbId`, `stringId`                                                       | ⚠️ no shared-types equivalent. Keep here.                                                        |
 
 ---
 
 ## Summary
 
-| Status | Count |
-|---|---|
-| ✅ Full shared-types equivalent confirmed | 4 schema groups |
-| 🔁 Partial overlap — verify during relevant phase | 11 schemas |
-| ⚠️ No shared-types equivalent — keep hand-written | 17 schemas |
+| Status                                            | Count           |
+| ------------------------------------------------- | --------------- |
+| ✅ Full shared-types equivalent confirmed         | 4 schema groups |
+| 🔁 Partial overlap — verify during relevant phase | 11 schemas      |
+| ⚠️ No shared-types equivalent — keep hand-written | 17 schemas      |
 
 **Migration strategy:**
+
 - Import `StatusSchema` enums (LoadStatus, InvoiceStatus, SettlementStatus, VehicleStatus)
-  from `@sally/shared-types` immediately — they are non-overlapping and safe.
+  from `@app/shared-types` immediately — they are non-overlapping and safe.
 - Defer replacing full response schemas until the Phase that rewrites each domain's tests.
   Each phase should run with `.strict()` on the replacement schema to catch field drift early.
 - Never remove a hand-written schema before confirming the shared-types equivalent is
@@ -153,7 +154,7 @@ schema audit for this domain:
 - `AlertSchema`, `AlertStatsSchema`, `SmartAlertStatsSchema`,
   `VolumeDataSchema`, `ResponseTimeEntrySchema`, `ResolutionDataSchema`,
   `TopAlertTypeSchema`, `HistoryResultSchema` — re-exported from
-  `@sally/test-utils/schemas/operations.ts` as
+  `@app/test-utils/schemas/operations.ts` as
   `AlertSharedSchema` / `AlertStatsSharedSchema` / `AlertAnalyticsVolumeSchema`
   / `AlertResponseTimeTrendSchema` / `AlertResolutionRatesSchema` /
   `AlertTopTypesSchema` / `AlertHistoryResponseSchema`.
@@ -261,7 +262,7 @@ Phase-0 `ApiKeySchema` that described a prior API shape.
 - **`ApiKeySchema` / `CreateApiKeyResponseSchema`** — the Phase-0 version
   declared fields (`keyId`, `prefix`, numeric `id`) that do not exist on the
   current `ApiKeyDto`. Rewritten against the live response (which matches
-  `@sally/shared-types/platform/api-key.schema.ts` `ApiKeyResponseSchema`
+  `@app/shared-types/platform/api-key.schema.ts` `ApiKeyResponseSchema`
   1:1). Kept local (not re-exported) so the list variant enforces `key`
   absent (shared-types models it `.optional()` which would silently accept
   a leak). Finding #36.
@@ -374,8 +375,8 @@ shapes — none existed in shared-types). Finding #38.
   use `select:` — four fields on `invitedByUser`, two on `driver`.
 - **`PublicInvitationLookupSchema`** — `GET /invitations/by-token/:token`
   (public). Prisma row + thin `tenant` (tenantId/companyName/subdomain)
-  + thin `invitedByUser` (firstName/lastName/email). Shape intended for
-  the acceptance page so the user sees which org they're joining.
+  - thin `invitedByUser` (firstName/lastName/email). Shape intended for
+    the acceptance page so the user sees which org they're joining.
 - **`AcceptInvitationResponseSchema`** — `POST /invitations/accept`
   (public). Returns the newly-created FULL User Prisma row + `tenant`
   (TenantRowSchema) + `driver` (nullable; Prisma row) + `customer`
@@ -458,11 +459,12 @@ Firebase Admin SDK is NOT invoked on the accept path (no
 pseudo-uid (`qa-fb-${nonce}`) and the happy-path runs end-to-end.
 This observation is stable across dev/stg — verified against
 `acceptInvitation` in `user-invitations.service.ts` (2026-04-20).
+
 - **`TenantListItemSchema`** — `TenantRowSchema` + nested
   `users: TenantEmbeddedUserSchema[]` + `_count: TenantCountSchema`.
   `.strict()` top-level and on every nested object.
 - **`TenantDetailResponseSchema`** — the envelope `{ tenant, users,
-  metrics }` returned by `GET /tenants/:tenantId/details`. NOT the raw
+metrics }` returned by `GET /tenants/:tenantId/details`. NOT the raw
   row — the service manually cherry-picks fields. Critical difference:
   `approvedAt/rejectedAt/suspendedAt/reactivatedAt` are `.optional()`
   (not `.nullable()`) because the service uses `?.toISOString()` which
@@ -507,7 +509,7 @@ Every Phase-4f shape is hand-written locally. Finding #40.
   admin activate). The service calls `prisma.tenantAddOn.update/upsert`
   directly on those paths — no include clause.
 - **`TenantAddOnRowSchema`** — `TenantAddOnRowBareSchema` + `addOn:
-  AddOnCatalogRowSchema` include. Returned by the three list endpoints
+AddOnCatalogRowSchema` include. Returned by the three list endpoints
   that use `include: { addOn: true }`.
 - **`AddOnStatusSchema`** — 5-field envelope returned by
   `GET /add-ons/:slug/status`. Flattens the `FeatureResolution` type
@@ -528,23 +530,25 @@ Every Phase-4f shape is hand-written locally. Finding #40.
 
 The self-service `POST /add-ons/:slug/activate` endpoint is gated by the
 global `payment_system` feature flag:
-  - When `payment_system=true` (default in dev), activation tries to
-    create a Stripe subscription item. For add-ons with a null
-    `providerPriceId` the service throws 400 with the message
-    `Add-on '<slug>' does not have a Stripe price configured`; for
-    add-ons with an existing Stripe subscription item it throws a
-    different 400 citing the Stripe `duplicate price` error; for add-ons
-    where the Stripe call succeeds the DB row is rolled back to
-    `cancelled` only if Stripe later rejects, otherwise the state lands
-    `active`.
-  - When `payment_system=false`, the Stripe sync is a no-op and the DB
-    transitions cleanly. The QA tests that exercise activate / request /
-    approve toggle the flag OFF in `test.beforeAll` and restore it in
-    `test.afterAll` so the round-trip is deterministic.
+
+- When `payment_system=true` (default in dev), activation tries to
+  create a Stripe subscription item. For add-ons with a null
+  `providerPriceId` the service throws 400 with the message
+  `Add-on '<slug>' does not have a Stripe price configured`; for
+  add-ons with an existing Stripe subscription item it throws a
+  different 400 citing the Stripe `duplicate price` error; for add-ons
+  where the Stripe call succeeds the DB row is rolled back to
+  `cancelled` only if Stripe later rejects, otherwise the state lands
+  `active`.
+- When `payment_system=false`, the Stripe sync is a no-op and the DB
+  transitions cleanly. The QA tests that exercise activate / request /
+  approve toggle the flag OFF in `test.beforeAll` and restore it in
+  `test.afterAll` so the round-trip is deterministic.
 
 Two consequences for the QA suite:
+
 1. The self-service tests live under `test.describe.configure({ mode:
-   'serial' })` and wrap the flag toggle in beforeAll/afterAll. Parallel
+'serial' })` and wrap the flag toggle in beforeAll/afterAll. Parallel
    execution with other specs that rely on `payment_system=true` is not
    supported for this block.
 2. The approve-request admin test (`add-ons-admin.spec.ts` test 8) also
@@ -594,11 +598,11 @@ Hand-written locally. Finding #41.
 
 - **`OAuthRevokeResponseSchema`** — RFC 7009 §2.2 requires HTTP 200
   with empty body on success (always, to prevent token enumeration).
-  The Sally controller returns `{}` (empty object). Schema is
+  The platform controller returns `{}` (empty object). Schema is
   `z.object({}).strict()` so any accidental leak (e.g. the revoked
   token id, the revocation timestamp) fails the contract.
 
-- **`OAuthErrorResponseSchema`** — Sally's `HttpExceptionFilter`
+- **`OAuthErrorResponseSchema`** — The platform's `HttpExceptionFilter`
   envelope, preserving the RFC `{error, error_description}` keys when
   the controller throws `BadRequestException({error, error_description})`
   with a structured object payload (vs the Nest default
@@ -611,8 +615,9 @@ Hand-written locally. Finding #41.
 ### PKCE + code verifier — handled in factory
 
 The authorize + token factories share a known-good PKCE pair:
-  - `OAUTH_PKCE_VERIFIER` = 43-char ASCII string.
-  - `OAUTH_PKCE_CHALLENGE` = `base64url(sha256(verifier))` — 43 chars.
+
+- `OAUTH_PKCE_VERIFIER` = 43-char ASCII string.
+- `OAUTH_PKCE_CHALLENGE` = `base64url(sha256(verifier))` — 43 chars.
 
 Stored as module constants so the verifier + challenge round-trip
 across both `buildOAuthAuthorizeParams` (challenge in the authorize
@@ -629,4 +634,3 @@ to `http://localhost:3000/oauth/callback` so both admin CRUD AND
 RFC register paths accept the same value. Tests that want to
 exercise the rejection path override `redirect_uris` with an
 `https://example.invalid` or an explicit `http://bad-host.test`.
-

@@ -250,7 +250,7 @@ export class McpToolService implements OnModuleInit {
   /**
    * Build a ToolSet containing exactly the tools named in `toolNames`.
    *
-   * Used by Sally's Desk (non-chat invocation): the engine hands over an
+   * Used by the Desk (non-chat invocation): the engine hands over an
    * explicit allowlist from `responsibility.policy.<beat>.tools`. Tools not
    * on the list are not included — no persona lookup. `confirm-action` is
    * NOT auto-added; Desk runs with HITL bypass (the episode-level approval
@@ -358,7 +358,7 @@ export class McpToolService implements OnModuleInit {
   /**
    * Lookup metadata for a single tool by name. Returns `null` when the tool
    * hasn't been discovered yet (registry cold) or doesn't exist. Callers
-   * outside the MCP subsystem (e.g. Sally's Desk agent-detail) use this to
+   * outside the MCP subsystem (e.g. the Desk agent-detail) use this to
    * surface tool descriptions and classify read/write intent without going
    * through the per-persona toolset path.
    */

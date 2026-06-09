@@ -39,7 +39,7 @@ describe('DeskMemoryService — tenant isolation', () => {
     prisma.deskMemory.findMany.mockResolvedValue([]);
     await service.listForUI({
       tenantId: 2, // Tenant B
-      agentKey: 'sally-billing',
+      agentKey: 'assistant-billing',
       activeOnly: true,
       limit: 50,
     });

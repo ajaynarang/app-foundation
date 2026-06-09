@@ -22,7 +22,7 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-900 dark:text-amber-100" />
           <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
-            Connect your fleet to unlock route planning — SALLY needs your ELD, drivers, and vehicles
+            Connect your fleet to unlock route planning — the platform needs your ELD, drivers, and vehicles
           </span>
         </div>
         <div className="flex items-center gap-2">

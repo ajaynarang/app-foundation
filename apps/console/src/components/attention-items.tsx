@@ -108,21 +108,7 @@ export function AttentionItems() {
       });
     }
 
-    // 4. Fleet limit approaching (>=80%)
-    if (planData.fleetLimit && planData.vehicleCount / planData.fleetLimit >= 0.8) {
-      const pct = Math.round((planData.vehicleCount / planData.fleetLimit) * 100);
-      result.push({
-        id: 'fleet-limit',
-        icon: AlertTriangle,
-        iconColor: 'text-yellow-500 dark:text-yellow-400',
-        title: 'Approaching fleet limit',
-        detail: `${planData.vehicleCount}/${planData.fleetLimit} vehicles (${pct}%)`,
-        href: '/account/plan',
-        priority: 4,
-      });
-    }
-
-    // 5. Pending invitations
+    // 4. Pending invitations
     const pending = invitations?.filter((i) => i.status === 'PENDING') ?? [];
     for (const inv of pending) {
       const createdAt = new Date(inv.createdAt);

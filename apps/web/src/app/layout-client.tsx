@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ProgressProvider } from '@bprogress/next/app';
 import { AppLayout } from '@/shared/components/layout/AppLayout';
 import { PublicLayout } from '@/shared/components/layout/PublicLayout';
-import { AppAIProvider, useSallyStore } from '@/features/platform/ai-chat';
+import { AppAIProvider, useAssistantStore } from '@/features/platform/ai-chat';
 import { useAuthStore } from '@/features/auth';
 import { isProtectedRoute } from '@/shared/lib/navigation';
 
@@ -16,7 +16,7 @@ function PassthroughLayout({ children }: { children: React.ReactNode }) {
 export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isExpanded, chatLayout } = useSallyStore();
+  const { isExpanded, chatLayout } = useAssistantStore();
   const { isAuthenticated, _hasHydrated } = useAuthStore();
 
   const requiresAuth = pathname ? isProtectedRoute(pathname) : false;
@@ -49,7 +49,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
 
   return (
     <ProgressProvider height="2px" color="hsl(var(--foreground))" options={{ showSpinner: false }} shallowRouting>
-      <div className={`sally-main-content ${isExpanded ? `sally-layout-${chatLayout}` : ''}`}>
+      <div className={`assistant-main-content ${isExpanded ? `assistant-layout-${chatLayout}` : ''}`}>
         <Layout>{children}</Layout>
       </div>
       <AppAIProvider />

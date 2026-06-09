@@ -44,7 +44,7 @@ export class AuthTokenService {
     const nonce = crypto.randomBytes(16).toString('hex');
     const statePayload = { tenantId, vendor, nonce };
     const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
-    await this.cache.set(buildKey('sally:oauth', 'nonce', vendor, nonce), tenantId, CACHE_TTL_WARM_10M);
+    await this.cache.set(buildKey('app:oauth', 'nonce', vendor, nonce), tenantId, CACHE_TTL_WARM_10M);
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -71,11 +71,11 @@ export class AuthTokenService {
     const { tenantId, vendor, nonce } = JSON.parse(Buffer.from(state, 'base64').toString());
 
     // Validate CSRF nonce
-    const cachedTenantId = await this.cache.get<number>(buildKey('sally:oauth', 'nonce', vendor, nonce));
+    const cachedTenantId = await this.cache.get<number>(buildKey('app:oauth', 'nonce', vendor, nonce));
     if (!cachedTenantId || cachedTenantId !== tenantId) {
       throw new UnauthorizedException('OAuth session expired — please reconnect your integration');
     }
-    await this.cache.del(buildKey('sally:oauth', 'nonce', vendor, nonce));
+    await this.cache.del(buildKey('app:oauth', 'nonce', vendor, nonce));
 
     // Exchange code for tokens
     const oauthConfig = this.getOAuthConfig(vendor);
@@ -321,7 +321,7 @@ export class AuthTokenService {
     // Fence value = UUID written into the lock key, checked on release so we
     // don't accidentally delete a lock acquired by another worker after our
     // EX window expired.
-    const lockKey = buildKey('sally:oauth', 'lock', String(integrationId));
+    const lockKey = buildKey('app:oauth', 'lock', String(integrationId));
     const lockValue = randomUUID();
     const acquired = await this.redis.set(lockKey, lockValue, 'EX', 30, 'NX');
 

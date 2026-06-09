@@ -1,5 +1,5 @@
 /**
- * Factories for the Sally AI domain (Phase 6 — groups 6a-6f).
+ * Factories for the Assistant AI domain (Phase 6 — groups 6a-6f).
  *
  * Group 6a owns the chat-surface factories:
  *   - buildCreateConversation  → POST /conversations       (CreateConversationDto)
@@ -25,9 +25,7 @@ import { unique } from './common.js';
  * back to the dispatcher greeting for unknown keys, but passing the
  * canonical value makes the intent explicit.
  */
-export function buildCreateConversation(
-  overrides: { userMode?: string } & Record<string, unknown> = {},
-) {
+export function buildCreateConversation(overrides: { userMode?: string } & Record<string, unknown> = {}) {
   return {
     userMode: 'dispatcher',
     ...overrides,
@@ -222,13 +220,11 @@ export function buildProspectMessage(
 
 /**
  * `POST /voice/token` — `VoiceTokenDto` requires only `conversationId`
- * (voice-token.dto.ts). Tests pass the id of a Sally AI conversation
+ * (voice-token.dto.ts). Tests pass the id of an assistant AI conversation
  * created via `POST /conversations` so the ownership check on
  * `voice.service.ts:69` (`conversation.userId !== user.id`) passes.
  */
-export function buildVoiceTokenRequest(
-  overrides: { conversationId?: string } & Record<string, unknown> = {},
-) {
+export function buildVoiceTokenRequest(overrides: { conversationId?: string } & Record<string, unknown> = {}) {
   return {
     conversationId: overrides.conversationId ?? `qa-test-conv-${unique('vt')}`,
     ...overrides,
@@ -240,7 +236,7 @@ export function buildVoiceTokenRequest(
  * `conversationId`, `text`, `userId` (string), `tenantId` (positive int).
  * The endpoint is reached via the LiveKit forked-agent process, so the
  * caller must supply realistic values. Defaults are bogus QA placeholders
- * — the endpoint short-circuits inside `SallyAiService.generateResponse`
+ * — the endpoint short-circuits inside `AssistantAiService.generateResponse`
  * with a generic error frame on a stale conversationId, but the FIRST
  * frame's contract shape (`{type, data}`) holds either way.
  */
@@ -254,7 +250,7 @@ export function buildVoiceInternalRequest(
 ) {
   return {
     conversationId: overrides.conversationId ?? `qa-test-conv-${unique('vir')}`,
-    text: overrides.text ?? '[QA-TEST] Hello Sally',
+    text: overrides.text ?? '[QA-TEST] Hello Assistant',
     userId: overrides.userId ?? `qa-test-user-${unique('uid')}`,
     tenantId: overrides.tenantId ?? 1,
     ...overrides,
@@ -266,7 +262,7 @@ export function buildVoiceInternalRequest(
 /**
  * Bogus API key used to drive the `POST /mcp/apikey` 401 path
  * (`ApiKeyAuthGuard` rejects). The `sk_live_` prefix matches the live
- * Sally API-key shape (validators inspect the prefix before hashing the
+ * Assistant API-key shape (validators inspect the prefix before hashing the
  * secret), so the request reaches the secret-validation branch — not
  * an early format reject. The suffix is deliberately gibberish so the
  * SHA lookup misses every row regardless of tenant.
@@ -300,9 +296,7 @@ export const MCP_BOGUS_HITL_TOKEN = '00000000-0000-0000-0000-000000000000';
  * 400 BEFORE the PIN check runs (controller line 104). The factory is
  * here so future Phase 8/9 tests can reuse the canonical shape.
  */
-export function buildMcpStepUpRequest(
-  overrides: { pin?: string } & Record<string, unknown> = {},
-) {
+export function buildMcpStepUpRequest(overrides: { pin?: string } & Record<string, unknown> = {}) {
   return {
     pin: '1234',
     ...overrides,

@@ -58,7 +58,7 @@ export class AdminCacheController {
       throw new BadRequestException('Body must include { "confirm": true } to flush all caches');
     }
 
-    this.logger.warn('Flushing ALL sally:* cache keys');
+    this.logger.warn('Flushing ALL app:* cache keys');
     const deleted = await this.cacheService.flushAll();
     return { flushed: deleted, scope: 'all' };
   }

@@ -1,18 +1,18 @@
 # Vehicles API
 
-The Vehicles API lets you register trucks in your fleet and maintain their specifications. Vehicle data -- especially fuel tank capacity and fuel efficiency -- directly impacts how SALLY plans routes and determines when fuel stops are needed.
+The Vehicles API lets you register trucks in your fleet and maintain their specifications. Vehicle data -- especially fuel tank capacity and fuel efficiency -- directly impacts how Platform plans routes and determines when fuel stops are needed.
 
 ## Why Vehicle Data Matters
 
-When SALLY plans a route, it uses the vehicle's `fuelTankCapacity` and `mpg` to simulate fuel consumption along each segment. If the vehicle will run low before the next stop, SALLY automatically inserts a fuel stop at the most cost-effective station along the route.
+When Platform plans a route, it uses the vehicle's `fuelTankCapacity` and `mpg` to simulate fuel consumption along each segment. If the vehicle will run low before the next stop, Platform automatically inserts a fuel stop at the most cost-effective station along the route.
 
-A vehicle with a 150-gallon tank at 6.2 MPG has a range of approximately 930 miles on a full tank. SALLY factors in the current fuel level and plans fuel stops before the tank drops below a safe reserve threshold.
+A vehicle with a 150-gallon tank at 6.2 MPG has a range of approximately 930 miles on a full tank. Platform factors in the current fuel level and plans fuel stops before the tank drops below a safe reserve threshold.
 
 ## Create a Vehicle
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/vehicles \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/vehicles \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "unitNumber": "TRK-2205",
@@ -31,11 +31,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/vehicles \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/vehicles",
+  "https://api-staging.appshore.in/api/v1/vehicles",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -96,8 +96,8 @@ const vehicle = await response.json();
 ## List Vehicles
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/vehicles?status=ACTIVE&page=1&pageSize=25" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/vehicles?status=ACTIVE&page=1&pageSize=25" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
@@ -110,9 +110,9 @@ const params = new URLSearchParams({
 });
 
 const response = await fetch(
-  `https://sally-api-staging.appshore.in/api/v1/vehicles?${params}`,
+  `https://api-staging.appshore.in/api/v1/vehicles?${params}`,
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -163,17 +163,17 @@ const { data, total } = await response.json();
 ## Get a Single Vehicle
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
+  "https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -204,8 +204,8 @@ const vehicle = await response.json();
 Update vehicle specifications. This is particularly useful when fuel efficiency changes over time or the vehicle undergoes modifications.
 
 ```bash
-curl -X PUT https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X PUT https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "mpg": 6.0,
@@ -217,11 +217,11 @@ curl -X PUT https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
+  "https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
   {
     method: "PUT",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -257,18 +257,18 @@ const updated = await response.json();
 Removing a vehicle sets its status to `INACTIVE`. It cannot be assigned to new routes but remains in the system for historical records.
 
 ```bash
-curl -X DELETE https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X DELETE https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
+  "https://api-staging.appshore.in/api/v1/vehicles/veh_e5f6g7h8",
   {
     method: "DELETE",
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 ```
@@ -286,7 +286,7 @@ const response = await fetch(
 
 ## Vehicle Assignment to Routes
 
-When planning a route, you reference the vehicle by its ID. SALLY reads the vehicle's fuel specifications to determine:
+When planning a route, you reference the vehicle by its ID. Platform reads the vehicle's fuel specifications to determine:
 
 1. **Fuel range**: Based on `fuelTankCapacity` and `mpg`
 2. **Fuel stop timing**: When current fuel level (provided in route planning request) drops below a safe threshold
@@ -307,7 +307,7 @@ Example route planning request that references a vehicle:
 }
 ```
 
-In this example, the vehicle has 75 gallons (50% full), giving it approximately 465 miles of range. If the route exceeds that distance, SALLY inserts a fuel stop.
+In this example, the vehicle has 75 gallons (50% full), giving it approximately 465 miles of range. If the route exceeds that distance, Platform inserts a fuel stop.
 
 ## Keeping MPG Accurate
 

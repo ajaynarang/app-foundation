@@ -10,9 +10,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Health"
-        ]
+        "tags": ["Health"]
       }
     },
     "/api/v1/auth/lookup-user": {
@@ -46,9 +44,7 @@
           }
         },
         "summary": "Lookup user by email or phone to detect tenant(s)",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/tenants": {
@@ -73,9 +69,7 @@
           }
         },
         "summary": "List available tenants (fleet companies)",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/tenants/{tenant_id}/users": {
@@ -117,14 +111,12 @@
           }
         },
         "summary": "List users for a tenant (for login user selection)",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/firebase/exchange": {
       "post": {
-        "description": "Verifies Firebase ID token and returns SALLY JWT tokens",
+        "description": "Verifies Firebase ID token and returns platform JWT tokens",
         "operationId": "AuthController_exchangeFirebaseToken",
         "parameters": [],
         "requestBody": {
@@ -145,10 +137,8 @@
             "description": "Invalid Firebase token or user not found"
           }
         },
-        "summary": "Exchange Firebase token for SALLY JWT",
-        "tags": [
-          "Authentication"
-        ]
+        "summary": "Exchange Firebase token for platform JWT",
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/login": {
@@ -182,9 +172,7 @@
           }
         },
         "summary": "Login (mock authentication for POC)",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/refresh": {
@@ -207,9 +195,7 @@
           }
         },
         "summary": "Refresh access token using refresh token",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/logout": {
@@ -227,9 +213,7 @@
           }
         ],
         "summary": "Logout and revoke refresh token",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/auth/me": {
@@ -254,9 +238,7 @@
           }
         ],
         "summary": "Get current user profile",
-        "tags": [
-          "Authentication"
-        ]
+        "tags": ["Authentication"]
       }
     },
     "/api/v1/session/login": {
@@ -272,19 +254,14 @@
                 "properties": {
                   "user_type": {
                     "type": "string",
-                    "enum": [
-                      "dispatcher",
-                      "driver"
-                    ]
+                    "enum": ["dispatcher", "driver"]
                   },
                   "user_id": {
                     "type": "string",
                     "nullable": true
                   }
                 },
-                "required": [
-                  "user_type"
-                ]
+                "required": ["user_type"]
               }
             }
           }
@@ -295,9 +272,7 @@
           }
         },
         "summary": "Mock login (no authentication, just creates session)",
-        "tags": [
-          "Session"
-        ]
+        "tags": ["Session"]
       }
     },
     "/api/v1/session/logout": {
@@ -315,9 +290,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "session_id"
-                ]
+                "required": ["session_id"]
               }
             }
           }
@@ -328,9 +301,7 @@
           }
         },
         "summary": "Logout (delete session)",
-        "tags": [
-          "Session"
-        ]
+        "tags": ["Session"]
       }
     },
     "/api/v1/drivers": {
@@ -348,9 +319,7 @@
           }
         ],
         "summary": "List all active drivers (basic info only, HOS fetched from external API)",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       },
       "post": {
         "operationId": "DriversController_createDriver",
@@ -376,9 +345,7 @@
           }
         ],
         "summary": "Create a new driver (basic info only)",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/{driver_id}": {
@@ -416,9 +383,7 @@
           }
         ],
         "summary": "Update driver basic info",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       },
       "delete": {
         "operationId": "DriversController_deleteDriver",
@@ -444,9 +409,7 @@
           }
         ],
         "summary": "Soft delete driver (set isActive=false)",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       },
       "get": {
         "operationId": "DriversController_getDriver",
@@ -475,9 +438,7 @@
           }
         ],
         "summary": "Get driver by ID",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/{driverId}/hos": {
@@ -505,9 +466,7 @@
           }
         ],
         "summary": "Get live HOS data for driver from integration (with cache fallback)",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/pending/list": {
@@ -525,9 +484,7 @@
           }
         ],
         "summary": "Get all pending drivers awaiting activation",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/inactive/list": {
@@ -545,9 +502,7 @@
           }
         ],
         "summary": "Get all inactive drivers",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/{driver_id}/activate": {
@@ -575,9 +530,7 @@
           }
         ],
         "summary": "Activate a pending driver",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/{driver_id}/deactivate": {
@@ -605,9 +558,7 @@
           }
         ],
         "summary": "Deactivate an active driver",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/drivers/{driver_id}/reactivate": {
@@ -635,9 +586,7 @@
           }
         ],
         "summary": "Reactivate an inactive driver",
-        "tags": [
-          "Drivers"
-        ]
+        "tags": ["Drivers"]
       }
     },
     "/api/v1/integrations": {
@@ -649,9 +598,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       },
       "post": {
         "operationId": "IntegrationsController_createIntegration",
@@ -671,9 +618,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/vendors": {
@@ -685,9 +630,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/{integrationId}": {
@@ -708,9 +651,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       },
       "patch": {
         "operationId": "IntegrationsController_updateIntegration",
@@ -739,9 +680,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       },
       "delete": {
         "operationId": "IntegrationsController_deleteIntegration",
@@ -760,9 +699,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/{integrationId}/test": {
@@ -783,9 +720,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/{integrationId}/sync": {
@@ -806,9 +741,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/{integrationId}/sync-history": {
@@ -845,9 +778,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/integrations/{integrationId}/sync-history/stats": {
@@ -868,9 +799,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Integrations"
-        ]
+        "tags": ["Integrations"]
       }
     },
     "/api/v1/alerts": {
@@ -911,9 +840,7 @@
           }
         },
         "summary": "List all alerts (filterable by status, priority, driver)",
-        "tags": [
-          "Alerts"
-        ]
+        "tags": ["Alerts"]
       }
     },
     "/api/v1/alerts/{alert_id}": {
@@ -936,9 +863,7 @@
           }
         },
         "summary": "Get alert details by ID",
-        "tags": [
-          "Alerts"
-        ]
+        "tags": ["Alerts"]
       }
     },
     "/api/v1/alerts/{alert_id}/acknowledge": {
@@ -976,9 +901,7 @@
           }
         },
         "summary": "Acknowledge an alert",
-        "tags": [
-          "Alerts"
-        ]
+        "tags": ["Alerts"]
       }
     },
     "/api/v1/alerts/{alert_id}/resolve": {
@@ -1001,9 +924,7 @@
           }
         },
         "summary": "Resolve an alert",
-        "tags": [
-          "Alerts"
-        ]
+        "tags": ["Alerts"]
       }
     },
     "/api/v1/vehicles": {
@@ -1021,9 +942,7 @@
           }
         ],
         "summary": "List all active vehicles",
-        "tags": [
-          "Vehicles"
-        ]
+        "tags": ["Vehicles"]
       },
       "post": {
         "operationId": "VehiclesController_createVehicle",
@@ -1049,9 +968,7 @@
           }
         ],
         "summary": "Create a new vehicle",
-        "tags": [
-          "Vehicles"
-        ]
+        "tags": ["Vehicles"]
       }
     },
     "/api/v1/vehicles/{vehicle_id}": {
@@ -1089,9 +1006,7 @@
           }
         ],
         "summary": "Update vehicle",
-        "tags": [
-          "Vehicles"
-        ]
+        "tags": ["Vehicles"]
       },
       "delete": {
         "operationId": "VehiclesController_deleteVehicle",
@@ -1117,9 +1032,7 @@
           }
         ],
         "summary": "Soft delete vehicle (set isActive=false)",
-        "tags": [
-          "Vehicles"
-        ]
+        "tags": ["Vehicles"]
       }
     },
     "/api/v1/loads": {
@@ -1142,9 +1055,7 @@
           }
         },
         "summary": "Create a new load with stops",
-        "tags": [
-          "Loads"
-        ]
+        "tags": ["Loads"]
       },
       "get": {
         "operationId": "LoadsController_listLoads",
@@ -1184,9 +1095,7 @@
           }
         },
         "summary": "List all loads with optional filtering",
-        "tags": [
-          "Loads"
-        ]
+        "tags": ["Loads"]
       }
     },
     "/api/v1/loads/{load_id}": {
@@ -1208,9 +1117,7 @@
           }
         },
         "summary": "Get load details with stops",
-        "tags": [
-          "Loads"
-        ]
+        "tags": ["Loads"]
       }
     },
     "/api/v1/route-planning/optimize": {
@@ -1223,9 +1130,7 @@
           }
         },
         "summary": "Plan and optimize a complete route",
-        "tags": [
-          "Route Planning"
-        ]
+        "tags": ["Route Planning"]
       }
     },
     "/api/v1/route-planning/update": {
@@ -1238,9 +1143,7 @@
           }
         },
         "summary": "Update an existing route plan with dynamic triggers",
-        "tags": [
-          "Route Planning"
-        ]
+        "tags": ["Route Planning"]
       }
     },
     "/api/v1/route-planning/status/{driverId}": {
@@ -1262,9 +1165,7 @@
           }
         },
         "summary": "Get current route status for a driver",
-        "tags": [
-          "Route Planning"
-        ]
+        "tags": ["Route Planning"]
       }
     },
     "/api/v1/route-planning/simulate-triggers": {
@@ -1277,9 +1178,7 @@
           }
         },
         "summary": "Simulate dynamic triggers on a route plan",
-        "tags": [
-          "Route Planning"
-        ]
+        "tags": ["Route Planning"]
       }
     },
     "/api/v1/hos-rules/check": {
@@ -1292,9 +1191,7 @@
           }
         },
         "summary": "Check HOS compliance for a driver",
-        "tags": [
-          "HOS Rules"
-        ]
+        "tags": ["HOS Rules"]
       }
     },
     "/api/v1/prediction/estimate": {
@@ -1307,9 +1204,7 @@
           }
         },
         "summary": "Estimate post-load drive demand",
-        "tags": [
-          "Prediction"
-        ]
+        "tags": ["Prediction"]
       }
     },
     "/api/v1/optimization/recommend": {
@@ -1322,9 +1217,7 @@
           }
         },
         "summary": "Get intelligent rest optimization recommendation",
-        "tags": [
-          "Optimization"
-        ]
+        "tags": ["Optimization"]
       }
     },
     "/api/v1/tenants/register": {
@@ -1346,9 +1239,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Tenants"
-        ]
+        "tags": ["Tenants"]
       }
     },
     "/api/v1/tenants/check-subdomain/{subdomain}": {
@@ -1369,9 +1260,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Tenants"
-        ]
+        "tags": ["Tenants"]
       }
     },
     "/api/v1/tenants": {
@@ -1392,9 +1281,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Tenants"
-        ]
+        "tags": ["Tenants"]
       }
     },
     "/api/v1/tenants/{tenantId}/approve": {
@@ -1415,9 +1302,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Tenants"
-        ]
+        "tags": ["Tenants"]
       }
     },
     "/api/v1/tenants/{tenantId}/reject": {
@@ -1438,9 +1323,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Tenants"
-        ]
+        "tags": ["Tenants"]
       }
     },
     "/api/v1/users": {
@@ -1452,9 +1335,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       },
       "post": {
         "operationId": "UsersController_createUser",
@@ -1474,9 +1355,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       }
     },
     "/api/v1/users/{userId}": {
@@ -1497,9 +1376,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       },
       "patch": {
         "operationId": "UsersController_updateUser",
@@ -1528,9 +1405,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       },
       "delete": {
         "operationId": "UsersController_deleteUser",
@@ -1549,9 +1424,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       }
     },
     "/api/v1/users/{userId}/deactivate": {
@@ -1572,9 +1445,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       }
     },
     "/api/v1/users/{userId}/activate": {
@@ -1595,9 +1466,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Users"
-        ]
+        "tags": ["Users"]
       }
     },
     "/api/v1/invitations": {
@@ -1619,9 +1488,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "UserInvitations"
-        ]
+        "tags": ["UserInvitations"]
       },
       "get": {
         "operationId": "UserInvitationsController_getInvitations",
@@ -1640,9 +1507,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "UserInvitations"
-        ]
+        "tags": ["UserInvitations"]
       }
     },
     "/api/v1/invitations/by-token/{token}": {
@@ -1663,9 +1528,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "UserInvitations"
-        ]
+        "tags": ["UserInvitations"]
       }
     },
     "/api/v1/invitations/accept": {
@@ -1687,9 +1550,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "UserInvitations"
-        ]
+        "tags": ["UserInvitations"]
       }
     },
     "/api/v1/invitations/{invitationId}": {
@@ -1710,9 +1571,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "UserInvitations"
-        ]
+        "tags": ["UserInvitations"]
       }
     },
     "/api/v1/preferences/user": {
@@ -1724,9 +1583,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       },
       "put": {
         "operationId": "PreferencesController_updateUserPreferences",
@@ -1746,9 +1603,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       }
     },
     "/api/v1/preferences/operations": {
@@ -1760,9 +1615,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       },
       "put": {
         "operationId": "PreferencesController_updateOperationsSettings",
@@ -1782,9 +1635,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       }
     },
     "/api/v1/preferences/driver": {
@@ -1796,9 +1647,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       },
       "put": {
         "operationId": "PreferencesController_updateDriverPreferences",
@@ -1818,9 +1667,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       }
     },
     "/api/v1/preferences/reset": {
@@ -1832,9 +1679,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       }
     },
     "/api/v1/preferences/defaults": {
@@ -1846,9 +1691,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Preferences"
-        ]
+        "tags": ["Preferences"]
       }
     },
     "/api/v1/feature-flags": {
@@ -1868,9 +1711,7 @@
           }
         },
         "summary": "Get all feature flags",
-        "tags": [
-          "Feature Flags"
-        ]
+        "tags": ["Feature Flags"]
       }
     },
     "/api/v1/feature-flags/{key}": {
@@ -1902,9 +1743,7 @@
           }
         },
         "summary": "Get specific feature flag by key",
-        "tags": [
-          "Feature Flags"
-        ]
+        "tags": ["Feature Flags"]
       },
       "put": {
         "operationId": "FeatureFlagsController_updateFlag",
@@ -1941,9 +1780,7 @@
           }
         },
         "summary": "Update feature flag enabled status",
-        "tags": [
-          "Feature Flags"
-        ]
+        "tags": ["Feature Flags"]
       }
     },
     "/api/v1/feature-flags/{key}/enabled": {
@@ -1980,9 +1817,7 @@
           }
         },
         "summary": "Check if feature is enabled",
-        "tags": [
-          "Feature Flags"
-        ]
+        "tags": ["Feature Flags"]
       }
     },
     "/api/v1/onboarding/status": {
@@ -1994,9 +1829,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "Onboarding"
-        ]
+        "tags": ["Onboarding"]
       }
     },
     "/api/v1/api-keys": {
@@ -2031,9 +1864,7 @@
           }
         ],
         "summary": "Generate a new API key",
-        "tags": [
-          "API Keys"
-        ]
+        "tags": ["API Keys"]
       },
       "get": {
         "operationId": "ApiKeysController_findAll",
@@ -2059,9 +1890,7 @@
           }
         ],
         "summary": "List all API keys for current user",
-        "tags": [
-          "API Keys"
-        ]
+        "tags": ["API Keys"]
       }
     },
     "/api/v1/api-keys/{id}": {
@@ -2088,9 +1917,7 @@
           }
         ],
         "summary": "Revoke an API key",
-        "tags": [
-          "API Keys"
-        ]
+        "tags": ["API Keys"]
       }
     },
     "/api/v1/scenarios": {
@@ -2112,9 +1939,7 @@
           }
         },
         "summary": "List all test scenarios",
-        "tags": [
-          "Scenarios"
-        ]
+        "tags": ["Scenarios"]
       }
     },
     "/api/v1/scenarios/{scenario_id}": {
@@ -2136,9 +1961,7 @@
           }
         },
         "summary": "Get scenario template details",
-        "tags": [
-          "Scenarios"
-        ]
+        "tags": ["Scenarios"]
       }
     },
     "/api/v1/scenarios/{scenario_id}/instantiate": {
@@ -2160,9 +1983,7 @@
           }
         },
         "summary": "Load driver and vehicle state from scenario",
-        "tags": [
-          "Scenarios"
-        ]
+        "tags": ["Scenarios"]
       }
     },
     "/api/v1/external/hos/{driverId}": {
@@ -2185,9 +2006,7 @@
           }
         },
         "summary": "Get driver HOS data from mock Samsara ELD API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/fuel-prices": {
@@ -2228,9 +2047,7 @@
           }
         },
         "summary": "Get fuel prices from mock GasBuddy API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/weather": {
@@ -2262,9 +2079,7 @@
           }
         },
         "summary": "Get weather data from mock OpenWeatherMap API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/tms/vehicles": {
@@ -2277,9 +2092,7 @@
           }
         },
         "summary": "Get vehicles from mock Project44 TMS API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/tms/vehicles/{vehicleId}": {
@@ -2302,9 +2115,7 @@
           }
         },
         "summary": "Get single vehicle from mock Project44 TMS API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/tms/drivers": {
@@ -2317,9 +2128,7 @@
           }
         },
         "summary": "Get drivers from mock Project44 TMS API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/external/tms/drivers/{driverId}": {
@@ -2342,9 +2151,7 @@
           }
         },
         "summary": "Get single driver from mock Project44 TMS API",
-        "tags": [
-          "External API Mock"
-        ]
+        "tags": ["External API Mock"]
       }
     },
     "/api/v1/mock/tms/api/vehicles": {
@@ -2365,9 +2172,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "MockTms"
-        ]
+        "tags": ["MockTms"]
       }
     },
     "/api/v1/mock/tms/api/drivers": {
@@ -2388,14 +2193,12 @@
             "description": ""
           }
         },
-        "tags": [
-          "MockTms"
-        ]
+        "tags": ["MockTms"]
       }
     }
   },
   "info": {
-    "title": "SALLY API",
+    "title": "Platform API",
     "description": "Fleet Operations Assistant API",
     "version": "1.0.0",
     "contact": {}
@@ -2456,7 +2259,7 @@
   ],
   "servers": [
     {
-      "url": "https://sally-api.apps.appshore.in/api/v1",
+      "url": "https://api.apps.appshore.in/api/v1",
       "description": "Staging"
     },
     {
@@ -2527,15 +2330,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "userId",
-          "email",
-          "firstName",
-          "lastName",
-          "role",
-          "tenantId",
-          "tenantName"
-        ]
+        "required": ["userId", "email", "firstName", "lastName", "role", "tenantId", "tenantName"]
       },
       "UserLookupResponseDto": {
         "type": "object",
@@ -2551,10 +2346,7 @@
             "description": "True if user exists in multiple tenants"
           }
         },
-        "required": [
-          "users",
-          "multiTenant"
-        ]
+        "required": ["users", "multiTenant"]
       },
       "TenantDto": {
         "type": "object",
@@ -2572,11 +2364,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "tenantId",
-          "companyName",
-          "isActive"
-        ]
+        "required": ["tenantId", "companyName", "isActive"]
       },
       "UserSummaryDto": {
         "type": "object",
@@ -2603,13 +2391,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "userId",
-          "email",
-          "firstName",
-          "lastName",
-          "role"
-        ]
+        "required": ["userId", "email", "firstName", "lastName", "role"]
       },
       "FirebaseExchangeDto": {
         "type": "object",
@@ -2629,9 +2411,7 @@
             "example": "user_swift_disp_001"
           }
         },
-        "required": [
-          "user_id"
-        ]
+        "required": ["user_id"]
       },
       "UserProfileDto": {
         "type": "object",
@@ -2650,11 +2430,7 @@
           },
           "role": {
             "type": "string",
-            "enum": [
-              "DISPATCHER",
-              "DRIVER",
-              "ADMIN"
-            ]
+            "enum": ["DISPATCHER", "DRIVER", "ADMIN"]
           },
           "tenantId": {
             "type": "string"
@@ -2672,16 +2448,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "userId",
-          "email",
-          "firstName",
-          "lastName",
-          "role",
-          "tenantId",
-          "tenantName",
-          "isActive"
-        ]
+        "required": ["userId", "email", "firstName", "lastName", "role", "tenantId", "tenantName", "isActive"]
       },
       "LoginResponseDto": {
         "type": "object",
@@ -2699,10 +2466,7 @@
             ]
           }
         },
-        "required": [
-          "accessToken",
-          "user"
-        ]
+        "required": ["accessToken", "user"]
       },
       "CreateDriverDto": {
         "type": "object",
@@ -2718,10 +2482,7 @@
             "description": "Driver full name"
           }
         },
-        "required": [
-          "driver_id",
-          "name"
-        ]
+        "required": ["driver_id", "name"]
       },
       "UpdateDriverDto": {
         "type": "object",
@@ -2770,10 +2531,7 @@
             "description": "Miles per gallon efficiency"
           }
         },
-        "required": [
-          "vehicle_id",
-          "unit_number"
-        ]
+        "required": ["vehicle_id", "unit_number"]
       },
       "UpdateVehicleDto": {
         "type": "object",
@@ -2834,12 +2592,7 @@
             "description": "Estimated dock hours at this stop"
           }
         },
-        "required": [
-          "stop_id",
-          "sequence_order",
-          "action_type",
-          "estimated_dock_hours"
-        ]
+        "required": ["stop_id", "sequence_order", "action_type", "estimated_dock_hours"]
       },
       "CreateLoadDto": {
         "type": "object",
@@ -2877,13 +2630,7 @@
             }
           }
         },
-        "required": [
-          "load_number",
-          "weight_lbs",
-          "commodity_type",
-          "customer_name",
-          "stops"
-        ]
+        "required": ["load_number", "weight_lbs", "commodity_type", "customer_name", "stops"]
       },
       "RegisterTenantDto": {
         "type": "object",
@@ -2941,12 +2688,7 @@
             "example": "dispatcher"
           }
         },
-        "required": [
-          "key",
-          "name",
-          "enabled",
-          "category"
-        ]
+        "required": ["key", "name", "enabled", "category"]
       },
       "FeatureFlagsResponse": {
         "type": "object",
@@ -2958,9 +2700,7 @@
             }
           }
         },
-        "required": [
-          "flags"
-        ]
+        "required": ["flags"]
       },
       "UpdateFeatureFlagDto": {
         "type": "object",
@@ -2971,9 +2711,7 @@
             "description": "Enable or disable the feature"
           }
         },
-        "required": [
-          "enabled"
-        ]
+        "required": ["enabled"]
       },
       "CreateApiKeyDto": {
         "type": "object",
@@ -2984,9 +2722,7 @@
             "description": "Human-readable name for the API key"
           }
         },
-        "required": [
-          "name"
-        ]
+        "required": ["name"]
       },
       "ApiKeyDto": {
         "type": "object",
@@ -3030,16 +2766,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "id",
-          "key",
-          "name",
-          "requestCount",
-          "lastUsedAt",
-          "isActive",
-          "createdAt",
-          "expiresAt"
-        ]
+        "required": ["id", "key", "name", "requestCount", "lastUsedAt", "isActive", "createdAt", "expiresAt"]
       }
     }
   }

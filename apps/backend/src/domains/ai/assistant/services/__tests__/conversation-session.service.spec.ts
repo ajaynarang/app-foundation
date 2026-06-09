@@ -3,7 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ConversationSessionService } from '../conversation-session.service';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/domain-events.constants';
 
 describe('ConversationSessionService', () => {
   let service: ConversationSessionService;
@@ -104,7 +104,7 @@ describe('ConversationSessionService', () => {
       );
     });
 
-    it('emits sally.conversation.session-issued', async () => {
+    it('emits app.conversation.session-issued', async () => {
       prisma.conversation.findUnique.mockResolvedValue({ id: conversationId, tenantId });
       prisma.conversationSession.create.mockImplementation(({ data }: any) =>
         Promise.resolve({ id: 11, ...data, createdAt: new Date() }),
@@ -145,7 +145,7 @@ describe('ConversationSessionService', () => {
   // ── revoke ──
 
   describe('revoke', () => {
-    it('sets revokedAt and emits sally.conversation.session-revoked', async () => {
+    it('sets revokedAt and emits app.conversation.session-revoked', async () => {
       const session = { id: 9, conversationId, tenantId, revokedAt: null };
       prisma.conversationSession.findUnique.mockResolvedValue(session);
       prisma.conversationSession.update.mockImplementation(({ data }: any) => Promise.resolve({ ...session, ...data }));

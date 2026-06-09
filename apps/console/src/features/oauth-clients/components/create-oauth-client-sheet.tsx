@@ -91,7 +91,7 @@ export function CreateOAuthClientSheet({ open, onOpenChange }: Props) {
             <SheetHeader>
               <SheetTitle>Register OAuth Client</SheetTitle>
               <SheetDescription>
-                Create an app that users can sign in to and approve before it gets access to SALLY data.
+                Create an app that users can sign in to and approve before it gets access to platform data.
               </SheetDescription>
             </SheetHeader>
 

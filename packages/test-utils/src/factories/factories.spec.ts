@@ -6,7 +6,7 @@ describe('factories', () => {
     const a = buildDriver();
     const b = buildDriver();
     expect(a.email).not.toBe(b.email);
-    expect(a.email).toMatch(/@test\.sally\.dev$/);
+    expect(a.email).toMatch(/@test\.example\.com$/);
   });
 
   it('buildVehicle VIN is exactly 17 chars', () => {

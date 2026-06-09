@@ -2,12 +2,12 @@
 
 import { Button } from '@app/ui/components/ui/button';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { useSallyStore } from '../../store';
+import { useAssistantStore } from '../../store';
 import type { ConfirmationCardData } from '../../engine/types';
 
 export function ConfirmationCard({ data }: { data: Record<string, unknown> }) {
   const card = data as unknown as ConfirmationCardData;
-  const { pendingConfirmation, confirmAction, cancelAction } = useSallyStore();
+  const { pendingConfirmation, confirmAction, cancelAction } = useAssistantStore();
   const isPending = !!pendingConfirmation;
 
   return (

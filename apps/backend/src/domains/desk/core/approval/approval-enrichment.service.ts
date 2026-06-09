@@ -5,7 +5,7 @@ import type { ApprovalArtifact, ApprovalDecisionHeader } from '../types';
 
 /**
  * Computes the canonical approval-sheet payload (artifact, decisionHeader,
- * sallysRead, context, confidence) from an approval row + its episode's step
+ * assistantRead, context, confidence) from an approval row + its episode's step
  * list. Runs at read time so we don't have to migrate the DeskApproval table or
  * recompute on every workflow iteration.
  *
@@ -41,7 +41,7 @@ export class ApprovalEnrichmentService {
 export interface EnrichedApprovalPayload {
   artifact: ApprovalArtifact | null;
   decisionHeader: ApprovalDecisionHeader | null;
-  sallysRead: string | null;
+  assistantRead: string | null;
   context: string[] | null;
   confidence: number | null;
 }
@@ -49,7 +49,7 @@ export interface EnrichedApprovalPayload {
 const EMPTY_PAYLOAD: EnrichedApprovalPayload = {
   artifact: null,
   decisionHeader: null,
-  sallysRead: null,
+  assistantRead: null,
   context: null,
   confidence: null,
 };

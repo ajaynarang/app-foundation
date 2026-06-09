@@ -8,9 +8,16 @@ import { MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from '../infrastructure/provider
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
 import { PromptingService } from '../../../domains/prompting';
-import { AgentContext, AgentDefinition, AgentResult, AgentStatus, ChatChunk, SallyAgent } from './agent.types';
+import {
+  AgentContext,
+  AgentDefinition,
+  AgentResult,
+  AgentStatus,
+  ChatChunk,
+  AssistantAgentContract,
+} from './agent.types';
 
-export abstract class AbstractBaseAgent implements SallyAgent {
+export abstract class AbstractBaseAgent implements AssistantAgentContract {
   protected readonly logger: Logger;
 
   abstract readonly definition: AgentDefinition;

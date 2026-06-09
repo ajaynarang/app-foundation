@@ -6,13 +6,13 @@ import { VoiceService } from './voice.service';
 import { VoiceAgentWorker } from './voice-agent.worker';
 
 /**
- * Voice Module — LiveKit voice sessions for Sally AI.
+ * Voice Module — LiveKit voice sessions for the assistant.
  *
- * Does NOT import SallyAiModule to avoid circular dependencies
- * (SallyAiModule → McpToolsModule → DriversModule → ... → SallyAiModule).
- * Instead, VoiceAgentWorker resolves SallyAiService lazily via ModuleRef.
+ * Does NOT import AssistantAiModule to avoid circular dependencies
+ * (AssistantAiModule → McpToolsModule → DriversModule → ... → AssistantAiModule).
+ * Instead, VoiceAgentWorker resolves AssistantAiService lazily via ModuleRef.
  *
- * Must be registered inside AiModule (which already exports SallyAiService).
+ * Must be registered inside AiModule (which already exports AssistantAiService).
  */
 @Module({
   imports: [ConfigModule, PrismaModule],

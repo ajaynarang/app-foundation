@@ -30,7 +30,7 @@ describe('AdminEventsService', () => {
       prisma.domainEventLog.findMany.mockResolvedValue([
         {
           id: 'evt-1',
-          event: 'sally.load.created',
+          event: 'app.load.created',
           aggregateType: 'load',
           aggregateId: 'LD-1',
           actorId: null,
@@ -70,7 +70,7 @@ describe('AdminEventsService', () => {
 
     it('applies search filter', async () => {
       await service.listEvents({
-        search: 'sally.load.created',
+        search: 'app.load.created',
         limit: 50,
         offset: 0,
       });
@@ -80,7 +80,7 @@ describe('AdminEventsService', () => {
           where: expect.objectContaining({
             OR: expect.arrayContaining([
               expect.objectContaining({
-                event: { contains: 'sally.load.created', mode: 'insensitive' },
+                event: { contains: 'app.load.created', mode: 'insensitive' },
               }),
             ]),
           }),
@@ -111,7 +111,7 @@ describe('AdminEventsService', () => {
     it('applies all filters together', async () => {
       await service.listEvents({
         tenantId: 't-1',
-        search: 'sally.load.created',
+        search: 'app.load.created',
         actorType: 'user',
         since: '2026-04-01T00:00:00Z',
         limit: 10,
@@ -125,7 +125,7 @@ describe('AdminEventsService', () => {
             actorType: 'user',
             OR: expect.arrayContaining([
               expect.objectContaining({
-                event: { contains: 'sally.load.created', mode: 'insensitive' },
+                event: { contains: 'app.load.created', mode: 'insensitive' },
               }),
             ]),
           }),
@@ -139,14 +139,14 @@ describe('AdminEventsService', () => {
   describe('getStats', () => {
     it('returns event counts grouped by type', async () => {
       prisma.domainEventLog.groupBy.mockResolvedValue([
-        { event: 'sally.load.created', _count: { id: 50 } },
-        { event: 'sally.load.updated', _count: { id: 30 } },
+        { event: 'app.load.created', _count: { id: 50 } },
+        { event: 'app.load.updated', _count: { id: 30 } },
       ]);
 
       const result = await service.getStats();
 
       expect(result.eventCounts).toHaveLength(2);
-      expect(result.eventCounts[0].event).toBe('sally.load.created');
+      expect(result.eventCounts[0].event).toBe('app.load.created');
       expect(result.eventCounts[0].count).toBe(50);
       expect(result.totalEvents).toBe(80);
       expect(result.since).toBeTruthy();

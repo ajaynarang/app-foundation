@@ -2,7 +2,7 @@
  * Voice Agent Entry Point
  *
  * Forked as a child process by LiveKit AgentServer.
- * Runs the voice pipeline: Deepgram STT → Sally API → Cartesia TTS.
+ * Runs the voice pipeline: Deepgram STT → the assistant API → Cartesia TTS.
  *
  * Reads user voice preferences from participant identity metadata:
  *   - voiceMode: 'manual' (review + send) or 'auto' (immediate)
@@ -38,9 +38,9 @@ const VOICE_MAP: Record<string, string> = {
 };
 
 /**
- * Call Sally's internal streaming endpoint. Returns a ReadableStream of text.
+ * Call the assistant's internal streaming endpoint. Returns a ReadableStream of text.
  */
-async function callSallyApi(
+async function callAssistantApi(
   conversationId: string,
   text: string,
   userId: string,
@@ -65,7 +65,7 @@ async function callSallyApi(
     });
   } catch (err: any) {
     clearTimeout(timeout);
-    console.error(`[VoiceAgent] Sally API fetch failed: ${err.message}`);
+    console.error(`[VoiceAgent] the assistant API fetch failed: ${err.message}`);
     return new ReadableStream<string>({
       start(ctrl) {
         ctrl.enqueue("Sorry, I'm taking too long to respond. Please try again or use text mode.");
@@ -77,7 +77,7 @@ async function callSallyApi(
 
   if (!response.ok || !response.body) {
     const errText = await response.text().catch(() => 'unknown error');
-    console.error(`[VoiceAgent] Sally API error: ${response.status} ${errText}`);
+    console.error(`[VoiceAgent] the assistant API error: ${response.status} ${errText}`);
     return new ReadableStream<string>({
       start(controller) {
         controller.enqueue("Sorry, I couldn't process that. Please try again.");
@@ -241,7 +241,7 @@ module.exports = defineAgent({
 
     let activeAbort: AbortController | null = null;
 
-    /** Shared handler: call Sally API, stream TTS + UI transcript. */
+    /** Shared handler: call the assistant API, stream TTS + UI transcript. */
     async function handleUserMessage(transcript: string) {
       // Cancel any in-progress response
       if (activeAbort) {
@@ -252,7 +252,7 @@ module.exports = defineAgent({
       const signal = activeAbort.signal;
 
       try {
-        const textStream = await callSallyApi(
+        const textStream = await callAssistantApi(
           authContext.conversationId,
           transcript,
           authContext.userId,
@@ -361,7 +361,7 @@ module.exports = defineAgent({
       console.log('[VoiceAgent] Starting session...');
       await session.start({ agent, room: ctx.room });
       console.log('[VoiceAgent] Session started — listening');
-      session.say('Hey, Sally here. What can I help you with?');
+      session.say('Hey, the assistant here. What can I help you with?');
     } catch (err) {
       console.error('[VoiceAgent] Session start failed:', err);
     }

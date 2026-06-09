@@ -6,7 +6,7 @@ jest.mock('../../infrastructure/providers/ai-provider', () => ({
 }));
 jest.mock('../../../../domains/prompting', () => ({
   PromptingService: jest.fn(),
-  PROMPT_NAMES: { SKILL_CLASSIFIER: 'sally-skill-classifier' },
+  PROMPT_NAMES: { SKILL_CLASSIFIER: 'assistant-skill-classifier' },
 }));
 
 import { SkillClassifierService } from '../skill-classifier.service';

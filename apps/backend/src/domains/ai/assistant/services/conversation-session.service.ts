@@ -2,12 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 
 /**
- * Issues, resolves, and revokes opaque session tokens for SALLY AI conversations.
+ * Issues, resolves, and revokes opaque session tokens for assistant conversations.
  *
- * Replaces the legacy `Conversation.sessionToken` column. Per the SALLY ID
+ * Replaces the legacy `Conversation.sessionToken` column. Per the APP ID
  * convention (Rule 5, opaque tokens never live on the entity row), each
  * conversation session lives in its own row with proper expiry, revoke, and
  * audit fields.

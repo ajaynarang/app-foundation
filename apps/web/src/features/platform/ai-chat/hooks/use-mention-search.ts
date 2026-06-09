@@ -16,7 +16,7 @@ export function useMentionSearch(query: string) {
   const enabled = debounced.trim().length >= MIN_QUERY;
 
   const { data, isFetching } = useQuery({
-    queryKey: queryKeys.sallyAi.mentionSearch(debounced),
+    queryKey: queryKeys.assistantAi.mentionSearch(debounced),
     queryFn: () => searchEntities(debounced),
     enabled,
     placeholderData: keepPreviousData,

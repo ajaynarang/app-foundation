@@ -11,7 +11,7 @@ describe('KnowledgeTool', () => {
         {
           documentId: 'doc_001',
           title: 'Route Planning',
-          content: 'SALLY optimizes routes using TSP algorithms...',
+          content: 'The platform optimizes your workflows...',
           documentType: 'feature',
           audience: 'prospect',
           category: 'route_planning',
@@ -21,7 +21,7 @@ describe('KnowledgeTool', () => {
         {
           documentId: 'doc_002',
           title: 'HOS Compliance',
-          content: 'SALLY ensures zero HOS violations...',
+          content: 'The platform keeps you compliant...',
           documentType: 'faq',
           audience: 'prospect',
           category: 'hos_compliance',
@@ -33,7 +33,7 @@ describe('KnowledgeTool', () => {
         {
           documentId: 'doc_003',
           title: 'Pricing Tiers',
-          content: 'SALLY offers three pricing tiers...',
+          content: 'The platform offers three pricing tiers...',
           documentType: 'pricing',
           category: 'pricing',
           keywords: ['pricing'],

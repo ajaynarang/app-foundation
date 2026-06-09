@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
 import { nanoid } from 'nanoid';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
@@ -85,7 +85,7 @@ export class ApiKeysService {
 
   /**
    * List every API key in a tenant, scoped via `user.tenantId`. Used by the
-   * Sally's Desk admin view (Phase D). Never returns the plaintext key.
+   * the Desk admin view (Phase D). Never returns the plaintext key.
    */
   async listForTenant(tenantId: number): Promise<TenantApiKeyListItemDto[]> {
     const keys = await this.prisma.apiKey.findMany({

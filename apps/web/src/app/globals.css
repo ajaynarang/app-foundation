@@ -1,4 +1,4 @@
-@import '@sally/ui/globals.css';
+@import '@app/ui/globals.css';
 
 @tailwind base;
 @tailwind components;
@@ -84,126 +84,126 @@
     @apply -translate-y-1 shadow-card-hover;
   }
 
-  /* Sally AI panel push-content */
-  .sally-main-content {
+  /* Assistant AI panel push-content */
+  .assistant-main-content {
     transition: margin-right 0.3s ease-in-out;
   }
 
-  .sally-main-content.sally-layout-side {
-    margin-right: var(--sally-side-width, 380px);
+  .assistant-main-content.assistant-layout-side {
+    margin-right: var(--assistant-side-width, 380px);
   }
 
-  .sally-main-content.sally-layout-split {
+  .assistant-main-content.assistant-layout-split {
     margin-right: 50%;
   }
 
-  .sally-main-content.sally-layout-float {
+  .assistant-main-content.assistant-layout-float {
     margin-right: 0;
   }
 
   @media (max-width: 640px) {
-    .sally-main-content.sally-layout-side,
-    .sally-main-content.sally-layout-split,
-    .sally-main-content.sally-layout-float {
+    .assistant-main-content.assistant-layout-side,
+    .assistant-main-content.assistant-layout-split,
+    .assistant-main-content.assistant-layout-float {
       margin-right: 0;
     }
   }
 
-  /* Sally AI markdown rendering */
-  .sally-markdown p {
+  /* Assistant AI markdown rendering */
+  .assistant-markdown p {
     margin-bottom: 0.5em;
   }
-  .sally-markdown p:last-child {
+  .assistant-markdown p:last-child {
     margin-bottom: 0;
   }
-  .sally-markdown strong {
+  .assistant-markdown strong {
     font-weight: 600;
   }
-  .sally-markdown em {
+  .assistant-markdown em {
     font-style: italic;
   }
-  .sally-markdown ul,
-  .sally-markdown ol {
+  .assistant-markdown ul,
+  .assistant-markdown ol {
     margin: 0.25em 0 0.5em;
     padding-left: 1.25em;
   }
-  .sally-markdown ul {
+  .assistant-markdown ul {
     list-style-type: disc;
   }
-  .sally-markdown ol {
+  .assistant-markdown ol {
     list-style-type: decimal;
   }
-  .sally-markdown li {
+  .assistant-markdown li {
     margin-bottom: 0.15em;
   }
-  .sally-markdown li > p {
+  .assistant-markdown li > p {
     margin-bottom: 0;
   }
-  .sally-markdown h1,
-  .sally-markdown h2,
-  .sally-markdown h3 {
+  .assistant-markdown h1,
+  .assistant-markdown h2,
+  .assistant-markdown h3 {
     font-weight: 600;
     margin-top: 0.75em;
     margin-bottom: 0.25em;
   }
-  .sally-markdown h1 {
+  .assistant-markdown h1 {
     font-size: 1.1em;
   }
-  .sally-markdown h2 {
+  .assistant-markdown h2 {
     font-size: 1.05em;
   }
-  .sally-markdown h3 {
+  .assistant-markdown h3 {
     font-size: 1em;
   }
-  .sally-markdown code {
+  .assistant-markdown code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.85em;
     padding: 0.15em 0.35em;
     border-radius: 0.25rem;
     background: hsl(var(--muted));
   }
-  .sally-markdown pre {
+  .assistant-markdown pre {
     margin: 0.5em 0;
     padding: 0.75em;
     border-radius: 0.5rem;
     background: hsl(var(--muted));
     overflow-x: auto;
   }
-  .sally-markdown pre code {
+  .assistant-markdown pre code {
     padding: 0;
     background: transparent;
   }
-  .sally-markdown blockquote {
+  .assistant-markdown blockquote {
     border-left: 2px solid hsl(var(--border));
     padding-left: 0.75em;
     margin: 0.5em 0;
     color: hsl(var(--muted-foreground));
   }
-  .sally-markdown a {
+  .assistant-markdown a {
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .sally-markdown hr {
+  .assistant-markdown hr {
     border-color: hsl(var(--border));
     margin: 0.75em 0;
   }
-  .sally-markdown table {
+  .assistant-markdown table {
     width: 100%;
     border-collapse: collapse;
     margin: 0.5em 0;
     font-size: 0.85em;
   }
-  .sally-markdown th,
-  .sally-markdown td {
+  .assistant-markdown th,
+  .assistant-markdown td {
     border: 1px solid hsl(var(--border));
     padding: 0.35em 0.65em;
     text-align: left;
   }
-  .sally-markdown th {
+  .assistant-markdown th {
     background: hsl(var(--muted));
     font-weight: 600;
   }
-  .sally-markdown tr:nth-child(even) td {
+  .assistant-markdown tr:nth-child(even) td {
     background: hsl(var(--muted) / 0.4);
   }
 
@@ -252,13 +252,13 @@
   background: transparent;
 }
 
-/* Sally AI Chat */
-.sally-hide-scrollbar::-webkit-scrollbar {
+/* Assistant AI Chat */
+.assistant-hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* Sally AI Chat animations */
-@keyframes sallyInputGlow {
+/* Assistant AI Chat animations */
+@keyframes assistantInputGlow {
   0%,
   100% {
     background-position: 0% 50%;
@@ -268,7 +268,7 @@
   }
 }
 
-.sally-input-glow {
+.assistant-input-glow {
   background: linear-gradient(
     135deg,
     hsl(var(--foreground) / 0.25),
@@ -277,10 +277,10 @@
     hsl(var(--foreground) / 0.15)
   );
   background-size: 200% 200%;
-  animation: sallyInputGlow 4s ease-in-out infinite;
+  animation: assistantInputGlow 4s ease-in-out infinite;
 }
 
-@keyframes sallyFloatGlow {
+@keyframes assistantFloatGlow {
   0% {
     background-position: 0% 0%;
   }
@@ -298,7 +298,7 @@
   }
 }
 
-.sally-float-glow {
+.assistant-float-glow {
   background: linear-gradient(
     135deg,
     hsl(var(--foreground) / 0.3),
@@ -308,11 +308,11 @@
     hsl(var(--foreground) / 0.2)
   );
   background-size: 300% 300%;
-  animation: sallyFloatGlow 6s ease-in-out infinite;
+  animation: assistantFloatGlow 6s ease-in-out infinite;
   padding: 1.5px;
 }
 
-.sally-float-glow > .sally-float-inner {
+.assistant-float-glow > .assistant-float-inner {
   background: hsl(var(--background));
   border-radius: calc(1rem - 1.5px);
   height: 100%;

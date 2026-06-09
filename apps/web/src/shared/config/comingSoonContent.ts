@@ -8,9 +8,10 @@ import type { ComingSoonBannerProps } from '@/features/platform/feature-flags';
 export const comingSoonContent: Record<string, Omit<ComingSoonBannerProps, 'category'>> = {
   voice_mode: {
     title: 'Voice Mode',
-    description: 'Talk to Sally hands-free with speech-to-text and text-to-speech — perfect for drivers on the road.',
+    description:
+      'Talk to Assistant hands-free with speech-to-text and text-to-speech — perfect for drivers on the road.',
     features: [
-      'Hands-free voice interaction with Sally',
+      'Hands-free voice interaction with Assistant',
       'Speech-to-text powered by Deepgram',
       'Text-to-speech responses via Cartesia',
       'Natural language commands for common operations',
@@ -20,7 +21,7 @@ export const comingSoonContent: Record<string, Omit<ComingSoonBannerProps, 'cate
   doc_intelligence: {
     title: 'Document Intelligence',
     description:
-      'Upload rate confirmations and Sally auto-extracts all load details — customer, origin, destination, rate, and special instructions.',
+      'Upload rate confirmations and Assistant auto-extracts all load details — customer, origin, destination, rate, and special instructions.',
     features: [
       'Auto-extract from rate-con PDFs using AI vision',
       'Customer, origin, destination, and rate detection',
@@ -143,7 +144,7 @@ export const comingSoonContent: Record<string, Omit<ComingSoonBannerProps, 'cate
     features: [
       'Automatic driver and vehicle import from external TMS',
       'Load data sync with status updates',
-      'Two-way reconciliation between SALLY and your TMS',
+      'Two-way reconciliation between the platform and your TMS',
       'Support for McLeod, TMW, and other major providers',
     ],
   },
@@ -155,7 +156,7 @@ export const comingSoonContent: Record<string, Omit<ComingSoonBannerProps, 'cate
       'One-click QuickBooks Online connection with OAuth',
       'Automatic invoice sync as they are created',
       'Settlement sync for driver pay and deductions',
-      'Customer and vendor mapping between SALLY and QuickBooks',
+      'Customer and vendor mapping between the platform and QuickBooks',
       'Reconciliation dashboard showing sync status',
     ],
   },

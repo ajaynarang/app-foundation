@@ -30,7 +30,7 @@ const platforms: Platform[] = [
   {
     id: 'claude-connector',
     name: 'Claude.ai',
-    description: 'Connect SALLY as an MCP Connector in Claude.ai. Paste your URL and sign in.',
+    description: 'Connect the platform as an MCP Connector in Claude.ai. Paste your URL and sign in.',
     icon: MessageSquare,
     tag: 'MCP Connector',
     color: 'bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400',
@@ -39,7 +39,7 @@ const platforms: Platform[] = [
   {
     id: 'claude-desktop',
     name: 'Claude Desktop',
-    description: 'Add SALLY as a connector in the Claude Desktop app. Same flow as Claude.ai.',
+    description: 'Add the platform as a connector in the Claude Desktop app. Same flow as Claude.ai.',
     icon: Monitor,
     tag: 'MCP Connector',
     color: 'bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400',
@@ -48,7 +48,7 @@ const platforms: Platform[] = [
   {
     id: 'chatgpt',
     name: 'ChatGPT',
-    description: 'Connect SALLY as an MCP app in ChatGPT. Paste your server URL and sign in.',
+    description: 'Connect the platform as an MCP app in ChatGPT. Paste your server URL and sign in.',
     icon: Bot,
     tag: 'MCP App',
     color: 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400',
@@ -163,8 +163,8 @@ function PlatformDetailSheet({
                     click <strong className="text-foreground">Connect</strong>
                   </li>
                   <li className="flex gap-2">
-                    <span className="font-mono text-foreground shrink-0">5.</span> Sign in with your SALLY credentials
-                    and approve access
+                    <span className="font-mono text-foreground shrink-0">5.</span> Sign in with your platform
+                    credentials and approve access
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">6.</span> Start chatting — ask Claude about
@@ -193,8 +193,8 @@ function PlatformDetailSheet({
                     click <strong className="text-foreground">Connect</strong>
                   </li>
                   <li className="flex gap-2">
-                    <span className="font-mono text-foreground shrink-0">5.</span> Sign in with your SALLY credentials
-                    and approve access
+                    <span className="font-mono text-foreground shrink-0">5.</span> Sign in with your platform
+                    credentials and approve access
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">6.</span> Start chatting — ask Claude about
@@ -223,7 +223,7 @@ function PlatformDetailSheet({
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">5.</span> Complete the OAuth login with your
-                    SALLY credentials
+                    platform credentials
                   </li>
                 </ol>
               )}
@@ -232,8 +232,8 @@ function PlatformDetailSheet({
                 <>
                   <UrlRow label="OAuth Metadata" value={oauthMetadataUrl} />
                   <p className="text-sm text-muted-foreground">
-                    SALLY uses OAuth 2.1 with PKCE (S256). Dynamic client registration is supported. Send JSON-RPC 2.0
-                    requests to the server URL with a Bearer token.
+                    The platform uses OAuth 2.1 with PKCE (S256). Dynamic client registration is supported. Send
+                    JSON-RPC 2.0 requests to the server URL with a Bearer token.
                   </p>
                 </>
               )}
@@ -278,7 +278,8 @@ export default function AiAssistantsPage() {
         <Rocket className="h-4 w-4" />
         <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            New to SALLY AI? Follow the 3-step quickstart in your tenant app to register an external agent end-to-end.
+            New to the platform AI? Follow the 3-step quickstart in your tenant app to register an external agent
+            end-to-end.
           </span>
           <Link href={OAUTH_QUICKSTART_HREF} target="_blank" rel="noopener noreferrer">
             <Button size="sm">

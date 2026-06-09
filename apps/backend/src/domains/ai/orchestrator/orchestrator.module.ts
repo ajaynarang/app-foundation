@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 
-import { SallyRouterService } from './sally-router.service';
+import { AssistantRouterService } from './assistant-router.service';
 import { SkillClassifierService } from './skill-classifier.service';
 
 @Module({
-  providers: [SallyRouterService, SkillClassifierService],
-  exports: [SallyRouterService],
+  providers: [AssistantRouterService, SkillClassifierService],
+  exports: [AssistantRouterService],
 })
 export class OrchestratorModule {}

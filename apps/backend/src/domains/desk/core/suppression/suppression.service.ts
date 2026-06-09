@@ -5,7 +5,7 @@ import type { SnoozeDuration } from '../types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEvent } from '../../../../infrastructure/events/domain-event';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 import { closeStep } from '../../shared-steps/close.step';
 
 /**
@@ -44,8 +44,8 @@ const DURATION_MS: Record<SnoozeDuration, number | null> = {
  * shortening the window by clicking "1 day" the next morning.
  *
  * DomainEvents:
- *   • sally.desk.episode.snoozed      — when snooze() completes
- *   • sally.desk.suppression.cleared  — when unsnooze() completes
+ *   • app.desk.episode.snoozed      — when snooze() completes
+ *   • app.desk.suppression.cleared  — when unsnooze() completes
  * Both wrap `new DomainEvent(...)` so wildcard subscribers
  * (CacheInvalidationSubscriber, DomainEventSseBridge, WebhookDispatcher)
  * receive the canonical event envelope.
@@ -170,7 +170,7 @@ export class SuppressionService {
   async unsnooze(suppressionId: string, tenantId: number, userId: number) {
     // Tenant-scoped lookup — the id alone is not a capability. UUIDs leak
     // through logs / SSE / webhooks, and every service-layer read MUST
-    // include tenantId per sally-backend-patterns §3. Cross-tenant clear
+    // include tenantId per app-backend-patterns §3. Cross-tenant clear
     // is treated identically to missing (same 404) so we don't signal
     // existence to a caller outside the owning tenant.
     const row = await this.prisma.deskEntitySuppression.findFirst({

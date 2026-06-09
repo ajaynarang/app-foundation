@@ -15,7 +15,7 @@ import { Label } from '@app/ui/components/ui/label';
 import { UrlRow } from '@app/ui/components/ui/url-row';
 import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
 
-const DEFAULT_MCP_URL = 'https://api.sally.app/mcp';
+const DEFAULT_MCP_URL = 'https://api.example.com/mcp';
 
 export interface ExternalAgentsQuickstartModalProps {
   open: boolean;

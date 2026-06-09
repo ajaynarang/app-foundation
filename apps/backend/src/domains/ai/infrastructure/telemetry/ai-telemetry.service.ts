@@ -8,7 +8,7 @@ import { AppCacheService } from '../../../../infrastructure/cache/app-cache.serv
 import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M, CACHE_TTL_HOT_60S } from '../../../../constants/cache.constants';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
 import { ZeroRetentionUnavailable } from '../redaction/zero-retention-unavailable.error';
@@ -18,7 +18,7 @@ import type { ModelAlias } from '@app/shared-types';
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
  *
- * Every LLM and embedding call across Sally (chat, desk steps, document
+ * Every LLM and embedding call across the platform (chat, desk steps, document
  * intelligence, alert briefings, memory extraction, embeddings, KB ingest)
  * flows through this service via `record()`. Token counts + latency + the
  * computed USD cost land in `ai_invocations` and the per-tenant cost
@@ -119,7 +119,7 @@ export class AiTelemetryService {
    */
   private async resolvePricing(provider: string, model: string): Promise<ModelPricing | null> {
     return this.cache.getOrSet(
-      buildKey('sally:ai-telemetry', 'pricing', provider, model),
+      buildKey('app:ai-telemetry', 'pricing', provider, model),
       async () => {
         const now = new Date();
         return this.prisma.modelPricing.findFirst({
@@ -231,7 +231,7 @@ export class AiTelemetryService {
 
   private async tenantRequiresZeroRetention(tenantId: number): Promise<boolean> {
     return this.cache.getOrSet(
-      buildKey('sally:ai-telemetry', 'zdr', tenantId),
+      buildKey('app:ai-telemetry', 'zdr', tenantId),
       async () => {
         const tenant = await this.prisma.tenant.findUnique({
           where: { id: tenantId },
@@ -319,7 +319,7 @@ export class AiTelemetryService {
    */
   private async getBudget(tenantId: number): Promise<TenantAiBudget> {
     return this.cache.getOrSet(
-      buildKey('sally:ai-telemetry', 'budget', tenantId),
+      buildKey('app:ai-telemetry', 'budget', tenantId),
       async () =>
         this.prisma.tenantAiBudget.upsert({
           where: { tenantId },
@@ -338,7 +338,7 @@ export class AiTelemetryService {
    */
   private async getSpent(tenantId: number): Promise<{ daily: Prisma.Decimal; monthly: Prisma.Decimal }> {
     const cached = await this.cache.getOrSet(
-      buildKey('sally:ai-telemetry', 'spent', tenantId),
+      buildKey('app:ai-telemetry', 'spent', tenantId),
       async () => {
         const now = new Date();
         const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -363,7 +363,7 @@ export class AiTelemetryService {
   }
 
   private async invalidateSpentCache(tenantId: number): Promise<void> {
-    await this.cache.del(buildKey('sally:ai-telemetry', 'spent', tenantId));
+    await this.cache.del(buildKey('app:ai-telemetry', 'spent', tenantId));
   }
 
   /** A permissive state used when budget evaluation fails (fail-open). */

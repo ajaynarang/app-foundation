@@ -60,9 +60,9 @@ describe('WebhookSubscriptionService', () => {
     it('excludes internal events from catalog', () => {
       const result = service.getEventCatalog();
       const allEvents = result.categories.flatMap((c: any) => c.events.map((e: any) => e.name));
-      expect(allEvents).not.toContain('sally.sync.started');
-      expect(allEvents).not.toContain('sally.telematics.updated');
-      expect(allEvents).not.toContain('sally.preferences.updated');
+      expect(allEvents).not.toContain('app.sync.started');
+      expect(allEvents).not.toContain('app.telematics.updated');
+      expect(allEvents).not.toContain('app.preferences.updated');
     });
   });
 
@@ -84,7 +84,7 @@ describe('WebhookSubscriptionService', () => {
         id: logId,
         subscriptionId: subId,
         failedAt: new Date(),
-        payload: { event: 'sally.load.created', data: {} },
+        payload: { event: 'app.load.created', data: {} },
       });
       prisma.webhookDeliveryLog.update.mockResolvedValue({});
 
@@ -150,7 +150,7 @@ describe('WebhookSubscriptionService', () => {
       prisma.domainEventLog.findMany.mockResolvedValue([
         {
           id: 'evt-1',
-          event: 'sally.load.created',
+          event: 'app.load.created',
           version: 1,
           tenantId,
           createdAt: new Date(),
@@ -162,7 +162,7 @@ describe('WebhookSubscriptionService', () => {
         },
         {
           id: 'evt-2',
-          event: 'sally.load.updated',
+          event: 'app.load.updated',
           version: 1,
           tenantId,
           createdAt: new Date(),
@@ -193,13 +193,13 @@ describe('WebhookSubscriptionService', () => {
 
       await service.replayEvents(tenantId, subId, {
         since: '2026-04-01T00:00:00Z',
-        events: ['sally.load.created'],
+        events: ['app.load.created'],
       });
 
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            event: { in: ['sally.load.created'] },
+            event: { in: ['app.load.created'] },
           }),
         }),
       );
@@ -220,7 +220,7 @@ describe('WebhookSubscriptionService', () => {
         id: subId,
         tenantId,
         active: true,
-        events: ['sally.load.created', 'sally.load.updated'],
+        events: ['app.load.created', 'app.load.updated'],
       });
       prisma.domainEventLog.findMany.mockResolvedValue([]);
 
@@ -231,7 +231,7 @@ describe('WebhookSubscriptionService', () => {
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            event: { in: ['sally.load.created', 'sally.load.updated'] },
+            event: { in: ['app.load.created', 'app.load.updated'] },
           }),
         }),
       );

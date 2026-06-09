@@ -143,9 +143,7 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
               {!isOwner && (
                 <p className="text-sm text-muted-foreground mt-1">Only the tenant owner can invite admin users</p>
               )}
-              <p className="text-sm text-muted-foreground mt-1">
-                To add drivers, use Fleet Management in the SALLY app
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">To add drivers, use Fleet Management in the main app</p>
             </div>
           </div>
 

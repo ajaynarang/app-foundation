@@ -23,6 +23,6 @@ export const ENV = {
   /** Browser test credentials */
   dispatcherEmail: process.env.TEST_DISPATCHER_EMAIL || 'ajaynarang.local@outlook.com',
   dispatcherPassword: process.env.TEST_DISPATCHER_PASSWORD || 'test1234',
-  superAdminEmail: process.env.TEST_SUPER_ADMIN_EMAIL || 'admin@sally.com',
-  superAdminPassword: process.env.TEST_SUPER_ADMIN_PASSWORD || 'SallyAdmin@2026',
+  superAdminEmail: process.env.TEST_SUPER_ADMIN_EMAIL || 'admin@example.com',
+  superAdminPassword: process.env.TEST_SUPER_ADMIN_PASSWORD || 'AppAdmin@2026',
 } as const;

@@ -11,7 +11,7 @@ import { RBAC_MATRIX, type RbacEntry } from './rbac-matrix.generated.js';
  * Tests are tagged @rbac for selective execution.
  */
 
-const ALL_ROLES = ['DISPATCHER', 'ADMIN', 'OWNER', 'DRIVER', 'CUSTOMER', 'SUPER_ADMIN'];
+const ALL_ROLES = ['MEMBER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'];
 
 // Group by domain for better reporting
 const byDomain = new Map<string, RbacEntry[]>();
@@ -41,9 +41,10 @@ for (const [domain, entries] of byDomain) {
             const client = asRole(role);
             const method = entry.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
 
-            const res = method === 'get' || method === 'delete'
-              ? await client[method](entry.path)
-              : await client[method](entry.path, {});
+            const res =
+              method === 'get' || method === 'delete'
+                ? await client[method](entry.path)
+                : await client[method](entry.path, {});
 
             if (expected === 403) {
               // Some endpoints return 404 for hidden resources instead of 403
@@ -61,8 +62,18 @@ for (const [domain, entries] of byDomain) {
               if (res.status() === 403 && expected !== 403) {
                 // Check response body for feature/plan gating signals (even without featureGate metadata)
                 const body = await res.text();
-                const gatingSignals = ['feature', 'plan', 'not enabled', 'not available', 'integration', 'not configured', 'upgrade', 'not linked', 'no customer account'];
-                if (gatingSignals.some(signal => body.toLowerCase().includes(signal))) {
+                const gatingSignals = [
+                  'feature',
+                  'plan',
+                  'not enabled',
+                  'not available',
+                  'integration',
+                  'not configured',
+                  'upgrade',
+                  'not linked',
+                  'no customer account',
+                ];
+                if (gatingSignals.some((signal) => body.toLowerCase().includes(signal))) {
                   test.skip(true, `${entry.description}: feature/integration not configured (not RBAC)`);
                   return;
                 }
@@ -73,26 +84,24 @@ for (const [domain, entries] of byDomain) {
                 // This is acceptable — the important thing is it's NOT 403/401
                 return;
               }
-              expect(
-                res.status(),
-                `${entry.description}: ${role} expected ${expected} (got ${res.status()})`,
-              ).toBe(expected);
+              expect(res.status(), `${entry.description}: ${role} expected ${expected} (got ${res.status()})`).toBe(
+                expected,
+              );
             }
           });
         }
 
         // ── Anonymous must get 401 ──
         // Skip for public endpoints (health, feature-flags, plans, add-ons)
-        const isPublic = Object.values(entry.expectations).every(
-          (v) => v === 200 || v === null,
-        );
+        const isPublic = Object.values(entry.expectations).every((v) => v === 200 || v === null);
 
         if (!isPublic) {
           test('ANONYMOUS → 401 🔒', async ({ asAnonymous }) => {
             const method = entry.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete';
-            const res = (method === 'get' || method === 'delete')
-              ? await asAnonymous[method](entry.path)
-              : await asAnonymous[method](entry.path, {});
+            const res =
+              method === 'get' || method === 'delete'
+                ? await asAnonymous[method](entry.path)
+                : await asAnonymous[method](entry.path, {});
 
             expect(res.status()).toBe(401);
           });

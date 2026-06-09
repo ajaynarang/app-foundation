@@ -16,7 +16,7 @@ describe('OAuthClientsService', () => {
 
   const mockClient = {
     id: 1,
-    clientId: 'sally_abc123',
+    clientId: 'app_abc123',
     clientSecret: '$2b$10$hashedsecret',
     name: 'Test Client',
     description: 'A test client',
@@ -78,7 +78,7 @@ describe('OAuthClientsService', () => {
     it('should return clients for a tenant', async () => {
       const result = await service.findAll(1);
       expect(result).toHaveLength(1);
-      expect(result[0].clientId).toBe('sally_abc123');
+      expect(result[0].clientId).toBe('app_abc123');
       expect((result[0] as any).clientSecret).toBeUndefined();
     });
 
@@ -90,8 +90,8 @@ describe('OAuthClientsService', () => {
 
   describe('findByClientId', () => {
     it('should return a client', async () => {
-      const result = await service.findByClientId('sally_abc123', 1);
-      expect(result.clientId).toBe('sally_abc123');
+      const result = await service.findByClientId('app_abc123', 1);
+      expect(result.clientId).toBe('app_abc123');
     });
 
     it('should throw NotFoundException when client not found', async () => {
@@ -104,19 +104,19 @@ describe('OAuthClientsService', () => {
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.findByClientId('sally_abc123', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.findByClientId('app_abc123', 1)).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow null tenantId (global access)', async () => {
-      const result = await service.findByClientId('sally_abc123', null);
-      expect(result.clientId).toBe('sally_abc123');
+      const result = await service.findByClientId('app_abc123', null);
+      expect(result.clientId).toBe('app_abc123');
     });
   });
 
   describe('update', () => {
     it('should update client fields', async () => {
-      const result = await service.update('sally_abc123', { name: 'Updated' }, 1);
-      expect(result.clientId).toBe('sally_abc123');
+      const result = await service.update('app_abc123', { name: 'Updated' }, 1);
+      expect(result.clientId).toBe('app_abc123');
       expect(prisma.oAuthClient.update).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
     });
@@ -131,13 +131,13 @@ describe('OAuthClientsService', () => {
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.update('sally_abc123', { name: 'X' }, 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.update('app_abc123', { name: 'X' }, 1)).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('revoke', () => {
     it('should revoke a client and its tokens', async () => {
-      await service.revoke('sally_abc123', 1);
+      await service.revoke('app_abc123', 1);
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
     });
@@ -152,7 +152,7 @@ describe('OAuthClientsService', () => {
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.revoke('sally_abc123', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.revoke('app_abc123', 1)).rejects.toThrow(ForbiddenException);
     });
   });
 });

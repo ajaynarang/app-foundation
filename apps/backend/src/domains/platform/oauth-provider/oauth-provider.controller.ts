@@ -248,7 +248,7 @@ export class OAuthProviderController {
     const clientType = tokenEndpointAuthMethod === 'none' ? 'public' : 'confidential';
 
     // Tenant binding strategy:
-    //   1. Subdomain (production) — `northstar.sally.app/oauth/register`
+    //   1. Subdomain (production) — `northstar.example.com/oauth/register`
     //      binds the client to Northstar at registration. Clean, no race.
     //   2. Fallback to first-authorizer adoption (handled in
     //      OAuthProviderService.approveConsent) — the first user to consent

@@ -12,7 +12,7 @@ export interface NamespaceMetrics {
 }
 
 /**
- * Single source of truth for all Sally cache operations.
+ * Single source of truth for all app cache operations.
  *
  * Backed by **one** ioredis client (REDIS_CLIENT). Every read, write, scan, lock,
  * rate-limit increment, and INFO call goes through this same connection. There
@@ -100,7 +100,7 @@ export class AppCacheService implements OnModuleInit {
     const cached = await this.get<T>(key);
     if (cached !== undefined) return cached;
 
-    // 2. Try to acquire lock (uses _lock: prefix to avoid collision with sally:* SCAN flush)
+    // 2. Try to acquire lock (uses _lock: prefix to avoid collision with app:* SCAN flush)
     const lockKey = `_lock:${key}`;
     const acquired = await this.redis.set(lockKey, '1', 'EX', 10, 'NX');
 
@@ -138,7 +138,7 @@ export class AppCacheService implements OnModuleInit {
   }
 
   async flushAll(): Promise<number> {
-    return this.scanAndDelete('sally:*');
+    return this.scanAndDelete('app:*');
   }
 
   // ---------------------------------------------------------------------------

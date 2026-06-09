@@ -108,7 +108,7 @@ describe('RateLimitService', () => {
       }),
     );
     const call = cache.increment.mock.calls[0];
-    expect(call[0]).toMatch(/^sally:agent:rate:oauth:gpt-abc:/);
+    expect(call[0]).toMatch(/^app:agent:rate:oauth:gpt-abc:/);
     expect(call[1]).toBe(1);
     expect(call[2]).toBe(60);
   });

@@ -1,7 +1,7 @@
 /**
- * Schema linter — enforces SALLY ID + column naming convention.
- * See .claude/skills/sally-backend-patterns/id-convention.md
- *     .claude/skills/sally-backend-patterns/column-naming.md
+ * Schema linter — enforces APP ID + column naming convention.
+ * See .claude/skills/app-backend-patterns/id-convention.md
+ *     .claude/skills/app-backend-patterns/column-naming.md
  */
 import { readFileSync } from 'fs';
 import { resolve } from 'path';

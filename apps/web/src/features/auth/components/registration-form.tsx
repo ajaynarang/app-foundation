@@ -19,7 +19,7 @@ import { useAuth } from '@/features/auth';
 import { showSuccess, showError } from '@/shared/lib/toast';
 import { PasswordStrengthMeter } from './password-strength-meter';
 
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'sally.appshore.in';
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'app.appshore.in';
 
 const CARRIER_TYPE_VALUES = ['FOR_HIRE_INTERSTATE', 'INTRASTATE_ONLY', 'PRIVATE_FLEET', 'LEASED_ON'] as const;
 
@@ -224,7 +224,7 @@ export function RegistrationForm() {
       // 1. Create Firebase account
       const firebaseUser = await signUp(data.email, data.password);
 
-      // 2. Register tenant in SALLY backend
+      // 2. Register tenant in the platform backend
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
       const response = await fetch(`${apiUrl}/tenants/register`, {
         method: 'POST',
@@ -427,7 +427,7 @@ export function RegistrationForm() {
                         exit={{ opacity: 0, y: -5 }}
                         className="text-sm text-muted-foreground mt-2 ml-2"
                       >
-                        ✓ Available! Your team will access SALLY at {subdomain}.{APP_DOMAIN}
+                        ✓ Available! Your team will access the platform at {subdomain}.{APP_DOMAIN}
                       </motion.p>
                     )}
                     {errors.subdomain && (

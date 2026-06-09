@@ -139,8 +139,8 @@ export function MaintenanceClient({ initialState }: { initialState: MaintenanceS
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-6">
       <div className="text-center max-w-lg">
-        {/* SALLY logo */}
-        <div className="text-3xl font-bold tracking-tight mb-8">SALLY</div>
+        {/* Brand logo */}
+        <div className="text-3xl font-bold tracking-tight mb-8">Platform</div>
 
         {/* Pulsing dot indicator */}
         <div className="mx-auto mb-6 flex items-center justify-center gap-2">

@@ -25,7 +25,7 @@ async function bootstrap() {
   app.useLogger(logger);
   app.enableShutdownHooks();
 
-  logger.log('SALLY Worker started — processing background jobs', 'Worker');
+  logger.log('App Worker started — processing background jobs', 'Worker');
 
   process.on('SIGTERM', () => {
     void (async () => {

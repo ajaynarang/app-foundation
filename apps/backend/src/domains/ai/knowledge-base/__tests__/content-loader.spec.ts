@@ -6,16 +6,16 @@ jest.mock('fs');
 const mockedFs = jest.mocked(fs);
 
 const SAMPLE_MD = `---
-title: "What is SALLY?"
+title: "What is the platform?"
 documentType: faq
 audience: prospect
 category: general
 keywords:
-  - sally
+  - platform
   - overview
 ---
 
-SALLY is a fleet operations assistant.
+The platform is an assistant.
 `;
 
 const SAMPLE_NO_KEYWORDS = `---
@@ -47,7 +47,7 @@ describe('loadKnowledgeEntries', () => {
         return [mockDirent('faq', true)] as any;
       }
       if (dir.endsWith('faq')) {
-        return [mockDirent('what-is-sally.md', false)] as any;
+        return [mockDirent('what-is-app.md', false)] as any;
       }
       return [];
     });
@@ -57,12 +57,12 @@ describe('loadKnowledgeEntries', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0]).toEqual({
-      title: 'What is SALLY?',
-      content: 'SALLY is a fleet operations assistant.',
+      title: 'What is the platform?',
+      content: 'The platform is an assistant.',
       documentType: 'faq',
       audience: 'prospect',
       category: 'general',
-      keywords: ['sally', 'overview'],
+      keywords: ['platform', 'overview'],
     });
   });
 
@@ -73,7 +73,7 @@ describe('loadKnowledgeEntries', () => {
         return [mockDirent('faq', true), mockDirent('pricing', true)] as any;
       }
       if (dir.endsWith('faq')) {
-        return [mockDirent('what-is-sally.md', false)] as any;
+        return [mockDirent('what-is-app.md', false)] as any;
       }
       if (dir.endsWith('pricing')) {
         return [mockDirent('pricing-tiers.md', false)] as any;
@@ -96,7 +96,7 @@ describe('loadKnowledgeEntries', () => {
         return [mockDirent('faq', true), mockDirent('.DS_Store', false)] as any;
       }
       if (dir.endsWith('faq')) {
-        return [mockDirent('what-is-sally.md', false), mockDirent('README.txt', false)] as any;
+        return [mockDirent('what-is-app.md', false), mockDirent('README.txt', false)] as any;
       }
       return [];
     });

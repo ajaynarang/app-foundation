@@ -5,8 +5,8 @@ import { Inngest } from 'inngest';
 import type { ApprovalDecision } from '@app/shared-types';
 
 /**
- * Typed event vocabulary for Sally's Desk — single source of truth.
- * Convention: `sally/desk.<responsibility_or_concern>.<event>`.
+ * Typed event vocabulary for the Desk — single source of truth.
+ * Convention: `app/desk.<responsibility_or_concern>.<event>`.
  *
  * One event per function-start + one per cross-cutting signal (approvals).
  * Each responsibility that ships gets its own `.run` event.
@@ -15,7 +15,7 @@ export type DeskEvents = {
   /** Starts an AR Follow-up episode. `id` carries the dedupe key so Inngest
    * rejects duplicates (matches our Postgres partial unique index on
    * `desk_episodes(tenant_id, dedupe_key) WHERE status in open`). */
-  'sally/desk.ar_followup.run': {
+  'app/desk.ar_followup.run': {
     data: {
       episodeId: string;
       tenantId: number;
@@ -25,7 +25,7 @@ export type DeskEvents = {
   };
   /** Starts a Closeout Review episode for a delivered-uninvoiced load. `id`
    * carries the dedupe key (same partial-unique-index semantics as AR). */
-  'sally/desk.closeout_review.run': {
+  'app/desk.closeout_review.run': {
     data: {
       episodeId: string;
       tenantId: number;
@@ -36,7 +36,7 @@ export type DeskEvents = {
   /** Starts a Document Expiry episode for one (driver, credential). `id`
    * carries the dedupe key (driver+credential, not findingId) so Inngest
    * rejects duplicate cron firings the same day. */
-  'sally/desk.document_expiry.run': {
+  'app/desk.document_expiry.run': {
     data: {
       episodeId: string;
       tenantId: number;
@@ -48,7 +48,7 @@ export type DeskEvents = {
   /** Starts a Settlement Review episode for one DRAFT settlement. `id`
    * carries the dedupe key (settlement_review:settlement:<settlementId>:<date>)
    * so Inngest rejects duplicate firings for the same settlement the same day. */
-  'sally/desk.settlement_review.run': {
+  'app/desk.settlement_review.run': {
     data: {
       episodeId: string;
       tenantId: number;
@@ -58,7 +58,7 @@ export type DeskEvents = {
   };
   /** Published when a human decides an approval — wakes any workflow that's
    * currently awaiting the matching approvalId via step.waitForEvent. */
-  'sally/desk.approval.decided': {
+  'app/desk.approval.decided': {
     data: {
       approvalId: string;
       episodeId: string;
@@ -92,7 +92,7 @@ export class InngestClientService implements OnModuleInit {
     const signingKey = this.config.get<string>('INNGEST_SIGNING_KEY');
 
     this._client = new Inngest({
-      id: 'sally-desk',
+      id: 'app-desk',
       env,
       ...(eventKey ? { eventKey } : {}),
       ...(signingKey ? { signingKey } : {}),

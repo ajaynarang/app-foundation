@@ -1,4 +1,4 @@
-// SALLY Motion System — Unified Animation Architecture
+// Platform Motion System — Unified Animation Architecture
 // Import from '@/shared/lib/motion' for all animation needs.
 
 // Constants & presets

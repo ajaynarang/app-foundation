@@ -18,7 +18,7 @@ export class DevAuthGuard implements CanActivate {
     // Hard-block in the production env-type (staging runs with
     // NODE_ENV=production but ENV_TYPE=sandbox — dev routes stay open there).
     // Belt-and-suspenders: primary defense is Doppler hygiene (secret unset
-    // in sally-backend/prd). This guardrail ensures a single misconfiguration
+    // in app-backend/prd). This guardrail ensures a single misconfiguration
     // cannot expose the route.
     if (getEnvType() === 'production') {
       throw new NotFoundException();

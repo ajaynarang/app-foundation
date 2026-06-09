@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiInfrastructureModule } from './infrastructure/ai-infrastructure.module';
-import { SallyAiModule } from './assistant/assistant.module';
+import { AssistantAiModule } from './assistant/assistant.module';
 import { McpToolsModule } from './mcp/mcp-tools.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { ModerationModule } from './moderation/moderation.module';
@@ -23,7 +23,7 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
 @Module({
   imports: [
     AiInfrastructureModule,
-    SallyAiModule,
+    AssistantAiModule,
     McpToolsModule,
     McpExternalServerModule,
     KnowledgeBaseModule,
@@ -33,7 +33,7 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     AgentContractModule,
   ],
   exports: [
-    SallyAiModule,
+    AssistantAiModule,
     McpToolsModule,
     McpExternalServerModule,
     KnowledgeBaseModule,

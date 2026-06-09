@@ -2,8 +2,8 @@
  * Tenant subdomain URL utilities.
  *
  * NEXT_PUBLIC_APP_DOMAIN is the bare domain (no protocol, no subdomain):
- *   - staging.sally.appshore.in  (staging)
- *   - sally.appshore.in          (production)
+ *   - staging.app.appshore.in  (staging)
+ *   - app.appshore.in          (production)
  *   - localhost:3000              (local dev)
  */
 
@@ -34,8 +34,8 @@ export function isValidSlug(slug: string): boolean {
  * extracted slug fails DNS label validation.
  *
  * Examples:
- *   "acme.staging.sally.appshore.in" → "acme"
- *   "staging.sally.appshore.in"      → null  (bare domain)
+ *   "acme.staging.app.appshore.in" → "acme"
+ *   "staging.app.appshore.in"      → null  (bare domain)
  *   "localhost:3000"                  → null  (local dev)
  */
 export function extractSubdomain(hostname: string): string | null {
@@ -69,7 +69,7 @@ export function buildTenantUrl(subdomain: string, path: string = '/'): string {
  * Build a cross-subdomain redirect URL that relays auth state in the hash.
  *
  * localStorage is origin-scoped, so when redirecting from the bare domain
- * (staging.sally.appshore.in) to a tenant subdomain (acme.staging.sally.appshore.in),
+ * (staging.app.appshore.in) to a tenant subdomain (acme.staging.app.appshore.in),
  * the Zustand auth store is empty on the target origin. This helper appends the
  * token + user as a `#sso-relay=...` hash fragment so the target page can hydrate.
  *
@@ -92,7 +92,7 @@ export function buildTenantRedirectUrl(
 /**
  * Get the cookie domain for cross-subdomain auth.
  *
- * Returns `.staging.sally.appshore.in` so the cookie is readable by
+ * Returns `.staging.app.appshore.in` so the cookie is readable by
  * both the bare domain and all tenant subdomains.
  *
  * Returns undefined on localhost (browser default scope).

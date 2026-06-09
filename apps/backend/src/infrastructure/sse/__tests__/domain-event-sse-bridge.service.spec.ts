@@ -1,6 +1,6 @@
 import { DomainEventSseBridge } from '../domain-event-sse-bridge.service';
 import { DomainEvent } from '../../events/domain-event';
-import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 import { SSE_EVENTS } from '../sse-events.constants';
 
 describe('DomainEventSseBridge', () => {

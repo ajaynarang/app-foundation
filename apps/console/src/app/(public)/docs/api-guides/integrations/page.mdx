@@ -1,10 +1,10 @@
 # Integrations
 
-SALLY's integration framework connects your fleet operations with external services -- ELD providers for HOS data, TMS platforms for load management, fuel price feeds, and weather services. Integrations run as managed adapters that SALLY syncs on your behalf.
+Platform's integration framework connects your fleet operations with external services -- ELD providers for HOS data, TMS platforms for load management, fuel price feeds, and weather services. Integrations run as managed adapters that Platform syncs on your behalf.
 
 ## Supported Vendors
 
-SALLY provides pre-built adapters for the following vendor categories:
+Platform provides pre-built adapters for the following vendor categories:
 
 | Category | Vendor | Adapter | Data Provided |
 |---|---|---|---|
@@ -44,17 +44,17 @@ stateDiagram-v2
 View all configured integrations for your tenant:
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/integrations \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  "https://api-staging.appshore.in/api/v1/integrations",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -97,17 +97,17 @@ const { data: integrations } = await response.json();
 Retrieve the complete list of supported vendors and their configuration requirements:
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/integrations/vendors \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/integrations/vendors \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/integrations/vendors",
+  "https://api-staging.appshore.in/api/v1/integrations/vendors",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -174,8 +174,8 @@ const { data: vendors } = await response.json();
 Configure a new integration by providing vendor credentials:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "vendor": "samsara",
@@ -192,11 +192,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  "https://api-staging.appshore.in/api/v1/integrations",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -235,8 +235,8 @@ Credentials are encrypted at rest and never returned in API responses after crea
 Before activating an integration, test that the credentials work:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_s1a2m3s4/test \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/integrations/int_s1a2m3s4/test \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response (success):**
@@ -278,8 +278,8 @@ If the test passes, the integration status automatically changes to `ACTIVE` and
 Force an immediate data sync outside the scheduled interval:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_s1a2m3s4/sync \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/integrations/int_s1a2m3s4/sync \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -295,7 +295,7 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_s1a2m
 
 ## How Data Flows
 
-When an integration syncs, data flows into SALLY and is used by the planning and monitoring engines:
+When an integration syncs, data flows into Platform and is used by the planning and monitoring engines:
 
 | Integration | Data Synced | Used By |
 |---|---|---|
@@ -309,5 +309,5 @@ When an integration syncs, data flows into SALLY and is used by the planning and
 
 - [ELD / Samsara Integration](/docs/api-guides/integrations/eld-samsara) -- Connect Samsara for real-time HOS and telematics
 - [TMS Integration](/docs/api-guides/integrations/tms) -- Connect McLeod or Project44 for load management
-- [Webhooks](/docs/api-guides/integrations/webhooks) -- Receive event notifications from SALLY
+- [Webhooks](/docs/api-guides/integrations/webhooks) -- Receive event notifications from Platform
 - [Error Handling](/docs/api-guides/integrations/error-handling) -- Handle errors, retries, and rate limits

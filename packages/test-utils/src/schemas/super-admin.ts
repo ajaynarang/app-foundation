@@ -85,7 +85,7 @@ const NamespaceMetricSchema = z
 
 export const AdminCacheStatsSchema = z
   .object({
-    namespaces: z.array(z.string().regex(/^sally:/)).min(1),
+    namespaces: z.array(z.string().regex(/^app:/)).min(1),
     metrics: z.record(z.string(), NamespaceMetricSchema),
     keyCounts: z.record(z.string(), z.number().int().nonnegative()),
   })
@@ -95,7 +95,7 @@ export const AdminCacheStatsSchema = z
  * `POST /admin/cache/flush[/:namespace]` — admin-cache.controller.ts:48-68.
  *
  * Both flush paths return the same envelope. `scope` is `'all'` for the
- * unconditional flush, or the namespace string (e.g. `'sally:health'`)
+ * unconditional flush, or the namespace string (e.g. `'app:health'`)
  * for the parameterised form. `flushed` is non-negative (Redis SCAN+DEL
  * returns the count actually removed; an empty namespace returns 0).
  */
@@ -257,7 +257,7 @@ export const AdminScheduleListSchema = z.array(AdminScheduleRowSchema);
 // ── Common error envelope (shared across all 400 guards) ─────────────
 
 /**
- * Sally's standard error envelope thrown by NestJS exception filters
+ * The platform's standard error envelope thrown by NestJS exception filters
  * — verified shape from `POST /admin/cache/flush` (no `confirm`) and
  * `POST /admin/cache/flush/:invalid-namespace` (2026-05-15).
  *
@@ -265,7 +265,7 @@ export const AdminScheduleListSchema = z.array(AdminScheduleRowSchema);
  * structured field. Permissive enough to absorb upstream filter
  * tweaks without breaking unrelated tests.
  */
-export const SallyErrorEnvelopeSchema = z
+export const AppErrorEnvelopeSchema = z
   .object({
     statusCode: z.number().int().positive(),
     timestamp: isoDateString,

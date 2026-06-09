@@ -1,7 +1,7 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Subject } from 'rxjs';
 import { DomainEvent } from '../../events/domain-event';
-import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 import { SSE_EVENTS } from '../sse-events.constants';
 import { SseService } from '../sse.service';
 import { DomainEventSseBridge } from '../domain-event-sse-bridge.service';

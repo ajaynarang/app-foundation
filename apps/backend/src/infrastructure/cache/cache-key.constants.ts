@@ -2,7 +2,7 @@
  * Cache key utilities.
  *
  * Build a cache key from namespace + parts:
- *   buildKey('sally:flags', 'enabled', 'shield') → 'sally:flags:enabled:shield'
+ *   buildKey('app:flags', 'enabled', 'shield') → 'app:flags:enabled:shield'
  */
 export function buildKey(namespace: string, ...parts: (string | number)[]): string {
   const segments = [namespace, ...parts];

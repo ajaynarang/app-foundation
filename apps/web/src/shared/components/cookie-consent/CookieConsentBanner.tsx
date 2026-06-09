@@ -50,7 +50,7 @@ export function CookieConsentBanner() {
             <div className="flex items-start gap-3 p-4 pb-2">
               <Cookie className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-foreground">SALLY uses cookies</h3>
+                <h3 className="text-sm font-semibold text-foreground">Platform uses cookies</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   We use cookies to improve your experience and analyze site usage.{' '}
                   <Link href="/legal/cookies" className="underline hover:text-foreground transition-colors">
@@ -91,7 +91,7 @@ export function CookieConsentBanner() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-medium text-foreground">Analytics</p>
-                        <p className="text-[11px] text-muted-foreground">Help us understand how you use SALLY</p>
+                        <p className="text-[11px] text-muted-foreground">Help us understand how you use the platform</p>
                       </div>
                       <Switch
                         checked={localAnalytics}

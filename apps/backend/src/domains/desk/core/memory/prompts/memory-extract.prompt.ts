@@ -1,6 +1,6 @@
 /**
  * Default memory-extract prompt — used by DeskMemoryWriterService at
- * episode close to summarize what Sally should remember.
+ * episode close to summarize what the assistant should remember.
  *
  * Per-responsibility variants override this via the
  * `desk.memory.extract.<responsibilityKey>.v1` naming pattern; the

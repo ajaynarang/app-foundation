@@ -57,8 +57,8 @@ interface AuthState {
  * Set or clear the `app-auth` presence cookie on the parent domain.
  *
  * Uses SameSite=Lax (not Strict) so the cookie is sent on cross-subdomain
- * top-level navigations (e.g., redirect from staging.sally.appshore.in to
- * acme.staging.sally.appshore.in). Lax still blocks CSRF from third-party sites.
+ * top-level navigations (e.g., redirect from staging.app.appshore.in to
+ * acme.staging.app.appshore.in). Lax still blocks CSRF from third-party sites.
  */
 function setAuthCookie(authenticated: boolean, role?: string) {
   if (typeof document === 'undefined') return;
@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthState>()(
           const userCredential = await signInWithEmailAndPassword(auth, email, password);
           const firebaseToken = await userCredential.user.getIdToken();
 
-          // Exchange Firebase token for SALLY JWT
+          // Exchange Firebase token for the platform JWT
           await get().exchangeFirebaseToken(firebaseToken);
 
           set({
@@ -115,7 +115,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // Sign up (only creates Firebase account, not SALLY user)
+      // Sign up (only creates Firebase account, not a platform user)
       signUp: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
@@ -165,7 +165,7 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      // Exchange Firebase token for SALLY JWT
+      // Exchange Firebase token for the platform JWT
       exchangeFirebaseToken: async (firebaseToken: string) => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
         const response = await fetch(`${apiUrl}/auth/firebase/exchange`, {

@@ -80,14 +80,14 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
             href="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity md:hidden"
             title="Go to Home"
-            data-sally-logo
+            data-app-logo
             {...longPressHandlers}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/sally-logo-dark.svg" alt="SALLY" className="h-6 w-6 dark:block hidden" />
+            <img src="/logo-dark.svg" alt="Platform" className="h-6 w-6 dark:block hidden" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/sally-logo-light.svg" alt="SALLY" className="h-6 w-6 dark:hidden block" />
-            <span className="text-xl font-bold tracking-tight font-space-grotesk">SALLY</span>
+            <img src="/logo-light.svg" alt="Platform" className="h-6 w-6 dark:hidden block" />
+            <span className="text-xl font-bold tracking-tight font-space-grotesk">Platform</span>
           </Link>
         </div>
 

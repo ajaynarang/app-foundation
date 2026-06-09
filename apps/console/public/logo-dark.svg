@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Console logo mark — for DARK backgrounds (white S) -->
+  <path d="M 72 68
+           C 72 56, 84 48, 100 48
+           C 116 48, 128 56, 128 68
+           C 128 80, 116 86, 100 90
+           C 84 94, 72 100, 72 112
+           C 72 124, 84 132, 100 132
+           C 116 132, 128 124, 128 112"
+        stroke="#ffffff"
+        stroke-width="10"
+        stroke-linecap="round"
+        fill="none"/>
+</svg>

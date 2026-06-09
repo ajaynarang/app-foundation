@@ -10,7 +10,7 @@ export class CreateWebhookSubscriptionDto {
   url: string;
 
   @ApiProperty({
-    example: ['sally.load.created'],
+    example: ['app.load.created'],
     description: 'Event names to subscribe to. Use ["*"] for all events.',
   })
   @IsArray()

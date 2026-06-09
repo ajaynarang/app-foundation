@@ -120,7 +120,7 @@ describe('DeskAgentEditGuard', () => {
       const ctx = makeCtx({
         user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/agents/:key' },
-        params: { key: 'sally-missing' },
+        params: { key: 'assistant-missing' },
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });

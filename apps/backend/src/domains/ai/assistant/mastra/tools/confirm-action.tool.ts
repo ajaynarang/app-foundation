@@ -12,7 +12,7 @@ import { z } from 'zod';
  *
  * This prevents the AI from executing write operations without explicit user consent.
  *
- * ## HITL bypass for Sally's Desk (spec §7.3)
+ * ## HITL bypass for the Desk (spec §7.3)
  *
  * The Desk runtime handles approval at the EPISODE level (human approve/reject
  * before Act runs). Per-tool-call confirmation would double-prompt the user

@@ -310,7 +310,7 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
 
   // Generate TypeScript
   let output = `/**
- * SALLY RBAC Permission Matrix — AUTO-GENERATED
+ * Platform RBAC Permission Matrix — AUTO-GENERATED
  *
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write

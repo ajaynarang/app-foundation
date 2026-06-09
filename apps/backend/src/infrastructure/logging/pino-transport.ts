@@ -16,7 +16,7 @@ export function buildPinoTransport(): TransportSingleOptions | TransportMultiOpt
   const transport = process.env.LOG_TRANSPORT?.toLowerCase();
   const isDev = process.env.NODE_ENV === 'development';
   const lokiUrl = process.env.LOKI_URL ?? 'http://localhost:3100';
-  const serviceName = process.env.OTEL_SERVICE_NAME ?? 'sally-backend';
+  const serviceName = process.env.OTEL_SERVICE_NAME ?? 'app-backend';
 
   // Target-level `level` is intentionally omitted — the parent LoggerModule
   // already reads LOG_LEVEL from env. Duplicating it here would create two

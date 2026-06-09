@@ -16,7 +16,7 @@ export default function ApiPlaygroundPage() {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SALLY API Playground</title>
+  <title>Platform API Playground</title>
   <style>body { margin: 0; background: #1a1a2e; }</style>
 </head>
 <body>
@@ -25,7 +25,7 @@ export default function ApiPlaygroundPage() {
     hideDownloadButton: false,
     hideModels: false,
     defaultHttpClient: { targetKey: 'node', clientKey: 'fetch' },
-    metaData: { title: 'SALLY API Playground' },
+    metaData: { title: 'Platform API Playground' },
   })}'></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
@@ -40,7 +40,7 @@ export default function ApiPlaygroundPage() {
         ref={containerRef}
         className="w-full border-0"
         style={{ height: 'calc(100vh - 3.5rem)' }}
-        title="SALLY API Playground"
+        title="Platform API Playground"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
       />
     </div>

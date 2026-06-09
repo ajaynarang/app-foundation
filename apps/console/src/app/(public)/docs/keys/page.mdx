@@ -13,7 +13,7 @@ Generate API keys for your integration. Keys start with `sk_staging_` and authen
 Pass your API key as a Bearer token on every request:
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/drivers \
+curl https://api-staging.appshore.in/api/v1/drivers \
   -H "Authorization: Bearer sk_staging_your_key_here"
 ```
 
@@ -21,7 +21,7 @@ Keys are scoped to your tenant and carry full API permissions. Store them in env
 
 ```bash
 # .env
-SALLY_API_KEY=sk_staging_your_key_here
+APP_API_KEY=sk_staging_your_key_here
 ```
 
 ## Key types

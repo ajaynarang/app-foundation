@@ -1,19 +1,19 @@
 # Manage Your Fleet
 
-Before you can plan routes, you need three things in SALLY: a **driver**, a **vehicle**, and at least one **load** (shipment). This page walks through creating each one.
+Before you can plan routes, you need three things in Platform: a **driver**, a **vehicle**, and at least one **load** (shipment). This page walks through creating each one.
 
 ## Setup
 
 ```bash
-export SALLY_API_KEY="sk_staging_your_key_here"
-export SALLY_BASE="https://sally-api-staging.appshore.in/api/v1"
+export APP_API_KEY="sk_staging_your_key_here"
+export APP_BASE="https://api-staging.appshore.in/api/v1"
 ```
 
 ## Create a driver
 
 ```bash
-curl -X POST $SALLY_BASE/drivers \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST $APP_BASE/drivers \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Mike",
@@ -41,11 +41,11 @@ Save the `id` — you'll need it when planning routes.
 
 ## Create a vehicle
 
-The `fuelTankCapacity` and `mpg` fields matter — SALLY uses them to calculate when fuel stops are needed.
+The `fuelTankCapacity` and `mpg` fields matter — Platform uses them to calculate when fuel stops are needed.
 
 ```bash
-curl -X POST $SALLY_BASE/vehicles \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST $APP_BASE/vehicles \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "unitNumber": "TRK-4821",
@@ -76,8 +76,8 @@ curl -X POST $SALLY_BASE/vehicles \
 A load represents a shipment with a pickup and delivery location.
 
 ```bash
-curl -X POST $SALLY_BASE/loads \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST $APP_BASE/loads \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "referenceNumber": "LD-2026-001",
@@ -112,16 +112,16 @@ Once created, you can list and filter:
 
 ```bash
 # List active drivers
-curl "$SALLY_BASE/drivers?status=ACTIVE" \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl "$APP_BASE/drivers?status=ACTIVE" \
+  -H "Authorization: Bearer $APP_API_KEY"
 
 # List vehicles
-curl "$SALLY_BASE/vehicles" \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl "$APP_BASE/vehicles" \
+  -H "Authorization: Bearer $APP_API_KEY"
 
 # List pending loads
-curl "$SALLY_BASE/loads?status=PENDING" \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl "$APP_BASE/loads?status=PENDING" \
+  -H "Authorization: Bearer $APP_API_KEY"
 ```
 
 All list endpoints support pagination with `page` and `pageSize` query parameters.

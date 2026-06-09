@@ -44,10 +44,10 @@ export default function OrganizationPage() {
           <p className="text-sm text-muted-foreground">
             Contact{' '}
             <a
-              href={mailto('sallySupport')}
+              href={mailto('appSupport')}
               className="text-foreground underline underline-offset-4 hover:text-muted-foreground"
             >
-              {CONTACTS.sallySupport}
+              {CONTACTS.appSupport}
             </a>{' '}
             to update organization details such as address, DOT number, or MC number.
           </p>

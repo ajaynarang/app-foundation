@@ -29,7 +29,7 @@ export class UserPreferencesService {
    * Get user preferences (creates defaults if not exist)
    */
   async getUserPreferences(userId: string) {
-    const cacheKey = buildKey('sally:prefs', 'user', userId);
+    const cacheKey = buildKey('app:prefs', 'user', userId);
     return this.cache.getOrSet(
       cacheKey,
       async () => {
@@ -59,7 +59,7 @@ export class UserPreferencesService {
       update: updates,
     });
 
-    await this.cache.del(buildKey('sally:prefs', 'user', userId));
+    await this.cache.del(buildKey('app:prefs', 'user', userId));
     return prefs;
   }
 
@@ -78,7 +78,7 @@ export class UserPreferencesService {
       const prefs = await this.prisma.userPreferences.create({
         data: { userId: dbId },
       });
-      await this.cache.del(buildKey('sally:prefs', 'user', userId));
+      await this.cache.del(buildKey('app:prefs', 'user', userId));
       return prefs;
     }
 

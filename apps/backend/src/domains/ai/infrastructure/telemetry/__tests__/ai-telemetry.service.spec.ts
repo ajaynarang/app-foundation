@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
 import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/domain-events.constants';
 import { AiTelemetryService } from '../ai-telemetry.service';
 import type { AiCallContext, AiUsage } from '@app/shared-types';
 
@@ -264,7 +264,7 @@ describe('AiTelemetryService', () => {
         tenantId: TENANT_ID,
         userId: 7,
         surface: 'CHAT',
-        agentId: 'sally-loads',
+        agentId: 'assistant-loads',
         linkRefType: 'conversation_message',
         linkRefId: 'msg-123',
         parentInvocationId: '01900000-0000-7000-8000-000000000000',
@@ -289,7 +289,7 @@ describe('AiTelemetryService', () => {
         tenantId: TENANT_ID,
         userId: 7,
         surface: 'CHAT',
-        agentId: 'sally-loads',
+        agentId: 'assistant-loads',
         model: 'claude-sonnet-4-6',
         provider: 'anthropic',
         promptTokens: 100,
@@ -336,7 +336,7 @@ describe('AiTelemetryService', () => {
       await service.record(makeUsage(), makeContext());
 
       expect(cache.getOrSet).toHaveBeenCalledWith(
-        'sally:ai-telemetry:pricing:anthropic:claude-sonnet-4-6',
+        'app:ai-telemetry:pricing:anthropic:claude-sonnet-4-6',
         expect.any(Function),
         expect.any(Number),
       );
@@ -452,7 +452,7 @@ describe('AiTelemetryService', () => {
   describe('record() — spent cache invalidation', () => {
     it('busts the per-tenant spent cache after a successful record', async () => {
       await service.record(makeUsage(), makeContext());
-      expect(cache.del).toHaveBeenCalledWith('sally:ai-telemetry:spent:42');
+      expect(cache.del).toHaveBeenCalledWith('app:ai-telemetry:spent:42');
     });
   });
 

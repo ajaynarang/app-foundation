@@ -79,8 +79,8 @@ export function PlanBlockedScreen() {
           {isSuspended
             ? 'Your account has been suspended. Please contact support to resolve this issue.'
             : canManageBilling
-              ? 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using SALLY and keep all your data.'
-              : 'Your 30-day free trial has expired. Ask your account admin to upgrade to continue using SALLY.'}
+              ? 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using the platform and keep all your data.'
+              : 'Your 30-day free trial has expired. Ask your account admin to upgrade to continue using the platform.'}
         </p>
 
         {/* Your data is safe */}
@@ -95,7 +95,7 @@ export function PlanBlockedScreen() {
               <Button>{isPaymentMode ? 'Upgrade Now' : 'View Plans & Pricing'}</Button>
             </a>
           )}
-          <a href={mailto(isSuspended ? 'support' : 'sally')}>
+          <a href={mailto(isSuspended ? 'support' : 'app')}>
             <Button variant={isTrialExpired && canManageBilling ? 'outline' : 'default'}>
               {isSuspended ? 'Contact Support' : canManageBilling ? 'Contact Sales' : 'Contact Support'}
             </Button>

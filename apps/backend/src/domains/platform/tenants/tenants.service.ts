@@ -168,7 +168,7 @@ export class TenantsService {
    * Get all tenants (SUPER_ADMIN only)
    */
   async getAllTenants(status?: string) {
-    const cacheKey = buildKey('sally:tenants', 'list', status || 'all');
+    const cacheKey = buildKey('app:tenants', 'list', status || 'all');
     return this.cache.getOrSet(
       cacheKey,
       () =>
@@ -498,7 +498,7 @@ export class TenantsService {
    * Get tenant details with users and metrics
    */
   async getTenantDetails(tenantId: string) {
-    const cacheKey = buildKey('sally:tenants', 'detail', tenantId);
+    const cacheKey = buildKey('app:tenants', 'detail', tenantId);
     return this.cache.getOrSet(cacheKey, () => this.fetchTenantDetails(tenantId), CACHE_TTL_WARM_5M);
   }
 
@@ -626,20 +626,20 @@ export class TenantsService {
   }
 
   private async invalidateTenantSettingsCache(tenantDbId: number): Promise<void> {
-    await this.cache.del(buildKey('sally:tenants', 'me-settings', tenantDbId));
+    await this.cache.del(buildKey('app:tenants', 'me-settings', tenantDbId));
   }
 
   /** Invalidate all tenant-related caches after a mutation. */
   private async invalidateTenantCache(tenantId?: string): Promise<void> {
     const keys = [
-      buildKey('sally:tenants', 'list', 'all'),
-      buildKey('sally:tenants', 'list', 'ACTIVE'),
-      buildKey('sally:tenants', 'list', 'PENDING_APPROVAL'),
-      buildKey('sally:tenants', 'list', 'SUSPENDED'),
-      buildKey('sally:tenants', 'list', 'REJECTED'),
+      buildKey('app:tenants', 'list', 'all'),
+      buildKey('app:tenants', 'list', 'ACTIVE'),
+      buildKey('app:tenants', 'list', 'PENDING_APPROVAL'),
+      buildKey('app:tenants', 'list', 'SUSPENDED'),
+      buildKey('app:tenants', 'list', 'REJECTED'),
     ];
     if (tenantId) {
-      keys.push(buildKey('sally:tenants', 'detail', tenantId));
+      keys.push(buildKey('app:tenants', 'detail', tenantId));
     }
     await Promise.allSettled(keys.map((k) => this.cache.del(k)));
   }

@@ -28,10 +28,10 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: {
-    default: 'SALLY Console',
-    template: '%s | SALLY Console',
+    default: 'Console',
+    template: '%s | Console',
   },
-  description: 'Platform management hub for SALLY',
+  description: 'Platform management hub',
   icons: {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
   },

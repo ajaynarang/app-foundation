@@ -4,7 +4,7 @@ import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
  * Cache namespace for login activity. The summary endpoint is the only
  * cacheable surface; the list endpoint is filter-heavy so we don't cache it.
  */
-export const LOGIN_ACTIVITY_CACHE_NAMESPACE = 'sally:login-activity';
+export const LOGIN_ACTIVITY_CACHE_NAMESPACE = 'app:login-activity';
 
 /**
  * Stable, sorted string for the `roles` filter so two requests with the same

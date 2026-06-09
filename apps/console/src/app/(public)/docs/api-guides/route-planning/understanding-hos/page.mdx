@@ -1,16 +1,16 @@
 # Understanding HOS Compliance
 
-Hours of Service (HOS) regulations are the foundation of safe and legal trucking operations. Understanding how SALLY validates compliance is essential for building reliable fleet management integrations.
+Hours of Service (HOS) regulations are the foundation of safe and legal trucking operations. Understanding how Platform validates compliance is essential for building reliable fleet management integrations.
 
-This guide explains the federal HOS rules, how SALLY tracks driver state, and how the platform ensures every route is compliant before a driver starts.
+This guide explains the federal HOS rules, how Platform tracks driver state, and how the platform ensures every route is compliant before a driver starts.
 
 ## What You'll Learn
 
 - Federal HOS regulations (11h drive, 14h duty, 30min break, 10h rest)
-- How SALLY validates compliance segment-by-segment
+- How Platform validates compliance segment-by-segment
 - Driver state tracking and HOS consumption
 - Understanding compliance reports
-- Common HOS scenarios and how SALLY handles them
+- Common HOS scenarios and how Platform handles them
 - Best practices for HOS-compliant route planning
 
 ---
@@ -30,7 +30,7 @@ For fleet managers, HOS compliance means:
 - **Better utilization** - Optimize rest timing to maximize productive hours
 - **Audit trail** - Prove compliance with clear reasoning
 
-**SALLY's mission: Plan routes that are compliant by design, not by luck.**
+**Platform's mission: Plan routes that are compliant by design, not by luck.**
 
 ---
 
@@ -47,9 +47,9 @@ The Federal Motor Carrier Safety Administration (FMCSA) enforces four critical H
 - Driving time includes all time behind the wheel (including traffic delays)
 - Does **not** include loading/unloading, inspections, or breaks
 
-**SALLY validation:**
+**Platform validation:**
 ```typescript
-// After each drive segment, SALLY checks:
+// After each drive segment, Platform checks:
 if (hours_driven + segment_drive_time > 11) {
   // Insert rest stop before this segment
   insertRestStop(location, "HOS 11h drive limit reached");
@@ -61,7 +61,7 @@ if (hours_driven + segment_drive_time > 11) {
 Driver starts with 5h already driven today
 Route requires 8h of drive time
 Total: 5h + 8h = 13h (EXCEEDS 11h limit)
-Action: SALLY inserts 10h rest stop to reset hours
+Action: Platform inserts 10h rest stop to reset hours
 ```
 
 ---
@@ -78,9 +78,9 @@ Action: SALLY inserts 10h rest stop to reset hours
 
 **Critical insight:** Even if a driver has 6 hours of drive time remaining, if they're at hour 13 of their duty window, they only have 1 hour left to drive.
 
-**SALLY validation:**
+**Platform validation:**
 ```typescript
-// SALLY tracks both drive time AND duty time
+// Platform tracks both drive time AND duty time
 if (on_duty_time + segment_time > 14) {
   // Duty window exceeded, must rest
   insertRestStop(location, "HOS 14h duty window exceeded");
@@ -99,7 +99,7 @@ Driver timeline:
 
 If next segment is 5h drive time:
 - Would exceed 14h duty window (10h + 5h = 15h)
-- SALLY inserts rest stop before this segment
+- Platform inserts rest stop before this segment
 ```
 
 ---
@@ -114,9 +114,9 @@ If next segment is 5h drive time:
 - Break counts as **on-duty time** (does not stop the 14-hour clock)
 - Break resets the 8-hour driving window
 
-**SALLY validation:**
+**Platform validation:**
 ```typescript
-// SALLY tracks hours since last break
+// Platform tracks hours since last break
 if (hours_since_break + segment_drive_time >= 8) {
   // Insert 30-minute break segment
   insertBreak(location, "30-minute break required after 8h driving");
@@ -128,7 +128,7 @@ if (hours_since_break + segment_drive_time >= 8) {
 Driver has driven 7h without a break
 Next segment is 2h drive time
 Total: 7h + 2h = 9h (EXCEEDS 8h before break)
-Action: SALLY inserts 30-min break before the segment
+Action: Platform inserts 30-min break before the segment
 ```
 
 ---
@@ -151,11 +151,11 @@ Drivers can split the 10-hour rest period into:
 - **7/3 split:** 7 hours in sleeper berth + 3 hours off duty (separate periods)
 - **8/2 split:** 8 hours in sleeper berth + 2 hours off duty (separate periods)
 
-SALLY supports sleeper berth splits in advanced scenarios (Phase 2).
+Platform supports sleeper berth splits in advanced scenarios (Phase 2).
 
-**SALLY validation:**
+**Platform validation:**
 ```typescript
-// When SALLY inserts a rest stop:
+// When Platform inserts a rest stop:
 function insertRestStop(location, reason) {
   segment = {
     type: "rest",
@@ -174,13 +174,13 @@ function insertRestStop(location, reason) {
 
 ---
 
-## How SALLY Validates HOS
+## How Platform Validates HOS
 
-SALLY validates HOS compliance using a **segment-by-segment simulation approach**. Here's how it works:
+Platform validates HOS compliance using a **segment-by-segment simulation approach**. Here's how it works:
 
 ### Step 1: Initialize Driver State
 
-When you request a route plan, SALLY starts with the driver's current HOS state:
+When you request a route plan, Platform starts with the driver's current HOS state:
 
 ```json
 {
@@ -192,7 +192,7 @@ When you request a route plan, SALLY starts with the driver's current HOS state:
 }
 ```
 
-**SALLY calculates remaining hours:**
+**Platform calculates remaining hours:**
 ```
 Drive hours remaining:  11h - 5h   = 6h
 Duty hours remaining:   14h - 8h   = 6h
@@ -203,10 +203,10 @@ Hours until break:      8h - 4.5h  = 3.5h
 
 ### Step 2: Simulate Route Segment-by-Segment
 
-SALLY walks through each segment of the route and tracks HOS consumption:
+Platform walks through each segment of the route and tracks HOS consumption:
 
 ```typescript
-// Pseudocode: SALLY's HOS simulation loop
+// Pseudocode: Platform's HOS simulation loop
 let currentHos = {
   hours_driven: 5.0,
   on_duty_time: 8.0,
@@ -248,13 +248,13 @@ for (segment of route_segments) {
 }
 ```
 
-**Key insight:** SALLY simulates the **entire route** before the driver starts. If any segment would violate HOS, SALLY inserts rest stops proactively.
+**Key insight:** Platform simulates the **entire route** before the driver starts. If any segment would violate HOS, Platform inserts rest stops proactively.
 
 ---
 
 ### Step 3: Generate Compliance Report
 
-After simulating the route, SALLY generates a compliance report:
+After simulating the route, Platform generates a compliance report:
 
 ```json
 {
@@ -275,7 +275,7 @@ After simulating the route, SALLY generates a compliance report:
 - `max_drive_hours_used`: Peak drive time reached during route (must be ≤ 11h)
 - `max_duty_hours_used`: Peak duty time reached during route (must be ≤ 14h)
 - `breaks_required`: Number of 30-min breaks needed
-- `breaks_planned`: Number of breaks SALLY inserted
+- `breaks_planned`: Number of breaks Platform inserted
 - `violations`: Array of HOS violations (should always be empty)
 
 **If violations are detected:**
@@ -299,7 +299,7 @@ After simulating the route, SALLY generates a compliance report:
 
 ## Driver State Tracking
 
-SALLY tracks three HOS state variables throughout the route:
+Platform tracks three HOS state variables throughout the route:
 
 ### 1. hours_driven
 
@@ -432,8 +432,8 @@ SALLY tracks three HOS state variables throughout the route:
 ### Request: Plan Route with HOS Validation
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "driver_id": "DRV-001",
@@ -538,7 +538,7 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
 
 1. **Sequence 1 (Dock):** On-duty time increased by 1h (6.0 → 9.0), but drive time unchanged
 2. **Sequence 2 (Drive):** Both drive time and on-duty time increased by 2h
-3. **Sequence 3 (Rest):** SALLY inserted a 10h rest stop because driver was approaching both 11h drive limit (8h/11h) and 14h duty window (11h/14h)
+3. **Sequence 3 (Rest):** Platform inserted a 10h rest stop because driver was approaching both 11h drive limit (8h/11h) and 14h duty window (11h/14h)
 4. **Sequence 4 (Drive):** After rest, all HOS hours reset to 0.0, allowing driver to continue
 
 ---
@@ -567,7 +567,7 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
 
 **Route requirement:** 5h drive time
 
-**SALLY's decision:**
+**Platform's decision:**
 ```
 Driver needs 5h drive time, but only has 2h available.
 Shortfall: 3h
@@ -615,7 +615,7 @@ Result: Driver takes 10h rest, resets to 0h, continues with fresh 11h
 
 **Route requirement:** 4h drive time + 2h dock time = 6h total on-duty time
 
-**SALLY's decision:**
+**Platform's decision:**
 ```
 Driver has 9h drive time and 11h duty time remaining.
 Route needs 4h drive and 6h total on-duty time.
@@ -661,7 +661,7 @@ No rest stop needed.
 
 **Route requirement:** 2h drive time
 
-**SALLY's decision:**
+**Platform's decision:**
 ```
 Driver has driven 7.5h since last break.
 Next segment is 2h drive (would total 9.5h without break).
@@ -707,7 +707,7 @@ Action: Insert break before continuing.
 
 **Route requirement:** 3h drive time + 1h dock time = 4h total on-duty
 
-**SALLY's decision:**
+**Platform's decision:**
 ```
 Driver has 6h drive time remaining (plenty).
 But only 2h duty time remaining.
@@ -774,12 +774,12 @@ The `compliance_report` object provides a complete HOS validation summary:
 - Calculated by checking when `hours_since_break >= 8`
 
 **breaks_planned**
-- Number of break segments SALLY inserted into the route
+- Number of break segments Platform inserted into the route
 - Should equal `breaks_required` for compliant routes
 
 **violations**
 - Array of HOS violations detected during simulation
-- Should always be empty (`[]`) for routes returned by SALLY
+- Should always be empty (`[]`) for routes returned by Platform
 - If non-empty, route is infeasible
 
 ---
@@ -810,7 +810,7 @@ The `compliance_report` object provides a complete HOS validation summary:
 }
 ```
 
-**Why it matters:** Inaccurate driver state leads to unrealistic routes. If SALLY thinks the driver has 11h available but they actually have 5h, the route will fail in the real world.
+**Why it matters:** Inaccurate driver state leads to unrealistic routes. If Platform thinks the driver has 11h available but they actually have 5h, the route will fail in the real world.
 
 **Best practice:** Integrate with your ELD (Samsara, KeepTruckin) to pull real-time HOS data before planning routes.
 
@@ -853,8 +853,8 @@ Result: Stranded driver, missed delivery
 ```
 8:00 AM: Driver clocks in
 8:05 AM: Pull real-time HOS from ELD
-8:10 AM: Plan route with SALLY (detects limited hours)
-8:15 AM: SALLY inserts rest stop proactively
+8:10 AM: Plan route with Platform (detects limited hours)
+8:15 AM: Platform inserts rest stop proactively
 8:30 AM: Driver leaves with compliant plan
 ```
 
@@ -872,17 +872,17 @@ HOS compliance doesn't end after planning. Conditions change during execution:
 - Driver takes longer break than planned
 - Load added mid-route (requires more hours)
 
-**Best practice:** Use SALLY's monitoring API to track routes in real-time. If HOS approaches limits, SALLY will recommend re-planning or inserting rest stops dynamically.
+**Best practice:** Use Platform's monitoring API to track routes in real-time. If HOS approaches limits, Platform will recommend re-planning or inserting rest stops dynamically.
 
 ---
 
-### 5. Trust SALLY's Rest Recommendations
+### 5. Trust Platform's Rest Recommendations
 
-SALLY inserts rest stops for a reason. Don't remove them.
+Platform inserts rest stops for a reason. Don't remove them.
 
 ❌ **Wrong:** "This rest stop looks inconvenient, I'll remove it"
 ```json
-// Route returned by SALLY with rest stop
+// Route returned by Platform with rest stop
 {
   "segments": [
     { "segment_type": "drive", "drive_time_hours": 8.0 },
@@ -892,17 +892,17 @@ SALLY inserts rest stops for a reason. Don't remove them.
 }
 ```
 
-✅ **Right:** Follow SALLY's plan or adjust driver state
+✅ **Right:** Follow Platform's plan or adjust driver state
 ```
 If rest stop seems wrong:
 1. Check driver_state input (is it accurate?)
 2. Check estimated_dock_hours (is dock time realistic?)
-3. If inputs are correct, trust SALLY's recommendation
+3. If inputs are correct, trust Platform's recommendation
 ```
 
-**Why it matters:** SALLY inserts rest stops because the route is **not feasible** without them. Removing rest stops creates an illegal route that will fail during execution.
+**Why it matters:** Platform inserts rest stops because the route is **not feasible** without them. Removing rest stops creates an illegal route that will fail during execution.
 
-**Best practice:** If you disagree with SALLY's rest recommendation, review your input data. SALLY's HOS engine is conservative and rule-based (no black-box ML). If the inputs are correct, the recommendation is correct.
+**Best practice:** If you disagree with Platform's rest recommendation, review your input data. Platform's HOS engine is conservative and rule-based (no black-box ML). If the inputs are correct, the recommendation is correct.
 
 ---
 
@@ -927,7 +927,7 @@ If rest stop seems wrong:
 
 ---
 
-## Integration with SALLY API
+## Integration with Platform API
 
 ### Get HOS Validation Before Assigning Route
 
@@ -935,9 +935,9 @@ If rest stop seems wrong:
 # Step 1: Get current driver HOS (from your ELD integration)
 curl -X GET https://your-eld-api.com/driver/DRV-001/hos
 
-# Step 2: Plan route with SALLY
-curl -X POST https://sally-api-staging.appshore.in/api/v1/routes/plan \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+# Step 2: Plan route with Platform
+curl -X POST https://api-staging.appshore.in/api/v1/routes/plan \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -d '{
     "driver_id": "DRV-001",
     "driver_state": { /* HOS from ELD */ },
@@ -956,7 +956,7 @@ if (response.compliance_report.is_feasible) {
 ### Handle Infeasible Routes
 
 ```typescript
-const response = await sallyApi.planRoute(request);
+const response = await appApi.planRoute(request);
 
 if (!response.compliance_report.is_feasible) {
   // Option 1: Assign route to different driver (with more hours)
@@ -984,7 +984,7 @@ if (!response.compliance_report.is_feasible) {
 - **30-minute break:** Required after 8h of driving
 - **10-hour rest:** Required to reset all HOS hours
 
-**SALLY's HOS Validation:**
+**Platform's HOS Validation:**
 - Segment-by-segment simulation
 - Proactive rest stop insertion when hours insufficient
 - Tracks three state variables: `hours_driven`, `on_duty_time`, `hours_since_break`
@@ -996,7 +996,7 @@ if (!response.compliance_report.is_feasible) {
 - Include accurate dock time estimates
 - Plan routes at start of shift
 - Monitor routes during execution
-- Trust SALLY's rest recommendations
+- Trust Platform's rest recommendations
 - Check both drive limit AND duty window
 
 **Key Insight:** The 14-hour duty window is often the limiting factor, not the 11-hour drive limit. Always account for dock time, breaks, and other on-duty activities when planning routes.
@@ -1006,6 +1006,6 @@ if (!response.compliance_report.is_feasible) {
 ## Next Steps
 
 - **[Your First Route Tutorial](/docs/getting-started/first-route)** - See HOS validation in action with a complete route planning example
-- **[Rest Optimization Guide](/docs/api-guides/route-planning/rest-stops)** - Learn how SALLY decides when and where to rest
+- **[Rest Optimization Guide](/docs/api-guides/route-planning/rest-stops)** - Learn how Platform decides when and where to rest
 - **[Route Updates Guide](/docs/api-guides/route-planning/route-updates)** - Handle HOS changes during route execution
 - **[API Reference: HOS Validation](/docs/api-reference/authentication#hos-validation)** - Complete API documentation

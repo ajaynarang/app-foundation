@@ -28,7 +28,7 @@ const linkGroups: { label: string; href: string; external?: boolean }[][] = [
     { label: 'AI Transparency', href: '/legal/ai' },
     {
       label: 'Contact',
-      href: mailto('sally'),
+      href: mailto('app'),
       external: true,
     },
   ],
@@ -45,7 +45,7 @@ export function Footer() {
           {/* Logo + tagline */}
           <div className="flex-shrink-0">
             <Link href="/" className="text-lg font-bold text-foreground font-space-grotesk">
-              SALLY
+              Platform
             </Link>
             <p className="text-xs text-muted-foreground mt-1">Your fleet&apos;s nervous system.</p>
           </div>
@@ -85,7 +85,7 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-8 pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-muted-foreground">
-          <p>&copy; {year} SALLY. All rights reserved.</p>
+          <p>&copy; {year} Platform. All rights reserved.</p>
 
           <div className="flex items-center gap-2">
             <Link href="/legal/privacy#ccpa" className="hover:text-foreground transition-colors">

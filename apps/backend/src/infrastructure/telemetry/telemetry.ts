@@ -55,7 +55,7 @@ if (process.env.NODE_ENV !== 'test') {
 
   try {
     sdk = new NodeSDK({
-      serviceName: process.env.OTEL_SERVICE_NAME ?? 'sally-backend',
+      serviceName: process.env.OTEL_SERVICE_NAME ?? 'app-backend',
       traceExporter: new OTLPTraceExporter({
         url: `${otlpBase}/v1/traces`,
       }),

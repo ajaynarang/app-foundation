@@ -1,6 +1,6 @@
 # Plan a Route
 
-This is the core of SALLY — give it a driver, a truck, and a set of stops. SALLY gives you back a fully optimized, HOS-compliant route with rest stops and fuel stops inserted automatically.
+This is the core of Platform — give it a driver, a truck, and a set of stops. Platform gives you back a fully optimized, HOS-compliant route with rest stops and fuel stops inserted automatically.
 
 ## Prerequisites
 
@@ -10,8 +10,8 @@ This is the core of SALLY — give it a driver, a truck, and a set of stops. SAL
 Set your environment variables:
 
 ```bash
-export SALLY_API_KEY="sk_staging_your_key_here"
-export SALLY_BASE="https://sally-api-staging.appshore.in/api/v1"
+export APP_API_KEY="sk_staging_your_key_here"
+export APP_BASE="https://api-staging.appshore.in/api/v1"
 ```
 
 ## The scenario
@@ -22,13 +22,13 @@ export SALLY_BASE="https://sally-api-staging.appshore.in/api/v1"
 
 **Route:** Chicago warehouse → Indianapolis customer → Columbus terminal.
 
-**The challenge:** Mike has limited remaining drive time today. SALLY will figure out if he needs a rest stop and where to fuel up.
+**The challenge:** Mike has limited remaining drive time today. Platform will figure out if he needs a rest stop and where to fuel up.
 
 ## Plan the route
 
 ```bash
-curl -X POST $SALLY_BASE/routes/plan \
-  -H "Authorization: Bearer $SALLY_API_KEY" \
+curl -X POST $APP_BASE/routes/plan \
+  -H "Authorization: Bearer $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "driverId": "drv_a1b2c3d4",
@@ -77,7 +77,7 @@ curl -X POST $SALLY_BASE/routes/plan \
 
 ## Understanding the response
 
-SALLY returns a route plan broken into segments. Each segment is either a drive, a rest stop, a fuel stop, or time at a stop (dwell).
+Platform returns a route plan broken into segments. Each segment is either a drive, a rest stop, a fuel stop, or time at a stop (dwell).
 
 ```json
 {
@@ -136,11 +136,11 @@ SALLY returns a route plan broken into segments. Each segment is either a drive,
 }
 ```
 
-### What SALLY figured out
+### What Platform figured out
 
-1. **HOS validation** — Mike has 2 hours already driven. After the 3-hour drive to Indianapolis, he'll be at 5 hours. After dock time and driving toward Columbus, he'd exceed the 11-hour drive limit. SALLY inserted a **10-hour rest stop** near Richmond, IN.
+1. **HOS validation** — Mike has 2 hours already driven. After the 3-hour drive to Indianapolis, he'll be at 5 hours. After dock time and driving toward Columbus, he'd exceed the 11-hour drive limit. Platform inserted a **10-hour rest stop** near Richmond, IN.
 
-2. **Stop sequence** — SALLY confirmed Chicago → Indianapolis → Columbus is optimal (no reordering needed for this route, but for complex multi-stop routes SALLY will optimize the sequence).
+2. **Stop sequence** — Platform confirmed Chicago → Indianapolis → Columbus is optimal (no reordering needed for this route, but for complex multi-stop routes Platform will optimize the sequence).
 
 3. **Compliance guarantee** — `hosCompliant: true` means every segment respects federal HOS rules. No violations.
 
@@ -149,19 +149,19 @@ SALLY returns a route plan broken into segments. Each segment is either a drive,
 Once you're satisfied with the plan, activate it to start monitoring:
 
 ```bash
-curl -X POST $SALLY_BASE/routes/rte_f8e7d6c5/activate \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl -X POST $APP_BASE/routes/rte_f8e7d6c5/activate \
+  -H "Authorization: Bearer $APP_API_KEY"
 ```
 
-Once activated, SALLY monitors the route 24/7 and sends alerts if anything changes — driver delays, dock hold-ups, HOS warnings, weather events.
+Once activated, Platform monitors the route 24/7 and sends alerts if anything changes — driver delays, dock hold-ups, HOS warnings, weather events.
 
 ## Check for alerts
 
 After activation, poll for alerts or set up [webhooks](/docs/webhooks) to receive them in real time:
 
 ```bash
-curl "$SALLY_BASE/alerts?routePlanId=rte_f8e7d6c5&status=ACTIVE" \
-  -H "Authorization: Bearer $SALLY_API_KEY"
+curl "$APP_BASE/alerts?routePlanId=rte_f8e7d6c5&status=ACTIVE" \
+  -H "Authorization: Bearer $APP_API_KEY"
 ```
 
 ## What's next

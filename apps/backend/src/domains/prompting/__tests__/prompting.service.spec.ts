@@ -44,8 +44,8 @@ describe('PromptingService', () => {
 
   describe('named prompts (no LangFuse)', () => {
     it('returns registered fallback', async () => {
-      service.registerFallback('sally-dispatcher', 'fallback body');
-      expect(await service.getPrompt('sally-dispatcher')).toBe('fallback body');
+      service.registerFallback('assistant-dispatcher', 'fallback body');
+      expect(await service.getPrompt('assistant-dispatcher')).toBe('fallback body');
     });
 
     it('returns empty string for unknown prompt name', async () => {
@@ -112,8 +112,8 @@ describe('PromptingService', () => {
       } catch {
         /* expected */
       }
-      withKeys.registerFallback('sally-dispatcher', 'hardcoded');
-      const result = await withKeys.getPrompt('sally-dispatcher');
+      withKeys.registerFallback('assistant-dispatcher', 'hardcoded');
+      const result = await withKeys.getPrompt('assistant-dispatcher');
       expect(result).toBeTruthy();
     });
   });

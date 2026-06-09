@@ -2,8 +2,8 @@
 
 import { useEffect, useLayoutEffect } from 'react';
 import { useAuthStore } from '@/features/auth';
-import { useSallyStore } from '../store';
-import { SallyStrip } from './SallyStrip';
+import { useAssistantStore } from '../store';
+import { AssistantStrip } from './AssistantStrip';
 import type { UserMode } from '../engine/types';
 
 function detectMode(userRole: string | undefined, isAuthenticated: boolean): UserMode {
@@ -19,7 +19,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 
 export function AppAIProvider() {
   const { user, isAuthenticated } = useAuthStore();
-  const { setUserMode, userMode } = useSallyStore();
+  const { setUserMode, userMode } = useAssistantStore();
 
   // Sync mode before paint to prevent flash of wrong mode / race with conversation creation
   useIsomorphicLayoutEffect(() => {
@@ -32,5 +32,5 @@ export function AppAIProvider() {
   // Platform super-admins manage the console, not end-user chat.
   if (user?.role === 'SUPER_ADMIN') return null;
 
-  return <SallyStrip />;
+  return <AssistantStrip />;
 }

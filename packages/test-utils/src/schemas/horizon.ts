@@ -68,11 +68,11 @@ const HorizonStatsSchema = z
     driversLoaded: z.number().int(),
     totalDrivers: z.number().int(),
     openDriverDays: z.number().int(),
-    sallySuggestions: z.number().int(),
+    assistantSuggestions: z.number().int(),
   })
   .strict();
 
-const SallySuggestionSchema = z
+const AssistantSuggestionSchema = z
   .object({
     suggestionId: z.string(),
     driverId: z.number().int(),
@@ -88,7 +88,7 @@ const SallySuggestionSchema = z
 const AppInsightSchema = z
   .object({
     message: z.string(),
-    suggestions: z.array(SallySuggestionSchema),
+    suggestions: z.array(AssistantSuggestionSchema),
   })
   .strict();
 
@@ -101,7 +101,7 @@ export const HorizonGridSchema = z
     weekEnd: dateOnlyString,
     drivers: z.array(HorizonDriverRowSchema),
     stats: HorizonStatsSchema,
-    sallyInsight: AppInsightSchema.nullable(),
+    assistantInsight: AppInsightSchema.nullable(),
   })
   .strict();
 export type HorizonGrid = z.infer<typeof HorizonGridSchema>;

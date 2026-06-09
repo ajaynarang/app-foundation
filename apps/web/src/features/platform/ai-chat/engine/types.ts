@@ -55,7 +55,7 @@ export interface ActionResult {
 }
 
 // ── Assistant Response ──
-export interface SallyResponse {
+export interface AssistantResponse {
   text: string;
   card?: RichCard;
   followUp?: string;

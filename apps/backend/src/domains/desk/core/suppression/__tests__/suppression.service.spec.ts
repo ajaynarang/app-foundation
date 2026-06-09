@@ -3,7 +3,7 @@
  * out in the T27g plan:
  *   1. snooze('1w') creates a row with suppressUntil ≈ now + 7d, calls
  *      closeStep with outcome=rejected_by_operator, and emits the
- *      sally.desk.episode.snoozed DomainEvent.
+ *      app.desk.episode.snoozed DomainEvent.
  *   2. duration='forever' → suppressUntil=null.
  *   3. Existing active suppression → finalUntil = max(current, new),
  *      never shortens (30d existing + 1w new → keeps 30d).
@@ -73,7 +73,7 @@ describe('SuppressionService', () => {
   });
 
   describe('snooze', () => {
-    it("creates a new suppression with suppressUntil ≈ now + 7d when duration='1w', closes the episode, and emits sally.desk.episode.snoozed", async () => {
+    it("creates a new suppression with suppressUntil ≈ now + 7d when duration='1w', closes the episode, and emits app.desk.episode.snoozed", async () => {
       prisma.deskEpisode.findFirst.mockResolvedValue(makeEpisode());
       prisma.deskEntitySuppression.findFirst.mockResolvedValue(null); // no existing
       const createdUntil = new Date(Date.now() + 7 * 86_400_000);
@@ -116,13 +116,13 @@ describe('SuppressionService', () => {
       );
 
       // DomainEvent emitted on the right topic with the right envelope.
-      expect(events.emit).toHaveBeenCalledWith('sally.desk.episode-snoozed', expect.any(DomainEvent));
+      expect(events.emit).toHaveBeenCalledWith('app.desk.episode-snoozed', expect.any(DomainEvent));
       const emittedEvent = events.emit.mock.calls[0][1] as DomainEvent<{
         episodeId: string;
         suppressionId: string;
         suppressUntil: string | null;
       }>;
-      expect(emittedEvent.event).toBe('sally.desk.episode-snoozed');
+      expect(emittedEvent.event).toBe('app.desk.episode-snoozed');
       expect(emittedEvent.tenantId).toBe(String(TENANT_ID));
       expect(emittedEvent.data.episodeId).toBe(EPISODE_ID);
       expect(emittedEvent.data.suppressionId).toBe('sup-1');
@@ -227,7 +227,7 @@ describe('SuppressionService', () => {
   });
 
   describe('unsnooze', () => {
-    it('sets unsuppressedAt (now) + unsuppressedByUserId and emits sally.desk.suppression-cleared', async () => {
+    it('sets unsuppressedAt (now) + unsuppressedByUserId and emits app.desk.suppression-cleared', async () => {
       const row = makeSuppressionRow({ suppressUntil: new Date(Date.now() + 86_400_000) });
       prisma.deskEntitySuppression.findFirst.mockResolvedValue(row);
       prisma.deskEntitySuppression.update.mockResolvedValue({
@@ -253,9 +253,9 @@ describe('SuppressionService', () => {
           }),
         }),
       );
-      expect(events.emit).toHaveBeenCalledWith('sally.desk.suppression-cleared', expect.any(DomainEvent));
+      expect(events.emit).toHaveBeenCalledWith('app.desk.suppression-cleared', expect.any(DomainEvent));
       const emittedEvent = events.emit.mock.calls[0][1] as DomainEvent<{ suppressionId: string }>;
-      expect(emittedEvent.event).toBe('sally.desk.suppression-cleared');
+      expect(emittedEvent.event).toBe('app.desk.suppression-cleared');
       expect(emittedEvent.tenantId).toBe(String(TENANT_ID));
       expect(emittedEvent.data.suppressionId).toBe('sup-1');
     });

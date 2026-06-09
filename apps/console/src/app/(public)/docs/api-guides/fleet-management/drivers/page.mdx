@@ -1,6 +1,6 @@
 # Drivers API
 
-The Drivers API lets you create and manage driver profiles in your fleet. Each driver record includes personal information, license details, and real-time Hours of Service (HOS) data that SALLY uses for route planning and compliance monitoring.
+The Drivers API lets you create and manage driver profiles in your fleet. Each driver record includes personal information, license details, and real-time Hours of Service (HOS) data that Platform uses for route planning and compliance monitoring.
 
 ## Driver Lifecycle
 
@@ -25,8 +25,8 @@ Only `ACTIVE` drivers can be assigned to route plans. Attempting to plan a route
 ## Create a Driver
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/drivers \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Sarah",
@@ -43,11 +43,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/drivers",
+  "https://api-staging.appshore.in/api/v1/drivers",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -109,8 +109,8 @@ const driver = await response.json();
 Retrieve all drivers in your fleet with optional filtering:
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/drivers?status=ACTIVE&page=1&pageSize=25" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/drivers?status=ACTIVE&page=1&pageSize=25" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
@@ -123,9 +123,9 @@ const params = new URLSearchParams({
 });
 
 const response = await fetch(
-  `https://sally-api-staging.appshore.in/api/v1/drivers?${params}`,
+  `https://api-staging.appshore.in/api/v1/drivers?${params}`,
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -178,17 +178,17 @@ const { data, total, page, pageSize } = await response.json();
 ## Get a Single Driver
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4",
+  "https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -222,8 +222,8 @@ const driver = await response.json();
 Update mutable fields on a driver profile:
 
 ```bash
-curl -X PUT https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X PUT https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "truckNumber": "TRK-5500",
@@ -235,11 +235,11 @@ curl -X PUT https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4",
+  "https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4",
   {
     method: "PUT",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -274,8 +274,8 @@ const updated = await response.json();
 Deactivating a driver sets their status to `INACTIVE`. They can no longer be assigned to new routes. Active routes are not affected.
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/deactivate \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/deactivate \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -293,8 +293,8 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/d
 You can also use `DELETE /api/v1/drivers/:driver_id` which performs a soft delete (equivalent to deactivation):
 
 ```bash
-curl -X DELETE https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X DELETE https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 ## Reactivate a Driver
@@ -302,8 +302,8 @@ curl -X DELETE https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4
 Bring an inactive driver back to active status:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/reactivate \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/reactivate \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -320,20 +320,20 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/r
 
 ## Get Driver HOS Data
 
-Retrieve the current Hours of Service data for a driver. This is the data SALLY uses to validate compliance when planning routes.
+Retrieve the current Hours of Service data for a driver. This is the data Platform uses to validate compliance when planning routes.
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/hos \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/hos \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/hos",
+  "https://api-staging.appshore.in/api/v1/drivers/drv_a1b2c3d4/hos",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -384,13 +384,13 @@ When a Samsara ELD integration is configured, HOS data is synced automatically. 
 
 ## Driver-User Linking
 
-Drivers in SALLY can be linked to user accounts with the `DRIVER` role. When a user with the `DRIVER` role logs in, they see the driver-specific view with their assigned routes and HOS information.
+Drivers in Platform can be linked to user accounts with the `DRIVER` role. When a user with the `DRIVER` role logs in, they see the driver-specific view with their assigned routes and HOS information.
 
 The link is established when you create a user invitation with the `DRIVER` role and associate it with a driver profile:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/user-invitations \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/user-invitations \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "mike.johnson@acmefreight.com",

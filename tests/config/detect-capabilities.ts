@@ -170,7 +170,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // non-empty list. Precondition for PATCH /accounting/mappings/:id and
   // POST /accounting/mappings/:id/confirm.
   'accounting-account-mapping', // At least one AccountingAccountMapping row
-  // exists (SALLY line-item type → QB chart-of-accounts). Created by
+  // exists (platform line-item type → QB chart-of-accounts). Created by
   // `createDefaultAccountMappings` during initial sync — same credential
   // precondition as above. Precondition for PATCH /accounting/account-mappings/:id.
   // ── Phase 5 Group 5d (EDI) additions ─────────────────────────────────────
@@ -183,9 +183,9 @@ export const KNOWN_DATA_CAPABILITIES = [
   // after seeding a tender (e.g. via the webhook once its secret is set)
   // and confirming `GET /edi/tenders` returns a non-empty list.
   'edi-suggested-rule', // At least one EDIAutoAcceptRule row with
-  // `createdBy='sally_suggested'` AND `approvedAt=null` exists.
+  // `createdBy='assistant_suggested'` AND `approvedAt=null` exists.
   // Precondition for `PATCH /edi/tenders/rules/:ruleId/approve`.
-  // Sally-suggested rules are created by the AI pattern-detection
+  // Assistant-suggested rules are created by the AI pattern-detection
   // subsystem (no public POST); seed manually and flip
   // `TESTS_DATA_CAPABILITIES=edi-suggested-rule`.
   'edi-webhook-secret', // `EDI_WEBHOOK_SECRET` env var is set on the
@@ -216,7 +216,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // the same flow as `email-intake-thread` but include at least one entry
   // in the webhook payload's `attachments[]` array.
   // ── Phase 5 Group 5f (load board) additions ──────────────────────────────
-  // ── Phase 6 Group 6a (Sally AI core) additions ───────────────────────────
+  // ── Phase 6 Group 6a (Assistant AI core) additions ───────────────────────────
   // ── Phase 6 Group 6b (document intelligence + jobs) additions ───────────
   'job-row', // At least one Job row exists on the tenant. Precondition
   // for tests 15 (GET /jobs/:jobId), 17a (PATCH /jobs/:jobId/dismiss), and
@@ -234,7 +234,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // via `TESTS_DATA_CAPABILITIES=failed-job` after a parse run lands
   // in failed status. The bootstrap helper `firstFailedJobId` enforces
   // the same loud-fail pattern as `job-row` above.
-  'hitl-suspended-agent', // At least one Sally AI conversation has a live
+  'hitl-suspended-agent', // At least one Assistant AI conversation has a live
   // suspended agent run with a known runId + toolCallId that can be
   // resumed. Suspended runs originate from a chat turn that triggered
   // a `confirm-action` tool-call; they live inside Mastra's in-memory
@@ -243,7 +243,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // (b) a persisted suspendPayload on the conversation. Demo tenants
   // ship zero suspended runs; flip on via
   // `TESTS_DATA_CAPABILITIES=hitl-suspended-agent` only after seeding
-  // one and verifying `sallyAiService.resumeAgent` reaches the happy
+  // one and verifying `assistantAiService.resumeAgent` reaches the happy
   // path. Precondition for a full resume-endpoint happy-path test;
   // Group 6a asserts only the error-path shape (no seed required).
   'load-board-listing', // At least one DAT load-board listing is retrievable
@@ -296,14 +296,14 @@ export const KNOWN_DATA_CAPABILITIES = [
   // is the contract.
   'desk-responsibility', // At least one DeskResponsibility row exists AND the
   // live `desk_responsibilities` table is queryable via Prisma's
-  // `findUnique({select: {notesForSally, supervisorUserId, ...}})`. PR #663
+  // `findUnique({select: {notesForAssistant, supervisorUserId, ...}})`. PR #663
   // bootstraps all 10 registry rows on tenant approve; demo-northstar
   // verified to have them (2026-04-27). Test 41 (list) does NOT need this
   // capability — the list service projection avoids the drifted columns.
   // Tests 42 (detail), 43 (ui-spec — which itself doesn't need this either,
   // but is gated for ergonomic alignment with detail), and 44 (PATCH)
   // gate on the SAME drift as Finding #53 — `apps/backend/prisma/
-  // schema.prisma::DeskResponsibility` declares `notesForSally` and
+  // schema.prisma::DeskResponsibility` declares `notesForAssistant` and
   // `supervisorUserId` columns the live `desk_responsibilities` table no
   // longer has (parallel migration to the desk_memories one). After
   // realigning the schema + regenerating Prisma client, flip via

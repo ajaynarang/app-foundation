@@ -1,6 +1,6 @@
 # Real-time Events
 
-SALLY provides two mechanisms for receiving alerts in real time: Server-Sent Events (SSE) and WebSocket via Socket.io. Both deliver alerts the moment they are generated, eliminating the need to poll the REST API.
+Platform provides two mechanisms for receiving alerts in real time: Server-Sent Events (SSE) and WebSocket via Socket.io. Both deliver alerts the moment they are generated, eliminating the need to poll the REST API.
 
 ## Choosing Between SSE and WebSocket
 
@@ -26,8 +26,8 @@ GET /api/v1/sse/alerts
 ### Connecting with curl
 
 ```bash
-curl -N "https://sally-api-staging.appshore.in/api/v1/sse/alerts" \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -N "https://api-staging.appshore.in/api/v1/sse/alerts" \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Accept: text/event-stream"
 ```
 
@@ -38,8 +38,8 @@ The `-N` flag disables output buffering so events are displayed as they arrive.
 The browser-native `EventSource` API is the simplest way to consume SSE. Since `EventSource` does not support custom headers, pass your API key as a query parameter:
 
 ```javascript
-const apiKey = process.env.SALLY_API_KEY;
-const url = `https://sally-api-staging.appshore.in/api/v1/sse/alerts?apiKey=${apiKey}`;
+const apiKey = process.env.APP_API_KEY;
+const url = `https://api-staging.appshore.in/api/v1/sse/alerts?apiKey=${apiKey}`;
 
 const eventSource = new EventSource(url);
 
@@ -84,7 +84,7 @@ In Node.js environments where `EventSource` is not available natively, use a str
 ```javascript
 async function subscribeToAlerts(apiKey) {
   const response = await fetch(
-    "https://sally-api-staging.appshore.in/api/v1/sse/alerts",
+    "https://api-staging.appshore.in/api/v1/sse/alerts",
     {
       headers: {
         "X-API-Key": apiKey,
@@ -117,7 +117,7 @@ async function subscribeToAlerts(apiKey) {
   }
 }
 
-subscribeToAlerts(process.env.SALLY_API_KEY);
+subscribeToAlerts(process.env.APP_API_KEY);
 ```
 
 ### SSE Event Format
@@ -165,16 +165,16 @@ pnpm install socket.io-client
 ```javascript
 import { io } from "socket.io-client";
 
-const socket = io("https://sally-api-staging.appshore.in", {
+const socket = io("https://api-staging.appshore.in", {
   path: "/socket.io",
   auth: {
-    token: process.env.SALLY_API_KEY, // or JWT token
+    token: process.env.APP_API_KEY, // or JWT token
   },
   transports: ["websocket"],
 });
 
 socket.on("connect", () => {
-  console.log("Connected to SALLY WebSocket");
+  console.log("Connected to Platform WebSocket");
   console.log("Socket ID:", socket.id);
 });
 
@@ -242,9 +242,9 @@ socket.on("alert:acknowledge:error", (error) => {
 ```javascript
 import { io } from "socket.io-client";
 
-const API_KEY = process.env.SALLY_API_KEY;
+const API_KEY = process.env.APP_API_KEY;
 
-const socket = io("https://sally-api-staging.appshore.in", {
+const socket = io("https://api-staging.appshore.in", {
   auth: { token: API_KEY },
   transports: ["websocket"],
   reconnection: true,

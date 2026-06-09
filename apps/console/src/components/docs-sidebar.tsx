@@ -158,7 +158,7 @@ const manualNavigation: DocsNavSection[] = [
     items: [
       { label: 'Home', href: '/docs/manual/web-app/driver/driver-home' },
       { label: 'Route', href: '/docs/manual/web-app/driver/viewing-route' },
-      { label: 'Sally AI', href: '/docs/manual/web-app/driver/sally-ai-assistant' },
+      { label: 'Assistant', href: '/docs/manual/web-app/driver/assistant' },
       { label: 'Alerts', href: '/docs/manual/web-app/driver/alerts-messages' },
     ],
   },
@@ -218,11 +218,11 @@ const manualNavigation: DocsNavSection[] = [
     ],
   },
   {
-    label: 'Sally AI',
+    label: 'Assistant',
     items: [
-      { label: 'What is Sally?', href: '/docs/manual/assistant/what-is-sally' },
+      { label: 'What is the assistant?', href: '/docs/manual/assistant/what-is-assistant' },
       { label: 'Asking Questions', href: '/docs/manual/assistant/asking-questions' },
-      { label: 'Actions', href: '/docs/manual/assistant/sally-actions' },
+      { label: 'Actions', href: '/docs/manual/assistant/assistant-actions' },
       { label: 'Voice Mode', href: '/docs/manual/assistant/voice-mode' },
       { label: 'Doc Intelligence', href: '/docs/manual/assistant/document-intelligence' },
     ],
@@ -284,7 +284,7 @@ const sectionAbbreviations: Record<string, string> = {
   Admin: 'AD',
   Customer: 'CU',
   Console: 'CO',
-  'Sally AI': 'AI',
+  Assistant: 'AI',
   Reference: 'RF',
 };
 

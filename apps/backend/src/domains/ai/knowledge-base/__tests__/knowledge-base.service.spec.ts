@@ -13,7 +13,7 @@ describe('KnowledgeBaseService', () => {
         {
           document_id: 'doc_001',
           title: 'Route Planning',
-          content: 'SALLY optimizes routes...',
+          content: 'The platform optimizes your workflows...',
           document_type: 'feature',
           audience: 'prospect',
           category: 'route_planning',

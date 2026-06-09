@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CacheInvalidationSubscriber } from '../cache-invalidation.subscriber';
 import { AppCacheService } from '../app-cache.service';
 import { DomainEvent } from '../../events/domain-event';
-import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 
 /**
  * Maps domain events to the cache entries they invalidate. Exact keys go

@@ -27,7 +27,7 @@ export interface FilterBarProps {
  * FilterBar — Zone 3 of the canonical page chrome. Search left, filter controls middle,
  * sort right. Scoped to the active tab. Unstyled re: container — pages decide whether to
  * wrap it in a Card/CardHeader (Billing/Pay) or leave it bare (Loads board).
- * See sally-frontend-patterns §16 (Page Chrome).
+ * See app-frontend-patterns §16 (Page Chrome).
  */
 export function FilterBar({
   searchValue,

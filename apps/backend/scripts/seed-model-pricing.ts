@@ -21,7 +21,7 @@ dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local' });
 
 async function main(): Promise<void> {
-  const connectionString = process.env.DATABASE_URL || 'postgresql://sally_user:sally_password@localhost:5432/sally';
+  const connectionString = process.env.DATABASE_URL || 'postgresql://app_user:app_password@localhost:5432/app';
   const pool = new pg.Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });

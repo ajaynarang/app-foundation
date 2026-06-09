@@ -2,8 +2,8 @@
 # Format: Model.field:rule  (or  Model:rule  for model-level rules)
 #
 # When a table is migrated to compliance, REMOVE its entries from this file.
-# Tracked in .claude/skills/sally-backend-patterns/id-migration-tracker.md
-# Convention in   .claude/skills/sally-backend-patterns/id-convention.md
+# Tracked in .claude/skills/app-backend-patterns/id-migration-tracker.md
+# Convention in   .claude/skills/app-backend-patterns/id-convention.md
 
 AddOn.id:no-cuid
 AddOn:tenant-scoping-missing

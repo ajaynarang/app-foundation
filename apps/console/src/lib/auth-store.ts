@@ -79,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
           const userCredential = await signInWithEmailAndPassword(auth, email, password);
           const firebaseToken = await userCredential.user.getIdToken();
 
-          // Exchange Firebase token for SALLY JWT
+          // Exchange Firebase token for platform JWT
           await get().exchangeFirebaseToken(firebaseToken);
 
           set({
@@ -125,7 +125,7 @@ export const useAuthStore = create<AuthState>()(
         clearAuthCookie();
       },
 
-      // Exchange Firebase token for SALLY JWT
+      // Exchange Firebase token for platform JWT
       exchangeFirebaseToken: async (firebaseToken: string) => {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
         const response = await fetch(`${apiUrl}/auth/firebase/exchange`, {

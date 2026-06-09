@@ -10,7 +10,7 @@ const ALL_TMS_ROLES = ['DISPATCHER', 'ADMIN', 'OWNER', 'DRIVER'];
  * Tour narrative arc — a new operator's first day:
  *
  *   Act I  — Set up:  Workspace → Fleet
- *   Act II — Operate: Sally's Desk → Inbox → Loads → Horizon → Smart Routes
+ *   Act II — Operate: Assistant's Desk → Inbox → Loads → Horizon → Smart Routes
  *                     → Tower → Alerts → Shield
  *   Act III — Get paid: Close Out → Billing → Pay → IFTA → Insights
  *   Epilogue — Make it yours: Settings
@@ -34,7 +34,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Fleet',
     content:
-      'Your people and machines. Add drivers, trucks, and trailers. Connect your ELD. This is the ground truth for everything else Sally does.',
+      'Your people and machines. Add drivers, trucks, and trailers. Connect your ELD. This is the ground truth for everything else Assistant does.',
     selector: '#tour-nav-fleet',
     side: 'right',
     route: '/dispatcher/fleet',
@@ -44,14 +44,14 @@ export const tourSteps: TourStepConfig[] = [
   // ── Act II · Run the business ────────────────────────────────
   {
     icon: null,
-    title: "Sally's Desk",
+    title: "Assistant's Desk",
     content:
       'Your AI agents at work — drafting dispatch, chasing documents, flagging risk. You approve, override, or let them run. Think of it as a team of employees that never sleeps.',
-    selector: '#tour-nav-sally-s-desk',
+    selector: '#tour-nav-assistant-s-desk',
     side: 'right',
     route: '/dispatcher/desk',
     roles: DISPATCHER_ROLES,
-    entitlement: 'sallys_desk',
+    entitlement: 'assistants_desk',
   },
   {
     icon: null,
@@ -89,7 +89,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'Smart Routes',
     content:
-      'Plan multi-stop runs with HOS built in. Sally picks fuel stops, sleeper splits, and detours — so miles roll with fewer surprises.',
+      'Plan multi-stop runs with HOS built in. Assistant picks fuel stops, sleeper splits, and detours — so miles roll with fewer surprises.',
     selector: '#tour-nav-smart-routes',
     side: 'right',
     route: '/dispatcher/smart-routes',
@@ -165,7 +165,7 @@ export const tourSteps: TourStepConfig[] = [
     icon: null,
     title: 'IFTA',
     content:
-      'Fuel tax reporting without the spreadsheet. Sally tracks mileage by jurisdiction as you operate, so quarterly filings take minutes.',
+      'Fuel tax reporting without the spreadsheet. Assistant tracks mileage by jurisdiction as you operate, so quarterly filings take minutes.',
     selector: '#tour-nav-ifta',
     side: 'right',
     route: '/dispatcher/ifta',

@@ -17,7 +17,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { WebhookSubscriptionService } from './subscription.service';
 import { WebhookDispatcher } from './dispatcher.service';
-import { DOMAIN_EVENTS } from '../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../events/domain-events.constants';
 import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 

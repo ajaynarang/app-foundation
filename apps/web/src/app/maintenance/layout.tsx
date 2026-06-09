@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Maintenance | SALLY',
-  description: 'SALLY is currently undergoing maintenance.',
+  title: 'Maintenance | Platform',
+  description: 'The platform is currently undergoing maintenance.',
 };
 
 /**

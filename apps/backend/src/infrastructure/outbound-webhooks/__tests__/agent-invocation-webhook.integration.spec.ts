@@ -8,7 +8,7 @@ import { DomainEventService } from '../../events/domain-event.service';
 import { WebhookDispatcher } from '../dispatcher.service';
 import { QUEUE_NAMES } from '../../queue/queue.constants';
 import { DomainEvent } from '../../events/domain-event';
-import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 
 /**
  * Integration smoke: AgentInvocationLoggerService → DomainEventService
@@ -20,7 +20,7 @@ import { DOMAIN_EVENTS } from '../../events/sally-events.constants';
  * future edit to AgentInvocationLoggerService#toWebhookPayload accidentally
  * spreads the whole row into the event data.
  */
-describe('sally.agent.invocation-completed webhook integration', () => {
+describe('app.agent.invocation-completed webhook integration', () => {
   const SENTINEL = '123-45-6789';
   const logRowTemplate = {
     id: 'row-1',
@@ -79,7 +79,7 @@ describe('sally.agent.invocation-completed webhook integration', () => {
         id: 'sub-1',
         tenantId: 7,
         url: 'https://example.test/hook',
-        events: ['sally.agent.*', DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED],
+        events: ['app.agent.*', DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED],
         active: true,
       },
     ]);
@@ -197,7 +197,7 @@ describe('sally.agent.invocation-completed webhook integration', () => {
     expect(mockWebhookQueue.add).not.toHaveBeenCalled();
   });
 
-  it('works with wildcard sally.agent.* subscription', async () => {
+  it('works with wildcard app.agent.* subscription', async () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([
       {
         id: 'sub-wild',

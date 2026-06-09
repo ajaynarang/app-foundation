@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
 import { fromUser } from '../agent-principal';
 import { digestArgs } from '../arg-redactor';
@@ -79,7 +79,7 @@ describe('AgentInvocationLoggerService', () => {
     expect(args.data.success).toBe(true);
     expect(args.data.durationMs).toBe(42);
     expect(events.emit).toHaveBeenCalledWith(
-      expect.stringMatching(/sally\.agent\.invocation-completed/),
+      expect.stringMatching(/app\.agent\.invocation-completed/),
       '7',
       expect.objectContaining({ success: true }),
     );

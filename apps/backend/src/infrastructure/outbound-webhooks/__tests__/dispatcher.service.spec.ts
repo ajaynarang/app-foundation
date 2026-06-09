@@ -45,7 +45,7 @@ describe('WebhookDispatcher', () => {
         id: 'sub-1',
         tenantId: 1,
         url: 'https://a.com',
-        events: ['sally.load.created'],
+        events: ['app.load.created'],
         active: true,
       },
       {
@@ -57,7 +57,7 @@ describe('WebhookDispatcher', () => {
       },
     ]);
 
-    const event = new DomainEvent('sally.load.created', 'tenant_x', {
+    const event = new DomainEvent('app.load.created', 'tenant_x', {
       loadId: 'LD-001',
     });
     await dispatcher.dispatchEvent(event);
@@ -82,16 +82,16 @@ describe('WebhookDispatcher', () => {
 
   it('skips internal events (sync, telematics, preferences)', async () => {
     const internalEvents = [
-      'sally.sync.started',
-      'sally.sync.completed',
-      'sally.sync.failed',
-      'sally.telematics.updated',
-      'sally.preferences.updated',
-      'sally.feature-flag.toggled',
-      'sally.trip.route-stale',
-      'sally.alert.unsnoozed',
-      'sally.user.created',
-      'sally.notification.sent',
+      'app.sync.started',
+      'app.sync.completed',
+      'app.sync.failed',
+      'app.telematics.updated',
+      'app.preferences.updated',
+      'app.feature-flag.toggled',
+      'app.trip.route-stale',
+      'app.alert.unsnoozed',
+      'app.user.created',
+      'app.notification.sent',
     ];
 
     for (const eventName of internalEvents) {
@@ -106,7 +106,7 @@ describe('WebhookDispatcher', () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([{ id: 'sub-1', tenantId: 1, active: true }]);
 
     const actor = { id: 'u-1', type: 'user' as const, label: 'John' };
-    const event = new DomainEvent('sally.load.created', 'tenant_x', { loadId: 'LD-1' }, actor);
+    const event = new DomainEvent('app.load.created', 'tenant_x', { loadId: 'LD-1' }, actor);
     await dispatcher.dispatchEvent(event);
 
     const createCall = mockPrisma.webhookDeliveryLog.create.mock.calls[0][0];
@@ -117,9 +117,9 @@ describe('WebhookDispatcher', () => {
   it('strips recipientUserIds from outbound webhook payloads (bridge-internal SSE routing must not leak)', async () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([{ id: 'sub-1', tenantId: 1, active: true }]);
 
-    // sally.alert.fired is visibility:'external' so it normally would be sent
+    // app.alert.fired is visibility:'external' so it normally would be sent
     // — confirm recipientUserIds is removed from the body.
-    const event = new DomainEvent('sally.alert.fired', 'tenant_x', {
+    const event = new DomainEvent('app.alert.fired', 'tenant_x', {
       alertId: 'a-1',
       priority: 'critical',
       title: 'X',
@@ -143,7 +143,7 @@ describe('WebhookDispatcher', () => {
   it('does not enqueue if no active subscriptions match', async () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([]);
 
-    const event = new DomainEvent('sally.load.created', 'tenant_x', {});
+    const event = new DomainEvent('app.load.created', 'tenant_x', {});
     await dispatcher.dispatchEvent(event);
 
     expect(mockQueue.add).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('WebhookDispatcher', () => {
         id: 'log-test',
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'sally.load.created', {
+      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {
         test: true,
       });
 
@@ -191,7 +191,7 @@ describe('WebhookDispatcher', () => {
         active: false,
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'sally.load.created', {});
+      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {});
 
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
@@ -199,7 +199,7 @@ describe('WebhookDispatcher', () => {
     it('does nothing if subscription is not found', async () => {
       mockPrisma.webhookSubscription.findUnique.mockResolvedValue(null);
 
-      await dispatcher.deliverToSubscription('sub-1', 'sally.load.created', {});
+      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {});
 
       expect(mockQueue.add).not.toHaveBeenCalled();
     });

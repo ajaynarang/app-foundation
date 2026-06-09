@@ -2,7 +2,7 @@ import { Callout } from "@/components/docs/callout"
 
 # ChatGPT
 
-Connect SALLY to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly called "connector"). ChatGPT now supports the Model Context Protocol natively -- the same protocol used by Claude, Cursor, and other MCP clients.
+Connect Platform to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly called "connector"). ChatGPT now supports the Model Context Protocol natively -- the same protocol used by Claude, Cursor, and other MCP clients.
 
 <Callout type="info">
   MCP apps in ChatGPT are available on **Business, Enterprise, and Edu** plans. An admin must enable developer mode for your workspace.
@@ -19,8 +19,8 @@ Connect SALLY to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly call
 
 | Environment | Server URL |
 |-------------|-----------|
-| **Production** | `https://api.trysally.com` |
-| **Staging** | `https://sally-api.apps.appshore.in` |
+| **Production** | `https://api.example.com` |
+| **Staging** | `https://api.apps.appshore.in` |
 
 ### Step 2: Enable Developer Mode
 
@@ -29,7 +29,7 @@ Connect SALLY to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly call
 3. Click **Advanced settings**
 4. Toggle on **Developer mode**
 
-### Step 3: Create the SALLY App
+### Step 3: Create the Platform App
 
 1. Click **"Create app"** (top-right corner in Advanced settings)
 2. Enter the Server URL from Step 1
@@ -37,14 +37,14 @@ Connect SALLY to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly call
 4. Confirm you trust the application
 5. Click **Create**
 
-### Step 3: Authorize SALLY
+### Step 3: Authorize Platform
 
-1. ChatGPT will launch the OAuth flow -- a browser window opens to the SALLY consent page
-2. Sign in with your **SALLY credentials** (same as the app)
+1. ChatGPT will launch the OAuth flow -- a browser window opens to the Platform consent page
+2. Sign in with your **Platform credentials** (same as the app)
 3. Review and approve the permission scopes
 4. You'll be redirected back to ChatGPT
 
-### Step 4: Start Using Sally
+### Step 4: Start Using Assistant
 
 Open a new chat and try:
 
@@ -69,26 +69,26 @@ ChatGPT's MCP support follows the same protocol as Claude:
 1. **Discovery**: ChatGPT queries `/.well-known/oauth-protected-resource` to find OAuth metadata
 2. **Registration**: ChatGPT registers itself via dynamic client registration (RFC 7591)
 3. **Authorization**: OAuth 2.1 + PKCE flow -- you sign in and approve scopes
-4. **Tool Access**: ChatGPT discovers available SALLY tools via `tools/list`
+4. **Tool Access**: ChatGPT discovers available Platform tools via `tools/list`
 5. **Execution**: When you ask a fleet question, ChatGPT calls the appropriate tool with your token
 
 ## Admin: Publishing to Your Workspace
 
-After testing, admins can publish the SALLY app to the workspace:
+After testing, admins can publish the Platform app to the workspace:
 
 1. Go to **Workspace Settings** → **Apps**
-2. Find SALLY under **Drafts**
+2. Find Platform under **Drafts**
 3. Click **Publish** to make it available to all workspace members
-4. Team members can then enable SALLY from their own **Settings** → **Apps & Connectors**
+4. Team members can then enable Platform from their own **Settings** → **Apps & Connectors**
 
-Each user authenticates with their own SALLY account, maintaining proper access control.
+Each user authenticates with their own Platform account, maintaining proper access control.
 
 ## Refreshing Tools
 
-If SALLY adds new tools or updates existing ones:
+If Platform adds new tools or updates existing ones:
 
 1. Go to **Settings** → **Apps & Connectors**
-2. Find the SALLY connector
+2. Find the Platform connector
 3. Click **Refresh** to pull the latest tool definitions
 4. Review and approve any new actions
 
@@ -118,12 +118,12 @@ If SALLY adds new tools or updates existing ones:
 
 - Verify the MCP Server URL is correct and accessible
 - Ensure your workspace admin has enabled developer mode
-- Check that the SALLY API is running
+- Check that the Platform API is running
 
 ### OAuth loop / can't authorize
 
-- Go to **Settings** → **Apps & Connectors**, remove SALLY, and re-add it
-- Ensure your SALLY account is active and has the correct role
+- Go to **Settings** → **Apps & Connectors**, remove Platform, and re-add it
+- Ensure your Platform account is active and has the correct role
 - Check browser pop-up blockers -- the OAuth flow opens in a new window
 
 ### No tools showing up
@@ -135,12 +135,12 @@ If SALLY adds new tools or updates existing ones:
 ### "Unauthorized" after working previously
 
 - ChatGPT should auto-refresh tokens, but if it fails:
-  - Remove and re-add the SALLY connector
-  - Re-authenticate with your SALLY credentials
+  - Remove and re-add the Platform connector
+  - Re-authenticate with your Platform credentials
 
 ## Legacy: GPT Actions (Alternative)
 
-If your workspace doesn't have MCP app support, you can still use SALLY via the older **GPT Actions** approach:
+If your workspace doesn't have MCP app support, you can still use Platform via the older **GPT Actions** approach:
 
 1. Create a Custom GPT at chatgpt.com → Explore GPTs → Create
 2. Under Actions, import from URL: `{your_base_url}/api/openapi.json`

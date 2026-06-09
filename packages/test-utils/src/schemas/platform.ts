@@ -1540,7 +1540,7 @@ export const AddOnRequestAdminRowSchema = AddOnRequestRowBareSchema.extend({
 //     synthesises its own wire shape (snake_case, different field set for
 //     public vs confidential clients). Hand-written below.
 //   - shared-types has NO RFC 7009 / RFC 6749 error-envelope schemas. The
-//     live error envelope is the Sally `HttpExceptionFilter` envelope
+//     live error envelope is the platform `HttpExceptionFilter` envelope
 //     (`{statusCode, timestamp, path, method, detail, error?, error_description?,
 //     message?}`) which preserves the RFC `{error, error_description}` keys
 //     when the controller throws `BadRequestException({error, error_description})`.
@@ -1608,18 +1608,18 @@ export const OAuthDCRResponseSchema = z
 
 /**
  * RFC 7009 revoke response. Per spec §2.2 the server MUST return HTTP 200
- * with NO body content on success; the Sally controller returns an empty
+ * with NO body content on success; the platform controller returns an empty
  * JSON object `{}`. Schema accepts the empty-object body under `.strict()`.
  */
 export const OAuthRevokeResponseSchema = z.object({}).strict();
 
 /**
- * OAuth error envelope — the Sally `HttpExceptionFilter` output when a
+ * OAuth error envelope — the platform `HttpExceptionFilter` output when a
  * controller throws `BadRequestException({error, error_description})` with
  * a structured object payload (RFC 6749 §5.2 / §4.1.2.1 / RFC 7591 §3.2.2).
  *
  * The filter preserves the RFC keys via the `extra` spread at
- * `http-exception.filter.ts:143`, but layers them ON TOP of the Sally
+ * `http-exception.filter.ts:143`, but layers them ON TOP of the platform
  * envelope (`statusCode`, `timestamp`, `path`, `method`, `detail`). The
  * `detail` field will typically be `'Request failed'` (fallback used when
  * neither `obj.detail` nor `obj.message` is set on the object payload).

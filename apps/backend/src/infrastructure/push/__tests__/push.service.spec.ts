@@ -20,7 +20,7 @@ describe('PushService', () => {
       const config: Record<string, string> = {
         VAPID_PUBLIC_KEY: 'test-public-key',
         VAPID_PRIVATE_KEY: 'test-private-key',
-        VAPID_SUBJECT: 'mailto:sally-support@appshore.in',
+        VAPID_SUBJECT: 'mailto:support@appshore.in',
       };
       return config[key];
     }),

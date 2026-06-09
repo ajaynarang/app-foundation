@@ -20,7 +20,7 @@ export function useUpgradeUrl() {
 
   const canManageBilling = isAdmin || isOwner;
 
-  const upgradeUrl = isPaymentEnabled ? '/settings/subscription' : mailto('sally');
+  const upgradeUrl = isPaymentEnabled ? '/settings/subscription' : mailto('app');
 
   const isPaymentMode = !!isPaymentEnabled;
 

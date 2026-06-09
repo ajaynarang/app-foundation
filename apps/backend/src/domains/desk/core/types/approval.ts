@@ -110,7 +110,7 @@ export const ApprovalRecordSchema = z.object({
   artifact: ApprovalArtifactSchema.nullable().optional(),
   decisionHeader: ApprovalDecisionHeaderSchema.nullable().optional(),
   /** The agent's one-line read rendered above the artifact. */
-  sallysRead: z.string().nullable().optional(),
+  assistantRead: z.string().nullable().optional(),
   /** Up to 3 bullet strings rendered inside the "How the agent got here" disclosure. */
   context: z.array(z.string()).nullable().optional(),
   /** 0..1 — drives the confidence bar in the disclosure. */

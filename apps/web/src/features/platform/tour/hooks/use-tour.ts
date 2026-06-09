@@ -40,7 +40,7 @@ export function useTour() {
       // Confetti is non-critical — silently ignore
     }
 
-    showSuccess("You're all set! That's SALLY — from loads to pay, with AI by your side.");
+    showSuccess("You're all set! That's the Assistant — AI by your side.");
   }, [closeOnborda, stopTour, updateStatus]);
 
   return {

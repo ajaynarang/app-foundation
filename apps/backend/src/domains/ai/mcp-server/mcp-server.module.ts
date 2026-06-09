@@ -12,7 +12,7 @@ import { AuthModule } from '../../../auth/auth.module';
 import { ApiKeysModule } from '../../platform/api-keys/api-keys.module';
 
 /**
- * MCP Server Module — Exposes SALLY tools to external AI clients
+ * MCP Server Module — Exposes app tools to external AI clients
  * via MCP Streamable HTTP transport with OAuth 2.1 authentication.
  *
  * Two controllers:

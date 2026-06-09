@@ -22,7 +22,7 @@ function CardSkeleton() {
 }
 
 export function OverviewCards() {
-  const { plan, displayName, isLoading: planLoading, vehicleCount, fleetLimit } = usePlan();
+  const { plan, displayName, isLoading: planLoading } = usePlan();
   const { data: health, isLoading: healthLoading } = useIntegrationHealth();
   const { data: members, isLoading: membersLoading } = useTeamMembers();
   const { data: invitations, isLoading: invitationsLoading } = useInvitations();
@@ -39,16 +39,9 @@ export function OverviewCards() {
     );
   }
 
-  // Plan & Usage — show vehicle + user counts
+  // Plan & Usage — show active user count
   const activeMembers = members?.filter((m) => m.isActive)?.length ?? 0;
-  const usageParts: string[] = [];
-  if (fleetLimit) {
-    usageParts.push(`${vehicleCount}/${fleetLimit} vehicles`);
-  } else if (vehicleCount > 0) {
-    usageParts.push(`${vehicleCount} vehicles`);
-  }
-  usageParts.push(`${activeMembers} user${activeMembers !== 1 ? 's' : ''}`);
-  const planDetail = usageParts.join(' · ');
+  const planDetail = `${activeMembers} user${activeMembers !== 1 ? 's' : ''}`;
 
   // Team — member count + pending invitations
   const pendingInvitations = invitations?.filter((i) => i.status === 'PENDING')?.length ?? 0;

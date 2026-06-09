@@ -325,21 +325,21 @@ export type DeskResponsibilityList = z.infer<typeof DeskResponsibilityListSchema
 
 /**
  * `GET /desk/responsibilities/:key` — detail extends the list-item with
- * 3 per-tenant fields (conditions, notesForSally, supervisorUserId).
+ * 3 per-tenant fields (conditions, notesForAssistant, supervisorUserId).
  * Service `getForTenant` (responsibility.service.ts lines 139-153) projects
  * the union.
  *
  * IMPORTANT — Finding #54 (Phase 6 Group 6f): on demo-northstar today this
  * endpoint returns 500 (Prisma error P2022). The Prisma model in
  * `apps/backend/prisma/schema.prisma::DeskResponsibility` (line ~6800) still
- * declares `notesForSally` and `supervisorUserId` columns, but the live
+ * declares `notesForAssistant` and `supervisorUserId` columns, but the live
  * `desk_responsibilities` table dropped them. Tests gated on
  * `@requires:data-desk-responsibility` exclude until the schema realigns
  * (same realignment that resolves Finding #53 for desk_memories).
  */
 export const DeskResponsibilityDetailSchema = DeskResponsibilityRowSchema.extend({
   conditions: z.record(z.unknown()),
-  notesForSally: z.string().nullable(),
+  notesForAssistant: z.string().nullable(),
   supervisorUserId: z.number().int().positive().nullable(),
 }).strict();
 export type DeskResponsibilityDetail = z.infer<typeof DeskResponsibilityDetailSchema>;
@@ -413,7 +413,10 @@ export const DeskResponsibilityUiSpecSchema = z
     title: z.string(),
     description: z.string(),
     lifecycle: z.enum(['AVAILABLE', 'COMING_SOON']),
-    conditionsUI: z.object({ fields: z.array(ConditionFieldSpecSchema) }).strict().nullable(),
+    conditionsUI: z
+      .object({ fields: z.array(ConditionFieldSpecSchema) })
+      .strict()
+      .nullable(),
     defaults: z
       .object({
         trustLevel: TrustLevelEnum,
@@ -456,8 +459,8 @@ export type DeskResponsibilityRunResponse = z.infer<typeof DeskResponsibilityRun
  * the plan suggests) — the service filters via
  * `orderedKeys.filter((k) => agentsByKey.has(k))` so only agents that own
  * a registered responsibility appear. Today the registry references 6
- * unique agents (sally-billing, sally-route, sally-dispatch, sally-compliance,
- * sally-maintenance, sally-payroll). The remaining 6 of the 12 AGENT_KEYS
+ * unique agents (assistant-billing, assistant-route, assistant-dispatch, assistant-compliance,
+ * assistant-maintenance, assistant-payroll). The remaining 6 of the 12 AGENT_KEYS
  * aren't surfaced until they own a responsibility.
  */
 export const DeskAgentRowSchema = z
@@ -511,7 +514,7 @@ export type DeskAgentBulkToggleResponse = z.infer<typeof DeskAgentBulkToggleResp
  * (per inngest-js v4 source). Schema is permissive — Inngest may add new
  * keys on minor versions. We pin only the discriminator that proves we
  * reached the serve handler (`schema_version`) plus the registered
- * `function_count` matching Sally's one registered function (ar-followup).
+ * `function_count` matching the assistant's one registered function (ar-followup).
  */
 export const InngestServeResponseSchema = z
   .object({

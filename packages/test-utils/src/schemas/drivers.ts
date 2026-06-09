@@ -79,7 +79,7 @@ export const DriverListItemSchema = z.object({
   activeLoadCounts: ActiveLoadCountsSchema,
   createdAt: isoDateString,
   updatedAt: isoDateString,
-  sallyAccessStatus: z.enum(['ACTIVE', 'INVITED', 'NO_ACCESS', 'DEACTIVATED']),
+  appAccessStatus: z.enum(['ACTIVE', 'INVITED', 'NO_ACCESS', 'DEACTIVATED']),
   linkedUserId: z.string().nullable(),
   pendingInvitationId: z.string().nullable(),
   upcomingUnavailability: UnavailabilitySchema,
@@ -169,7 +169,7 @@ export const DriverDetailSchema = z
     assignedVehicle: AssignedVehicleSchema.nullable(),
     currentLoad: z.unknown().nullable(),
     upcomingLoads: z.array(z.unknown()),
-    sallyAccessStatus: z.string(),
+    appAccessStatus: z.string(),
     linkedUserId: z.string().nullable(),
     pendingInvitationId: z.string().nullable(),
     createdAt: isoDateString,
@@ -352,14 +352,14 @@ export const ActivateAndInviteResponseSchema = z
 // platform domain. We only assert the envelope + `invitationId` for
 // cross-domain coupling. Not applied to any Driver-owned response.
 
-// ── GET /driver/sally/timeline ────────────────────────────────────
+// ── GET /driver/assistant/timeline ────────────────────────────────────
 //
 // Response from DriverTimelineService.getTimeline:
 //   { entries: TimelineEntry[], cursor: string | null, loadContext: LoadContext | null }
 
 const TimelineEntrySchema = z.object({
   id: z.string(),
-  type: z.enum(['sally', 'operations', 'alert', 'driver', 'system']),
+  type: z.enum(['assistant', 'operations', 'alert', 'driver', 'system']),
   content: z.string(),
   timestamp: isoDateString,
   metadata: z.record(z.string(), z.unknown()).optional(),

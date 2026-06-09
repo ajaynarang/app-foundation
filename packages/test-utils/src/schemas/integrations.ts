@@ -459,11 +459,11 @@ export const AccountingStatusSchema = z.discriminatedUnion('connected', [
  * accounting-mapping.service.ts::listEntityMappings (lines 226–260).
  *
  * Prisma schema: {id: Int, tenantId, integrationId, entityType,
- * sallyEntityId, externalId?, externalName?, matchConfidence?,
+ * appEntityId, externalId?, externalName?, matchConfidence?,
  * confirmedAt?, createdAt, updatedAt}. The service spreads the row and
- * adds `sallyEntityName` (line 258). On PATCH (updateMapping) and
+ * adds `appEntityName` (line 258). On PATCH (updateMapping) and
  * POST :id/confirm, the raw Prisma row is returned WITHOUT the
- * `sallyEntityName` enrichment — so that field is `.optional()`.
+ * `appEntityName` enrichment — so that field is `.optional()`.
  */
 export const AccountingMappingSchema = z
   .object({
@@ -471,14 +471,14 @@ export const AccountingMappingSchema = z
     tenantId: z.number().int(),
     integrationId: z.string(),
     entityType: z.string(),
-    sallyEntityId: z.string(),
+    appEntityId: z.string(),
     externalId: z.string().nullable(),
     externalName: z.string().nullable(),
     matchConfidence: z.number().nullable(),
     confirmedAt: isoDateString.nullable(),
     createdAt: isoDateString,
     updatedAt: isoDateString,
-    sallyEntityName: z.string().optional(),
+    appEntityName: z.string().optional(),
   })
   .strict();
 
@@ -514,7 +514,7 @@ export const ExternalEntityListSchema = z.array(ExternalEntitySchema);
  * accounting-mapping.service.ts::listAccountMappings (lines 407–412)
  * and ::updateAccountMapping (line 414).
  *
- * Prisma model: {id, tenantId, integrationId, sallyItemType, direction,
+ * Prisma model: {id, tenantId, integrationId, appItemType, direction,
  * externalAccountId, externalAccountName, isDefault, createdAt, updatedAt}.
  */
 export const AccountAccountMappingSchema = z
@@ -522,7 +522,7 @@ export const AccountAccountMappingSchema = z
     id: z.number().int(),
     tenantId: z.number().int(),
     integrationId: z.string(),
-    sallyItemType: z.string(),
+    appItemType: z.string(),
     direction: z.string(),
     externalAccountId: z.string(),
     externalAccountName: z.string(),
@@ -655,14 +655,8 @@ const EdiMessageAuditItemSchema = z
     metadata: z.unknown().nullable(),
     createdAt: isoDateString,
     updatedAt: isoDateString,
-    tradingPartner: z
-      .object({ name: z.string() })
-      .strict()
-      .nullable(),
-    load: z
-      .object({ loadId: z.string(), loadNumber: z.string().nullable() })
-      .strict()
-      .nullable(),
+    tradingPartner: z.object({ name: z.string() }).strict().nullable(),
+    load: z.object({ loadId: z.string(), loadNumber: z.string().nullable() }).strict().nullable(),
   })
   .strict();
 
@@ -767,11 +761,7 @@ export const EdiAutoAcceptRuleSchema = z
     approvedByUserId: z.number().int().nullable(),
     createdAt: isoDateString,
     updatedAt: isoDateString,
-    tradingPartner: z
-      .object({ name: z.string() })
-      .strict()
-      .nullable()
-      .optional(),
+    tradingPartner: z.object({ name: z.string() }).strict().nullable().optional(),
   })
   .strict();
 

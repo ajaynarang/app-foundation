@@ -7,11 +7,11 @@ import * as path from 'path';
  *
  * The LiveKit Agents SDK forks child processes to handle jobs. The agent
  * entry point (voice-agent.entry.ts) runs the voice pipeline:
- *   Deepgram STT → Sally API (HTTP on localhost) → Cartesia TTS
+ *   Deepgram STT → the assistant API (HTTP on localhost) → Cartesia TTS
  *
  * The forked process calls back to this NestJS server via an internal
  * HTTP endpoint (/api/v1/voice/internal/respond) secured by a shared
- * secret. This lets the agent use Sally's full AI pipeline (moderation,
+ * secret. This lets the agent use the assistant's full AI pipeline (moderation,
  * MCP tools, audit) — identical to text chat.
  */
 @Injectable()
@@ -32,7 +32,7 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
     // because the forked agent process from the previous run may still
     // be alive with the old secret. In dev, use a fixed default.
     if (!process.env.VOICE_AGENT_SECRET) {
-      process.env.VOICE_AGENT_SECRET = 'sally-voice-dev-secret-do-not-use-in-production';
+      process.env.VOICE_AGENT_SECRET = 'app-voice-dev-secret-do-not-use-in-production';
       this.logger.warn('VOICE_AGENT_SECRET not set — using dev default. Set a real secret in production.');
     }
 
@@ -101,7 +101,7 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
 
       const serverOpts = new ServerOptions({
         agent: entryFile,
-        agentName: 'sally-voice',
+        agentName: 'app-voice',
         wsURL: livekitUrl,
         apiKey,
         apiSecret,

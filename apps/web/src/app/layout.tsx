@@ -11,7 +11,7 @@ import { NetworkStatusBanner } from '@/shared/components/common/network-status-b
 
 const inter = Inter({ subsets: ['latin'] });
 
-// Font options for SALLY logo
+// Font options for the brand logo
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   weight: ['600', '700'],
@@ -32,14 +32,14 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: {
-    default: 'SALLY - Your Fleet Operations Assistant',
-    template: '%s | SALLY',
+    default: 'Platform',
+    template: '%s | Platform',
   },
-  description: 'Stop planning routes. Start preventing violations. The only platform that routes drivers, not trucks.',
-  keywords: ['fleet management', 'HOS compliance', 'route planning', 'trucking', 'logistics', 'dispatch'],
-  authors: [{ name: 'SALLY' }],
-  creator: 'SALLY',
-  publisher: 'SALLY',
+  description: 'The platform for your operations.',
+  keywords: ['platform', 'operations', 'dashboard', 'management'],
+  authors: [{ name: 'Platform' }],
+  creator: 'Platform',
+  publisher: 'Platform',
 
   // Favicon and icons
   icons: {
@@ -58,19 +58,18 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://sally.com',
-    title: 'SALLY - Your Fleet Operations Assistant',
-    description:
-      'Stop planning routes. Start preventing violations. The only platform that routes drivers, not trucks.',
-    siteName: 'SALLY',
+    url: 'https://app.example.com',
+    title: 'Platform',
+    description: 'The platform for your operations.',
+    siteName: 'Platform',
   },
 
   // Twitter Card
   twitter: {
     card: 'summary_large_image',
-    title: 'SALLY - Your Fleet Operations Assistant',
-    description: 'Stop planning routes. Start preventing violations.',
-    creator: '@sally',
+    title: 'Platform',
+    description: 'The platform for your operations.',
+    creator: '@platform',
   },
 
   // Robots

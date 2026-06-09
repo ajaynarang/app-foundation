@@ -59,7 +59,7 @@ export function OAuthClientsList() {
             <KeyRound className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 text-lg font-semibold">No OAuth clients</h3>
             <p className="mb-4 text-muted-foreground">
-              Register your first app so users can sign in and approve access to SALLY data.
+              Register your first app so users can sign in and approve access to platform data.
             </p>
             <Button onClick={() => setCreateOpen(true)}>Register First Client</Button>
           </CardContent>

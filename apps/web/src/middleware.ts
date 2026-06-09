@@ -29,9 +29,9 @@ const PUBLIC_PREFIXES = [
   '/pricing',
   '/product',
   '/accept-invitation',
-  '/sally-canvas',
-  '/sally-nerve',
-  '/sally-default',
+  '/assistant-canvas',
+  '/assistant-nerve',
+  '/assistant-default',
   '/rest-optimizer',
   '/_next',
   '/api',
@@ -159,8 +159,8 @@ function getRoleRedirect(pathname: string, role: string | undefined): string | n
  * Duplicated from shared/lib/tenant-url.ts because middleware runs on Edge
  * runtime and we want zero external dependencies here.
  *
- * "acme.staging.sally.appshore.in" → "acme"
- * "staging.sally.appshore.in"      → null
+ * "acme.staging.app.appshore.in" → "acme"
+ * "staging.app.appshore.in"      → null
  * "localhost:3000"                  → null
  */
 /** Valid DNS label: lowercase alphanumeric + hyphens, 1-63 chars. */

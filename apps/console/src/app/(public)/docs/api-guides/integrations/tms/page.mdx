@@ -1,17 +1,17 @@
 # TMS Integration
 
-SALLY integrates with Transportation Management Systems (TMS) to sync load data, dispatch assignments, and shipment tracking. Two TMS adapters are available: McLeod for dispatch-oriented workflows and Project44 for visibility and tracking.
+Platform integrates with Transportation Management Systems (TMS) to sync load data, dispatch assignments, and shipment tracking. Two TMS adapters are available: McLeod for dispatch-oriented workflows and Project44 for visibility and tracking.
 
 ## McLeod Integration
 
-McLeod Software is a widely-used TMS in North American trucking. Connecting McLeod to SALLY enables automatic load sync, so dispatchers do not need to create loads manually in both systems.
+McLeod Software is a widely-used TMS in North American trucking. Connecting McLeod to Platform enables automatic load sync, so dispatchers do not need to create loads manually in both systems.
 
 ### What You Get
 
-- **Automatic load creation** -- New loads dispatched in McLeod appear in SALLY automatically
+- **Automatic load creation** -- New loads dispatched in McLeod appear in Platform automatically
 - **Status sync** -- Load status changes in either system are reflected in the other
 - **Customer data** -- Customer and facility information syncs for accurate stop planning
-- **Dispatch assignments** -- Driver and vehicle assignments flow from McLeod to SALLY
+- **Dispatch assignments** -- Driver and vehicle assignments flow from McLeod to Platform
 
 ### Setup
 
@@ -25,8 +25,8 @@ Contact your McLeod account representative to enable API access. You will need:
 #### Step 2: Create the Integration
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "vendor": "mcleod",
@@ -44,11 +44,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  "https://api-staging.appshore.in/api/v1/integrations",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -84,8 +84,8 @@ const integration = await response.json();
 #### Step 3: Test and Activate
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_m1c2l3d4/test \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/integrations/int_m1c2l3d4/test \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -107,9 +107,9 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_m1c2l
 
 ### Data Mapping
 
-SALLY maps McLeod fields to SALLY load fields:
+Platform maps McLeod fields to Platform load fields:
 
-| McLeod Field | SALLY Field | Notes |
+| McLeod Field | Platform Field | Notes |
 |---|---|---|
 | `orderNumber` | `referenceNumber` | Primary load identifier |
 | `billTo.name` | `customer` | Billing customer name |
@@ -122,13 +122,13 @@ SALLY maps McLeod fields to SALLY load fields:
 
 ## Project44 Integration
 
-Project44 provides advanced shipment visibility and predictive ETAs. Connecting Project44 to SALLY enhances monitoring accuracy with external tracking data.
+Project44 provides advanced shipment visibility and predictive ETAs. Connecting Project44 to Platform enhances monitoring accuracy with external tracking data.
 
 ### What You Get
 
 - **Shipment visibility** -- Real-time tracking from Project44's carrier network
 - **Predictive ETAs** -- Machine learning-based ETA predictions
-- **Exception alerts** -- Project44's exception events feed into SALLY's alert system
+- **Exception alerts** -- Project44's exception events feed into Platform's alert system
 - **Multi-modal tracking** -- Track shipments across truck, rail, and intermodal
 
 ### Setup
@@ -143,8 +143,8 @@ Register for API access at [developer.project44.com](https://developer.project44
 #### Step 2: Create the Integration
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/integrations \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "vendor": "project44",
@@ -162,11 +162,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/integrations",
+  "https://api-staging.appshore.in/api/v1/integrations",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -188,8 +188,8 @@ const integration = await response.json();
 #### Step 3: Test and Activate
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_p4q5r6s7/test \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST https://api-staging.appshore.in/api/v1/integrations/int_p4q5r6s7/test \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -209,15 +209,15 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/integrations/int_p4q5r
 }
 ```
 
-### How Project44 Data Enhances SALLY
+### How Project44 Data Enhances Platform
 
-When both a TMS integration (McLeod) and visibility integration (Project44) are active, SALLY combines data from both sources:
+When both a TMS integration (McLeod) and visibility integration (Project44) are active, Platform combines data from both sources:
 
 1. **McLeod** provides load details, dispatch assignments, and appointment times
 2. **Project44** provides real-time tracking, predictive ETAs, and exception events
-3. **SALLY** uses both to plan optimal routes and generate accurate alerts
+3. **Platform** uses both to plan optimal routes and generate accurate alerts
 
-For example, if Project44 detects that a carrier is running late, SALLY generates a `LATE_TO_APPOINTMENT` alert before the scheduled time, giving dispatchers time to notify the customer.
+For example, if Project44 detects that a carrier is running late, Platform generates a `LATE_TO_APPOINTMENT` alert before the scheduled time, giving dispatchers time to notify the customer.
 
 ## Sync Interval Recommendations
 
@@ -237,7 +237,7 @@ For example, if Project44 detects that a carrier is running late, SALLY generate
 
 ### McLeod: Loads Not Syncing
 
-- Check that loads in McLeod have a status that SALLY recognizes (dispatched, in-transit)
+- Check that loads in McLeod have a status that Platform recognizes (dispatched, in-transit)
 - Completed or voided loads are not synced
 - Verify the sync interval -- newly created loads appear after the next sync
 

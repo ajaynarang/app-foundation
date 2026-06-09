@@ -2,12 +2,12 @@ import { DomainEvent, EventActor } from '../domain-event';
 
 describe('DomainEvent', () => {
   it('creates event with required fields only (backward compat)', () => {
-    const event = new DomainEvent('sally.load.created', 'tenant-1', {
+    const event = new DomainEvent('app.load.created', 'tenant-1', {
       loadId: 'LD-1',
     });
     expect(event.id).toBeDefined();
     expect(event.timestamp).toBeInstanceOf(Date);
-    expect(event.event).toBe('sally.load.created');
+    expect(event.event).toBe('app.load.created');
     expect(event.tenantId).toBe('tenant-1');
     expect(event.data).toEqual({ loadId: 'LD-1' });
     expect(event.version).toBe(1);
@@ -22,14 +22,7 @@ describe('DomainEvent', () => {
       type: 'user',
       label: 'John D.',
     };
-    const event = new DomainEvent(
-      'sally.load.assigned',
-      'tenant-1',
-      { loadId: 'LD-1' },
-      actor,
-      'corr-123',
-      'cause-456',
-    );
+    const event = new DomainEvent('app.load.assigned', 'tenant-1', { loadId: 'LD-1' }, actor, 'corr-123', 'cause-456');
     expect(event.actor).toEqual(actor);
     expect(event.correlationId).toBe('corr-123');
     expect(event.causationId).toBe('cause-456');
@@ -37,14 +30,14 @@ describe('DomainEvent', () => {
   });
 
   it('generates unique IDs for each event', () => {
-    const e1 = new DomainEvent('sally.load.created', 't1', {});
-    const e2 = new DomainEvent('sally.load.created', 't1', {});
+    const e1 = new DomainEvent('app.load.created', 't1', {});
+    const e2 = new DomainEvent('app.load.created', 't1', {});
     expect(e1.id).not.toBe(e2.id);
   });
 
   it('sets timestamp close to current time', () => {
     const before = new Date();
-    const event = new DomainEvent('sally.load.created', 't1', {});
+    const event = new DomainEvent('app.load.created', 't1', {});
     const after = new Date();
     expect(event.timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
     expect(event.timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
@@ -55,7 +48,7 @@ describe('DomainEvent', () => {
       entityId: string;
       entityType: string;
     }
-    const event = new DomainEvent<TestPayload>('sally.load.created', 't1', {
+    const event = new DomainEvent<TestPayload>('app.load.created', 't1', {
       entityId: 'LD-1',
       entityType: 'load',
     });
@@ -67,7 +60,7 @@ describe('DomainEvent', () => {
     it('reconstructs event with original id, timestamp, and version', () => {
       const event = DomainEvent.fromSerialized({
         id: 'original-id',
-        event: 'sally.load.created',
+        event: 'app.load.created',
         tenantId: 'tenant-1',
         data: { entityId: 'LD-1' },
         actor: { id: 'u-1', type: 'user', label: 'John' },
@@ -78,7 +71,7 @@ describe('DomainEvent', () => {
       });
 
       expect(event.id).toBe('original-id');
-      expect(event.event).toBe('sally.load.created');
+      expect(event.event).toBe('app.load.created');
       expect(event.tenantId).toBe('tenant-1');
       expect(event.data).toEqual({ entityId: 'LD-1' });
       expect(event.actor).toEqual({ id: 'u-1', type: 'user', label: 'John' });
@@ -91,7 +84,7 @@ describe('DomainEvent', () => {
     it('handles null actor', () => {
       const event = DomainEvent.fromSerialized({
         id: 'id-1',
-        event: 'sally.sync.started',
+        event: 'app.sync.started',
         tenantId: 't-1',
         data: {},
         actor: null,
@@ -107,7 +100,7 @@ describe('DomainEvent', () => {
     it('is an instanceof DomainEvent', () => {
       const event = DomainEvent.fromSerialized({
         id: 'id-1',
-        event: 'sally.load.created',
+        event: 'app.load.created',
         tenantId: 't-1',
         data: {},
         actor: null,

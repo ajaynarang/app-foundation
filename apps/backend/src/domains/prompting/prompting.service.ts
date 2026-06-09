@@ -132,12 +132,12 @@ export class PromptingService implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   private buildCacheKey(name: string, variables?: Record<string, string>): string {
-    if (!variables) return buildKey('sally:prompt', name);
+    if (!variables) return buildKey('app:prompt', name);
     const varSuffix = Object.entries(variables)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join('&');
-    return buildKey('sally:prompt', `${name}:${varSuffix}`);
+    return buildKey('app:prompt', `${name}:${varSuffix}`);
   }
 
   private async resolvePrompt(name: string, variables?: Record<string, string>): Promise<string> {

@@ -1,6 +1,6 @@
 # Tenant Setup
 
-SALLY is a multi-tenant platform. Every organization (carrier, broker, fleet operator) operates within its own isolated tenant. All data -- drivers, vehicles, loads, routes, and alerts -- is automatically scoped to your tenant. Users never see data from other tenants.
+Platform is a multi-tenant platform. Every organization (carrier, broker, fleet operator) operates within its own isolated tenant. All data -- drivers, vehicles, loads, routes, and alerts -- is automatically scoped to your tenant. Users never see data from other tenants.
 
 ## Tenant Lifecycle
 
@@ -27,7 +27,7 @@ stateDiagram-v2
 Create your organization account:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/tenants/register \
+curl -X POST https://api-staging.appshore.in/api/v1/tenants/register \
   -H "Content-Type: application/json" \
   -d '{
     "organization": {
@@ -51,7 +51,7 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/tenants/register \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/tenants/register",
+  "https://api-staging.appshore.in/api/v1/tenants/register",
   {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -120,12 +120,12 @@ The registering user is automatically assigned the `OWNER` role, which has full 
 
 ### Step 2: Await Approval
 
-After registration, the tenant enters `PENDING_APPROVAL` status. A SALLY administrator reviews the registration and either approves or rejects it. Approval typically takes less than 24 hours during business days.
+After registration, the tenant enters `PENDING_APPROVAL` status. A Platform administrator reviews the registration and either approves or rejects it. Approval typically takes less than 24 hours during business days.
 
 You can check your tenant status by logging in:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/auth/login \
+curl -X POST https://api-staging.appshore.in/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "robert.williams@acmefreight.com",
@@ -156,14 +156,14 @@ Once approved, you receive a confirmation email and the tenant moves to `ACTIVE`
 
 ## Onboarding Steps
 
-After your tenant is approved, complete these steps to start using SALLY:
+After your tenant is approved, complete these steps to start using Platform:
 
 ### 1. Generate API Keys
 
 Create API keys for your integrations:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/api-keys \
+curl -X POST https://api-staging.appshore.in/api/v1/api-keys \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -178,8 +178,8 @@ See [API Keys](/docs/getting-started/api-keys) for details.
 Add dispatchers, admins, and other team members:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/user-invitations \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/user-invitations \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "jane.smith@acmefreight.com",
@@ -235,8 +235,8 @@ Tenants can configure various settings that affect platform behavior. These are 
 Configure which alerts your team receives and at what thresholds:
 
 ```bash
-curl -X PUT https://sally-api-staging.appshore.in/api/v1/tenant/settings/alerts \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X PUT https://api-staging.appshore.in/api/v1/tenant/settings/alerts \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "hosApproachingThresholdHours": 1.0,
@@ -253,8 +253,8 @@ curl -X PUT https://sally-api-staging.appshore.in/api/v1/tenant/settings/alerts 
 Configure the monitoring service behavior:
 
 ```bash
-curl -X PUT https://sally-api-staging.appshore.in/api/v1/tenant/settings/monitoring \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X PUT https://api-staging.appshore.in/api/v1/tenant/settings/monitoring \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "monitoringIntervalSeconds": 60,
@@ -283,7 +283,7 @@ If your tenant is suspended (due to billing issues, policy violations, or admini
 ```json
 {
   "statusCode": 403,
-  "message": "Tenant tnt_acme001 is suspended. Contact sally-support@appshore.in for assistance.",
+  "message": "Tenant tnt_acme001 is suspended. Contact app-support@appshore.in for assistance.",
   "error": "Forbidden"
 }
 ```

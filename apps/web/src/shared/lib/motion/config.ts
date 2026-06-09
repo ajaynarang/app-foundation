@@ -1,5 +1,5 @@
 /**
- * SALLY Motion System — Centralized Animation Configuration
+ * Platform Motion System — Centralized Animation Configuration
  *
  * Design philosophy: "Quiet Confidence"
  * - Functional, not decorative — every animation communicates state change

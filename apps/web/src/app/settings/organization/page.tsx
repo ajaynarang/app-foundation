@@ -48,7 +48,7 @@ export default function OrganizationPage() {
           <CardTitle>Company Details</CardTitle>
           <CardDescription>
             {canEdit
-              ? 'Update your company profile and the timezone Sally schedules in'
+              ? 'Update your company profile and the timezone Assistant schedules in'
               : 'Organization information from your account'}
           </CardDescription>
         </CardHeader>
@@ -82,10 +82,10 @@ export default function OrganizationPage() {
               <p className="text-sm text-muted-foreground">
                 Contact{' '}
                 <a
-                  href={mailto('sallySupport')}
+                  href={mailto('appSupport')}
                   className="text-foreground underline underline-offset-4 hover:text-muted-foreground"
                 >
-                  {CONTACTS.sallySupport}
+                  {CONTACTS.appSupport}
                 </a>{' '}
                 to update organization details.
               </p>

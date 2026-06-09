@@ -106,7 +106,7 @@ export function OAuthClientRegisterSheet({ open, onOpenChange }: Props) {
             <Label htmlFor="agent-description">Description (optional)</Label>
             <Textarea
               id="agent-description"
-              placeholder="What this app does with your SALLY tenant"
+              placeholder="What this app does with your tenant"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}

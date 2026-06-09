@@ -10,7 +10,7 @@ export default function WebhooksPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Webhooks</h1>
           <p className="text-muted-foreground mt-1">
-            Receive real-time notifications when events happen in your SALLY account.
+            Receive real-time notifications when events happen in your platform account.
           </p>
         </div>
 

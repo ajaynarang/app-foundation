@@ -615,11 +615,11 @@ function generateHtml(matrix: ConfidenceMatrix): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SALLY Quality Gate — Confidence Matrix</title>
+  <title>Platform Quality Gate — Confidence Matrix</title>
 </head>
 <body style="font-family:-apple-system,system-ui,sans-serif;background:#0a0a0a;color:#e5e5e5;max-width:900px;margin:0 auto;padding:24px">
   <h1 style="color:#fff;border-bottom:1px solid #333;padding-bottom:12px">
-    SALLY Quality Gate
+    Platform Quality Gate
   </h1>
   <div style="color:#737373;margin-bottom:24px">
     <div>Generated: ${esc(matrix.timestamp)}</div>
@@ -792,7 +792,7 @@ async function main(): Promise<void> {
 
   // Console output
   console.log('\n═══════════════════════════════════════════');
-  console.log('  SALLY Quality Gate');
+  console.log('  Platform Quality Gate');
   console.log('═══════════════════════════════════════════');
   console.log(`  Target:  ${matrix.target}`);
   console.log(`  Tenant:  ${matrix.tenant}`);

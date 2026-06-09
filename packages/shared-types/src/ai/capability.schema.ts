@@ -5,11 +5,11 @@ import { z } from 'zod';
  * command palette and capability card. Mirrors the frontend's UserMode union —
  * kept here so backend and frontend agree on the API contract.
  */
-export const SallyUserModeSchema = z.enum(['prospect', 'member', 'owner', 'admin', 'super_admin', 'support']);
-export type SallyUserMode = z.infer<typeof SallyUserModeSchema>;
+export const AssistantUserModeSchema = z.enum(['prospect', 'member', 'owner', 'admin', 'super_admin', 'support']);
+export type AssistantUserMode = z.infer<typeof AssistantUserModeSchema>;
 
-/** A single thing the user can ask Sally to do. */
-export const SallyCapabilityItemSchema = z.object({
+/** A single thing the user can ask the assistant to do. */
+export const AssistantCapabilityItemSchema = z.object({
   /** Stable id, used as React key and analytics token. */
   id: z.string(),
   /** Short title rendered in the palette row (≤ ~40 chars). */
@@ -19,29 +19,29 @@ export const SallyCapabilityItemSchema = z.object({
   /** The example prompt drafted into the textarea on selection. */
   example: z.string(),
 });
-export type SallyCapabilityItem = z.infer<typeof SallyCapabilityItemSchema>;
+export type AssistantCapabilityItem = z.infer<typeof AssistantCapabilityItemSchema>;
 
 /** Capability rows are grouped under a category heading in the palette. */
-export const SallyCapabilityCategorySchema = z.object({
+export const AssistantCapabilityCategorySchema = z.object({
   title: z.string(),
-  items: z.array(SallyCapabilityItemSchema),
+  items: z.array(AssistantCapabilityItemSchema),
 });
-export type SallyCapabilityCategory = z.infer<typeof SallyCapabilityCategorySchema>;
+export type AssistantCapabilityCategory = z.infer<typeof AssistantCapabilityCategorySchema>;
 
 /** A "Quick action" — promoted to the top of the palette per role. */
-export const SallyQuickActionSchema = z.object({
+export const AssistantQuickActionSchema = z.object({
   id: z.string(),
   label: z.string(),
   hint: z.string(),
   /** Prompt drafted into the textarea on selection. We never auto-fire. */
   prompt: z.string(),
 });
-export type SallyQuickAction = z.infer<typeof SallyQuickActionSchema>;
+export type AssistantQuickAction = z.infer<typeof AssistantQuickActionSchema>;
 
-/** Full payload returned by GET /sally/capabilities. */
-export const SallyCapabilitiesSchema = z.object({
-  mode: SallyUserModeSchema,
-  quickActions: z.array(SallyQuickActionSchema),
-  categories: z.array(SallyCapabilityCategorySchema),
+/** Full payload returned by GET /assistant/capabilities. */
+export const AssistantCapabilitiesSchema = z.object({
+  mode: AssistantUserModeSchema,
+  quickActions: z.array(AssistantQuickActionSchema),
+  categories: z.array(AssistantCapabilityCategorySchema),
 });
-export type SallyCapabilities = z.infer<typeof SallyCapabilitiesSchema>;
+export type AssistantCapabilities = z.infer<typeof AssistantCapabilitiesSchema>;

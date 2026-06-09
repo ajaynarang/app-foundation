@@ -1,8 +1,39 @@
 import { apiClient } from '@/shared/lib/api';
 import { useAuthStore } from '@/features/auth';
 import { STORAGE_KEYS } from '@/shared/constants';
-import type { SallyCapabilities } from '@app/shared-types';
 import type { UserMode } from './engine/types';
+
+// ── Assistant capabilities (GET /assistant/capabilities) ──
+// Shape of the capability catalog surfaced in the command palette / capability card.
+
+/** A single thing the user can ask the assistant to do. */
+export interface AssistantCapabilityItem {
+  id: string;
+  name: string;
+  description: string;
+  example: string;
+}
+
+/** Capability rows grouped under a category heading in the palette. */
+export interface AssistantCapabilityCategory {
+  title: string;
+  items: AssistantCapabilityItem[];
+}
+
+/** A "Quick action" promoted to the top of the palette per role. */
+export interface AssistantQuickAction {
+  id: string;
+  label: string;
+  hint: string;
+  prompt: string;
+}
+
+/** Full payload returned by GET /assistant/capabilities. */
+export interface AssistantCapabilities {
+  mode: UserMode;
+  quickActions: AssistantQuickAction[];
+  categories: AssistantCapabilityCategory[];
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -119,12 +150,12 @@ export async function getVoiceToken(conversationId: string): Promise<{ token: st
 // ── Capabilities ──
 
 /**
- * Fetch the things Sally can do for the current user. Mode is normally
+ * Fetch the things Assistant can do for the current user. Mode is normally
  * derived from the JWT role on the backend; pass one to force a specific
  * set (e.g. a marketing surface that wants the prospect catalog while the
  * user happens to be authenticated).
  */
-export async function getSallyCapabilities(mode?: UserMode): Promise<SallyCapabilities> {
+export async function getAssistantCapabilities(mode?: UserMode): Promise<AssistantCapabilities> {
   const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
-  return apiClient<SallyCapabilities>(`/sally/capabilities${query}`);
+  return apiClient<AssistantCapabilities>(`/assistant/capabilities${query}`);
 }

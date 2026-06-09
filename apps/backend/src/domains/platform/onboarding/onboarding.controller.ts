@@ -26,7 +26,7 @@ export class OnboardingController {
   async getOnboardingStatus(@TenantDbId() tenantDbId: number): Promise<OnboardingStatusResponse> {
     this.logger.log(`GET /onboarding/status for tenant DB ID ${tenantDbId}`);
 
-    const cacheKey = buildKey('sally:onboarding', 'status', 'tenant', tenantDbId);
+    const cacheKey = buildKey('app:onboarding', 'status', 'tenant', tenantDbId);
     return this.cache.getOrSet(
       cacheKey,
       () => this.onboardingService.getOnboardingStatus(tenantDbId),

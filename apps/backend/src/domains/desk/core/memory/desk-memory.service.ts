@@ -296,7 +296,7 @@ export class DeskMemoryService {
    * (intent=reinforce + memory=CORRECT, or intent=correct + memory=REINFORCE)
    *
    * Pinned rows escape contradiction penalty — the operator explicitly said
-   * "trust this memory". Surfacing it gives Sally the chance to honor the
+   * "trust this memory". Surfacing it gives the assistant the chance to honor the
    * pinned guidance even when current intent disagrees.
    */
   private contradictionPenalty(

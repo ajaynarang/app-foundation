@@ -17,8 +17,8 @@ export interface CookieConsentState {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const COOKIE_KEY = 'sally-cookies';
-const CONSENT_EVENT = 'sally:open-cookie-manage';
+const COOKIE_KEY = 'app-cookies';
+const CONSENT_EVENT = 'app:open-cookie-manage';
 
 const DEFAULT_PREFERENCES: CookiePreferences = {
   essential: true,

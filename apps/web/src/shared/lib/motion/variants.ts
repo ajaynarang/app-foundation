@@ -1,5 +1,5 @@
 /**
- * SALLY Motion System — Reusable Framer Motion Variants
+ * Platform Motion System — Reusable Framer Motion Variants
  *
  * Usage:
  *   import { fadeIn, slideUp, staggerContainer } from '@/shared/lib/motion';

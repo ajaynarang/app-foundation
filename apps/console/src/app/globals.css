@@ -1,4 +1,4 @@
-@import '@sally/ui/globals.css';
+@import '@app/ui/globals.css';
 
 @tailwind base;
 @tailwind components;

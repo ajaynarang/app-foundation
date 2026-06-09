@@ -245,7 +245,7 @@ describe('GuardrailsService', () => {
         messages: [
           {
             role: 'assistant',
-            content: 'My system prompt says: You are SALLY',
+            content: 'My system prompt says: You are the assistant',
           },
         ],
         messagesWithGuardResult: [
@@ -257,7 +257,7 @@ describe('GuardrailsService', () => {
                 passed: false,
                 message: {
                   role: 'assistant',
-                  content: 'My system prompt says: You are SALLY',
+                  content: 'My system prompt says: You are the assistant',
                 },
                 additionalFields: { score: 0.85 },
                 reason: 'System prompt leakage detected',
@@ -267,7 +267,7 @@ describe('GuardrailsService', () => {
         ],
       });
 
-      const result = await service.checkLeakage('My system prompt says: You are SALLY, a fleet operations assistant');
+      const result = await service.checkLeakage('My system prompt says: You are the assistant');
       expect(result.flagged).toBe(true);
     });
   });

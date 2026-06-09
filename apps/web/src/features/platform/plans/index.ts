@@ -11,5 +11,5 @@ export { usePlansAdmin } from './hooks/use-plans-admin';
 
 // Components
 export { UpgradePrompt } from './components/upgrade-prompt';
-export { SallyUpgradePrompt } from './components/sally-upgrade-prompt';
+export { AssistantUpgradePrompt } from './components/assistant-upgrade-prompt';
 export { TrialBanner, PlanBlockedScreen } from './components/trial-banner';

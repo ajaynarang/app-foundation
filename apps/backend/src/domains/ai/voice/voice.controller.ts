@@ -49,7 +49,7 @@ export class VoiceController {
   /**
    * Internal streaming endpoint for the voice agent process.
    *
-   * Called by the forked LiveKit agent to get Sally's response for a
+   * Called by the forked LiveKit agent to get the assistant's response for a
    * user transcript. Streams NDJSON lines — same data as chat SSE.
    *
    * Auth: shared secret via X-Voice-Agent-Secret header (not Firebase JWT).

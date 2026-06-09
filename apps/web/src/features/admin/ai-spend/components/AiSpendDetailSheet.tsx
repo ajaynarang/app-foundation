@@ -20,7 +20,7 @@ interface AiSpendDetailSheetProps {
 }
 
 /**
- * View-only drill-in for one tenant's AI spend. Per Sally sheet rules this
+ * View-only drill-in for one tenant's AI spend. Per Assistant sheet rules this
  * is a detail view (not an edit form), so everything closes it. Cost-vs-quota
  * panel on top, then the per-surface breakdown and the invocation list. An
  * "Edit budget" action opens a separate edit Sheet (FormSheet).

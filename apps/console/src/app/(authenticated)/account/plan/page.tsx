@@ -1,11 +1,10 @@
 'use client';
 
 import { mailto } from '@/lib/contacts';
-import { Check, Lock, AlertTriangle } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@app/ui/components/ui/card';
 import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
-import { Progress } from '@app/ui/components/ui/progress';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/plans/use-plan';
 import { useFormatters, DISPLAY_FORMATS } from '@/shared/lib/formatters';
@@ -27,20 +26,7 @@ function planBadgeVariant(plan?: string): BadgeVariant {
 // ---------------------------------------------------------------------------
 export default function BillingPage() {
   const { formatTimestamp } = useFormatters();
-  const {
-    plan,
-    displayName,
-    planDetails,
-    isLoading,
-    vehicleCount,
-    fleetLimit,
-    fleetLimitWarning,
-    isTrialExpired,
-    isOnTrial,
-    daysLeftInTrial,
-  } = usePlan();
-
-  const usagePercent = fleetLimit && fleetLimit > 0 ? Math.min((vehicleCount / fleetLimit) * 100, 100) : 0;
+  const { plan, displayName, planDetails, isLoading, isTrialExpired, isOnTrial, daysLeftInTrial } = usePlan();
 
   if (isLoading) {
     return (
@@ -104,7 +90,7 @@ export default function BillingPage() {
             </div>
 
             {plan !== 'ENTERPRISE' && plan !== 'SUSPENDED' && (
-              <a href={mailto('sally')} className="shrink-0">
+              <a href={mailto('sales')} className="shrink-0">
                 <Button variant="outline" size="sm">
                   Contact Sales to Upgrade
                 </Button>
@@ -113,38 +99,6 @@ export default function BillingPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Fleet Usage Card (only if limit exists) */}
-      {fleetLimit !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              Fleet Usage
-              {fleetLimitWarning && <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Vehicles</span>
-              <span
-                className={
-                  fleetLimitWarning
-                    ? 'font-semibold text-yellow-700 dark:text-yellow-400'
-                    : 'font-medium text-foreground'
-                }
-              >
-                {vehicleCount} / {fleetLimit}
-              </span>
-            </div>
-            <Progress value={usagePercent} className="h-2 bg-gray-200 dark:bg-gray-800" />
-            {fleetLimitWarning && (
-              <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                You are approaching your fleet limit. Contact sales to upgrade.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Features Card — driven by entitlements from the DB */}
       {planDetails?.planConfig?.entitlements && planDetails.planConfig.entitlements.length > 0 && (

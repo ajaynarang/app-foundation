@@ -60,22 +60,16 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         <div className="flex items-center justify-between px-4 md:px-6 py-3">
           {/* Logo and tagline */}
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" data-sally-logo>
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity" data-app-logo>
+              <Image src="/logo-dark.svg" alt="Platform" width={28} height={28} className="h-7 w-7 dark:block hidden" />
               <Image
-                src="/sally-logo-dark.svg"
-                alt="SALLY"
-                width={28}
-                height={28}
-                className="h-7 w-7 dark:block hidden"
-              />
-              <Image
-                src="/sally-logo-light.svg"
-                alt="SALLY"
+                src="/logo-light.svg"
+                alt="Platform"
                 width={28}
                 height={28}
                 className="h-7 w-7 dark:hidden block"
               />
-              <span className="text-lg sm:text-xl font-bold text-foreground font-space-grotesk">SALLY</span>
+              <span className="text-lg sm:text-xl font-bold text-foreground font-space-grotesk">Platform</span>
             </Link>
             <span className="hidden sm:inline text-xs text-gray-400">|</span>
             <p className="hidden sm:block text-xs text-gray-500">Smart Routes. Confident Dispatchers. Happy Drivers.</p>

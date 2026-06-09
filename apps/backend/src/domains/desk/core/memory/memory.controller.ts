@@ -120,7 +120,7 @@ export class DeskMemoryController extends BaseTenantController {
   @Delete(':id')
   @UseGuards(DeskAgentEditGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Soft-delete a memory (prune what Sally learned or what the operator wrote)' })
+  @ApiOperation({ summary: 'Soft-delete a memory (prune what the assistant learned or what the operator wrote)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   async remove(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);

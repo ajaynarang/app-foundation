@@ -4,7 +4,7 @@ import { AppCacheService } from '../../../infrastructure/cache/app-cache.service
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M } from '../../../constants/cache.constants';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
@@ -35,7 +35,7 @@ export class OAuthClientsService {
   ): Promise<OAuthClientCreatedResponse> {
     this.assertScopesAreGrantable(input.scopes as AgentScope[]);
 
-    const clientIdValue = `sally_${nanoid(32)}`;
+    const clientIdValue = `app_${nanoid(32)}`;
     const rawSecret = crypto.randomBytes(32).toString('hex');
     const hashedSecret = await bcrypt.hash(rawSecret, 10);
 
@@ -69,7 +69,7 @@ export class OAuthClientsService {
   }
 
   async findAll(tenantId: number | null): Promise<OAuthClientResponse[]> {
-    const cacheKey = buildKey('sally:oauth', 'clients', String(tenantId ?? 'global'));
+    const cacheKey = buildKey('app:oauth', 'clients', String(tenantId ?? 'global'));
     return this.cache.getOrSet(
       cacheKey,
       async () => {
@@ -317,6 +317,6 @@ export class OAuthClientsService {
 
   /** Invalidate the OAuth clients list cache. */
   private async invalidateOAuthClientsCache(tenantId: number | null): Promise<void> {
-    await this.cache.del(buildKey('sally:oauth', 'clients', String(tenantId ?? 'global')));
+    await this.cache.del(buildKey('app:oauth', 'clients', String(tenantId ?? 'global')));
   }
 }

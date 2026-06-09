@@ -2,7 +2,7 @@ import { Callout } from "@/components/docs/callout"
 
 # Cursor / Windsurf
 
-Connect SALLY to your IDE's AI assistant using MCP support in [Cursor](https://cursor.sh) or [Windsurf](https://codeium.com/windsurf). This is useful for developers working on SALLY integrations who want to query fleet data without leaving their editor.
+Connect Platform to your IDE's AI assistant using MCP support in [Cursor](https://cursor.sh) or [Windsurf](https://codeium.com/windsurf). This is useful for developers working on Platform integrations who want to query fleet data without leaving their editor.
 
 ## Cursor Setup
 
@@ -13,11 +13,11 @@ Connect SALLY to your IDE's AI assistant using MCP support in [Cursor](https://c
 3. Navigate to **Features** > **MCP Servers**
 4. Click **Add new MCP server**
 
-### Step 2: Add SALLY Server
+### Step 2: Add Platform Server
 
 Add the following configuration:
 
-**Name:** `sally`
+**Name:** `app`
 
 **Type:** `sse` (or `streamable-http` if available)
 
@@ -25,8 +25,8 @@ Add the following configuration:
 
 | Environment | URL |
 |-------------|-----|
-| **Production** | `https://api.trysally.com` |
-| **Staging** | `https://sally-api.apps.appshore.in` |
+| **Production** | `https://api.example.com` |
+| **Staging** | `https://api.apps.appshore.in` |
 | **Local** | `http://localhost:8000` |
 
 Alternatively, create a `.cursor/mcp.json` file in your project root:
@@ -34,11 +34,11 @@ Alternatively, create a `.cursor/mcp.json` file in your project root:
 ```json
 {
   "mcpServers": {
-    "sally": {
-      "url": "https://api.trysally.com"
+    "app": {
+      "url": "https://api.example.com"
     },
-    "sally-staging": {
-      "url": "https://sally-api.apps.appshore.in"
+    "app-staging": {
+      "url": "https://api.apps.appshore.in"
     }
   }
 }
@@ -46,7 +46,7 @@ Alternatively, create a `.cursor/mcp.json` file in your project root:
 
 ### Step 3: Authenticate
 
-When you first use a SALLY tool, Cursor will open a browser window for OAuth authorization. Sign in with your SALLY credentials and approve access.
+When you first use a Platform tool, Cursor will open a browser window for OAuth authorization. Sign in with your Platform credentials and approve access.
 
 ## Windsurf Setup
 
@@ -56,15 +56,15 @@ When you first use a SALLY tool, Cursor will open a browser window for OAuth aut
 2. Open the command palette (Cmd+Shift+P / Ctrl+Shift+P)
 3. Search for **"MCP: Configure Servers"**
 
-### Step 2: Add SALLY Server
+### Step 2: Add Platform Server
 
 Add to the MCP configuration:
 
 ```json
 {
   "mcpServers": {
-    "sally": {
-      "serverUrl": "https://api.trysally.com"
+    "app": {
+      "serverUrl": "https://api.example.com"
     }
   }
 }
@@ -75,11 +75,11 @@ Add to the MCP configuration:
 In the AI chat panel, try:
 
 ```
-@sally What loads are currently active?
+@app What loads are currently active?
 
-@sally Show me the fleet compliance score
+@app Show me the fleet compliance score
 
-@sally What invoices are pending for customer ABC Logistics?
+@app What invoices are pending for customer ABC Logistics?
 ```
 
 ## Troubleshooting
@@ -94,4 +94,4 @@ In the AI chat panel, try:
 
 - Clear stored OAuth tokens in your IDE's MCP settings
 - Re-authenticate by triggering a tool call
-- Ensure the SALLY backend has CORS configured for your IDE's origin
+- Ensure the Platform backend has CORS configured for your IDE's origin

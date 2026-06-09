@@ -13,7 +13,7 @@ import { useUpgradeUrl } from '@/features/platform/plans/hooks/use-upgrade-url';
 const featureDescriptions: Record<string, { label: string; description: string; requiredPlan: string }> = {
   api_keys: {
     label: 'API Keys',
-    description: 'Create server-to-server API keys for programmatic access to SALLY.',
+    description: 'Create server-to-server API keys for programmatic access to the platform.',
     requiredPlan: 'Freight Force',
   },
   webhooks: {
@@ -65,7 +65,7 @@ export function FeatureGuard({ entitlementKey, children }: FeatureGuardProps) {
           {featureInfo && <p className="text-sm text-muted-foreground">{featureInfo.description}</p>}
           {canManageBilling ? (
             <a
-              href={isPaymentMode ? upgradeUrl : mailto('sally', 'Plan Upgrade Inquiry')}
+              href={isPaymentMode ? upgradeUrl : mailto('app', 'Plan Upgrade Inquiry')}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors mt-2"
             >
               {isPaymentMode ? 'Upgrade Now' : 'Contact Sales'}
@@ -105,7 +105,7 @@ export function PlanBlockedScreen() {
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
           {isSuspended
             ? 'Your account has been suspended. Please contact support to resolve this issue.'
-            : 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using SALLY.'}
+            : 'Your 30-day free trial has expired. Upgrade to a paid plan to continue using the platform.'}
         </p>
         {isTrialExpired && (
           <p className="text-xs text-muted-foreground">Your data is safe -- it will be available once you upgrade.</p>
@@ -120,7 +120,7 @@ export function PlanBlockedScreen() {
             </a>
           )}
           <a
-            href={mailto(isSuspended ? 'support' : 'sally')}
+            href={mailto(isSuspended ? 'support' : 'app')}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 border border-input bg-background hover:bg-muted transition-colors"
           >
             {isSuspended ? 'Contact Support' : canManageBilling ? 'Contact Sales' : 'Contact Support'}

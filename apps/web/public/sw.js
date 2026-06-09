@@ -1,4 +1,4 @@
-// SALLY Push Notification Service Worker
+// Platform Push Notification Service Worker
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
@@ -7,9 +7,9 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || '',
-    icon: '/icons/sally-icon-192.png',
-    badge: '/icons/sally-badge-72.png',
-    tag: data.tag || 'sally-notification',
+    icon: '/icons/app-icon-192.png',
+    badge: '/icons/app-badge-72.png',
+    tag: data.tag || 'app-notification',
     data: { url: data.url || '/' },
     vibrate: [200, 100, 200],
     actions: [
@@ -18,9 +18,7 @@ self.addEventListener('push', (event) => {
     ],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'SALLY Alert', options),
-  );
+  event.waitUntil(self.registration.showNotification(data.title || 'Platform Alert', options));
 });
 
 self.addEventListener('notificationclick', (event) => {

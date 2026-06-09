@@ -50,7 +50,7 @@ export function FeatureGate({ featureKey, children, icon, name, description, ben
       }),
     onSuccess: () => {
       setRequested(true);
-      showSuccess('Request sent! The SALLY team will review and activate it for you.');
+      showSuccess('Request sent! The Assistant team will review and activate it for you.');
     },
     onError: (error: Error) => {
       showError('Could not send request', extractErrorMessage(error));
@@ -113,7 +113,7 @@ export function FeatureGate({ featureKey, children, icon, name, description, ben
               onClick={() => requestAddOn()}
               loading={isPending}
             >
-              Request from SALLY
+              Request from the Assistant
             </Button>
           </div>
         )}

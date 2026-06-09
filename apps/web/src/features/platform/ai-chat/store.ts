@@ -27,7 +27,7 @@ interface PendingConfirmation {
   toolCallId?: string;
 }
 
-interface SallyState {
+interface AssistantState {
   // Strip state
   isOpen: boolean;
   isExpanded: boolean;
@@ -52,7 +52,7 @@ interface SallyState {
   // HITL confirmation
   pendingConfirmation: PendingConfirmation | null;
 
-  // Input draft (prefilled by Ask Sally buttons)
+  // Input draft (prefilled by Ask Assistant buttons)
   draftInput: string | null;
 
   // Follow-up suggestions from AI
@@ -154,7 +154,7 @@ function createFallbackGreeting(mode: UserMode): ChatMessage {
 /** Module-level abort controller for cancelling in-flight streaming requests */
 let activeAbortController: AbortController | null = null;
 
-export const useSallyStore = create<SallyState>((set, get) => ({
+export const useAssistantStore = create<AssistantState>((set, get) => ({
   // Initial state
   isOpen: false,
   isExpanded: false,

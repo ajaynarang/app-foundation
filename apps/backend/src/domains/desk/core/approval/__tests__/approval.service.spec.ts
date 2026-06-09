@@ -313,7 +313,7 @@ describe('ApprovalService', () => {
       // inngest event published
       const inngest = (service as any).inngest as FakeInngest;
       expect(inngest.send).toHaveBeenCalledWith(
-        'sally/desk.approval.decided',
+        'app/desk.approval.decided',
         expect.objectContaining({
           approvalId: 'app-1',
           decision: 'APPROVED',
@@ -420,7 +420,7 @@ describe('ApprovalService', () => {
       const inngest = (service as any).inngest as FakeInngest;
       expect(inngest.send).toHaveBeenCalledTimes(2);
       expect(inngest.send).toHaveBeenCalledWith(
-        'sally/desk.approval.decided',
+        'app/desk.approval.decided',
         expect.objectContaining({
           approvalId: 'a1',
           decision: 'REJECTED',
@@ -458,7 +458,7 @@ describe('ApprovalService', () => {
   });
 
   describe('listPending (slim shape)', () => {
-    it('returns EpisodeListItem-shaped rows (no artifact / no sallysRead / no context)', async () => {
+    it('returns EpisodeListItem-shaped rows (no artifact / no assistantRead / no context)', async () => {
       const localPrisma = makePrismaWithOneApproval();
       const enrichment = { enrich: jest.fn() } as any;
       const svc = new ApprovalService(localPrisma as unknown as PrismaService, new FakeInngest() as any, enrichment);
@@ -483,7 +483,7 @@ describe('ApprovalService', () => {
 
       // detail-only fields absent
       expect(row.artifact).toBeUndefined();
-      expect(row.sallysRead).toBeUndefined();
+      expect(row.assistantRead).toBeUndefined();
       expect(row.context).toBeUndefined();
       expect(row.confidence).toBeUndefined();
       expect(row.decisionHeader).toBeUndefined();

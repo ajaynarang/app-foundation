@@ -143,7 +143,7 @@ describe('DeskAgentService', () => {
 
     it('throws NotFound when agent missing', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue(null);
-      await expect(service.getDetailForTenant(1, 'sally-missing')).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.getDetailForTenant(1, 'assistant-missing')).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('marks isActive when any AVAILABLE responsibility is enabled', async () => {

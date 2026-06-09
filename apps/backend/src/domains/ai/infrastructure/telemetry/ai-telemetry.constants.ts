@@ -23,7 +23,7 @@ export const AI_LINK_REF_TYPES = {
   DESK_EPISODE: 'desk_episode',
   /** Operator-authored Desk playbook rule embedding. */
   DESK_MEMORY_RULE: 'desk_memory_rule',
-  /** Sally chat turn, keyed by conversation message id (wired in a later PR). */
+  /** Assistant chat turn, keyed by conversation message id (wired in a later PR). */
   CONVERSATION_MESSAGE: 'conversation_message',
   /** Knowledge-base ingestion chunk (wired in a later PR). */
   KB_DOCUMENT: 'kb_document',

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
 import { AgentPrincipal } from './agent-principal';
 import { HitlTier } from './hitl-policy.service';
 
@@ -92,7 +92,7 @@ export class HitlChallengeService {
     if (id === null) return null;
     // tenantId is part of the where-clause for defense-in-depth: the
     // principalId equality check below already binds the row to the caller's
-    // audit id, but per the Sally tenant-scoping rule the DB query must scope
+    // audit id, but per the platform tenant-scoping rule the DB query must scope
     // by tenant itself, not derive isolation from a downstream equality check.
     const row = await this.prisma.hitlChallenge.findFirst({
       where: {

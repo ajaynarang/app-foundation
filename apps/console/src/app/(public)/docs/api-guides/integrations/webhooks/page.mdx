@@ -6,32 +6,32 @@ import { Callout } from "@/components/docs/callout"
   **Manage your webhook endpoints** at [/webhooks](/docs/webhooks) — register endpoints, select events, view delivery logs, and send test events — all from this portal once signed in.
 </Callout>
 
-Webhooks let SALLY push event notifications to your systems as they happen. Instead of polling the API for changes, you register a URL and SALLY sends HTTP POST requests to it whenever relevant events occur.
+Webhooks let Platform push event notifications to your systems as they happen. Instead of polling the API for changes, you register a URL and Platform sends HTTP POST requests to it whenever relevant events occur.
 
 ## How Webhooks Work
 
-1. You register a webhook URL with SALLY
-2. When an event occurs (new alert, route status change, load update), SALLY sends an HTTP POST to your URL
+1. You register a webhook URL with Platform
+2. When an event occurs (new alert, route status change, load update), Platform sends an HTTP POST to your URL
 3. Your server processes the event and returns a `200` response
-4. If delivery fails, SALLY retries with exponential backoff
+4. If delivery fails, Platform retries with exponential backoff
 
 ## Supported Events
 
 | Event | Description | Payload Contains |
 |---|---|---|
-| `sally.alert.fired` | An alert has been generated | Full alert object |
-| `sally.route.planned` | A new route plan was created | Plan ID, summary |
-| `sally.load.created` | A new load is added | Full load object |
-| `sally.load.updated` | A load's status or assignment changes | Load ID, updated fields |
+| `app.alert.fired` | An alert has been generated | Full alert object |
+| `app.route.planned` | A new route plan was created | Plan ID, summary |
+| `app.load.created` | A new load is added | Full load object |
+| `app.load.updated` | A load's status or assignment changes | Load ID, updated fields |
 
 ## Registering a Webhook
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/webhooks \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/webhooks \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://your-server.com/webhooks/sally",
+    "url": "https://your-server.com/webhooks/app",
     "events": ["alert.created", "alert.resolved", "route.activated"],
     "secret": "whsec_your_signing_secret_here",
     "description": "Production alert handler"
@@ -42,15 +42,15 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/webhooks \
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/webhooks",
+  "https://api-staging.appshore.in/api/v1/webhooks",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      url: "https://your-server.com/webhooks/sally",
+      url: "https://your-server.com/webhooks/app",
       events: ["alert.created", "alert.resolved", "route.activated"],
       secret: process.env.WEBHOOK_SIGNING_SECRET,
       description: "Production alert handler",
@@ -66,7 +66,7 @@ const webhook = await response.json();
 ```json
 {
   "id": "wh_a1b2c3d4",
-  "url": "https://your-server.com/webhooks/sally",
+  "url": "https://your-server.com/webhooks/app",
   "events": ["alert.created", "alert.resolved", "route.activated"],
   "status": "ACTIVE",
   "description": "Production alert handler",
@@ -108,14 +108,14 @@ Every webhook request includes these headers:
 | Header | Description |
 |---|---|
 | `Content-Type` | `application/json` |
-| `X-Sally-Event` | Event type (e.g., `alert.created`) |
-| `X-Sally-Delivery` | Unique delivery ID for idempotency |
-| `X-Sally-Signature` | HMAC-SHA256 signature for verification |
-| `X-Sally-Timestamp` | Unix timestamp of when the event was sent |
+| `X-App-Event` | Event type (e.g., `alert.created`) |
+| `X-App-Delivery` | Unique delivery ID for idempotency |
+| `X-App-Signature` | HMAC-SHA256 signature for verification |
+| `X-App-Timestamp` | Unix timestamp of when the event was sent |
 
 ## Verifying Webhook Signatures
 
-Always verify webhook signatures to ensure the request came from SALLY and was not tampered with. SALLY signs the payload using the secret you provided during registration.
+Always verify webhook signatures to ensure the request came from Platform and was not tampered with. Platform signs the payload using the secret you provided during registration.
 
 ### Node.js Verification
 
@@ -136,9 +136,9 @@ function verifyWebhookSignature(payload, signature, timestamp, secret) {
 }
 
 // Express.js example
-app.post("/webhooks/sally", express.raw({ type: "application/json" }), (req, res) => {
-  const signature = req.headers["x-sally-signature"];
-  const timestamp = req.headers["x-sally-timestamp"];
+app.post("/webhooks/app", express.raw({ type: "application/json" }), (req, res) => {
+  const signature = req.headers["x-app-signature"];
+  const timestamp = req.headers["x-app-timestamp"];
   const payload = req.body.toString();
 
   if (!verifyWebhookSignature(payload, signature, timestamp, WEBHOOK_SECRET)) {
@@ -223,7 +223,7 @@ function handleRouteActivated(route) {
 
 ## Retry Policy
 
-If your server does not return a `2xx` response, SALLY retries the delivery:
+If your server does not return a `2xx` response, Platform retries the delivery:
 
 | Attempt | Delay | Total Wait |
 |---|---|---|
@@ -235,17 +235,17 @@ If your server does not return a `2xx` response, SALLY retries the delivery:
 
 After 5 failed retries, the delivery is marked as failed. You can view failed deliveries in the webhook dashboard and retry them manually.
 
-SALLY considers any `2xx` status code as successful delivery. Return `200 OK` as quickly as possible -- process the event asynchronously if it requires significant work.
+Platform considers any `2xx` status code as successful delivery. Return `200 OK` as quickly as possible -- process the event asynchronously if it requires significant work.
 
 ## Idempotency
 
-Webhook deliveries may be sent more than once in rare cases (network issues, retries). Use the `X-Sally-Delivery` header as an idempotency key:
+Webhook deliveries may be sent more than once in rare cases (network issues, retries). Use the `X-App-Delivery` header as an idempotency key:
 
 ```javascript
 const processedDeliveries = new Set();
 
-app.post("/webhooks/sally", (req, res) => {
-  const deliveryId = req.headers["x-sally-delivery"];
+app.post("/webhooks/app", (req, res) => {
+  const deliveryId = req.headers["x-app-delivery"];
 
   if (processedDeliveries.has(deliveryId)) {
     return res.status(200).send("Already processed");
@@ -265,27 +265,27 @@ For production use, store processed delivery IDs in a database or Redis rather t
 ### List Webhooks
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/webhooks \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/webhooks \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 ### Update a Webhook
 
 ```bash
-curl -X PUT https://sally-api-staging.appshore.in/api/v1/webhooks/wh_a1b2c3d4 \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X PUT https://api-staging.appshore.in/api/v1/webhooks/wh_a1b2c3d4 \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "events": ["alert.created", "alert.resolved", "route.activated", "route.completed"],
-    "url": "https://your-server.com/webhooks/sally-v2"
+    "url": "https://your-server.com/webhooks/app-v2"
   }'
 ```
 
 ### Disable a Webhook
 
 ```bash
-curl -X DELETE https://sally-api-staging.appshore.in/api/v1/webhooks/wh_a1b2c3d4 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X DELETE https://api-staging.appshore.in/api/v1/webhooks/wh_a1b2c3d4 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 ## Best Practices
@@ -293,7 +293,7 @@ curl -X DELETE https://sally-api-staging.appshore.in/api/v1/webhooks/wh_a1b2c3d4
 1. **Always verify signatures** -- Never trust unverified webhook payloads
 2. **Return 200 quickly** -- Process events asynchronously to avoid timeouts
 3. **Implement idempotency** -- Handle duplicate deliveries gracefully
-4. **Use HTTPS** -- SALLY only delivers webhooks to HTTPS endpoints
+4. **Use HTTPS** -- Platform only delivers webhooks to HTTPS endpoints
 5. **Monitor delivery failures** -- Set up alerts if deliveries fail repeatedly
 6. **Handle events you do not recognize** -- New event types may be added; ignore unknown events gracefully
 

@@ -2,7 +2,7 @@ import { WebhookManager } from "@/components/docs/webhook-manager"
 
 # Webhooks
 
-Register HTTPS endpoints to receive real-time event notifications from SALLY. SALLY sends HTTP POST requests with HMAC-signed payloads whenever relevant events occur.
+Register HTTPS endpoints to receive real-time event notifications from Platform. Platform sends HTTP POST requests with HMAC-signed payloads whenever relevant events occur.
 
 <WebhookManager returnTo="/webhooks" />
 
@@ -10,14 +10,14 @@ Register HTTPS endpoints to receive real-time event notifications from SALLY. SA
 
 ## Supported Events
 
-All events use the `sally.*` prefix:
+All events use the `app.*` prefix:
 
 | Event | When it fires |
 |-------|--------------|
-| `sally.load.created` | A new load is added to the system |
-| `sally.load.updated` | A load's status, stops, or assignment changes |
-| `sally.route.planned` | A route plan is created for a driver |
-| `sally.alert.fired` | An alert is generated (HOS violation, delay, deviation) |
+| `app.load.created` | A new load is added to the system |
+| `app.load.updated` | A load's status, stops, or assignment changes |
+| `app.route.planned` | A route plan is created for a driver |
+| `app.alert.fired` | An alert is generated (HOS violation, delay, deviation) |
 
 Subscribe to `*` to receive all current and future events.
 
@@ -28,19 +28,19 @@ Every delivery has a standard envelope:
 ```json
 {
   "id": "evt_a1b2c3d4",
-  "event": "sally.alert.fired",
+  "event": "app.alert.fired",
   "timestamp": "2026-02-23T14:00:00Z",
   "webhookId": "wh_x1y2z3",
   "data": { ... }
 }
 ```
 
-### `sally.alert.fired`
+### `app.alert.fired`
 
 ```json
 {
   "id": "evt_h8i9j0k1",
-  "event": "sally.alert.fired",
+  "event": "app.alert.fired",
   "timestamp": "2026-02-23T14:00:00Z",
   "webhookId": "wh_a1b2c3d4",
   "data": {
@@ -57,12 +57,12 @@ Every delivery has a standard envelope:
 }
 ```
 
-### `sally.route.planned`
+### `app.route.planned`
 
 ```json
 {
   "id": "evt_d4e5f6g7",
-  "event": "sally.route.planned",
+  "event": "app.route.planned",
   "timestamp": "2026-02-23T08:00:00Z",
   "webhookId": "wh_a1b2c3d4",
   "data": {
@@ -78,12 +78,12 @@ Every delivery has a standard envelope:
 }
 ```
 
-### `sally.load.created` / `sally.load.updated`
+### `app.load.created` / `app.load.updated`
 
 ```json
 {
   "id": "evt_a1b2c3d4",
-  "event": "sally.load.created",
+  "event": "app.load.created",
   "timestamp": "2026-02-23T16:15:00Z",
   "webhookId": "wh_a1b2c3d4",
   "data": {
@@ -98,7 +98,7 @@ Every delivery has a standard envelope:
 
 ## Signature Verification
 
-SALLY signs every request with HMAC-SHA256. **Always verify signatures** before processing.
+Platform signs every request with HMAC-SHA256. **Always verify signatures** before processing.
 
 ```javascript
 import crypto from 'crypto'
@@ -113,9 +113,9 @@ function verifyWebhook(payload, signature, timestamp, secret) {
 }
 
 // Express.js
-app.post('/webhooks/sally', express.raw({ type: 'application/json' }), (req, res) => {
-  const sig = req.headers['x-sally-signature']
-  const ts = req.headers['x-sally-timestamp']
+app.post('/webhooks/app', express.raw({ type: 'application/json' }), (req, res) => {
+  const sig = req.headers['x-app-signature']
+  const ts = req.headers['x-app-timestamp']
 
   if (!verifyWebhook(req.body.toString(), sig, ts, process.env.WEBHOOK_SECRET)) {
     return res.status(401).send('Invalid signature')

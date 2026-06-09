@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/sally-events.constants';
+import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
 import { OPEN_EPISODE_STATUSES, EpisodeStatusSchema } from '../types';

@@ -45,7 +45,7 @@ export class PlansService {
 
   async getTenantPlan(tenantId: string): Promise<TenantPlan> {
     return this.cache.getOrSet<TenantPlan>(
-      buildKey('sally:plans', 'tenant-plan', tenantId),
+      buildKey('app:plans', 'tenant-plan', tenantId),
       async () => {
         const tenant = await this.prisma.tenant.findUnique({
           where: { tenantId },
@@ -62,7 +62,7 @@ export class PlansService {
     if (plan === TenantPlan.TRIAL_EXPIRED || plan === TenantPlan.SUSPENDED) return false;
 
     return this.cache.getOrSet<boolean>(
-      buildKey('sally:plans', 'entitlement', plan, feature),
+      buildKey('app:plans', 'entitlement', plan, feature),
       async () => {
         const entitlement = await this.prisma.planEntitlement.findUnique({
           where: { plan_feature: { plan, feature } },
@@ -80,7 +80,7 @@ export class PlansService {
    */
   async isFeatureConfigured(feature: string): Promise<boolean> {
     return this.cache.getOrSet<boolean>(
-      buildKey('sally:plans', 'entitlement-exists', feature),
+      buildKey('app:plans', 'entitlement-exists', feature),
       async () => {
         const row = await this.prisma.planEntitlement.findFirst({
           where: { feature },
@@ -119,7 +119,7 @@ export class PlansService {
       }),
     ]);
 
-    await this.cache.del(buildKey('sally:plans', 'tenant-plan', tenantId));
+    await this.cache.del(buildKey('app:plans', 'tenant-plan', tenantId));
 
     return result[0];
   }
@@ -149,7 +149,7 @@ export class PlansService {
       data,
     });
 
-    await this.cache.del(buildKey('sally:plans', 'all'));
+    await this.cache.del(buildKey('app:plans', 'all'));
 
     this.logger.log(`Plan config '${planKey}' updated: ${JSON.stringify(data)}`);
     return updated;
@@ -161,7 +161,7 @@ export class PlansService {
       data: { enabled },
     });
 
-    await this.cache.del(buildKey('sally:plans', 'entitlement', planKey, feature));
+    await this.cache.del(buildKey('app:plans', 'entitlement', planKey, feature));
 
     this.logger.log(`Entitlement '${feature}' for plan '${planKey}' set to ${enabled}`);
     return updated;

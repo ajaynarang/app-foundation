@@ -143,7 +143,7 @@ export function TenantTable({
             <TableRow key={tenant.id}>
               <TableCell className="font-medium">{tenant.companyName}</TableCell>
               <TableCell className="hidden sm:table-cell">
-                <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.sally.com</code>
+                <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
               </TableCell>
               <TableCell className="hidden lg:table-cell">{tenant.dotNumber}</TableCell>
               <TableCell className="hidden md:table-cell">

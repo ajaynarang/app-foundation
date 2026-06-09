@@ -10,12 +10,12 @@ jest.mock('../../../../shared/utils/id-generator', () => ({
 jest.mock('../content/content-loader', () => ({
   loadAllEntries: jest.fn().mockReturnValue([
     {
-      title: 'What is SALLY?',
-      content: 'SALLY is a fleet operations assistant that helps trucking companies.',
+      title: 'What is the platform?',
+      content: 'The platform is an assistant that helps you get things done.',
       documentType: 'faq',
       audience: 'prospect',
       category: 'general',
-      keywords: ['sally', 'overview'],
+      keywords: ['platform', 'overview'],
     },
     {
       title: 'Route Planning Engine',
@@ -102,7 +102,7 @@ describe('IngestionService', () => {
       expect(mockEmbedding.embedBatch).toHaveBeenCalled();
       const batchTexts = mockEmbedding.embedBatch.mock.calls[0][0];
       expect(batchTexts.length).toBe(2);
-      expect(batchTexts[0]).toContain('What is SALLY?:');
+      expect(batchTexts[0]).toContain('What is the platform?:');
     });
   });
 });

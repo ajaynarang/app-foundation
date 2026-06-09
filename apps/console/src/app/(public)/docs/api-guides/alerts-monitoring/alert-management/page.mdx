@@ -7,8 +7,8 @@ This guide covers the full set of operations for working with alerts: listing an
 Retrieve alerts with flexible filtering options:
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts?status=ACTIVE&priority=HIGH&category=HOS_VIOLATION&page=1&pageSize=20" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts?status=ACTIVE&priority=HIGH&category=HOS_VIOLATION&page=1&pageSize=20" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
@@ -23,9 +23,9 @@ const params = new URLSearchParams({
 });
 
 const response = await fetch(
-  `https://sally-api-staging.appshore.in/api/v1/alerts?${params}`,
+  `https://api-staging.appshore.in/api/v1/alerts?${params}`,
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -85,8 +85,8 @@ const { data: alerts, total, page, pageSize } = await response.json();
 You can combine multiple filters. For example, to find all critical HOS alerts for a specific driver:
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts?category=HOS_VIOLATION&priority=CRITICAL&driverId=drv_a1b2c3d4" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts?category=HOS_VIOLATION&priority=CRITICAL&driverId=drv_a1b2c3d4" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 ## Get Alert Details
@@ -94,17 +94,17 @@ curl "https://sally-api-staging.appshore.in/api/v1/alerts?category=HOS_VIOLATION
 Retrieve full details for a single alert:
 
 ```bash
-curl https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4",
+  "https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4",
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -151,8 +151,8 @@ const alert = await response.json();
 Acknowledging an alert signals to the team that a dispatcher is aware of the issue and working on it. This moves the alert from `ACTIVE` to `ACKNOWLEDGED` status.
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/acknowledge \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/acknowledge \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Contacting driver Mike Johnson now. Will route to nearest rest area."
@@ -163,11 +163,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/ac
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/acknowledge",
+  "https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/acknowledge",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -201,8 +201,8 @@ const acknowledged = await response.json();
 Resolving an alert marks the issue as handled. Include a resolution message describing what was done.
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/resolve \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/resolve \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "resolution": "Driver Mike Johnson stopped at Pilot Travel Center in Lebanon, IN. 10-hour rest period initiated. Route will be re-planned for 02:30 UTC departure."
@@ -213,11 +213,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/re
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/resolve",
+  "https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/resolve",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -251,8 +251,8 @@ const resolved = await response.json();
 Temporarily hide an alert. It will return to `ACTIVE` status after the snooze duration expires.
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_a5b6c7d8/snooze \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/alt_a5b6c7d8/snooze \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "durationMinutes": 30,
@@ -264,11 +264,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_a5b6c7d8/sn
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/alt_a5b6c7d8/snooze",
+  "https://api-staging.appshore.in/api/v1/alerts/alt_a5b6c7d8/snooze",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -302,8 +302,8 @@ const snoozed = await response.json();
 Attach notes to an alert for record-keeping and shift handoffs:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/notes \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/notes \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "content": "Spoke with driver at 16:25. He confirmed he is pulling into the Pilot in Lebanon, IN now. ETA for rest start: 16:35 UTC."
@@ -314,11 +314,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/no
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/notes",
+  "https://api-staging.appshore.in/api/v1/alerts/alt_x1y2z3w4/notes",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -355,8 +355,8 @@ Notes create an audit trail that is valuable for compliance reviews and shift ha
 Acknowledge multiple alerts at once:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/bulk/acknowledge \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/bulk/acknowledge \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "alertIds": ["alt_x1y2z3w4", "alt_a5b6c7d8", "alt_e9f0g1h2"],
@@ -368,11 +368,11 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/bulk/acknowledg
 
 ```javascript
 const response = await fetch(
-  "https://sally-api-staging.appshore.in/api/v1/alerts/bulk/acknowledge",
+  "https://api-staging.appshore.in/api/v1/alerts/bulk/acknowledge",
   {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -405,8 +405,8 @@ const result = await response.json();
 Resolve multiple alerts at once:
 
 ```bash
-curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/bulk/resolve \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST https://api-staging.appshore.in/api/v1/alerts/bulk/resolve \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "alertIds": ["alt_x1y2z3w4", "alt_a5b6c7d8"],
@@ -432,8 +432,8 @@ curl -X POST https://sally-api-staging.appshore.in/api/v1/alerts/bulk/resolve \
 Retrieve paginated alert history for audit and compliance purposes:
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/history?startDate=2026-02-01T00:00:00Z&endDate=2026-02-10T23:59:59Z&page=1&pageSize=50" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/history?startDate=2026-02-01T00:00:00Z&endDate=2026-02-10T23:59:59Z&page=1&pageSize=50" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
@@ -447,9 +447,9 @@ const params = new URLSearchParams({
 });
 
 const response = await fetch(
-  `https://sally-api-staging.appshore.in/api/v1/alerts/history?${params}`,
+  `https://api-staging.appshore.in/api/v1/alerts/history?${params}`,
   {
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -490,8 +490,8 @@ const { data: history, total } = await response.json();
 Get a summary of alert statistics:
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/stats" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/stats" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -526,8 +526,8 @@ curl "https://sally-api-staging.appshore.in/api/v1/alerts/stats" \
 ### Volume Trends
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/volume?period=daily&startDate=2026-02-01&endDate=2026-02-10" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/analytics/volume?period=daily&startDate=2026-02-01&endDate=2026-02-10" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -553,15 +553,15 @@ curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/volume?perio
 ### Response Time Trends
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/response-time?period=daily&startDate=2026-02-01&endDate=2026-02-10" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/analytics/response-time?period=daily&startDate=2026-02-01&endDate=2026-02-10" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 ### Resolution Analytics
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/resolution?startDate=2026-02-01&endDate=2026-02-10" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/analytics/resolution?startDate=2026-02-01&endDate=2026-02-10" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -584,8 +584,8 @@ curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/resolution?s
 ### Top Alert Types
 
 ```bash
-curl "https://sally-api-staging.appshore.in/api/v1/alerts/analytics/top-types?limit=5" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "https://api-staging.appshore.in/api/v1/alerts/analytics/top-types?limit=5" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**

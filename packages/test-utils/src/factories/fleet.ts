@@ -11,7 +11,7 @@ import { unique, futureDate } from './common.js';
 export function buildDriver(overrides: Record<string, unknown> = {}) {
   return {
     name: `TestDriver ${unique('Last')}`,
-    email: `driver-${unique('d')}@test.sally.dev`,
+    email: `driver-${unique('d')}@test.example.com`,
     phone: `+1555${String(Date.now()).slice(-7)}`,
     cdlClass: 'A' as const,
     licenseNumber: unique('DL'),
@@ -52,7 +52,7 @@ export function buildCustomer(overrides: Record<string, unknown> = {}) {
   return {
     companyName: `Test Customer ${unique('c')}`,
     customerType: 'SHIPPER' as const,
-    billingEmail: `customer-${unique('c')}@test.sally.dev`,
+    billingEmail: `customer-${unique('c')}@test.example.com`,
     paymentTerms: 'NET_30' as const,
     creditLimit: 50000,
     address: '100 Main St',
@@ -71,7 +71,7 @@ export function buildCustomerContact(overrides: Record<string, unknown> = {}) {
     firstName: 'TestContact',
     lastName: unique('Last'),
     role: 'OPERATIONS' as const,
-    email: `contact-${unique('cc')}@test.sally.dev`,
+    email: `contact-${unique('cc')}@test.example.com`,
     phone: `+1555${String(Date.now()).slice(-7)}`,
     title: 'Operations Manager',
     ...overrides,
@@ -109,7 +109,7 @@ export function buildStop(overrides: Record<string, unknown> = {}) {
     locationType: 'WAREHOUSE' as const,
     contactName: 'QA Dock Manager',
     contactPhone: '+15551234567',
-    contactEmail: `dock-${unique('s')}@test.sally.dev`,
+    contactEmail: `dock-${unique('s')}@test.example.com`,
     appointmentRequired: false,
     notes: 'Created by QA suite',
     ...overrides,

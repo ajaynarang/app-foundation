@@ -1,20 +1,20 @@
 # Your First Route
 
-This tutorial walks you through planning a complete, HOS-compliant route from scratch. You will create a driver, register a vehicle, set up loads, plan the route, and activate it -- all through the SALLY API.
+This tutorial walks you through planning a complete, HOS-compliant route from scratch. You will create a driver, register a vehicle, set up loads, plan the route, and activate it -- all through the Platform API.
 
 ## What You Will Build
 
-A multi-stop route for driver Mike Johnson hauling freight from Chicago, IL through Indianapolis, IN to Columbus, OH. SALLY will optimize the stop sequence, insert rest and fuel stops as needed, and validate HOS compliance at every segment.
+A multi-stop route for driver Mike Johnson hauling freight from Chicago, IL through Indianapolis, IN to Columbus, OH. Platform will optimize the stop sequence, insert rest and fuel stops as needed, and validate HOS compliance at every segment.
 
 **Scenario:**
 - **Driver:** Mike Johnson, CDL holder, 2 hours already driven today
 - **Vehicle:** Unit TRK-4821, Freightliner Cascadia, 150-gallon tank at 60% fuel
 - **Route:** Chicago warehouse to Indianapolis customer to Columbus terminal
-- **Challenge:** The driver has been on duty for 4 hours already; SALLY will determine if rest stops are required
+- **Challenge:** The driver has been on duty for 4 hours already; Platform will determine if rest stops are required
 
 ## Prerequisites
 
-- A SALLY account ([sign up here](https://sally.appshore.in))
+- A Platform account ([sign up here](https://app.appshore.in))
 - An API key or JWT token ([get your API key](/docs/getting-started/api-keys))
 - curl, Postman, or any HTTP client
 
@@ -23,14 +23,14 @@ A multi-stop route for driver Mike Johnson hauling freight from Chicago, IL thro
 Set your API key as an environment variable for convenience:
 
 ```bash
-export SALLY_API_KEY="sk_staging_your_key_here"
-export SALLY_BASE="https://sally-api-staging.appshore.in/api/v1"
+export APP_API_KEY="sk_staging_your_key_here"
+export APP_BASE="https://api-staging.appshore.in/api/v1"
 ```
 
 Alternatively, obtain a JWT token using the mock login endpoint (for POC/development):
 
 ```bash
-curl -X POST $SALLY_BASE/auth/login \
+curl -X POST $APP_BASE/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_swift_disp_001"
@@ -56,7 +56,7 @@ The `refreshToken` is set as an HTTP-only cookie and is not included in the resp
 For this tutorial, we will use the `X-API-Key` header. All subsequent requests include:
 
 ```bash
--H "X-API-Key: $SALLY_API_KEY"
+-H "X-API-Key: $APP_API_KEY"
 -H "Content-Type: application/json"
 ```
 
@@ -65,8 +65,8 @@ For this tutorial, we will use the `X-API-Key` header. All subsequent requests i
 Register the driver who will operate this route:
 
 ```bash
-curl -X POST $SALLY_BASE/drivers \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST $APP_BASE/drivers \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "firstName": "Mike",
@@ -107,7 +107,7 @@ curl -X POST $SALLY_BASE/drivers \
 const response = await fetch(`${BASE_URL}/drivers`, {
   method: "POST",
   headers: {
-    "X-API-Key": process.env.SALLY_API_KEY,
+    "X-API-Key": process.env.APP_API_KEY,
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
@@ -132,8 +132,8 @@ Save the `id` value. You will need it in Step 5.
 Register the truck assigned to this route:
 
 ```bash
-curl -X POST $SALLY_BASE/vehicles \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST $APP_BASE/vehicles \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "unitNumber": "TRK-4821",
@@ -173,7 +173,7 @@ curl -X POST $SALLY_BASE/vehicles \
 const response = await fetch(`${BASE_URL}/vehicles`, {
   method: "POST",
   headers: {
-    "X-API-Key": process.env.SALLY_API_KEY,
+    "X-API-Key": process.env.APP_API_KEY,
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
@@ -193,7 +193,7 @@ const vehicle = await response.json();
 console.log("Vehicle ID:", vehicle.id);
 ```
 
-The `fuelTankCapacity` and `mpg` fields are critical -- SALLY uses them to calculate when fuel stops are needed along the route.
+The `fuelTankCapacity` and `mpg` fields are critical -- Platform uses them to calculate when fuel stops are needed along the route.
 
 ## Step 4: Create Loads
 
@@ -202,8 +202,8 @@ Create the loads (shipments) that define the pickup and delivery stops:
 ### Load 1: Chicago to Indianapolis
 
 ```bash
-curl -X POST $SALLY_BASE/loads \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST $APP_BASE/loads \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "referenceNumber": "LD-20260210-001",
@@ -249,8 +249,8 @@ curl -X POST $SALLY_BASE/loads \
 ### Load 2: Indianapolis to Columbus
 
 ```bash
-curl -X POST $SALLY_BASE/loads \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST $APP_BASE/loads \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "referenceNumber": "LD-20260210-002",
@@ -328,7 +328,7 @@ for (const load of loads) {
   const response = await fetch(`${BASE_URL}/loads`, {
     method: "POST",
     headers: {
-      "X-API-Key": process.env.SALLY_API_KEY,
+      "X-API-Key": process.env.APP_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(load),
@@ -342,11 +342,11 @@ console.log("Load IDs:", loadIds);
 
 ## Step 5: Plan the Route
 
-Now bring everything together. Pass the driver, vehicle, and load IDs to the route planning endpoint. SALLY will optimize the stop sequence, simulate HOS compliance segment by segment, and automatically insert rest and fuel stops where needed.
+Now bring everything together. Pass the driver, vehicle, and load IDs to the route planning endpoint. Platform will optimize the stop sequence, simulate HOS compliance segment by segment, and automatically insert rest and fuel stops where needed.
 
 ```bash
-curl -X POST $SALLY_BASE/routes/plan \
-  -H "X-API-Key: $SALLY_API_KEY" \
+curl -X POST $APP_BASE/routes/plan \
+  -H "X-API-Key: $APP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "driverId": "drv_a1b2c3d4",
@@ -410,7 +410,7 @@ curl -X POST $SALLY_BASE/routes/plan \
 const routePlan = await fetch(`${BASE_URL}/routes/plan`, {
   method: "POST",
   headers: {
-    "X-API-Key": process.env.SALLY_API_KEY,
+    "X-API-Key": process.env.APP_API_KEY,
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
@@ -477,7 +477,7 @@ console.log("Feasible:", route.complianceReport.isFeasible);
 
 ## Step 6: Understand the Route Response
 
-SALLY returns a detailed route plan with every segment the driver will follow:
+Platform returns a detailed route plan with every segment the driver will follow:
 
 ```json
 {
@@ -621,9 +621,9 @@ Each segment represents one step in the driver's journey:
 | 5 | DRIVE | Indianapolis to Columbus (175.8 mi, 2.8 hours) |
 | 6 | DOCK | Unloading at Central Ohio Distribution (1 hour) |
 
-### Why SALLY Inserted a Rest Stop
+### Why Platform Inserted a Rest Stop
 
-After segment 3, the driver has been 8.9 hours since their last break. FMCSA regulation 395.3 requires a 30-minute break before the 8th hour of driving. SALLY detected that the driver would exceed this threshold during the next drive segment and proactively inserted a 30-minute break.
+After segment 3, the driver has been 8.9 hours since their last break. FMCSA regulation 395.3 requires a 30-minute break before the 8th hour of driving. Platform detected that the driver would exceed this threshold during the next drive segment and proactively inserted a 30-minute break.
 
 ### HOS State Tracking
 
@@ -638,8 +638,8 @@ The `hosStateAfter` field on each segment shows the driver's cumulative hours af
 The route is created in `DRAFT` status. Activate it to begin monitoring:
 
 ```bash
-curl -X POST $SALLY_BASE/routes/rte_f8e7d6c5/activate \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl -X POST $APP_BASE/routes/rte_f8e7d6c5/activate \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response:**
@@ -660,7 +660,7 @@ const activateResponse = await fetch(
   `${BASE_URL}/routes/rte_f8e7d6c5/activate`,
   {
     method: "POST",
-    headers: { "X-API-Key": process.env.SALLY_API_KEY },
+    headers: { "X-API-Key": process.env.APP_API_KEY },
   }
 );
 
@@ -668,15 +668,15 @@ const activated = await activateResponse.json();
 console.log("Status:", activated.status); // "ACTIVE"
 ```
 
-Once active, SALLY begins continuous monitoring -- checking for HOS violations, route deviations, weather changes, and mechanical alerts every 60 seconds.
+Once active, Platform begins continuous monitoring -- checking for HOS violations, route deviations, weather changes, and mechanical alerts every 60 seconds.
 
 ## Step 8: Check for Alerts
 
-After activating the route, check for any alerts that SALLY has generated:
+After activating the route, check for any alerts that Platform has generated:
 
 ```bash
-curl "$SALLY_BASE/alerts?driverId=drv_a1b2c3d4&status=ACTIVE" \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl "$APP_BASE/alerts?driverId=drv_a1b2c3d4&status=ACTIVE" \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **Response (no alerts -- everything is on track):**
@@ -690,22 +690,22 @@ curl "$SALLY_BASE/alerts?driverId=drv_a1b2c3d4&status=ACTIVE" \
 }
 ```
 
-If the driver deviates from the plan or an HOS threshold approaches, SALLY generates alerts automatically. You can subscribe to real-time alerts using [Server-Sent Events](/docs/api-guides/alerts-monitoring/real-time-events).
+If the driver deviates from the plan or an HOS threshold approaches, Platform generates alerts automatically. You can subscribe to real-time alerts using [Server-Sent Events](/docs/api-guides/alerts-monitoring/real-time-events).
 
 ## Step 9: Get Route Details Anytime
 
 Retrieve the current state of the route at any point:
 
 ```bash
-curl $SALLY_BASE/routes/rte_f8e7d6c5 \
-  -H "X-API-Key: $SALLY_API_KEY"
+curl $APP_BASE/routes/rte_f8e7d6c5 \
+  -H "X-API-Key: $APP_API_KEY"
 ```
 
 **JavaScript (fetch):**
 
 ```javascript
 const routeDetails = await fetch(`${BASE_URL}/routes/rte_f8e7d6c5`, {
-  headers: { "X-API-Key": process.env.SALLY_API_KEY },
+  headers: { "X-API-Key": process.env.APP_API_KEY },
 });
 
 const route = await routeDetails.json();
@@ -719,11 +719,11 @@ console.log("ETA:", route.summary.estimatedCompletion);
 Here is the full workflow as a single JavaScript script:
 
 ```javascript
-const SALLY_API_KEY = process.env.SALLY_API_KEY;
-const BASE_URL = "https://sally-api-staging.appshore.in/api/v1";
+const APP_API_KEY = process.env.APP_API_KEY;
+const BASE_URL = "https://api-staging.appshore.in/api/v1";
 
 const headers = {
-  "X-API-Key": SALLY_API_KEY,
+  "X-API-Key": APP_API_KEY,
   "Content-Type": "application/json",
 };
 
@@ -857,7 +857,7 @@ async function planFirstRoute() {
   // Step 5: Activate the route
   const activateRes = await fetch(
     `${BASE_URL}/routes/${route.planId}/activate`,
-    { method: "POST", headers: { "X-API-Key": SALLY_API_KEY } }
+    { method: "POST", headers: { "X-API-Key": APP_API_KEY } }
   );
   const activated = await activateRes.json();
   console.log("Route status:", activated.status);
