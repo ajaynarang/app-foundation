@@ -18,7 +18,7 @@ import { useAuth } from '@/features/auth';
 import { showSuccess, showError } from '@/shared/lib/toast';
 import { PasswordStrengthMeter } from './password-strength-meter';
 
-const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'app.appshore.in';
+const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost:3000';
 
 const registrationSchema = z
   .object({

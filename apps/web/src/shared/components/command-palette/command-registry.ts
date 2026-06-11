@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
 import { STORAGE_KEYS } from '@/shared/constants';
-import { ClipboardList, FileText, Moon, Package, Plus, Receipt, Sun, Users, Wallet } from 'lucide-react';
-import { apiClient } from '@/shared/lib/api';
+import { FileText, Moon, Package, Plus, Sun, Users } from 'lucide-react';
 import type { UserRole, NavigationItem, NavItem } from '@/shared/lib/navigation';
 import { getNavigationForRole, getSubPanelSections } from '@/shared/lib/navigation';
+import type { SearchApiResult } from '@/shared/lib/search';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -180,28 +180,17 @@ export const defaultProviders: PaletteProvider[] = [navigationProvider, quickAct
 
 // ---------------------------------------------------------------------------
 // Entity Search
+//
+// `searchEntities` lives in @/shared/lib/search (shared with the AI chat
+// @-mention picker) and is a no-op until a backend GET /search endpoint is
+// registered. Extend ENTITY_ICONS with your domain's entity types when you
+// enable it.
 // ---------------------------------------------------------------------------
 
 const ENTITY_ICONS: Record<string, LucideIcon> = {
-  load: ClipboardList,
-  driver: Users,
-  invoice: Receipt,
-  customer: Package,
-  settlement: Wallet,
+  user: Users,
+  document: FileText,
 };
-
-export interface SearchApiResult {
-  type: string;
-  id: string;
-  label: string;
-  description: string;
-  href: string;
-}
-
-export async function searchEntities(query: string): Promise<SearchApiResult[]> {
-  if (!query || query.length < 2) return [];
-  return apiClient<SearchApiResult[]>(`/search?q=${encodeURIComponent(query)}&limit=8`);
-}
 
 export function searchResultsToPaletteItems(
   results: SearchApiResult[],

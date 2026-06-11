@@ -20,7 +20,7 @@ Connect Platform to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly c
 | Environment | Server URL |
 |-------------|-----------|
 | **Production** | `https://api.example.com` |
-| **Staging** | `https://api.apps.appshore.in` |
+| **Staging** | `https://api-staging.example.com` |
 
 ### Step 2: Enable Developer Mode
 
@@ -49,17 +49,11 @@ Connect Platform to [ChatGPT](https://chatgpt.com) as an **MCP app** (formerly c
 Open a new chat and try:
 
 ```
-"Show me all active loads"
+"Run a health check on my platform connection"
 
-"What's the fleet status today?"
+"Search the knowledge base for our onboarding guide"
 
-"What invoices are overdue?"
-
-"What's the compliance score for my fleet?"
-
-"Generate an invoice for load #1234"
-
-"Plan a route from Dallas to Chicago"
+"What does the knowledge base say about billing?"
 ```
 
 ## How It Works
@@ -70,7 +64,7 @@ ChatGPT's MCP support follows the same protocol as Claude:
 2. **Registration**: ChatGPT registers itself via dynamic client registration (RFC 7591)
 3. **Authorization**: OAuth 2.1 + PKCE flow -- you sign in and approve scopes
 4. **Tool Access**: ChatGPT discovers available Platform tools via `tools/list`
-5. **Execution**: When you ask a fleet question, ChatGPT calls the appropriate tool with your token
+5. **Execution**: When you ask a question, ChatGPT calls the appropriate tool with your token
 
 ## Admin: Publishing to Your Workspace
 
@@ -99,17 +93,11 @@ If Platform adds new tools or updates existing ones:
 ## Example Prompts
 
 ```
-"What loads are currently in transit?"
+"Is the platform healthy right now?"
 
-"Show me the A/R aging summary"
+"Search the knowledge base for the API key rotation policy"
 
-"What's the Shield compliance score?"
-
-"Approve settlement for driver John Smith"
-
-"What customers have the slowest payment times?"
-
-"Check billing readiness for load L-1001"
+"Summarize what the knowledge base says about onboarding"
 ```
 
 ## Troubleshooting
@@ -130,7 +118,7 @@ If Platform adds new tools or updates existing ones:
 
 - Click **Refresh** on the connector to re-fetch tools
 - Check that you approved all scopes during authorization
-- Your role may limit which tools are available (e.g., Drivers see fewer tools than Dispatchers)
+- Your role may limit which tools are available (e.g., Members see fewer tools than Admins)
 
 ### "Unauthorized" after working previously
 

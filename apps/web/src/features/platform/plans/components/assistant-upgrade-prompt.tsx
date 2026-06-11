@@ -8,7 +8,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { apiClient } from '@/shared/lib/api';
 import { showSuccess, showError } from '@/shared/lib/toast';
 import { useUpgradeUrl } from '../hooks/use-upgrade-url';
-import { mailto } from '@/shared/lib/contacts';
+import { CONTACTS, mailto } from '@/shared/lib/contacts';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
 
 interface AssistantUpgradePromptProps {
@@ -112,7 +112,7 @@ function AddOnUpsellCard({ feature }: { feature: string }) {
         <p className="text-xs text-muted-foreground mt-3">
           Our team will review your request and activate it for you.
           <br />
-          Usually within 24 hours. Questions? support@appshore.in
+          Usually within 24 hours. Questions? {CONTACTS.support}
         </p>
       </div>
     </div>

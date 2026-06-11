@@ -30,7 +30,7 @@ export class DurableEventProcessor extends WorkerHost {
 
       // Normalize the tenantId once for every downstream subscriber. Domain
       // services may pass either a numeric DB id (`String(7)`) or the wire
-      // slug (`demo-northstar-2026`); persistence and webhook dispatch both
+      // slug (`demo-acme-2026`); persistence and webhook dispatch both
       // need the slug. Centralizing here avoids the bug class of "consumer
       // forgot to resolve" that bit us on the agent webhook path.
       const slug = await this.tenantResolver.resolveToSlug(raw.tenantId);

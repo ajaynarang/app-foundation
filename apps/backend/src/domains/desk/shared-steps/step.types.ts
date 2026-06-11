@@ -40,7 +40,7 @@ export interface SharedHydrateOutput {
   /**
    * Generic counterparty keys a responsibility names on its own hydrate
    * output so the shared close step can fold them into the memory entityRef
-   * (e.g. AR keys `{ customerId }`, settlement keys `{ driverId }`). The
+   * (e.g. a billing responsibility names `{ customerId }`). The
    * close step copies whatever is provided without knowing the entity shape.
    */
   relationshipRef?: Record<string, string>;

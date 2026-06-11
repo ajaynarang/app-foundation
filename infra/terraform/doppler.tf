@@ -10,8 +10,6 @@ resource "aws_ssm_parameter" "doppler_token" {
 
   tags = { Name = "${local.prefix}-doppler-token" }
 
-  lifecycle {
-    # Prevent Terraform from showing the value in plan output
-    ignore_changes = []
-  }
+  # Note: the value is masked in plan output because var.doppler_token is
+  # marked sensitive and the provider treats SecureString values as sensitive.
 }

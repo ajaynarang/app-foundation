@@ -30,7 +30,7 @@ export class TenantIdResolver {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Returns the wire-format slug (`demo-northstar-2026`) for any of the
+   * Returns the wire-format slug (`demo-acme-2026`) for any of the
    * accepted inputs. Returns `null` if the input is unresolvable.
    */
   async resolveToSlug(rawTenantId: string): Promise<string | null> {

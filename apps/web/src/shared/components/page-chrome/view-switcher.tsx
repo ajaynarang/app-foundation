@@ -21,9 +21,9 @@ export interface ViewSwitcherProps<T extends string = string> {
 }
 
 /**
- * Segmented control used for the view (Board/Table) and group (None/Trip) switchers in
- * the page chrome's right cluster. Extracted from the hand-rolled Loads toggle so every
- * page renders the same affordance. See app-frontend-patterns §16 (Page Chrome).
+ * Segmented control used for the view (e.g. Board/Table) and group-by switchers in
+ * the page chrome's right cluster — a single shared affordance so every page renders
+ * the same toggle. See app-frontend-patterns §16 (Page Chrome).
  */
 function Switcher<T extends string>({ options, value, onChange, label = 'View', className }: ViewSwitcherProps<T>) {
   return (

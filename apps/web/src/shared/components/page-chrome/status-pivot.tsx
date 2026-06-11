@@ -25,8 +25,8 @@ export interface StatusPivotProps<T extends string = string> {
 /**
  * StatusPivot — the canonical Zone-3 status/scope FILTER control (text + dots + counts).
  *
- * This is the lightweight funnel style used for filtering data (e.g. Loads
- * Active/Pending/…/History, Inbox Pending/Archive). It is deliberately NOT the underline
+ * This is the lightweight funnel style used for filtering data (e.g. an
+ * Active/Pending/…/History or Pending/Archive funnel). It is deliberately NOT the underline
  * `PageTabs` style — those are for page NAVIGATION. Filters use this pivot; nav uses tabs.
  * See app-frontend-patterns §15.4 (Page Chrome).
  */

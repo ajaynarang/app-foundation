@@ -35,7 +35,9 @@ infra/
     ├── iam.tf                   ← Permissions (who can do what)
     ├── alb.tf                   ← Load balancer + HTTPS + DNS
     ├── cloudwatch.tf            ← Logs
-    ├── secrets.tf               ← Secret placeholders (DB password, API keys, etc.)
+    ├── s3.tf                    ← Document storage bucket (user uploads)
+    ├── cdn.tf                   ← S3 + CloudFront for public static assets
+    ├── doppler.tf               ← Doppler service token in SSM Parameter Store
     ├── ecs.tf                   ← Where your app actually runs (containers)
     └── scheduler.tf             ← Auto-shutoff for staging at night (saves money)
 ```
@@ -59,8 +61,18 @@ That's it. Everything else is just configuration inside those blocks.
 
 This creates the S3 bucket that stores Terraform's memory (called "state"). Terraform needs somewhere to remember what it has already created. Without this, it would try to recreate everything from scratch every time.
 
+**Before you run anything:** the state-bucket name ships as the template token `__PROJECT__-terraform-state`. The token is deliberately an invalid S3 bucket name, so an un-templated `terraform apply` fails fast. Replace it with your project slug first — `pnpm init-app` (see `tools/init-app/`) does this for you, or do it manually:
+
+```bash
+# Replace __PROJECT__ with your project slug in all 3 files that use it
+# (infra/bootstrap/main.tf, infra/terraform/main.tf, infra/terraform/iam.tf)
+grep -rl __PROJECT__ infra | xargs sed -i '' 's/__PROJECT__/myproj/g'
 ```
-S3 bucket: app-terraform-state
+
+Keep the slug equal to `var.project` (in `terraform/variables.tf`) so bucket names and resource prefixes line up.
+
+```
+S3 bucket: <project>-terraform-state
   └── staging/terraform.tfstate    ← Terraform's memory for staging
   └── production/terraform.tfstate ← Terraform's memory for production (when ready)
 ```
@@ -176,7 +188,7 @@ Creates a managed PostgreSQL 16 database. "Managed" means AWS handles backups, p
 
 Key settings:
 
-- **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from a separate Secrets Manager secret (`app-staging-secret-db-url`) which doesn't auto-sync with RDS rotation.
+- **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from Doppler, which doesn't auto-sync with RDS rotation.
 - **`publicly_accessible = false`** — cannot be reached from the internet, only from inside the VPC
 - **`storage_encrypted = true`** — data on disk is encrypted
 - **Staging:** no final snapshot on destroy (cheap teardowns), 1-day backups, no deletion protection
@@ -199,12 +211,12 @@ IAM is AWS's permission system. Three roles are created:
 **ECS Execution Role** — used by AWS (not your code) to:
 
 - Pull your Docker image from ECR
-- Inject secrets from Secrets Manager into containers as environment variables
+- Inject the Doppler service token from SSM Parameter Store into containers
 - Write logs to CloudWatch
 
 **ECS Task Role** — used by your running app code to:
 
-- Read secrets from Secrets Manager at runtime (if needed)
+- Read/write objects in the S3 documents bucket
 - Use ECS Exec (SSH-like access into a running container for migrations/debugging)
 
 **GitHub Deploy Role** — used by GitHub Actions to:
@@ -277,29 +289,22 @@ aws logs tail /app/staging/api --follow
 
 ---
 
-### `terraform/secrets.tf` — Secret Placeholders
+### `terraform/doppler.tf` — Runtime Secrets via Doppler
 
-Creates empty slots in AWS Secrets Manager — one per secret. **Does not set values.** After `terraform apply`, you fill each one manually via CLI:
+All app environment variables (`DATABASE_URL`, `REDIS_URL`, JWT secrets, API keys, `FRONTEND_URL`, `CONSOLE_URL`, `CORS_ORIGINS`, optional LiveKit/voice settings, etc.) live in **Doppler** — not in Terraform and not in AWS Secrets Manager. See `docs/doppler.md` for setting up your Doppler project.
+
+Terraform's only job here is storing the Doppler **service token** in SSM Parameter Store as a SecureString (`/<project>-<env>/doppler-token`). The ECS task definitions inject that one token via the `secrets` block, and the container entrypoint runs the app under `doppler run`, which fetches everything else at startup.
+
+You pass the token at apply time:
 
 ```bash
-aws secretsmanager put-secret-value \
-  --secret-id app-staging-secret-db-url \
-  --secret-string "postgresql://..."
+terraform apply -var-file=environments/staging.tfvars \
+  -var="doppler_token=dp.st.stg.xxxx"
 ```
 
-The secrets created:
+CI does the same — the GitHub Actions deploy workflow reads `DOPPLER_TOKEN_STG` / `DOPPLER_TOKEN_PRD` from GitHub secrets and passes them to both Terraform and the migration step.
 
-| Secret name                        | What goes in it                                       |
-| ---------------------------------- | ----------------------------------------------------- |
-| `app-staging-secret-db-url`        | PostgreSQL connection string                          |
-| `app-staging-secret-redis-url`     | Redis connection string (use `rediss://`)             |
-| `app-staging-secret-jwt-access`    | JWT access token secret (run: `openssl rand -hex 32`) |
-| `app-staging-secret-jwt-refresh`   | JWT refresh token secret                              |
-| `app-staging-secret-jwt-secret`    | General secret key                                    |
-| `app-staging-secret-anthropic-key` | Your Anthropic API key                                |
-| `app-staging-secret-resend-key`    | Your Resend API key                                   |
-
-ECS injects these as environment variables into your containers at startup — your app reads them as `process.env.DATABASE_URL` etc. The values never appear in your code or logs.
+Secret values never appear in your code, task definitions, or Terraform state output (the variable is marked `sensitive`).
 
 ---
 
@@ -339,11 +344,14 @@ aws ecs execute-command \
 
 Saves ~$15-20/month by scaling staging to zero containers at night and back up in the morning:
 
-| Time (UTC)      | Action                              |
-| --------------- | ----------------------------------- |
-| 8:00 AM Mon–Fri | Start (set desired count back to 1) |
-| 8:00 PM Mon–Fri | Stop (set desired count to 0)       |
-| Weekends        | Stays off                           |
+| Time (America/New_York) | Action                            |
+| ----------------------- | --------------------------------- |
+| 8:00 AM daily           | Start (set desired count back up) |
+| 12:00 AM (midnight)     | Stop (set desired count to 0)     |
+
+Services are down midnight–8am ET (8 hours/day). The timezone auto-adjusts for EST/EDT.
+
+**All schedules ship `state = "DISABLED"`** — they do nothing until you deliberately flip them to `ENABLED` in `scheduler.tf` (or the AWS console) once you're ready for staging to sleep at night.
 
 The database (RDS) keeps running 24/7 — stopping it would be more complex and the savings are smaller.
 
@@ -396,8 +404,13 @@ main.tf               configures AWS provider + where to store state
      ├── elasticache.tf creates Redis
      │     └─ lives in the private subnets from vpc.tf
      │
-     ├── secrets.tf    creates secret placeholders
-     │     └─ ARNs injected into containers by ↓
+     ├── s3.tf         creates the documents bucket
+     │     └─ CORS origins from s3_cors_origins
+     │
+     ├── cdn.tf        creates the public-assets bucket + CloudFront
+     │
+     ├── doppler.tf    stores the Doppler token in SSM
+     │     └─ injected into containers by ↓
      │
      ├── iam.tf        creates permissions
      │     └─ roles attached to ↓
@@ -472,35 +485,21 @@ Run these steps in order every time you set up a new environment.
 
 ### Step 1: Run Migrations
 
-Applies all Prisma migrations to create the schema (including pgvector extension and knowledge_documents table).
+Applies all Prisma migrations to create the schema (including the pgvector extension and `knowledge_documents` table).
+
+**CI does this automatically** — the deploy workflow (`.github/workflows/deploy-all.yml`) opens an SSM port-forwarding tunnel to RDS through a running ECS task and runs `prisma migrate deploy` from the CI runner.
+
+To run migrations manually, open the SSM tunnel (see "Connecting TablePlus" below — it forwards local port 5433 → RDS 5432), then:
 
 ```bash
-aws ecs run-task \
-  --cluster app-staging-ecs-cluster \
-  --task-definition app-staging-ecs-taskdef-api \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[PRIVATE_SUBNET_1,PRIVATE_SUBNET_2],securityGroups=[ECS_SG],assignPublicIp=DISABLED}" \
-  --overrides '{"containerOverrides":[{"name":"api","command":["/bin/sh","apply-migration.sh"]}]}'
+cd apps/backend
+DATABASE_URL="postgresql://app_user:URL_ENCODED_PASSWORD@127.0.0.1:5433/app?sslmode=no-verify" \
+  pnpm exec prisma migrate deploy
 ```
-
-Wait for it to stop, then check exit code is 0:
-
-```bash
-aws ecs describe-tasks --cluster app-staging-ecs-cluster \
-  --tasks <TASK_ARN> \
-  --query "tasks[0].containers[0].exitCode" --output text
-```
-
-Get subnets and SG from: `terraform output` / AWS console → VPC.
-
-Staging values:
-
-- Subnets: `subnet-006269cf8658ccdb0`, `subnet-0b2cd0939cb6038c8`
-- Security Group: `sg-0ce4743d31c340698`
 
 ### Step 2: Run Base Seed
 
-Seeds super admin, feature flags, truck stops, reference data, plan config. Requires SSM tunnel open (see "Connecting TablePlus" section below).
+Seeds platform reference data: implicit tenant, super admin, feature flags, plan config, plan entitlements, vendor configs, add-ons, desk config, and AI model pricing (see `apps/backend/prisma/seeds/index.ts`). Requires SSM tunnel open (see "Connecting TablePlus" section below).
 
 ```bash
 # Update .env to point at RDS via tunnel (IMPORTANT: update .env not .env.local — dotenv loads .env with priority)
@@ -517,7 +516,7 @@ sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@loc
 
 ### Step 3: Seed Knowledge Base (pgvector)
 
-Seeds 41 product knowledge documents (143 chunks) with OpenAI embeddings into pgvector for the AI chat feature.
+Seeds the Markdown documents under `apps/backend/content/knowledge-base/` (chunked, with OpenAI embeddings) into pgvector for the AI chat feature. The template ships only a starter document set — the count depends on your content.
 
 Requires:
 
@@ -538,7 +537,7 @@ sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@loc
   apps/backend/.env
 ```
 
-Verify in TablePlus: `SELECT COUNT(*) FROM knowledge_documents;` → should return `143`.
+Verify in TablePlus: `SELECT COUNT(*) FROM knowledge_documents;` → should match the number of chunks reported by the seed script.
 
 ### Step 4: Set Super Admin Firebase UID
 
@@ -563,31 +562,25 @@ TASK_ID=$(echo $TASK_ARN | cut -d'/' -f3)
 RUNTIME_ID=$(aws ecs describe-tasks --cluster app-staging-ecs-cluster --tasks $TASK_ARN --query 'tasks[0].containers[0].runtimeId' --output text)
 
 # Start tunnel — forwards local port 5433 → RDS port 5432
+# Get <RDS_ENDPOINT> from: terraform output rds_endpoint (or AWS console → RDS)
 aws ssm start-session \
   --target "ecs:app-staging-ecs-cluster_${TASK_ID}_${RUNTIME_ID}" \
   --document-name AWS-StartPortForwardingSessionToRemoteHost \
-  --parameters '{"host":["app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"],"portNumber":["5432"],"localPortNumber":["5433"]}'
+  --parameters '{"host":["<RDS_ENDPOINT>"],"portNumber":["5432"],"localPortNumber":["5433"]}'
 ```
 
 You'll see: `Port 5433 opened for sessionId ... Waiting for connections...` — keep this tab open.
 
 **Step 2: Connect TablePlus**
 
-| Field    | Value                                                |
-| -------- | ---------------------------------------------------- |
-| Host     | `127.0.0.1`                                          |
-| Port     | `5433`                                               |
-| User     | `app_user`                                           |
-| Password | (raw password from `rds!` secret in Secrets Manager) |
-| Database | `app`                                                |
-| SSL      | **On** (required by RDS)                             |
-
-To get the password:
-
-```bash
-RDS_ARN=$(aws secretsmanager list-secrets --output json | python3 -c "import sys,json; [print(s['ARN']) for s in json.load(sys.stdin)['SecretList'] if 'rds' in s['Name'].lower()]")
-aws secretsmanager get-secret-value --secret-id "$RDS_ARN" --query SecretString --output text
-```
+| Field    | Value                                                                          |
+| -------- | ------------------------------------------------------------------------------ |
+| Host     | `127.0.0.1`                                                                    |
+| Port     | `5433`                                                                         |
+| User     | `<project>_user` (e.g. `app_user`)                                             |
+| Password | the value you set via `TF_VAR_rds_password` (also in Doppler's `DATABASE_URL`) |
+| Database | `app`                                                                          |
+| SSL      | **On** (required by RDS)                                                       |
 
 Close the terminal tab when done to close the tunnel.
 
@@ -700,34 +693,21 @@ postgresql://app_user:PASSWORD@host:5432/app?sslmode=no-verify
 
 ### 5. Prisma CLI not in production image
 
-**Problem:** `pnpm deploy --prod` creates a self-contained bundle but doesn't include the Prisma CLI binary (only the Prisma Client). Running `npx prisma migrate deploy` or `node_modules/.bin/prisma` fails.
+**Problem:** `pnpm deploy --prod` creates a self-contained bundle but doesn't include the Prisma CLI binary (only the Prisma Client). Running `npx prisma migrate deploy` inside the container fails.
 
-**Fix:** Use `apply-migration.sh` (already in the image) which uses `psql` directly:
-
-```bash
-aws ecs run-task \
-  --cluster app-staging-ecs-cluster \
-  --task-definition app-staging-ecs-taskdef-api \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[PRIVATE_SUBNET_1,PRIVATE_SUBNET_2],securityGroups=[ECS_SG],assignPublicIp=DISABLED}" \
-  --overrides '{"containerOverrides":[{"name":"api","command":["/bin/sh","apply-migration.sh"]}]}'
-```
-
-Get subnet and SG IDs from `terraform output` / AWS console.
+**Fix:** Don't run migrations inside the production image at all. The deploy workflow (`.github/workflows/deploy-all.yml`) opens an SSM port-forwarding tunnel to RDS through a running ECS task and runs `pnpm exec prisma migrate deploy` from the CI runner, where the full repo (and Prisma CLI) is available. The same tunnel approach works for manual migrations (see "Database Setup" above).
 
 ---
 
-### 6. Secrets Manager secret with empty value crashes ECS
+### 6. Empty container secret crashes ECS at startup
 
-**Problem:** ECS fetches all secrets at container startup before the app runs. If any secret has no value (was created by Terraform but never populated), ECS fails to start the task entirely.
+> Historical: this stack originally injected ~13 individual Secrets Manager secrets. It now injects a single Doppler token from SSM (see `doppler.tf`), but the lesson still applies to that one parameter.
 
-**Error:** `ResourceNotFoundException: Secrets Manager can't find the specified secret value for staging label: AWSCURRENT`
+**Problem:** ECS fetches everything in the task definition's `secrets` block at container startup, before the app runs. If a referenced secret/parameter has no value (was created by Terraform but never populated), ECS fails to start the task entirely.
 
-**Fix:** All 13 secrets must have a value set before the first deploy. If a secret is unused (e.g. Anthropic key when using AI gateway instead), set a dummy value:
+**Error:** `ResourceNotFoundException: ... can't find the specified secret value`
 
-```bash
-aws secretsmanager put-secret-value --secret-id app-staging-secret-anthropic-key --secret-string "unused"
-```
+**Fix:** Make sure the Doppler token is set before the first deploy — pass a real `-var="doppler_token=..."` on `terraform apply` (CI passes it from the `DOPPLER_TOKEN_STG`/`DOPPLER_TOKEN_PRD` GitHub secrets).
 
 ---
 

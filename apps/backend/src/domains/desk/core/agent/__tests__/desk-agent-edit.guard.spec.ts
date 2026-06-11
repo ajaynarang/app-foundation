@@ -165,11 +165,11 @@ describe('DeskAgentEditGuard', () => {
       const ctx = makeCtx({
         user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key' },
-        params: { key: 'ar_followup' },
+        params: { key: 'welcome' },
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
       expect(prisma.deskResponsibility.findUnique).toHaveBeenCalledWith({
-        where: { tenantId_key: { tenantId: 10, key: 'ar_followup' } },
+        where: { tenantId_key: { tenantId: 10, key: 'welcome' } },
         select: { agent: { select: { supervisorUserId: true } } },
       });
     });
@@ -181,7 +181,7 @@ describe('DeskAgentEditGuard', () => {
       const ctx = makeCtx({
         user: { dbId: 42, role: UserRole.MEMBER, tenantId: 't1' },
         route: { path: '/desk/responsibilities/:key/run' },
-        params: { key: 'ar_followup' },
+        params: { key: 'welcome' },
       });
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });

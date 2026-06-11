@@ -7,7 +7,7 @@ Every request to the Platform API must include an authentication credential. For
 Generate a key at **[API Keys](/docs/keys)**, then pass it as a Bearer token:
 
 ```bash
-curl https://api-staging.appshore.in/api/v1/drivers \
+curl https://api-staging.example.com/api/v1/users \
   -H "Authorization: Bearer sk_staging_your_key_here"
 ```
 
@@ -27,11 +27,11 @@ API keys are long-lived, scoped to your tenant, and carry the permissions of the
 ```javascript
 const APP_API_KEY = process.env.APP_API_KEY;
 
-const res = await fetch("https://api-staging.appshore.in/api/v1/drivers", {
+const res = await fetch("https://api-staging.example.com/api/v1/users", {
   headers: { Authorization: `Bearer ${APP_API_KEY}` },
 });
 
-const drivers = await res.json();
+const users = await res.json();
 ```
 
 **Python:**
@@ -42,11 +42,11 @@ import os, requests
 API_KEY = os.environ["APP_API_KEY"]
 
 res = requests.get(
-    "https://api-staging.appshore.in/api/v1/drivers",
+    "https://api-staging.example.com/api/v1/users",
     headers={"Authorization": f"Bearer {API_KEY}"},
 )
 
-drivers = res.json()
+users = res.json()
 ```
 
 ## Error responses
@@ -66,5 +66,5 @@ drivers = res.json()
 
 ## Next steps
 
-- [Plan a Route](/docs/getting-started/plan-a-route) — See Platform's route optimization in action
+- [Quickstart](/docs/getting-started/quickstart) — Make your first API call
 - [API Keys Reference](/docs/getting-started/api-keys) — Full reference for key management (create, list, revoke via API)

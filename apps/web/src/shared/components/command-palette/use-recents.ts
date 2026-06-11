@@ -2,18 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-  ClipboardList,
-  FileText,
-  Package,
-  Receipt,
-  Settings,
-  Truck,
-  User,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react';
+import { FileText, Home, Settings, Sparkles, User, Users, type LucideIcon } from 'lucide-react';
 import { getNavigationForRole, type NavItem, type UserRole } from '@/shared/lib/navigation';
 import { STORAGE_KEYS } from '@/shared/constants';
 
@@ -35,16 +24,15 @@ export interface RecentItem {
 // Icon map — maps serialized icon names back to Lucide components
 // ---------------------------------------------------------------------------
 
+// Add your own icons here as you register ENTITY_PATTERNS below — entries
+// must match the nav/entity `iconName` strings you serialize.
 export const ICON_MAP: Record<string, LucideIcon> = {
-  ClipboardList,
   FileText,
-  Package,
-  Receipt,
+  Home,
   Settings,
-  Truck,
+  Sparkles,
   User,
   Users,
-  Wallet,
 };
 
 // ---------------------------------------------------------------------------
@@ -52,7 +40,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
 // ---------------------------------------------------------------------------
 
 const MAX_RECENTS = 8;
-const SKIP_ROUTES = ['/', '/login', '/track'];
+const SKIP_ROUTES = ['/', '/login'];
 
 function storageKey(role: UserRole | undefined): string {
   return role ? STORAGE_KEYS.cmdPaletteRecents(role) : STORAGE_KEYS.CMD_PALETTE_RECENTS_PREFIX;

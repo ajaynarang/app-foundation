@@ -18,7 +18,7 @@ const VoiceContext = createContext<VoiceContextValue | null>(null);
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const store = useAssistantStore();
-  const { sessionId, setOrbState, setActiveTranscript, userMode } = store;
+  const { sessionId, setOrbState, setActiveTranscript } = store;
   const [isVoiceAvailable, setIsVoiceAvailable] = useState(false);
   const setVoicePrefs = useAssistantStore((s) => s.setVoicePrefs);
 
@@ -27,10 +27,6 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   // Fetch voice status and preferences on mount
   useEffect(() => {
-    if (userMode === 'prospect') {
-      setIsVoiceAvailable(false);
-      return;
-    }
     getVoiceStatus()
       .then((status) => setIsVoiceAvailable(status.available))
       .catch(() => setIsVoiceAvailable(false));
@@ -49,7 +45,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         /* use defaults */
       });
-  }, [userMode, setVoicePrefs]);
+  }, [setVoicePrefs]);
 
   const resetVoiceTurnState = useCallback(() => {
     assistantMsgIdRef.current = null;

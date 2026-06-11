@@ -54,7 +54,6 @@ export function AssistantStrip({ hideOrb }: { hideOrb?: boolean } = {}) {
   const {
     isExpanded,
     orbState,
-    userMode,
     chatLayout,
     hasUnreadAsync,
     expandStrip,
@@ -369,8 +368,8 @@ export function AssistantStrip({ hideOrb }: { hideOrb?: boolean } = {}) {
                     </LayoutModeButton>
                   </div>
 
-                  {/* Voice settings — authenticated users only */}
-                  {userMode !== 'prospect' && <AssistantVoiceSettings />}
+                  {/* Voice settings */}
+                  <AssistantVoiceSettings />
 
                   {/* Keyboard hint */}
                   <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-2xs font-mono text-muted-foreground bg-muted rounded border border-border">
@@ -407,6 +406,7 @@ export function AssistantStrip({ hideOrb }: { hideOrb?: boolean } = {}) {
           !hideOrb && (
             <motion.div
               key="collapsed"
+              id="tour-assistant-orb"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}

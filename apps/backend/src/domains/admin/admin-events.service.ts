@@ -25,7 +25,7 @@ export class AdminEventsService {
     const where: Prisma.DomainEventLogWhereInput = {};
 
     if (filters.tenantId) {
-      // Filter accepts the public slug from the admin UI (e.g. "demo-northstar-2026").
+      // Filter accepts the public slug from the admin UI (e.g. "demo-acme-2026").
       // domain_event_log.tenant_id is now Int, so match through the tenant relation.
       where.tenant = { tenantId: filters.tenantId };
     }

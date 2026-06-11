@@ -494,7 +494,9 @@ enum IntegrationStatus {
   NEEDS_RECONNECT
 }
 
-/// Generic cache of entities fetched from external systems (QB customers, vendors, classes, etc.)
+/// Generic cache of entities fetched from external systems (e.g. customers, accounts, categories).
+/// Not used by the starter itself — this is an extension-point table for integration
+/// connectors you add to VENDOR_REGISTRY (see CLAUDE.md "Integration connectors").
 model IntegrationExternalEntity {
   id            Int      @id @default(autoincrement())
   tenantId      Int      @map("tenant_id")
@@ -512,7 +514,9 @@ model IntegrationExternalEntity {
   @@map("integration_external_entities")
 }
 
-/// Generic mapping from a platform entity to an external entity in an integrated system
+/// Generic mapping from a platform entity to an external entity in an integrated system.
+/// Not used by the starter itself — extension-point table for integration connectors
+/// (pairs with IntegrationExternalEntity above).
 model IntegrationEntityMapping {
   id              Int       @id @default(autoincrement())
   tenantId        Int       @map("tenant_id")
@@ -785,10 +789,6 @@ model Conversation {
   userMode String  @map("user_mode") @db.VarChar(20)
   title    String? @db.VarChar(255)
   isActive Boolean @default(true) @map("is_active")
-
-  // Read tracking — last time each role viewed this conversation
-  dispatcherReadAt DateTime? @map("dispatcher_read_at") @db.Timestamptz
-  driverReadAt     DateTime? @map("driver_read_at") @db.Timestamptz
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz

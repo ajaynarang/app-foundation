@@ -10,7 +10,7 @@ import { SseBusContext } from './sse-context';
 import { SseConnectionContext, type SseConnectionState } from './sse-connection-context';
 import { SSE_INVALIDATION_MAP } from './invalidation-map';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 const RECONNECT_DELAY = 5_000;
 
 interface SseProviderProps {

@@ -15,7 +15,7 @@ Connect Platform directly to [Claude.ai](https://claude.ai) as an MCP Connector.
 | Environment | Connector URL |
 |-------------|--------------|
 | **Production** | `https://api.example.com` |
-| **Staging** | `https://api.apps.appshore.in` |
+| **Staging** | `https://api-staging.example.com` |
 
 <Callout type="info">
   Use the **base URL** — Claude.ai discovers endpoints automatically via `/.well-known/oauth-authorization-server`.
@@ -44,17 +44,11 @@ Once authorized, you'll be redirected back to Claude.ai.
 Open a new chat in Claude and try these prompts:
 
 ```
-"Show me all active loads"
+"Run a health check on my platform connection"
 
-"What's the fleet status today?"
+"Search the knowledge base for our onboarding guide"
 
-"What invoices are overdue?"
-
-"What's the compliance score for my fleet?"
-
-"Generate an invoice for load #1234"
-
-"Plan a route from Dallas to Chicago for driver John Smith"
+"What does the knowledge base say about billing?"
 ```
 
 ## How It Works
@@ -66,18 +60,15 @@ When you add Platform as a connector:
 3. **Authorization**: You sign in and approve scopes via Platform's consent page
 4. **Token Exchange**: Claude.ai exchanges the auth code for access/refresh tokens (OAuth 2.1 + PKCE)
 5. **Tool Access**: Claude sees your available Platform tools based on granted scopes
-6. **Execution**: When you ask a fleet question, Claude calls the appropriate Platform tool with your token
+6. **Execution**: When you ask a question, Claude calls the appropriate Platform tool with your token
 
 ## Available Tools in Claude
 
 After connecting, Claude will have access to tools like:
 
-- **query-loads** -- Search and filter your loads
-- **get-fleet-status** -- Dashboard summary of active loads, drivers, alerts
-- **get-invoice-summary** -- A/R aging and invoice breakdown
-- **get-shield-score** -- Fleet compliance score
-- **generate-invoice** -- Create a draft invoice from a delivered load
-- **plan-route** -- Create an optimized route with HOS compliance
+- **health-check** -- Verify the connection and server status
+- **search-kb** -- Semantic search over your tenant knowledge base
+- Any domain tools you register in the backend MCP tools module
 
 The exact tools available depend on the scopes you approved during authorization.
 
@@ -93,12 +84,12 @@ The exact tools available depend on the scopes you approved during authorization
 
 - Make sure you're signing in with valid Platform credentials
 - Your account must be active and belong to a tenant
-- Check that your role (Dispatcher, Admin, etc.) has access to the requested scopes
+- Check that your role (Admin, Member, etc.) has access to the requested scopes
 
 ### "No tools available"
 
 - You may have denied scopes during authorization. Disconnect and reconnect, approving all scopes
-- Check your Platform role -- Drivers see fewer tools than Dispatchers or Admins
+- Check your Platform role -- Members see fewer tools than Admins
 
 ### Token Expired
 

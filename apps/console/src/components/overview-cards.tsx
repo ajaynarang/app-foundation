@@ -51,9 +51,7 @@ export function OverviewCards() {
       : 'All invitations accepted';
 
   // Integrations — connected count + health status
-  const tmsHasError = health?.tms?.hasError ?? false;
-  const eldHasError = health?.eld?.hasError ?? false;
-  const errorCount = [tmsHasError, eldHasError].filter(Boolean).length;
+  const errorCount = health?.integrations?.filter((i) => i.hasError).length ?? 0;
   const configuredTypes: string[] = health?.configuredTypes ?? [];
   const connectedCount = configuredTypes.length;
   const integrationDetail =

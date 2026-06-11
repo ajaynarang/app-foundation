@@ -35,7 +35,10 @@ export class AuthService {
     if (!lookupDto.email && !lookupDto.phone) {
       throw new BadRequestException('Email or phone is required');
     }
-    const where: any = { isActive: true };
+    // Only tenant-backed users are eligible for the tenant picker —
+    // tenant-less rows (SUPER_ADMIN, single-tenant-mode users) are never
+    // disclosed here and would otherwise null-deref below.
+    const where: any = { isActive: true, tenantId: { not: null } };
     if (lookupDto.email) where.email = lookupDto.email.toLowerCase().trim();
     if (lookupDto.phone) where.phone = lookupDto.phone.trim();
     const users = await this.prisma.user.findMany({
@@ -51,14 +54,14 @@ export class AuthService {
         firstName: u.firstName,
         lastName: u.lastName,
         role: u.role,
-        tenantId: u.tenant.tenantId,
-        tenantName: u.tenant.companyName,
+        tenantId: u.tenant!.tenantId,
+        tenantName: u.tenant!.companyName,
       })),
       multiTenant: users.length > 1,
     };
   }
 
-  async refreshAccessToken(userId: string, _tokenId: string) {
+  async refreshAccessToken(userId: string, tokenId: string) {
     const user = await this.prisma.user.findUnique({
       where: { userId },
       include: { tenant: true },
@@ -69,6 +72,9 @@ export class AuthService {
       email: user.email,
       role: user.role,
       tenantId: user.tenant?.tenantId,
+      // Keep the new access token tied to the same refresh-token session
+      // so logout can revoke it.
+      sid: tokenId,
     });
     return { accessToken, user: this.toUserProfile(user) };
   }
@@ -219,7 +225,8 @@ export class AuthService {
       include: { tenant: true },
     });
     if (!user || !user.phoneVerified) throw new UnauthorizedException('Invalid phone or PIN');
-    if (!user.tenant.isActive) throw new UnauthorizedException('Account is not active');
+    // Null-safe: tenant-less users (single-tenant mode) have user.tenant = null
+    if (user.tenant && !user.tenant.isActive) throw new UnauthorizedException('Account is not active');
     if (!user.pinHash) throw new UnauthorizedException('Invalid phone or PIN');
     const isPinValid = await this.pinService.verifyPin(dto.pin, user.pinHash);
     if (!isPinValid) throw new UnauthorizedException('Invalid phone or PIN');
@@ -229,7 +236,7 @@ export class AuthService {
         userId: user.userId,
         email: user.email,
         role: user.role,
-        tenantId: user.tenant.tenantId,
+        tenantId: user.tenant?.tenantId,
       },
       'phone_pin' satisfies AuthMethod,
     );
@@ -271,7 +278,7 @@ export class AuthService {
         userId: user.userId,
         email: user.email,
         role: user.role,
-        tenantId: user.tenant.tenantId,
+        tenantId: user.tenant?.tenantId,
       },
       'phone_otp' satisfies AuthMethod,
     );

@@ -33,7 +33,9 @@ export class JwtTokenService {
         ...(user.email ? { email: user.email } : {}),
         role: user.role,
         tenantId: user.tenantId,
-        driverId: user.driverId,
+        // Session id: ties the access token to its refresh-token row so
+        // logout / change-password can revoke the right session.
+        sid: tokenId,
         // How this session was established — immutable for the token lifetime
         ...(authMethod ? { authMethod } : {}),
       },
@@ -88,7 +90,9 @@ export class JwtTokenService {
         email: user.email,
         role: user.role,
         tenantId: user.tenantId,
-        driverId: user.driverId,
+        // Carry the session id forward so the refreshed access token stays
+        // tied to the same refresh-token row (used by logout revocation).
+        ...(user.sid ? { sid: user.sid } : {}),
       },
       {
         secret: this.configService.get<string>('jwt.accessSecret'),

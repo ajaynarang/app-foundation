@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { DriverSchemas, VehicleSchemas, LoadSchemas, expectContract } from './index.js';
+import { PlatformSchemas, SupportSchemas, ExampleSchemas, expectContract } from './index.js';
 
 describe('schemas', () => {
-  it('exports driver schemas', () => {
-    expect(Object.keys(DriverSchemas).length).toBeGreaterThan(0);
+  it('exports platform schemas', () => {
+    expect(Object.keys(PlatformSchemas).length).toBeGreaterThan(0);
   });
 
-  it('exports vehicle schemas', () => {
-    expect(Object.keys(VehicleSchemas).length).toBeGreaterThan(0);
+  it('exports support schemas', () => {
+    expect(Object.keys(SupportSchemas).length).toBeGreaterThan(0);
   });
 
-  it('exports load schemas', () => {
-    expect(Object.keys(LoadSchemas).length).toBeGreaterThan(0);
+  it('exports the example schema pair', () => {
+    expect(Object.keys(ExampleSchemas).length).toBeGreaterThan(0);
   });
 
   it('re-exports expectContract helper', () => {

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Lock-in guardrail (PR 6/6 of the domain-enums series).
+ * Lock-in guardrail.
  *
  * Forbid hand-maintained Zod enums in `packages/shared-types/src/**` whose
  * name matches a generated Prisma enum at
@@ -19,7 +19,7 @@ import * as path from 'path';
  * Allow-list below documents intentional exceptions where keeping the
  * hand-written one is correct (e.g. it lives in a different file with a
  * different value space, or the import shape is needed for legacy callers
- * that PR 6 cannot retire safely in a single change).
+ * that cannot be retired safely in a single change).
  */
 
 const SHARED_TYPES_ROOT = path.resolve(__dirname, '..', '..', '..', '..', 'packages', 'shared-types', 'src');
@@ -32,55 +32,18 @@ const GENERATED_FILE = path.join(SHARED_TYPES_ROOT, 'generated', 'prisma-enums.t
  *
  * Format: `<SchemaName> → reason`
  *
- * Today this list captures the legacy state: ~46 hand-written Zod enums
- * that duplicate generated Prisma enums. Retiring them is a mechanical
- * sweep (each entry: replace `export const FooSchema = z.enum([...])`
- * with `export { FooSchema } from '../generated/prisma-enums'`, then sweep
- * import sites). PR 6 ships the guardrail; subsequent PRs retire entries
- * one domain at a time, removing them from this allow-list as they go.
+ * Retiring an entry is a mechanical sweep: replace
+ * `export const FooSchema = z.enum([...])` with
+ * `export { FooSchema } from '../generated/prisma-enums'`, then sweep
+ * import sites and remove the entry here.
  *
  * Adding a NEW entry to this list requires reviewer sign-off — the
  * default position is "if codegen emits it, use codegen."
  */
 const ALLOW_LIST = new Map<string, string>([
-  // ── Operations / Alerts ──────────────────────────────────────────────────
-  // AlertPrioritySchema, AlertScopeSchema, AlertStatusSchema all retired —
-  // re-exported from codegen mirror in operations/alert.schema.ts.
-  // ── Desk ─────────────────────────────────────────────────────────────────
-  // ApprovalDecisionSchema, LifecycleSchema, PrioritySchema, TriggerKindSchema,
-  // TrustLevelSchema, MemoryScopeSchema, MemoryPolaritySchema all retired —
-  // re-exported from codegen mirror in desk/enums.ts. The Memory schemas were
-  // flipped to UPPER end-to-end (boundary `.toLowerCase()` translation removed)
-  // so wire format and DB representation now agree.
-  // ── Financials ───────────────────────────────────────────────────────────
-  // BillingPath, DeductionType, FactoringTxnType, InvoiceStatus, LineItemType,
-  // NoaStatus, PayStructureType, RecourseType, SettlementStatus all retired —
-  // re-exported from codegen mirror in financials/{invoice,settlement,
-  // factoring-transaction}.schema.ts.
-  // ── Fleet ────────────────────────────────────────────────────────────────
-  // ContactRole, DocumentStatus, TripStatus, CustomerStatus, CustomerType,
-  // EquipmentType, LoadBillingStatus, LoadLegStatus, LoadStatus, LoadStopStatus,
-  // MoneyCodeMethod, MoneyCodeStatus, OwnershipType, PaymentTerms,
-  // RecurringLaneStatus, TrailerLifecycleStatus, TrailerStatus, VehicleStatus —
-  // all retired, re-exported from codegen mirror across fleet/*.schema.ts.
-  // ── Infrastructure / Notifications + Jobs ────────────────────────────────
-  // JobStatusSchema, NotificationCategorySchema, NotificationTypeSchema all
-  // retired in the shadow-sweep PR — they now re-export from the codegen mirror
-  // in webhook.schema.ts. NotificationStatusSchema was renamed to
-  // NotificationInboxStatusSchema (UI inbox state vs Prisma delivery state).
-  // ── Integrations ─────────────────────────────────────────────────────────
-  // IntegrationStatusSchema, IntegrationTypeSchema, IntegrationVendorSchema all
-  // retired in the shadow-sweep PR — re-export from codegen mirror.
-  // ── Operations / Shield ──────────────────────────────────────────────────
-  // All 5 Shield schemas retired in the shadow-sweep PR — re-export from
-  // codegen mirror in operations/shield.schema.ts.
-  // ── Operations / Support ─────────────────────────────────────────────────
-  // All 3 Support schemas retired in the shadow-sweep PR — re-export from
-  // codegen mirror in operations/support.schema.ts.
-  // ── Platform ─────────────────────────────────────────────────────────────
-  // BundleFormatSchema, DriverPayTimingSchema, TenantPlanSchema all retired
-  // in the shadow-sweep PR — re-export from codegen mirror.
-  ['LeadStatusSchema', 'PR 6.X: hand-written in platform/lead.schema.ts (added by PR 5b promotion)'],
+  // Empty — every shared-types Zod enum that mirrors a Prisma enum is
+  // re-exported from the codegen mirror. Example entry shape:
+  // ['FooStatusSchema', 'hand-written in <domain>/foo.schema.ts because <reason>'],
 ]);
 
 /**
@@ -91,10 +54,8 @@ const ALLOW_LIST = new Map<string, string>([
  * hand-written schema is renamed so it stops shadowing.
  */
 const VALUE_DRIFT_RENAME_PENDING = new Map<string, string>([
-  // Empty — no allow-listed schemas have value drift today. The Memory pair
-  // (MemoryScope/MemoryPolarity) was the last entry; resolved by flipping
-  // the Memory wire format to UPPER end-to-end. The map is retained as a
-  // mechanism for future intentional-drift cases.
+  // Empty — no allow-listed schemas have value drift today. The map is
+  // retained as a mechanism for future intentional-drift cases.
 ]);
 
 interface DuplicateFinding {

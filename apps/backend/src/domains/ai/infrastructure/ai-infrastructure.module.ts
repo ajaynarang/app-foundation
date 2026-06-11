@@ -12,8 +12,8 @@ import { AiTelemetryModule } from './telemetry/ai-telemetry.module';
  * because it's passed to Mastra Agent constructors at initialization time.
  *
  * StructuredOutputService wraps AI SDK `generateText` + `Output.object()` for
- * workflow-shaped (non-agent) structured extraction — ratecon parsing, fuel
- * receipts, shield analysis, load-board NLP, desk memory extract.
+ * workflow-shaped (non-agent) structured extraction — document parsing, desk
+ * memory extract, and similar non-chat surfaces.
  *
  * EmbeddingService wraps AI SDK `embed` + `embedMany` for 1536-dim vectors
  * via the AI gateway. Shared by knowledge-base RAG and desk-memory semantic

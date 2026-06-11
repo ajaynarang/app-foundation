@@ -48,8 +48,8 @@ describe('AssistantAiController', () => {
     mockAgentRegistry = {
       getForPersona: jest.fn().mockReturnValue([
         {
-          id: 'dispatch',
-          displayName: 'Dispatch',
+          id: 'assistant',
+          displayName: 'Assistant',
           getStatus: jest.fn().mockResolvedValue({ state: 'idle', summary: 'Ready' }),
         },
       ]),
@@ -112,7 +112,7 @@ describe('AssistantAiController', () => {
       expect(result.agents).toHaveLength(1);
       expect(result.agents[0]).toEqual(
         expect.objectContaining({
-          id: 'dispatch',
+          id: 'assistant',
           status: { state: 'idle', summary: 'Ready' },
         }),
       );

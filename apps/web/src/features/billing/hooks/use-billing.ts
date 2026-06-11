@@ -114,12 +114,12 @@ export function useUpdateQuantity() {
   return useMutation({
     mutationFn: (data: UpdateQuantityRequest) => billingApi.updateQuantity(data),
     onSuccess: () => {
-      showSuccess('Truck count updated');
+      showSuccess('Seat count updated');
       qc.invalidateQueries({ queryKey: queryKeys.billing.root });
       qc.invalidateQueries({ queryKey: queryKeys.plans.root });
     },
     onError: (error: Error) => {
-      showError('Failed to update truck count', extractErrorMessage(error));
+      showError('Failed to update seat count', extractErrorMessage(error));
     },
   });
 }

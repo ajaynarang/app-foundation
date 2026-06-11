@@ -1,2773 +1,318 @@
 {
   "openapi": "3.0.0",
-  "paths": {
-    "/api/v1/health": {
-      "get": {
-        "operationId": "HealthController_healthCheck",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Health"]
-      }
-    },
-    "/api/v1/auth/lookup-user": {
-      "post": {
-        "description": "Used for simplified login flow - returns user(s) with tenant information",
-        "operationId": "AuthController_lookupUser",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserLookupDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User(s) found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserLookupResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No user found with this email/phone"
-          }
-        },
-        "summary": "Lookup user by email or phone to detect tenant(s)",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/tenants": {
-      "get": {
-        "deprecated": true,
-        "description": "DEPRECATED: Use POST /auth/lookup-user instead for simplified login flow",
-        "operationId": "AuthController_listTenants",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of tenants",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TenantDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List available tenants (fleet companies)",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/tenants/{tenant_id}/users": {
-      "get": {
-        "deprecated": true,
-        "description": "DEPRECATED: Use POST /auth/lookup-user instead for simplified login flow",
-        "operationId": "AuthController_listUsersForTenant",
-        "parameters": [
-          {
-            "name": "tenant_id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "role",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of users",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserSummaryDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List users for a tenant (for login user selection)",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/firebase/exchange": {
-      "post": {
-        "description": "Verifies Firebase ID token and returns platform JWT tokens",
-        "operationId": "AuthController_exchangeFirebaseToken",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FirebaseExchangeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Token exchange successful"
-          },
-          "401": {
-            "description": "Invalid Firebase token or user not found"
-          }
-        },
-        "summary": "Exchange Firebase token for platform JWT",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "description": "Login with user_id. tenant_id is optional (userId is globally unique)",
-        "operationId": "AuthController_login",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Login successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoginResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found"
-          }
-        },
-        "summary": "Login (mock authentication for POC)",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/refresh": {
-      "post": {
-        "operationId": "AuthController_refreshToken",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "New access token generated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoginResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or expired refresh token"
-          }
-        },
-        "summary": "Refresh access token using refresh token",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/logout": {
-      "post": {
-        "operationId": "AuthController_logout",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Logout successful"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Logout and revoke refresh token",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/auth/me": {
-      "get": {
-        "operationId": "AuthController_getProfile",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "User profile",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserProfileDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get current user profile",
-        "tags": ["Authentication"]
-      }
-    },
-    "/api/v1/session/login": {
-      "post": {
-        "operationId": "SessionController_login",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "user_type": {
-                    "type": "string",
-                    "enum": ["dispatcher", "driver"]
-                  },
-                  "user_id": {
-                    "type": "string",
-                    "nullable": true
-                  }
-                },
-                "required": ["user_type"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Mock login (no authentication, just creates session)",
-        "tags": ["Session"]
-      }
-    },
-    "/api/v1/session/logout": {
-      "post": {
-        "operationId": "SessionController_logout",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "session_id": {
-                    "type": "string"
-                  }
-                },
-                "required": ["session_id"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Logout (delete session)",
-        "tags": ["Session"]
-      }
-    },
-    "/api/v1/drivers": {
-      "get": {
-        "operationId": "DriversController_listDrivers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List all active drivers (basic info only, HOS fetched from external API)",
-        "tags": ["Drivers"]
-      },
-      "post": {
-        "operationId": "DriversController_createDriver",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDriverDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a new driver (basic info only)",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/{driver_id}": {
-      "put": {
-        "operationId": "DriversController_updateDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDriverDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Update driver basic info",
-        "tags": ["Drivers"]
-      },
-      "delete": {
-        "operationId": "DriversController_deleteDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Soft delete driver (set isActive=false)",
-        "tags": ["Drivers"]
-      },
-      "get": {
-        "operationId": "DriversController_getDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Driver details"
-          },
-          "404": {
-            "description": "Driver not found"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get driver by ID",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/{driverId}/hos": {
-      "get": {
-        "operationId": "DriversController_getDriverHOS",
-        "parameters": [
-          {
-            "name": "driverId",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get live HOS data for driver from integration (with cache fallback)",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/pending/list": {
-      "get": {
-        "operationId": "DriversController_getPendingDrivers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get all pending drivers awaiting activation",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/inactive/list": {
-      "get": {
-        "operationId": "DriversController_getInactiveDrivers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get all inactive drivers",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/{driver_id}/activate": {
-      "post": {
-        "operationId": "DriversController_activateDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Activate a pending driver",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/{driver_id}/deactivate": {
-      "post": {
-        "operationId": "DriversController_deactivateDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Deactivate an active driver",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/drivers/{driver_id}/reactivate": {
-      "post": {
-        "operationId": "DriversController_reactivateDriver",
-        "parameters": [
-          {
-            "name": "driver_id",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Reactivate an inactive driver",
-        "tags": ["Drivers"]
-      }
-    },
-    "/api/v1/integrations": {
-      "get": {
-        "operationId": "IntegrationsController_listIntegrations",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      },
-      "post": {
-        "operationId": "IntegrationsController_createIntegration",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateIntegrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/vendors": {
-      "get": {
-        "operationId": "IntegrationsController_getVendorRegistry",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/{integrationId}": {
-      "get": {
-        "operationId": "IntegrationsController_getIntegration",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      },
-      "patch": {
-        "operationId": "IntegrationsController_updateIntegration",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateIntegrationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      },
-      "delete": {
-        "operationId": "IntegrationsController_deleteIntegration",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/{integrationId}/test": {
-      "post": {
-        "operationId": "IntegrationsController_testConnection",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/{integrationId}/sync": {
-      "post": {
-        "operationId": "IntegrationsController_triggerSync",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/{integrationId}/sync-history": {
-      "get": {
-        "operationId": "IntegrationsController_getSyncHistory",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offset",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/integrations/{integrationId}/sync-history/stats": {
-      "get": {
-        "operationId": "IntegrationsController_getSyncStats",
-        "parameters": [
-          {
-            "name": "integrationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Integrations"]
-      }
-    },
-    "/api/v1/alerts": {
-      "get": {
-        "operationId": "AlertsController_listAlerts",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "Filter by status (active, acknowledged, resolved)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "priority",
-            "required": false,
-            "in": "query",
-            "description": "Filter by priority (critical, high, medium, low)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "driver_id",
-            "required": false,
-            "in": "query",
-            "description": "Filter by driver ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "List all alerts (filterable by status, priority, driver)",
-        "tags": ["Alerts"]
-      }
-    },
-    "/api/v1/alerts/{alert_id}": {
-      "get": {
-        "operationId": "AlertsController_getAlert",
-        "parameters": [
-          {
-            "name": "alert_id",
-            "required": true,
-            "in": "path",
-            "description": "Alert ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get alert details by ID",
-        "tags": ["Alerts"]
-      }
-    },
-    "/api/v1/alerts/{alert_id}/acknowledge": {
-      "post": {
-        "operationId": "AlertsController_acknowledgeAlert",
-        "parameters": [
-          {
-            "name": "alert_id",
-            "required": true,
-            "in": "path",
-            "description": "Alert ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "acknowledged_by": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Acknowledge an alert",
-        "tags": ["Alerts"]
-      }
-    },
-    "/api/v1/alerts/{alert_id}/resolve": {
-      "post": {
-        "operationId": "AlertsController_resolveAlert",
-        "parameters": [
-          {
-            "name": "alert_id",
-            "required": true,
-            "in": "path",
-            "description": "Alert ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Resolve an alert",
-        "tags": ["Alerts"]
-      }
-    },
-    "/api/v1/vehicles": {
-      "get": {
-        "operationId": "VehiclesController_listVehicles",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List all active vehicles",
-        "tags": ["Vehicles"]
-      },
-      "post": {
-        "operationId": "VehiclesController_createVehicle",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateVehicleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a new vehicle",
-        "tags": ["Vehicles"]
-      }
-    },
-    "/api/v1/vehicles/{vehicle_id}": {
-      "put": {
-        "operationId": "VehiclesController_updateVehicle",
-        "parameters": [
-          {
-            "name": "vehicle_id",
-            "required": true,
-            "in": "path",
-            "description": "Vehicle ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateVehicleDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Update vehicle",
-        "tags": ["Vehicles"]
-      },
-      "delete": {
-        "operationId": "VehiclesController_deleteVehicle",
-        "parameters": [
-          {
-            "name": "vehicle_id",
-            "required": true,
-            "in": "path",
-            "description": "Vehicle ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Soft delete vehicle (set isActive=false)",
-        "tags": ["Vehicles"]
-      }
-    },
-    "/api/v1/loads": {
-      "post": {
-        "operationId": "LoadsController_createLoad",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateLoadDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Create a new load with stops",
-        "tags": ["Loads"]
-      },
-      "get": {
-        "operationId": "LoadsController_listLoads",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "customer_name",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "List all loads with optional filtering",
-        "tags": ["Loads"]
-      }
-    },
-    "/api/v1/loads/{load_id}": {
-      "get": {
-        "operationId": "LoadsController_getLoad",
-        "parameters": [
-          {
-            "name": "load_id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get load details with stops",
-        "tags": ["Loads"]
-      }
-    },
-    "/api/v1/route-planning/optimize": {
-      "post": {
-        "operationId": "RoutePlanningController_optimizeRoute",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Optimized route plan"
-          }
-        },
-        "summary": "Plan and optimize a complete route",
-        "tags": ["Route Planning"]
-      }
-    },
-    "/api/v1/route-planning/update": {
-      "post": {
-        "operationId": "RoutePlanningController_updateRoute",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Route update result"
-          }
-        },
-        "summary": "Update an existing route plan with dynamic triggers",
-        "tags": ["Route Planning"]
-      }
-    },
-    "/api/v1/route-planning/status/{driverId}": {
-      "get": {
-        "operationId": "RoutePlanningController_getRouteStatus",
-        "parameters": [
-          {
-            "name": "driverId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Current route status"
-          }
-        },
-        "summary": "Get current route status for a driver",
-        "tags": ["Route Planning"]
-      }
-    },
-    "/api/v1/route-planning/simulate-triggers": {
-      "post": {
-        "operationId": "RoutePlanningController_simulateTriggers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Simulation results"
-          }
-        },
-        "summary": "Simulate dynamic triggers on a route plan",
-        "tags": ["Route Planning"]
-      }
-    },
-    "/api/v1/hos-rules/check": {
-      "post": {
-        "operationId": "HOSRulesController_checkHOSCompliance",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "HOS compliance result"
-          }
-        },
-        "summary": "Check HOS compliance for a driver",
-        "tags": ["HOS Rules"]
-      }
-    },
-    "/api/v1/prediction/estimate": {
-      "post": {
-        "operationId": "PredictionController_estimateDriveDemand",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Drive demand prediction"
-          }
-        },
-        "summary": "Estimate post-load drive demand",
-        "tags": ["Prediction"]
-      }
-    },
-    "/api/v1/optimization/recommend": {
-      "post": {
-        "operationId": "OptimizationController_recommendRest",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "REST optimization recommendation"
-          }
-        },
-        "summary": "Get intelligent rest optimization recommendation",
-        "tags": ["Optimization"]
-      }
-    },
-    "/api/v1/tenants/register": {
-      "post": {
-        "operationId": "TenantsController_register",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterTenantDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Tenants"]
-      }
-    },
-    "/api/v1/tenants/check-subdomain/{subdomain}": {
-      "get": {
-        "operationId": "TenantsController_checkSubdomain",
-        "parameters": [
-          {
-            "name": "subdomain",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Tenants"]
-      }
-    },
-    "/api/v1/tenants": {
-      "get": {
-        "operationId": "TenantsController_getAllTenants",
-        "parameters": [
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Tenants"]
-      }
-    },
-    "/api/v1/tenants/{tenantId}/approve": {
-      "post": {
-        "operationId": "TenantsController_approveTenant",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Tenants"]
-      }
-    },
-    "/api/v1/tenants/{tenantId}/reject": {
-      "post": {
-        "operationId": "TenantsController_rejectTenant",
-        "parameters": [
-          {
-            "name": "tenantId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Tenants"]
-      }
-    },
-    "/api/v1/users": {
-      "get": {
-        "operationId": "UsersController_getAllUsers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      },
-      "post": {
-        "operationId": "UsersController_createUser",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      }
-    },
-    "/api/v1/users/{userId}": {
-      "get": {
-        "operationId": "UsersController_getUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      },
-      "patch": {
-        "operationId": "UsersController_updateUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      },
-      "delete": {
-        "operationId": "UsersController_deleteUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      }
-    },
-    "/api/v1/users/{userId}/deactivate": {
-      "post": {
-        "operationId": "UsersController_deactivateUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      }
-    },
-    "/api/v1/users/{userId}/activate": {
-      "post": {
-        "operationId": "UsersController_activateUser",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["Users"]
-      }
-    },
-    "/api/v1/invitations": {
-      "post": {
-        "operationId": "UserInvitationsController_inviteUser",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InviteUserDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["UserInvitations"]
-      },
-      "get": {
-        "operationId": "UserInvitationsController_getInvitations",
-        "parameters": [
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["UserInvitations"]
-      }
-    },
-    "/api/v1/invitations/by-token/{token}": {
-      "get": {
-        "operationId": "UserInvitationsController_getInvitationByToken",
-        "parameters": [
-          {
-            "name": "token",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["UserInvitations"]
-      }
-    },
-    "/api/v1/invitations/accept": {
-      "post": {
-        "operationId": "UserInvitationsController_acceptInvitation",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AcceptInvitationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": ["UserInvitations"]
-      }
-    },
-    "/api/v1/invitations/{invitationId}": {
-      "delete": {
-        "operationId": "UserInvitationsController_cancelInvitation",
-        "parameters": [
-          {
-            "name": "invitationId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["UserInvitations"]
-      }
-    },
-    "/api/v1/preferences/user": {
-      "get": {
-        "operationId": "PreferencesController_getUserPreferences",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      },
-      "put": {
-        "operationId": "PreferencesController_updateUserPreferences",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserPreferencesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      }
-    },
-    "/api/v1/preferences/operations": {
-      "get": {
-        "operationId": "PreferencesController_getOperationsSettings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      },
-      "put": {
-        "operationId": "PreferencesController_updateOperationsSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateOperationsSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      }
-    },
-    "/api/v1/preferences/driver": {
-      "get": {
-        "operationId": "PreferencesController_getDriverPreferences",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      },
-      "put": {
-        "operationId": "PreferencesController_updateDriverPreferences",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDriverPreferencesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      }
-    },
-    "/api/v1/preferences/reset": {
-      "post": {
-        "operationId": "PreferencesController_resetToDefaults",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      }
-    },
-    "/api/v1/preferences/defaults": {
-      "get": {
-        "operationId": "PreferencesController_getDefaults",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Preferences"]
-      }
-    },
-    "/api/v1/feature-flags": {
-      "get": {
-        "operationId": "FeatureFlagsController_getAllFlags",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Feature flags retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeatureFlagsResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get all feature flags",
-        "tags": ["Feature Flags"]
-      }
-    },
-    "/api/v1/feature-flags/{key}": {
-      "get": {
-        "operationId": "FeatureFlagsController_getFlagByKey",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Feature flag retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeatureFlagDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Feature flag not found"
-          }
-        },
-        "summary": "Get specific feature flag by key",
-        "tags": ["Feature Flags"]
-      },
-      "put": {
-        "operationId": "FeatureFlagsController_updateFlag",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateFeatureFlagDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Feature flag updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeatureFlagDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Update feature flag enabled status",
-        "tags": ["Feature Flags"]
-      }
-    },
-    "/api/v1/feature-flags/{key}/enabled": {
-      "get": {
-        "operationId": "FeatureFlagsController_isEnabled",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Feature enabled status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string"
-                    },
-                    "enabled": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Check if feature is enabled",
-        "tags": ["Feature Flags"]
-      }
-    },
-    "/api/v1/onboarding/status": {
-      "get": {
-        "operationId": "OnboardingController_getOnboardingStatus",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["Onboarding"]
-      }
-    },
-    "/api/v1/api-keys": {
-      "post": {
-        "operationId": "ApiKeysController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateApiKeyDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "API key created successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiKeyDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Generate a new API key",
-        "tags": ["API Keys"]
-      },
-      "get": {
-        "operationId": "ApiKeysController_findAll",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of API keys",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiKeyDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "List all API keys for current user",
-        "tags": ["API Keys"]
-      }
-    },
-    "/api/v1/api-keys/{id}": {
-      "delete": {
-        "operationId": "ApiKeysController_revoke",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "API key revoked successfully"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Revoke an API key",
-        "tags": ["API Keys"]
-      }
-    },
-    "/api/v1/scenarios": {
-      "get": {
-        "operationId": "ScenariosController_listScenarios",
-        "parameters": [
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "List all test scenarios",
-        "tags": ["Scenarios"]
-      }
-    },
-    "/api/v1/scenarios/{scenario_id}": {
-      "get": {
-        "operationId": "ScenariosController_getScenario",
-        "parameters": [
-          {
-            "name": "scenario_id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get scenario template details",
-        "tags": ["Scenarios"]
-      }
-    },
-    "/api/v1/scenarios/{scenario_id}/instantiate": {
-      "post": {
-        "operationId": "ScenariosController_instantiateScenario",
-        "parameters": [
-          {
-            "name": "scenario_id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Load driver and vehicle state from scenario",
-        "tags": ["Scenarios"]
-      }
-    },
-    "/api/v1/external/hos/{driverId}": {
-      "get": {
-        "operationId": "ExternalApisController_getDriverHOS",
-        "parameters": [
-          {
-            "name": "driverId",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID (e.g., DRV-001)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get driver HOS data from mock Samsara ELD API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/fuel-prices": {
-      "get": {
-        "operationId": "ExternalApisController_getFuelPrices",
-        "parameters": [
-          {
-            "name": "lat",
-            "required": true,
-            "in": "query",
-            "description": "Latitude",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lon",
-            "required": true,
-            "in": "query",
-            "description": "Longitude",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "radius",
-            "required": false,
-            "in": "query",
-            "description": "Search radius in miles (default: 25)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get fuel prices from mock GasBuddy API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/weather": {
-      "get": {
-        "operationId": "ExternalApisController_getWeather",
-        "parameters": [
-          {
-            "name": "lat",
-            "required": true,
-            "in": "query",
-            "description": "Latitude",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lon",
-            "required": true,
-            "in": "query",
-            "description": "Longitude",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get weather data from mock OpenWeatherMap API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/tms/vehicles": {
-      "get": {
-        "operationId": "ExternalApisController_getTmsVehicles",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get vehicles from mock Project44 TMS API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/tms/vehicles/{vehicleId}": {
-      "get": {
-        "operationId": "ExternalApisController_getTmsVehicle",
-        "parameters": [
-          {
-            "name": "vehicleId",
-            "required": true,
-            "in": "path",
-            "description": "Vehicle ID (e.g., TMS-V001)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get single vehicle from mock Project44 TMS API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/tms/drivers": {
-      "get": {
-        "operationId": "ExternalApisController_getTmsDrivers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get drivers from mock Project44 TMS API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/external/tms/drivers/{driverId}": {
-      "get": {
-        "operationId": "ExternalApisController_getTmsDriver",
-        "parameters": [
-          {
-            "name": "driverId",
-            "required": true,
-            "in": "path",
-            "description": "Driver ID (e.g., TMS-D001)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get single driver from mock Project44 TMS API",
-        "tags": ["External API Mock"]
-      }
-    },
-    "/api/v1/mock/tms/api/vehicles": {
-      "get": {
-        "operationId": "MockTmsController_getVehicles",
-        "parameters": [
-          {
-            "name": "authorization",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["MockTms"]
-      }
-    },
-    "/api/v1/mock/tms/api/drivers": {
-      "get": {
-        "operationId": "MockTmsController_getDrivers",
-        "parameters": [
-          {
-            "name": "authorization",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["MockTms"]
-      }
-    }
-  },
   "info": {
     "title": "Platform API",
-    "description": "Fleet Operations Assistant API",
-    "version": "1.0.0",
+    "description": "REST API for the platform starter — authentication, API keys, and health. Regenerate this spec from the backend's Swagger output (`pnpm --filter @app/console sync-openapi`) once you add your own domain endpoints.",
+    "version": "1.0",
     "contact": {}
   },
-  "tags": [
-    {
-      "name": "Authentication",
-      "description": "JWT-based authentication with multi-tenancy"
-    },
-    {
-      "name": "API Keys",
-      "description": "API key management for external developers"
-    },
-    {
-      "name": "Route Planning",
-      "description": "Create and manage optimized routes"
-    },
-    {
-      "name": "Monitoring",
-      "description": "Monitor active routes in real-time"
-    },
-    {
-      "name": "Alerts",
-      "description": "Dispatcher alerts and notifications"
-    },
-    {
-      "name": "HOS Rules",
-      "description": "Hours of Service compliance validation"
-    },
-    {
-      "name": "Optimization",
-      "description": "REST optimization recommendations"
-    },
-    {
-      "name": "Prediction",
-      "description": "Drive demand predictions"
-    },
-    {
-      "name": "Drivers",
-      "description": "Driver management"
-    },
-    {
-      "name": "Vehicles",
-      "description": "Vehicle management"
-    },
-    {
-      "name": "Loads",
-      "description": "Load management"
-    },
-    {
-      "name": "Scenarios",
-      "description": "Test scenario management"
-    },
-    {
-      "name": "External Mock APIs",
-      "description": "Mock external API endpoints for testing"
-    }
-  ],
   "servers": [
-    {
-      "url": "https://api.apps.appshore.in/api/v1",
-      "description": "Staging"
-    },
     {
       "url": "http://localhost:8000/api/v1",
       "description": "Local Development"
     }
   ],
+  "tags": [
+    { "name": "Health", "description": "Liveness and readiness probes" },
+    { "name": "Auth", "description": "Authentication and session management" },
+    { "name": "API Keys", "description": "Server-to-server API key management" }
+  ],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "summary": "Liveness probe",
+        "description": "Returns 200 when the process is up. No authentication required.",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "summary": "Readiness probe",
+        "description": "Returns 200 when the service can reach its dependencies (database, Redis). No authentication required.",
+        "tags": ["Health"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthStatus" }
+              }
+            }
+          },
+          "503": { "description": "A dependency is unavailable" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "summary": "Get the authenticated user",
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "description": "The current user",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid credentials" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "summary": "Refresh an access token",
+        "tags": ["Auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": { "type": "string" },
+                    "refreshToken": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid or expired refresh token" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "summary": "End the current session",
+        "tags": ["Auth"],
+        "responses": {
+          "204": { "description": "Session ended" },
+          "401": { "description": "Missing or invalid credentials" }
+        }
+      }
+    },
+    "/api-keys": {
+      "get": {
+        "operationId": "ApiKeysController_list",
+        "summary": "List API keys",
+        "description": "Lists the API keys for the authenticated tenant. Key secrets are never returned after creation.",
+        "tags": ["API Keys"],
+        "responses": {
+          "200": {
+            "description": "API keys for the current tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiKey" }
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid credentials" }
+        }
+      },
+      "post": {
+        "operationId": "ApiKeysController_create",
+        "summary": "Create an API key",
+        "description": "Creates a new key. The plaintext secret is returned once — store it securely.",
+        "tags": ["API Keys"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateApiKey" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created key, including the plaintext secret (shown once)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiKeyWithSecret" }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid credentials" },
+          "403": { "description": "Plan does not include API keys" }
+        }
+      }
+    },
+    "/api-keys/{id}": {
+      "delete": {
+        "operationId": "ApiKeysController_delete",
+        "summary": "Delete an API key",
+        "tags": ["API Keys"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Key deleted" },
+          "404": { "description": "Key not found" }
+        }
+      }
+    },
+    "/api-keys/{id}/rotate": {
+      "post": {
+        "operationId": "ApiKeysController_rotate",
+        "summary": "Rotate an API key",
+        "description": "Issues a new secret for the key and invalidates the old one.",
+        "tags": ["API Keys"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rotated key with its new plaintext secret (shown once)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiKeyWithSecret" }
+              }
+            }
+          },
+          "404": { "description": "Key not found" }
+        }
+      }
+    },
+    "/api-keys/{id}/revoke": {
+      "post": {
+        "operationId": "ApiKeysController_revoke",
+        "summary": "Revoke an API key",
+        "description": "Permanently disables the key. Revoked keys cannot be re-enabled.",
+        "tags": ["API Keys"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The revoked key",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiKey" }
+              }
+            }
+          },
+          "404": { "description": "Key not found" }
+        }
+      }
+    }
+  },
   "components": {
     "securitySchemes": {
       "bearer": {
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "type": "http"
-      },
-      "api-key": {
-        "scheme": "bearer",
-        "bearerFormat": "API Key",
         "type": "http",
-        "description": "Enter your API key (sk_staging_...)",
-        "name": "Authorization",
-        "in": "header"
+        "scheme": "bearer",
+        "description": "API key (sk_*) or JWT access token"
       }
     },
     "schemas": {
-      "UserLookupDto": {
+      "HealthStatus": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string",
-            "description": "Email address to lookup",
-            "example": "dispatcher1@swift.com"
-          },
-          "phone": {
-            "type": "string",
-            "description": "Phone number to lookup (future enhancement)",
-            "example": "+1234567890"
-          }
+          "status": { "type": "string", "example": "ok" },
+          "timestamp": { "type": "string", "format": "date-time" }
         }
       },
-      "UserLookupResultDto": {
+      "User": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "tenantName": {
-            "type": "string"
-          },
-          "driverId": {
-            "type": "string"
-          },
-          "driverName": {
-            "type": "string"
-          }
-        },
-        "required": ["userId", "email", "firstName", "lastName", "role", "tenantId", "tenantName"]
-      },
-      "UserLookupResponseDto": {
-        "type": "object",
-        "properties": {
-          "users": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserLookupResultDto"
-            }
-          },
-          "multiTenant": {
-            "type": "boolean",
-            "description": "True if user exists in multiple tenants"
-          }
-        },
-        "required": ["users", "multiTenant"]
-      },
-      "TenantDto": {
-        "type": "object",
-        "properties": {
-          "tenantId": {
-            "type": "string"
-          },
-          "companyName": {
-            "type": "string"
-          },
-          "subdomain": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          }
-        },
-        "required": ["tenantId", "companyName", "isActive"]
-      },
-      "UserSummaryDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "driverId": {
-            "type": "string"
-          },
-          "driverName": {
-            "type": "string"
-          }
-        },
-        "required": ["userId", "email", "firstName", "lastName", "role"]
-      },
-      "FirebaseExchangeDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "LoginDto": {
-        "type": "object",
-        "properties": {
-          "tenant_id": {
-            "type": "string",
-            "description": "Tenant ID (company identifier) - OPTIONAL: userId is globally unique",
-            "example": "swift_transport"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "User ID for pre-seeded user",
-            "example": "user_swift_disp_001"
-          }
-        },
-        "required": ["user_id"]
-      },
-      "UserProfileDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
+          "id": { "type": "integer" },
+          "email": { "type": "string", "format": "email" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
           "role": {
             "type": "string",
-            "enum": ["DISPATCHER", "DRIVER", "ADMIN"]
+            "enum": ["OWNER", "ADMIN", "MEMBER", "SUPER_ADMIN"]
           },
-          "tenantId": {
-            "type": "string"
-          },
-          "tenantName": {
-            "type": "string"
-          },
-          "driverId": {
-            "type": "string"
-          },
-          "driverName": {
-            "type": "string"
-          },
-          "isActive": {
-            "type": "boolean"
-          }
-        },
-        "required": ["userId", "email", "firstName", "lastName", "role", "tenantId", "tenantName", "isActive"]
+          "tenantId": { "type": "integer" }
+        }
       },
-      "LoginResponseDto": {
+      "CreateApiKey": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "example": "ci-pipeline" },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "ApiKey": {
         "type": "object",
         "properties": {
-          "accessToken": {
-            "type": "string",
-            "description": "JWT access token"
-          },
-          "user": {
-            "description": "User profile information",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/UserProfileDto"
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "prefix": { "type": "string", "example": "sk_staging_" },
+          "isActive": { "type": "boolean" },
+          "lastUsedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ApiKeyWithSecret": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ApiKey" },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Plaintext secret — returned only on create/rotate",
+                "example": "sk_staging_abc123..."
               }
-            ]
-          }
-        },
-        "required": ["accessToken", "user"]
-      },
-      "CreateDriverDto": {
-        "type": "object",
-        "properties": {
-          "driver_id": {
-            "type": "string",
-            "example": "DRV-001",
-            "description": "Unique driver identifier"
-          },
-          "name": {
-            "type": "string",
-            "example": "John Doe",
-            "description": "Driver full name"
-          }
-        },
-        "required": ["driver_id", "name"]
-      },
-      "UpdateDriverDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "John Smith",
-            "description": "Driver full name"
-          }
-        }
-      },
-      "CreateIntegrationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateIntegrationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateVehicleDto": {
-        "type": "object",
-        "properties": {
-          "vehicle_id": {
-            "type": "string",
-            "example": "VEH-001",
-            "description": "Unique vehicle identifier"
-          },
-          "unit_number": {
-            "type": "string",
-            "example": "TRUCK-123",
-            "description": "Vehicle unit number"
-          },
-          "fuel_capacity_gallons": {
-            "type": "number",
-            "example": 150,
-            "description": "Fuel tank capacity in gallons"
-          },
-          "current_fuel_gallons": {
-            "type": "number",
-            "example": 100,
-            "description": "Current fuel level in gallons"
-          },
-          "mpg": {
-            "type": "number",
-            "example": 6.5,
-            "description": "Miles per gallon efficiency"
-          }
-        },
-        "required": ["vehicle_id", "unit_number"]
-      },
-      "UpdateVehicleDto": {
-        "type": "object",
-        "properties": {
-          "unit_number": {
-            "type": "string",
-            "example": "TRUCK-456",
-            "description": "Vehicle unit number"
-          },
-          "fuel_capacity_gallons": {
-            "type": "number",
-            "example": 150,
-            "description": "Fuel tank capacity in gallons"
-          },
-          "current_fuel_gallons": {
-            "type": "number",
-            "example": 100,
-            "description": "Current fuel level in gallons"
-          },
-          "mpg": {
-            "type": "number",
-            "example": 6.5,
-            "description": "Miles per gallon efficiency"
-          }
-        }
-      },
-      "CreateLoadStopDto": {
-        "type": "object",
-        "properties": {
-          "stop_id": {
-            "type": "string",
-            "example": "STOP-001",
-            "description": "Stop identifier"
-          },
-          "sequence_order": {
-            "type": "number",
-            "example": 1,
-            "description": "Sequence order of stop in the load"
-          },
-          "action_type": {
-            "type": "string",
-            "example": "PICKUP",
-            "description": "Action type at stop (PICKUP, DELIVERY)"
-          },
-          "earliest_arrival": {
-            "type": "string",
-            "example": "2026-02-05T08:00:00Z",
-            "description": "Earliest arrival time"
-          },
-          "latest_arrival": {
-            "type": "string",
-            "example": "2026-02-05T17:00:00Z",
-            "description": "Latest arrival time"
-          },
-          "estimated_dock_hours": {
-            "type": "number",
-            "example": 2.5,
-            "description": "Estimated dock hours at this stop"
-          }
-        },
-        "required": ["stop_id", "sequence_order", "action_type", "estimated_dock_hours"]
-      },
-      "CreateLoadDto": {
-        "type": "object",
-        "properties": {
-          "load_number": {
-            "type": "string",
-            "example": "LOAD-001",
-            "description": "Unique load number"
-          },
-          "weight_lbs": {
-            "type": "number",
-            "example": 40000,
-            "description": "Weight of load in pounds"
-          },
-          "commodity_type": {
-            "type": "string",
-            "example": "Electronics",
-            "description": "Type of commodity being transported"
-          },
-          "special_requirements": {
-            "type": "string",
-            "example": "Temperature controlled, fragile",
-            "description": "Special handling requirements"
-          },
-          "customer_name": {
-            "type": "string",
-            "example": "Acme Corp",
-            "description": "Customer name"
-          },
-          "stops": {
-            "description": "Array of stops for this load",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CreateLoadStopDto"
             }
           }
-        },
-        "required": ["load_number", "weight_lbs", "commodity_type", "customer_name", "stops"]
-      },
-      "RegisterTenantDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateUserDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateUserDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "InviteUserDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "AcceptInvitationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateUserPreferencesDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateOperationsSettingsDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateDriverPreferencesDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "FeatureFlagDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "example": "route_planning_enabled"
-          },
-          "name": {
-            "type": "string",
-            "example": "Route Planning"
-          },
-          "description": {
-            "type": "string",
-            "example": "Intelligent route planning with HOS compliance"
-          },
-          "enabled": {
-            "type": "boolean",
-            "example": false
-          },
-          "category": {
-            "type": "string",
-            "example": "dispatcher"
-          }
-        },
-        "required": ["key", "name", "enabled", "category"]
-      },
-      "FeatureFlagsResponse": {
-        "type": "object",
-        "properties": {
-          "flags": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FeatureFlagDto"
-            }
-          }
-        },
-        "required": ["flags"]
-      },
-      "UpdateFeatureFlagDto": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "example": true,
-            "description": "Enable or disable the feature"
-          }
-        },
-        "required": ["enabled"]
-      },
-      "CreateApiKeyDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "example": "Production API Key",
-            "description": "Human-readable name for the API key"
-          }
-        },
-        "required": ["name"]
-      },
-      "ApiKeyDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "550e8400-e29b-41d4-a716-446655440000"
-          },
-          "key": {
-            "type": "string",
-            "example": "sk_staging_abc123...",
-            "description": "API key (only shown once on creation)"
-          },
-          "name": {
-            "type": "string",
-            "example": "Production API Key"
-          },
-          "requestCount": {
-            "type": "number",
-            "example": 0
-          },
-          "lastUsedAt": {
-            "format": "date-time",
-            "type": "string",
-            "example": "2026-02-05T10:30:00Z",
-            "nullable": true
-          },
-          "isActive": {
-            "type": "boolean",
-            "example": true
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string",
-            "example": "2026-02-05T08:00:00Z"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string",
-            "example": null,
-            "nullable": true
-          }
-        },
-        "required": ["id", "key", "name", "requestCount", "lastUsedAt", "isActive", "createdAt", "expiresAt"]
+        ]
       }
     }
-  }
+  },
+  "security": [{ "bearer": [] }]
 }

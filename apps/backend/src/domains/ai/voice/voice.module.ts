@@ -9,7 +9,7 @@ import { VoiceAgentWorker } from './voice-agent.worker';
  * Voice Module — LiveKit voice sessions for the assistant.
  *
  * Does NOT import AssistantAiModule to avoid circular dependencies
- * (AssistantAiModule → McpToolsModule → DriversModule → ... → AssistantAiModule).
+ * (AssistantAiModule → McpToolsModule → your domain modules → ... → AssistantAiModule).
  * Instead, VoiceAgentWorker resolves AssistantAiService lazily via ModuleRef.
  *
  * Must be registered inside AiModule (which already exports AssistantAiService).

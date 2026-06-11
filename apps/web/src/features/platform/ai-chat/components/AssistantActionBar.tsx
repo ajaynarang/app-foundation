@@ -16,9 +16,8 @@ interface AssistantActionBarProps {
 }
 
 /**
- * Dynamic follow-up suggestions surfaced after a Assistant response. Renders
- * nothing when the store has no follow-ups — generic capability prompts
- * now live in the command palette (AssistantCommandPalette), not here.
+ * Dynamic follow-up suggestions surfaced after an Assistant response. Renders
+ * nothing when the store has no follow-ups.
  */
 export function AssistantActionBar({ onSelect, hideTopBorder = false }: AssistantActionBarProps) {
   const followUps = useAssistantStore((s) => s.suggestedFollowUps);

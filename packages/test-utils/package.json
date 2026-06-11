@@ -10,8 +10,7 @@
     "./factories": "./src/factories/index.ts",
     "./auth": "./src/auth/index.ts",
     "./schemas": "./src/schemas/index.ts",
-    "./playwright": "./src/playwright/index.ts",
-    "./helpers": "./src/helpers/index.ts"
+    "./playwright": "./src/playwright/index.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",

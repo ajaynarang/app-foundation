@@ -37,3 +37,14 @@ export function isSilentPath(url: string): boolean {
 export function shouldSkipRequestLog(req: IncomingMessage): boolean {
   return isSilentPath(req.url ?? '');
 }
+
+/**
+ * Mask credential-bearing query params before a URL is written to logs.
+ * SSE/EventSource clients cannot send an Authorization header, so they pass
+ * the access token as `?token=` — without masking, every SSE connect would
+ * write a valid bearer token into the log pipeline.
+ */
+export function maskUrlSecrets(url: string | undefined): string {
+  if (!url) return '';
+  return url.replace(/([?&]token=)[^&]+/gi, '$1[REDACTED]');
+}

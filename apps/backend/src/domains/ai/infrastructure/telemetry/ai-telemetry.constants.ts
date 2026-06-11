@@ -11,11 +11,11 @@
  * and consumer references this single map instead of inlining the literal.
  *
  * `agentId` strings are intentionally NOT centralized here — they're free
- * descriptive labels (e.g. `ratecon-parser-fallback`) scoped to one call
+ * descriptive labels (e.g. `document-parser-fallback`) scoped to one call
  * site, not a shared vocabulary other code branches on.
  */
 export const AI_LINK_REF_TYPES = {
-  /** Rate-con / fuel-receipt document parse, keyed by document or attachment id. */
+  /** Document parse, keyed by document or attachment id. */
   DOCUMENT: 'document',
   /** A single Desk episode step row (DeskEpisodeStep.aiInvocationId mirrors this). */
   DESK_EPISODE_STEP: 'desk_episode_step',

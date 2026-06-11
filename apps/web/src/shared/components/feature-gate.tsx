@@ -9,6 +9,7 @@ import { upgradeRegistry } from '@/features/platform/plans/config/upgrade-regist
 import { apiClient } from '@/shared/lib/api';
 import { showSuccess, showError } from '@/shared/lib/toast';
 import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { CONTACTS } from '@/shared/lib/contacts';
 
 // ---------------------------------------------------------------------------
 // Default benefit bullets per category (fallback)
@@ -122,7 +123,7 @@ export function FeatureGate({ featureKey, children, icon, name, description, ben
         <p className="text-xs text-muted-foreground">
           Our team will review your request and activate it for you.
           <br />
-          Usually within 24 hours. Questions? support@appshore.in
+          Usually within 24 hours. Questions? {CONTACTS.support}
         </p>
       </div>
     </div>

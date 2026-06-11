@@ -51,13 +51,14 @@ docker compose up -d postgres redis
 pnpm install
 pnpm --filter @app/shared-types build
 
-# 3. Configure backend secrets
-cd apps/backend && cp .env.example .env
+# 3. Configure env files
+cp apps/backend/.env.example apps/backend/.env
 #    set DATABASE_URL=postgresql://postgres:postgres@localhost:5499/app?schema=public
 #    set ANTHROPIC_API_KEY=... (for the AI assistant)
+cp apps/web/.env.example apps/web/.env.local
 
-# 4. Migrate + seed
-pnpm prisma:migrate:deploy && pnpm db:seed
+# 4. Generate Prisma client, migrate + seed
+cd apps/backend && pnpm prisma:generate && pnpm prisma:migrate:deploy && pnpm db:seed
 
 # 5. Run everything (backend :8000, web :3000, console :3002)
 cd ../.. && pnpm dev

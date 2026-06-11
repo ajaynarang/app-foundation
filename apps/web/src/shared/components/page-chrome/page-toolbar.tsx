@@ -11,7 +11,7 @@ export interface PageToolbarProps {
   // RIGHT cluster — fixed visual order (right → left): [⋯ More] · [1° CTA] · [2° CTA] · [view] · [group].
   // In source/DOM (left → right) the order is the reverse, enforced below so no page can reorder it.
 
-  /** Group switcher (e.g. None / By Trip). Leftmost in the cluster. */
+  /** Group switcher (e.g. None / By Group). Leftmost in the cluster. */
   groupSwitcher?: ReactNode;
   /** View switcher (e.g. Board / Table). */
   viewSwitcher?: ReactNode;

@@ -8,9 +8,8 @@ import * as path from 'path';
  * `@Processor(queueName)` class. Two `@Processor` classes on the SAME queue are
  * competing consumers — BullMQ delivers each job to exactly one of them, so a
  * foreign worker can grab a job and (via a `if (job.name !== mine) return`
- * guard) silently complete it without doing the work. This is exactly what
- * stalled rate-con imports on staging (2026-05-29): the email-intake worker
- * grabbed rate-con jobs and completed them with `returnValue: null`.
+ * guard) silently complete it without doing the work, leaving the real
+ * handler's jobs stalled with `returnValue: null`.
  *
  * The fix is one dispatcher `WorkerHost` per queue that routes by job name to
  * per-name handlers (see `BaseQueueDispatcher` + `QueueJobHandler`). This test
@@ -23,11 +22,10 @@ import * as path from 'path';
 
 const SRC_DIR = path.resolve(__dirname, '..');
 
-// Queues still pending dispatcher conversion. Now EMPTY — every shared queue
-// was converted to a single dispatcher (documents, safety-detect, geo-compute,
-// notifications, bulk-ops, finance, vendor-data). A new entry here would mark a
-// regression awaiting conversion; adding a second @Processor on any queue
-// without an entry fails the test below.
+// Queues still pending dispatcher conversion. EMPTY — every shared queue uses
+// a single dispatcher. A new entry here would mark a regression awaiting
+// conversion; adding a second @Processor on any queue without an entry fails
+// the test below.
 const PENDING_CONVERSION_QUEUES = new Set<string>([]);
 
 function listTsFiles(dir: string): string[] {
@@ -78,10 +76,5 @@ describe('No competing BullMQ queue workers', () => {
       .map(([queue, files]) => `${queue}: ${files.join(', ')}`);
 
     expect(offenders).toEqual([]);
-  });
-
-  it('keeps the documents queue on a single dispatcher (rate-con regression guard)', () => {
-    const documentsProcessors = byQueue['documents'] ?? [];
-    expect(documentsProcessors.length).toBe(1);
   });
 });

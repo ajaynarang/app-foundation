@@ -26,16 +26,24 @@ export interface SyncLog {
   errorMessage: string | null;
 }
 
-export interface IntegrationHealthCategory {
+export interface IntegrationHealthItem {
+  id: string;
+  vendor: string;
+  displayName: string;
+  isEnabled: boolean;
+  status: string;
+  lastSyncAt: string | null;
+  lastSuccessAt: string | null;
   hasError: boolean;
-  displayName?: string;
-  lastErrorMessage?: string;
+  lastErrorMessage: string | null;
 }
 
 export interface IntegrationHealth {
-  tms?: IntegrationHealthCategory;
-  eld?: IntegrationHealthCategory;
+  hasIntegrations: boolean;
+  activeSyncs: { type: string; vendor: string; syncType: string; startedAt: string }[];
   configuredTypes?: string[];
+  integrations?: IntegrationHealthItem[];
+  lastSyncByType?: Record<string, string | null>;
 }
 
 export function useIntegrations() {

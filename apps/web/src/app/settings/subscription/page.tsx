@@ -443,7 +443,7 @@ export default function SubscriptionPage() {
                     {formatCents(planDetails.planConfig.pricePerUnit)} / {planDetails.planConfig.unitLabel}
                     {subscription && (
                       <span className="ml-2">
-                        · {subscription.quantity} truck
+                        · {subscription.quantity} seat
                         {subscription.quantity !== 1 ? 's' : ''} ={' '}
                         <span className="font-medium text-foreground">
                           {formatCents(subscription.unitPriceCents * subscription.quantity)}

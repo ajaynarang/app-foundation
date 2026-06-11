@@ -1,6 +1,6 @@
 // ── User Modes ──
-// Generic platform roles. Drives greetings, placeholders and capability sets.
-export type UserMode = 'prospect' | 'member' | 'admin' | 'owner' | 'super_admin' | 'support';
+// Generic platform roles. Drives greetings and placeholders.
+export type UserMode = 'member' | 'admin' | 'owner' | 'super_admin';
 
 // ── Orb States ──
 export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking';
@@ -16,7 +16,7 @@ export type ChatLayout = 'side' | 'split' | 'full' | 'float';
 export type Intent = 'question' | 'action' | 'lookup' | 'general';
 
 // ── Rich Cards ──────────────────────────────────────────────
-// The card catalog is intentionally empty in the starter. `RichCardRenderer`
+// The card catalog is intentionally minimal in the starter. `RichCardRenderer`
 // is a pluggable registry — add your own card types here and register the
 // matching component in `components/cards/RichCardRenderer.tsx`.
 //
@@ -24,8 +24,7 @@ export type Intent = 'question' | 'action' | 'lookup' | 'general';
 //   - `text`         : a generic title + markdown body card (TextCard)
 //   - `confirmation` : the human-in-the-loop (HITL) approval card the agent
 //                      suspend protocol depends on (ConfirmationCard)
-//   - `capabilities` : a "what can I do" helper card (CapabilitiesCard)
-export type RichCardType = 'text' | 'confirmation' | 'capabilities';
+export type RichCardType = 'text' | 'confirmation';
 
 export interface RichCard {
   type: RichCardType;
@@ -74,11 +73,4 @@ export interface ChatMessage {
   card?: RichCard;
   action?: ActionResult;
   speakText?: string;
-}
-
-// ── Lead Data ──
-export interface LeadData {
-  name?: string;
-  email?: string;
-  company?: string;
 }

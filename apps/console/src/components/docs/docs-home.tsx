@@ -1,44 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { Route, Clock, Bell, Truck, Webhook, Building2 } from 'lucide-react';
+import { KeyRound, ShieldCheck, Webhook, Bot, Building2, Code2 } from 'lucide-react';
 
 const FEATURES = [
   {
-    icon: Route,
-    title: 'Route Planning',
-    description: 'HOS-compliant route optimization with automatic rest and fuel stop insertion.',
-    href: '/docs/api-guides/route-planning/creating-routes',
+    icon: ShieldCheck,
+    title: 'Authentication',
+    description: 'Bearer-token auth with API keys and OAuth 2.1. JWT sessions with refresh for first-party apps.',
+    href: '/docs/getting-started/authentication',
   },
   {
-    icon: Clock,
-    title: 'HOS Compliance',
-    description: 'Segment-by-segment Hours of Service validation. Zero violations guaranteed.',
-    href: '/docs/api-guides/route-planning/understanding-hos',
-  },
-  {
-    icon: Bell,
-    title: 'Real-time Alerts',
-    description: '20 alert types — HOS violations, delays, deviations — pushed to your system via webhooks.',
-    href: '/docs/webhooks',
-  },
-  {
-    icon: Truck,
-    title: 'Fleet Management',
-    description: 'Drivers, vehicles, and loads via REST API. Full CRUD with role-based access.',
-    href: '/docs/api-guides/fleet-management/drivers',
+    icon: KeyRound,
+    title: 'API Keys',
+    description: 'Create, rotate, and revoke server-to-server keys. Scoped to your tenant with full audit trails.',
+    href: '/docs/getting-started/api-keys',
   },
   {
     icon: Webhook,
     title: 'Webhook Events',
-    description: 'Subscribe to route, load, and alert events. HMAC-signed payloads with retry logic.',
+    description: 'Subscribe to platform events. HMAC-signed payloads with automatic retry and delivery logs.',
     href: '/docs/webhooks',
   },
   {
+    icon: Bot,
+    title: 'AI Assistants (MCP)',
+    description: 'Connect Claude, ChatGPT, or any MCP client to your workspace via the built-in MCP server.',
+    href: '/docs/api-guides/ai-integrations',
+  },
+  {
     icon: Building2,
-    title: 'White-label / Multi-tenant',
-    description: 'Provision isolated tenants for your customers. Full data isolation guaranteed.',
-    href: '/docs/api-guides/multi-tenancy/tenant-setup',
+    title: 'Multi-tenant',
+    description: 'Tenant-scoped data isolation out of the box. Run multi-tenant or single-tenant from one codebase.',
+    href: '/docs/getting-started/introduction',
+  },
+  {
+    icon: Code2,
+    title: 'REST API',
+    description: 'Predictable JSON APIs with consistent errors, pagination, and rate limits. Explore them live.',
+    href: '/docs/api-playground',
   },
 ];
 
@@ -46,21 +46,21 @@ const STEPS = [
   {
     number: '1',
     title: 'Generate an API key',
-    description: 'Sign in and create your first staging key in seconds.',
+    description: 'Sign in and create your first key in seconds.',
     href: '/developer/api-keys',
     cta: 'Get API Keys →',
   },
   {
     number: '2',
-    title: 'Plan your first route',
-    description: 'POST a route with drivers, vehicles, and stops. Get back a compliance-checked plan.',
+    title: 'Make your first request',
+    description: 'Call the API with your Bearer token and get JSON back.',
     href: '/docs/getting-started/quickstart',
     cta: 'Quickstart →',
   },
   {
     number: '3',
     title: 'Subscribe to events',
-    description: 'Register a webhook endpoint and receive alerts, route changes, and load updates.',
+    description: 'Register a webhook endpoint and receive platform events in real time.',
     href: '/docs/webhooks',
     cta: 'Webhook docs →',
   },
@@ -72,14 +72,14 @@ export function DocsHome() {
       {/* Hero */}
       <div className="mb-16 pt-8">
         <div className="mb-2 inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-          Staging &middot; v1
+          v1
         </div>
         <h1 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
           Build with the platform
         </h1>
         <p className="mb-8 max-w-xl text-base text-muted-foreground md:text-lg">
-          Route planning, HOS compliance, real-time alerts, and webhook events — all via REST API. Ship fleet
-          integrations faster.
+          Authentication, multi-tenancy, webhooks, and AI assistant integrations — all via REST API. Ship your
+          integration faster.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link

@@ -64,15 +64,9 @@ function findControllerFiles(dir: string): string[] {
 
 function inferDomain(filePath: string): string {
   const rel = path.relative(BACKEND_SRC, filePath).replace(/\\/g, '/');
-  if (rel.includes('domains/fleet/')) return 'fleet';
-  if (rel.includes('domains/financials/')) return 'financials';
-  if (rel.includes('domains/operations/')) return 'operations';
-  if (rel.includes('domains/integrations/')) return 'integrations';
-  if (rel.includes('domains/platform/')) return 'platform';
-  if (rel.includes('domains/ai/')) return 'ai';
-  if (rel.includes('domains/routing/')) return 'operations';
+  const domainMatch = rel.match(/domains\/([^/]+)\//);
   if (rel.includes('domains/admin/')) return 'super-admin';
-  if (rel.includes('domains/billing/')) return 'financials';
+  if (domainMatch) return domainMatch[1];
   if (rel.includes('auth/')) return 'infrastructure';
   if (rel.includes('health')) return 'infrastructure';
   if (rel.includes('dev/')) return 'dev';
@@ -213,7 +207,7 @@ function parseController(filePath: string): EndpointInfo[] {
 
 // ── Matrix Generation ──
 
-const ALL_ROLES = ['DISPATCHER', 'ADMIN', 'OWNER', 'DRIVER', 'CUSTOMER', 'SUPER_ADMIN'];
+const ALL_ROLES = ['MEMBER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'];
 
 function generateExpectations(ep: EndpointInfo): Record<string, number | null> {
   const expectations: Record<string, number | null> = {};

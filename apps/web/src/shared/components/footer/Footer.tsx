@@ -10,11 +10,14 @@ const consoleUrl = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002
 
 const linkGroups: { label: string; href: string; external?: boolean }[][] = [
   [
-    { label: 'Product', href: '/product' },
-    { label: 'Pricing', href: '/pricing' },
     {
       label: 'API Docs',
       href: `${consoleUrl}/docs`,
+      external: true,
+    },
+    {
+      label: 'Contact',
+      href: mailto('app'),
       external: true,
     },
   ],
@@ -26,11 +29,6 @@ const linkGroups: { label: string; href: string; external?: boolean }[][] = [
   [
     { label: 'Security', href: '/legal/security' },
     { label: 'AI Transparency', href: '/legal/ai' },
-    {
-      label: 'Contact',
-      href: mailto('app'),
-      external: true,
-    },
   ],
 ];
 
@@ -47,7 +45,7 @@ export function Footer() {
             <Link href="/" className="text-lg font-bold text-foreground font-space-grotesk">
               Platform
             </Link>
-            <p className="text-xs text-muted-foreground mt-1">Your fleet&apos;s nervous system.</p>
+            <p className="text-xs text-muted-foreground mt-1">Your platform, ready to build on.</p>
           </div>
 
           {/* Link groups */}

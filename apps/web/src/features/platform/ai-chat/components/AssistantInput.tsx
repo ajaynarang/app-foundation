@@ -11,7 +11,6 @@ import { useVoice } from '../voice/voice-provider';
 import { showError } from '@/shared/lib/toast';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import type { UserMode } from '../engine/types';
-import { AssistantCommandPalette } from './AssistantCommandPalette';
 import { MentionPicker } from './MentionPicker';
 import { useMentionSearch } from '../hooks/use-mention-search';
 import { getMentionFragment, buildMentionText } from '../lib/mention';
@@ -23,19 +22,16 @@ import type { SearchApiResult } from '@/shared/lib/search';
 // entity picker so the affordance is discoverable on an empty input.
 const MENTION_HINT = '  ·  @ to mention';
 const PLACEHOLDERS: Record<UserMode, string> = {
-  prospect: 'Ask anything…',
   member: `Ask anything…${MENTION_HINT}`,
   owner: `Ask anything…${MENTION_HINT}`,
   admin: `Ask anything…${MENTION_HINT}`,
   super_admin: `Ask anything…${MENTION_HINT}`,
-  support: 'Ask anything…',
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function AssistantInput() {
   const [input, setInput] = useState('');
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -210,21 +206,13 @@ export function AssistantInput() {
           return;
         }
       }
-      // `/` on an empty input opens the command palette. Linear/Slack/Notion
-      // gesture. We require empty so we never hijack `/` mid-typing — users
-      // searching loads (e.g. "L-1045/B") shouldn't summon the palette.
-      if (e.key === '/' && input.length === 0 && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        setPaletteOpen(true);
-        return;
-      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
         return;
       }
     },
-    [handleSend, input.length, mentionOpen, mentionResults, mentionIndex, handleMentionSelect, closeMention],
+    [handleSend, mentionOpen, mentionResults, mentionIndex, handleMentionSelect, closeMention],
   );
 
   const handleMicTap = useCallback(() => {
@@ -422,27 +410,7 @@ export function AssistantInput() {
                     )}
                   </Tooltip>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPaletteOpen(true)}
-                        className="shrink-0 h-8 px-2 gap-1.5 rounded-full text-muted-foreground hover:text-foreground"
-                        aria-label="See what the assistant can do"
-                      >
-                        <span className="text-xs">Ask</span>
-                        <kbd className="hidden sm:inline-flex h-4 items-center px-1 ml-0.5 text-2xs font-mono rounded border border-border bg-muted text-muted-foreground">
-                          /
-                        </kbd>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">See what the assistant can do (/)</TooltipContent>
-                  </Tooltip>
-
-                  {/* Persistent @-mention affordance — mirrors the "Ask /" chip
-                      so it reads as a real shortcut, and stays visible after the
+                  {/* Persistent @-mention affordance — stays visible after the
                       placeholder is gone. */}
                   <span className="hidden sm:inline-flex items-center gap-1 ml-0.5 text-xs text-muted-foreground select-none">
                     <kbd className="inline-flex h-4 items-center px-1 text-2xs font-mono rounded border border-border bg-muted text-muted-foreground">
@@ -500,7 +468,6 @@ export function AssistantInput() {
           </div>
         </div>
       </div>
-      <AssistantCommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </>
   );
 }

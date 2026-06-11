@@ -18,7 +18,7 @@ Platform implements the **Model Context Protocol (MCP)** with Streamable HTTP tr
 | Environment | Server URL | OAuth Metadata |
 |-------------|-----------|----------------|
 | **Production** | `https://api.example.com` | `https://api.example.com/.well-known/oauth-authorization-server` |
-| **Staging** | `https://api.apps.appshore.in` | `https://api.apps.appshore.in/.well-known/oauth-authorization-server` |
+| **Staging** | `https://api-staging.example.com` | `https://api-staging.example.com/.well-known/oauth-authorization-server` |
 | **Local** | `http://localhost:8000` | `http://localhost:8000/.well-known/oauth-authorization-server` |
 
 ## Authentication Flow
@@ -73,7 +73,7 @@ GET https://api.example.com/api/v1/oauth/authorize
   &redirect_uri={redirect_uri}
   &code_challenge={challenge}
   &code_challenge_method=S256
-  &scope=fleet:read+fleet:write+invoices:read+invoices:write
+  &scope=knowledge:read+documents:read+documents:write
   &state={random_state}
 ```
 
@@ -94,7 +94,7 @@ Response:
   "refreshToken": "eyJ...",
   "expiresIn": 3600,
   "tokenType": "Bearer",
-  "scope": "fleet:read fleet:write invoices:read invoices:write"
+  "scope": "knowledge:read documents:read documents:write"
 }
 ```
 
@@ -135,9 +135,9 @@ curl -X POST https://api.example.com \
     "id": "2",
     "method": "tools/call",
     "params": {
-      "name": "query-loads",
+      "name": "search-kb",
       "arguments": {
-        "status": "in_transit"
+        "query": "onboarding guide"
       }
     }
   }'
@@ -152,7 +152,7 @@ Response:
     "content": [
       {
         "type": "text",
-        "text": "Found 5 loads currently in transit..."
+        "text": "Found 3 knowledge base entries matching your query..."
       }
     ],
     "isError": false
@@ -162,7 +162,7 @@ Response:
 
 ## Write Actions & Confirmation
 
-Write tools (send-invoice, void-invoice, approve-settlement, etc.) require a **Human-in-the-Loop (HITL) confirmation**:
+Write tools (any tool you register that mutates data) require a **Human-in-the-Loop (HITL) confirmation**:
 
 1. First call returns a `confirmationToken` and a description of the action
 2. Call the tool again with the `confirmationToken` to execute
@@ -173,9 +173,9 @@ Write tools (send-invoice, void-invoice, approve-settlement, etc.) require a **H
   "id": "3",
   "method": "tools/call",
   "params": {
-    "name": "send-invoice",
+    "name": "your-write-tool",
     "arguments": {
-      "invoiceId": "inv_123",
+      "resourceId": "res_123",
       "confirmationToken": "ct_abc123..."
     }
   }
@@ -196,7 +196,7 @@ curl https://api.example.com/.well-known/oauth-protected-resource
 {
   "resource": "https://api.example.com",
   "authorization_servers": ["https://api.example.com"],
-  "scopes_supported": ["fleet:read", "fleet:write", "invoices:read", ...]
+  "scopes_supported": ["knowledge:read", "documents:read", "documents:write", ...]
 }
 ```
 
@@ -214,6 +214,6 @@ MCP requests are subject to the same rate limits as the REST API:
 
 - All MCP requests require a valid OAuth Bearer token
 - Tokens are scoped -- tools are filtered based on granted scopes
-- Tenant isolation is enforced server-side (you can only access your own fleet data)
+- Tenant isolation is enforced server-side (you can only access your own tenant's data)
 - Write actions require HITL confirmation tokens
 - All tool calls are logged in the audit trail

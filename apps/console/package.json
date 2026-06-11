@@ -12,8 +12,7 @@
     "type-check": "tsc --noEmit",
     "clean": "rm -rf .next .turbo node_modules",
     "sync-openapi": "node scripts/sync-openapi.js",
-    "sync-manual": "node scripts/sync-product-manual.js",
-    "prebuild": "node scripts/sync-openapi.js && node scripts/sync-product-manual.js"
+    "prebuild": "node scripts/sync-openapi.js"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",

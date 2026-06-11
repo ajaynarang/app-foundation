@@ -44,25 +44,7 @@ export const SEMANTIC_COLORS = {
 export type SemanticColor = keyof typeof SEMANTIC_COLORS;
 
 // ---------------------------------------------------------------------------
-// Load status → semantic color
-// ---------------------------------------------------------------------------
-export function getLoadStatusColor(status: string): SemanticColor {
-  switch (status) {
-    case 'ASSIGNED':
-    case 'DISPATCHED':
-    case 'IN_TRANSIT':
-      return 'info';
-    case 'ON_HOLD':
-      return 'caution';
-    case 'overdue':
-      return 'critical';
-    default:
-      return 'neutral';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Alert / Shield severity → semantic color
+// Alert severity → semantic color
 // ---------------------------------------------------------------------------
 export function getSeverityColor(severity: string): SemanticColor {
   switch (severity?.toLowerCase()) {
@@ -74,38 +56,6 @@ export function getSeverityColor(severity: string): SemanticColor {
     default:
       return 'neutral';
   }
-}
-
-// ---------------------------------------------------------------------------
-// Shield status → semantic color
-// ---------------------------------------------------------------------------
-export function getShieldStatusColor(status: string): SemanticColor {
-  switch (status?.toUpperCase()) {
-    case 'VULNERABLE':
-      return 'critical';
-    case 'AT_RISK':
-      return 'caution';
-    default:
-      return 'neutral';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// HOS ratio → semantic color (neutral-first)
-// ---------------------------------------------------------------------------
-export function getHOSColor(ratio: number): SemanticColor {
-  if (ratio >= 0.9) return 'critical';
-  if (ratio >= 0.75) return 'caution';
-  return 'neutral';
-}
-
-// ---------------------------------------------------------------------------
-// HOS remaining hours → semantic color (neutral-first)
-// ---------------------------------------------------------------------------
-export function getHOSRemainingColor(hoursRemaining: number): SemanticColor {
-  if (hoursRemaining < 2) return 'critical';
-  if (hoursRemaining < 4) return 'caution';
-  return 'neutral';
 }
 
 // ---------------------------------------------------------------------------
@@ -138,22 +88,6 @@ export function getInvoiceStatusColor(status: string): SemanticColor {
       return 'caution';
     case 'sent':
     case 'approved':
-      return 'info';
-    default:
-      return 'neutral';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Settlement status → semantic color
-// ---------------------------------------------------------------------------
-export function getSettlementStatusColor(status: string): SemanticColor {
-  switch (status?.toLowerCase()) {
-    case 'pending_review':
-    case 'pending_approval':
-      return 'caution';
-    case 'approved':
-    case 'processing':
       return 'info';
     default:
       return 'neutral';
@@ -222,34 +156,4 @@ export function getJobStatusColor(status: string): SemanticColor {
     default:
       return 'neutral';
   }
-}
-
-// ---------------------------------------------------------------------------
-// IFTA filing status → semantic color
-// ---------------------------------------------------------------------------
-export function getIftaFilingStatusColor(status: string): SemanticColor {
-  switch (status) {
-    case 'FILED':
-    case 'CONFIRMED':
-      return 'info';
-    case 'REVIEWED':
-    case 'DRAFT':
-      return 'caution';
-    case 'OPEN':
-    case 'CALCULATING':
-      return 'neutral';
-    case 'AMENDED':
-      return 'caution';
-    default:
-      return 'neutral';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// IFTA net liability → semantic color
-// ---------------------------------------------------------------------------
-export function getIftaLiabilityColor(netCents: number): SemanticColor {
-  if (netCents > 0) return 'critical'; // Owes money
-  if (netCents < 0) return 'info'; // Refund
-  return 'neutral'; // Zero
 }

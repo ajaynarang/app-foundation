@@ -227,7 +227,7 @@ export class DeskEpisodeService {
       ...toListItem(row),
       // Human-facing agent name — the sheet's title row renders this so
       // dispatchers in a multi-agent future can see "Autumn · You · 8m ago"
-      // instead of a machine key like ar_followup-bot. Null when the agent
+      // instead of a machine key like welcome-bot. Null when the agent
       // row's name column is blank (legacy seed data).
       ownerAgentName: row.ownerAgent.name ?? null,
       // Human-facing responsibility title ("Nudge customers on overdue

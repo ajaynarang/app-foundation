@@ -37,6 +37,7 @@ import {
   getNavigationForRole,
   getActiveSubPanel,
   getSubPanelSections,
+  getDefaultRouteForRole,
   type NavItem,
   type SubPanelId,
   type UserRole,
@@ -126,8 +127,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
   // Navigate back to main sidebar from sub-panel
   const handleBackToMain = () => {
     // Navigate to the default route for the role to exit sub-panel
-    const defaultRoute = user?.role === 'SUPER_ADMIN' ? '/admin/tenants' : '/';
-    router.push(defaultRoute);
+    router.push(getDefaultRouteForRole(user?.role));
   };
 
   // Get the sub-panel title
@@ -448,23 +448,13 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
 
                 {/* Profile / Settings */}
                 <div className="p-1">
-                  {user?.role === 'SUPER_ADMIN' ? (
-                    <button
-                      onClick={() => router.push('/admin/settings/profile')}
-                      className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-foreground"
-                    >
-                      <User className="h-4 w-4" />
-                      <span>Profile</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => router.push('/settings/profile')}
-                      className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-foreground"
-                    >
-                      <User className="h-4 w-4" />
-                      <span>Profile</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => router.push('/settings/profile')}
+                    className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-foreground"
+                  >
+                    <User className="h-4 w-4" />
+                    <span>Profile</span>
+                  </button>
                 </div>
 
                 {/* Display preferences */}
@@ -647,12 +637,18 @@ function SubPanelNav({
                 {visibleItems.map((item) => {
                   const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
                   const Icon = item.icon;
+                  // Stable anchor for the product tour (e.g. #tour-nav-members)
+                  const tourId = `tour-nav-${item.label
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '')}`;
 
                   if (item.external) {
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
+                        id={tourId}
                         onClick={onClose}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',
@@ -670,6 +666,7 @@ function SubPanelNav({
                     <Link
                       key={item.href}
                       href={item.href}
+                      id={tourId}
                       onClick={onClose}
                       className={cn(
                         'flex items-center gap-3 px-3 py-2 rounded-md transition-colors',

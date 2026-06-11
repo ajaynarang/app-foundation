@@ -219,11 +219,11 @@ describe('DeskMemoryWriterService — close-step write map', () => {
       entityRef: { customerId: '42' },
       hydrateContext: '<...>',
       outcome: 'followup_sent',
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
     });
     // The first call should be the per-responsibility name; second fallback to default.
     const calls = prompting.getPrompt.mock.calls.map((c) => c[0]);
-    expect(calls[0]).toBe('desk.memory.extract.ar_followup.v1');
+    expect(calls[0]).toBe('desk.memory.extract.welcome.v1');
   });
 
   it('I2 — findDuplicate query carries the expires_at filter', async () => {

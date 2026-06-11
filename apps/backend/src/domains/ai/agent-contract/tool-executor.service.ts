@@ -39,7 +39,7 @@ export class ToolExecutorService {
     // write it into VARCHAR audit columns (Alert.acknowledgedBy,
     // Invoice.voidedBy, etc.) or use it to look up by `firebaseUid`.
     // Inject the string form here; RLS session uses the numeric DB id
-    // (that's what `executeWithRlsContext` needs for role='driver' bindings).
+    // (that's the numeric id `executeWithRlsContext` binds to app.current_user_id).
     const userIdString = await this.resolveUserIdString(principal, userDbId);
 
     const injectedArgs = {

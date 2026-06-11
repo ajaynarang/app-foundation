@@ -1,7 +1,7 @@
 /**
- * Factories for the Assistant AI domain (Phase 6 — groups 6a-6f).
+ * Factories for the Assistant AI domain.
  *
- * Group 6a owns the chat-surface factories:
+ * Chat-surface factories:
  *   - buildCreateConversation  → POST /conversations       (CreateConversationDto)
  *   - buildSendMessage         → POST /conversations/:id/messages (SendMessageDto)
  *   - buildResumeAgent         → POST /conversations/:id/resume (ResumeAgentDto)
@@ -19,15 +19,15 @@ import { unique } from './common.js';
 
 /**
  * POST /conversations — CreateConversationDto requires a non-empty
- * `userMode` constrained to the 8 known values
- * (create-conversation.dto.ts line 5). Default 'dispatcher' — matches
- * the role fixture used by every Group 6a test; service line 108 falls
- * back to the dispatcher greeting for unknown keys, but passing the
- * canonical value makes the intent explicit.
+ * `userMode` constrained to the known values
+ * ('owner' | 'admin' | 'member' | 'super_admin' — see
+ * create-conversation.dto.ts). Default 'member' — the broadest tenant
+ * role; the service falls back to the default greeting for unknown keys,
+ * but passing a canonical value makes the intent explicit.
  */
 export function buildCreateConversation(overrides: { userMode?: string } & Record<string, unknown> = {}) {
   return {
-    userMode: 'dispatcher',
+    userMode: 'member',
     ...overrides,
   };
 }
@@ -88,135 +88,7 @@ export function buildResumeAgent(
   };
 }
 
-// ── PHASE 6 GROUP 6b — DOCUMENT INTELLIGENCE / JOBS ─────────────────
-
-/**
- * Minimal valid PDF (1 page, no content) — ~190 bytes inline.
- *
- * Encoded as latin1 so every byte round-trips exactly (UTF-8 would
- * mangle the structural delimiters). The trailer points to a 4-entry
- * xref with the catalog → pages → page object chain. This is the
- * smallest PDF the controller's `validatePdf` (mimetype check only —
- * line 124) and BullMQ enqueue path will accept WITHOUT triggering
- * the parser service. The async parser will later fail, but the
- * synchronous 202 envelope is what Phase 6 asserts (the QA scope is
- * the enqueue contract, NOT the parse outcome — see plan §2 OUT).
- *
- * Each call returns a UNIQUE filename so the SHA-256 hash differs
- * across runs — `processFile` (controller line 149) hashes
- * `Buffer.concat([file.buffer, Buffer.from(strategy)])`, but identical
- * test runs would COLLIDE on hash and trip the `ConflictException`
- * dup-detection (line 160). The unique filename forces a different
- * `originalname` which doesn't change the buffer — so strategy alone
- * isn't enough; we also append a random byte to the buffer to
- * guarantee a fresh hash per call.
- */
-const MINIMAL_PDF_TEMPLATE = `%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj
-xref
-0 4
-0000000000 65535 f
-0000000009 00000 n
-0000000052 00000 n
-0000000101 00000 n
-trailer<</Size 4/Root 1 0 R>>
-startxref
-148
-%%EOF`;
-
-export function buildRateconUploadBuffer(): {
-  buffer: Buffer;
-  filename: string;
-  mimeType: 'application/pdf';
-} {
-  // Append a random comment line BEFORE %%EOF so the hash differs across
-  // calls; PDF parsers ignore arbitrary bytes between objects (the xref
-  // table's offsets aren't validated by the controller). This guarantees
-  // a fresh inputHash per test run.
-  const tag = unique('ratecon');
-  const body = MINIMAL_PDF_TEMPLATE.replace('%%EOF', `%${tag}\n%%EOF`);
-  return {
-    buffer: Buffer.from(body, 'latin1'),
-    filename: `${tag}.pdf`,
-    mimeType: 'application/pdf',
-  };
-}
-
-/**
- * Minimal 1×1 white JPEG — ~134 bytes inline, base64-decoded.
- *
- * The fuel-receipt parser passes the raw buffer to the AI gateway as
- * a `file` part with mediaType=`image/jpeg`. Tests tagged
- * `@requires:data-ai-gateway-credits` are collection-excluded by
- * default so this stub is never sent to the LLM on a normal run.
- *
- * This is a known-good 1×1 white-pixel JPEG (standard test fixture).
- */
-const MINIMAL_JPEG_BASE64 =
-  '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAr/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AL+AB//Z';
-
-export function buildFuelReceiptUploadBuffer(): {
-  buffer: Buffer;
-  filename: string;
-  mimeType: 'image/jpeg';
-} {
-  return {
-    buffer: Buffer.from(MINIMAL_JPEG_BASE64, 'base64'),
-    filename: `${unique('fuel-receipt')}.jpg`,
-    mimeType: 'image/jpeg',
-  };
-}
-
-/**
- * `POST /jobs/:jobId/retry` — controller takes no body (line 97), but the
- * Playwright `post(url, undefined)` shape requires `data` to be defined-ish
- * to send a content-length-0 POST cleanly. Empty object is the safe
- * default; Nest discards it (no DTO).
- */
-export function buildJobRetry(): Record<string, never> {
-  return {};
-}
-
-/**
- * `PATCH /jobs/:jobId/dismiss` — same shape as retry (no body).
- */
-export function buildJobDismiss(): Record<string, never> {
-  return {};
-}
-
-// ── PHASE 6 GROUP 6c — PROSPECT + VOICE ─────────────────────────────
-
-/**
- * `POST /prospect/conversations` — controller takes NO body (line 18:
- * `async createConversation()`). Returning `{}` keeps the
- * `RoleApiClient.post(url, data)` signature happy without sending fields
- * the service ignores anyway. The conversation row's `userMode` is
- * always set server-side to `'prospect'` (service line 33).
- */
-export function buildProspectConversation(): Record<string, never> {
-  return {};
-}
-
-/**
- * `POST /prospect/conversations/:id/messages` — same `SendMessageDto`
- * shape as the dispatcher endpoint. Tests use the `content`-branch with
- * a short `[QA-TEST]` prefix that flags the row in DB inspection. Default
- * inputMode is `text`; voice tests would pass `voice` explicitly.
- */
-export function buildProspectMessage(
-  overrides: {
-    content?: string;
-    inputMode?: 'text' | 'voice';
-  } & Record<string, unknown> = {},
-) {
-  return {
-    content: `[QA-TEST] ${unique('prospect-msg')}`,
-    inputMode: 'text' as const,
-    ...overrides,
-  };
-}
+// ── VOICE ────────────────────────────────────────────────────────────
 
 /**
  * `POST /voice/token` — `VoiceTokenDto` requires only `conversationId`

@@ -4,8 +4,6 @@ Allow: /
 
 # Disallow authenticated pages
 Disallow: /admin/
-Disallow: /dispatcher/
-Disallow: /driver/
 Disallow: /settings/
 Disallow: /onboarding/
 Disallow: /api/

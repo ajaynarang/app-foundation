@@ -75,7 +75,7 @@ interface WriteInput {
   transition: CloseTransition;
   entityRef: Record<string, unknown>;
   entityPredicate?: Record<string, unknown>;
-  /** Per-responsibility prompt override key (e.g. 'ar_followup'). */
+  /** Per-responsibility prompt override key (e.g. 'welcome'). */
   responsibilityKey?: string;
   /** Free-form context for the extractor (typically the hydrate snapshot). */
   hydrateContext: string;

@@ -23,8 +23,6 @@ import { showSuccess, showError } from '@app/ui';
 import { useFormatters, DISPLAY_FORMATS } from '@/shared/lib/formatters';
 import { UserPlus, Copy } from 'lucide-react';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
 interface UserListProps {
   onInviteClick: () => void;
   defaultTab?: string;
@@ -59,10 +57,6 @@ const getRoleBadgeVariant = (role: string) => {
     case 'OWNER':
     case 'ADMIN':
       return 'default' as const;
-    case 'DISPATCHER':
-      return 'muted' as const;
-    case 'DRIVER':
-      return 'outline' as const;
     default:
       return 'muted' as const;
   }
@@ -103,7 +97,7 @@ const isExpiryWarning = (dateStr: string) => {
   return diffDays < 2;
 };
 
-export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps) {
+export function UserList({ onInviteClick, defaultTab = 'members' }: UserListProps) {
   const { formatTimestamp } = useFormatters();
   const { user: currentUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -253,9 +247,7 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
     }
   };
 
-  // Filter users by role
-  const staffUsers = users?.filter((u) => u.role !== 'DRIVER') || [];
-  const driverUsers = users?.filter((u) => u.role === 'DRIVER') || [];
+  const memberUsers = users || [];
   const pendingInvitations = invitations?.filter((i) => i.status === 'PENDING') || [];
 
   return (
@@ -266,7 +258,7 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
           {!isSuperAdmin && (
             <Button onClick={onInviteClick} size="sm">
               <UserPlus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Invite Staff Member</span>
+              <span className="hidden sm:inline">Invite Member</span>
             </Button>
           )}
         </div>
@@ -274,11 +266,8 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
-            <TabsTrigger value="staff" className="text-xs sm:text-sm">
-              Staff ({staffUsers.length})
-            </TabsTrigger>
-            <TabsTrigger value="drivers" className="text-xs sm:text-sm">
-              Drivers ({driverUsers.length})
+            <TabsTrigger value="members" className="text-xs sm:text-sm">
+              Members ({memberUsers.length})
             </TabsTrigger>
             <TabsTrigger value="invitations" className="text-xs sm:text-sm">
               <span className="hidden sm:inline">Invitations</span>
@@ -286,10 +275,10 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
             </TabsTrigger>
           </TabsList>
 
-          {/* Staff Tab */}
-          <TabsContent value="staff" className="mt-4">
+          {/* Members Tab */}
+          <TabsContent value="members" className="mt-4">
             {usersLoading ? (
-              <div className="text-muted-foreground">Loading staff...</div>
+              <div className="text-muted-foreground">Loading members...</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -304,7 +293,7 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {staffUsers.map((user) => {
+                    {memberUsers.map((user) => {
                       const isCurrentUser = user.userId === currentUser?.userId;
                       const isOwner = user.role === 'OWNER';
                       const isAdmin = user.role === 'ADMIN';
@@ -362,104 +351,16 @@ export function UserList({ onInviteClick, defaultTab = 'staff' }: UserListProps)
                         </TableRow>
                       );
                     })}
-                    {staffUsers.length === 0 && (
+                    {memberUsers.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          No staff members found
+                          No members found
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </TabsContent>
-
-          {/* Drivers Tab */}
-          <TabsContent value="drivers" className="mt-4">
-            {usersLoading ? (
-              <div className="text-muted-foreground">Loading drivers...</div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="hidden sm:table-cell">Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="hidden md:table-cell">Last Login</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {driverUsers.map((user) => {
-                        const isCurrentUser = user.userId === currentUser?.userId;
-                        const canManage = currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN';
-                        const userName = `${user.firstName} ${user.lastName}`;
-                        return (
-                          <TableRow key={user.userId}>
-                            <TableCell className="font-medium">
-                              {userName}
-                              <div className="sm:hidden text-xs text-muted-foreground font-normal">{user.email}</div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                            <TableCell>
-                              <Badge variant={user.isActive ? 'default' : 'muted'}>
-                                {user.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              {user.lastLoginAt ? formatTimestamp(user.lastLoginAt, DISPLAY_FORMATS.FRIENDLY) : 'Never'}
-                            </TableCell>
-                            <TableCell>
-                              {canManage && (
-                                <div className="flex gap-1 sm:gap-2">
-                                  <a href={`${APP_URL}/dispatcher/fleet`} target="_blank" rel="noopener noreferrer">
-                                    <Button size="sm" variant="outline">
-                                      <span className="hidden sm:inline">View in Fleet</span>
-                                      <span className="sm:hidden">Fleet</span>
-                                    </Button>
-                                  </a>
-                                  {user.isActive && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleDeactivateUser(user.userId, userName)}
-                                      loading={deactivateUserMutation.isPending}
-                                      disabled={isCurrentUser}
-                                    >
-                                      Deactivate
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {driverUsers.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No driver accounts yet
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                <p className="text-sm text-muted-foreground mt-4">
-                  To invite more drivers, go to{' '}
-                  <a
-                    href={`${APP_URL}/dispatcher/fleet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-foreground"
-                  >
-                    Fleet Management
-                  </a>
-                </p>
-              </>
             )}
           </TabsContent>
 

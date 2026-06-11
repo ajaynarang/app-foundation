@@ -11,10 +11,8 @@ import { ThemeToggle } from './theme-toggle';
 
 function getRoleView(role: string | undefined): string {
   switch (role) {
-    case 'DISPATCHER':
-      return 'Dispatcher View';
-    case 'DRIVER':
-      return 'Driver View';
+    case 'MEMBER':
+      return 'Member View';
     case 'ADMIN':
     case 'OWNER':
       return 'Admin View';

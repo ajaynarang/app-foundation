@@ -168,7 +168,7 @@ function PlatformDetailSheet({
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">6.</span> Start chatting — ask Claude about
-                    your loads, fleet status, invoices, and more
+                    your workspace data using the tools you registered
                   </li>
                 </ol>
               )}
@@ -198,7 +198,7 @@ function PlatformDetailSheet({
                   </li>
                   <li className="flex gap-2">
                     <span className="font-mono text-foreground shrink-0">6.</span> Start chatting — ask Claude about
-                    your loads, fleet status, invoices, and more
+                    your workspace data using the tools you registered
                   </li>
                 </ol>
               )}
@@ -269,7 +269,7 @@ export default function AiAssistantsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">AI Assistants</h1>
         <p className="text-muted-foreground mt-1">
-          Give Claude, ChatGPT, or any MCP client access to your fleet data. Each assistant registers its own OAuth
+          Give Claude, ChatGPT, or any MCP client access to your workspace data. Each assistant registers its own OAuth
           credentials automatically.
         </p>
       </div>

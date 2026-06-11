@@ -12,9 +12,6 @@ import {
   Home,
   LogOut,
   LayoutDashboard,
-  Settings2,
-  Bell,
-  FileText,
   Plug,
   Webhook,
   RefreshCw,
@@ -25,7 +22,6 @@ import {
   Users,
   CreditCard,
   Receipt,
-  ArrowLeftRight,
   Building2,
   Activity,
   Scale,
@@ -66,38 +62,13 @@ type NavItemConfig = NavLinkItem | NavSeparatorItem;
 
 const navigationItems: NavItemConfig[] = [
   { type: 'link', label: 'Overview', href: '/overview', icon: LayoutDashboard, hint: 'Platform summary at a glance' },
-  { type: 'separator', label: 'Configuration' },
-  {
-    type: 'link',
-    label: 'Operations',
-    href: '/configuration/operations',
-    icon: Settings2,
-    hint: 'HOS, optimization, fuel, compliance',
-  },
-  { type: 'link', label: 'Alerts', href: '/configuration/alerts', icon: Bell, hint: 'Thresholds, channels, grouping' },
-  {
-    type: 'link',
-    label: 'Invoicing',
-    href: '/configuration/invoicing',
-    icon: FileText,
-    hint: 'Branding, terms, email templates',
-  },
-  {
-    type: 'link',
-    label: 'EDI',
-    href: '/configuration/edi',
-    icon: ArrowLeftRight,
-    hint: 'Trading partners, rules, messages',
-    entitlement: 'edi_integration',
-  },
   { type: 'separator', label: 'Integrations' },
   {
     type: 'link',
     label: 'Connections',
     href: '/integrations/connections',
     icon: Plug,
-    hint: 'Samsara, QuickBooks, and more',
-    entitlement: 'samsara_integration',
+    hint: 'Third-party service connections',
   },
   {
     type: 'link',
@@ -105,7 +76,6 @@ const navigationItems: NavItemConfig[] = [
     href: '/integrations/sync',
     icon: RefreshCw,
     hint: 'Health, logs, re-sync triggers',
-    entitlement: 'samsara_integration',
   },
   { type: 'separator', label: 'Developer' },
   {
@@ -197,10 +167,8 @@ function getInitials(firstName: string, lastName: string): string {
 
 function getRoleLabel(role: string | undefined): string {
   switch (role) {
-    case 'DISPATCHER':
-      return 'Dispatcher';
-    case 'DRIVER':
-      return 'Driver';
+    case 'MEMBER':
+      return 'Member';
     case 'ADMIN':
       return 'Admin';
     case 'OWNER':
@@ -219,25 +187,8 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
 
   const appBase = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-  // Deep-link to the user's role-based landing page
-  const getAppUrl = (): string => {
-    switch (user?.role) {
-      case 'SUPER_ADMIN':
-        return `${appBase}/admin/tenants`;
-      case 'OWNER':
-      case 'ADMIN':
-      case 'DISPATCHER':
-        return `${appBase}/dispatcher/loads`;
-      case 'DRIVER':
-        return `${appBase}/driver/home`;
-      case 'CUSTOMER':
-        return `${appBase}/customer/dashboard`;
-      default:
-        return appBase;
-    }
-  };
-
-  const appUrl = getAppUrl();
+  // Link to the main app — all roles land on the app root
+  const appUrl = appBase;
 
   const handleLogout = async () => {
     await signOut();
@@ -386,8 +337,20 @@ export function ConsoleSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse 
                 className="hidden md:flex items-center justify-center"
                 title="Expand sidebar"
               >
-                <Image src="/logo-dark.svg" alt="S" width={24} height={24} className="h-6 w-6 dark:block hidden" />
-                <Image src="/logo-light.svg" alt="S" width={24} height={24} className="h-6 w-6 dark:hidden block" />
+                <Image
+                  src="/logo-dark.svg"
+                  alt="Console"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 dark:block hidden"
+                />
+                <Image
+                  src="/logo-light.svg"
+                  alt="Console"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 dark:hidden block"
+                />
               </button>
             ) : (
               <>

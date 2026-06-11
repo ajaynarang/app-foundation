@@ -21,18 +21,6 @@ export const STORAGE_KEYS = {
   /** Active theme (light | dark) */
   THEME: 'theme',
 
-  /** Loads page persisted board mode: 'status' | 'table' (layout) or 'convoy' (legacy persisted value → Trip grouping) */
-  LOADS_VIEW_MODE: 'loads-active-view-mode',
-
-  /** Command center card compact/expanded mode */
-  COMMAND_CENTER_CARD_MODE: 'command-center-card-mode',
-
-  /** Command center primary view (list | map) */
-  COMMAND_CENTER_PRIMARY_VIEW: 'command-center-primary-view',
-
-  /** Command center entity view (load | driver) */
-  COMMAND_CENTER_VIEW_MODE: 'command-center-view-mode',
-
   /** Onboarding banner dismissed flag */
   ONBOARDING_BANNER_DISMISSED: 'onboarding-banner-dismissed',
 
@@ -53,9 +41,6 @@ export const STORAGE_KEYS = {
   /** Per-entity-type sheet sizing preference (side-panel/half/full) */
   SHEET_SIZES: 'app:sheet-sizes',
 
-  /** Active loads table — visible column keys (JSON array) */
-  LOADS_TABLE_COLUMNS: 'app:loads-table-columns',
-
   /** Display font-size scale percentage (80–120) */
   FONT_SIZE_SCALE: 'app:font-size-scale',
 
@@ -64,26 +49,11 @@ export const STORAGE_KEYS = {
 
   /** Desk External-agents quickstart modal — "don't show again" flag */
   DESK_QUICKSTART_DISMISSED: 'desk-quickstart-dismissed',
-
-  /** Tower v3 lookahead window preference (2 | 4 | 8 | 'shift') */
-  TOWER_LOOKAHEAD: 'app:tower:lookahead',
-
-  /** Tower v3 adaptive 2-pane preference at <1100px (JSON: [left, right]) */
-  TOWER_PANE_PREFERENCE: 'app:tower:pane-pref',
-
-  /** Tower v3 ≥1100px column layout — spine/wire widths + collapsed state (JSON) */
-  TOWER_LAYOUT: 'app:tower:layout',
-
-  /** Tower v3 map radar ledge collapsed state ('1' = collapsed) */
-  TOWER_RADAR_COLLAPSED: 'app:tower:radar-collapsed',
 } as const;
 
 // ─── sessionStorage ────────────────────────────────────────────────────────────
 
 export const SESSION_KEYS = {
-  /** Last delivered load ID (driver flow) */
-  LAST_DELIVERED_LOAD: 'lastDeliveredLoad',
-
   /** Dev tools visible — activated by Ctrl+Shift+> */
   DEV_GHOST_VISIBLE: 'app_dev_ghost_visible',
 } as const;

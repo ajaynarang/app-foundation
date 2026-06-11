@@ -29,7 +29,7 @@ interface ScopeMultiSelectProps {
 
 /**
  * Combobox multi-select for agent scopes. Grouped by domain prefix
- * (fleet, loads, invoices, etc.). Filters out NEVER_EXTERNAL_SCOPES
+ * (platform, documents, comms, etc.). Filters out NEVER_EXTERNAL_SCOPES
  * (platform:admin) so they cannot be chosen at all.
  */
 export function ScopeMultiSelect({ value, onChange, disabled, placeholder = 'Add scope…' }: ScopeMultiSelectProps) {

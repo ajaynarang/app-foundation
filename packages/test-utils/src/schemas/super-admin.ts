@@ -4,7 +4,7 @@
  *
  * Hand-written Zod schemas pinned against the live response shapes on
  * `apps/backend/src/domains/admin/admin-{cache,events,schedules}.controller.ts`,
- * probed against `demo-northstar-2026` (backend :8001, 2026-05-15).
+ * verified against the admin controllers.
  *
  * Group 7a covers admin/* core (cache, events, schedules). Group 7b
  * (admin-jobs, platform-health) and 7c (billing-admin) extend this

@@ -12,7 +12,7 @@ import { TenantGuard } from './auth/guards/tenant.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { RequestContextMiddleware, requestContextStorage } from './infrastructure/logging/request-context.middleware';
 import { PlanGuard } from './auth/guards/plan.guard';
-import { shouldSkipRequestLog } from './infrastructure/logging/log-filter';
+import { shouldSkipRequestLog, maskUrlSecrets } from './infrastructure/logging/log-filter';
 import { getActiveTraceContext } from './infrastructure/logging/trace-context';
 import { buildPinoTransport } from './infrastructure/logging/pino-transport';
 
@@ -92,9 +92,17 @@ import { PromptingModule } from './domains/prompting/prompting.module';
           return fields;
         },
         autoLogging: { ignore: shouldSkipRequestLog },
-        customSuccessMessage: (req: any, res: any) => `${req.method} ${req.url} ${res.statusCode}`,
+        serializers: {
+          // Mask credential-bearing query params (e.g. the SSE ?token= access
+          // token) so they never reach the log pipeline.
+          req(req: any) {
+            if (req?.url) req.url = maskUrlSecrets(req.url);
+            return req;
+          },
+        },
+        customSuccessMessage: (req: any, res: any) => `${req.method} ${maskUrlSecrets(req.url)} ${res.statusCode}`,
         customErrorMessage: (req: any, res: any, err: any) =>
-          `${req.method} ${req.url} ${res.statusCode} - ${err.message}`,
+          `${req.method} ${maskUrlSecrets(req.url)} ${res.statusCode} - ${err.message}`,
       },
     }),
     SharedModule,

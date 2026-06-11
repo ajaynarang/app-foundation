@@ -1,19 +1,14 @@
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/shared/constants';
-import type { ChatMessage, OrbState, UserMode, LeadData, InputMode, Intent, ChatLayout } from './engine/types';
+import type { ChatMessage, OrbState, UserMode, InputMode, Intent, ChatLayout } from './engine/types';
 import { DEFAULT_VOICE_PREFS, type VoicePreferences } from './voice/types';
 import {
   createConversation as createConversationApi,
-  createProspectConversation as createProspectConversationApi,
   listConversations,
   getConversationMessages,
   getStreamingUrl,
   getResumeUrl,
-  getProspectStreamingUrl,
   getAuthHeaders,
-  getProspectHeaders,
-  storeSessionToken,
-  clearSessionToken,
   type ConversationSummary,
 } from './api';
 
@@ -45,10 +40,6 @@ interface AssistantState {
   userMode: UserMode;
   chatLayout: ChatLayout;
 
-  // Lead capture (prospect mode)
-  leadData: LeadData | null;
-  leadCaptureStep: number;
-
   // HITL confirmation
   pendingConfirmation: PendingConfirmation | null;
 
@@ -61,8 +52,6 @@ interface AssistantState {
   // Async job follow-up
   hasUnreadAsync: boolean;
 
-  // Driver overlay
-  driverUnreadCount: number;
   openSource: 'tab' | 'orb' | null;
 
   // Chat history
@@ -93,7 +82,6 @@ interface AssistantState {
   setDraftInput: (draft: string | null) => void;
   setSuggestedFollowUps: (followUps: string[]) => void;
   setHasUnreadAsync: (hasUnread: boolean) => void;
-  setDriverUnreadCount: (count: number) => void;
   clearSession: () => void;
   loadHistory: () => Promise<void>;
   viewConversation: (conversationId: string) => Promise<void>;
@@ -102,20 +90,6 @@ interface AssistantState {
 
 async function initConversationViaApi(mode: UserMode): Promise<{ sessionId: string; messages: ChatMessage[] } | null> {
   try {
-    if (mode === 'prospect') {
-      const res = await createProspectConversationApi();
-      storeSessionToken(res.sessionToken);
-      const greeting: ChatMessage = {
-        id: res.greeting.messageId,
-        role: 'assistant',
-        content: res.greeting.content,
-        inputMode: 'text',
-        timestamp: new Date(res.greeting.createdAt),
-        speakText: res.greeting.speakText,
-      };
-      return { sessionId: res.conversationId, messages: [greeting] };
-    }
-
     const res = await createConversationApi(mode);
     const greeting: ChatMessage = {
       id: res.greeting.messageId,
@@ -133,13 +107,10 @@ async function initConversationViaApi(mode: UserMode): Promise<{ sessionId: stri
 
 function createFallbackGreeting(mode: UserMode): ChatMessage {
   const greetings: Record<UserMode, string> = {
-    prospect:
-      "Hi! I'm your AI assistant. I can tell you about the product, pricing, integrations, or help you get started. What would you like to know?",
     member: "Hi! I'm your AI assistant. Ask me anything or tell me what you'd like to get done.",
     owner: "Hi! I'm your AI assistant. I can help you across your workspace — what do you need?",
     admin: "Hi! I'm your AI assistant. I can help you manage your workspace. What do you need?",
     super_admin: "Hi! I'm your AI assistant. I can help you across the platform. What do you need?",
-    support: "Hi! I'm your AI assistant. I can help with your support request. What do you need assistance with?",
   };
   return {
     id: 'initial',
@@ -163,16 +134,13 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   orbState: 'idle',
   activeTranscript: '',
   voicePrefs: DEFAULT_VOICE_PREFS,
-  userMode: 'prospect',
+  userMode: 'member',
   chatLayout:
     (typeof window !== 'undefined' ? (localStorage.getItem(STORAGE_KEYS.APP_CHAT_LAYOUT) as ChatLayout) : null) ||
     'side',
-  leadData: null,
-  leadCaptureStep: 0,
   draftInput: null,
   suggestedFollowUps: [],
   hasUnreadAsync: false,
-  driverUnreadCount: 0,
   openSource: null,
   pastConversations: [],
   pendingConfirmation: null,
@@ -242,13 +210,10 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   setUserMode: (mode) =>
     set((state) => {
       if (mode === state.userMode) return {};
-      clearSessionToken();
       return {
         userMode: mode,
         sessionId: null,
         messages: [],
-        leadData: null,
-        leadCaptureStep: 0,
         pastConversations: [],
         isViewingHistory: false,
         viewedMessages: [],
@@ -305,16 +270,14 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     activeAbortController = new AbortController();
     const { signal } = activeAbortController;
 
-    // Stream from backend — use prospect or authenticated endpoint
-    const isProspect = state.userMode === 'prospect';
-    const streamUrl = isProspect ? getProspectStreamingUrl(sessionId) : getStreamingUrl(sessionId);
-    const modeHeaders = isProspect ? getProspectHeaders() : getAuthHeaders();
+    // Stream from the authenticated conversations endpoint
+    const streamUrl = getStreamingUrl(sessionId);
 
     fetch(streamUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...modeHeaders,
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         content,
@@ -323,7 +286,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
         ...(options?.promptVariables ? { promptVariables: options.promptVariables } : {}),
       }),
       signal,
-      ...(isProspect ? {} : { credentials: 'include' as RequestCredentials }),
+      credentials: 'include' as RequestCredentials,
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -598,20 +561,16 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   setDraftInput: (draft) => set({ draftInput: draft }),
   setSuggestedFollowUps: (suggestedFollowUps) => set({ suggestedFollowUps }),
   setHasUnreadAsync: (hasUnread) => set({ hasUnreadAsync: hasUnread }),
-  setDriverUnreadCount: (count) => set({ driverUnreadCount: count }),
   setOrbState: (orbState) => set({ orbState }),
   setActiveTranscript: (text) => set({ activeTranscript: text }),
   setVoicePrefs: (voicePrefs) => set({ voicePrefs }),
 
   clearSession: () => {
-    clearSessionToken();
     set({
       sessionId: null,
       messages: [],
       orbState: 'idle',
       activeTranscript: '',
-      leadData: null,
-      leadCaptureStep: 0,
       pendingConfirmation: null,
       suggestedFollowUps: [],
       isViewingHistory: false,

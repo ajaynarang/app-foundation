@@ -25,11 +25,9 @@ function loadAuthState(): AuthState {
 type TestFixtures = {
   authState: AuthState;
   asRole: (role: string) => RoleApiClient;
-  asDispatcher: RoleApiClient;
+  asMember: RoleApiClient;
   asAdmin: RoleApiClient;
   asOwner: RoleApiClient;
-  asDriver: RoleApiClient;
-  asCustomer: RoleApiClient;
   asSuperAdmin: RoleApiClient;
   asAnonymous: RoleApiClient;
 };
@@ -53,13 +51,13 @@ export const test = base.extend<TestFixtures>({
     });
   },
 
-  asDispatcher: async ({ request }, use) => {
+  asMember: async ({ request }, use) => {
     const state = loadAuthState();
-    if (!state.tokens['DISPATCHER']) {
-      test.skip(true, `No DISPATCHER in tenant "${state.tenantName}"`);
+    if (!state.tokens['MEMBER']) {
+      test.skip(true, `No MEMBER in tenant "${state.tenantName}"`);
       return;
     }
-    await use(createRoleClient(request, 'DISPATCHER', state.tokens['DISPATCHER'], state.baseUrl));
+    await use(createRoleClient(request, 'MEMBER', state.tokens['MEMBER'], state.baseUrl));
   },
   asAdmin: async ({ request }, use) => {
     const state = loadAuthState();
@@ -76,22 +74,6 @@ export const test = base.extend<TestFixtures>({
       return;
     }
     await use(createRoleClient(request, 'OWNER', state.tokens['OWNER'], state.baseUrl));
-  },
-  asDriver: async ({ request }, use) => {
-    const state = loadAuthState();
-    if (!state.tokens['DRIVER']) {
-      test.skip(true, `No DRIVER in tenant "${state.tenantName}"`);
-      return;
-    }
-    await use(createRoleClient(request, 'DRIVER', state.tokens['DRIVER'], state.baseUrl));
-  },
-  asCustomer: async ({ request }, use) => {
-    const state = loadAuthState();
-    if (!state.tokens['CUSTOMER']) {
-      test.skip(true, `No CUSTOMER in tenant "${state.tenantName}"`);
-      return;
-    }
-    await use(createRoleClient(request, 'CUSTOMER', state.tokens['CUSTOMER'], state.baseUrl));
   },
   asSuperAdmin: async ({ request }, use) => {
     const state = loadAuthState();

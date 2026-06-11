@@ -272,14 +272,14 @@ describe('FeedbackService', () => {
     it('should return distinct tenants from feedback', async () => {
       mockPrisma.feedback.findMany.mockResolvedValue([
         { tenant: { id: 1, companyName: 'Acme' } },
-        { tenant: { id: 2, companyName: 'Fleet Co' } },
+        { tenant: { id: 2, companyName: 'Acme Co' } },
       ]);
 
       const result = await service.getTenants();
 
       expect(result).toEqual([
         { id: 1, companyName: 'Acme' },
-        { id: 2, companyName: 'Fleet Co' },
+        { id: 2, companyName: 'Acme Co' },
       ]);
     });
   });

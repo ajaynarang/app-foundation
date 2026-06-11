@@ -15,9 +15,8 @@ interface DynamicIslandProps {
 /**
  * Header status pill — shows the current workspace, plan, and role.
  *
- * The fleet-metrics rotation face was removed with the trucking domain; this
- * is now a static glass pill. Features can re-introduce a rotating metrics
- * face by reading their own query hooks here.
+ * Rendered as a static glass pill. Features can introduce a rotating
+ * metrics face by reading their own query hooks here.
  */
 export function DynamicIsland({
   tenantName,

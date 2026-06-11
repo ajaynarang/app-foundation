@@ -48,24 +48,14 @@ export function AttentionItems() {
     const result: AttentionItem[] = [];
 
     // 1. Integration sync errors (highest priority)
-    if (health?.tms?.hasError) {
+    for (const integration of health?.integrations ?? []) {
+      if (!integration.hasError) continue;
       result.push({
-        id: 'tms-error',
+        id: `integration-error-${integration.id}`,
         icon: AlertTriangle,
         iconColor: 'text-red-500 dark:text-red-400',
-        title: `${health.tms.displayName ?? 'TMS'} sync error`,
-        detail: health.tms.lastErrorMessage ?? 'Sync failed',
-        href: '/integrations/sync',
-        priority: 1,
-      });
-    }
-    if (health?.eld?.hasError) {
-      result.push({
-        id: 'eld-error',
-        icon: AlertTriangle,
-        iconColor: 'text-red-500 dark:text-red-400',
-        title: `${health.eld.displayName ?? 'ELD'} sync error`,
-        detail: health.eld.lastErrorMessage ?? 'Sync failed',
+        title: `${integration.displayName ?? integration.vendor} sync error`,
+        detail: integration.lastErrorMessage ?? 'Sync failed',
         href: '/integrations/sync',
         priority: 1,
       });

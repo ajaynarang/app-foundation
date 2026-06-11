@@ -1,7 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import * as admin from 'firebase-admin';
 
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'PlatformAdmin@2026';
+// No hardcoded fallback: a publicly-known default password must never be used
+// to create a real Firebase login. Set SUPER_ADMIN_PASSWORD before seeding if
+// you want the Firebase super-admin account created.
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 
 let firebaseAuth: admin.auth.Auth | null = null;
 
@@ -69,7 +72,15 @@ export const seed = {
 
     initFirebase();
 
-    const superAdminFirebaseUid = await createFirebaseUser('admin@example.com', SUPER_ADMIN_PASSWORD, 'Platform Admin');
+    let superAdminFirebaseUid: string | null = null;
+    if (firebaseAuth && !SUPER_ADMIN_PASSWORD) {
+      console.log(
+        '  SUPER_ADMIN_PASSWORD is not set — skipping Firebase super-admin creation. ' +
+          'Set SUPER_ADMIN_PASSWORD and re-run the seed to create the Firebase login.',
+      );
+    } else if (SUPER_ADMIN_PASSWORD) {
+      superAdminFirebaseUid = await createFirebaseUser('admin@example.com', SUPER_ADMIN_PASSWORD, 'Platform Admin');
+    }
 
     const superAdmin = await prisma.user.create({
       data: {

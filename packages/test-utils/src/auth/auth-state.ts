@@ -4,7 +4,6 @@ export interface DevUser {
   firstName: string;
   lastName: string;
   role: string;
-  driverId?: string | null;
   phone?: string | null;
 }
 

@@ -3,7 +3,7 @@
  *
  * Hand-written Zod schemas pinned against the live response shapes on
  * `apps/backend/src/domains/desk/core/{approval,episode,memory}/*.ts`,
- * probed against `demo-northstar-2026` (backend :8011, 2026-04-27).
+ * verified against the desk controllers/services.
  *
  * Group 6e covers:
  *
@@ -312,8 +312,8 @@ export type DeskResponsibilityRow = z.infer<typeof DeskResponsibilityRowSchema>;
 
 /**
  * `GET /desk/responsibilities` — bare array (NOT envelope-wrapped).
- * Verified live (2026-04-27) on demo-northstar: 10 rows, registry order
- * (ar_followup first, then 9 COMING_SOON stubs).
+ * Verified live (2026-04-27) on a seeded dev tenant: 10 rows, registry order
+ * (the shipped `welcome` responsibility, plus any you add).
  */
 export const DeskResponsibilityListSchema = z.array(DeskResponsibilityRowSchema);
 export type DeskResponsibilityList = z.infer<typeof DeskResponsibilityListSchema>;
@@ -329,7 +329,7 @@ export type DeskResponsibilityList = z.infer<typeof DeskResponsibilityListSchema
  * Service `getForTenant` (responsibility.service.ts lines 139-153) projects
  * the union.
  *
- * IMPORTANT — Finding #54 (Phase 6 Group 6f): on demo-northstar today this
+ * IMPORTANT — Finding #54 (Phase 6 Group 6f): on a seeded dev tenant today this
  * endpoint returns 500 (Prisma error P2022). The Prisma model in
  * `apps/backend/prisma/schema.prisma::DeskResponsibility` (line ~6800) still
  * declares `notesForAssistant` and `supervisorUserId` columns, but the live
@@ -455,7 +455,7 @@ export type DeskResponsibilityRunResponse = z.infer<typeof DeskResponsibilityRun
  * Agent roster row — `DeskAgentService::listForTenant`
  * (agent.service.ts lines 111-121). Projects exactly these 8 keys.
  *
- * Live response on demo-northstar (2026-04-27) returned 6 rows (NOT 12 as
+ * Live response on a seeded dev tenant (2026-04-27) returned 6 rows (NOT 12 as
  * the plan suggests) — the service filters via
  * `orderedKeys.filter((k) => agentsByKey.has(k))` so only agents that own
  * a registered responsibility appear. Today the registry references 6
@@ -502,7 +502,7 @@ export type DeskAgentBulkToggleResponse = z.infer<typeof DeskAgentBulkToggleResp
  * Inngest catches unsigned GETs and returns a JSON registry of registered
  * functions + framework metadata (used by Inngest Cloud for discovery).
  *
- * IMPORTANT — Finding #55 (Phase 6 Group 6f): on demo-northstar today this
+ * IMPORTANT — Finding #55 (Phase 6 Group 6f): on a seeded dev tenant today this
  * endpoint returns HTTP 500 with body `{"code":"internal_server_error"}`
  * because `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` env vars are unset
  * on dev. The serve handler refuses to introspect without a signing key.

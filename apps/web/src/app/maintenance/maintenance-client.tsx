@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { CONTACTS, mailto } from '@/shared/lib/contacts';
 
 export interface MaintenanceState {
   enabled: boolean;
@@ -203,10 +204,10 @@ export function MaintenanceClient({ initialState }: { initialState: MaintenanceS
           <p className="text-xs text-muted-foreground/40">
             Need help?{' '}
             <a
-              href="mailto:support@appshore.in"
+              href={mailto('support')}
               className="text-muted-foreground/60 hover:text-muted-foreground underline underline-offset-2"
             >
-              support@appshore.in
+              {CONTACTS.support}
             </a>
           </p>
         </div>

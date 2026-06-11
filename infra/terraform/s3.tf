@@ -1,5 +1,5 @@
 # infra/terraform/s3.tf
-# S3 bucket for document storage (rate confirmations, BOLs, PODs, etc.)
+# S3 bucket for user-uploaded documents and files.
 # Each environment gets its own bucket for data isolation and independent lifecycle.
 
 resource "aws_s3_bucket" "documents" {

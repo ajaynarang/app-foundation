@@ -90,7 +90,7 @@ describe('pipeAgentResponse', () => {
   });
 
   it('streams follow-ups extracted from text', async () => {
-    const text = 'Answer.\n\n<followups>\nWhat loads are active?\nCheck fleet status\n</followups>';
+    const text = 'Answer.\n\n<followups>\nWhat items are active?\nCheck system status\n</followups>';
     const response = {
       textStream: createReadableStream([text]),
     };
@@ -115,7 +115,7 @@ describe('pipeAgentResponse', () => {
     };
 
     const cardAccumulator = {
-      card: { type: 'fleet', data: { loads: 5 } },
+      card: { type: 'summary', data: { items: 5 } },
     };
 
     await pipeAgentResponse(response as any, {

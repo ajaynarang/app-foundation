@@ -5,7 +5,7 @@ import { fetchDevUsers, switchToUser, type AuthState, type DevUsersResponse } fr
 import { ENV } from './test-env.js';
 import { detectCapabilities, buildCapabilitiesJson } from './detect-capabilities.js';
 
-const ALL_TENANT_ROLES = ['OWNER', 'ADMIN', 'DISPATCHER', 'DRIVER', 'CUSTOMER'];
+const ALL_TENANT_ROLES = ['OWNER', 'ADMIN', 'MEMBER'];
 const AUTH_STATE_PATH = path.join(import.meta.dirname, 'auth-state.json');
 const CAPABILITIES_PATH = path.join(import.meta.dirname, 'tenant-capabilities.json');
 

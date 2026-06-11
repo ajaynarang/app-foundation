@@ -111,7 +111,7 @@ export class McpToolService implements OnModuleInit {
    *
    * RLS enforcement: When context is provided, each tool call is wrapped in
    * `AiPrismaService.executeWithRlsContext()`, setting PostgreSQL session
-   * variables (app.current_tenant_id, app.current_user_role, app.current_driver_id)
+   * variables (app.current_tenant_id, app.current_user_role, app.current_user_id)
    * within a transaction. This provides database-level tenant isolation as a
    * defense-in-depth layer on top of application-level WHERE clause filtering.
    */
@@ -266,8 +266,8 @@ export class McpToolService implements OnModuleInit {
       userId: string;
       // `userDbId` is only meaningful when the trigger is a real user
       // (e.g. `triggeredBy = 'user:42'`). For scheduler/event triggers the
-      // caller passes null; RLS only reads user id for `role='driver'`, and
-      // Desk runs with `role='desk'`, so null is safe today. When Desk
+      // caller passes null; the starter's RLS policies only key on the
+      // tenant id (never app.current_user_id), so null is safe today. When Desk
       // joins the pipeline (Phase F) the principal factory will reject
       // null and the caller will need to resolve or pass a system user.
       userDbId: number | null;
@@ -337,7 +337,7 @@ export class McpToolService implements OnModuleInit {
           };
 
           if (context) {
-            // RLS only reads user id when role='driver'. Desk runs as
+            // No starter RLS policy reads app.current_user_id. Desk runs as
             // role='desk', so userDbId may be null (scheduler/event
             // triggers without a user attribution). Fall back to 0 so the
             // SQL set_config call still has a value to bind; the value is

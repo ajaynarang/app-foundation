@@ -3,7 +3,7 @@
  * Keep in sync with apps/web/src/shared/lib/contacts.ts
  */
 
-const DOMAIN = 'appshore.in';
+const DOMAIN = 'example.com';
 
 export const CONTACTS = {
   // --- Corporate / functional ---

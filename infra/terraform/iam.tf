@@ -196,10 +196,11 @@ resource "aws_iam_role_policy" "github_deploy" {
         Resource = "*"
       },
       {
-        Sid      = "MigrationLogs"
-        Effect   = "Allow"
-        Action   = ["logs:GetLogEvents"]
-        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/ecs/${local.prefix}-*"
+        Sid    = "MigrationLogs"
+        Effect = "Allow"
+        Action = ["logs:GetLogEvents"]
+        # Must match the log groups created in cloudwatch.tf (/<project>/<env>/api|worker)
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/${var.project}/${var.env}/*"
       },
       {
         Sid    = "PassRoleToECSAndScheduler"

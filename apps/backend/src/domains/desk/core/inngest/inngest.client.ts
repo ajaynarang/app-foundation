@@ -12,47 +12,15 @@ import type { ApprovalDecision } from '@app/shared-types';
  * Each responsibility that ships gets its own `.run` event.
  */
 export type DeskEvents = {
-  /** Starts an AR Follow-up episode. `id` carries the dedupe key so Inngest
-   * rejects duplicates (matches our Postgres partial unique index on
-   * `desk_episodes(tenant_id, dedupe_key) WHERE status in open`). */
-  'app/desk.ar_followup.run': {
+  /** Example responsibility-start event for the shipped `welcome`
+   * responsibility. Add one `.run` event per responsibility you build; `id`
+   * carries the dedupe key so Inngest rejects duplicates (matches the
+   * Postgres partial unique index on `desk_episodes(tenant_id, dedupe_key)
+   * WHERE status in open). */
+  'app/desk.welcome.run': {
     data: {
       episodeId: string;
       tenantId: number;
-      invoiceNumber: string;
-      idempotencyKey: string;
-    };
-  };
-  /** Starts a Closeout Review episode for a delivered-uninvoiced load. `id`
-   * carries the dedupe key (same partial-unique-index semantics as AR). */
-  'app/desk.closeout_review.run': {
-    data: {
-      episodeId: string;
-      tenantId: number;
-      loadNumber: string;
-      idempotencyKey: string;
-    };
-  };
-  /** Starts a Document Expiry episode for one (driver, credential). `id`
-   * carries the dedupe key (driver+credential, not findingId) so Inngest
-   * rejects duplicate cron firings the same day. */
-  'app/desk.document_expiry.run': {
-    data: {
-      episodeId: string;
-      tenantId: number;
-      driverId: string;
-      credentialType: string;
-      idempotencyKey: string;
-    };
-  };
-  /** Starts a Settlement Review episode for one DRAFT settlement. `id`
-   * carries the dedupe key (settlement_review:settlement:<settlementId>:<date>)
-   * so Inngest rejects duplicate firings for the same settlement the same day. */
-  'app/desk.settlement_review.run': {
-    data: {
-      episodeId: string;
-      tenantId: number;
-      settlementId: string;
       idempotencyKey: string;
     };
   };

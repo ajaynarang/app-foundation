@@ -320,7 +320,7 @@ export class SubscriptionService {
   }
 
   /**
-   * Update the truck/vehicle quantity on the subscription.
+   * Update the seat/unit quantity on the subscription.
    * Stripe handles proration automatically.
    */
   async updateQuantity(tenantId: string, tenantDbId: number, newQuantity: number): Promise<void> {

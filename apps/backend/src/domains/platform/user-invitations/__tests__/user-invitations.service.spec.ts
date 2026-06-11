@@ -123,7 +123,7 @@ describe('UserInvitationsService', () => {
         email: inviteDto.email,
         status: 'PENDING',
         invitedByUser: { firstName: 'Admin', lastName: 'User' },
-        tenant: { companyName: 'Fleet Co' },
+        tenant: { companyName: 'Acme Co' },
       });
 
       const result = await service.inviteUser(inviteDto, defaultCurrentUser);
@@ -269,7 +269,7 @@ describe('UserInvitationsService', () => {
         lastName: 'Doe',
         status: 'PENDING',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        tenant: { companyName: 'Fleet Co' },
+        tenant: { companyName: 'Acme Co' },
         invitedByUser: { firstName: 'Admin', lastName: 'User' },
       };
 
@@ -334,10 +334,10 @@ describe('UserInvitationsService', () => {
         phone: '+15551234567',
         email: null,
         firstName: 'Mike',
-        lastName: 'Driver',
+        lastName: 'Rivera',
         status: 'PENDING',
         inviteChannel: 'SMS',
-        tenant: { companyName: 'Fleet Co' },
+        tenant: { companyName: 'Acme Co' },
         invitedByUser: { firstName: 'Admin', lastName: 'User' },
       });
       mockPrismaService.userInvitation.update.mockResolvedValue({
@@ -346,7 +346,11 @@ describe('UserInvitationsService', () => {
 
       await service.resendInvitation('inv_sms', 'tenant_abc');
 
-      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('the platform'));
+      expect(mockSmsService.sendSms).toHaveBeenCalledTimes(1);
+      const [smsTo, smsBody] = mockSmsService.sendSms.mock.calls[0];
+      expect(smsTo).toBe('+15551234567');
+      expect(smsBody).toContain('invited');
+      expect(smsBody).toContain('/accept-invitation?token=');
     });
 
     it('should throw when tenant not found', async () => {
@@ -380,7 +384,7 @@ describe('UserInvitationsService', () => {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         tenant: {
           tenantId: 'tnt-1',
-          companyName: 'Fleet Co',
+          companyName: 'Acme Co',
           subdomain: 'fleet',
         },
         invitedByUser: {
@@ -541,20 +545,24 @@ describe('UserInvitationsService', () => {
         id: 1,
         status: 'PENDING',
         invitedByUser: { firstName: 'Admin', lastName: 'User' },
-        tenant: { companyName: 'Fleet Co' },
+        tenant: { companyName: 'Acme Co' },
       });
 
       await service.inviteUser(
         {
           phone: '+15551234567',
-          firstName: 'Driver',
+          firstName: 'Sam',
           lastName: 'One',
           role: 'MEMBER' as any,
         },
         { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
       );
 
-      expect(mockSmsService.sendSms).toHaveBeenCalledWith('+15551234567', expect.stringContaining('the platform'));
+      expect(mockSmsService.sendSms).toHaveBeenCalledTimes(1);
+      const [smsTo, smsBody] = mockSmsService.sendSms.mock.calls[0];
+      expect(smsTo).toBe('+15551234567');
+      expect(smsBody).toContain('invited');
+      expect(smsBody).toContain('/accept-invitation?token=');
       expect(mockEmailService.sendUserInvitation).not.toHaveBeenCalled();
     });
   });
@@ -641,7 +649,7 @@ describe('UserInvitationsService', () => {
         token: 'phone-token',
         phone: '+15551234567',
         firstName: 'Mike',
-        lastName: 'Driver',
+        lastName: 'Rivera',
         role: 'MEMBER',
         tenantId: 1,
         email: null,
@@ -651,7 +659,7 @@ describe('UserInvitationsService', () => {
 
       const mockUser = {
         id: 2,
-        userId: 'user_driver1',
+        userId: 'user_member1',
         phone: '+15551234567',
       };
 

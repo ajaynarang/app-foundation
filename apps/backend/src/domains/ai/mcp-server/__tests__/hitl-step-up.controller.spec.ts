@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HitlStepUpController } from '../hitl-step-up.controller';
 import { HitlChallengeService } from '../../agent-contract/hitl-challenge.service';
 import { PinService } from '../../../../auth/pin.service';
@@ -20,6 +21,9 @@ describe('HitlStepUpController', () => {
         { provide: HitlChallengeService, useValue: challenges },
         { provide: PinService, useValue: pinService },
         { provide: PrismaService, useValue: prisma },
+        // TenantGuard (class-level guard) takes ConfigService for the
+        // multi-tenant toggle; guards are instantiated at module compile.
+        { provide: ConfigService, useValue: { get: jest.fn() } },
       ],
     }).compile();
     ctrl = mod.get(HitlStepUpController);

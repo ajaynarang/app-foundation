@@ -58,6 +58,9 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
+  })
   @Post('lookup-user')
   @ApiOperation({
     summary: 'Lookup user by email or phone to detect tenant(s)',

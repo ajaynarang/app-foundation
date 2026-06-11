@@ -95,7 +95,7 @@ export class HitlStepUpController {
   @ApiOperation({
     summary: 'Complete PIN step-up for a pending HITL challenge token',
     description:
-      'Verifies the dispatcher PIN and marks the HITL challenge as step-up-completed, unlocking the sensitive-tier tool call. The agent must then re-present the same token in its next tools/call to execute.',
+      'Verifies the user PIN and marks the HITL challenge as step-up-completed, unlocking the sensitive-tier tool call. The agent must then re-present the same token in its next tools/call to execute.',
   })
   @ApiParam({
     name: 'token',

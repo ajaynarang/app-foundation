@@ -15,7 +15,7 @@ export function scopeChipClass(scope: AgentScope): string {
   }
 }
 
-/** Group scopes by their domain prefix (e.g. "fleet:*"). Stable, sort-friendly. */
+/** Group scopes by their domain prefix (e.g. "documents:*"). Stable, sort-friendly. */
 export function groupScopesByDomain(scopes: readonly AgentScope[]): Record<string, AgentScope[]> {
   const grouped: Record<string, AgentScope[]> = {};
   for (const s of scopes) {

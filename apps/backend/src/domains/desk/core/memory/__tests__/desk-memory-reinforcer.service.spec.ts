@@ -49,7 +49,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'approve_unchanged',
       entityRef: { customerId: '42' },
       outcome: 'followup_sent',
@@ -71,7 +71,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'approve_unchanged',
       entityRef: { customerId: '42' },
       outcome: 'followup_sent',
@@ -88,7 +88,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'reject',
       entityRef: { customerId: '42' },
       outcome: 'rejected_by_operator',
@@ -106,7 +106,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'reject',
       entityRef: { customerId: '42' },
       outcome: 'rejected_by_operator',
@@ -123,7 +123,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'no_action',
       entityRef: { customerId: '42' },
       outcome: 'no_action_needed',
@@ -168,7 +168,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: [],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'approve_unchanged',
       entityRef: { customerId: '42' },
       outcome: 'followup_sent',
@@ -189,7 +189,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['m-1', 'm-2', 'm-3'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'approve_unchanged',
       entityRef: { customerId: '42' },
       outcome: 'followup_sent',
@@ -214,7 +214,7 @@ describe('DeskMemoryReinforcer', () => {
 
     await reinforcer.reinforce({
       retrievedMemoryIds: ['matches', 'mismatched'],
-      responsibilityKey: 'ar_followup',
+      responsibilityKey: 'welcome',
       transition: 'approve_unchanged',
       entityRef: { customerId: '42' },
       outcome: 'followup_sent',

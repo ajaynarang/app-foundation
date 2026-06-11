@@ -8,10 +8,10 @@ import * as path from 'path';
  * web app has no equivalent — and because many frontend types declare
  * `status: string` instead of the real enum, TypeScript cannot reject a
  * wrong-case comparison like `doc.status === 'confirmed'` when the API in fact
- * returns the UPPER_SNAKE enum value `'CONFIRMED'`. That exact mismatch shipped
- * the "Rate Confirmation shows in both UPLOADED and MISSING" bug. This test
- * closes the gap from CI: it lives in the backend suite (which runs in the
- * quality gate + every deploy's "Unit tests" step) and scans `apps/web/src`.
+ * returns the UPPER_SNAKE enum value `'CONFIRMED'` (a bug class that makes a
+ * record silently match the wrong UI bucket). This test closes the gap from
+ * CI: it lives in the backend suite (which runs in the quality gate + every
+ * deploy's "Unit tests" step) and scans `apps/web/src`.
  *
  * Source of truth: the generated Prisma enums. We flag a lowercase literal
  * only when it is the lowercase form of a MULTI-WORD UPPER_SNAKE enum value
@@ -19,12 +19,11 @@ import * as path from 'path';
  * a `status`/`state` identifier. The multi-word restriction is deliberate:
  * single common words ('paid', 'approved', 'completed', 'error', 'active', …)
  * are legitimately used by local UI state machines and lowercase-by-design
- * derived labels (payStatus), so flagging them is pure noise. Multi-word
- * UPPER_SNAKE values almost never appear as a legit lowercase literal, so they
- * are the high-signal regressions — including the original `pending_upload` /
- * `confirmed` document bug class. Lowercase-by-design schemas that DO use a
- * multi-word value (onboarding 'in_progress', probe 'not_configured', ETA
- * 'at_risk') are allow-listed by file, each with a justification.
+ * derived labels, so flagging them is pure noise. Multi-word UPPER_SNAKE
+ * values almost never appear as a legit lowercase literal, so they are the
+ * high-signal regressions. Lowercase-by-design schemas that DO use a
+ * multi-word value (e.g. onboarding 'in_progress') are allow-listed by file,
+ * each with a justification.
  */
 
 const WEB_SRC = path.resolve(__dirname, '../../../web/src');
@@ -39,32 +38,16 @@ const ALLOW_LIST: string[] = [
   // Onboarding milestones use a deliberately-lowercase schema
   // (MilestoneStatusSchema = z.enum(['complete','in_progress','available'])).
   'features/platform/onboarding/',
-  'app/setup-hub/page.tsx',
-  // Command-center ETA status is a lowercase schema ('on_time'|'at_risk'|'late').
-  'features/operations/tower/',
-  // Platform-services probe status is lowercase by design
-  // (z.enum(['success','failed','unsupported','not_configured'])).
-  'app/(super-admin)/admin/platform-health/page.tsx',
   // Assistant engine simulation types — local lowercase unions, not DB enums.
   'features/platform/ai-chat/engine/',
-  // Client-only UI state machines (upload/extract phases, lifecycle rails,
-  // tracking timeline, ghost-import cards). These never compare a DB-backed
-  // status; they drive local animation/step state and are lowercase by
-  // convention across the app.
-  'features/fleet/loads/components/ratecon-preview-dialog.tsx',
-  'features/fleet/loads/components/LoadLifecycleRail.tsx',
-  'features/fleet/loads/types/ratecon.ts',
-  'features/fleet/drivers/components/RouteTimeline.tsx',
-  'features/fleet/drivers/components/RouteStopCard.tsx',
-  'app/driver/trip/components/TripTimeline.tsx',
-  'app/track/[token]/page.tsx',
 ];
 
 /**
  * Tokens that are lowercase by design even on a `status` field — never flag.
- * HOS duty codes are FMCSA 49 CFR 395 wire format (matched by Samsara).
+ * Use for external wire formats your domain must match verbatim (e.g. a
+ * vendor API or regulatory code set that is lowercase on the wire).
  */
-const REGULATORY_LOWERCASE = new Set(['driving', 'on_duty', 'off_duty', 'sleeper']);
+const REGULATORY_LOWERCASE = new Set<string>([]);
 
 function walk(dir: string, exts: string[]): string[] {
   const out: string[] = [];
@@ -86,7 +69,7 @@ function walk(dir: string, exts: string[]): string[] {
  *   - `mixedCase` = lowercase form of any value containing an uppercase letter
  *     (i.e. an UPPER_SNAKE enum value that must never be lowercased on the wire)
  *   - `lowercaseByDesign` = values that are ALREADY lowercase in some enum
- *     (payStatus 'paid', milestone 'in_progress', probe 'not_configured', …)
+ *     (e.g. milestone 'in_progress', or any deliberately-lowercase schema)
  *
  * A token is suspicious when it is the lowercase form of an UPPER_SNAKE value
  * AND it is NOT also a lowercase-by-design value of some other enum — EXCEPT

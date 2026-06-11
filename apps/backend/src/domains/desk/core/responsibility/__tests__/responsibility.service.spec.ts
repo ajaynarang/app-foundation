@@ -12,7 +12,8 @@ import { DeskResponsibilityService } from '../responsibility.service';
  * on its own?" check every non-manual trigger path must consult.
  */
 describe('DeskResponsibilityService — autonomy switch', () => {
-  const AVAILABLE_KEY = 'ar_followup';
+  // The starter registry's one shipped AVAILABLE responsibility.
+  const AVAILABLE_KEY = 'welcome';
 
   function detailRow(overrides: Record<string, unknown> = {}) {
     return {
@@ -121,9 +122,9 @@ describe('DeskResponsibilityService — autonomy switch', () => {
       const svc = new DeskResponsibilityService(prisma);
 
       const list = await svc.listForTenant(7);
-      const ar = list.find((r) => r.key === AVAILABLE_KEY);
+      const row = list.find((r) => r.key === AVAILABLE_KEY);
 
-      expect(ar?.autonomyEnabled).toBe(true);
+      expect(row?.autonomyEnabled).toBe(true);
     });
   });
 

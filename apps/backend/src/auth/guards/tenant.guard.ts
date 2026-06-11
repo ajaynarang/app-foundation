@@ -25,12 +25,11 @@ export class TenantGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    // Single-tenant mode: short-circuit to the implicit tenant. We never
-    // require a tenant claim — every request resolves to the one seeded
-    // tenant so manual `where: { tenantId }` scoping continues to work.
+    // Single-tenant mode: short-circuit — we never require a tenant claim.
+    // JwtStrategy stamps the implicit tenant onto request.user, so manual
+    // `where: { tenantId }` scoping continues to work.
     const multiTenancy = this.configService.get('multiTenancy', { infer: true });
     if (multiTenancy?.enabled === false) {
-      request.tenantId = multiTenancy.implicitTenantId;
       return true;
     }
 
@@ -43,9 +42,9 @@ export class TenantGuard implements CanActivate {
       throw new UnauthorizedException('Tenant context missing');
     }
 
-    // Attach tenant context to request for easy access
-    request.tenantId = user.tenantId;
-
+    // NOTE: this guard only ENFORCES tenant context. Consumers should read
+    // tenant scoping from @CurrentUser(): `tenantDbId` (numeric, for queries)
+    // and `tenantId` (public string id) — both set by JwtStrategy.validate.
     return true;
   }
 }

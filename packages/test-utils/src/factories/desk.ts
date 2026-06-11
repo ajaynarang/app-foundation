@@ -74,7 +74,7 @@ export function buildDeskMemoryPatch(
  * the persistence assertion can verify the follow-up GET reflects it.
  *
  *   - `enabled`: bool — flips the per-tenant row. Skipped here because
- *     toggling enabled on `ar_followup` ripples into every active episode.
+ *     toggling enabled on `welcome` ripples into every active episode.
  *   - `trustLevel`: SUPERVISED | ASSISTED | AUTONOMOUS.
  *   - `conditions`: typed-per-responsibility JSON. Validated by the
  *     registry's Zod schema in service `updateForTenant` (line 186-192).

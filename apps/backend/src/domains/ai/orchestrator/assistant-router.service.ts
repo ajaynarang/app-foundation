@@ -24,8 +24,15 @@ const PERSONA_DEFAULT_AGENT: Record<string, AgentId> = {
 
 const DEFAULT_AGENT: AgentId = 'assistant';
 
-/** Personas that always go to their default agent (skip classification). */
-const SINGLE_DOMAIN_PERSONAS: string[] = [];
+/**
+ * Personas that always go to their default agent (skip classification).
+ *
+ * The starter registers a single agent, so classifying would burn an LLM call
+ * per chat turn only to answer 'assistant' every time. All starter personas
+ * short-circuit here. When you add specialist agents, remove the personas
+ * that should be routed by the classifier (step 3 below).
+ */
+const SINGLE_DOMAIN_PERSONAS: string[] = Object.keys(PERSONA_DEFAULT_AGENT);
 
 @Injectable()
 export class AssistantRouterService {

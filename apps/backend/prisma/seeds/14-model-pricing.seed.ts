@@ -5,29 +5,9 @@ import { PrismaClient } from '@prisma/client';
  * pair the platform currently routes traffic through. Used by `AiTelemetryService`
  * to compute USD cost per invocation at write time.
  *
- * ──────────────────────────────────────────────────────────────────────────
- * TODO: Pricing values BELOW need human verification before staging deploy.
- * ──────────────────────────────────────────────────────────────────────────
- * Open question #1 from `.docs/plans/06-assistant-ai/2026-05-27-ai-cost-telemetry-and-budgets-implementation.md`:
- *
- *   "Implementer must verify each entry against the current Anthropic +
- *    OpenAI pricing pages and the AI Gateway markup (if any) before running
- *    the seed."
- *
- * I (PR 1 implementer) attempted to verify via WebFetch against
- * `anthropic.com/pricing` and `platform.openai.com/docs/pricing` during this
- * pass; the Anthropic URL redirects to `claude.com/pricing` which only
- * shows subscription plans (no API token pricing), and the OpenAI URL
- * returned 403. The reference values in the plan are seeded below as-is.
- *
- * Action required before staging:
- *   1. Pull current per-million-token rates from each provider's docs OR
- *      from the AI Gateway invoicing / dashboard (which reflects what we
- *      actually pay, not list price).
- *   2. Update the rows below.
- *   3. If a value changes, also bump `effectiveFromDate` to the
- *      verification date so the historical "row at write time" stays
- *      accurate.
+ * Placeholder rates — verify against your providers' current pricing pages
+ * (and any gateway markup you pay) before deploying. Anthropic rows were
+ * verified against list pricing on 2026-06-11; OpenAI rows are unverified.
  *
  * Pricing is data, not code: in production, prices are updated by inserting
  * a new row with `effectiveFromDate = today` and setting
@@ -47,7 +27,8 @@ interface PricingRow {
   notes: string;
 }
 
-const VERIFICATION_NEEDED = '⚠ PR 1 placeholder — verify against provider docs';
+const VERIFIED_ANTHROPIC = 'Verified against Anthropic list pricing 2026-06-11';
+const VERIFICATION_NEEDED = '⚠ Placeholder — verify against provider docs before deploy';
 
 // effective_from_date for the initial seed row. Pinned to the date the
 // schema landed so subsequent verified rows can supersede via
@@ -62,7 +43,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '1.000000',
     outputPerMtokUsd: '5.000000',
     cachedInputPerMtokUsd: '0.100000',
-    notes: VERIFICATION_NEEDED,
+    notes: VERIFIED_ANTHROPIC,
   },
   {
     provider: 'anthropic',
@@ -70,15 +51,15 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '3.000000',
     outputPerMtokUsd: '15.000000',
     cachedInputPerMtokUsd: '0.300000',
-    notes: VERIFICATION_NEEDED,
+    notes: VERIFIED_ANTHROPIC,
   },
   {
     provider: 'anthropic',
     model: 'claude-opus-4-6',
-    inputPerMtokUsd: '15.000000',
-    outputPerMtokUsd: '75.000000',
-    cachedInputPerMtokUsd: '1.500000',
-    notes: VERIFICATION_NEEDED,
+    inputPerMtokUsd: '5.000000',
+    outputPerMtokUsd: '25.000000',
+    cachedInputPerMtokUsd: '0.500000',
+    notes: VERIFIED_ANTHROPIC,
   },
 
   // ─── OpenAI ────────────────────────────────────────────────────────

@@ -32,9 +32,9 @@ When a request fails input validation, the response includes an array of field-l
 {
   "statusCode": 400,
   "message": [
-    "stops must contain at least 2 elements",
-    "driver.hosState.driveTimeRemaining must be a positive number",
-    "vehicle.fuelCapacityGallons is required"
+    "email must be a valid email address",
+    "name should not be empty",
+    "role must be one of: OWNER, ADMIN, MEMBER"
   ],
   "error": "Bad Request"
 }
@@ -62,8 +62,8 @@ The request body or query parameters failed validation.
 {
   "statusCode": 400,
   "message": [
-    "origin.latitude must be between -90 and 90",
-    "stops must contain at least 2 elements"
+    "email must be a valid email address",
+    "name should not be empty"
   ],
   "error": "Bad Request"
 }
@@ -102,7 +102,7 @@ The request is missing authentication credentials or the provided credentials ar
 The authenticated user does not have permission to perform the requested action.
 
 **Common causes:**
-- User role lacks the required permission (e.g., a DRIVER trying to create a route plan)
+- User role lacks the required permission (e.g., a MEMBER trying to manage API keys)
 - User attempting to access a resource in a different tenant
 - API key does not have the necessary scope
 
@@ -111,12 +111,12 @@ The authenticated user does not have permission to perform the requested action.
 ```json
 {
   "statusCode": 403,
-  "message": "Insufficient permissions. Required role: DISPATCHER",
+  "message": "Insufficient permissions. Required role: ADMIN",
   "error": "Forbidden"
 }
 ```
 
-**Resolution:** Confirm that the authenticated user has the appropriate role. See the [FAQ](/docs/resources/faq) for a list of roles and their permissions.
+**Resolution:** Confirm that the authenticated user has the appropriate role.
 
 ---
 
@@ -134,7 +134,7 @@ The requested resource does not exist or is not accessible to the current tenant
 ```json
 {
   "statusCode": 404,
-  "message": "Route plan not found",
+  "message": "Resource not found",
   "error": "Not Found"
 }
 ```
@@ -156,7 +156,7 @@ The request conflicts with the current state of a resource.
 ```json
 {
   "statusCode": 409,
-  "message": "A driver with this email already exists",
+  "message": "A user with this email already exists",
   "error": "Conflict"
 }
 ```
@@ -170,21 +170,20 @@ The request conflicts with the current state of a resource.
 The request is syntactically valid but violates a business rule.
 
 **Common causes:**
-- Route planning request that cannot produce an HOS-compliant plan (e.g., appointment windows are physically unreachable)
-- Attempting to assign a load to a driver whose HOS clocks are exhausted
-- Invalid state transition (e.g., resolving an alert that has not been acknowledged)
+- Invalid state transition (e.g., revoking an API key that is already revoked)
+- A business constraint that cannot be satisfied with the given input
 
 **Example:**
 
 ```json
 {
   "statusCode": 422,
-  "message": "Cannot plan route: appointment window at Stop 3 is unreachable given driver's remaining HOS hours",
+  "message": "Cannot revoke API key: key is already revoked",
   "error": "Unprocessable Entity"
 }
 ```
 
-**Resolution:** Review the business rule described in the message. Adjust the input data to satisfy the constraint (e.g., extend appointment windows, assign a different driver, or reduce the number of stops).
+**Resolution:** Review the business rule described in the message and adjust the input data to satisfy the constraint.
 
 ---
 
@@ -232,7 +231,7 @@ An unexpected error occurred on the server.
 **Common causes:**
 - Unhandled exception in business logic
 - Database connectivity issue
-- Third-party integration failure (ELD, TMS, fuel price API)
+- Third-party integration failure
 
 **Example:**
 

@@ -82,10 +82,14 @@ export class IntegrationsController {
   }
 
   // ---- Parameterized routes (must come AFTER static routes) ----
+  // Every :integrationId route resolves the caller's tenant and passes it to
+  // the service, which scopes the lookup with where: { integrationId, tenantId }.
+  // Cross-tenant ids get the same 404 as nonexistent ids (no information leak).
 
   @Get(':integrationId')
-  async getIntegration(@Param('integrationId') integrationId: string) {
-    return this.integrationsService.getIntegration(integrationId);
+  async getIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.getIntegration(integrationId, tenant.id);
   }
 
   @Post()
@@ -94,24 +98,32 @@ export class IntegrationsController {
   }
 
   @Patch(':integrationId')
-  async updateIntegration(@Param('integrationId') integrationId: string, @Body() dto: UpdateIntegrationDto) {
-    return this.integrationsService.updateIntegration(integrationId, dto);
+  async updateIntegration(
+    @Param('integrationId') integrationId: string,
+    @Body() dto: UpdateIntegrationDto,
+    @Request() req,
+  ) {
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.updateIntegration(integrationId, tenant.id, dto);
   }
 
   @Delete(':integrationId')
-  async deleteIntegration(@Param('integrationId') integrationId: string) {
-    return this.integrationsService.deleteIntegration(integrationId);
+  async deleteIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.deleteIntegration(integrationId, tenant.id);
   }
 
   @Post(':integrationId/test')
-  async testConnection(@Param('integrationId') integrationId: string) {
-    return this.integrationsService.testConnection(integrationId);
+  async testConnection(@Param('integrationId') integrationId: string, @Request() req) {
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.testConnection(integrationId, tenant.id);
   }
 
   @Post(':integrationId/sync')
   async triggerSync(@Param('integrationId') integrationId: string, @Request() req) {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { integrationId },
+    const tenant = await this.getTenant(req);
+    const integration = await this.prisma.integrationConfig.findFirst({
+      where: { integrationId, tenantId: tenant.id },
       select: {
         id: true,
         tenantId: true,
@@ -157,15 +169,23 @@ export class IntegrationsController {
   @Get(':integrationId/sync-history')
   async getSyncHistory(
     @Param('integrationId') integrationId: string,
+    @Request() req,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.integrationsService.getSyncHistory(integrationId, parseInt(limit || '50'), parseInt(offset || '0'));
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.getSyncHistory(
+      integrationId,
+      tenant.id,
+      parseInt(limit || '50'),
+      parseInt(offset || '0'),
+    );
   }
 
   @Get(':integrationId/sync-history/stats')
-  async getSyncStats(@Param('integrationId') integrationId: string) {
-    return this.integrationsService.getSyncStats(integrationId);
+  async getSyncStats(@Param('integrationId') integrationId: string, @Request() req) {
+    const tenant = await this.getTenant(req);
+    return this.integrationsService.getSyncStats(integrationId, tenant.id);
   }
 
   // ---- Helpers ----

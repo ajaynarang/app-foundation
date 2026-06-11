@@ -53,14 +53,25 @@ describe('AssistantRouterService', () => {
       expect(result.taskSkill).toBe('example-skill');
     });
 
-    it('should skip skills without primaryAgent', async () => {
+    it('should skip skills without primaryAgent and fall through to the default agent', async () => {
       const result = await service.route('something unrelated', 'member');
-      // Should fall through to classifier since no primaryAgent on the matching skill
-      expect(result.source).toBe('classifier');
+      // No primaryAgent on the matching skill → no regex route. Starter
+      // personas are single-domain, so the classifier is skipped entirely.
+      expect(result.source).toBe('default');
+      expect(result.agentId).toBe('assistant');
     });
 
-    it('should use classifier for multi-domain personas', async () => {
-      const result = await service.route('show me the latest', 'member');
+    it('should short-circuit starter personas to the default agent without classifying', async () => {
+      for (const persona of ['member', 'admin', 'owner', 'super_admin'] as const) {
+        const result = await service.route('show me the latest', persona);
+        expect(result.source).toBe('default');
+        expect(result.agentId).toBe('assistant');
+      }
+      expect(classifier.classify).not.toHaveBeenCalled();
+    });
+
+    it('should use classifier for personas outside the single-domain list (multi-agent extension point)', async () => {
+      const result = await service.route('show me the latest', 'custom-persona' as any);
       expect(result.source).toBe('classifier');
       expect(result.agentId).toBe('assistant');
       expect(classifier.classify).toHaveBeenCalledWith('show me the latest');
@@ -71,7 +82,7 @@ describe('AssistantRouterService', () => {
         agentId: 'assistant',
         taskSkill: 'example-skill',
       });
-      const result = await service.route('help me out', 'member');
+      const result = await service.route('help me out', 'custom-persona' as any);
       expect(result.taskSkillContent).toBe('skill content here');
     });
 

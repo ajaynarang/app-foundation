@@ -1,14 +1,23 @@
+import { redirect } from 'next/navigation';
 import { RegistrationForm } from '@/features/auth';
 
+// Placeholder marketing stats — replace with your product's real value props
+// before launch. These render in the left column of the registration page.
 const valueProps = [
-  { number: '$185K+', description: 'saved annually per team' },
-  { number: '520', description: 'hours recovered per year' },
-  { number: '100%', description: 'on top of every task. Every time.' },
-  { number: '1 click', description: 'automated workflows — set up in seconds. Done.' },
-  { number: '24/7', description: 'continuous monitoring, zero manual checks' },
+  { number: 'XX%', description: 'your headline metric here' },
+  { number: 'X,XXX', description: 'your usage or scale stat here' },
+  { number: 'XX hrs', description: 'time saved — quantify your core benefit' },
+  { number: '1 click', description: 'your simplest "aha" moment here' },
+  { number: '24/7', description: 'your reliability or support promise here' },
 ];
 
 export default function RegisterPage() {
+  // Self-registration is a multi-tenant feature — in single-tenant mode
+  // users are provisioned by an admin, so send visitors to login instead.
+  if (process.env.NEXT_PUBLIC_MULTI_TENANT === 'false') {
+    redirect('/login');
+  }
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left column — value props (desktop only) */}

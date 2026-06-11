@@ -1,9 +1,12 @@
 /**
  * Single source of truth for all contact emails and domains.
  * Update here — all legal pages, footer, product pages pull from this.
+ *
+ * TEMPLATE: replace `example.com` with your real domain (or set
+ * NEXT_PUBLIC_CONTACT_DOMAIN) before launch.
  */
 
-const DOMAIN = 'appshore.in';
+const DOMAIN = process.env.NEXT_PUBLIC_CONTACT_DOMAIN || 'example.com';
 
 export const CONTACTS = {
   // --- Corporate / functional ---

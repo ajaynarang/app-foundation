@@ -3,14 +3,8 @@
  * `@db.Time` values (which Prisma returns as `Date` instances anchored at
  * 1970-01-01 in UTC).
  *
- * Currently unused at runtime: the B3a Tier-1 audit pivot kept LoadStop
- * and RecurringLaneStop arrival columns as `String VarChar(30)` (with a
- * format CHECK constraint) rather than converting to `@db.Time`. These
- * helpers are kept as scaffolding for the future Tier-2 cutover that
- * does the conversion in lockstep across the 47 reference sites.
- *
- * Distinct from `apps/backend/src/domains/ai/assistant/lib/time-of-day.ts`
- * which classifies time-of-day for AI prompting (morning/midday/evening).
+ * Currently unused at runtime: kept as scaffolding for domains that store
+ * time-of-day columns as `@db.Time` (or as validated "HH:mm" strings).
  */
 
 const HHMM_RE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;

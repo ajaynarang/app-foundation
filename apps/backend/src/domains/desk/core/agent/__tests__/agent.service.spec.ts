@@ -154,7 +154,7 @@ describe('DeskAgentService', () => {
         description:
           'Keeps invoices moving — nudges overdue customers, handles close-out review, flags anything unusual for approval.',
         supervisor: null,
-        responsibilities: [{ key: 'ar_followup', lifecycle: 'AVAILABLE', enabled: true, trustLevel: 'ASSISTED' }],
+        responsibilities: [{ key: 'welcome', lifecycle: 'AVAILABLE', enabled: true, trustLevel: 'ASSISTED' }],
       });
       const detail = await service.getDetailForTenant(1, 'assistant');
       expect(detail.isActive).toBe(true);

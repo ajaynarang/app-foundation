@@ -1,9 +1,9 @@
 import { test, expect } from '../fixtures/auth.fixture.js';
 
 test.describe('Auth & Role Verification @smoke', () => {
-  test('DISPATCHER token is valid — can access /loads', async ({ asDispatcher }) => {
-    const res = await asDispatcher.get('/loads');
-    expect(res.ok(), `Dispatcher /loads returned ${res.status()}`).toBeTruthy();
+  test('MEMBER token is valid — can access /notifications', async ({ asMember }) => {
+    const res = await asMember.get('/notifications');
+    expect(res.ok(), `Member /notifications returned ${res.status()}`).toBeTruthy();
   });
 
   test('ADMIN token is valid — can access /users', async ({ asAdmin }) => {
@@ -16,18 +16,13 @@ test.describe('Auth & Role Verification @smoke', () => {
     expect(res.ok(), `Owner /billing/overview returned ${res.status()}`).toBeTruthy();
   });
 
-  test('DRIVER token is valid — can access /notifications', async ({ asDriver }) => {
-    const res = await asDriver.get('/notifications');
-    expect(res.ok(), `Driver /notifications returned ${res.status()}`).toBeTruthy();
-  });
-
   test('SUPER_ADMIN token is valid — can access /tenants', async ({ asSuperAdmin }) => {
     const res = await asSuperAdmin.get('/tenants');
     expect(res.ok(), `SuperAdmin /tenants returned ${res.status()}`).toBeTruthy();
   });
 
   test('anonymous request to protected endpoint returns 401', async ({ asAnonymous }) => {
-    const res = await asAnonymous.get('/loads');
+    const res = await asAnonymous.get('/notifications');
     expect(res.status()).toBe(401);
   });
 
@@ -38,30 +33,16 @@ test.describe('Auth & Role Verification @smoke', () => {
 });
 
 test.describe('Critical Reads @smoke', () => {
-  const dispatcherEndpoints = [
-    '/loads',
-    '/drivers',
-    '/vehicles',
-    '/customers',
-    '/alerts',
-    '/notifications',
-    '/settlements',
-    '/invoices',
-  ];
+  const memberEndpoints = ['/auth/me', '/notifications', '/notifications/count', '/feature-flags', '/support/tickets'];
 
-  for (const endpoint of dispatcherEndpoints) {
-    test(`DISPATCHER can read ${endpoint}`, async ({ asDispatcher }) => {
-      const res = await asDispatcher.get(endpoint);
+  for (const endpoint of memberEndpoints) {
+    test(`MEMBER can read ${endpoint}`, async ({ asMember }) => {
+      const res = await asMember.get(endpoint);
       expect(res.ok(), `${endpoint} returned ${res.status()}`).toBeTruthy();
     });
   }
 
-  const superAdminEndpoints = [
-    '/tenants',
-    '/plans',
-    '/admin/broadcasts',
-    '/admin/feedback',
-  ];
+  const superAdminEndpoints = ['/tenants', '/plans', '/admin/broadcasts', '/admin/feedback'];
 
   for (const endpoint of superAdminEndpoints) {
     test(`SUPER_ADMIN can read ${endpoint}`, async ({ asSuperAdmin }) => {

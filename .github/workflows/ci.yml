@@ -1,10 +1,14 @@
 # .github/workflows/ci.yml
-# Runs on every push to develop/main and every PR targeting them.
+# Runs on every push to main and every PR targeting it.
 # Blocks merge if lint, type-check, test, or build fails.
 
 name: CI
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,7 +17,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   format:
     name: Formatting — Prettier
-    runs-on: self-hosted # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,7 +42,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   backend:
     name: Backend — Lint, Type-check, Test, Build
-    runs-on: self-hosted # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -75,7 +79,7 @@ jobs:
         run: pnpm --filter=backend test
 
       - name: RBAC gap audit
-        run: npx tsx tests/domain/scripts/audit-rbac-gaps.ts --ci
+        run: npx tsx tests/scripts/audit-rbac-gaps.ts --ci
         continue-on-error: true
 
       - name: Build (verify compilation)
@@ -86,7 +90,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   web:
     name: Web — Lint, Type-check, Build
-    runs-on: self-hosted # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -131,7 +135,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   console:
     name: Console — Lint, Type-check, Build
-    runs-on: self-hosted # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -173,7 +177,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   ui:
     name: UI — Lint, Type-check
-    runs-on: self-hosted # runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # runs-on: self-hosted
 
     steps:
       - name: Checkout

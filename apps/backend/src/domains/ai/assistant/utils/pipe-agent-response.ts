@@ -17,7 +17,7 @@ import type { Request, Response } from 'express';
  * - Handles client disconnect by aborting the stream read
  *
  * When `moderationService` is provided, output is PII-redacted before persistence.
- * When omitted (e.g. prospect), text is stored as-is.
+ * When omitted (e.g. anonymous/unauthenticated sessions), text is stored as-is.
  */
 export async function pipeAgentResponse(
   response: {

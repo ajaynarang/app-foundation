@@ -3,5 +3,5 @@
     "deploymentEnabled": false
   },
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @app/shared-types build && cd apps/console && node scripts/sync-openapi.js && node scripts/sync-product-manual.js && next build"
+  "buildCommand": "cd ../.. && pnpm --filter @app/shared-types build && cd apps/console && node scripts/sync-openapi.js && next build"
 }

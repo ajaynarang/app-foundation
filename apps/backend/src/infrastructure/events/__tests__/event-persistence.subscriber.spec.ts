@@ -37,11 +37,11 @@ describe('EventPersistenceSubscriber', () => {
 
   it('persists tenantId as Int FK to Tenant.id', async () => {
     tenantResolver.resolveToDbId.mockResolvedValue(42);
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', { entityId: 'LD-1' });
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', { entityId: 'LD-1' });
 
     await subscriber.persistEvent(event);
 
-    expect(tenantResolver.resolveToDbId).toHaveBeenCalledWith('demo-northstar-2026');
+    expect(tenantResolver.resolveToDbId).toHaveBeenCalledWith('demo-acme-2026');
     const create = getUpsertCreate();
     expect(create.tenantId).toBe(42);
     expect(typeof create.tenantId).toBe('number');
@@ -50,7 +50,7 @@ describe('EventPersistenceSubscriber', () => {
   it('persists event with entityId from standardized payload', async () => {
     const event = new DomainEvent(
       'app.load.created',
-      'demo-northstar-2026',
+      'demo-acme-2026',
       { entityId: 'LD-123', entityType: 'load', loadNumber: 'LD-123' },
       { id: 'user-1', type: 'user', label: 'John' },
       'corr-1',
@@ -72,29 +72,29 @@ describe('EventPersistenceSubscriber', () => {
   });
 
   it('falls back to legacy ID fields when entityId missing', async () => {
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', {
-      loadId: 'LD-456',
+    const event = new DomainEvent('app.invoice.created', 'demo-acme-2026', {
+      invoiceId: 'INV-456',
     });
 
     await subscriber.persistEvent(event);
 
-    expect(getUpsertCreate().aggregateId).toBe('LD-456');
+    expect(getUpsertCreate().aggregateId).toBe('INV-456');
   });
 
-  it('extracts driverId from payload', async () => {
-    const event = new DomainEvent('app.driver.created', 'demo-northstar-2026', {
-      driverId: 'DRV-100',
+  it('extracts customerId from payload', async () => {
+    const event = new DomainEvent('app.customer.created', 'demo-acme-2026', {
+      customerId: 'CUST-100',
     });
 
     await subscriber.persistEvent(event);
 
     const create = getUpsertCreate();
-    expect(create.aggregateId).toBe('DRV-100');
-    expect(create.aggregateType).toBe('driver');
+    expect(create.aggregateId).toBe('CUST-100');
+    expect(create.aggregateType).toBe('customer');
   });
 
   it('sets aggregateId to null when no ID found', async () => {
-    const event = new DomainEvent('app.sync.started', 'demo-northstar-2026', {
+    const event = new DomainEvent('app.sync.started', 'demo-acme-2026', {
       jobId: 'job-1',
     });
 
@@ -104,7 +104,7 @@ describe('EventPersistenceSubscriber', () => {
   });
 
   it('infers aggregateType from event key when not in registry', async () => {
-    const event = new DomainEvent('app.unknown-entity.created', 'demo-northstar-2026', {});
+    const event = new DomainEvent('app.unknown-entity.created', 'demo-acme-2026', {});
 
     await subscriber.persistEvent(event);
 
@@ -112,7 +112,7 @@ describe('EventPersistenceSubscriber', () => {
   });
 
   it('sets actor fields to null when no actor provided', async () => {
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', {});
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', {});
 
     await subscriber.persistEvent(event);
 
@@ -126,13 +126,13 @@ describe('EventPersistenceSubscriber', () => {
 
   it('does not throw on persistence failure (fire-and-forget)', async () => {
     prisma.domainEventLog.upsert.mockRejectedValue(new Error('DB down'));
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', {});
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', {});
 
     await expect(subscriber.persistEvent(event)).resolves.not.toThrow();
   });
 
   it('handles null data gracefully', async () => {
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', null as any);
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', null as any);
 
     await subscriber.persistEvent(event);
 
@@ -152,7 +152,7 @@ describe('EventPersistenceSubscriber', () => {
   });
 
   it('upsert uses event.id as where clause (idempotent)', async () => {
-    const event = new DomainEvent('app.load.created', 'demo-northstar-2026', {});
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', {});
 
     await subscriber.persistEvent(event);
 

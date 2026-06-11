@@ -39,8 +39,6 @@ const mockCredentials = {
 const mockConfig = {
   get: jest.fn((key: string, fallback?: string) => {
     const map: Record<string, string> = {
-      SAMSARA_OAUTH_CLIENT_ID: 'test-client-id',
-      SAMSARA_OAUTH_CLIENT_SECRET: 'test-client-secret',
       OAUTH_REDIRECT_URI: 'https://example.com/callback',
       QUICKBOOKS_OAUTH_CLIENT_ID: 'qb-client-id',
       QUICKBOOKS_OAUTH_CLIENT_SECRET: 'qb-client-secret',
@@ -75,18 +73,18 @@ describe('AuthTokenService', () => {
 
   describe('getConnectUrl', () => {
     it('should build authorization URL with nonce in cache', async () => {
-      const result = await service.getConnectUrl('SAMSARA_ELD', 1);
+      const result = await service.getConnectUrl('QUICKBOOKS', 1);
 
-      expect(result.authUrl).toContain('https://api.samsara.com/oauth2/authorize');
-      expect(result.authUrl).toContain('client_id=test-client-id');
+      expect(result.authUrl).toContain('https://appcenter.intuit.com/connect/oauth2');
+      expect(result.authUrl).toContain('client_id=qb-client-id');
       expect(result.authUrl).toContain('response_type=code');
-      expect(result.authUrl).toContain('scope=admin%3Aread');
+      expect(result.authUrl).toContain('scope=com.intuit.quickbooks.accounting');
       expect(result.authUrl).toContain('state=');
-      expect(mockCache.set).toHaveBeenCalledWith(expect.stringContaining('app:oauth:nonce:SAMSARA_ELD:'), 1, 600000);
+      expect(mockCache.set).toHaveBeenCalledWith(expect.stringContaining('app:oauth:nonce:QUICKBOOKS:'), 1, 600000);
     });
 
     it('should throw if vendor does not support OAuth', async () => {
-      await expect(service.getConnectUrl('PROJECT44_TMS', 1)).rejects.toThrow('does not support OAuth');
+      await expect(service.getConnectUrl('UNKNOWN_VENDOR', 1)).rejects.toThrow('does not support OAuth');
     });
 
     it('should include extra auth params for QuickBooks', async () => {
@@ -100,7 +98,7 @@ describe('AuthTokenService', () => {
   // --------------------------------------------------------------------------
 
   describe('handleCallback', () => {
-    const statePayload = { tenantId: 1, vendor: 'SAMSARA_ELD', nonce: 'abc' };
+    const statePayload = { tenantId: 1, vendor: 'QUICKBOOKS', nonce: 'abc' };
     const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
 
     beforeEach(() => {
@@ -121,14 +119,14 @@ describe('AuthTokenService', () => {
 
       const result = await service.handleCallback('auth-code', state, {});
 
-      expect(result).toEqual({ vendor: 'SAMSARA_ELD', tenantId: 1 });
+      expect(result).toEqual({ vendor: 'QUICKBOOKS', tenantId: 1 });
       expect(mockCache.del).toHaveBeenCalled();
       expect(mockCredentials.encrypt).toHaveBeenCalled();
       expect(mockPrisma.integrationConfig.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             tenantId: 1,
-            vendor: 'SAMSARA_ELD',
+            vendor: 'QUICKBOOKS',
             isEnabled: true,
             status: 'ACTIVE',
           }),
@@ -145,7 +143,7 @@ describe('AuthTokenService', () => {
 
       const result = await service.handleCallback('auth-code', state, {});
 
-      expect(result).toEqual({ vendor: 'SAMSARA_ELD', tenantId: 1 });
+      expect(result).toEqual({ vendor: 'QUICKBOOKS', tenantId: 1 });
       expect(mockPrisma.integrationConfig.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 5 } }));
     });
 
@@ -202,7 +200,7 @@ describe('AuthTokenService', () => {
   describe('refreshTokens', () => {
     const mockConfig = {
       id: 10,
-      vendor: 'SAMSARA_ELD',
+      vendor: 'QUICKBOOKS',
       credentials: 'encrypted_creds',
     };
 
@@ -331,7 +329,7 @@ describe('AuthTokenService', () => {
 
       const token = await service.getActiveToken({
         id: 1,
-        vendor: 'SAMSARA_ELD',
+        vendor: 'QUICKBOOKS',
         credentials: 'encrypted',
       });
 
@@ -343,7 +341,7 @@ describe('AuthTokenService', () => {
 
       const token = await service.getActiveToken({
         id: 1,
-        vendor: 'SAMSARA_ELD',
+        vendor: 'QUICKBOOKS',
         credentials: 'encrypted',
       });
 
@@ -362,7 +360,7 @@ describe('AuthTokenService', () => {
 
       const token = await service.getActiveToken({
         id: 1,
-        vendor: 'SAMSARA_ELD',
+        vendor: 'QUICKBOOKS',
         credentials: 'encrypted',
       });
 
@@ -380,7 +378,7 @@ describe('AuthTokenService', () => {
 
       const token = await service.getActiveToken({
         id: 1,
-        vendor: 'SAMSARA_ELD',
+        vendor: 'QUICKBOOKS',
         credentials: 'encrypted',
       });
 
@@ -391,7 +389,7 @@ describe('AuthTokenService', () => {
       await expect(
         service.getActiveToken({
           id: 1,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: null,
         }),
       ).rejects.toThrow('Integration credentials are not configured');
@@ -403,7 +401,7 @@ describe('AuthTokenService', () => {
       await expect(
         service.getActiveToken({
           id: 1,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: 'enc',
         }),
       ).rejects.toThrow('Integration credentials are in an unsupported format — please reconnect');
@@ -424,7 +422,7 @@ describe('AuthTokenService', () => {
       mockFetch.mockResolvedValue({ ok: true });
       mockPrisma.integrationConfig.update.mockResolvedValue({});
 
-      await service.disconnect('SAMSARA_ELD', 1);
+      await service.disconnect('QUICKBOOKS', 1);
 
       expect(mockPrisma.integrationConfig.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -440,7 +438,7 @@ describe('AuthTokenService', () => {
     it('should do nothing if no config found', async () => {
       mockPrisma.integrationConfig.findFirst.mockResolvedValue(null);
 
-      await service.disconnect('SAMSARA_ELD', 1);
+      await service.disconnect('QUICKBOOKS', 1);
 
       expect(mockPrisma.integrationConfig.update).not.toHaveBeenCalled();
     });
@@ -454,7 +452,7 @@ describe('AuthTokenService', () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
       mockPrisma.integrationConfig.update.mockResolvedValue({});
 
-      await service.disconnect('SAMSARA_ELD', 1);
+      await service.disconnect('QUICKBOOKS', 1);
 
       expect(mockPrisma.integrationConfig.update).toHaveBeenCalled();
     });
@@ -468,7 +466,7 @@ describe('AuthTokenService', () => {
       mockCredentials.decrypt.mockReturnValue(JSON.stringify({ authMethod: 'api_token' }));
       mockPrisma.integrationConfig.update.mockResolvedValue({});
 
-      await service.disconnect('SAMSARA_ELD', 1);
+      await service.disconnect('QUICKBOOKS', 1);
 
       expect(mockFetch).not.toHaveBeenCalled();
     });

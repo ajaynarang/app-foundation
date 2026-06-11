@@ -57,8 +57,8 @@ interface AuthState {
  * Set or clear the `app-auth` presence cookie on the parent domain.
  *
  * Uses SameSite=Lax (not Strict) so the cookie is sent on cross-subdomain
- * top-level navigations (e.g., redirect from staging.app.appshore.in to
- * acme.staging.app.appshore.in). Lax still blocks CSRF from third-party sites.
+ * top-level navigations (e.g., redirect from staging.app.example.com to
+ * acme.staging.app.example.com). Lax still blocks CSRF from third-party sites.
  */
 function setAuthCookie(authenticated: boolean, role?: string) {
   if (typeof document === 'undefined') return;
@@ -159,7 +159,7 @@ export const useAuthStore = create<AuthState>()(
 
       // Reset password
       resetPassword: async (email: string) => {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         await sendPasswordResetEmail(auth, email, {
           url: `${appUrl}/reset-password`,
         });

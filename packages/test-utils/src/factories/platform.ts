@@ -9,14 +9,14 @@ import { unique } from './common.js';
  * at the service layer). Default factory emits `email`-channel invitation
  * with a fresh unique suffix so parallel test runs cannot collide on the
  * `{tenantId, email, status: PENDING}` uniqueness check. Role defaults to
- * DISPATCHER because OWNER/SUPER_ADMIN are rejected at the service layer,
- * ADMIN is OWNER-only, and DISPATCHER is the broadest, side-effect-free
+ * MEMBER because OWNER/SUPER_ADMIN are rejected at the service layer,
+ * ADMIN is OWNER-only, and MEMBER is the broadest, side-effect-free
  * role that can be invited by either OWNER or ADMIN.
  */
 export function buildUserInvitation(overrides: Record<string, unknown> = {}) {
   return {
     email: `invite-${unique('inv')}@test.example.com`,
-    role: 'DISPATCHER',
+    role: 'MEMBER',
     firstName: 'Test',
     lastName: 'Invite',
     ...overrides,
@@ -26,7 +26,7 @@ export function buildUserInvitation(overrides: Record<string, unknown> = {}) {
 export function buildWebhookSubscription(overrides: Record<string, unknown> = {}) {
   return {
     url: `https://test.example.com/webhooks/${unique('wh')}`,
-    events: ['load.created', 'load.updated'],
+    events: ['user.created', 'user.updated'],
     ...overrides,
   };
 }
@@ -83,52 +83,19 @@ export function buildFeedbackCategoryUpdate(overrides: Record<string, unknown> =
 export function buildApiKeyCreate(overrides: Record<string, unknown> = {}) {
   return {
     name: `Phase-4-b api-key ${unique('ak')}`,
-    scopes: ['fleet:read', 'loads:read'],
+    scopes: ['platform:read', 'knowledge:read'],
     ...overrides,
   };
 }
 
-// ── Phase 4 Group 4a — settings factories ───────────────────────────────────
+// ── Settings factories ───────────────────────────────────────────────────────
 //
-// The five factories below scaffold the minimal-but-valid payloads the four
-// settings PUT endpoints accept. All mutation tests MUST use these — never
-// build inline JSON (9-criteria rubric, criterion 2).
+// Minimal-but-valid payloads for the settings PUT endpoints. All mutation
+// tests MUST use these — never build inline JSON.
 //
 // Shape guidance sources:
-//   - alert-config.dto.ts + the live `GET /settings/alerts` response on
-//     `demo-northstar-2026` (which drifts from the DTO docstring — the
-//     tenant-facing AlertTypeConfig today carries `priority` + `autoResolve`
-//     instead of the DTO-declared `mandatory/thresholdPercent/thresholdMinutes`
-//     variant. Factory returns ONLY fields the DTO accepts — `groupingConfig`
-//     is the least-risk write-then-restore path — see finding #35).
-//   - operations-settings.dto.ts.
-//   - user-preferences.dto.ts + driver-preferences.dto.ts.
+//   - user-preferences.dto.ts.
 //   - super-admin-preferences.dto.ts.
-
-export function buildAlertConfig(overrides: Record<string, unknown> = {}) {
-  // `groupingConfig` is the safest round-trip target — simple scalar booleans
-  // and one integer, and it doesn't interact with the tenant's live alerting
-  // behaviour. PUT endpoints accept partial bodies and merge.
-  return {
-    groupingConfig: {
-      dedupWindowMinutes: 20,
-      groupSameTypePerDriver: true,
-      smartGroupAcrossDrivers: true,
-      linkCascading: true,
-    },
-    ...overrides,
-  };
-}
-
-export function buildOperationsSettings(overrides: Record<string, unknown> = {}) {
-  // `maxFuelDetour` is a bounded integer (0..50) — low blast radius and
-  // easily observed in the response. All other fields are scalars the DTO
-  // accepts via `@IsOptional` — override freely for targeted writes.
-  return {
-    maxFuelDetour: 15,
-    ...overrides,
-  };
-}
 
 export function buildUserPreferences(overrides: Record<string, unknown> = {}) {
   // `timezone` + `dateFormat` are plain strings that exist on every row and
@@ -138,18 +105,6 @@ export function buildUserPreferences(overrides: Record<string, unknown> = {}) {
   return {
     timezone: 'America/Chicago',
     dateFormat: 'YYYY-MM-DD',
-    ...overrides,
-  };
-}
-
-export function buildDriverPreferences(overrides: Record<string, unknown> = {}) {
-  // `preferredNavApp` is `@IsIn([...])`-gated to a fixed set; factory picks
-  // a non-default value so the echo is provably distinct from the initial
-  // seeded value (`google_maps`).
-  return {
-    preferredNavApp: 'waze',
-    theme: 'dark',
-    pushEnabled: true,
     ...overrides,
   };
 }
@@ -174,10 +129,9 @@ export function buildSuperAdminPreferences(overrides: Record<string, unknown> = 
 //   - `/reject` takes a raw `{ reason: string }` body (no DTO class); factory
 //     returns the same shape so the rubric's "no inline JSON" rule holds.
 //
-// Enum values intentionally match the Prisma-wire variant names
-// (`INTRASTATE_ONLY` / `SIZE_1_10` / etc.). The `register` factory emits
-// clearly test-marked values (prefix `qa-test-`, timestamp-suffixed) so a
-// real tenant isn't created by accident if Turnstile ever goes fail-open.
+// The `register` factory emits clearly test-marked values (prefix
+// `qa-test-`, timestamp-suffixed) so a real tenant isn't created by
+// accident if Turnstile ever goes fail-open.
 
 /**
  * POST /tenants/register body. Public endpoint, Turnstile-gated.
@@ -197,11 +151,8 @@ export function buildSuperAdminPreferences(overrides: Record<string, unknown> = 
 export function buildTenantRegistration(overrides: Record<string, unknown> = {}) {
   const nonce = unique('tn');
   return {
-    companyName: `QA Test Fleet ${nonce}`,
+    companyName: `QA Test Company ${nonce}`,
     subdomain: `qa-test-${nonce}`.toLowerCase(),
-    dotNumber: '1234567',
-    carrierType: 'INTRASTATE_ONLY',
-    fleetSize: 'SIZE_1_10',
     firstName: 'QA',
     lastName: 'Probe',
     email: `qa-test-${nonce}@test.example.com`,
@@ -226,8 +177,8 @@ export function buildTenantUpdate(overrides: Record<string, unknown> = {}) {
 
 /**
  * POST /tenants/:tenantId/suspend body. `SuspendTenantDto` requires
- * `reason` ≥ 10 chars. Used only when a suspendable tenant exists (not on
- * demo-northstar-2026) — gated by `@requires:data-suspendable-tenant`
+ * `reason` ≥ 10 chars. Used only when a suspendable tenant exists (never
+ * the seeded demo tenant) — gated by `@requires:data-suspendable-tenant`
  * when the spec activates it.
  */
 export function buildTenantSuspend(overrides: Record<string, unknown> = {}) {
@@ -255,19 +206,18 @@ export function buildTenantReject(overrides: Record<string, unknown> = {}) {
 // Factories mirror `CreateUserDto` / `UpdateUserDto` / `AcceptInvitationDto`
 // 1:1. The invitation-side `buildUserInvitation` is declared above next to
 // the legacy feedback/webhook factories — the shape already matches the
-// live `InviteUserDto` so we leave it in place (verified 2026-04-20 probe).
+// live `InviteUserDto` so we leave it in place (verified against the DTO).
 //
 // Every factory uses the `unique()` helper to guarantee cross-spec /
-// cross-worker isolation. Phase 4 Group 4d tests create-and-cleanup user
-// rows against the live demo tenant — unique email/firebaseUid suffixes
-// are the only fence against `{tenantId, email}` collisions when two
-// specs run concurrently (`--workers=2`).
+// cross-worker isolation — unique email/firebaseUid suffixes are the only
+// fence against `{tenantId, email}` collisions when two specs run
+// concurrently.
 
 /**
  * POST /users body — matches `CreateUserDto`.
  *
  * All four fields are `@IsNotEmpty()`; `role` is `@IsEnum(UserRole)`. Default
- * emits a DISPATCHER user with a fresh unique email suffix. OWNER-promotion
+ * emits a MEMBER user with a fresh unique email suffix. OWNER-promotion
  * is blocked at the service layer (a tenant can only have one OWNER); the
  * SUPER_ADMIN role can only be created without a tenant, also blocked in
  * tenant-scoped paths. Tests that need a different role override `role`.
@@ -277,7 +227,7 @@ export function buildUser(overrides: Record<string, unknown> = {}) {
     email: `qa-user-${unique('usr')}@test.example.com`,
     firstName: 'QA',
     lastName: 'User',
-    role: 'DISPATCHER',
+    role: 'MEMBER',
     ...overrides,
   };
 }
@@ -333,11 +283,10 @@ export function buildInvitationCancel(overrides: Record<string, unknown> = {}) {
 // ── Phase 4 Group 4e — plans + announcements factories ──────────────────────
 //
 // Plans-side factories MUST only emit fields that can be restored losslessly
-// in afterEach — every PATCH targets `STARTER` (the lowest-blast-radius plan
-// for demo-northstar-2026 which runs PROFESSIONAL, so STARTER is effectively
-// observer-only on this tenant). The caller captures original state before
-// mutating, writes via the factory payload, then restores via a second PATCH
-// using the captured original.
+// in afterEach — every PATCH targets `STARTER` (the lowest-blast-radius
+// plan). The caller captures original state before mutating, writes via the
+// factory payload, then restores via a second PATCH using the captured
+// original.
 //
 // Announcement factories default to TENANT-targeted broadcasts with a
 // bogus tenantId (`__qa_no_match_tenant__`) so PUBLISHED rows can never
@@ -439,140 +388,6 @@ export function buildAnnouncementUpdate(overrides: Record<string, unknown> = {})
   };
 }
 
-// ── Phase 4 Group 4f — add-ons factories ────────────────────────────────────
-//
-// The add-on surface (self-service + admin catalog + admin request moderation)
-// spans three controllers. The payload shapes are small — most endpoints
-// either take a single body field (`note`, `reason`, `enabled`) or an
-// empty body. Factories exist to keep the rubric's no-inline-JSON rule
-// honoured and to funnel the `[QA-TEST]` prefix + `unique()` suffixes into
-// every writable field so accidentally-leaked rows stand out in the admin UI.
-
-/**
- * POST /add-ons/:slug/request body — `RequestAddOnDto`.
- *
- * The DTO declares a single optional `note` (string, max 500). Default emits
- * a clearly-test-marked note with a fresh unique suffix. Callers may pass
- * `{ note: undefined }` to exercise the empty-note branch (the service
- * stores `requestNote: null` in that case).
- *
- * Service-side constraints (verified 2026-04-20 against demo-northstar-2026):
- *   - 400 if a pending request for the same tenant+add-on already exists.
- *   - 400 if the tenant's TenantAddOn row is already `status='active'`.
- * Both checks run BEFORE the DTO is validated, so those precondition errors
- * surface even on an empty body. The test suite guarantees preconditions by
- * cancelling the target add-on first (see `_helpers.ts::ensureInactiveAddOn`).
- */
-export function buildAddOnRequest(overrides: Record<string, unknown> = {}) {
-  return {
-    note: `[QA-TEST] Phase-4f request probe ${unique('addon-req')}`,
-    ...overrides,
-  };
-}
-
-/**
- * POST /add-ons/:slug/activate body — controller accepts NO DTO (empty body).
- * Emitted here so the rubric's "no inline JSON" rule still holds for the
- * activate path even though the payload is `{}`. Callers pass the returned
- * object directly to `.post(url, payload)`.
- */
-export function buildAddOnActivate(overrides: Record<string, unknown> = {}) {
-  return {
-    ...overrides,
-  };
-}
-
-/**
- * POST /add-ons/:slug/cancel body — `CancelAddOnDto` (optional `reason`).
- * Default emits a clearly-test-marked reason with a fresh unique suffix.
- * Used by both the self-service cancel path and the admin tenant-cancel path.
- */
-export function buildAddOnCancel(overrides: Record<string, unknown> = {}) {
-  return {
-    reason: `[QA-TEST] Phase-4f cancel probe ${unique('addon-cancel')}`,
-    ...overrides,
-  };
-}
-
-/**
- * PATCH /add-ons/:slug/overage body — `ToggleOverageDto` (required `enabled`
- * boolean). Default emits `enabled: true`; callers flip via override.
- * Caller captures the original `allowOverage` value before the write and
- * restores in afterEach via a second PATCH.
- */
-export function buildAddOnOverageToggle(overrides: Record<string, unknown> = {}) {
-  return {
-    enabled: true,
-    ...overrides,
-  };
-}
-
-/**
- * PATCH /admin/add-ons/:slug body — `UpdateAddOnDto`. All five fields are
- * `@IsOptional()`. Default mutates ONLY `description` — it's the lowest-risk
- * scalar on the catalog row (no pricing, no feature-resolution side effect,
- * no cache invalidation signal). Caller captures the original value before
- * the write and restores it in afterEach via a second PATCH.
- */
-export function buildAddOnCatalogUpdate(overrides: Record<string, unknown> = {}) {
-  return {
-    description: `[QA-TEST] Phase-4f catalog-update probe ${unique('addon-cat')}`,
-    ...overrides,
-  };
-}
-
-/**
- * PATCH /admin/add-ons/:slug/provider-price body — controller reads
- * `providerPriceId` directly from the raw body (no DTO class). The service
- * accepts `null` to clear the field. Default emits a clearly-test-marked
- * synthetic price id; callers override to `{ providerPriceId: null }` for
- * the clear-path test.
- */
-export function buildAddOnProviderPriceUpdate(overrides: Record<string, unknown> = {}) {
-  return {
-    providerPriceId: `[QA-TEST] price_${unique('addon-price')}`,
-    ...overrides,
-  };
-}
-
-/**
- * POST /admin/tenants/:tenantId/add-ons/:slug/enable body — `EnableAddOnDto`.
- * `priceCents` is optional; when omitted the service falls back to
- * `addOn.priceCents`. Default emits `priceCents: 0` (gifted equivalent) so
- * the admin enable path is idempotent w.r.t. billing even on real tenants.
- */
-export function buildAddOnAdminEnable(overrides: Record<string, unknown> = {}) {
-  return {
-    priceCents: 0,
-    ...overrides,
-  };
-}
-
-/**
- * POST /admin/add-on-requests/:id/approve body — `ApproveRequestDto`.
- * `giftedPriceCents` is optional (presence flips `source='gifted'`, absence
- * flips `source='purchased'`). Default emits `giftedPriceCents: 0` so the
- * approve path is a no-cost gift — tests don't depend on Stripe or billing.
- */
-export function buildAddOnApprove(overrides: Record<string, unknown> = {}) {
-  return {
-    giftedPriceCents: 0,
-    ...overrides,
-  };
-}
-
-/**
- * POST /admin/add-on-requests/:id/decline body — `DeclineRequestDto`.
- * `reason` is `@IsNotEmpty()`, max 500. Default emits a clearly-test-marked
- * reason with a fresh unique suffix.
- */
-export function buildAddOnDecline(overrides: Record<string, unknown> = {}) {
-  return {
-    reason: `[QA-TEST] Phase-4f decline probe ${unique('addon-dec')}`,
-    ...overrides,
-  };
-}
-
 // ── Phase 4 Group 4g — OAuth factories ─────────────────────────────────────
 //
 // Two controllers, two wire idioms:
@@ -624,7 +439,7 @@ export function buildOAuthClient(overrides: Record<string, unknown> = {}) {
   return {
     name: `[QA-TEST] Phase-4g client ${unique('oauth-cl')}`,
     redirectUris: ['http://localhost:3000/oauth/callback'],
-    scopes: ['fleet:read'],
+    scopes: ['platform:read'],
     clientType: 'confidential',
     ...overrides,
   };
@@ -681,7 +496,7 @@ export function buildOAuthAuthorizeParams(overrides: Record<string, unknown> = {
     response_type: 'code',
     client_id: 'OVERRIDE-ME',
     redirect_uri: 'http://localhost:3000/oauth/callback',
-    scope: 'fleet:read',
+    scope: 'platform:read',
     state: unique('oauth-state'),
     code_challenge: PKCE_CODE_CHALLENGE,
     code_challenge_method: 'S256',

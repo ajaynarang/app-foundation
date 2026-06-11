@@ -122,50 +122,13 @@ variable "github_repo" {
   type        = string
 }
 
-# Frontend
-variable "frontend_url" {
-  description = "Full URL of the frontend for this environment — used in APP_URL, FRONTEND_URL, invitation links"
-  type        = string
-}
-
-variable "console_url" {
-  description = "Full URL of the Console app — used in CONSOLE_URL for OAuth callback redirects"
-  type        = string
-}
-
-variable "cors_origins" {
-  description = "Comma-separated CORS origins for the backend. Supports wildcard patterns like https://*.example.com"
-  type        = string
-}
-
+# S3
+# Note: app-level URLs (FRONTEND_URL, CONSOLE_URL, CORS_ORIGINS, LiveKit/voice
+# settings, etc.) are NOT Terraform variables — they are injected at runtime
+# via Doppler (see doppler.tf and ecs.tf).
 variable "s3_cors_origins" {
   description = "List of origins allowed for S3 CORS (supports wildcards like https://*.example.com)"
   type        = list(string)
-}
-
-# Voice Mode
-variable "livekit_url" {
-  description = "LiveKit Cloud WebSocket URL (e.g. wss://your-project.livekit.cloud)"
-  type        = string
-  default     = ""
-}
-
-variable "cartesia_voice_warm" {
-  description = "Cartesia voice UUID for 'Warm' tone — find at https://play.cartesia.ai/"
-  type        = string
-  default     = "1f15f888-ce6e-4656-9c9f-fd769a11d5bc"
-}
-
-variable "cartesia_voice_confident" {
-  description = "Cartesia voice UUID for 'Confident' tone"
-  type        = string
-  default     = "bf7d7fc1-7236-4fce-a36f-3eabed0eb39b"
-}
-
-variable "cartesia_voice_calm" {
-  description = "Cartesia voice UUID for 'Calm' tone"
-  type        = string
-  default     = "1f15f888-ce6e-4656-9c9f-fd769a11d5bc"
 }
 
 # Container image

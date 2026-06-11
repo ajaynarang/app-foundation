@@ -6,8 +6,7 @@ import { useAssistantStore } from '../store';
 import { AssistantStrip } from './AssistantStrip';
 import type { UserMode } from '../engine/types';
 
-function detectMode(userRole: string | undefined, isAuthenticated: boolean): UserMode {
-  if (!isAuthenticated) return 'prospect';
+function detectMode(userRole: string | undefined): UserMode {
   if (userRole === 'OWNER') return 'owner';
   if (userRole === 'ADMIN') return 'admin';
   if (userRole === 'SUPER_ADMIN') return 'super_admin';
@@ -23,11 +22,15 @@ export function AppAIProvider() {
 
   // Sync mode before paint to prevent flash of wrong mode / race with conversation creation
   useIsomorphicLayoutEffect(() => {
-    const mode = detectMode(user?.role, isAuthenticated);
+    if (!isAuthenticated) return;
+    const mode = detectMode(user?.role);
     if (mode !== userMode) {
       setUserMode(mode);
     }
   }, [user?.role, isAuthenticated, setUserMode, userMode]);
+
+  // The assistant is an authenticated-only surface in the starter.
+  if (!isAuthenticated) return null;
 
   // Platform super-admins manage the console, not end-user chat.
   if (user?.role === 'SUPER_ADMIN') return null;

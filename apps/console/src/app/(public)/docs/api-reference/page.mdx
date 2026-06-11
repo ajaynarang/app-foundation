@@ -1,11 +1,11 @@
 # API Reference
 
-Platform provides a powerful REST API for route planning, HOS compliance, and fleet management.
+Platform provides a REST API for authentication, users and teams, API keys, and webhooks.
 
 ## Base URL
 
 ```
-https://api-staging.appshore.in/api/v1
+https://api-staging.example.com/api/v1
 ```
 
 ## Quick Start
@@ -16,31 +16,31 @@ https://api-staging.appshore.in/api/v1
 
 ## Core Endpoints
 
-### Routes
-Plan optimized, HOS-compliant routes with automatic rest and fuel stop insertion.
+### Auth
+Identify the current principal and manage sessions.
 
 **Key endpoints:**
-- `POST /api/v1/routes/plan` - Plan a new route
-- `GET /api/v1/routes/{planId}` - Get route details
-- `POST /api/v1/routes/{planId}/activate` - Activate route
-- `POST /api/v1/routes/{planId}/cancel` - Cancel route
+- `GET /api/v1/auth/me` - Get the authenticated user
+- `POST /api/v1/auth/refresh` - Refresh an access token
+- `POST /api/v1/auth/logout` - End the session
 
-[Explore in playground →](/docs/api-playground#tag/Routes)
-
-### Alerts
-Manage dispatcher alerts and notifications for proactive fleet management.
+### API Keys
+Create and manage server-to-server keys.
 
 **Key endpoints:**
-- `GET /api/v1/alerts` - List active alerts
-- `POST /api/v1/alerts/{id}/acknowledge` - Acknowledge alert
-- `POST /api/v1/alerts/{id}/resolve` - Resolve alert
+- `POST /api/v1/api-keys` - Create a key
+- `GET /api/v1/api-keys` - List keys
+- `POST /api/v1/api-keys/{id}/rotate` - Rotate a key
+- `POST /api/v1/api-keys/{id}/revoke` - Revoke a key
 
-[Explore in playground →](/docs/api-playground#tag/Alerts)
+### Health
+Liveness and readiness probes (no auth required).
 
-### HOS Validation
-The HOS compliance engine is an internal component of the route planner. It is not directly accessible as a standalone API. HOS validation runs automatically during route planning and continuous monitoring.
+**Key endpoints:**
+- `GET /api/v1/health/live` - Liveness check
+- `GET /api/v1/health/ready` - Readiness check (DB + Redis)
 
-See [Route Planning](/docs/api-guides/route-planning) for how HOS compliance is enforced.
+[Explore everything in the playground →](/docs/api-playground)
 
 ## Response Format
 

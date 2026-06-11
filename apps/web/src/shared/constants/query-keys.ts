@@ -11,9 +11,8 @@
  *
  * This is the GENERIC platform set — preferences, feature flags, API keys,
  * OAuth clients, notifications, plans, organization, billing, AI/conversations,
- * onboarding, and the super-admin consoles. Domain-specific namespaces
- * (loads/drivers/fleet/routes/invoices/settlements/alerts/shield/…) were
- * removed when the trucking domain was stripped.
+ * onboarding, and the super-admin consoles. Add your own domain namespaces
+ * alongside these as you build features.
  */
 
 export const queryKeys = {
@@ -77,7 +76,6 @@ export const queryKeys = {
     root: ['preferences'] as const,
     user: ['preferences', 'user'] as const,
     operations: ['preferences', 'operations'] as const,
-    driver: ['preferences', 'driver'] as const,
   },
 
   // ─── API keys / OAuth clients / agents ──────────────────────────────────

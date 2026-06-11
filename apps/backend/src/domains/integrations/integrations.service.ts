@@ -75,11 +75,8 @@ export class IntegrationsService {
   /**
    * Get integration health summary for a tenant.
    *
-   * Groups integrations into two categories:
-   * - Fleet Data Pipeline (TMS, ELD) — shown on fleet pages
-   * - Business Integrations (ACCOUNTING) — settings only
-   *
-   * One-per-type model: returns singular tms/eld objects (first found per type).
+   * Returns per-integration status, active sync jobs, and the last successful
+   * sync per integration type for the tenant's configured integrations.
    */
   async getHealthSummary(tenantId: number) {
     const [integrations, activeJobs] = await Promise.all([
@@ -207,16 +204,27 @@ export class IntegrationsService {
   }
 
   /**
-   * Get a specific integration
+   * Assert an integration exists AND belongs to the tenant.
+   * Returns the integration row or throws the same 404 for "doesn't exist"
+   * and "belongs to another tenant" (no cross-tenant information leak).
    */
-  async getIntegration(integrationId: string) {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { integrationId },
+  private async assertIntegrationInTenant(integrationId: string, tenantId: number) {
+    const integration = await this.prisma.integrationConfig.findFirst({
+      where: { integrationId, tenantId },
     });
 
     if (!integration) {
       throw new NotFoundException('Integration not found');
     }
+
+    return integration;
+  }
+
+  /**
+   * Get a specific integration (tenant-scoped)
+   */
+  async getIntegration(integrationId: string, tenantId: number) {
+    const integration = await this.assertIntegrationInTenant(integrationId, tenantId);
 
     return {
       id: integration.integrationId,
@@ -351,16 +359,10 @@ export class IntegrationsService {
   }
 
   /**
-   * Update integration
+   * Update integration (tenant-scoped)
    */
-  async updateIntegration(integrationId: string, dto: UpdateIntegrationDto) {
-    const existing = await this.prisma.integrationConfig.findUnique({
-      where: { integrationId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Integration not found');
-    }
+  async updateIntegration(integrationId: string, tenantId: number, dto: UpdateIntegrationDto) {
+    const existing = await this.assertIntegrationInTenant(integrationId, tenantId);
 
     // Encrypt credentials if provided (dynamically encrypt all credential fields)
     let encryptedCredentials = existing.credentials;
@@ -394,9 +396,11 @@ export class IntegrationsService {
   }
 
   /**
-   * Delete integration
+   * Delete integration (tenant-scoped)
    */
-  async deleteIntegration(integrationId: string) {
+  async deleteIntegration(integrationId: string, tenantId: number) {
+    await this.assertIntegrationInTenant(integrationId, tenantId);
+
     await this.prisma.integrationConfig.delete({
       where: { integrationId },
     });
@@ -405,9 +409,11 @@ export class IntegrationsService {
   }
 
   /**
-   * Test connection
+   * Test connection (tenant-scoped)
    */
-  async testConnection(integrationId: string) {
+  async testConnection(integrationId: string, tenantId: number) {
+    await this.assertIntegrationInTenant(integrationId, tenantId);
+
     const success = await this.integrationManager.testConnection(integrationId);
 
     return {
@@ -417,19 +423,14 @@ export class IntegrationsService {
   }
 
   /**
-   * Get sync history for an integration (from jobs table)
+   * Get sync history for an integration (from jobs table, tenant-scoped)
    */
-  async getSyncHistory(integrationId: string, limit: number = 50, offset: number = 0) {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { integrationId },
-    });
-
-    if (!integration) {
-      throw new NotFoundException('Integration not found');
-    }
+  async getSyncHistory(integrationId: string, tenantId: number, limit: number = 50, offset: number = 0) {
+    const integration = await this.assertIntegrationInTenant(integrationId, tenantId);
 
     const jobs = await this.prisma.job.findMany({
       where: {
+        tenantId,
         category: { in: ['vendor', 'telemetry', 'finance'] },
         inputData: { path: ['integrationId'], equals: integrationId },
       },
@@ -442,18 +443,13 @@ export class IntegrationsService {
   }
 
   /**
-   * Get sync statistics for an integration (from jobs table)
+   * Get sync statistics for an integration (from jobs table, tenant-scoped)
    */
-  async getSyncStats(integrationId: string) {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { integrationId },
-    });
-
-    if (!integration) {
-      throw new NotFoundException('Integration not found');
-    }
+  async getSyncStats(integrationId: string, tenantId: number) {
+    await this.assertIntegrationInTenant(integrationId, tenantId);
 
     const where = {
+      tenantId,
       category: { in: ['vendor', 'telemetry', 'finance'] },
       inputData: {
         path: ['integrationId'] as string[],

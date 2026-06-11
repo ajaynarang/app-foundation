@@ -4,7 +4,6 @@ import type { ComponentType } from 'react';
 import type { RichCard, RichCardType } from '../../engine/types';
 import { TextCard } from './TextCard';
 import { ConfirmationCard } from './ConfirmationCard';
-import { CapabilitiesCard } from './CapabilitiesCard';
 
 /**
  * Pluggable rich-card registry.
@@ -19,7 +18,6 @@ import { CapabilitiesCard } from './CapabilitiesCard';
 const CARD_REGISTRY: Record<RichCardType, ComponentType<{ data: Record<string, any> }>> = {
   text: TextCard,
   confirmation: ConfirmationCard,
-  capabilities: CapabilitiesCard,
 };
 
 export function RichCardRenderer({ card }: { card: RichCard }) {

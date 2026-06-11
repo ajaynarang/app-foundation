@@ -6,11 +6,11 @@
  * Scans all controllers and identifies security gaps:
  *
  * 1. MISSING ROLES — Endpoints with no @Roles() and no @Public() decorator.
- *    These are accessible to ANY authenticated user (CUSTOMER, DRIVER, etc.)
- *    which is almost always a bug.
+ *    These are accessible to ANY authenticated user (any MEMBER) which is
+ *    almost always a bug.
  *
- * 2. OVERLY PERMISSIVE — Endpoints that include CUSTOMER or DRIVER role
- *    for admin-level operations (delete, deactivate, settings mutations).
+ * 2. OVERLY PERMISSIVE — Endpoints that include the MEMBER role for
+ *    admin-level operations (delete, deactivate, settings mutations).
  *
  * 3. UNTESTED ENDPOINTS — Endpoints that exist in controllers but have
  *    no corresponding E2E test coverage.
@@ -49,7 +49,7 @@ interface EndpointAudit {
 
 type GapType =
   | 'MISSING_ROLES' // No @Roles() and no @Public()
-  | 'OVERLY_PERMISSIVE' // CUSTOMER/DRIVER on admin operations
+  | 'OVERLY_PERMISSIVE' // MEMBER on admin operations
   | 'UNTESTED' // No E2E test coverage found
   | 'MUTATION_NO_GUARD'; // POST/PUT/PATCH/DELETE without role restriction
 
@@ -92,15 +92,8 @@ function findControllerFiles(dir: string): string[] {
 
 function inferDomain(filePath: string): string {
   const rel = path.relative(BACKEND_SRC, filePath).replace(/\\/g, '/');
-  if (rel.includes('domains/fleet/')) return 'fleet';
-  if (rel.includes('domains/financials/')) return 'financials';
-  if (rel.includes('domains/operations/')) return 'operations';
-  if (rel.includes('domains/integrations/')) return 'integrations';
-  if (rel.includes('domains/platform/')) return 'platform';
-  if (rel.includes('domains/ai/')) return 'ai';
-  if (rel.includes('domains/routing/')) return 'routing';
-  if (rel.includes('domains/admin/')) return 'admin';
-  if (rel.includes('domains/billing/')) return 'billing';
+  const domainMatch = rel.match(/domains\/([^/]+)\//);
+  if (domainMatch) return domainMatch[1];
   if (rel.includes('auth/')) return 'auth';
   return 'other';
 }
@@ -287,17 +280,12 @@ function detectGaps(endpoints: EndpointAudit[], testedRoutes: Set<string>): Audi
       }
     }
 
-    // GAP 2: Overly permissive — CUSTOMER on destructive ops
+    // GAP 2: Overly permissive — MEMBER on destructive/admin ops
     if (ep.roles.length > 0) {
       const pathLower = ep.path.toLowerCase();
       const isAdminOp = ADMIN_OPERATIONS.some((op) => pathLower.includes(op));
 
-      if (isAdminOp && ep.roles.includes('CUSTOMER')) {
-        ep.gaps.push('OVERLY_PERMISSIVE');
-        summary.overlyPermissive++;
-      }
-
-      if (isAdminOp && ep.roles.includes('DRIVER') && !pathLower.includes('driver')) {
+      if (isAdminOp && ep.roles.includes('MEMBER')) {
         ep.gaps.push('OVERLY_PERMISSIVE');
         summary.overlyPermissive++;
       }

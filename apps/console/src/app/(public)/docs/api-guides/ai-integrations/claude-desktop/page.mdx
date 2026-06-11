@@ -2,7 +2,7 @@ import { Callout } from "@/components/docs/callout"
 
 # Claude Desktop
 
-Connect Platform to the [Claude Desktop](https://claude.ai/download) app as an MCP Connector. The setup is the same as Claude.ai — paste a URL, sign in, and start managing your fleet.
+Connect Platform to the [Claude Desktop](https://claude.ai/download) app as an MCP Connector. The setup is the same as Claude.ai — paste a URL, sign in, and start working with your workspace.
 
 <Callout type="info">
   Requires Claude Desktop version 0.7+ with MCP support enabled.
@@ -15,7 +15,7 @@ Connect Platform to the [Claude Desktop](https://claude.ai/download) app as an M
 | Environment | Connector URL |
 |-------------|--------------|
 | **Production** | `https://api.example.com` |
-| **Staging** | `https://api.apps.appshore.in` |
+| **Staging** | `https://api-staging.example.com` |
 
 ### Step 2: Add the Connector in Claude Desktop
 
@@ -40,17 +40,11 @@ Once authorized, you'll be redirected back to Claude Desktop.
 Open a new chat and try these prompts:
 
 ```
-"What loads are currently in transit?"
+"Run a health check on my platform connection"
 
-"Show me driver HOS status for the fleet"
+"Search the knowledge base for our onboarding guide"
 
-"What's my compliance score?"
-
-"Generate an invoice for load L-1001"
-
-"What are the overdue invoices?"
-
-"Plan a route from Houston to Memphis"
+"What does the knowledge base say about billing?"
 ```
 
 ## Alternative: JSON Config File
@@ -82,7 +76,7 @@ If you prefer to configure MCP servers manually via the config file:
 You can add both production and staging:
 
 1. Add the production connector URL: `https://api.example.com`
-2. Add the staging connector URL: `https://api.apps.appshore.in`
+2. Add the staging connector URL: `https://api-staging.example.com`
 
 Both will appear as separate connectors in your settings.
 
@@ -108,4 +102,4 @@ Both will appear as separate connectors in your settings.
 ### "No tools available"
 
 - You may have denied scopes during authorization. Disconnect and reconnect, approving all scopes
-- Check your Platform role — Drivers see fewer tools than Dispatchers or Admins
+- Check your Platform role — Members see fewer tools than Admins

@@ -7,21 +7,16 @@ import { TenantIdResolver } from './tenant-id-resolver.service';
 // Order: canonical business identifiers first, legacy *Id fields last.
 // The walker stops at the first match, so canonical names win when both are
 // present (e.g. an event carrying both `invoiceNumber` and a legacy `invoiceId`).
+// Add your domain's identifier fields here (canonical name first) so events
+// persist with a meaningful aggregateId.
 const AGGREGATE_ID_FIELDS = [
   'entityId',
-  'loadNumber',
   'invoiceNumber',
-  'loadId',
-  'driverId',
-  'vehicleId',
   'customerId',
   'invoiceId',
-  'settlementId',
-  'alertId',
-  'tripId',
-  'trailerId',
   'documentId',
   'threadId',
+  'userId',
   'id',
 ] as const;
 

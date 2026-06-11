@@ -20,7 +20,7 @@ export interface AgentContext {
   /**
    * Resolved numeric DB id (`User.id`). Needed for `AgentPrincipal`
    * construction when tools route through `InvocationPipelineService`,
-   * and for the RLS session user for role='driver'. Callers resolve via
+   * and for the RLS session variable `app.current_user_id`. Callers resolve via
    * `BaseTenantController.getUserDbId` (or `AssistantAiService.getUserDbId`)
    * before entering agent.chat().
    */

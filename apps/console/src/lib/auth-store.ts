@@ -25,11 +25,9 @@ interface User {
   email?: string;
   firstName: string;
   lastName: string;
-  role: 'OWNER' | 'ADMIN' | 'DISPATCHER' | 'DRIVER' | 'CUSTOMER' | 'SUPER_ADMIN';
+  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'SUPER_ADMIN';
   tenantId?: string;
   tenantName?: string;
-  driverId?: string;
-  customerId?: string;
   phone?: string;
   phoneVerified?: boolean;
   emailVerified?: boolean;

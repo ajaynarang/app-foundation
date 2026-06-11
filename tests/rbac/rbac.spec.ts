@@ -71,14 +71,13 @@ for (const [domain, entries] of byDomain) {
                   'not configured',
                   'upgrade',
                   'not linked',
-                  'no customer account',
                 ];
                 if (gatingSignals.some((signal) => body.toLowerCase().includes(signal))) {
                   test.skip(true, `${entry.description}: feature/integration not configured (not RBAC)`);
                   return;
                 }
               }
-              // 404 is acceptable for "allowed but no data" (e.g., customer with no loads)
+              // 404 is acceptable for "allowed but no data" (e.g., a user with no records)
               if (res.status() === 404 && expected === 200) {
                 // 404 means the role IS authorized (passed RBAC) but no data exists
                 // This is acceptable — the important thing is it's NOT 403/401

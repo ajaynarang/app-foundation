@@ -3,13 +3,13 @@ import { scopeChipClass, groupScopesByDomain } from '../scope-copy';
 describe('scope-copy utils', () => {
   describe('scopeChipClass', () => {
     it('uses caution (yellow) for sensitive scopes', () => {
-      expect(scopeChipClass('fleet:write:sensitive')).toContain('yellow-500');
+      expect(scopeChipClass('platform:write:sensitive')).toContain('yellow-500');
     });
     it('uses primary tint for standard (write) scopes', () => {
-      expect(scopeChipClass('loads:write')).toContain('primary');
+      expect(scopeChipClass('documents:write')).toContain('primary');
     });
     it('uses muted for read scopes', () => {
-      expect(scopeChipClass('fleet:read')).toContain('muted');
+      expect(scopeChipClass('documents:read')).toContain('muted');
     });
     it('uses caution for comms:send:bulk', () => {
       expect(scopeChipClass('comms:send:bulk')).toContain('yellow-500');
@@ -21,16 +21,16 @@ describe('scope-copy utils', () => {
 
   describe('groupScopesByDomain', () => {
     it('groups scopes by their domain prefix', () => {
-      const grouped = groupScopesByDomain(['fleet:read', 'fleet:write', 'loads:read']);
+      const grouped = groupScopesByDomain(['documents:read', 'documents:write', 'comms:send']);
       expect(grouped).toEqual({
-        fleet: ['fleet:read', 'fleet:write'],
-        loads: ['loads:read'],
+        documents: ['documents:read', 'documents:write'],
+        comms: ['comms:send'],
       });
     });
 
     it('handles sensitive suffix correctly', () => {
-      const grouped = groupScopesByDomain(['invoices:write', 'invoices:write:sensitive']);
-      expect(grouped.invoices).toEqual(['invoices:write', 'invoices:write:sensitive']);
+      const grouped = groupScopesByDomain(['integrations:write', 'integrations:write:sensitive']);
+      expect(grouped.integrations).toEqual(['integrations:write', 'integrations:write:sensitive']);
     });
   });
 });

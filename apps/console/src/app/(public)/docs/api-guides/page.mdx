@@ -1,37 +1,34 @@
 # API Guides
 
-These guides help you integrate Platform's API into your fleet management systems. Whether you are planning routes, managing drivers and vehicles, or subscribing to real-time alerts, you will find step-by-step instructions and working examples here.
+These guides help you integrate Platform's API into your systems — from authenticating requests to subscribing to real-time events and connecting AI assistants.
 
 ## Base URL
 
 | Environment | Base URL |
 |---|---|
 | Development | `http://localhost:8000/api/v1/` |
-| Staging | `https://staging.app.appshore.in/api/v1/` |
-| Production | `https://your-instance.app.appshore.in/api/v1/` |
+| Staging | `https://api-staging.example.com/api/v1/` |
+| Production | `https://api.example.com/api/v1/` |
 
-All endpoints documented in these guides are relative to the base URL. For example, `POST /routes/plan` means `POST https://your-instance.app.appshore.in/api/v1/routes/plan`.
+All endpoints documented in these guides are relative to the base URL. For example, `GET /users` means `GET https://api.example.com/api/v1/users`.
 
 ## Authentication
 
 Every request must include a Bearer token in the `Authorization` header:
 
 ```bash
-curl -X GET https://your-instance.app.appshore.in/api/v1/drivers \
+curl -X GET https://api.example.com/api/v1/users \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
-See [Getting Started > Authentication](/docs/getting-started/quickstart) for instructions on obtaining your token.
+See [Getting Started > Authentication](/docs/getting-started/authentication) for instructions on obtaining your token.
 
 ## Guide Map
 
 | Guide | What You Will Learn |
 |---|---|
-| [Route Planning](/docs/api-guides/route-planning) | Plan, optimize, and manage routes with full HOS compliance. Create routes, insert rest and fuel stops, update routes dynamically. |
-| [Fleet Management](/docs/api-guides/fleet-management) | Manage drivers, vehicles, and loads. Create and update resources, query status, handle assignments. |
-| [Alerts and Monitoring](/docs/api-guides/alerts-monitoring) | Subscribe to real-time alerts, handle monitoring events, acknowledge and resolve dispatcher notifications. |
-| [Integrations](/docs/api-guides/integrations) | Connect external services -- ELD providers, TMS platforms, fuel price feeds, and weather data sources. |
-| [Multi-tenancy](/docs/api-guides/multi-tenancy) | Set up tenants, manage users and roles, configure tenant-specific settings. |
+| [AI Integrations](/docs/api-guides/ai-integrations) | Connect Claude, ChatGPT, Cursor, or any MCP client to the platform's built-in MCP server with OAuth 2.1. |
+| [Webhooks](/docs/webhooks) | Register endpoints, verify HMAC signatures, and handle event deliveries with retries. |
 
 ## Response Format
 
@@ -43,9 +40,8 @@ Successful requests return the resource or collection directly:
 
 ```json
 {
-  "id": "route_abc123",
-  "status": "planned",
-  "stops": [ ... ],
+  "id": "usr_abc123",
+  "email": "jane@example.com",
   "createdAt": "2026-02-10T14:30:00Z"
 }
 ```
@@ -70,7 +66,7 @@ Errors return a consistent structure:
 ```json
 {
   "statusCode": 422,
-  "message": "Validation failed: origin is required",
+  "message": "Validation failed: email is required",
   "error": "Unprocessable Entity"
 }
 ```
@@ -92,7 +88,7 @@ Common status codes:
 List endpoints accept `page` and `limit` query parameters:
 
 ```
-GET /api/v1/drivers?page=2&limit=50
+GET /api/v1/users?page=2&limit=50
 ```
 
 | Parameter | Default | Maximum | Description |
@@ -106,4 +102,4 @@ Use the [API Playground](/docs/api-playground) to test endpoints directly in you
 
 ## Next Steps
 
-If you are new to Platform, start with the [Route Planning](/docs/api-guides/route-planning) guide -- it covers the core workflow that most integrations build on.
+If you are new to Platform, start with the [Quickstart](/docs/getting-started/quickstart) — it covers keys, your first request, and webhooks.

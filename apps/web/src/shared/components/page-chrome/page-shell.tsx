@@ -18,7 +18,7 @@ export interface PageShellProps {
 }
 
 /**
- * PageShell — thin spacing wrapper for the canonical dispatcher page chrome.
+ * PageShell — thin spacing wrapper for the canonical page chrome.
  *
  * Renders the four zones in order with the standard `space-y-6` rhythm. It owns
  * NO state — header/toolbar/filters are slots, children is the page's data zone.

@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class StepUpDto {
   @ApiProperty({
     example: '1234',
-    description: '4-digit dispatcher PIN used to confirm sensitive HITL actions',
+    description: '4-digit user PIN used to confirm sensitive HITL actions',
   })
   @IsString()
   @Length(4, 4)

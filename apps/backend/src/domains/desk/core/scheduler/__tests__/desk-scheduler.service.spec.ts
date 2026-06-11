@@ -1,5 +1,23 @@
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
 
+// The starter registry ships no scheduled responsibility (its one example is
+// manual-trigger only), so stub the registry with a test definition carrying a
+// tenant-tz cron — the heartbeat reads triggers from the registry by key.
+jest.mock('../../../responsibilities', () => ({
+  findResponsibilityDefinition: (key: string) => {
+    if (key === 'daily_digest') {
+      return {
+        key: 'daily_digest',
+        triggers: [{ kind: 'scheduled', cron: '0 9 * * *', tz: 'tenant' }],
+      };
+    }
+    if (key === 'manual_only') {
+      return { key: 'manual_only', triggers: [{ kind: 'manual' }] };
+    }
+    return undefined;
+  },
+}));
+
 import { DeskSchedulerService } from '../desk-scheduler.service';
 
 /**
@@ -23,9 +41,9 @@ const DUE_TICK = new Date('2026-05-22T14:01:00.000Z');
 // A tick on an unrelated minute — cron never fires here.
 const NOT_DUE_TICK = new Date('2026-05-22T18:30:00.000Z');
 
-function arRow(overrides: Record<string, unknown> = {}) {
+function schedRow(overrides: Record<string, unknown> = {}) {
   return {
-    key: 'ar_followup', // registry cron: '0 9 * * *', tz: 'tenant'
+    key: 'daily_digest', // mocked registry cron: '0 9 * * *', tz: 'tenant'
     tenantId: 10,
     tenant: { id: 10, timezone: 'America/Chicago' },
     ...overrides,
@@ -48,13 +66,13 @@ describe('DeskSchedulerService.runHeartbeat', () => {
   it('dispatches a due responsibility when both switches are on', async () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 10 }]);
-    prisma.deskResponsibility.findMany.mockResolvedValue([arRow()]);
+    prisma.deskResponsibility.findMany.mockResolvedValue([schedRow()]);
     const trigger = makeTrigger();
     const proc = new DeskSchedulerService(prisma, trigger as never);
 
     await proc.runHeartbeat(DUE_TICK);
 
-    expect(trigger.runByKey).toHaveBeenCalledWith('ar_followup', 10);
+    expect(trigger.runByKey).toHaveBeenCalledWith('daily_digest', 10);
   });
 
   it('only loads autonomy-armed, enabled, AVAILABLE rows (gating in the query)', async () => {
@@ -78,7 +96,7 @@ describe('DeskSchedulerService.runHeartbeat', () => {
   it('does NOT dispatch on a minute the cron does not fire', async () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 10 }]);
-    prisma.deskResponsibility.findMany.mockResolvedValue([arRow()]);
+    prisma.deskResponsibility.findMany.mockResolvedValue([schedRow()]);
     const trigger = makeTrigger();
     const proc = new DeskSchedulerService(prisma, trigger as never);
 
@@ -91,7 +109,7 @@ describe('DeskSchedulerService.runHeartbeat', () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 11 }]);
     prisma.deskResponsibility.findMany.mockResolvedValue([
-      arRow({ tenantId: 11, tenant: { id: 11, timezone: 'America/New_York' } }),
+      schedRow({ tenantId: 11, tenant: { id: 11, timezone: 'America/New_York' } }),
     ]);
     const trigger = makeTrigger();
     const proc = new DeskSchedulerService(prisma, trigger as never);
@@ -99,7 +117,7 @@ describe('DeskSchedulerService.runHeartbeat', () => {
     // 09:00 EDT == 13:00:00Z; the window opening at 13:00:00Z is due for NY,
     // and NOT due at the Chicago-due tick (14:01Z).
     await proc.runHeartbeat(new Date('2026-05-22T13:01:00.000Z'));
-    expect(trigger.runByKey).toHaveBeenCalledWith('ar_followup', 11);
+    expect(trigger.runByKey).toHaveBeenCalledWith('daily_digest', 11);
 
     trigger.runByKey.mockClear();
     await proc.runHeartbeat(DUE_TICK); // 14:01Z — Chicago time, not NY's 9am
@@ -109,9 +127,12 @@ describe('DeskSchedulerService.runHeartbeat', () => {
   it('skips a row whose registry definition has no scheduled trigger', async () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 10 }]);
-    // A key with no scheduled trigger in the registry would never match;
+    // A key with no scheduled trigger in the registry never matches;
     // an unknown key has no definition at all.
-    prisma.deskResponsibility.findMany.mockResolvedValue([arRow({ key: 'totally_unknown_key' })]);
+    prisma.deskResponsibility.findMany.mockResolvedValue([
+      schedRow({ key: 'manual_only' }),
+      schedRow({ key: 'totally_unknown_key' }),
+    ]);
     const trigger = makeTrigger();
     const proc = new DeskSchedulerService(prisma, trigger as never);
 
@@ -124,8 +145,8 @@ describe('DeskSchedulerService.runHeartbeat', () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 10 }, { id: 20 }]);
     prisma.deskResponsibility.findMany.mockResolvedValue([
-      arRow({ tenantId: 10, tenant: { id: 10, timezone: 'America/Chicago' } }),
-      arRow({ tenantId: 20, tenant: { id: 20, timezone: 'America/Chicago' } }),
+      schedRow({ tenantId: 10, tenant: { id: 10, timezone: 'America/Chicago' } }),
+      schedRow({ tenantId: 20, tenant: { id: 20, timezone: 'America/Chicago' } }),
     ]);
     const trigger = makeTrigger();
     trigger.runByKey
@@ -136,19 +157,19 @@ describe('DeskSchedulerService.runHeartbeat', () => {
     await expect(proc.runHeartbeat(DUE_TICK)).resolves.toBeUndefined();
 
     expect(trigger.runByKey).toHaveBeenCalledTimes(2);
-    expect(trigger.runByKey).toHaveBeenNthCalledWith(1, 'ar_followup', 10);
-    expect(trigger.runByKey).toHaveBeenNthCalledWith(2, 'ar_followup', 20);
+    expect(trigger.runByKey).toHaveBeenNthCalledWith(1, 'daily_digest', 10);
+    expect(trigger.runByKey).toHaveBeenNthCalledWith(2, 'daily_digest', 20);
   });
 
   it('evaluates a tenant-tz trigger as UTC when the tenant has no timezone', async () => {
     const prisma = createMockPrisma();
     prisma.tenant.findMany.mockResolvedValue([{ id: 10 }]);
-    prisma.deskResponsibility.findMany.mockResolvedValue([arRow({ tenant: { id: 10, timezone: null } })]);
+    prisma.deskResponsibility.findMany.mockResolvedValue([schedRow({ tenant: { id: 10, timezone: null } })]);
     const trigger = makeTrigger();
     const proc = new DeskSchedulerService(prisma, trigger as never);
 
     // With UTC fallback, "0 9 * * *" fires at 09:00Z; window opening 09:00Z is due.
     await proc.runHeartbeat(new Date('2026-05-22T09:01:00.000Z'));
-    expect(trigger.runByKey).toHaveBeenCalledWith('ar_followup', 10);
+    expect(trigger.runByKey).toHaveBeenCalledWith('daily_digest', 10);
   });
 });

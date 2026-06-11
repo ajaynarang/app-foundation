@@ -72,10 +72,10 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'INVOICE_GENERATED' as any,
-        category: 'BILLING',
-        title: 'Invoice #1',
-        message: 'Generated',
+        type: 'USER_INVITATION' as any,
+        category: 'TEAM',
+        title: 'Invitation #1',
+        message: 'Sent',
       });
 
       expect(prisma.notification.create).toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe('InAppNotificationService', () => {
       prisma.notification.findFirst.mockResolvedValue({
         id: 1,
         groupCount: 2,
-        groupKey: 'INVOICE_GENERATED:1:123',
+        groupKey: 'USER_INVITATION:1:123',
         metadata: { items: [{ title: 'A' }, { title: 'B' }] },
       });
       prisma.notification.update.mockResolvedValue({ id: 1 });
@@ -96,23 +96,23 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'INVOICE_GENERATED' as any,
-        category: 'BILLING',
-        title: 'Invoice #3',
-        message: 'Generated',
+        type: 'USER_INVITATION' as any,
+        category: 'TEAM',
+        title: 'Invitation #3',
+        message: 'Sent',
       });
 
       expect(prisma.notification.update).toHaveBeenCalled();
       const data = prisma.notification.update.mock.calls[0][0].data;
       expect(data.groupCount).toBe(3);
-      expect(data.message).toBe('3 invoices generated');
+      expect(data.message).toBe('3 invitations sent');
     });
 
     it('should create new group when existing group has 20 items', async () => {
       prisma.notification.findFirst.mockResolvedValue({
         id: 1,
         groupCount: 20,
-        groupKey: 'INVOICE_GENERATED:1:123',
+        groupKey: 'USER_INVITATION:1:123',
         metadata: { items: Array(20).fill({ title: 'X' }) },
       });
       prisma.notification.create.mockResolvedValue({ id: 2 });
@@ -120,10 +120,10 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'INVOICE_GENERATED' as any,
-        category: 'BILLING',
-        title: 'Invoice #21',
-        message: 'Generated',
+        type: 'USER_INVITATION' as any,
+        category: 'TEAM',
+        title: 'Invitation #21',
+        message: 'Sent',
       });
 
       expect(prisma.notification.create).toHaveBeenCalled();
@@ -155,16 +155,16 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'INVOICE_SENT' as any,
-        category: 'BILLING',
-        title: 'Invoice sent',
-        message: 'Sent',
-        metadata: { invoiceNumber: 'INV-123' },
+        type: 'SETTINGS_UPDATED' as any,
+        category: 'SYSTEM',
+        title: 'Settings updated',
+        message: 'Updated',
+        metadata: { settingKey: 'theme' },
       });
 
       expect(prisma.notification.create).toHaveBeenCalled();
       const data = prisma.notification.create.mock.calls[0][0].data;
-      expect(data.metadata.invoiceNumber).toBe('INV-123');
+      expect(data.metadata.settingKey).toBe('theme');
       expect(data.metadata.items).toBeDefined();
     });
   });

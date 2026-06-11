@@ -465,8 +465,6 @@ CREATE TABLE "conversations" (
     "user_mode" VARCHAR(20) NOT NULL,
     "title" VARCHAR(255),
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "dispatcher_read_at" TIMESTAMPTZ,
-    "driver_read_at" TIMESTAMPTZ,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL,
 
@@ -2169,3 +2167,37 @@ CREATE INDEX IF NOT EXISTS "knowledge_documents_content_tsv_idx"
   ON "knowledge_documents" USING gin ("content_tsv");
 CREATE INDEX IF NOT EXISTS "desk_memories_content_embedding_idx"
   ON "desk_memories" USING ivfflat ("content_embedding" vector_cosine_ops) WITH (lists = 100);
+
+-- Auto-populate knowledge_documents.content_tsv on insert/update so the
+-- hybrid-search text score (ts_rank_cd over content_tsv) is never NULL.
+CREATE OR REPLACE FUNCTION knowledge_documents_tsv_trigger() RETURNS trigger AS $$
+BEGIN
+  NEW.content_tsv := to_tsvector('english', COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.content, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_knowledge_documents_tsv
+  BEFORE INSERT OR UPDATE ON "knowledge_documents"
+  FOR EACH ROW EXECUTE FUNCTION knowledge_documents_tsv_trigger();
+
+-- ---------------------------------------------------------------------------
+-- Partial unique indexes (documented in schema.prisma; Prisma cannot express
+-- the WHERE clause, so they live here as raw SQL)
+-- ---------------------------------------------------------------------------
+
+-- Only ONE open episode per (tenant, dedupe_key) — enforced for episodes that
+-- are still active. TriggerService relies on this to avoid duplicate episodes.
+CREATE UNIQUE INDEX "desk_episodes_open_dedupe_unique"
+  ON "desk_episodes"("tenant_id", "dedupe_key")
+  WHERE "status" IN ('RUNNING', 'WAITING_APPROVAL');
+
+-- Only ONE active suppression per (tenant, responsibility, entity).
+CREATE UNIQUE INDEX "uq_desk_entity_suppressions_active"
+  ON "desk_entity_suppressions" ("tenant_id", "responsibility_key", "entity_type", "entity_id")
+  WHERE "unsuppressed_at" IS NULL;
+
+-- Lookup index for the TriggerService skip path.
+CREATE INDEX "idx_desk_entity_suppressions_lookup"
+  ON "desk_entity_suppressions" ("tenant_id", "responsibility_key", "entity_type", "entity_id", "suppress_until")
+  WHERE "unsuppressed_at" IS NULL;

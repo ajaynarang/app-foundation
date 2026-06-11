@@ -1,24 +1,27 @@
 import { describe, it, expect } from 'vitest';
-import { buildDriver, buildVehicle, buildLoad } from './index.js';
+import { buildUser, buildUserInvitation, buildExampleItem, buildSupportTicket } from './index.js';
 
 describe('factories', () => {
-  it('buildDriver produces unique emails across calls', () => {
-    const a = buildDriver();
-    const b = buildDriver();
+  it('buildUser produces unique emails across calls', () => {
+    const a = buildUser();
+    const b = buildUser();
     expect(a.email).not.toBe(b.email);
     expect(a.email).toMatch(/@test\.example\.com$/);
   });
 
-  it('buildVehicle VIN is exactly 17 chars', () => {
-    const v = buildVehicle();
-    expect(v.vin).toHaveLength(17);
+  it('buildUserInvitation defaults to the MEMBER role', () => {
+    expect(buildUserInvitation().role).toBe('MEMBER');
   });
 
   it('overrides take precedence over defaults', () => {
-    const d = buildDriver({ name: 'Override' });
-    expect(d.name).toBe('Override');
-    const l = buildLoad(42, { rateCents: 999900 });
-    expect(l.rateCents).toBe(999900);
-    expect(l.customerId).toBe(42);
+    const u = buildUser({ firstName: 'Override' });
+    expect(u.firstName).toBe('Override');
+    const item = buildExampleItem({ quantity: 42 });
+    expect(item.quantity).toBe(42);
+  });
+
+  it('buildSupportTicket emits a valid default payload', () => {
+    const t = buildSupportTicket();
+    expect(t.subject.length).toBeGreaterThan(0);
   });
 });

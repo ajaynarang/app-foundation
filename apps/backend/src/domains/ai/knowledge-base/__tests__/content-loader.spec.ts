@@ -8,7 +8,7 @@ const mockedFs = jest.mocked(fs);
 const SAMPLE_MD = `---
 title: "What is the platform?"
 documentType: faq
-audience: prospect
+audience: all
 category: general
 keywords:
   - platform
@@ -21,7 +21,7 @@ The platform is an assistant.
 const SAMPLE_NO_KEYWORDS = `---
 title: "Pricing"
 documentType: pricing
-audience: prospect
+audience: all
 category: pricing
 ---
 
@@ -60,7 +60,7 @@ describe('loadKnowledgeEntries', () => {
       title: 'What is the platform?',
       content: 'The platform is an assistant.',
       documentType: 'faq',
-      audience: 'prospect',
+      audience: 'all',
       category: 'general',
       keywords: ['platform', 'overview'],
     });
@@ -170,7 +170,7 @@ Content without documentType, audience, category.
     const invalidMd = `---
 title: "Test"
 documentType: invalid_type
-audience: prospect
+audience: all
 category: general
 ---
 

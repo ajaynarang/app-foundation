@@ -15,7 +15,7 @@
  *
  * All schemas are hand-written under `.strict()` and pinned against the
  * live service projection on `apps/backend/src/domains/ai/assistant/assistant.service.ts`
- * (probed against `demo-northstar-2026`, backend :8011, 2026-04-24).
+ * (verified against the assistant service projection).
  *
  * Streaming protocol — the AI SDK data-stream protocol
  * ---------------------------------------------------
@@ -183,10 +183,9 @@ export const AgentStatusItemSchema = z
 
 /**
  * GET /conversations/agents/status — `{ agents: [...] }`
- * (assistant.controller.ts line 110). Only OWNER/ADMIN/DISPATCHER are
- * routed; the returned list is filtered by `agent.personas.includes(userMode)`
- * (agent.registry.ts line 61) so DISPATCHER persona sees all 12 agents
- * (every agent declares DISPATCHER in `personas`).
+ * (assistant.controller.ts). The returned list is filtered by
+ * `agent.personas.includes(userMode)` (agent.registry.ts), so each
+ * persona sees only the agents that declare it.
  */
 export const AgentStatusResponseSchema = z
   .object({
@@ -277,293 +276,6 @@ export const AiErrorEnvelopeSchema = z
   })
   .strict();
 
-// ── PHASE 6 GROUP 6b — DOCUMENT INTELLIGENCE ────────────────────────
-
-/**
- * `POST /ai/documents/parse-ratecon` (single PDF) response —
- * `ratecon.controller.ts::processFile` lines 214-218 return
- * `{ jobId: <prisma cuid>, status: 'queued', fileName: <originalname> }`.
- *
- * The handler is decorated `@HttpCode(202)` (line 59); the body is the
- * job-creation envelope, NOT the parsed ratecon (parsing happens async
- * in the BullMQ documents queue). `status` is the literal `'queued'` at
- * create-time — narrowed to a literal so any drift to e.g. `'processing'`
- * trips the assertion.
- */
-export const RateconJobResponseSchema = z
-  .object({
-    jobId: stringId,
-    status: z.literal('queued'),
-    fileName: z.string().min(1),
-  })
-  .strict();
-
-/**
- * `POST /ai/documents/parse-ratecon/bulk` response — controller line 104
- * returns `Promise.all(files.map((f) => this.processFile(f, ...)))` so the
- * envelope is a flat array of single-file responses (NOT a wrapped object).
- * Per-file `ConflictException`s would propagate before the all() resolves;
- * a successful 202 means EVERY file enqueued cleanly.
- */
-export const RateconBulkJobResponseSchema = z.array(RateconJobResponseSchema);
-
-/**
- * 409 envelope on duplicate-hash detection — `ratecon.controller.ts:160-166`
- * throws `new ConflictException({ statusCode: 409, message, existingLoadId,
- * loadNumber })`. NestJS's `ConflictException(payload)` sends the payload
- * AS the body (not nested under `.response`). The platform `HttpExceptionFilter`
- * then enriches with `timestamp`, `path`, `method`, `detail` (same as
- * `AiErrorEnvelopeSchema`).
- *
- * Group 6b does NOT exercise the dup-hash path (test 9 deferred — needs a
- * pre-seeded ratecon). Schema is here for completeness / future Group 6c+.
- */
-export const RateconConflictResponseSchema = z
-  .object({
-    statusCode: z.literal(409),
-    message: z.string(),
-    existingLoadId: z.string().optional(),
-    loadNumber: z.string().optional(),
-    timestamp: z.string().optional(),
-    path: z.string().optional(),
-    method: z.string().optional(),
-    detail: z.string().optional(),
-    error: z.string().optional(),
-  })
-  .strict();
-
-/**
- * `GET /ai/documents/parser-config` response — `ratecon.controller.ts:110-121`
- * returns a plain config envelope from `ConfigService.get(...)` and process
- * env vars. Field set is fixed in the controller body:
- *   { defaultStrategy, allowUserOverride, aiProvider, model, fallbackEnabled,
- *     fallbackModel, timeoutMs, fallbackTimeoutMs }
- *
- * `defaultStrategy` is either `'text-first'` or `'vision'` per the
- * `resolveStrategy` helper enum (line 132). Modelled `z.string()` here
- * for forward-compat — backend may add new strategies (e.g. `'multimodal'`)
- * without requiring a test-utils bump.
- */
-export const ParserConfigSchema = z
-  .object({
-    defaultStrategy: z.string().min(1),
-    allowUserOverride: z.boolean(),
-    aiProvider: z.string().min(1),
-    model: z.string().min(1),
-    fallbackEnabled: z.boolean(),
-    fallbackModel: z.string().min(1),
-    timeoutMs: z.number().int().nonnegative(),
-    fallbackTimeoutMs: z.number().int().nonnegative(),
-  })
-  .strict();
-
-/**
- * `POST /ifta/fuel-receipts/scan` response —
- * `fuel-receipt.controller.ts::scanReceipt` lines 47-53:
- *   { extracted: <FuelReceiptSchema>, fieldsExtracted, totalFields, parsing }
- *
- * `extracted` is the full LLM-extracted fuel receipt — every field is
- * `.nullable()` per `fuel-receipt.schema.ts` (LLM returns null for any
- * field it cannot read). `parsing` carries the model / fallback metadata
- * (parser service lines 71-75 + 104-108).
- *
- * `fieldsExtracted` is the count of NON-NULL keys in `extracted`
- * (controller line 45). `totalFields` is the static field count of
- * `FuelReceiptSchema` (`FUEL_RECEIPT_FIELD_COUNT` = 13).
- *
- * Strict on the parsing envelope; tolerant on the extracted payload's
- * field VALUES (every field nullable). Phase 6 rubric is contract-shape
- * only — no LLM accuracy assertions.
- */
-export const FuelReceiptExtractedSchema = z
-  .object({
-    purchaseDate: z.string().nullable(),
-    gallons: z.number().nullable(),
-    pricePerGallon: z.number().nullable(),
-    totalAmount: z.number().nullable(),
-    vendorName: z.string().nullable(),
-    stationAddress: z.string().nullable(),
-    city: z.string().nullable(),
-    state: z.string().nullable(),
-    zipCode: z.string().nullable(),
-    fuelType: z.string().nullable(),
-    taxAmount: z.number().nullable(),
-    federalTax: z.number().nullable(),
-    stateTax: z.number().nullable(),
-  })
-  .strict();
-
-export const FuelReceiptParsingSchema = z
-  .object({
-    model: z.string().min(1),
-    fallbackUsed: z.boolean(),
-    // `fallbackReason` is `'fast_model_failed' | null` per parser service
-    // line 73 (no fallback) + line 107 (after fallback). Modelled as a
-    // tolerant string-or-null to keep the contract robust to new reasons.
-    fallbackReason: z.string().nullable(),
-    durationMs: z.number().int().nonnegative(),
-  })
-  .strict();
-
-export const FuelReceiptScanResponseSchema = z
-  .object({
-    extracted: FuelReceiptExtractedSchema,
-    fieldsExtracted: z.number().int().nonnegative(),
-    totalFields: z.number().int().nonnegative(),
-    parsing: FuelReceiptParsingSchema,
-  })
-  .strict();
-
-// ── PHASE 6 GROUP 6b — JOBS QUEUE ────────────────────────────────────
-
-/**
- * Single Job row from `Prisma.JobModel`, as projected by
- * `JobService.getJob` (line 150) and the list endpoints. The Prisma
- * `Job` model emits the full row — we observed live (demo-northstar):
- *
- *   id, tenantId, submittedBy, category, type, status, priority,
- *   inputData, inputHash, resultData?, errorMessage?, errorDetails?,
- *   startedAt?, completedAt?, dismissedAt?, attempts, maxAttempts,
- *   createdAt, updatedAt
- *
- * Nullable / optional fields per the migration:
- *   submittedBy → Int? (system-submitted jobs have null)
- *   inputHash, resultData, errorMessage, errorDetails — nullable
- *   startedAt, completedAt, dismissedAt — nullable timestamps
- *
- * `status` is one of {queued, processing, completed, failed, cancelled}
- * (job.types.ts). Modelled as a tolerant string for forward-compat —
- * the semantic assertion in test 17 checks `status === 'cancelled'`
- * and is the actual gate.
- *
- * `inputData` / `resultData` / `errorDetails` are JSON columns —
- * modelled `.unknown().nullable()` to stay contract-shape-only.
- */
-export const JobRowSchema = z
-  .object({
-    id: stringId,
-    tenantId: z.number().int().positive(),
-    submittedBy: z.number().int().nullable(),
-    category: z.string().min(1),
-    type: z.string().min(1),
-    status: z.string().min(1),
-    priority: z.number().int(),
-    // `progress` — observed live (Group 6b probe 2026-04-23): integer
-    // 0–100 set by the BullMQ processor (`bullJob.updateProgress(...)`)
-    // and persisted onto the Prisma row. Schema drift vs Prisma model:
-    // the column IS in the model but was omitted from the plan §6
-    // sketch. Pinned here so the contract catches any rename.
-    progress: z.number().int().nullable(),
-    // `queuedAt` — observed live: ISO timestamp set when the BullMQ
-    // job is enqueued (post-Prisma create, post-S3 upload). Distinct
-    // from `createdAt` (Prisma row creation) and `startedAt` (worker
-    // pick-up). Modelled nullable for forward-compat.
-    queuedAt: z.string().nullable(),
-    inputData: z.unknown().nullable(),
-    inputHash: z.string().nullable(),
-    resultData: z.unknown().nullable(),
-    errorMessage: z.string().nullable(),
-    errorDetails: z.unknown().nullable(),
-    startedAt: z.string().nullable(),
-    completedAt: z.string().nullable(),
-    dismissedAt: z.string().nullable(),
-    attempts: z.number().int().nonnegative(),
-    maxAttempts: z.number().int().positive(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
-  })
-  .strict();
-
-/**
- * `GET /jobs` response — paged envelope from `listJobsPaginated`
- * (job.service.ts:212-217): `{ items, total, limit, offset }`.
- */
-export const JobListResponseSchema = z
-  .object({
-    items: z.array(JobRowSchema),
-    total: z.number().int().nonnegative(),
-    limit: z.number().int().nonnegative(),
-    offset: z.number().int().nonnegative(),
-  })
-  .strict();
-
-/**
- * `GET /jobs/categories/summary` response — `getCategorySummary`
- * (job.service.ts:435-510) returns `CategorySummary[]` (a flat array,
- * NOT a record). Each entry projects:
- *   { category, displayName, lastRunAt, todayTotal, todaySucceeded,
- *     todayFailed, health, types: [...] }
- *
- * `health` is the literal-union `'healthy' | 'warning' | 'critical'`
- * (calculateHealth line 513). `types[]` per row is itself a list of
- * type-level rollups. Visible categories on demo are filtered by
- * `getVisibleCategories` (line 343) — depends on active integrations,
- * so the array length is dynamic; can be empty on a fresh tenant.
- *
- * Modelled tolerantly on the per-type fields (`schedule`, `nextRun`,
- * `lastRunAt`, `lastRunStatus` are all nullable).
- */
-export const JobCategoryTypeSchema = z
-  .object({
-    type: z.string().min(1),
-    displayName: z.string().min(1),
-    lastRunAt: z.string().nullable(),
-    lastRunStatus: z.string().nullable(),
-    todayTotal: z.number().int().nonnegative(),
-    todaySucceeded: z.number().int().nonnegative(),
-    todayFailed: z.number().int().nonnegative(),
-    schedule: z.string().nullable(),
-    nextRun: z.string().nullable(),
-  })
-  .strict();
-
-export const JobCategorySummaryRowSchema = z
-  .object({
-    category: z.string().min(1),
-    displayName: z.string().min(1),
-    lastRunAt: z.string().nullable(),
-    todayTotal: z.number().int().nonnegative(),
-    todaySucceeded: z.number().int().nonnegative(),
-    todayFailed: z.number().int().nonnegative(),
-    health: z.enum(['healthy', 'warning', 'critical']),
-    types: z.array(JobCategoryTypeSchema),
-  })
-  .strict();
-
-/**
- * Endpoint returns the array directly (controller line 74 returns the
- * service call which yields `CategorySummary[]`). NOT a wrapped envelope.
- */
-export const JobCategoriesSummarySchema = z.array(JobCategorySummaryRowSchema);
-
-/**
- * Envelope returned by `POST /jobs/:jobId/retry` and `DELETE /jobs/:jobId`
- * — both project a thin `{ jobId, status }` (controller lines 157, 193)
- * — and `PATCH /jobs/:jobId/dismiss` which projects `{ jobId, dismissed }`
- * (line 172). Three distinct shapes — modelled separately to keep each
- * endpoint's contract pinned exactly.
- */
-export const JobRetryResponseSchema = z
-  .object({
-    jobId: stringId,
-    status: z.literal('queued'),
-  })
-  .strict();
-
-export const JobDismissResponseSchema = z
-  .object({
-    jobId: stringId,
-    dismissed: z.literal(true),
-  })
-  .strict();
-
-export const JobCancelResponseSchema = z
-  .object({
-    jobId: stringId,
-    status: z.literal('cancelled'),
-  })
-  .strict();
-
 // ── PHASE 6 GROUP 6c — AGENT ACTIVITY + DEV SCOPES ───────────────────
 
 /**
@@ -574,7 +286,7 @@ export const JobCancelResponseSchema = z
  * `oauth:<clientId>`). `argsRedacted` is an arbitrary JSON record.
  *
  * Mirrors `AgentActivityRowSchema` in shared-types/ai/agent-activity.schema.ts
- * (live-probed 2026-04-27 against demo-northstar).
+ * (verified against the agent-activity service projection).
  */
 export const AgentActivityRowSchema = z
   .object({
@@ -634,25 +346,6 @@ export const DeveloperScopeRowSchema = z
  * (line 32: `list(): DeveloperScopeEntry[]`). NOT a wrapped envelope.
  */
 export const DeveloperScopesResponseSchema = z.array(DeveloperScopeRowSchema);
-
-// ── PHASE 6 GROUP 6c — PROSPECT (PUBLIC) ─────────────────────────────
-
-/**
- * `POST /prospect/conversations` response — `prospect.service.ts::createConversation`
- * (lines 50-63). The greeting is created in the same Prisma transaction.
- * Live-probed 2026-04-27: response is identical in shape to the dispatcher
- * `ConversationRowSchema` BUT also includes a `sessionToken` (the bearer
- * substitute for the public surface) and `userMode` is always `'prospect'`.
- */
-export const ProspectConversationResponseSchema = z
-  .object({
-    conversationId: stringId,
-    sessionToken: stringId,
-    userMode: z.literal('prospect'),
-    createdAt: isoDateString,
-    greeting: ConversationGreetingSchema,
-  })
-  .strict();
 
 // ── PHASE 6 GROUP 6c — VOICE ─────────────────────────────────────────
 

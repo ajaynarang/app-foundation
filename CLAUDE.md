@@ -87,7 +87,9 @@ tests/         — Playwright QA suite (@app/qa)
 docker compose up -d postgres redis          # Postgres (pgvector) on :5499, Redis on :6399
 pnpm install
 pnpm --filter @app/shared-types build         # build shared types (dependents need its dist)
+cp apps/web/.env.example apps/web/.env.local   # web env (NEXT_PUBLIC_API_URL etc.)
 cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL, ANTHROPIC_API_KEY, ...)
+pnpm prisma:generate                           # Prisma client + shared-enum codegen
 pnpm prisma:migrate:deploy && pnpm db:seed     # apply migration + seed platform data
 cd ../.. && pnpm dev                           # backend + web + console
 ```

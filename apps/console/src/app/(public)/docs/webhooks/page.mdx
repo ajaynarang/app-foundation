@@ -10,14 +10,14 @@ Register HTTPS endpoints to receive real-time event notifications from Platform.
 
 ## Supported Events
 
-All events use the `app.*` prefix:
+All events use the `app.*` prefix. The exact event catalog depends on the domains you build — the event picker above always shows the live list. Examples:
 
 | Event | When it fires |
 |-------|--------------|
-| `app.load.created` | A new load is added to the system |
-| `app.load.updated` | A load's status, stops, or assignment changes |
-| `app.route.planned` | A route plan is created for a driver |
-| `app.alert.fired` | An alert is generated (HOS violation, delay, deviation) |
+| `app.user.invited` | A user is invited to the tenant |
+| `app.user.updated` | A user's profile or role changes |
+| `app.resource.created` | A domain resource is created |
+| `app.resource.updated` | A domain resource changes |
 
 Subscribe to `*` to receive all current and future events.
 
@@ -28,70 +28,27 @@ Every delivery has a standard envelope:
 ```json
 {
   "id": "evt_a1b2c3d4",
-  "event": "app.alert.fired",
+  "event": "app.resource.created",
   "timestamp": "2026-02-23T14:00:00Z",
   "webhookId": "wh_x1y2z3",
   "data": { ... }
 }
 ```
 
-### `app.alert.fired`
+### Example delivery
 
 ```json
 {
   "id": "evt_h8i9j0k1",
-  "event": "app.alert.fired",
+  "event": "app.user.invited",
   "timestamp": "2026-02-23T14:00:00Z",
   "webhookId": "wh_a1b2c3d4",
   "data": {
-    "id": "alt_x1y2z3w4",
-    "type": "HOS_APPROACHING_DRIVE_LIMIT",
-    "priority": "HIGH",
-    "status": "ACTIVE",
-    "title": "Driver approaching 11-hour drive limit",
-    "message": "Mike Johnson has 45 minutes of drive time remaining.",
-    "driverId": "drv_a1b2c3d4",
-    "routePlanId": "rte_f8e7d6c5",
+    "id": "usr_x1y2z3w4",
+    "email": "jane@example.com",
+    "role": "MEMBER",
+    "invitedById": "usr_a1b2c3d4",
     "createdAt": "2026-02-23T14:00:00Z"
-  }
-}
-```
-
-### `app.route.planned`
-
-```json
-{
-  "id": "evt_d4e5f6g7",
-  "event": "app.route.planned",
-  "timestamp": "2026-02-23T08:00:00Z",
-  "webhookId": "wh_a1b2c3d4",
-  "data": {
-    "id": "rte_f8e7d6c5",
-    "status": "PLANNED",
-    "driverId": "drv_a1b2c3d4",
-    "vehicleId": "veh_t4r5k6",
-    "hosCompliant": true,
-    "estimatedDurationHours": 9.5,
-    "estimatedDistanceMiles": 487,
-    "createdAt": "2026-02-23T08:00:00Z"
-  }
-}
-```
-
-### `app.load.created` / `app.load.updated`
-
-```json
-{
-  "id": "evt_a1b2c3d4",
-  "event": "app.load.created",
-  "timestamp": "2026-02-23T16:15:00Z",
-  "webhookId": "wh_a1b2c3d4",
-  "data": {
-    "id": "load_l1l2l3",
-    "referenceNumber": "ORD-2026-0042",
-    "status": "PENDING",
-    "tenantId": "tnt_acme001",
-    "createdAt": "2026-02-23T16:15:00Z"
   }
 }
 ```
@@ -172,7 +129,3 @@ ngrok http 3000
 
 **Timeout errors:**
 Respond `200 OK` immediately, process the event asynchronously.
-
-## Full Reference
-
-See the [Webhook Integration Guide](/docs/api-guides/integrations/webhooks) for complete handler examples, idempotency patterns, and best practices.

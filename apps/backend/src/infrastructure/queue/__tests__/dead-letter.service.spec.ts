@@ -39,7 +39,7 @@ describe('DeadLetterService', () => {
     overrides: Partial<{ data: unknown; name: string; queueName: string; id: string; attemptsMade: number }> = {},
   ): Job {
     const envelope: JobEnvelope<{ loadId: string }> = {
-      tenantId: 'demo-northstar-2026',
+      tenantId: 'demo-acme-2026',
       correlationId: 'corr-1',
       causationId: 'cause-1',
       userId: 'user-1',
@@ -67,7 +67,7 @@ describe('DeadLetterService', () => {
 
     await service.recordPermanentFailure(job, err);
 
-    expect(mockTenantResolver.resolveToDbId).toHaveBeenCalledWith('demo-northstar-2026');
+    expect(mockTenantResolver.resolveToDbId).toHaveBeenCalledWith('demo-acme-2026');
     expect(mockPrisma.deadLetterLog.create).toHaveBeenCalledTimes(1);
 
     const createArg = mockPrisma.deadLetterLog.create.mock.calls[0][0];

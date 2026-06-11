@@ -13,7 +13,7 @@ import { Input } from '@app/ui/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { useAuth } from '@/features/auth';
 import { getValidToken, resolvePostLoginRedirect } from '@/shared/lib/navigation';
-import { buildTenantRedirectUrl } from '@/shared/lib/tenant-url';
+import { buildTenantRedirectUrl, isMultiTenant } from '@/shared/lib/tenant-url';
 import { formatAsYouType } from '@/shared/lib/utils/phone';
 import { authApi } from '../api';
 import { OtpInput } from '@/components/ui/otp-input';
@@ -653,8 +653,8 @@ export function LoginForm({
           )}
         </AnimatePresence>
 
-        {/* Register link — hidden on tenant subdomains */}
-        {!tenantBranding && (
+        {/* Register link — hidden on tenant subdomains and in single-tenant mode */}
+        {!tenantBranding && isMultiTenant() && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

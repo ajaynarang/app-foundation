@@ -1,5 +1,5 @@
 /**
- * Page Chrome — the canonical dispatcher page layout system.
+ * Page Chrome — the canonical data-page layout system.
  *
  * Four zones: Identity (PageHeader) · Toolbar (PageToolbar + PageTabs) ·
  * Filter bar (FilterBar) · Data (page-owned). Composition wrappers over the local

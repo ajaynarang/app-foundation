@@ -515,7 +515,7 @@ function makePrismaWithOneApproval() {
         priority: 'NORMAL',
         status: 'WAITING_APPROVAL',
         openedAt: new Date('2026-04-24T09:00:00Z'),
-        responsibility: { key: 'ar_followup', title: 'AR Follow-up' },
+        responsibility: { key: 'welcome', title: 'AR Follow-up' },
         ownerAgent: { key: 'autumn', name: 'Autumn' },
       },
     },

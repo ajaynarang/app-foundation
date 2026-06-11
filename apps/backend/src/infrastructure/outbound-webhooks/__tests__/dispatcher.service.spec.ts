@@ -45,7 +45,7 @@ describe('WebhookDispatcher', () => {
         id: 'sub-1',
         tenantId: 1,
         url: 'https://a.com',
-        events: ['app.load.created'],
+        events: ['app.user.invited'],
         active: true,
       },
       {
@@ -57,8 +57,8 @@ describe('WebhookDispatcher', () => {
       },
     ]);
 
-    const event = new DomainEvent('app.load.created', 'tenant_x', {
-      loadId: 'LD-001',
+    const event = new DomainEvent('app.user.invited', 'tenant_x', {
+      invitationId: 'inv-001',
     });
     await dispatcher.dispatchEvent(event);
 
@@ -80,18 +80,18 @@ describe('WebhookDispatcher', () => {
     );
   });
 
-  it('skips internal events (sync, telematics, preferences)', async () => {
+  it('skips internal events (sync, preferences, flags)', async () => {
+    // Every entry must be registered with visibility:'internal' in the
+    // event registry — unregistered events are NOT skipped.
     const internalEvents = [
       'app.sync.started',
       'app.sync.completed',
       'app.sync.failed',
-      'app.telematics.updated',
       'app.preferences.updated',
       'app.feature-flag.toggled',
-      'app.trip.route-stale',
-      'app.alert.unsnoozed',
       'app.user.created',
       'app.notification.sent',
+      'app.desk.episode-changed',
     ];
 
     for (const eventName of internalEvents) {
@@ -106,7 +106,7 @@ describe('WebhookDispatcher', () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([{ id: 'sub-1', tenantId: 1, active: true }]);
 
     const actor = { id: 'u-1', type: 'user' as const, label: 'John' };
-    const event = new DomainEvent('app.load.created', 'tenant_x', { loadId: 'LD-1' }, actor);
+    const event = new DomainEvent('app.user.invited', 'tenant_x', { invitationId: 'inv-1' }, actor);
     await dispatcher.dispatchEvent(event);
 
     const createCall = mockPrisma.webhookDeliveryLog.create.mock.calls[0][0];
@@ -117,14 +117,14 @@ describe('WebhookDispatcher', () => {
   it('strips recipientUserIds from outbound webhook payloads (bridge-internal SSE routing must not leak)', async () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([{ id: 'sub-1', tenantId: 1, active: true }]);
 
-    // app.alert.fired is visibility:'external' so it normally would be sent
-    // — confirm recipientUserIds is removed from the body.
-    const event = new DomainEvent('app.alert.fired', 'tenant_x', {
-      alertId: 'a-1',
+    // app.notification.created is visibility:'external' so it normally would
+    // be sent — confirm recipientUserIds is removed from the body.
+    const event = new DomainEvent('app.notification.created', 'tenant_x', {
+      notificationId: 'n-1',
       priority: 'critical',
       title: 'X',
       message: 'Y',
-      recipientUserIds: ['user-disp-1', 'user-driver-2'],
+      recipientUserIds: ['user-a-1', 'user-b-2'],
     });
 
     await dispatcher.dispatchEvent(event);
@@ -132,7 +132,7 @@ describe('WebhookDispatcher', () => {
     const createCall = mockPrisma.webhookDeliveryLog.create.mock.calls[0][0];
     const payloadData = createCall.data.payload.data;
     expect(payloadData).toEqual({
-      alertId: 'a-1',
+      notificationId: 'n-1',
       priority: 'critical',
       title: 'X',
       message: 'Y',
@@ -143,7 +143,7 @@ describe('WebhookDispatcher', () => {
   it('does not enqueue if no active subscriptions match', async () => {
     mockPrisma.webhookSubscription.findMany.mockResolvedValue([]);
 
-    const event = new DomainEvent('app.load.created', 'tenant_x', {});
+    const event = new DomainEvent('app.user.invited', 'tenant_x', {});
     await dispatcher.dispatchEvent(event);
 
     expect(mockQueue.add).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('WebhookDispatcher', () => {
         id: 'log-test',
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {
+      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {
         test: true,
       });
 
@@ -191,7 +191,7 @@ describe('WebhookDispatcher', () => {
         active: false,
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {});
+      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
 
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
@@ -199,7 +199,7 @@ describe('WebhookDispatcher', () => {
     it('does nothing if subscription is not found', async () => {
       mockPrisma.webhookSubscription.findUnique.mockResolvedValue(null);
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.load.created', {});
+      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
 
       expect(mockQueue.add).not.toHaveBeenCalled();
     });

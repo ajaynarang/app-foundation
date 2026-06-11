@@ -27,7 +27,7 @@ export interface SegmentedControlProps<T extends string = string> {
 /**
  * SegmentedControl — the canonical boxed toggle (bordered container, active = filled
  * pill). Used for compact mutually-exclusive choices that aren't page navigation or the
- * status funnel: e.g. Fleet's Trucks/Trailers sub-tab and lifecycle (Active/Inactive/…)
+ * status funnel: e.g. an entity sub-tab or a lifecycle (Active/Inactive/…)
  * filter. One sizing for all instances. See app-frontend-patterns §15.4 (Page Chrome).
  */
 export function SegmentedControl<T extends string>({

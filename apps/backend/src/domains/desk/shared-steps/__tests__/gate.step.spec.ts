@@ -7,6 +7,28 @@ jest.mock('../../core/inngest/nest-context', () => ({
   nestApp: () => ({ get: nestGet }),
 }));
 
+// The starter registry ships no responsibility with a conditionsEvaluator
+// (its one example has no conditions schema), so stub the registry with a
+// test definition — the gate looks evaluators up by episode key and stays
+// job-blind, which is exactly the mechanism pinned here.
+jest.mock('../../responsibilities', () => {
+  const evaluator = (conditions: unknown, hydrate: unknown) => {
+    const c = (conditions ?? {}) as { maxAmountUsd?: number; firstActionOnly?: boolean };
+    const h = hydrate as { entity: { amount: number; priorActionCount: number } };
+    const checks: Record<string, boolean> = {};
+    if (c.maxAmountUsd !== undefined) checks.amountOk = h.entity.amount <= c.maxAmountUsd;
+    if (c.firstActionOnly) checks.firstActionOk = h.entity.priorActionCount === 0;
+    return { conditionsMet: Object.values(checks).every(Boolean), checks };
+  };
+  return {
+    findResponsibilityDefinition: (key: string) => {
+      if (key === 'gated_example') return { key, conditionsEvaluator: evaluator };
+      if (key === 'no_conditions_example') return { key };
+      return undefined;
+    },
+  };
+});
+
 import { ScopeRegistryService } from '../../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../../core/episode/desk-step-writer.service';
 import { ApprovalService } from '../../core/approval/approval.service';
@@ -27,21 +49,16 @@ function makeEpisode(overrides: Partial<EpisodeRow> = {}): EpisodeRow {
     id: EPISODE_ID,
     trustLevelSnapshot: 'ASSISTED',
     conditionsSnapshot: {},
-    responsibility: { key: 'ar_followup' },
+    responsibility: { key: 'gated_example' },
     ...overrides,
   };
 }
 
-function makeHydrateOutput(
-  overrides: { amount?: number; customerId?: string | null; priorReminderCount?: number } = {},
-) {
+function makeHydrateOutput(overrides: { amount?: number; priorActionCount?: number } = {}) {
   return {
     entity: {
-      invoice: {
-        amount: overrides.amount ?? 1000,
-        customerId: overrides.customerId ?? 'cust_acme',
-      },
-      priorReminderCount: overrides.priorReminderCount ?? 0,
+      amount: overrides.amount ?? 1000,
+      priorActionCount: overrides.priorActionCount ?? 0,
     },
   };
 }
@@ -98,8 +115,8 @@ beforeEach(() => {
   nestGet.mockReset();
 });
 
-describe('gateStep — registry-driven conditions evaluator (ar_followup)', () => {
-  it('applies AR conditions: gates when amount exceeds maxAmountUsd (Assisted)', async () => {
+describe('gateStep — registry-driven conditions evaluator', () => {
+  it('applies the evaluator: gates when amount exceeds maxAmountUsd (Assisted)', async () => {
     const { stepWriter, approvalService } = setup({
       episode: makeEpisode({
         trustLevelSnapshot: 'ASSISTED',
@@ -118,7 +135,7 @@ describe('gateStep — registry-driven conditions evaluator (ar_followup)', () =
     expect(gateDecision.checks.amountOk).toBe(false);
   });
 
-  it('applies AR conditions: passes when conditions met + confidence ≥ 0.90 (Assisted)', async () => {
+  it('applies the evaluator: passes when conditions met + confidence ≥ 0.90 (Assisted)', async () => {
     const { stepWriter } = setup({
       episode: makeEpisode({
         trustLevelSnapshot: 'ASSISTED',
@@ -135,13 +152,13 @@ describe('gateStep — registry-driven conditions evaluator (ar_followup)', () =
     expect(stepWriter.succeeded).toHaveBeenCalledTimes(1);
   });
 
-  it('maps prior reminder count onto firstReminderOnly condition', async () => {
+  it('maps prior action count onto firstActionOnly condition', async () => {
     const { stepWriter } = setup({
       episode: makeEpisode({
         trustLevelSnapshot: 'ASSISTED',
-        conditionsSnapshot: { firstReminderOnly: true },
+        conditionsSnapshot: { firstActionOnly: true },
       }),
-      hydrate: makeHydrateOutput({ priorReminderCount: 2 }),
+      hydrate: makeHydrateOutput({ priorActionCount: 2 }),
       lastConfidence: 0.99,
     });
 
@@ -149,20 +166,20 @@ describe('gateStep — registry-driven conditions evaluator (ar_followup)', () =
 
     expect(result.rule).toBe('assisted_conditions_failed');
     const gateDecision = stepWriter.gated.mock.calls[0][0].gateDecision;
-    expect(gateDecision.checks.firstReminderOk).toBe(false);
+    expect(gateDecision.checks.firstActionOk).toBe(false);
   });
 });
 
 describe('gateStep — evaluator-absent (no conditions schema)', () => {
-  // eta_monitoring is a COMING_SOON stub: conditionsSchema = null, no
+  // no_conditions_example has conditionsSchema = null and no
   // conditionsEvaluator. Conditions are treated as met; trust/confidence
   // rules still apply.
   it('treats conditions as met when the responsibility has no evaluator (Assisted passes on confidence)', async () => {
     const { stepWriter, approvalService } = setup({
       episode: makeEpisode({
         trustLevelSnapshot: 'ASSISTED',
-        responsibility: { key: 'eta_monitoring' },
-        conditionsSnapshot: { maxAmountUsd: 1 }, // would fail AR, but no evaluator runs
+        responsibility: { key: 'no_conditions_example' },
+        conditionsSnapshot: { maxAmountUsd: 1 }, // would fail the evaluator, but none runs
       }),
       hydrate: makeHydrateOutput({ amount: 1_000_000 }),
       lastConfidence: 0.95,
@@ -180,7 +197,7 @@ describe('gateStep — evaluator-absent (no conditions schema)', () => {
     const { approvalService } = setup({
       episode: makeEpisode({
         trustLevelSnapshot: 'SUPERVISED',
-        responsibility: { key: 'eta_monitoring' },
+        responsibility: { key: 'no_conditions_example' },
       }),
       hydrate: makeHydrateOutput(),
     });

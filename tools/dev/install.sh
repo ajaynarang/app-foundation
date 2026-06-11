@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# the platform Installation Script
-# This script automates the initial setup of the the platform project
+# Project bootstrap script
+# One-time local setup: infra containers, dependencies, env files, database.
+# Run from the repo root: ./tools/dev/install.sh
 
-set -e  # Exit on error
+set -e # Exit on error
 
 echo "========================================="
-echo "  the platform Installation Script"
+echo "  Project Bootstrap"
 echo "========================================="
 echo ""
 
@@ -17,30 +18,28 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Check if running from project root
-if [ ! -f "package.json" ]; then
+if [ ! -f "package.json" ] || [ ! -f "pnpm-workspace.yaml" ]; then
     echo -e "${RED}Error: Please run this script from the project root directory${NC}"
     exit 1
 fi
 
-echo -e "${YELLOW}Step 1: Installing root dependencies (Turborepo)${NC}"
-pnpm install
-echo -e "${GREEN}✓ Root dependencies installed${NC}"
-echo ""
-
-echo -e "${YELLOW}Step 2: Installing backend dependencies${NC}"
-cd apps/backend
-if ! command -v uv &> /dev/null; then
-    echo -e "${RED}Error: UV is not installed. Please install it first:${NC}"
-    echo "curl -LsSf https://astral.sh/uv/install.sh | sh"
+echo -e "${YELLOW}Step 1: Starting Postgres + Redis (Docker)${NC}"
+if ! command -v docker &>/dev/null; then
+    echo -e "${RED}Error: Docker is not installed or not on PATH${NC}"
     exit 1
 fi
-uv sync
-echo -e "${GREEN}✓ Backend dependencies installed${NC}"
-cd ../..
+docker compose up -d postgres redis
+echo -e "${GREEN}✓ Postgres (localhost:5499) and Redis (localhost:6399) running${NC}"
 echo ""
 
-echo -e "${YELLOW}Step 3: Frontend dependencies${NC}"
-echo -e "${GREEN}✓ Frontend dependencies installed (via pnpm workspace)${NC}"
+echo -e "${YELLOW}Step 2: Installing dependencies (pnpm workspace)${NC}"
+pnpm install
+echo -e "${GREEN}✓ Dependencies installed${NC}"
+echo ""
+
+echo -e "${YELLOW}Step 3: Building shared types (@app/shared-types)${NC}"
+pnpm --filter @app/shared-types build
+echo -e "${GREEN}✓ Shared types built${NC}"
 echo ""
 
 echo -e "${YELLOW}Step 4: Setting up environment files${NC}"
@@ -59,24 +58,28 @@ else
 fi
 echo ""
 
+echo -e "${YELLOW}Step 5: Initializing database (Prisma)${NC}"
+pnpm --filter @app/backend prisma:generate
+pnpm --filter @app/backend prisma:migrate:deploy
+pnpm --filter @app/backend db:seed
+echo -e "${GREEN}✓ Database migrated and seeded${NC}"
+echo ""
+
 echo -e "${GREEN}=========================================${NC}"
-echo -e "${GREEN}  Installation Complete!${NC}"
+echo -e "${GREEN}  Bootstrap Complete!${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "Next steps:"
 echo ""
-echo "1. Start services with Docker:"
-echo "   ${YELLOW}docker-compose up -d${NC}"
+echo "1. Fill in secrets in ${YELLOW}apps/backend/.env${NC} (ANTHROPIC_API_KEY, ...)"
 echo ""
-echo "2. Initialize database:"
-echo "   ${YELLOW}docker-compose exec backend uv run alembic upgrade head${NC}"
+echo "2. Start everything (backend + web + console):"
+echo "   ${YELLOW}pnpm dev${NC}"
 echo ""
-echo "3. (Optional) Seed database:"
-echo "   ${YELLOW}docker-compose exec backend uv run python scripts/db_seed.py${NC}"
+echo "3. Access the application:"
+echo "   Web:         ${YELLOW}http://localhost:3000${NC}"
+echo "   Console:     ${YELLOW}http://localhost:3002${NC}"
+echo "   Backend API: ${YELLOW}http://localhost:8000${NC}"
 echo ""
-echo "4. Access the application:"
-echo "   Frontend: ${YELLOW}http://localhost:3000${NC}"
-echo "   Backend API: ${YELLOW}http://localhost:8000/docs${NC}"
-echo ""
-echo "For more details, see SETUP.md"
+echo "For more details, see CLAUDE.md (Quick start)."
 echo ""

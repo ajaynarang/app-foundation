@@ -11,7 +11,6 @@ name: Deploy All
 #   DOPPLER_TOKEN_STG, DOPPLER_TOKEN_PRD
 #   VERCEL_WEB_DEPLOY_HOOK_STAGING, VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
 #   VERCEL_CONSOLE_DEPLOY_HOOK_STAGING, VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION
-#   VERCEL_TOKEN, VERCEL_TEAM_ID
 #
 # Required GitHub Environments: staging, production (with Required Reviewers)
 
@@ -118,7 +117,6 @@ jobs:
         run: |
           docker build \
             -f apps/backend/Dockerfile \
-            --build-arg BUILD_SHA=$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
@@ -486,7 +484,7 @@ jobs:
           DATABASE_URL: ${{ steps.db-secret.outputs.database_url }}
           RDS_HOST: ${{ steps.db-secret.outputs.rds_host }}
         run: |
-          CLUSTER="app-prod-ecs-cluster"
+          CLUSTER="app-production-ecs-cluster"
           TUNNEL_PORT=5433
 
           TASK_ARNS=$(aws ecs list-tasks \
@@ -636,8 +634,8 @@ jobs:
         run: |
           echo "Waiting for API service to stabilize..."
           aws ecs wait services-stable \
-            --cluster app-prod-ecs-cluster \
-            --services app-prod-ecs-service-api
+            --cluster app-production-ecs-cluster \
+            --services app-production-ecs-service-api
           echo "✓ API service stable"
 
       - name: Smoke test production health endpoint (with retries)
@@ -657,8 +655,8 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # 4. Deploy Frontends to Vercel (after backend succeeds)
-  #    Triggers both web and console, then polls until builds complete.
-  #    Requires: VERCEL_TOKEN, VERCEL_TEAM_ID
+  #    Fires the web and console deploy hooks (fire-and-forget;
+  #    check the Vercel dashboard for build status).
   # ─────────────────────────────────────────────────────────────
   deploy-frontend-staging:
     name: Deploy Web + Console to Staging (Vercel)

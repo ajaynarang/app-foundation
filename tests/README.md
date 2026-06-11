@@ -1,89 +1,58 @@
 # @app/qa — QA Suite
 
-Playwright-based QA for the platform. One framework, one package, all cross-cutting tests (smoke, RBAC, API workflows, browser, loadtest, AI evals scaffold).
-
-Spec: `.docs/plans/2026-04-17-qa-coverage/architecture-spec.md`
-Plan: `.docs/plans/2026-04-17-qa-coverage/architecture-plan.md`
-Phase roadmap: `.docs/plans/2026-04-17-qa-coverage/00-overview.md`
+Playwright-based QA for the platform starter. One framework, one package, all cross-cutting tests (smoke, RBAC, loadtest). Add your domain workflow suites under `api/` as your app grows.
 
 ## Suites
 
-| Suite    | Tag                       | What it tests                                                          | Speed |
-| -------- | ------------------------- | ---------------------------------------------------------------------- | ----- |
-| smoke    | `@smoke`                  | Health, auth, critical reads, security headers                         | ~30s  |
-| rbac     | `@rbac`                   | Every endpoint × every role → expected status                          | ~2min |
-| api      | `@workflow` / `@contract` | Multi-step domain chains (fleet, financials, operations, platform, ai) | ~3min |
-| browser  | `@browser`                | Login, dashboard, page navigation, no JS errors                        | ~2min |
-| loadtest | —                         | Baseline perf (50 concurrent users × top 10 endpoints)                 | ~5min |
-| evals    | —                         | **Scaffold only** — not active (see `tests/evals/README.md`)           | —     |
+| Suite    | Tag      | What it tests                                            | Speed |
+| -------- | -------- | -------------------------------------------------------- | ----- |
+| smoke    | `@smoke` | Health, auth, critical reads, security headers           | ~30s  |
+| rbac     | `@rbac`  | Every endpoint × every role → expected status            | ~2min |
+| loadtest | —        | Baseline perf (50 concurrent users × platform endpoints) | ~5min |
 
 ## Directory layout
 
 ```
 tests/
   smoke/                     — health + security-headers + auth
-  rbac/                      — role × endpoint matrix (generated + hand-curated)
-  api/                       — workflow + contract tests grouped by backend domain
-    fleet/                   — drivers, vehicles, loads, trailers, recurring lanes, docs
-    financials/              — invoicing, settlements, close-out, IFTA, lumper
-    operations/              — alerts, command center, routing, convoy, smart routes
-    platform/                — admin, integrations (Samsara, QuickBooks, EDI), tickets
-    ai/                      — document intel, email intake
-    contracts/               — response-shape sweeps across all endpoints
-  browser/                   — Playwright UI critical paths
-  evals/                     — AI evals scaffold (inactive)
+  rbac/                      — role × endpoint matrix (generated)
   loadtest/                  — autocannon baselines
   fixtures/                  — thin re-exports to @app/test-utils
-  config/                    — global-setup, test-env
+  config/                    — global-setup, test-env, capability detection
   scripts/                   — RBAC matrix gen, gap audit, confidence matrix
 ```
 
 ## Quick start
 
-### Local (Doppler-injected, no .env files)
-
-Requires `doppler login` once per machine. Secrets come from `app-backend/dev` — no local config files to keep in sync.
-
 ```bash
-pnpm qa:list-tenants                     # discover valid TENANT_ID
-TENANT_ID=<id> pnpm test:qa:local        # full suite against localhost:8001
+# Backend must be running (default localhost:8000) with DEV_AUTH_SECRET set.
+DEV_AUTH_SECRET=<secret> pnpm qa:list-tenants    # discover valid TENANT_ID
+DEV_AUTH_SECRET=<secret> TENANT_ID=<id> pnpm test:qa
 
 # Individual suites
-TENANT_ID=<id> pnpm test:smoke:local
-TENANT_ID=<id> pnpm test:rbac:local
-TENANT_ID=<id> pnpm test:api:local
-TENANT_ID=<id> pnpm test:browser:local
+DEV_AUTH_SECRET=<secret> TENANT_ID=<id> pnpm --filter @app/qa test:smoke
+DEV_AUTH_SECRET=<secret> TENANT_ID=<id> pnpm --filter @app/qa test:rbac
 ```
 
-### Against staging
+### Against a deployed environment
 
 ```bash
 DEV_AUTH_SECRET=<stg-secret> \
 TENANT_ID=<id> \
-API_BASE_URL=https://app-api-staging.appshore.in/api/v1 \
-WEB_BASE_URL=https://staging.app.appshore.in \
+API_BASE_URL=https://api-staging.example.com/api/v1 \
+WEB_BASE_URL=https://staging.example.com \
 pnpm test:qa
-```
-
-### Individual suites
-
-```bash
-pnpm --filter @app/qa test:smoke
-pnpm --filter @app/qa test:rbac
-pnpm --filter @app/qa test:api
-pnpm --filter @app/qa test:contracts
-pnpm --filter @app/qa test:browser
 ```
 
 ## Authentication
 
 Tests authenticate via `/dev/users` + `/dev/switch` on the backend. Both endpoints are gated by `DevAuthGuard` which enforces the `x-dev-auth-secret` header with `crypto.timingSafeEqual`, plus a hard-block if `NODE_ENV === 'production'`.
 
-- **Local**: injected by `doppler run --project app-backend --config dev --` (via `pnpm test:qa:local`). No `.env.test` file.
-- **CI**: `DEV_AUTH_SECRET` is a GitHub Actions repo secret (mirrors Doppler `app-backend/stg`).
-- **Production**: hard-blocked by NODE_ENV check + secret unset in Doppler `app-backend/prd`.
+- **Local**: export `DEV_AUTH_SECRET` in your shell (or use a secrets manager like Doppler — see `docs/doppler.md`).
+- **CI**: `DEV_AUTH_SECRET` as a GitHub Actions repo secret.
+- **Production**: hard-blocked by the NODE_ENV check; leave the secret unset.
 
-The UI flag `NEXT_PUBLIC_ENABLE_DEV_SWITCHER` is independent — it only toggles the UI button visibility.
+The UI flag `NEXT_PUBLIC_DEV_SWITCHER` is independent — it only toggles the UI button visibility.
 
 ## Fixtures + factories
 
@@ -91,26 +60,19 @@ All from `@app/test-utils`. Never re-invent.
 
 ```ts
 import { test, expect } from '@app/test-utils/auth';
-import { buildDriver } from '@app/test-utils/factories';
-import { DriverSchemas, expectContract } from '@app/test-utils/schemas';
+import { buildUser } from '@app/test-utils/factories';
+import { PlatformSchemas, expectContract } from '@app/test-utils/schemas';
 
-test('dispatcher creates a driver @workflow', async ({ asDispatcher }) => {
-  const res = await asDispatcher.post('/drivers', buildDriver());
+test('admin creates a user @workflow', async ({ asAdmin }) => {
+  const res = await asAdmin.post('/users', buildUser());
   expect(res.status()).toBe(201);
-  expectContract(DriverSchemas.CreateResponse, await res.json());
+  expectContract(PlatformSchemas.UserCreateResponseSchema, await res.json());
 });
 ```
 
-Available fixtures: `asDispatcher`, `asAdmin`, `asOwner`, `asDriver`, `asCustomer`, `asSuperAdmin`, `asAnonymous`, `asRole('ROLE')`.
+Available fixtures: `asMember`, `asAdmin`, `asOwner`, `asSuperAdmin`, `asAnonymous`, `asRole('ROLE')`.
 
-## Adding new tests — use slash commands
-
-- `/app-qa-add-api <desc>` — scaffold API test
-- `/app-qa-add-browser <desc>` — scaffold browser E2E
-- `/app-qa-add-smoke <desc>` — scaffold smoke
-- `/app-qa-run [suite]` — run suite + publish report
-- `/app-qa-fix` — triage last-run failures
-- `/app-qa-review` — audit PR for missing coverage
+When you add a domain, copy the example pair (`@app/test-utils` → `factories/example.ts` + `schemas/example.ts`) as the pattern for your factories and response schemas.
 
 ## Reports
 
@@ -120,18 +82,6 @@ open tests/reports/html/index.html              # Playwright HTML report
 open tests/reports/confidence-matrix.html       # confidence dashboard
 ```
 
-## CI
-
-`.github/workflows/quality-gate.yml` — **manual-dispatch only** in this round. No PR/push/schedule triggers.
-
-Trigger: GitHub Actions → "Quality Gate" → Run workflow → pick suite + tenant.
-
-Artifacts per run:
-
-- `qa-report-<n>` — reports + Playwright HTML + JUnit (30-day retention).
-- `qa-traces-<n>` — traces, videos, screenshots (7-day retention).
-- `unit-results-<n>` — unit test JSON + coverage summary (30-day retention).
-
 ## Rules
 
 1. Never modify application code — this package is tests only.
@@ -139,7 +89,7 @@ Artifacts per run:
 3. `TENANT_ID` is mandatory. Use `pnpm qa:list-tenants` if unsure.
 4. Regenerate RBAC on every material change: `pnpm --filter @app/qa generate:rbac`.
 5. Run RBAC gap audit before PR: `pnpm --filter @app/qa exec tsx scripts/audit-rbac-gaps.ts`.
-6. Tag tests: `@smoke`, `@rbac`, `@workflow`, `@contract`, `@browser`.
+6. Tag tests: `@smoke`, `@rbac`, `@workflow`, `@contract`.
 7. Use `@app/test-utils` — never copy-paste factories or auth helpers.
 8. Feature-gated endpoints: tag with `@requires:plan-<feature>`. Never use `test.skip()` at runtime.
 
@@ -156,12 +106,12 @@ No raw tokens. Always use a named fixture.
 
 ```ts
 // ❌ Don't
-const token = process.env.DISPATCHER_TOKEN;
-const res = await request.get('/loads', { headers: { Authorization: `Bearer ${token}` } });
+const token = process.env.MEMBER_TOKEN;
+const res = await request.get('/users', { headers: { Authorization: `Bearer ${token}` } });
 
 // ✅ Do
-test('dispatcher lists loads @workflow', async ({ asDispatcher }) => {
-  const res = await asDispatcher.get('/loads');
+test('admin lists users @workflow', async ({ asAdmin }) => {
+  const res = await asAdmin.get('/users');
 });
 ```
 
@@ -171,11 +121,11 @@ No inline JSON for mutations.
 
 ```ts
 // ❌ Don't
-await asDispatcher.post('/drivers', { firstName: 'John', lastName: 'Smith', email: 'j@s.com', licenseNumber: 'DL123' });
+await asAdmin.post('/users', { firstName: 'John', lastName: 'Smith', email: 'j@s.com', role: 'MEMBER' });
 
 // ✅ Do
-import { buildDriver } from '@app/test-utils/factories';
-await asDispatcher.post('/drivers', buildDriver());
+import { buildUser } from '@app/test-utils/factories';
+await asAdmin.post('/users', buildUser());
 ```
 
 ### Criterion 3 — Assert specific HTTP status code
@@ -200,9 +150,8 @@ const body = await res.json();
 expect(body.id).toBeTruthy();
 
 // ✅ Do
-import { expectContract } from '@app/test-utils/schemas';
-import { DriverSchema } from '@app/shared-types';
-expectContract(DriverSchema.strict(), await res.json());
+import { expectContract, PlatformSchemas } from '@app/test-utils/schemas';
+expectContract(PlatformSchemas.UserDetailSchema, await res.json());
 ```
 
 ### Criterion 5 — Assert at least one semantic property
@@ -211,10 +160,10 @@ Verify that the response reflects the intent of the operation.
 
 ```ts
 // ❌ Don't (schema pass is not enough)
-expectContract(LoadStatusChangeSchema, body);
+expectContract(UserDetailSchema, body);
 
 // ✅ Do
-expect(body.status).toBe('IN_TRANSIT');
+expect(body.isActive).toBe(true);
 ```
 
 ### Criterion 6 — Assert persistence via a second request
@@ -223,14 +172,14 @@ GET after POST to confirm the entity exists; GET 404 after DELETE to confirm it'
 
 ```ts
 // ❌ Don't
-const createRes = await asDispatcher.post('/drivers', buildDriver());
+const createRes = await asAdmin.post('/users', buildUser());
 expect(createRes.status()).toBe(201);
 
 // ✅ Do
-const createRes = await asDispatcher.post('/drivers', buildDriver());
+const createRes = await asAdmin.post('/users', buildUser());
 expect(createRes.status()).toBe(201);
-const { driverId } = await createRes.json();
-const getRes = await asDispatcher.get(`/drivers/${driverId}`);
+const { userId } = await createRes.json();
+const getRes = await asAdmin.get(`/users/${userId}`);
 expect(getRes.status()).toBe(200);
 ```
 
@@ -240,11 +189,11 @@ Use `afterEach` or inline cleanup so tests are stateless.
 
 ```ts
 // ✅ Do
-let driverId: string;
+let userId: string;
 
-afterEach(async ({ asDispatcher }) => {
-  if (driverId) {
-    await asDispatcher.post(`/drivers/${driverId}/deactivate`, {});
+afterEach(async ({ asAdmin }) => {
+  if (userId) {
+    await asAdmin.post(`/users/${userId}/deactivate`, {});
   }
 });
 ```
@@ -255,7 +204,7 @@ Every test gets at minimum `@workflow` or `@contract`. Feature-gated tests get `
 
 ```ts
 // ✅ Do
-test('invoice is generated from delivered load @workflow @requires:plan-invoicing', async () => { ... });
+test('AI assistant answers a prompt @workflow @requires:plan-ai_assistant', async () => { ... });
 ```
 
 ### Criterion 9 — Zero runtime `test.skip()`
@@ -265,10 +214,10 @@ let Playwright exclude it at collection time. Never call `test.skip()` with a co
 
 ```ts
 // ❌ Don't
-if (!tenantHasFeature('quickbooks')) test.skip();
+if (!tenantHasFeature('ai_assistant')) test.skip();
 
 // ✅ Do — tag it, let playwright.config.ts grep-exclude it
-test('syncs to QuickBooks @workflow @requires:plan-quickbooks', async () => { ... });
+test('streams a chat turn @workflow @requires:plan-ai_assistant', async () => { ... });
 ```
 
 ---
@@ -279,36 +228,12 @@ test('syncs to QuickBooks @workflow @requires:plan-quickbooks', async () => { ..
 @smoke               Health, critical reads. <60s total.
 @workflow            Happy-path CRUD or multi-step operation.
 @contract            Shape-only (Zod strict validation).
-@rbac                Role × endpoint matrix (existing, unchanged).
+@rbac                Role × endpoint matrix (generated).
 @requires:plan-<F>   Needs plan feature F enabled on the tenant.
-                     Examples: plan-quickbooks, plan-samsara, plan-ai-parser,
-                     plan-command-center, plan-ai-chat, plan-email-intake.
 @requires:data-<D>   Needs specific seeded data on the tenant.
-                     Examples: data-completed-job, data-active-integration.
+                     Examples: data-pending-tenant, data-job-row.
 @destructive         Mutates state beyond its own scope. Never on prod tenants.
 @slow                >5s per test. Excluded from fast smoke loops.
-```
-
-**Example usages:**
-
-```ts
-// Smoke
-test('health endpoint returns 200 @smoke', async ({ asAnonymous }) => { ... });
-
-// Workflow (full CRUD cycle)
-test('dispatcher creates and assigns a load @workflow', async ({ asDispatcher }) => { ... });
-
-// Contract (shape only)
-test('GET /drivers response matches DriverSchema @contract', async ({ asDispatcher }) => { ... });
-
-// Plan-gated (excluded at collection time if tenant lacks Samsara integration)
-test('syncs driver HOS from Samsara @workflow @requires:plan-samsara', async ({ asDispatcher }) => { ... });
-
-// Data dependency (excluded at collection time if demo data is missing)
-test('generates invoice from completed load @workflow @requires:data-completed-job', async () => { ... });
-
-// Destructive (only runs against demo tenants, never staging production)
-test('hard-deletes all loads @destructive', async ({ asSuperAdmin }) => { ... });
 ```
 
 ---
@@ -321,25 +246,9 @@ target tenant does not have that feature enabled. This prevents noisy skip count
 Set `ENABLE_ALL_TESTS=1` to disable the feature filter and run every test regardless of
 tenant capabilities. Use this when:
 
-- The tenant has all features enabled (e.g., a freshly seeded demo tenant after `pnpm qa:enable-features`).
+- The tenant has all features enabled (e.g., a freshly seeded tenant after `pnpm qa:enable-features`).
 - You want to see which plan-gated tests exist, even those that would fail.
 - CI needs to gate on a full test count (separate from feature availability).
-
-**Example CI usage:**
-
-```yaml
-# .github/workflows/quality-gate.yml
-- name: Run full QA suite (all features must be enabled on demo-northstar)
-  env:
-    TENANT_ID: demo-northstar-2026
-    ENABLE_ALL_TESTS: '1'
-    DEV_AUTH_SECRET: ${{ secrets.DEV_AUTH_SECRET }}
-  run: pnpm test:qa:local
-```
-
-Without `ENABLE_ALL_TESTS=1`, the standard CI run excludes plan-gated tests that the
-tenant does not support, so the reported test count reflects only tests valid for that
-tenant's plan.
 
 ---
 
@@ -378,43 +287,13 @@ After any test run with `TENANT_ID` set:
 
 ```bash
 cat tests/config/tenant-capabilities.json
-# {
-#   "tenantId": "demo-northstar-2026",
-#   "planKey": "SCALE",
-#   "enabledFeatures": ["samsara", "quickbooks", "ai_chat"],
-#   "disabledFeatures": ["email_intake", "command_center"],
-#   "generatedAt": "2026-04-17T10:00:00.000Z"
-# }
 ```
 
 If `disabledFeatures` lists a feature you expect to be enabled, run:
 
 ```bash
-pnpm qa:enable-features --tenant demo-northstar-2026
+pnpm qa:enable-features --tenant <tenant-id>
 ```
-
----
-
-## Adding a New Test
-
-Use the `/app-qa-add-api` slash command for API tests:
-
-```
-/app-qa-add-api Create and assign a load
-```
-
-The command will scaffold a test file following the 9-criteria rubric. After scaffolding,
-verify the following before committing:
-
-- [ ] Role fixture used (no raw tokens)
-- [ ] Factory used for request payload (no inline JSON)
-- [ ] Specific status code asserted (`toBe(201)`, not `toBeTruthy()`)
-- [ ] Schema asserted via `expectContract(Schema.strict(), body)`
-- [ ] Semantic property asserted (field echo or state change)
-- [ ] Persistence verified (second GET request)
-- [ ] Cleanup in `afterEach`
-- [ ] Tags: `@workflow` / `@contract` / `@requires:plan-<F>` as appropriate
-- [ ] Zero `test.skip(condition, …)` calls
 
 ---
 
@@ -428,34 +307,21 @@ The Playwright grep filter excluded them because the tenant lacks the required p
 # 1. Inspect what's enabled
 cat tests/config/tenant-capabilities.json
 
-# 2. Enable all features on the demo tenant
-pnpm qa:enable-features --tenant demo-northstar-2026
+# 2. Enable all features on the tenant
+pnpm qa:enable-features --tenant <tenant-id>
 
 # 3. Re-run — or bypass filtering entirely:
-ENABLE_ALL_TESTS=1 TENANT_ID=demo-northstar-2026 pnpm test:qa:local
-```
-
-### Tenant state polluted (tests failing due to stale data)
-
-Hard-reset the demo tenant and start fresh:
-
-```bash
-pnpm qa:tenant:reset --tenant demo-northstar-2026 --yes
-# Then re-seed if needed:
-cd apps/backend && pnpm setup:demo
+ENABLE_ALL_TESTS=1 TENANT_ID=<tenant-id> pnpm test:qa
 ```
 
 ### `detect-capabilities` errors in console
 
 Possible causes:
 
-1. **`DEV_AUTH_SECRET` not set** — check that Doppler is injecting it:
-   ```bash
-   doppler run --project app-backend --config dev -- env | grep DEV_AUTH_SECRET
-   ```
-2. **Backend not running** — start it with `pnpm doppler:backend` from the repo root.
-3. **Super-admin user doesn't exist** — run `pnpm setup:base` in `apps/backend/`.
-4. **Wrong API base URL** — verify `API_BASE_URL` or `tests/config/test-env.ts` defaults.
+1. **`DEV_AUTH_SECRET` not set** — export it in your shell (must match the backend's value).
+2. **Backend not running** — start it with `pnpm dev` from the repo root.
+3. **Super-admin user doesn't exist** — run the seed: `cd apps/backend && pnpm db:seed`.
+4. **Wrong API base URL** — verify `API_BASE_URL` or `tests/config/test-env.ts` defaults (localhost:8000).
 
 These errors are non-fatal: capability detection failure causes the full suite to run
 (all plan-gated tests included). Check the warning message in the test output for details.

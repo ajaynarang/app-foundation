@@ -83,7 +83,6 @@ describe('FirebaseAuthService', () => {
         where: { firebaseUid: 'firebase-uid-123' },
         include: {
           tenant: true,
-          driver: true,
         },
       });
     });

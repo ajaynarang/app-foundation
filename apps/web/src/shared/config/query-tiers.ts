@@ -8,10 +8,10 @@
  *
  * | Tier          | Use when                                              |
  * |---------------|-------------------------------------------------------|
- * | (default)     | SSE covers it — loads, drivers, vehicles, alerts, etc |
- * | OPERATIONAL   | Needs refetchOnWindowFocus (dispatch board, cmd center)|
+ * | (default)     | SSE covers it — most entity lists and detail views    |
+ * | OPERATIONAL   | Needs refetchOnWindowFocus (operational dashboards)   |
  * | STATIC        | Rarely changes — reference data, plans, config        |
- * | ACTIVE_POLL   | No SSE coverage, must poll — job status, HOS clocks   |
+ * | ACTIVE_POLL   | No SSE coverage, must poll — e.g. job status          |
  */
 export const QUERY_TIERS = {
   /** Operational dashboards — refetch on tab focus for instant catch-up */

@@ -2,11 +2,11 @@ import { Callout } from "@/components/docs/callout"
 
 # AI Integrations
 
-Platform is an **AI-native** fleet operations platform. In addition to the built-in Assistant AI chat, you can connect Platform to your favorite AI assistants and use natural language to manage your fleet from anywhere.
+Platform is **AI-native**. In addition to the built-in Assistant AI chat, you can connect Platform to your favorite AI assistants and use natural language to work with your workspace from anywhere.
 
 ## How It Works
 
-Platform exposes a **Model Context Protocol (MCP)** server that gives AI assistants secure access to your fleet data. When you connect an AI client to Platform:
+Platform exposes a **Model Context Protocol (MCP)** server that gives AI assistants secure access to your workspace data. When you connect an AI client to Platform:
 
 1. You authenticate with your Platform account (OAuth 2.1)
 2. You choose which permissions (scopes) to grant
@@ -16,20 +16,17 @@ All actions respect your role permissions and tenant isolation -- the AI can onl
 
 ## Available Tools
 
-Once connected, your AI assistant gets access to **20+ fleet operations tools**:
+The starter ships with a deliberately small toolset — it is your extension point:
 
-| Category | Tools | Examples |
-|----------|-------|---------|
-| Fleet & Operations | 6 tools | Query loads, driver HOS, fleet status, alerts |
-| Invoicing | 5 tools | Generate invoices, record payments, send/void |
-| Settlements & Pay | 5 tools | View settlements, driver pay, approve payouts |
-| Customers | 3 tools | Customer details, payment stats |
-| Billing & Close-out | 3 tools | Billing readiness, approve for billing |
-| Shield Compliance | 3 tools | Compliance scores, findings, trigger audits |
-| Route Planning | 2 tools | Plan routes, check route status |
+| Tool | What it does |
+|------|--------------|
+| `health-check` | Verify the connection and server status |
+| `search-kb` | Semantic search over the tenant knowledge base |
+
+Add your own domain tools by registering `@Tool` providers in the backend MCP tools module — they appear to connected assistants automatically.
 
 <Callout type="info">
-  Write actions (approve, send, void) require a confirmation step -- the AI will ask you to confirm before executing.
+  Write tools require a confirmation step -- the AI will ask you to confirm before executing.
 </Callout>
 
 ## Supported Platforms
@@ -49,7 +46,7 @@ Your Platform server URL depends on your environment. All MCP clients connect to
 | Environment | Server URL |
 |-------------|-----------|
 | **Production** | `https://api.example.com` |
-| **Staging** | `https://api.apps.appshore.in` |
+| **Staging** | `https://api-staging.example.com` |
 | **Local Development** | `http://localhost:8000` |
 
 <Callout type="info">
@@ -62,15 +59,11 @@ When connecting, you'll be asked to approve access scopes:
 
 | Scope | Access Level |
 |-------|-------------|
-| `fleet:read` | View drivers, vehicles, loads, alerts |
-| `fleet:write` | Acknowledge/resolve alerts, plan routes |
-| `invoices:read` | View invoices and summaries |
-| `invoices:write` | Create, send, void invoices, record payments |
-| `settlements:read` | View settlements and driver pay |
-| `settlements:write` | Approve settlements |
-| `customers:read` | View customer information |
-| `billing:read` | View billing readiness |
-| `billing:write` | Approve loads for billing |
-| `shield:read` | View compliance scores |
-| `shield:write` | Trigger compliance audits |
-| `documents:read` | View document compliance status |
+| `knowledge:read` | Search the tenant knowledge base |
+| `documents:read` | View documents |
+| `documents:write` | Create and update documents |
+| `integrations:read` | View integration status |
+| `integrations:write` | Manage integrations |
+| `comms:send` | Send outbound communications |
+
+Scopes you define for your own tools appear here as well.

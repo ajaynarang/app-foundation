@@ -1,30 +1,30 @@
 # Introduction
 
-Platform provides REST APIs for intelligent fleet operations with HOS-compliant route planning.
+Platform provides REST APIs for building on a multi-tenant application foundation — authentication, users and teams, API keys, webhooks, and AI assistant (MCP) integrations.
 
 ## What You Can Build
 
 With Platform APIs, you can:
 
-- **Route Planning Applications** - Build custom dispatching tools with HOS compliance built-in
-- **Fleet Management Dashboards** - Monitor routes and receive proactive alerts
-- **Mobile Driver Apps** - Provide drivers with optimized routes and rest recommendations
-- **TMS Integrations** - Connect your existing TMS with intelligent route planning
-- **Analytics Platforms** - Analyze fleet performance and compliance metrics
+- **Server-to-server integrations** - Authenticate with API keys and call any endpoint your role allows
+- **Event-driven workflows** - Receive HMAC-signed webhook events when things change
+- **AI assistant integrations** - Connect Claude, ChatGPT, or any MCP client to your workspace
+- **Internal tools and dashboards** - Query users, teams, and platform data over REST
+- **Custom domain features** - The platform is a starter; add your own domain endpoints alongside these
 
 ## Core Capabilities
 
-### Route Planning
-Generate optimized routes that respect HOS regulations, automatically insert rest stops, and optimize fuel stops based on price.
+### Authentication
+API keys for integrations, OAuth 2.1 for AI assistants and third-party apps, and JWT sessions for first-party UIs.
 
-### Continuous Monitoring
-Platform monitors active routes 24/7 and detects 20 alert types that may require dispatcher intervention.
+### Multi-tenancy
+Every request is tenant-scoped. Data isolation is enforced server-side, so an API key can only ever see its own tenant.
 
-### Dynamic Updates
-Routes automatically update when conditions change - dock delays, traffic, driver rest requests, etc.
+### Webhooks
+Subscribe HTTPS endpoints to platform events and receive signed payloads with automatic retries.
 
-### Compliance Validation
-Every route is validated for HOS compliance before the driver starts, preventing violations proactively.
+### AI / MCP
+A built-in Model Context Protocol server exposes your tools to AI assistants, with OAuth scopes and human-in-the-loop confirmation for writes.
 
 ## API Architecture
 
@@ -41,6 +41,6 @@ Platform APIs follow RESTful conventions:
 
 ## Next Steps
 
-1. [Quickstart Guide](/docs/getting-started/quickstart) - Create your first route in 5 minutes
+1. [Quickstart Guide](/docs/getting-started/quickstart) - Make your first API call in 5 minutes
 2. [Authentication](/docs/getting-started/authentication) - Learn how API authentication works
 3. [API Keys Setup](/docs/getting-started/api-keys) - Generate your first API key

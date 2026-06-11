@@ -96,35 +96,11 @@ function categorize(title: string): { suite: string; domain: string } {
   if (t.includes('@smoke')) return { suite: 'smoke', domain: 'health-auth' };
   if (t.includes('@contract')) return { suite: 'contracts', domain: extractContractDomain(t) };
   if (t.includes('@browser')) return { suite: 'browser', domain: 'ui-smoke' };
-  if (
-    t.includes('fleet') ||
-    t.includes('driver') ||
-    t.includes('vehicle') ||
-    t.includes('load') ||
-    t.includes('customer') ||
-    t.includes('recurring')
-  )
-    return { suite: 'workflows', domain: 'fleet' };
-  if (
-    t.includes('billing') ||
-    t.includes('invoice') ||
-    t.includes('settlement') ||
-    t.includes('close-out') ||
-    t.includes('profitability') ||
-    t.includes('pay structure')
-  )
-    return { suite: 'workflows', domain: 'financials' };
-  if (
-    t.includes('alert') ||
-    t.includes('shield') ||
-    t.includes('command center') ||
-    t.includes('notification') ||
-    t.includes('ifta') ||
-    t.includes('monitoring') ||
-    t.includes('route') ||
-    t.includes('setting')
-  )
-    return { suite: 'workflows', domain: 'operations' };
+  if (t.includes('billing') || t.includes('wallet') || t.includes('subscription') || t.includes('invoice'))
+    return { suite: 'workflows', domain: 'billing' };
+  if (t.includes('ai') || t.includes('assistant') || t.includes('conversation') || t.includes('mcp'))
+    return { suite: 'workflows', domain: 'ai' };
+  if (t.includes('desk')) return { suite: 'workflows', domain: 'desk' };
   if (t.includes('super admin') || t.includes('tenant') || t.includes('broadcast') || t.includes('admin'))
     return { suite: 'workflows', domain: 'super-admin' };
   if (
@@ -133,13 +109,13 @@ function categorize(title: string): { suite: string; domain: string } {
     t.includes('invitation') ||
     t.includes('feature flag') ||
     t.includes('api key') ||
-    t.includes('add-on') ||
     t.includes('feedback') ||
     t.includes('support') ||
+    t.includes('notification') ||
+    t.includes('setting') ||
     t.includes('webhook') ||
     t.includes('integration') ||
     t.includes('oauth') ||
-    t.includes('analytic') ||
     t.includes('document') ||
     t.includes('search')
   )
@@ -148,21 +124,20 @@ function categorize(title: string): { suite: string; domain: string } {
 }
 
 function extractRbacDomain(t: string): string {
-  if (t.includes('fleet')) return 'fleet';
-  if (t.includes('financial')) return 'financials';
-  if (t.includes('operation')) return 'operations';
   if (t.includes('platform')) return 'platform';
+  if (t.includes('billing')) return 'billing';
+  if (t.includes('ai')) return 'ai';
+  if (t.includes('desk')) return 'desk';
   if (t.includes('super-admin') || t.includes('super admin')) return 'super-admin';
   if (t.includes('infrastructure')) return 'infrastructure';
-  if (t.includes('analytic')) return 'analytics';
   return 'other';
 }
 
 function extractContractDomain(t: string): string {
-  if (t.includes('fleet')) return 'fleet';
-  if (t.includes('financial')) return 'financials';
-  if (t.includes('operation')) return 'operations';
   if (t.includes('platform')) return 'platform';
+  if (t.includes('billing')) return 'billing';
+  if (t.includes('ai')) return 'ai';
+  if (t.includes('desk')) return 'desk';
   if (t.includes('super')) return 'super-admin';
   return 'other';
 }
@@ -202,13 +177,11 @@ function flattenSuites(suites: any[], prefix = ''): TestDetail[] {
 
 function inferSkipReason(testName: string): string {
   const t = testName.toLowerCase();
-  if (t.includes('dispatcher')) return 'No DISPATCHER user in test tenant';
+  if (t.includes('member')) return 'No MEMBER user in test tenant';
   if (t.includes('owner')) return 'No OWNER user in test tenant';
-  if (t.includes('driver')) return 'No DRIVER user in test tenant';
-  if (t.includes('customer')) return 'No CUSTOMER user in test tenant';
+  if (t.includes('admin') && !t.includes('super')) return 'No ADMIN user in test tenant';
   if (t.includes('super_admin') || t.includes('superadmin')) return 'No SUPER_ADMIN user available';
-  if (t.includes('feature') || t.includes('shield') || t.includes('command-center'))
-    return 'Feature not enabled on tenant plan';
+  if (t.includes('feature')) return 'Feature not enabled on tenant plan';
   if (t.includes('billing') || t.includes('stripe')) return 'Billing/Stripe not configured';
   return 'Role or feature not available';
 }
@@ -224,21 +197,16 @@ function buildSkipAnalysis(allTests: TestDetail[]): SkipAnalysis[] {
   }
 
   const fixes: Record<string, string> = {
-    'No DISPATCHER user in test tenant': 'Add a user with DISPATCHER role to the test tenant',
-    'No DISPATCHER in tenant': 'Add a user with DISPATCHER role to the test tenant',
-    'No DISPATCHER user in tenant': 'Add a user with DISPATCHER role to the test tenant',
+    'No MEMBER user in test tenant': 'Add a user with MEMBER role to the test tenant',
+    'No MEMBER in tenant': 'Add a user with MEMBER role to the test tenant',
+    'No ADMIN user in test tenant': 'Add a user with ADMIN role to the test tenant',
+    'No ADMIN in tenant': 'Add a user with ADMIN role to the test tenant',
     'No OWNER user in test tenant': 'Add a user with OWNER role to the test tenant',
     'No OWNER in tenant': 'Add a user with OWNER role to the test tenant',
-    'No DRIVER user in test tenant': 'Add a user with DRIVER role to the test tenant',
-    'No DRIVER in tenant': 'Add a user with DRIVER role to the test tenant',
-    'No CUSTOMER user in test tenant': 'Add a user with CUSTOMER role to the test tenant',
-    'No CUSTOMER in tenant': 'Add a user with CUSTOMER role to the test tenant',
     'No SUPER_ADMIN user available': 'Create a SUPER_ADMIN user in the system',
-    'Feature not enabled on tenant plan':
-      'Enable the feature (shield, alerts, etc.) on the test tenant plan via super admin',
-    'Billing/Stripe not configured': 'Configure Stripe keys in staging Doppler or use a tenant with billing set up',
-    'Role or feature not available':
-      'Ensure all 6 roles (OWNER, ADMIN, DISPATCHER, DRIVER, CUSTOMER, SUPER_ADMIN) exist in the test tenant',
+    'Feature not enabled on tenant plan': 'Enable the feature on the test tenant plan via super admin',
+    'Billing/Stripe not configured': 'Configure Stripe keys or use a tenant with billing set up',
+    'Role or feature not available': 'Ensure all roles (OWNER, ADMIN, MEMBER, SUPER_ADMIN) exist in the test tenant',
   };
 
   // Fuzzy match for skip reasons that contain tenant names
@@ -250,10 +218,9 @@ function buildSkipAnalysis(allTests: TestDetail[]): SkipAnalysis[] {
       if (reason.toLowerCase().includes(key.toLowerCase())) return fix;
     }
     // Pattern matching
-    if (reason.includes('DISPATCHER')) return 'Add a user with DISPATCHER role to the test tenant';
+    if (reason.includes('MEMBER')) return 'Add a user with MEMBER role to the test tenant';
     if (reason.includes('OWNER')) return 'Add a user with OWNER role to the test tenant';
-    if (reason.includes('DRIVER')) return 'Add a user with DRIVER role to the test tenant';
-    if (reason.includes('CUSTOMER')) return 'Add a user with CUSTOMER role to the test tenant';
+    if (reason.includes('ADMIN') && !reason.includes('SUPER')) return 'Add a user with ADMIN role to the test tenant';
     if (reason.includes('SUPER_ADMIN')) return 'Create a SUPER_ADMIN user in the system';
     if (reason.includes('feature') || reason.includes('not enabled'))
       return 'Enable the feature on the test tenant plan via super admin';
@@ -662,33 +629,32 @@ function generateHtml(matrix: ConfidenceMatrix): string {
         <tr style="border-bottom:1px solid #1a1a1a">
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">Unit Tests</td>
           <td style="padding:10px 16px;color:#a3a3a3">Backend service logic is correct in isolation</td>
-          <td style="padding:10px 16px;color:#525252">Settlement PER_MILE calc returns rate x miles, invoice generation maps all charge types, JWT guard rejects expired tokens</td>
+          <td style="padding:10px 16px;color:#525252">Service logic edge cases, guard chains, enum codegen parity, JWT guard rejects expired tokens</td>
         </tr>
         <tr style="border-bottom:1px solid #1a1a1a">
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">Smoke</td>
           <td style="padding:10px 16px;color:#a3a3a3">System is alive, users can authenticate</td>
-          <td style="padding:10px 16px;color:#525252">Health returns 200, DISPATCHER token works, critical GETs don't 500</td>
+          <td style="padding:10px 16px;color:#525252">Health returns 200, MEMBER token works, critical GETs don't 500</td>
         </tr>
         <tr style="border-bottom:1px solid #1a1a1a">
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">RBAC</td>
           <td style="padding:10px 16px;color:#a3a3a3">Only correct roles can access each endpoint</td>
-          <td style="padding:10px 16px;color:#525252">DRIVER can't create loads (403), DISPATCHER can list loads (200), anonymous gets 401</td>
+          <td style="padding:10px 16px;color:#525252">MEMBER can't manage users (403), ADMIN can list users (200), anonymous gets 401</td>
         </tr>
         <tr style="border-bottom:1px solid #1a1a1a">
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">Workflows</td>
           <td style="padding:10px 16px;color:#a3a3a3">Domain features work end-to-end per business area</td>
           <td style="padding:10px 16px;color:#525252">
-            <b>Fleet:</b> drivers, vehicles, loads, customers, recurring lanes<br>
-            <b>Financials:</b> invoices, settlements, billing, close-out, profitability<br>
-            <b>Operations:</b> alerts, shield, command center, notifications, routes, IFTA<br>
-            <b>Platform:</b> users, invitations, feature flags, plans, add-ons, webhooks<br>
-            <b>Super Admin:</b> tenants, billing admin, broadcasts, feedback admin
+            <b>Platform:</b> users, invitations, feature flags, plans, settings<br>
+            <b>Billing:</b> subscriptions, wallet, payment methods<br>
+            <b>AI:</b> conversations, assistant, MCP<br>
+            <b>Super Admin:</b> tenants, broadcasts, feedback admin
           </td>
         </tr>
         <tr style="border-bottom:1px solid #1a1a1a">
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">Contracts</td>
           <td style="padding:10px 16px;color:#a3a3a3">API response shapes haven't changed — fields exist, types match</td>
-          <td style="padding:10px 16px;color:#525252">Driver response has <code>driverId</code> (string), <code>name</code> (string). If removed or renamed, test fails. New fields are fine.</td>
+          <td style="padding:10px 16px;color:#525252">User response has <code>userId</code> (string), <code>email</code> (string). If removed or renamed, test fails. New fields are fine.</td>
         </tr>
         <tr>
           <td style="padding:10px 16px;color:#e5e5e5;font-weight:600">Browser</td>

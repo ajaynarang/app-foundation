@@ -5,14 +5,14 @@
  * on a target tenant. Designed for local dev and CI warm-up, not production.
  *
  * Usage:
- *   pnpm qa:enable-features [--tenant <id>] [--dry-run]
+ *   pnpm qa:enable-features --tenant <id> [--dry-run]   (or set TENANT_ID)
  */
 
 import { fetchDevUsers, switchToUser } from '@app/test-utils/auth';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_TENANT = 'demo-northstar-2026';
+const DEFAULT_TENANT = process.env.TENANT_ID || '';
 
 // ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -91,7 +91,13 @@ async function enableEntitlement(baseUrl: string, token: string, planKey: string
 
 async function main(): Promise<void> {
   const { tenantId, dryRun } = parseArgs();
-  const baseUrl = process.env.API_BASE_URL ?? 'http://localhost:8001/api/v1';
+  const baseUrl = process.env.API_BASE_URL ?? 'http://localhost:8000/api/v1';
+
+  if (!tenantId) {
+    console.error('  Error: No tenant specified. Pass --tenant <id> or set TENANT_ID.');
+    console.error('  Discover tenants with: pnpm qa:list-tenants');
+    process.exit(1);
+  }
 
   console.log(`\n  Platform — Enable QA Features`);
   console.log(`  Tenant:  ${tenantId}`);

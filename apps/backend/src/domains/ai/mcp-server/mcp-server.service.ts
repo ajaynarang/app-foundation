@@ -58,7 +58,7 @@ export class McpServerService implements OnModuleInit {
    * by scopes, wires up tools/list and tools/call handlers, then handles transport.
    */
   private async handleMcpStreamable(req: Request, res: Response, principal: AgentPrincipal): Promise<void> {
-    const server = new Server({ name: 'assistant-fleet-ops', version: '1.0.0' }, { capabilities: { tools: {} } });
+    const server = new Server({ name: 'app-assistant', version: '1.0.0' }, { capabilities: { tools: {} } });
 
     // tools/list — registry-driven, filtered by principal scopes
     server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -124,7 +124,7 @@ export class McpServerService implements OnModuleInit {
             title: t.name,
             readOnlyHint: isRead,
             // Sensitive writes touch destructive territory (void invoice,
-            // terminate driver, deactivate customer). Standard writes
+            // delete records, deactivate accounts). Standard writes
             // (create/update) aren't destructive in the spec's sense.
             destructiveHint: isSensitive,
             // Reads are idempotent; writes generally aren't.

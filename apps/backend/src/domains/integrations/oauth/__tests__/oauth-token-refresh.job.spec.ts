@@ -43,17 +43,17 @@ describe('OAuthTokenRefreshJob', () => {
 
   describe('registerForIntegration', () => {
     it('should add a repeatable envelope-wrapped job at 80% of token expiry', async () => {
-      await job.registerForIntegration(1, 'int-1', 'SAMSARA_ELD', 3600);
+      await job.registerForIntegration(1, 'int-1', 'QUICKBOOKS', 3600);
 
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
         'oauth-refresh',
         expect.objectContaining({
           tenantId: '1',
-          payload: { tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' },
+          payload: { tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' },
           metadata: expect.objectContaining({ source: 'cron', version: 1 }),
         }),
         expect.objectContaining({
-          jobId: 'oauth-refresh-SAMSARA_ELD-1',
+          jobId: 'oauth-refresh-QUICKBOOKS-1',
           repeat: { every: 2880000 }, // 3600 * 0.8 * 1000
         }),
       );
@@ -64,14 +64,14 @@ describe('OAuthTokenRefreshJob', () => {
     it('should remove matching repeatable job', async () => {
       vendorDataQueue.getRepeatableJobs.mockResolvedValue([
         {
-          id: 'oauth-refresh-SAMSARA_ELD-1',
+          id: 'oauth-refresh-QUICKBOOKS-1',
           key: 'key-1',
           name: 'oauth-refresh',
         },
         { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: 'oauth-refresh' },
       ]);
 
-      await job.removeForIntegration('SAMSARA_ELD', 1);
+      await job.removeForIntegration('QUICKBOOKS', 1);
 
       expect(vendorDataQueue.removeRepeatableByKey).toHaveBeenCalledWith('key-1');
       expect(vendorDataQueue.removeRepeatableByKey).toHaveBeenCalledTimes(1);
@@ -82,7 +82,7 @@ describe('OAuthTokenRefreshJob', () => {
         { id: 'oauth-refresh-OTHER-2', key: 'key-2', name: 'oauth-refresh' },
       ]);
 
-      await job.removeForIntegration('SAMSARA_ELD', 1);
+      await job.removeForIntegration('QUICKBOOKS', 1);
 
       expect(vendorDataQueue.removeRepeatableByKey).not.toHaveBeenCalled();
     });
@@ -109,13 +109,13 @@ describe('OAuthTokenRefreshJob', () => {
     it('should register refresh jobs for OAuth integrations', async () => {
       vendorDataQueue.getRepeatableJobs.mockResolvedValue([]);
 
-      // Return an integration that uses OAuth (Samsara uses OAuth)
+      // Return an integration that uses OAuth (QuickBooks uses OAuth)
       prisma.integrationConfig.findMany.mockResolvedValue([
         {
           id: 1,
-          integrationId: 'int-samsara-1',
+          integrationId: 'int-qb-1',
           tenantId: 5,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: 'encrypted_creds',
         },
       ]);
@@ -132,10 +132,10 @@ describe('OAuthTokenRefreshJob', () => {
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
         'oauth-refresh',
         expect.objectContaining({
-          payload: expect.objectContaining({ tenantId: 5, vendor: 'SAMSARA_ELD' }),
+          payload: expect.objectContaining({ tenantId: 5, vendor: 'QUICKBOOKS' }),
         }),
         expect.objectContaining({
-          jobId: 'oauth-refresh-SAMSARA_ELD-5',
+          jobId: 'oauth-refresh-QUICKBOOKS-5',
         }),
       );
     });
@@ -146,16 +146,16 @@ describe('OAuthTokenRefreshJob', () => {
       prisma.integrationConfig.findMany.mockResolvedValue([
         {
           id: 2,
-          integrationId: 'int-samsara-2',
+          integrationId: 'int-qb-2',
           tenantId: 6,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: 'encrypted_api_creds',
         },
       ]);
 
       authTokenService.decryptCredentials.mockReturnValue({
         authMethod: 'api_token',
-        apiToken: 'samsara-api-token',
+        apiToken: 'qb-api-token',
       });
 
       await job.onModuleInit();
@@ -171,7 +171,7 @@ describe('OAuthTokenRefreshJob', () => {
           id: 3,
           integrationId: 'int-bad',
           tenantId: 7,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: 'corrupt',
         },
       ]);
@@ -193,7 +193,7 @@ describe('OAuthTokenRefreshJob', () => {
           id: 4,
           integrationId: 'int-nocred',
           tenantId: 8,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: null,
         },
       ]);
@@ -204,7 +204,7 @@ describe('OAuthTokenRefreshJob', () => {
       // and proceeds to register the refresh job (assumes OAuth)
       expect(vendorDataQueue.add).toHaveBeenCalledWith(
         'oauth-refresh',
-        expect.objectContaining({ payload: expect.objectContaining({ tenantId: 8, vendor: 'SAMSARA_ELD' }) }),
+        expect.objectContaining({ payload: expect.objectContaining({ tenantId: 8, vendor: 'QUICKBOOKS' }) }),
         expect.any(Object),
       );
     });
@@ -226,14 +226,14 @@ describe('OAuthTokenRefreshJob', () => {
           id: 5,
           integrationId: 'int-legacy',
           tenantId: 9,
-          vendor: 'SAMSARA_ELD',
+          vendor: 'QUICKBOOKS',
           credentials: 'encrypted',
         },
       ]);
 
       // Older format: no authMethod field, but has apiToken and no accessToken
       authTokenService.decryptCredentials.mockReturnValue({
-        apiToken: 'samsara-token-here',
+        apiToken: 'qb-token-here',
       });
 
       await job.onModuleInit();

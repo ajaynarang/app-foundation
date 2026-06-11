@@ -59,7 +59,7 @@ describe('OAuthRefreshJobHandler', () => {
       circuitBreaker.isOpen.mockResolvedValue(true);
 
       await expect(
-        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' })),
+        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' })),
       ).rejects.toThrow(/circuit open/i);
 
       expect(authTokenService.refreshTokens).not.toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('OAuthRefreshJobHandler', () => {
     it('should skip refresh when tenant is paused', async () => {
       prisma.tenant.findUnique.mockResolvedValue({ jobsPaused: true });
 
-      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' }));
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' }));
 
       expect(authTokenService.refreshTokens).not.toHaveBeenCalled();
     });
@@ -77,7 +77,7 @@ describe('OAuthRefreshJobHandler', () => {
       prisma.tenant.findUnique.mockResolvedValue({ jobsPaused: false });
       prisma.integrationConfig.findFirst.mockResolvedValue(null);
 
-      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-missing', vendor: 'SAMSARA_ELD' }));
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-missing', vendor: 'QUICKBOOKS' }));
 
       expect(authTokenService.refreshTokens).not.toHaveBeenCalled();
     });
@@ -90,7 +90,7 @@ describe('OAuthRefreshJobHandler', () => {
         status: 'ACTIVE',
       });
 
-      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' }));
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' }));
 
       expect(authTokenService.refreshTokens).not.toHaveBeenCalled();
     });
@@ -103,7 +103,7 @@ describe('OAuthRefreshJobHandler', () => {
         status: 'NOT_CONFIGURED',
       });
 
-      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' }));
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' }));
 
       expect(authTokenService.refreshTokens).not.toHaveBeenCalled();
     });
@@ -117,10 +117,10 @@ describe('OAuthRefreshJobHandler', () => {
       });
       authTokenService.refreshTokens.mockResolvedValue('new-token');
 
-      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' }));
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' }));
 
       expect(authTokenService.refreshTokens).toHaveBeenCalledWith(42);
-      expect(circuitBreaker.recordSuccess).toHaveBeenCalledWith('SAMSARA_ELD');
+      expect(circuitBreaker.recordSuccess).toHaveBeenCalledWith('QUICKBOOKS');
     });
 
     it('should not throw and not trip breaker for non-retryable errors', async () => {
@@ -135,7 +135,7 @@ describe('OAuthRefreshJobHandler', () => {
       authTokenService.refreshTokens.mockRejectedValue(error);
 
       await expect(
-        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' })),
+        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' })),
       ).resolves.toBeUndefined();
 
       expect(circuitBreaker.recordFailure).not.toHaveBeenCalled();
@@ -151,10 +151,10 @@ describe('OAuthRefreshJobHandler', () => {
       authTokenService.refreshTokens.mockRejectedValue(new Error('network timeout'));
 
       await expect(
-        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'SAMSARA_ELD' })),
+        processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' })),
       ).rejects.toThrow('network timeout');
 
-      expect(circuitBreaker.recordFailure).toHaveBeenCalledWith('SAMSARA_ELD');
+      expect(circuitBreaker.recordFailure).toHaveBeenCalledWith('QUICKBOOKS');
     });
   });
 });

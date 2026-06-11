@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ChevronRight, ChevronLeft, BookOpen, Search, X, Code2, BookMarked } from 'lucide-react';
+import { ChevronRight, ChevronLeft, BookOpen, Search, X } from 'lucide-react';
 import { cn } from '@app/ui';
 import { ScrollArea } from '@app/ui/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@app/ui/components/ui/tooltip';
@@ -19,8 +19,6 @@ type DocsNavSection = {
   items: DocsNavItem[];
 };
 
-type DocsTab = 'api' | 'manual';
-
 // ─── API Docs navigation ────────────────────────────────────────────────────
 
 const apiNavigation: DocsNavSection[] = [
@@ -31,54 +29,11 @@ const apiNavigation: DocsNavSection[] = [
       { label: 'Quickstart', href: '/docs/getting-started/quickstart' },
       { label: 'Authentication', href: '/docs/getting-started/authentication' },
       { label: 'API Keys', href: '/docs/getting-started/api-keys' },
-      { label: 'Manage Fleet', href: '/docs/getting-started/manage-fleet' },
-      { label: 'Plan a Route', href: '/docs/getting-started/plan-a-route' },
-      { label: 'Your First Route', href: '/docs/getting-started/first-route' },
     ],
   },
   {
     label: 'Guides',
     items: [
-      {
-        label: 'Route Planning',
-        href: '/docs/api-guides/route-planning',
-        children: [
-          { label: 'Creating Routes', href: '/docs/api-guides/route-planning/creating-routes' },
-          { label: 'Understanding HOS', href: '/docs/api-guides/route-planning/understanding-hos' },
-          { label: 'Stop Optimization', href: '/docs/api-guides/route-planning/stop-optimization' },
-          { label: 'Fuel Stops', href: '/docs/api-guides/route-planning/fuel-stops' },
-          { label: 'Rest Stops', href: '/docs/api-guides/route-planning/rest-stops' },
-          { label: 'Route Updates', href: '/docs/api-guides/route-planning/route-updates' },
-        ],
-      },
-      {
-        label: 'Fleet Management',
-        href: '/docs/api-guides/fleet-management',
-        children: [
-          { label: 'Drivers', href: '/docs/api-guides/fleet-management/drivers' },
-          { label: 'Vehicles', href: '/docs/api-guides/fleet-management/vehicles' },
-          { label: 'Loads', href: '/docs/api-guides/fleet-management/loads' },
-        ],
-      },
-      {
-        label: 'Alerts & Monitoring',
-        href: '/docs/api-guides/alerts-monitoring',
-        children: [
-          { label: 'Alert Types', href: '/docs/api-guides/alerts-monitoring/alert-types' },
-          { label: 'Alert Management', href: '/docs/api-guides/alerts-monitoring/alert-management' },
-          { label: 'Real-Time Events', href: '/docs/api-guides/alerts-monitoring/real-time-events' },
-        ],
-      },
-      {
-        label: 'Integrations',
-        href: '/docs/api-guides/integrations',
-        children: [
-          { label: 'TMS', href: '/docs/api-guides/integrations/tms' },
-          { label: 'Samsara ELD', href: '/docs/api-guides/integrations/eld-samsara' },
-          { label: 'Webhooks', href: '/docs/api-guides/integrations/webhooks' },
-          { label: 'Error Handling', href: '/docs/api-guides/integrations/error-handling' },
-        ],
-      },
       {
         label: 'AI Integrations',
         href: '/docs/api-guides/ai-integrations',
@@ -88,14 +43,6 @@ const apiNavigation: DocsNavSection[] = [
           { label: 'Claude Connector', href: '/docs/api-guides/ai-integrations/claude-connector' },
           { label: 'Cursor', href: '/docs/api-guides/ai-integrations/cursor' },
           { label: 'MCP Clients', href: '/docs/api-guides/ai-integrations/mcp-clients' },
-        ],
-      },
-      {
-        label: 'Multi-Tenancy',
-        href: '/docs/api-guides/multi-tenancy',
-        children: [
-          { label: 'Tenant Setup', href: '/docs/api-guides/multi-tenancy/tenant-setup' },
-          { label: 'User Roles', href: '/docs/api-guides/multi-tenancy/user-roles' },
         ],
       },
     ],
@@ -114,127 +61,7 @@ const apiNavigation: DocsNavSection[] = [
   },
   {
     label: 'Resources',
-    items: [
-      { label: 'FAQ', href: '/docs/resources/faq' },
-      { label: 'Glossary', href: '/docs/resources/glossary' },
-      { label: 'Support', href: '/docs/resources/support' },
-      { label: 'Changelog', href: '/docs/resources/changelog' },
-    ],
-  },
-];
-
-// ─── Product Manual navigation ──────────────────────────────────────────────
-
-const manualNavigation: DocsNavSection[] = [
-  {
-    label: 'Getting Started',
-    items: [
-      { label: 'Welcome', href: '/docs/manual/getting-started/welcome' },
-      { label: 'First Login', href: '/docs/manual/getting-started/first-login' },
-      { label: 'Your Plan', href: '/docs/manual/getting-started/understanding-your-plan' },
-      { label: 'Key Concepts', href: '/docs/manual/getting-started/key-concepts' },
-    ],
-  },
-  {
-    label: 'Dispatcher',
-    items: [
-      { label: 'Dashboard', href: '/docs/manual/web-app/dispatcher/dashboard-overview' },
-      { label: 'Loads', href: '/docs/manual/web-app/dispatcher/managing-loads' },
-      { label: 'Drivers', href: '/docs/manual/web-app/dispatcher/managing-drivers' },
-      { label: 'Vehicles', href: '/docs/manual/web-app/dispatcher/managing-vehicles' },
-      { label: 'Customers', href: '/docs/manual/web-app/dispatcher/managing-customers' },
-      { label: 'Route Planning', href: '/docs/manual/web-app/dispatcher/route-planning' },
-      { label: 'Alerts', href: '/docs/manual/web-app/dispatcher/alerts-monitoring' },
-      { label: 'Tower', href: '/docs/manual/web-app/dispatcher/command-center' },
-      { label: 'Shield', href: '/docs/manual/web-app/dispatcher/shield-compliance' },
-      { label: 'Billing', href: '/docs/manual/web-app/dispatcher/billing-invoicing' },
-      { label: 'Driver Pay', href: '/docs/manual/web-app/dispatcher/driver-pay-settlements' },
-      { label: 'Close-Out', href: '/docs/manual/web-app/dispatcher/close-out' },
-      { label: 'Documents', href: '/docs/manual/web-app/dispatcher/documents' },
-    ],
-  },
-  {
-    label: 'Driver',
-    items: [
-      { label: 'Home', href: '/docs/manual/web-app/driver/driver-home' },
-      { label: 'Route', href: '/docs/manual/web-app/driver/viewing-route' },
-      { label: 'Assistant', href: '/docs/manual/web-app/driver/assistant' },
-      { label: 'Alerts', href: '/docs/manual/web-app/driver/alerts-messages' },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { label: 'Settings', href: '/docs/manual/web-app/admin/tenant-settings' },
-      { label: 'Users', href: '/docs/manual/web-app/admin/user-management' },
-      { label: 'Feature Flags', href: '/docs/manual/web-app/admin/feature-flags' },
-    ],
-  },
-  {
-    label: 'Customer',
-    items: [{ label: 'Customer Portal', href: '/docs/manual/web-app/customer/customer-portal' }],
-  },
-  {
-    label: 'Console',
-    items: [
-      { label: 'Overview', href: '/docs/manual/console-app/overview' },
-      {
-        label: 'Configuration',
-        href: '/docs/manual/console-app/configuration/operations-settings',
-        children: [
-          { label: 'Operations', href: '/docs/manual/console-app/configuration/operations-settings' },
-          { label: 'Alerts', href: '/docs/manual/console-app/configuration/alert-settings' },
-          { label: 'Invoicing', href: '/docs/manual/console-app/configuration/invoicing-settings' },
-        ],
-      },
-      {
-        label: 'Integrations',
-        href: '/docs/manual/console-app/integrations/samsara-setup',
-        children: [
-          { label: 'Samsara', href: '/docs/manual/console-app/integrations/samsara-setup' },
-          { label: 'QuickBooks', href: '/docs/manual/console-app/integrations/quickbooks-setup' },
-          { label: 'Sync', href: '/docs/manual/console-app/integrations/sync-management' },
-        ],
-      },
-      {
-        label: 'Developer',
-        href: '/docs/manual/console-app/developer/api-keys',
-        children: [
-          { label: 'API Keys', href: '/docs/manual/console-app/developer/api-keys' },
-          { label: 'Webhooks', href: '/docs/manual/console-app/developer/webhooks' },
-          { label: 'OAuth', href: '/docs/manual/console-app/developer/oauth-clients' },
-          { label: 'AI Assistants', href: '/docs/manual/console-app/developer/ai-assistants' },
-        ],
-      },
-      {
-        label: 'Team & Account',
-        href: '/docs/manual/console-app/team-account/team-members',
-        children: [
-          { label: 'Team', href: '/docs/manual/console-app/team-account/team-members' },
-          { label: 'Plan & Billing', href: '/docs/manual/console-app/team-account/plan-billing' },
-          { label: 'Organization', href: '/docs/manual/console-app/team-account/organization' },
-        ],
-      },
-    ],
-  },
-  {
-    label: 'Assistant',
-    items: [
-      { label: 'What is the assistant?', href: '/docs/manual/assistant/what-is-assistant' },
-      { label: 'Asking Questions', href: '/docs/manual/assistant/asking-questions' },
-      { label: 'Actions', href: '/docs/manual/assistant/assistant-actions' },
-      { label: 'Voice Mode', href: '/docs/manual/assistant/voice-mode' },
-      { label: 'Doc Intelligence', href: '/docs/manual/assistant/document-intelligence' },
-    ],
-  },
-  {
-    label: 'Reference',
-    items: [
-      { label: 'Roles', href: '/docs/manual/reference/roles-permissions' },
-      { label: 'Shortcuts', href: '/docs/manual/reference/keyboard-shortcuts' },
-      { label: 'Troubleshooting', href: '/docs/manual/reference/troubleshooting' },
-      { label: 'Glossary', href: '/docs/manual/reference/glossary' },
-    ],
+    items: [{ label: 'Support', href: '/docs/resources/support' }],
   },
 ];
 
@@ -267,10 +94,6 @@ function getExpandedKeys(sections: DocsNavSection[], pathname: string): Set<stri
   return keys;
 }
 
-function detectTab(pathname: string): DocsTab {
-  return pathname.startsWith('/docs/manual') ? 'manual' : 'api';
-}
-
 const COLLAPSED_KEY = 'docs-sidebar-collapsed';
 
 const sectionAbbreviations: Record<string, string> = {
@@ -279,13 +102,6 @@ const sectionAbbreviations: Record<string, string> = {
   'API Reference': 'API',
   Webhooks: 'WH',
   Resources: 'RS',
-  Dispatcher: 'DI',
-  Driver: 'DR',
-  Admin: 'AD',
-  Customer: 'CU',
-  Console: 'CO',
-  Assistant: 'AI',
-  Reference: 'RF',
 };
 
 function filterNavItem(item: DocsNavItem, query: string): DocsNavItem | null {
@@ -373,61 +189,16 @@ function NavItem({ item, pathname, expandedKeys, onToggle, depth = 0 }: NavItemP
   );
 }
 
-// ─── Tab Switcher ───────────────────────────────────────────────────────────
-
-function TabSwitcher({ activeTab, onTabChange }: { activeTab: DocsTab; onTabChange: (tab: DocsTab) => void }) {
-  return (
-    <div className="flex items-center gap-1 p-1 mx-4 mt-3 mb-1 rounded-lg bg-muted/50 border border-border">
-      <button
-        onClick={() => onTabChange('api')}
-        className={cn(
-          'flex items-center gap-1.5 flex-1 justify-center py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-          activeTab === 'api'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground',
-        )}
-      >
-        <Code2 className="h-3.5 w-3.5" />
-        API Docs
-      </button>
-      <button
-        onClick={() => onTabChange('manual')}
-        className={cn(
-          'flex items-center gap-1.5 flex-1 justify-center py-1.5 px-2 rounded-md text-xs font-medium transition-all',
-          activeTab === 'manual'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground',
-        )}
-      >
-        <BookMarked className="h-3.5 w-3.5" />
-        Manual
-      </button>
-    </div>
-  );
-}
-
 // ─── DocsSidebar ────────────────────────────────────────────────────────────
 
 export function DocsSidebar() {
   const pathname = usePathname() ?? '';
-  const [activeTab, setActiveTab] = useState<DocsTab>(() => detectTab(pathname));
-  const activeNavigation = activeTab === 'manual' ? manualNavigation : apiNavigation;
+  const activeNavigation = apiNavigation;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => getExpandedKeys(activeNavigation, pathname));
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-switch tab only when navigating to a URL that belongs to the other tab
-  const pathnameTabRef = useRef<DocsTab>(detectTab(pathname));
-  useEffect(() => {
-    const urlTab = detectTab(pathname);
-    if (urlTab !== pathnameTabRef.current) {
-      pathnameTabRef.current = urlTab;
-      setActiveTab(urlTab);
-      setSearchQuery('');
-    }
-  }, [pathname]);
 
   const filteredNavigation = useMemo(
     () => filterNavigation(activeNavigation, searchQuery),
@@ -507,20 +278,10 @@ export function DocsSidebar() {
     });
   };
 
-  const handleTabChange = (tab: DocsTab) => {
-    setActiveTab(tab);
-    setSearchQuery('');
-    const nav = tab === 'manual' ? manualNavigation : apiNavigation;
-    setExpandedKeys(getExpandedKeys(nav, pathname));
-  };
-
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      {/* Tab Switcher */}
-      <TabSwitcher activeTab={activeTab} onTabChange={handleTabChange} />
-
       {/* Search */}
-      <div className="px-4 pt-2 pb-2">
+      <div className="px-4 pt-3 pb-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
@@ -528,7 +289,7 @@ export function DocsSidebar() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={activeTab === 'manual' ? 'Search manual...' : 'Search API docs...'}
+            placeholder="Search docs..."
             className="w-full h-8 pl-8 pr-8 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
@@ -677,52 +438,12 @@ export function DocsSidebar() {
           )}
         </div>
 
-        {/* Expanded: tab switcher + nav */}
+        {/* Expanded: nav */}
         {!isCollapsed && sidebarContent}
 
-        {/* Collapsed: tab icons + section initials */}
+        {/* Collapsed: section initials */}
         {isCollapsed && (
           <div className="flex-1 py-4 px-2 space-y-2 overflow-y-auto">
-            {/* Collapsed tab switcher */}
-            <div className="flex flex-col gap-1 mb-3 pb-3 border-b border-border">
-              <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleTabChange('api')}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-full rounded-md transition-colors',
-                      activeTab === 'api'
-                        ? 'bg-black text-white dark:bg-white dark:text-black'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                  >
-                    <Code2 className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">
-                  API Docs
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleTabChange('manual')}
-                    className={cn(
-                      'flex items-center justify-center h-9 w-full rounded-md transition-colors',
-                      activeTab === 'manual'
-                        ? 'bg-black text-white dark:bg-white dark:text-black'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                  >
-                    <BookMarked className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">
-                  Product Manual
-                </TooltipContent>
-              </Tooltip>
-            </div>
-
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <button

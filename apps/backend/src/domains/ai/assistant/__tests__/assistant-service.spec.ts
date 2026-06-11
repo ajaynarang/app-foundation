@@ -52,7 +52,7 @@ describe('AssistantAiService', () => {
         create: jest.fn().mockResolvedValue({
           id: 1,
           conversationId: 'conv_test',
-          userMode: 'dispatcher',
+          userMode: 'member',
           title: null,
           createdAt: new Date('2026-01-01'),
           messages: [
@@ -102,12 +102,12 @@ describe('AssistantAiService', () => {
 
     mockAssistantRouter = {
       route: jest.fn().mockResolvedValue({
-        agentId: 'dispatch',
+        agentId: 'assistant',
         taskSkill: null,
         taskSkillContent: null,
         source: 'default',
       }),
-      defaultAgentFor: jest.fn().mockReturnValue('dispatch'),
+      defaultAgentFor: jest.fn().mockReturnValue('assistant'),
     };
 
     mockAgentRegistry = {
@@ -130,15 +130,15 @@ describe('AssistantAiService', () => {
 
   describe('createConversation', () => {
     it('creates a conversation and returns greeting', async () => {
-      const result = await service.createConversation('user_1', 1, 'dispatcher');
+      const result = await service.createConversation('user_1', 1, 'member');
       expect(result.conversationId).toBe('conv_test');
-      expect(result.userMode).toBe('dispatcher');
+      expect(result.userMode).toBe('member');
       expect(result.greeting.role).toBe('assistant');
       expect(result.greeting.content).toContain('assistant');
       expect(mockPrisma.conversation.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            userMode: 'dispatcher',
+            userMode: 'member',
             tenantId: 1,
             userId: 1,
           }),
@@ -148,7 +148,7 @@ describe('AssistantAiService', () => {
 
     it('throws NotFoundException when user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.createConversation('user_nonexist', 1, 'dispatcher')).rejects.toThrow(NotFoundException);
+      await expect(service.createConversation('user_nonexist', 1, 'member')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -159,7 +159,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: null,
       });
     });
@@ -176,7 +176,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 99,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: null,
       });
       const gen = service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1);
@@ -204,21 +204,21 @@ describe('AssistantAiService', () => {
         events: [],
       });
 
-      const gen = service.generateResponse('conv_test', 'What loads are active?', 'text', 'user_1', 1);
+      const gen = service.generateResponse('conv_test', 'What can you help me with?', 'text', 'user_1', 1);
       await gen.next();
 
       expect(mockPrisma.conversationMessage.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             role: 'user',
-            content: 'What loads are active?',
+            content: 'What can you help me with?',
           }),
         }),
       );
       expect(mockPrisma.conversation.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            title: 'What loads are active?',
+            title: 'What can you help me with?',
           }),
         }),
       );
@@ -231,19 +231,19 @@ describe('AssistantAiService', () => {
       }
 
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
-      const gen = service.generateResponse('conv_test', 'Show fleet status', 'text', 'user_1', 1);
+      const gen = service.generateResponse('conv_test', 'Show my summary', 'text', 'user_1', 1);
 
       const chunks: any[] = [];
       for await (const chunk of gen) {
         chunks.push(chunk);
       }
 
-      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show fleet status', 'dispatcher');
-      expect(mockAgentRegistry.get).toHaveBeenCalledWith('dispatch');
+      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show my summary', 'member');
+      expect(mockAgentRegistry.get).toHaveBeenCalledWith('assistant');
       expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
       expect(chunks.some((c) => c.type === 'complete')).toBe(true);
     });
@@ -252,12 +252,12 @@ describe('AssistantAiService', () => {
       async function* mockChat() {
         yield {
           type: 'text-delta' as const,
-          data: 'Answer.\n\n<followups>\nCheck HOS status\nShow active loads\n</followups>',
+          data: 'Answer.\n\n<followups>\nView settings\nOpen documentation\n</followups>',
         };
       }
 
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -284,7 +284,7 @@ describe('AssistantAiService', () => {
       }
 
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -308,7 +308,7 @@ describe('AssistantAiService', () => {
       }
 
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -338,7 +338,7 @@ describe('AssistantAiService', () => {
         yield { type: 'text-delta' as const, data: 'Text' };
       }
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -354,7 +354,7 @@ describe('AssistantAiService', () => {
         yield { type: 'text-delta' as const, data: 'Text' };
       }
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -376,7 +376,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: 'Existing Title',
       });
 
@@ -401,7 +401,7 @@ describe('AssistantAiService', () => {
       }
 
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn().mockReturnValue(mockChat()),
       });
 
@@ -423,7 +423,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: null,
       });
 
@@ -473,7 +473,7 @@ describe('AssistantAiService', () => {
       mockPrisma.conversation.findMany.mockResolvedValue([
         {
           conversationId: 'conv_1',
-          userMode: 'dispatcher',
+          userMode: 'member',
           title: 'Test Chat',
           _count: { messages: 5 },
           messages: [{ createdAt: new Date('2026-01-01') }],
@@ -491,7 +491,7 @@ describe('AssistantAiService', () => {
       mockPrisma.conversation.findMany.mockResolvedValue([
         {
           conversationId: 'conv_empty',
-          userMode: 'prospect',
+          userMode: 'member',
           title: null,
           _count: { messages: 0 },
           messages: [],
@@ -511,7 +511,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_1',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: 'Test',
         messages: [
           {
@@ -543,7 +543,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_1',
         userId: 999,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         messages: [],
       });
       await expect(service.getMessages('conv_1', 'user_1', 1)).rejects.toThrow(ForbiddenException);
@@ -575,7 +575,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: 'Test',
       });
 
@@ -652,20 +652,20 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: null,
       });
       mockPrisma.tenant = {
-        findUnique: jest.fn().mockResolvedValue({ companyName: 'Acme Trucking' }),
+        findUnique: jest.fn().mockResolvedValue({ companyName: 'Acme Inc' }),
       };
-      mockPrisma.user.findUnique = jest.fn().mockResolvedValue({ id: 1, role: 'DISPATCHER' });
+      mockPrisma.user.findUnique = jest.fn().mockResolvedValue({ id: 1, role: 'MEMBER' });
 
       // Empty async iterable for agent.chat
       const emptyStream = (async function* () {
         // no-op
       })();
       mockAgentRegistry.get.mockReturnValue({
-        id: 'dispatch',
+        id: 'assistant',
         chat: jest.fn((c: string) => {
           capturedAgentContent = c;
           return emptyStream;
@@ -687,32 +687,10 @@ describe('AssistantAiService', () => {
       expect(capturedAgentContent).toBe('rendered prompt body');
     });
 
-    it('overrides server-authoritative variables for assistant-briefing regardless of client-supplied values', async () => {
-      mockPromptService.getPrompt.mockResolvedValue('briefing rendered');
-
-      await service.streamMessage('conv_test', '', 'text', 'user_1', 1, mockReq(), mockRes(), {
-        promptKey: 'assistant-briefing',
-        promptVariables: {
-          timeOfDay: 'CLIENT_LIES',
-          tenantName: 'CLIENT_LIES',
-          now: 'CLIENT_LIES',
-          userRole: 'CLIENT_LIES',
-          customVar: 'keep-me',
-        },
-      });
-
-      const briefingCall = mockPromptService.getPrompt.mock.calls.find((c: any[]) => c[0] === 'assistant-briefing');
-      expect(briefingCall).toBeDefined();
-      const [key, vars] = briefingCall;
-      expect(key).toBe('assistant-briefing');
-      expect(vars.timeOfDay).not.toBe('CLIENT_LIES');
-      expect(['morning', 'midday', 'evening']).toContain(vars.timeOfDay);
-      expect(vars.tenantName).toBe('Acme Trucking');
-      expect(vars.now).not.toBe('CLIENT_LIES');
-      expect(vars.now).toMatch(/\d{4}-\d{2}-\d{2}T/);
-      expect(vars.userRole).toBe('DISPATCHER');
-      // Non-reserved client variables are preserved
-      expect(vars.customVar).toBe('keep-me');
-    });
+    // NOTE: the original platform's briefing prompt (server-authoritative variable overrides
+    // in resolvePromptKey) was not carried into the starter. If you add a
+    // prompt whose variables must be trusted (tenant name, role, time),
+    // override them server-side in resolvePromptKey and add a test asserting
+    // client-supplied values for those keys are ignored.
   });
 });

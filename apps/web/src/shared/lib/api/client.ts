@@ -9,7 +9,7 @@
 
 import { useAuthStore } from '@/features/auth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export class ApiError extends Error {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

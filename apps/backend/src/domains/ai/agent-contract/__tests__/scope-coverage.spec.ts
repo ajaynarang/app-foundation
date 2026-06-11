@@ -44,9 +44,9 @@ describe('scope coverage', () => {
 
     expect(mismatches).toEqual([]);
     expect(totalTools).toBe(totalScopes);
-    // Desk v3 refactor (PR #637) removed ~14 desk tools (Phase C baseline
-    // was ≥ 117). Keep a lower floor so we still catch accidental mass
-    // tool removal, but don't block legitimate retirements.
-    expect(totalTools).toBeGreaterThanOrEqual(95);
+    // The starter ships 3 tools (health-check, search-kb, get-product-info).
+    // Keep a floor of 1 so we still catch the toolset being wiped entirely,
+    // without blocking template consumers who replace the samples.
+    expect(totalTools).toBeGreaterThanOrEqual(1);
   });
 });

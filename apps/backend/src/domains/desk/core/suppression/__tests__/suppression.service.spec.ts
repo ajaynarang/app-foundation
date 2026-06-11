@@ -38,7 +38,7 @@ function makeEpisode() {
     id: EPISODE_ID,
     entityType: 'invoice',
     entityId: 'INV-001',
-    responsibility: { key: 'ar_followup' },
+    responsibility: { key: 'welcome' },
   };
 }
 
@@ -46,7 +46,7 @@ function makeSuppressionRow(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'sup-1',
     tenantId: TENANT_ID,
-    responsibilityKey: 'ar_followup',
+    responsibilityKey: 'welcome',
     entityType: 'invoice',
     entityId: 'INV-001',
     suppressUntil: null as Date | null,
@@ -97,7 +97,7 @@ describe('SuppressionService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             tenantId: TENANT_ID,
-            responsibilityKey: 'ar_followup',
+            responsibilityKey: 'welcome',
             entityType: 'invoice',
             entityId: 'INV-001',
             setByUserId: USER_ID,
@@ -210,7 +210,7 @@ describe('SuppressionService', () => {
         id: EPISODE_ID,
         entityType: null,
         entityId: null,
-        responsibility: { key: 'ar_followup' },
+        responsibility: { key: 'welcome' },
       });
       const { BadRequestException } = await import('@nestjs/common');
       await expect(

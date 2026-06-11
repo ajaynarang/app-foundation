@@ -21,59 +21,59 @@ describe('SkillClassifierService', () => {
 
   beforeEach(() => {
     promptService = {
-      getPrompt: jest.fn().mockResolvedValue('You route fleet operations messages.'),
+      getPrompt: jest.fn().mockResolvedValue('You route user messages to agents.'),
     } as unknown as jest.Mocked<PromptingService>;
     service = new SkillClassifierService(promptService);
     mockGenerateText.mockReset();
   });
 
-  it('should classify a billing message', async () => {
+  it('should return a registered agent id', async () => {
     mockGenerateText.mockResolvedValue({
-      text: '{ "agentId": "billing", "taskSkill": null }',
+      text: '{ "agentId": "assistant", "taskSkill": null }',
     });
-    const result = await service.classify('show me unpaid invoices');
-    expect(result.agentId).toBe('billing');
+    const result = await service.classify('show me my account');
+    expect(result.agentId).toBe('assistant');
     expect(result.taskSkill).toBeNull();
   });
 
   it('should handle JSON wrapped in markdown fences', async () => {
     mockGenerateText.mockResolvedValue({
-      text: '```json\n{ "agentId": "route", "taskSkill": null }\n```',
+      text: '```json\n{ "agentId": "assistant", "taskSkill": null }\n```',
     });
-    const result = await service.classify('plan a route');
-    expect(result.agentId).toBe('route');
+    const result = await service.classify('help me');
+    expect(result.agentId).toBe('assistant');
   });
 
-  it('should default to dispatch for unknown agent IDs', async () => {
+  it('should fall back to assistant for unregistered agent IDs', async () => {
     mockGenerateText.mockResolvedValue({
       text: '{ "agentId": "unknown_agent", "taskSkill": null }',
     });
     const result = await service.classify('hello');
-    expect(result.agentId).toBe('dispatch');
+    expect(result.agentId).toBe('assistant');
   });
 
-  it('should default to dispatch on parse error', async () => {
+  it('should default to assistant on parse error', async () => {
     mockGenerateText.mockResolvedValue({
       text: 'not valid json',
     });
     const result = await service.classify('hello');
-    expect(result.agentId).toBe('dispatch');
+    expect(result.agentId).toBe('assistant');
     expect(result.taskSkill).toBeNull();
   });
 
-  it('should default to dispatch on network error', async () => {
+  it('should default to assistant on network error', async () => {
     mockGenerateText.mockRejectedValue(new Error('Network error'));
     const result = await service.classify('hello');
-    expect(result.agentId).toBe('dispatch');
+    expect(result.agentId).toBe('assistant');
     expect(result.taskSkill).toBeNull();
   });
 
   it('should pass taskSkill from response', async () => {
     mockGenerateText.mockResolvedValue({
-      text: '{ "agentId": "compliance", "taskSkill": "shield-audit" }',
+      text: '{ "agentId": "assistant", "taskSkill": "example-skill" }',
     });
-    const result = await service.classify('run compliance audit');
-    expect(result.agentId).toBe('compliance');
-    expect(result.taskSkill).toBe('shield-audit');
+    const result = await service.classify('run the example task');
+    expect(result.agentId).toBe('assistant');
+    expect(result.taskSkill).toBe('example-skill');
   });
 });

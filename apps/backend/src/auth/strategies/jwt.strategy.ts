@@ -10,6 +10,7 @@ export interface JwtPayload {
   email?: string; // Optional — phone-only users may not have one
   role: string;
   tenantId?: string; // Optional - SUPER_ADMIN has no tenant
+  sid?: string; // Session id — the refresh-token row this session is tied to
   authMethod?: 'email_password' | 'phone_pin' | 'phone_otp';
   iat: number;
   exp: number;
@@ -58,16 +59,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // seeded tenant — even for users created without a tenant relation.
     const multiTenancy = this.configService.get<{ enabled: boolean; implicitTenantId: number }>('multiTenancy');
     if (multiTenancy?.enabled === false && user.role !== 'SUPER_ADMIN' && !user.tenant) {
+      const implicitTenant = await this.getImplicitTenant(multiTenancy.implicitTenantId);
       return {
         dbId: user.id,
         userId: user.userId,
         email: user.email,
         role: user.role,
-        tenantId: String(multiTenancy.implicitTenantId),
+        // Use the seeded tenant's REAL public string id so string-keyed
+        // lookups (tenant.findUnique({ where: { tenantId } })) resolve.
+        tenantId: implicitTenant?.tenantId ?? String(multiTenancy.implicitTenantId),
         tenantDbId: multiTenancy.implicitTenantId,
-        tenantName: 'Default Workspace',
+        tenantName: implicitTenant?.companyName ?? 'Default Workspace',
         isActive: user.isActive,
         authMethod: payload.authMethod,
+        tokenId: payload.sid, // Session id — lets logout revoke this session's refresh token
       };
     }
 
@@ -82,6 +87,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantName: user.tenant?.companyName,
       isActive: user.isActive,
       authMethod: payload.authMethod, // How this session was established
+      tokenId: payload.sid, // Session id — lets logout revoke this session's refresh token
     };
+  }
+
+  /**
+   * Resolve (and memoize) the seeded implicit tenant for single-tenant mode.
+   * Cached for the process lifetime — the implicit tenant is seeded once and
+   * never changes identity.
+   */
+  private implicitTenant: { tenantId: string; companyName: string } | null | undefined;
+
+  private async getImplicitTenant(implicitTenantId: number) {
+    if (this.implicitTenant !== undefined) return this.implicitTenant;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: implicitTenantId },
+      select: { tenantId: true, companyName: true },
+    });
+    this.implicitTenant = tenant ?? null;
+    return this.implicitTenant;
   }
 }

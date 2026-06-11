@@ -64,8 +64,8 @@ describe('McpServerService', () => {
       userId: '1',
       tenantDbId: 1,
       clientId: 'client_1',
-      role: 'DISPATCHER',
-      scopes: ['platform:read', 'fleet:write'],
+      role: 'ADMIN',
+      scopes: ['platform:read', 'documents:write'],
     };
 
     let mockReq: any;
@@ -84,10 +84,7 @@ describe('McpServerService', () => {
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
-      expect(Server).toHaveBeenCalledWith(
-        { name: 'assistant-fleet-ops', version: '1.0.0' },
-        { capabilities: { tools: {} } },
-      );
+      expect(Server).toHaveBeenCalledWith({ name: 'app-assistant', version: '1.0.0' }, { capabilities: { tools: {} } });
     });
 
     it('should call transport.handleRequest with req, res, body', async () => {
@@ -125,11 +122,11 @@ describe('McpServerService', () => {
 
   describe('listToolsForPrincipal', () => {
     it('filters registry-provided tools by principal scopes', () => {
-      mockScopeRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
+      mockScopeRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-items']));
       mockScopeRegistry.getAllTools.mockReturnValue([
         {
-          name: 'query-loads',
-          description: 'List loads',
+          name: 'query-items',
+          description: 'List items',
           inputSchema: { type: 'object', properties: {} },
           scope: 'platform:read',
         },
@@ -156,8 +153,8 @@ describe('McpServerService', () => {
       // so clients like Claude.ai can group tools. Verify the shape.
       expect(tools).toHaveLength(1);
       expect(tools[0]).toMatchObject({
-        name: 'query-loads',
-        description: 'List loads',
+        name: 'query-items',
+        description: 'List items',
         inputSchema: { type: 'object', properties: {} },
         annotations: expect.objectContaining({
           readOnlyHint: true,
@@ -191,7 +188,7 @@ describe('McpServerService — pipeline routing', () => {
   const oauthUser = {
     userId: '99',
     tenantDbId: 7,
-    role: 'DISPATCHER',
+    role: 'ADMIN',
     scopes: ['platform:read'],
     clientId: 'gpt-abc',
   };
@@ -201,7 +198,7 @@ describe('McpServerService — pipeline routing', () => {
       content: [{ type: 'text', text: '{"count":0}' }],
     });
 
-    const res = await service.executeToolCall('query-loads', { status: 'active' }, oauthUser as any);
+    const res = await service.executeToolCall('query-items', { status: 'active' }, oauthUser as any);
 
     expect(pipeline.run).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -209,7 +206,7 @@ describe('McpServerService — pipeline routing', () => {
         clientId: 'gpt-abc',
         tenantId: 7,
       }),
-      'query-loads',
+      'query-items',
       { status: 'active' },
     );
     expect(res.content[0].text).toBe('{"count":0}');
@@ -218,7 +215,7 @@ describe('McpServerService — pipeline routing', () => {
   it('returns pipeline_error when pipeline throws PipelineError', async () => {
     pipeline.run.mockRejectedValue(new PipelineError('scope_denied'));
 
-    const res = await service.executeToolCall('query-loads', {}, oauthUser as any);
+    const res = await service.executeToolCall('query-items', {}, oauthUser as any);
 
     expect(pipeline.run).toHaveBeenCalled();
     expect(res.isError).toBe(true);
@@ -229,6 +226,6 @@ describe('McpServerService — pipeline routing', () => {
   it('propagates non-PipelineError exceptions from the pipeline', async () => {
     pipeline.run.mockRejectedValue(new Error('db is on fire'));
 
-    await expect(service.executeToolCall('query-loads', {}, oauthUser as any)).rejects.toThrow(/db is on fire/);
+    await expect(service.executeToolCall('query-items', {}, oauthUser as any)).rejects.toThrow(/db is on fire/);
   });
 });

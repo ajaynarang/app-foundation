@@ -19,7 +19,7 @@ describe('delegateToAgentTool', () => {
   it('should validate valid input', () => {
     const schema = delegateToAgentTool.inputSchema;
     const result = schema.safeParse({
-      agentId: 'dispatch',
+      agentId: 'assistant',
       action: 'check load',
       params: { loadId: '123' },
     });

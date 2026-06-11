@@ -28,7 +28,7 @@ function makeEvents() {
 const baseEpisode = {
   id: 'ep-1',
   tenantId: 10,
-  responsibility: { key: 'ar_followup', title: 'AR Follow-up' },
+  responsibility: { key: 'welcome', title: 'AR Follow-up' },
   ownerAgent: { key: 'autumn', displayName: 'Autumn', name: 'Autumn' },
   trustLevelSnapshot: 'SUPERVISED' as const,
   triggerKind: 'SCHEDULED' as const,

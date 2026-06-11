@@ -2,7 +2,7 @@ import { Callout } from "@/components/docs/callout"
 
 # Cursor / Windsurf
 
-Connect Platform to your IDE's AI assistant using MCP support in [Cursor](https://cursor.sh) or [Windsurf](https://codeium.com/windsurf). This is useful for developers working on Platform integrations who want to query fleet data without leaving their editor.
+Connect Platform to your IDE's AI assistant using MCP support in [Cursor](https://cursor.sh) or [Windsurf](https://codeium.com/windsurf). This is useful for developers working on Platform integrations who want to query workspace data without leaving their editor.
 
 ## Cursor Setup
 
@@ -26,7 +26,7 @@ Add the following configuration:
 | Environment | URL |
 |-------------|-----|
 | **Production** | `https://api.example.com` |
-| **Staging** | `https://api.apps.appshore.in` |
+| **Staging** | `https://api-staging.example.com` |
 | **Local** | `http://localhost:8000` |
 
 Alternatively, create a `.cursor/mcp.json` file in your project root:
@@ -38,7 +38,7 @@ Alternatively, create a `.cursor/mcp.json` file in your project root:
       "url": "https://api.example.com"
     },
     "app-staging": {
-      "url": "https://api.apps.appshore.in"
+      "url": "https://api-staging.example.com"
     }
   }
 }
@@ -75,11 +75,11 @@ Add to the MCP configuration:
 In the AI chat panel, try:
 
 ```
-@app What loads are currently active?
+@app Run a health check on the platform
 
-@app Show me the fleet compliance score
+@app Search the knowledge base for the onboarding guide
 
-@app What invoices are pending for customer ABC Logistics?
+@app What does the knowledge base say about billing?
 ```
 
 ## Troubleshooting

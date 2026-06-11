@@ -91,12 +91,12 @@ services:
   # App services (backend + frontend) — DISABLED for local dev.
   #
   # For local development, use the Doppler-injected host flow instead:
-  #   pnpm doppler:backend     # http://localhost:8001
-  #   pnpm doppler:frontend    # http://localhost:3001
+  #   pnpm doppler:backend     # http://localhost:8000
+  #   pnpm doppler:frontend    # http://localhost:3000
   #   pnpm doppler:console     # http://localhost:3002
   #
   # Or run multiple instances side-by-side with different ports:
-  #   ./scripts/app-dev.sh --backend 8004 --web 3010 --console 3012
+  #   ./tools/dev/app-dev.sh --backend 8004 --web 3010 --console 3012
   #
   # The services below are only useful for testing the production image
   # locally. They DO NOT use Doppler secrets and will not work for full
@@ -137,7 +137,7 @@ services:
   #   container_name: app-frontend
   #   profiles: [apps]
   #   environment:
-  #     NEXT_PUBLIC_API_URL: http://localhost:8000
+  #     NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
   #     NODE_ENV: development
   #   ports:
   #     - "3000:3000"
@@ -159,8 +159,8 @@ services:
   # UI: http://localhost:8288
   #
   # Points at the backend running on the host via host.docker.internal.
-  # Backend port defaults to 8001 (standard `pnpm doppler:backend`); set
-  # BACKEND_PORT in a local `.env` (gitignored) or inline to override:
+  # Backend port defaults to 8000 (standard `pnpm dev` / `pnpm doppler:backend`);
+  # set BACKEND_PORT in a local `.env` (gitignored) or inline to override:
   #   BACKEND_PORT=8004 docker-compose up -d inngest
   #
   # macOS/Windows: host.docker.internal resolves natively.
@@ -177,7 +177,7 @@ services:
       - --host
       - '0.0.0.0'
       - --sdk-url
-      - 'http://host.docker.internal:${BACKEND_PORT:-8001}/api/v1/inngest'
+      - 'http://host.docker.internal:${BACKEND_PORT:-8000}/api/v1/inngest'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
 

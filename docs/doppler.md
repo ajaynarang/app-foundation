@@ -75,8 +75,8 @@ pnpm test:qa:local       # doppler run --project app-backend --config dev -- pnp
 ```
 
 > The QA scripts read `API_BASE_URL`, `WEB_BASE_URL`, and `DEV_AUTH_SECRET` from
-> `app-backend/dev` — add those three to that config if you use `test:*:local`,
-> `qa:*`, or `tenant:reset`.
+> `app-backend/dev` — add those three to that config if you use `test:*:local`
+> or `qa:*`.
 
 ## Seeding from .env.example
 
@@ -86,6 +86,7 @@ real values:
 ```bash
 doppler secrets upload apps/backend/.env.example --project app-backend  --config dev
 doppler secrets upload apps/web/.env.example     --project app-frontend --config dev
+doppler secrets upload apps/console/.env.example --project app-console  --config dev
 ```
 
 Notes:
@@ -93,9 +94,6 @@ Notes:
 - `doppler secrets upload` only imports **uncommented** `KEY=value` lines. Secrets in
   `.env.example` are intentionally commented out — set those individually afterwards
   (see the [reference tables](#variable-reference) for where to get each value).
-- `apps/console` has no `.env.example`; seed `app-console/dev` by hand (it needs
-  `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONSOLE_URL`, and optionally the
-  `NEXT_PUBLIC_FIREBASE_*` set — same values as `app-frontend`).
 - Repeat per config (`--config stg`, `--config prd`) with environment-appropriate values.
 
 ## Updating a variable
@@ -220,7 +218,7 @@ set real ones in `stg`/`prd`.
 
 ### Web (`app-frontend`)
 
-The web app boots with zero env vars locally (code falls back to `http://localhost:8000` /
+The web app boots with zero env vars locally (code falls back to `http://localhost:8000/api/v1` /
 `localhost:3000`). In any deployed environment, `NEXT_PUBLIC_API_URL` is effectively required.
 `NEXT_PUBLIC_*` values are baked into the browser bundle — never put secrets in them, and
 remember a rebuild (not just a restart) is needed for changes to take effect.
@@ -247,11 +245,11 @@ remember a rebuild (not just a restart) is needed for changes to take effect.
 
 ### Console (`app-console`)
 
-The console has **no `.env.example`** (its variables are undocumented in-repo). From code, it
-reads: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONSOLE_URL`,
-`NEXT_PUBLIC_TENANT_APP_URL`, `NEXT_PUBLIC_DOCS_ONLY_MODE`, and the same
-`NEXT_PUBLIC_FIREBASE_*` set as the web app. All have localhost or empty fallbacks; seed
-`app-console/dev` with at least `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_APP_URL`.
+The contract lives in `apps/console/.env.example`. The console reads `NEXT_PUBLIC_API_URL`,
+`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONSOLE_URL`, `NEXT_PUBLIC_TENANT_APP_URL`,
+`NEXT_PUBLIC_DOCS_ONLY_MODE`, and the same `NEXT_PUBLIC_FIREBASE_*` set as the web app. All
+have localhost or empty fallbacks; seed `app-console/dev` with at least `NEXT_PUBLIC_API_URL`
+and `NEXT_PUBLIC_APP_URL`.
 
 ## Per-environment guidance
 
@@ -262,15 +260,6 @@ Each project has three root configs:
 | `dev`  | Local dev, QA scripts | localhost Postgres/Redis, sandbox/test keys |
 | `stg`  | Staging ECS + CI      | staging RDS/ElastiCache, sandbox/test keys  |
 | `prd`  | Production ECS + CI   | production RDS/ElastiCache, live keys       |
-
-There is also a **branch config** `dev_stg_debug` on `app-backend` (branched from `dev`) for
-the parallel local stack on ports 5434/6380 — used by `pnpm doppler:backend:stg-debug`:
-
-```bash
-doppler configs create dev_stg_debug --project app-backend
-doppler secrets set DATABASE_URL=postgresql://postgres:postgres@localhost:5434/app?schema=public \
-  REDIS_URL=redis://localhost:6380/0 --project app-backend --config dev_stg_debug
-```
 
 ### Service tokens for CI/CD
 
@@ -324,9 +313,10 @@ Production so the configs stay in sync automatically.
 Plain `.env` files work fine for local dev — Doppler is optional:
 
 ```bash
-cd apps/backend && cp .env.example .env          # then fill in values
-cd apps/web     && cp .env.example .env.local
-pnpm dev                                          # instead of pnpm doppler:*
+cp apps/backend/.env.example apps/backend/.env        # then fill in values
+cp apps/web/.env.example     apps/web/.env.local
+cp apps/console/.env.example apps/console/.env.local  # optional — console has localhost fallbacks
+pnpm dev                                              # instead of pnpm doppler:*
 ```
 
 The backend's startup log tells you which source is active (`Doppler (project/config)` vs

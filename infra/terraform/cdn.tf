@@ -1,12 +1,11 @@
 # infra/terraform/cdn.tf
-# S3 + CloudFront CDN for static marketing assets (videos, images)
-# Only rendered video outputs go here — not source files.
+# S3 + CloudFront CDN for public static assets (videos, images)
 #
 # Usage:
-#   aws s3 cp out/master.mp4 s3://${bucket}/videos/demo.mp4
-#   aws s3 cp out/trailer.mp4 s3://${bucket}/videos/launch.mp4
+#   aws s3 cp ./my-asset.mp4 s3://${bucket}/videos/my-asset.mp4
 #
-# Files served at: https://cdn.${domain}/videos/demo.mp4
+# Files served at: https://<cdn_domain_name>/videos/my-asset.mp4
+# (see the cdn_domain_name output)
 
 # ─── S3 Bucket ───
 
@@ -88,7 +87,7 @@ resource "aws_s3_bucket_policy" "cdn" {
 resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   is_ipv6_enabled     = true
-  comment             = "${local.prefix} CDN — marketing videos and static assets"
+  comment             = "${local.prefix} CDN — public static assets"
   default_root_object = ""
   price_class         = "PriceClass_100" # US + Europe (cheapest, covers your audience)
   http_version        = "http2and3"
@@ -130,7 +129,7 @@ resource "aws_cloudfront_distribution" "cdn" {
 
     # Cache for 30 days, respect S3 headers
     min_ttl     = 0
-    default_ttl = 2592000 # 30 days
+    default_ttl = 2592000  # 30 days
     max_ttl     = 31536000 # 1 year
 
     forwarded_values {
@@ -153,7 +152,7 @@ resource "aws_cloudfront_distribution" "cdn" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
-    # To use custom domain (cdn.appshore.in), add:
+    # To use a custom domain (cdn.${var.domain}), add:
     # acm_certificate_arn      = aws_acm_certificate.cdn.arn
     # ssl_support_method       = "sni-only"
     # minimum_protocol_version = "TLSv1.2_2021"
@@ -179,11 +178,11 @@ resource "aws_cloudfront_response_headers_policy" "cdn_cors" {
       items = ["GET", "HEAD"]
     }
 
+    # Derived from var.domain — no hardcoded hostnames.
     access_control_allow_origins {
       items = [
         "https://*.${var.domain}",
-        "https://staging.example.com",
-        "https://example.com",
+        "https://${var.domain}",
         "http://localhost:3000",
       ]
     }
@@ -211,14 +210,6 @@ output "cdn_distribution_id" {
 }
 
 output "cdn_domain_name" {
-  description = "CloudFront domain name — use this URL for video src"
+  description = "CloudFront domain name — prefix asset paths with this to build public URLs"
   value       = aws_cloudfront_distribution.cdn.domain_name
-}
-
-output "cdn_video_urls" {
-  description = "Full URLs for the marketing videos"
-  value = {
-    demo   = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/demo.mp4"
-    launch = "https://${aws_cloudfront_distribution.cdn.domain_name}/videos/launch.mp4"
-  }
 }

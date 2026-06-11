@@ -19,12 +19,11 @@ import {
 import { ThemeToggle } from './ThemeToggle';
 import { DevSwitcherTrigger } from '@/shared/components/common';
 import { getDefaultRouteForRole } from '@/shared/lib/navigation';
+import { isMultiTenant } from '@/shared/lib/tenant-url';
 import { Footer } from '@/shared/components/footer';
 
 const navItems = [
   { label: 'Home', href: '/', external: false },
-  { label: 'Product', href: '/product', external: false },
-  { label: 'Pricing', href: '/pricing', external: false },
   { label: 'Docs', href: `${process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002'}/docs`, external: true },
 ];
 
@@ -111,15 +110,17 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
             <ThemeToggle />
 
-            {/* Login/Register or Profile Menu */}
+            {/* Login/Register or Profile Menu — Register hidden in single-tenant mode */}
             {!isAuthenticated ? (
               <>
-                <Link href="/register">
-                  <Button variant="outline" size="sm">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Register
-                  </Button>
-                </Link>
+                {isMultiTenant() && (
+                  <Link href="/register">
+                    <Button variant="outline" size="sm">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Register
+                    </Button>
+                  </Link>
+                )}
                 <Link href="/login">
                   <Button size="sm">
                     <LogIn className="h-4 w-4 mr-2" />
@@ -237,15 +238,17 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 <ThemeToggle />
               </div>
 
-              {/* Login/Logout on mobile */}
+              {/* Login/Logout on mobile — Register hidden in single-tenant mode */}
               {!isAuthenticated ? (
                 <>
-                  <Link href="/register" className="w-full">
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setIsMobileMenuOpen(false)}>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Register
-                    </Button>
-                  </Link>
+                  {isMultiTenant() && (
+                    <Link href="/register" className="w-full">
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => setIsMobileMenuOpen(false)}>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Register
+                      </Button>
+                    </Link>
+                  )}
                   <Link href="/login" className="w-full">
                     <Button size="sm" className="w-full" onClick={() => setIsMobileMenuOpen(false)}>
                       <LogIn className="h-4 w-4 mr-2" />

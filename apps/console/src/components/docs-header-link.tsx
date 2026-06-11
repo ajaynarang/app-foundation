@@ -32,7 +32,7 @@ export function DocsHeaderLinks({ isAuthenticated }: DocsHeaderLinksProps) {
 
   return (
     <div className="flex items-center gap-1">
-      <a href={`${appUrl}/dispatcher`} className={linkClass}>
+      <a href={appUrl} className={linkClass}>
         <Home className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">App</span>
       </a>

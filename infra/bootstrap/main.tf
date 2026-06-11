@@ -8,7 +8,7 @@
 #   terraform apply
 
 terraform {
-  required_version = ">= 1.10"  # Required for S3 native locking (no DynamoDB needed)
+  required_version = ">= 1.10" # Required for S3 native locking (no DynamoDB needed)
 
   required_providers {
     aws = {
@@ -22,6 +22,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# NOTE: "__PROJECT__" is a template token — replace it with your project slug
+# before applying (`pnpm init-app` does this for you, or see infra/README.md
+# for a manual sed one-liner). It is deliberately an INVALID S3 bucket name so
+# an un-templated apply fails fast instead of creating a generic bucket.
 resource "aws_s3_bucket" "terraform_state" {
   bucket = "__PROJECT__-terraform-state"
 
@@ -30,7 +34,7 @@ resource "aws_s3_bucket" "terraform_state" {
   }
 
   tags = {
-    Project   = "app"
+    Project   = "__PROJECT__"
     ManagedBy = "terraform-bootstrap"
   }
 }

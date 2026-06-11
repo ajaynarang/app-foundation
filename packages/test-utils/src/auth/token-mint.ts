@@ -10,7 +10,6 @@ export interface DevUsersResponse {
       email: string | null;
       firstName: string;
       lastName: string;
-      driverId?: string | null;
       phone?: string | null;
     }>;
   }>;

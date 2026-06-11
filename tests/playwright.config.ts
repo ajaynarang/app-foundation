@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 import { ENV } from './config/test-env.js';
 import { detectCapabilities, detectDataCapabilities, buildGrepInvert } from './config/detect-capabilities.js';
 
@@ -90,16 +90,7 @@ export default defineConfig({
   projects: [
     {
       name: 'api',
-      testMatch: ['smoke/**/*.spec.ts', 'rbac/**/*.spec.ts', 'api/**/*.spec.ts'],
-    },
-    {
-      name: 'browser',
-      testMatch: ['browser/**/*.spec.ts'],
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: ENV.webBaseUrl,
-        viewport: { width: 1440, height: 900 },
-      },
+      testMatch: ['smoke/**/*.spec.ts', 'rbac/**/*.spec.ts'],
     },
   ],
 });

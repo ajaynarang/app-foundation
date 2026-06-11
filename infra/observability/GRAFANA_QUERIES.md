@@ -35,21 +35,21 @@ Pino level numbers:
 ## By tenant
 
 ```logql
-# One tenant, everything
-{service="app-backend"} | json | tenantId="demo-northstar-2026"
+# One tenant, everything (replace with your tenant id; single-tenant mode uses "1")
+{service="app-backend"} | json | tenantId="<your-tenant-id>"
 
 # One tenant, errors only
 {service="app-backend"} | json | tenantId="7" | level="50"
 
-# All tenants EXCEPT the demo tenant
-{service="app-backend"} | json | tenantId!="demo-northstar-2026"
+# All tenants EXCEPT one (e.g. a noisy demo/test tenant)
+{service="app-backend"} | json | tenantId!="<your-tenant-id>"
 ```
 
 ## By user
 
 ```logql
 # What did this user trigger?
-{service="app-backend"} | json | userId="user_demo_owner"
+{service="app-backend"} | json | userId="<user-id>"
 
 # Admins actions only (any UUID — replace with yours)
 {service="app-backend"} | json | userId="<paste-from-jwt>"
@@ -67,16 +67,16 @@ Grab `x-request-id` from browser Network tab → Response headers.
 
 ```logql
 # All logs from one job type
-{service="app-backend"} | json | jobName="route-plan-progress"
+{service="app-backend"} | json | jobName="data-retention"
 
 # One specific job run (jobId comes from Bull Board or the logs themselves)
 {service="app-backend"} | json | jobId="12345"
 
-# All sync-related jobs, errors only
-{service="app-backend"} | json | jobName=~".*sync.*" | level="50"
+# All cleanup jobs, errors only
+{service="app-backend"} | json | jobName=~".*cleanup.*" | level="50"
 
 # Heavy-hitter processors (filter out noise)
-{service="app-backend"} | json | jobName=~"route-plan-progress|samsara-sync|data-retention"
+{service="app-backend"} | json | jobName=~"data-retention|job-cleanup|uploads-cleanup"
 
 # Logs from ANY job (BullMQ work), not HTTP
 {service="app-backend"} | json | jobName!=""
@@ -88,8 +88,8 @@ Grab `x-request-id` from browser Network tab → Response headers.
 ## By NestJS service / controller
 
 ```logql
-# Only from MonitoringEngineService
-{service="app-backend"} | json | context="MonitoringEngineService"
+# Only from NotificationTriggersService
+{service="app-backend"} | json | context="NotificationTriggersService"
 
 # Any service matching a pattern
 {service="app-backend"} | json | context=~".*Controller"
@@ -105,8 +105,8 @@ Grab `x-request-id` from browser Network tab → Response headers.
 # Anything mentioning "failed"
 {service="app-backend"} | json | msg=~".*failed.*"
 
-# "rate-con" or "ratecon"
-{service="app-backend"} | json | msg=~".*rate.?con.*"
+# "webhook" anywhere in the message
+{service="app-backend"} | json | msg=~".*webhook.*"
 
 # SQL-ish errors (P2002 unique constraint etc.)
 {service="app-backend"} | json | msg=~"P20[0-9]{2}"
@@ -126,17 +126,17 @@ Or click the `traceId` field on any log row → Grafana jumps to the trace in Te
 ## Combinations (real debugging scenarios)
 
 ```logql
-# "Why did tenant 7's Samsara sync fail at 14:03?"
-{service="app-backend"} | json | tenantId="7" | jobName="samsara-sync" | level="50"
+# "Why did tenant 7's data-retention job fail at 14:03?"
+{service="app-backend"} | json | tenantId="7" | jobName="data-retention" | level="50"
 
 # "What happened in this whole request, end-to-end?"
 {service="app-backend"} | json | requestId="<paste-uuid>"
 
-# "Route planning is slow — find the longest logs"
-{service="app-backend"} | json | context="RoutePlanningService" | msg=~".*completed in [0-9]{4,}.*"
+# "A service is slow — find the longest-running operations"
+{service="app-backend"} | json | context=~".*Service" | msg=~".*completed in [0-9]{4,}.*"
 
-# "Customer reported a 400 on POST /loads"
-{service="app-backend"} | json | context="LoadsController" | level=~"40|50" | msg=~".*POST /loads.*"
+# "Customer reported a 400 on POST /notifications"
+{service="app-backend"} | json | context="NotificationsController" | level=~"40|50" | msg=~".*POST /notifications.*"
 
 # "All errors in the last 15min, grouped by service"
 sum by (context) (count_over_time({service="app-backend"} | json | level="50" [15m]))

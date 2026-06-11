@@ -65,32 +65,30 @@ describe('TenantGuard', () => {
     expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
 
-  it('should allow a regular user with valid tenantId and attach it to request', () => {
-    const { ctx, request } = createMockContext({
+  it('should allow a regular user with valid tenantId', () => {
+    const { ctx } = createMockContext({
       role: 'MEMBER',
       tenantId: 'tnt-001',
     });
 
     expect(guard.canActivate(ctx)).toBe(true);
-    expect(request.tenantId).toBe('tnt-001');
   });
 
-  it('should attach tenantId from user to the request object', () => {
+  it('should not mutate the request — tenant scoping is read from @CurrentUser()', () => {
     const { ctx, request } = createMockContext({
       role: 'ADMIN',
       tenantId: 'tnt-002',
     });
 
     guard.canActivate(ctx);
-    expect(request.tenantId).toBe('tnt-002');
+    expect(request.tenantId).toBeUndefined();
   });
 
-  it('should short-circuit to the implicit tenant when multi-tenancy is disabled', () => {
+  it('should short-circuit when multi-tenancy is disabled', () => {
     configGet.mockReturnValue({ enabled: false, implicitTenantId: 1 });
     // No tenant claim on the user, and not SUPER_ADMIN — would normally throw.
-    const { ctx, request } = createMockContext({ role: 'MEMBER' });
+    const { ctx } = createMockContext({ role: 'MEMBER' });
 
     expect(guard.canActivate(ctx)).toBe(true);
-    expect(request.tenantId).toBe(1);
   });
 });

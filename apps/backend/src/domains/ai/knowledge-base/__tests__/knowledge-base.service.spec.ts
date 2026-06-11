@@ -15,8 +15,8 @@ describe('KnowledgeBaseService', () => {
           title: 'Route Planning',
           content: 'The platform optimizes your workflows...',
           document_type: 'feature',
-          audience: 'prospect',
-          category: 'route_planning',
+          audience: 'user',
+          category: 'getting-started',
           keywords: ['route', 'planning'],
           similarity: '0.89',
         },
@@ -40,7 +40,7 @@ describe('KnowledgeBaseService', () => {
   describe('hybridSearch', () => {
     it('should return documents matching the query', async () => {
       const results = await service.hybridSearch('How does route planning work?', {
-        audience: 'prospect',
+        audience: 'user',
         limit: 5,
       });
 
@@ -52,7 +52,7 @@ describe('KnowledgeBaseService', () => {
     });
 
     it('should filter by audience when provided', async () => {
-      await service.hybridSearch('pricing', { audience: 'prospect', limit: 5 });
+      await service.hybridSearch('pricing', { audience: 'user', limit: 5 });
 
       const rawQuery = mockPrisma.$queryRawUnsafe.mock.calls[0][0];
       expect(rawQuery).toContain('audience');
@@ -71,7 +71,7 @@ describe('KnowledgeBaseService', () => {
 
     it('should filter by category when provided', async () => {
       await service.hybridSearch('pricing details', {
-        audience: 'prospect',
+        audience: 'user',
         category: 'pricing',
         limit: 3,
       });
@@ -83,13 +83,13 @@ describe('KnowledgeBaseService', () => {
 
   describe('getByCategory', () => {
     it('should fetch documents by category and audience', async () => {
-      await service.getByCategory('route_planning', 'prospect');
+      await service.getByCategory('getting-started', 'user');
 
       expect(mockPrisma.knowledgeDocument.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            category: 'route_planning',
-            audience: expect.objectContaining({ in: ['prospect', 'all'] }),
+            category: 'getting-started',
+            audience: expect.objectContaining({ in: ['user', 'all'] }),
           }),
         }),
       );

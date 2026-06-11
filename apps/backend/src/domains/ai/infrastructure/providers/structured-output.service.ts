@@ -97,7 +97,7 @@ export class StructuredOutputService {
 
     // Build Langfuse `experimental_telemetry` metadata when env is
     // configured and the caller supplied attribution context. This makes
-    // raw-SDK surfaces (ratecon, fuel-receipt, memory extract) appear in
+    // raw-SDK surfaces (document parsing, memory extract) appear in
     // Langfuse alongside Mastra agent traces. When env vars are unset the
     // AI SDK silently drops the metadata.
     const telemetryMetadata = this.buildLangfuseTelemetry(options);

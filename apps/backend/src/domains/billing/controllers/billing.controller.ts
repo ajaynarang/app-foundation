@@ -81,7 +81,7 @@ export class BillingController {
   }
 
   /**
-   * Update the truck/vehicle quantity on the subscription
+   * Update the seat/unit quantity on the subscription
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Patch('quantity')

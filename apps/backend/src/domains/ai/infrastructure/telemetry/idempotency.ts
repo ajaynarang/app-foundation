@@ -8,7 +8,7 @@ import type { AiCallContext } from '@app/shared-types';
  * Shape: `${surface}:${linkRefType}:${linkRefId}:${attemptKind}:${attemptHash}`
  *
  *   - surface / linkRefType / linkRefId — from the call context; identifies
- *     WHICH entity this call is for (e.g. DOC_RATECON:document:doc_abc).
+ *     WHICH entity this call is for (e.g. DOC_PARSE:document:doc_abc).
  *   - attemptKind — 'primary' | 'fallback'. A primary and its fallback are
  *     legitimately distinct calls (different models) and must NOT collapse —
  *     so the kind is part of the key.
@@ -22,7 +22,7 @@ import type { AiCallContext } from '@app/shared-types';
  * deliberately reprocessed the same document" (a real second API call that
  * must be billed). Callers MUST fold a per-attempt discriminator that is
  * stable across retries but distinct across reprocesses into
- * `contentDigestInput` — e.g. the ratecon parser mixes in the document
+ * `contentDigestInput` — e.g. a document parser mixes in the document
  * `jobId` (same across retries of a job, new for each reprocess). Hashing
  * only the content would let an intentional reprocess collapse onto the prior
  * row and silently under-report cost.

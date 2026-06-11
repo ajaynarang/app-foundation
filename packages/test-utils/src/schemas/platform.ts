@@ -7,11 +7,9 @@
  *   - Reference data (1 schema, hand-written — `sort_order` drift vs shared-types).
  *   - Feature flags (3 schemas — public list + single + enabled-only).
  *   - Onboarding status (re-exports shared-types).
- *   - Settings: alerts, operations, user prefs, driver prefs, super-admin prefs
- *     (8 schemas — GET / PUT response shapes. AlertConfig drifts from
- *     shared-types — hand-written. Operations / user / driver / super-admin
+ *   - Settings: user prefs + super-admin prefs (GET / PUT response shapes —
  *     mostly align with shared-types but surface extra timestamps + Prisma
- *     row shape on PUT — dual schemas for GET vs PUT where shapes diverge.)
+ *     row shape on PUT).
  *
  * Phase 4 Group 4b additions (feedback + api-keys):
  *   - Feedback has FIVE wire shapes depending on the endpoint:
@@ -40,7 +38,6 @@
  *     shared-types `ApiKeyResponseSchema` exactly — replaced in place, not
  *     re-exported (so the original export names survive). Finding #36.
  *
- * See `SCHEMA-AUDIT.md` for drift notes.
  */
 import { z } from 'zod';
 import {
@@ -48,29 +45,25 @@ import {
   FeatureFlagsResponseSchema as SharedFeatureFlagsResponseSchema,
   FeatureFlagEnabledResponseSchema as SharedFeatureFlagEnabledResponseSchema,
   OnboardingStatusResponseSchema as SharedOnboardingStatusResponseSchema,
-  DriverPreferencesSchema as SharedDriverPreferencesSchema,
   AgentScopeSchema,
 } from '@app/shared-types';
 import { dbId, stringId, isoDateString } from './helpers.js';
 
 // Note: `SuperAdminPreferencesSchema` is NOT exported from shared-types —
-// hand-written below. Tracked in SCHEMA-AUDIT.md.
+// hand-written below.
 
 // ── USERS (Phase 4 Group 4d — tightened from Phase-0 placeholders) ───
 //
-// The prior Phase-0 `UserListItemSchema` / `UserDetailSchema` used wide
-// `z.any()` placeholders for `tenant`, `driver`, `createdAt`, `updatedAt`.
-// Group 4d rewrites them against the live response on the GET /users list
-// (projected shape — 11 fields), GET /users/:userId detail (list-row +
-// full Prisma tenant row), POST /users create (list-row minus driver +
-// full tenant row), and PATCH /users/:userId update (list-row + full
-// tenant row + driver relation).
+// Schemas cover the GET /users list (projected list-row shape),
+// GET /users/:userId detail (list-row + full Prisma tenant row),
+// POST /users create (list-row + full tenant row), and
+// PATCH /users/:userId update (list-row + full tenant row).
 //
-// Live shape map (probed 2026-04-20 on demo-northstar-2026):
+// Live shape map:
 //
-//   GET /users            → UserListRowSchema[]    — 11 fields incl. nested `{tenantId, companyName}` + optional `{driverId, name}`.
-//   GET /users/:userId    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema) + driver Prisma row | null.
-//   POST /users           → UserCreateResponseSchema — list-row minus driver + full Prisma tenant row (no `driver`, no `emailVerified`, no `createdAt`, no `lastLoginAt`).
+//   GET /users            → UserListRowSchema[]    — list projection incl. nested `{tenantId, companyName}`.
+//   GET /users/:userId    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema).
+//   POST /users           → UserCreateResponseSchema — list-row + full Prisma tenant row (no `emailVerified`, no `createdAt`, no `lastLoginAt`).
 //   PATCH /users/:userId  → UserDetailSchema       — same as GET /users/:userId.
 //   POST /users/:userId/{activate,deactivate} → `{message: string}`.
 //   DELETE /users/:userId → `{message: string}`.
@@ -103,13 +96,6 @@ export const UserListRowSchema = z
       })
       .strict()
       .nullable(),
-    driver: z
-      .object({
-        driverId: stringId,
-        name: z.string(),
-      })
-      .strict()
-      .nullable(),
   })
   .strict();
 
@@ -129,7 +115,7 @@ export const UserListItemSchema = UserListRowSchema;
 // `GET /tenants`, `GET /tenants/:tenantId/details`, `GET /tenants/check-
 // subdomain`, `GET /tenants/branding`, `POST /tenants/:id/approve |
 // /reject | /suspend | /reactivate`, and `PATCH /tenants/:tenantId`
-// responses observed on `demo-northstar-2026`.
+// responses of the platform tenants controller.
 //
 // Schema map:
 //   - `TenantListItemSchema` — `GET /tenants[?status=...]` row. List items
@@ -151,21 +137,18 @@ export const UserListItemSchema = UserListRowSchema;
 //
 // Shared-types provides paper-thin `TenantDetailsSchema` /
 // `TenantListItemSchema` / `TenantListResponseSchema` — all missing the
-// status/dotNumber/carrierType/mcNumber/fleetSize/approval/rejection/
-// suspension metadata the live API returns. Hand-written here and
-// tracked in finding #37.
+// status/approval/rejection/suspension metadata the live API returns.
+// Hand-written here.
 //
-// Shape notes pulled from live `demo-northstar-2026`:
+// Shape notes:
 //   - `status` is the `TenantStatus` enum (`PENDING_APPROVAL | ACTIVE |
 //     SUSPENDED | REJECTED`).
 //   - `plan` is the `TenantPlan` enum (string on the wire).
-//   - `carrierType` is the `CarrierType` enum; `fleetSize` the
-//     `FleetSize` enum; both serialise as the enum variant names.
 //   - `isActive: boolean` is distinct from `status === 'ACTIVE'` (it's
 //     the join flag the guards read).
 //   - `approved*/rejected*/suspended*/reactivated*` fields are mutually
 //     exclusive in practice but all declared as `nullable()` on the row.
-//   - `fleetLimitWarning` + `jobsPaused*` are billing flags on the row.
+//   - `jobsPaused*` are job-control flags on the row.
 
 const TenantEmbeddedUserSchema = z
   .object({
@@ -180,7 +163,6 @@ const TenantEmbeddedUserSchema = z
 const TenantCountSchema = z
   .object({
     users: z.number().int().nonnegative(),
-    drivers: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -190,14 +172,10 @@ export const TenantRowSchema = z
     id: dbId,
     tenantId: stringId,
     companyName: z.string(),
-    subdomain: z.string(),
-    contactEmail: z.string(),
+    subdomain: z.string().nullable(),
+    contactEmail: z.string().nullable(),
     contactPhone: z.string().nullable(),
     status: z.enum(['PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'SUSPENDED']),
-    dotNumber: z.string().nullable(),
-    carrierType: z.string().nullable(),
-    mcNumber: z.string().nullable(),
-    fleetSize: z.string().nullable(),
     approvedAt: isoDateString.nullable(),
     approvedBy: z.string().nullable(),
     rejectedAt: isoDateString.nullable(),
@@ -209,7 +187,9 @@ export const TenantRowSchema = z
     reactivatedBy: z.string().nullable(),
     onboardingCompletedAt: isoDateString.nullable(),
     onboardingProgress: z.any().nullable(),
-    timezone: z.string(),
+    timezone: z.string().nullable(),
+    deskScheduleEnabled: z.boolean(),
+    aiZeroRetention: z.boolean(),
     isActive: z.boolean(),
     createdAt: isoDateString,
     updatedAt: isoDateString,
@@ -218,10 +198,9 @@ export const TenantRowSchema = z
     trialEndsAt: isoDateString.nullable(),
     planAssignedAt: isoDateString.nullable(),
     planAssignedBy: z.string().nullable(),
-    fleetLimitWarning: z.boolean(),
     jobsPaused: z.boolean(),
     jobsPausedAt: isoDateString.nullable(),
-    jobsPausedBy: z.string().nullable(),
+    jobsPausedBy: z.number().int().nullable(),
   })
   .strict();
 
@@ -241,13 +220,9 @@ const TenantDetailProjectionSchema = z
     id: dbId,
     tenantId: stringId,
     companyName: z.string(),
-    subdomain: z.string(),
+    subdomain: z.string().nullable(),
     status: z.enum(['PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'SUSPENDED']),
-    dotNumber: z.string().nullable(),
-    carrierType: z.string().nullable(),
-    mcNumber: z.string().nullable(),
-    fleetSize: z.string().nullable(),
-    contactEmail: z.string(),
+    contactEmail: z.string().nullable(),
     contactPhone: z.string().nullable(),
     createdAt: isoDateString,
     // approvedAt / rejectedAt / suspendedAt / reactivatedAt are conditionally
@@ -284,9 +259,6 @@ const TenantDetailUserSchema = z
 const TenantMetricsSchema = z
   .object({
     totalUsers: z.number().int().nonnegative(),
-    totalDrivers: z.number().int().nonnegative(),
-    totalVehicles: z.number().int().nonnegative(),
-    totalRoutePlans: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -358,39 +330,13 @@ export const TenantRegisterValidationErrorSchema = z
 // These must follow `TenantRowSchema` (declared above) because the user
 // detail / create / update responses embed the full Prisma tenant row.
 
-/** Full Prisma driver row — detail/update embed this as nullable. */
-const UserDetailDriverSchema = z.object({
-  id: dbId,
-  driverId: stringId,
-  tenantId: dbId,
-  name: z.string(),
-  phone: z.string().nullable(),
-  email: z.string().nullable(),
-  licenseNumber: z.string().nullable(),
-  licenseState: z.string().nullable(),
-  licenseExpiry: z.string().nullable(),
-  status: z.string(),
-  hiredAt: isoDateString.nullable(),
-  terminatedAt: isoDateString.nullable(),
-  activatedAt: isoDateString.nullable(),
-  activatedBy: dbId.nullable(),
-  createdAt: isoDateString,
-  updatedAt: isoDateString,
-});
-// NOTE: the Prisma Driver row carries more than the fields above (e.g.
-// `medicalCertExpiry`, `hosData`, `profilePictureUrl`, …). We deliberately
-// DO NOT `.strict()` this nested sub-object because the Driver row in the
-// current schema drifts across migrations faster than a QA spec can track.
-// The User-side surface (where we DO care about contract) is `.strict()`
-// on the outer `UserDetailSchema` — leaking a driver row field does not
-// affect the caller here.
 /**
  * `GET /users/:userId` detail + `PATCH /users/:userId` response.
  *
- * Live shape = list-row projection + full Prisma tenant row + full Prisma
- * driver row (nullable). The service's manual re-projection drops the
- * Prisma-row numeric `id`, `tenantId` (foreign-key int), and `updatedAt`
- * so we match the observed top-level keys exactly.
+ * Live shape = list-row projection + full Prisma tenant row. The service's
+ * manual re-projection drops the Prisma-row numeric `id`, `tenantId`
+ * (foreign-key int), and `updatedAt` so we match the observed top-level
+ * keys exactly.
  */
 export const UserDetailSchema = z
   .object({
@@ -404,15 +350,14 @@ export const UserDetailSchema = z
     createdAt: isoDateString,
     lastLoginAt: isoDateString.nullable(),
     tenant: TenantRowSchema.nullable(),
-    driver: UserDetailDriverSchema.nullable(),
   })
   .strict();
 
 /**
  * `POST /users` create response — list-row subset + full Prisma tenant row.
  * The service's createUser projection intentionally omits
- * `emailVerified` / `createdAt` / `lastLoginAt` / `driver` (the freshly-
- * created user has no driver link; those fields return on the detail read).
+ * `emailVerified` / `createdAt` / `lastLoginAt` (those fields return on
+ * the detail read).
  */
 export const UserCreateResponseSchema = z
   .object({
@@ -428,9 +373,8 @@ export const UserCreateResponseSchema = z
 
 /**
  * `PATCH /users/:userId` response — the service's updateUser projection
- * emits `{userId, email, firstName, lastName, role, isActive, tenant,
- * driver}` (8 fields). It drops `emailVerified` / `createdAt` /
- * `lastLoginAt` (unlike detail) but includes `driver` (unlike create).
+ * emits `{userId, email, firstName, lastName, role, isActive, tenant}`.
+ * It drops `emailVerified` / `createdAt` / `lastLoginAt` (unlike detail).
  * Distinct from both — hand-written.
  */
 export const UserUpdateResponseSchema = z
@@ -442,7 +386,6 @@ export const UserUpdateResponseSchema = z
     role: z.string(),
     isActive: z.boolean(),
     tenant: TenantRowSchema.nullable(),
-    driver: UserDetailDriverSchema.nullable(),
   })
   .strict();
 
@@ -460,22 +403,21 @@ export const UserMessageResponseSchema = z
 // ── USER INVITATIONS (Phase 4 Group 4d) ─────────────────────────────
 //
 // The controller mounts seven invitation endpoints. Response shapes
-// (probed 2026-04-20 against demo-northstar-2026):
+// (per the platform controllers/services):
 //
 //   POST   /invitations                         → InvitationCreatedSchema
 //     — full Prisma row + `tenant` (TenantRowSchema) + `invitedByUser`
 //       (full Prisma user row) + `inviteLink: string`.
 //
 //   GET    /invitations                         → InvitationListItemSchema[]
-//     — full Prisma row + `invitedByUser` (thin projection)
-//       + `driver` (thin projection or null). NO `tenant`.
+//     — full Prisma row + `invitedByUser` (thin projection). NO `tenant`.
 //
 //   GET    /invitations/by-token/:token (PUBLIC) → PublicInvitationLookupSchema
 //     — full Prisma row + `tenant` (thin projection: tenantId/companyName/subdomain)
 //       + `invitedByUser` (thin projection: firstName/lastName/email).
 //
 //   POST   /invitations/accept (PUBLIC)         → AcceptInvitationResponseSchema
-//     — full Prisma user row + `tenant` (TenantRowSchema) + `driver` | null + `customer` | null.
+//     — full Prisma user row + `tenant` (TenantRowSchema).
 //
 //   POST   /invitations/:id/resend              → InvitationResendSchema
 //     — full Prisma row + `inviteLink`. No relations.
@@ -502,8 +444,6 @@ const UserInvitationPrismaRowProjection = {
   firstName: z.string(),
   lastName: z.string(),
   role: z.string(),
-  driverId: dbId.nullable(),
-  customerId: dbId.nullable(),
   token: z.string(),
   expiresAt: isoDateString,
   invitedBy: dbId,
@@ -540,8 +480,6 @@ const InvitedByUserFullSchema = z
     phone: z.string().nullable(),
     phoneVerified: z.boolean(),
     pinHash: z.string().nullable(),
-    driverId: dbId.nullable(),
-    customerId: dbId.nullable(),
     isActive: z.boolean(),
     lastLoginAt: isoDateString.nullable(),
     passwordChangedAt: isoDateString.nullable(),
@@ -563,8 +501,8 @@ export const UserInvitationCreateResponseSchema = z
   .strict();
 
 /**
- * `GET /invitations` list-row — Prisma row + thin `invitedByUser` include
- * + nullable thin `driver` include. No `tenant`. No `inviteLink`.
+ * `GET /invitations` list-row — Prisma row + thin `invitedByUser` include.
+ * No `tenant`. No `inviteLink`.
  */
 const InvitedByUserListProjectionSchema = z
   .object({
@@ -575,18 +513,10 @@ const InvitedByUserListProjectionSchema = z
   })
   .strict();
 
-const InvitationListDriverProjectionSchema = z
-  .object({
-    driverId: stringId,
-    name: z.string(),
-  })
-  .strict();
-
 export const UserInvitationListItemSchema = z
   .object({
     ...UserInvitationPrismaRowProjection,
     invitedByUser: InvitedByUserListProjectionSchema,
-    driver: InvitationListDriverProjectionSchema.nullable(),
   })
   .strict();
 
@@ -622,15 +552,11 @@ export const PublicInvitationLookupSchema = z
 
 /**
  * `POST /invitations/accept` — full Prisma user row + `tenant`
- * (TenantRowSchema) + `driver` (nullable) + `customer` (nullable).
- * The response is the newly-created User row — distinct from the admin
- * UserDetailSchema because it uses the raw Prisma-row field set (numeric
- * `id`, `tenantId`, `passwordHash`, `firebaseUid`, etc.). Model the
- * outer object `.strict()` and enumerate every observed field.
+ * (TenantRowSchema). The response is the newly-created User row — distinct
+ * from the admin UserDetailSchema because it uses the raw Prisma-row field
+ * set (numeric `id`, `tenantId`, `passwordHash`, `firebaseUid`, etc.).
+ * Model the outer object `.strict()` and enumerate every observed field.
  */
-const AcceptDriverProjectionSchema = z.any().nullable();
-const AcceptCustomerProjectionSchema = z.any().nullable();
-
 export const AcceptInvitationResponseSchema = z
   .object({
     id: dbId,
@@ -646,8 +572,6 @@ export const AcceptInvitationResponseSchema = z
     phone: z.string().nullable(),
     phoneVerified: z.boolean(),
     pinHash: z.string().nullable(),
-    driverId: dbId.nullable(),
-    customerId: dbId.nullable(),
     isActive: z.boolean(),
     lastLoginAt: isoDateString.nullable(),
     passwordChangedAt: isoDateString.nullable(),
@@ -657,8 +581,6 @@ export const AcceptInvitationResponseSchema = z
     createdAt: isoDateString,
     updatedAt: isoDateString,
     tenant: TenantRowSchema.nullable(),
-    driver: AcceptDriverProjectionSchema,
-    customer: AcceptCustomerProjectionSchema,
   })
   .strict();
 
@@ -718,33 +640,6 @@ export const CreateApiKeyResponseSchema = ApiKeyBaseSchema.extend({
   key: z.string().regex(/^sk_live_[A-Za-z0-9_-]{32}$/),
 });
 
-// ─── REFERENCE DATA (Phase 4 Group 4a) ────────────────────────────
-//
-// Drift note: shared-types `ReferenceItemSchema` declares `sortOrder`
-// (camelCase), but the live response on `GET /reference-data` serialises
-// `sort_order` (snake_case — the service copies the Prisma row and
-// renames the column manually). We hand-write here to match the observed
-// shape and flag the drift in finding #35.
-
-export const ReferenceDataItemSchema = z
-  .object({
-    code: z.string().min(1),
-    label: z.string().min(1),
-    sort_order: z.number(),
-    metadata: z.record(z.string(), z.any()),
-  })
-  .strict();
-
-/**
- * Envelope shape — `Record<categoryKey, ReferenceDataItem[]>`. The set of
- * categories is open-ended (driver_status, equipment_type, state, country,
- * …) so we validate as a record of arrays. `z.record` doesn't support
- * `.strict()` itself (Zod v3 records naturally permit any string key), but
- * the nested `ReferenceDataItemSchema` IS `.strict()`, which catches
- * extra-key drift where it matters.
- */
-export const ReferenceDataSchema = z.record(z.string(), z.array(ReferenceDataItemSchema));
-
 // ─── FEATURE FLAGS (Phase 4 Group 4a) ─────────────────────────────
 //
 // Re-export the shared-types schemas so we can apply `.strict()` at call
@@ -762,133 +657,13 @@ export const FeatureFlagEnabledSchema = SharedFeatureFlagEnabledResponseSchema;
 
 export const OnboardingStatusSchema = SharedOnboardingStatusResponseSchema;
 
-// ─── SETTINGS — ALERT CONFIG (Phase 4 Group 4a) ───────────────────
-//
-// Drift note: shared-types `AlertConfigurationSchema` models a different
-// (older or speculative) shape — e.g. it declares `AlertTypeConfig` with
-// `mandatory/thresholdPercent/thresholdMinutes`, `EscalationPolicyConfig`
-// as `Record<priority, { acknowledgeSlaMinutes, escalateTo, channels }>`,
-// and `ChannelConfig` with a `sms` field. The LIVE response on
-// `demo-northstar-2026` carries:
-//   - `alertTypes.<alertKey> = { enabled, priority, autoResolve }`
-//   - `escalationPolicy.levels[] = { notifyRoles: string[], delayMinutes }`
-//   - `defaultChannels.<priority> = { push, email, inApp }` (no `sms`)
-// We hand-write here to match the observed shape. See finding #35 for the
-// shared-types gap and the service's `getDefaults()` discrepancy.
-
-const AlertTypeConfigLiveSchema = z.object({
-  enabled: z.boolean(),
-  priority: z.string(),
-  autoResolve: z.boolean(),
-});
-
-const EscalationLevelSchema = z.object({
-  notifyRoles: z.array(z.string()),
-  delayMinutes: z.number(),
-});
-
-const EscalationPolicyLiveSchema = z.object({
-  levels: z.array(EscalationLevelSchema),
-});
-
-const GroupingConfigLiveSchema = z.object({
-  dedupWindowMinutes: z.number(),
-  groupSameTypePerDriver: z.boolean(),
-  smartGroupAcrossDrivers: z.boolean(),
-  linkCascading: z.boolean(),
-});
-
-const ChannelConfigLiveSchema = z.object({
-  inApp: z.boolean(),
-  email: z.boolean(),
-  push: z.boolean(),
-});
-
-/** Response of GET /settings/alerts — projected shape (no row id / timestamps). */
-export const AlertConfigSchema = z.object({
-  alertTypes: z.record(z.string(), AlertTypeConfigLiveSchema),
-  escalationPolicy: EscalationPolicyLiveSchema,
-  groupingConfig: GroupingConfigLiveSchema,
-  defaultChannels: z.record(z.string(), ChannelConfigLiveSchema),
-});
-
-/** Response of PUT /settings/alerts — returns the raw Prisma row
- *  (adds `id`, `tenantId`, `createdAt`, `updatedAt`). */
-export const AlertConfigRowSchema = AlertConfigSchema.extend({
-  id: dbId,
-  tenantId: dbId,
-  createdAt: isoDateString,
-  updatedAt: isoDateString,
-});
-
-// ─── SETTINGS — OPERATIONS (Phase 4 Group 4a) ─────────────────────
-//
-// Drift note: shared-types `OperationsSettingsSchema` matches the Prisma
-// FleetOperationsSettings row shape with `createdAt` / `updatedAt` as
-// `z.string()`. The live response matches. Hand-write here because we also
-// need the `defaults` response (Prisma-free shape, no id/tenantId/timestamps).
-
-export const OperationsSettingsSchema = z.object({
-  id: dbId,
-  tenantId: dbId,
-  costPerMile: z.number(),
-  laborCostPerHour: z.number(),
-  preferFullRest: z.boolean(),
-  allowDockRest: z.boolean(),
-  maxFuelDetour: z.number(),
-  estimatedDieselPricePerGallon: z.number(),
-  splitSleeperThresholdHours: z.number(),
-  fuelCards: z.array(z.string()),
-  shieldAiEnabled: z.boolean(),
-  shieldCustomRulesEnabled: z.boolean(),
-  shieldAuditPeriodDays: z.number(),
-  alertResolveCooldownHours: z.number(),
-  laneGenerationLookaheadDays: z.number(),
-  bolEnforcement: z.string(),
-  podEnforcement: z.string(),
-  rateConEnforcement: z.string(),
-  lumperReceiptEnforcement: z.string(),
-  scaleTicketEnforcement: z.string(),
-  podGracePeriodHours: z.number(),
-  requireBillableCharge: z.boolean(),
-  allowBillingOverride: z.boolean(),
-  createdAt: isoDateString,
-  updatedAt: isoDateString,
-});
-
-/** Response of GET /settings/operations/defaults — defaults-only shape,
- *  no id/tenantId/timestamps. */
-export const OperationsSettingsDefaultsSchema = z.object({
-  costPerMile: z.number(),
-  laborCostPerHour: z.number(),
-  preferFullRest: z.boolean(),
-  allowDockRest: z.boolean(),
-  maxFuelDetour: z.number(),
-  estimatedDieselPricePerGallon: z.number(),
-  splitSleeperThresholdHours: z.number(),
-  fuelCards: z.array(z.string()),
-  shieldAiEnabled: z.boolean(),
-  shieldCustomRulesEnabled: z.boolean(),
-  shieldAuditPeriodDays: z.number(),
-  alertResolveCooldownHours: z.number(),
-  laneGenerationLookaheadDays: z.number(),
-  bolEnforcement: z.string(),
-  podEnforcement: z.string(),
-  rateConEnforcement: z.string(),
-  lumperReceiptEnforcement: z.string(),
-  scaleTicketEnforcement: z.string(),
-  podGracePeriodHours: z.number(),
-  requireBillableCharge: z.boolean(),
-  allowBillingOverride: z.boolean(),
-});
-
 // ─── SETTINGS — USER PREFERENCES (Phase 4 Group 4a) ───────────────
 //
 // Live response matches shared-types `UserPreferencesSchema` except that
-// `platformTourStatus` observed as nullable on fresh rows ("fresh DRIVER
-// row" = `null`; ADMIN account seeded one = `"dismissed"`). Shared-types
-// already declares it as `.nullable().optional()`. Hand-written locally so
-// we can layer `.strict()` cleanly.
+// `platformTourStatus` is nullable on fresh rows (`null` until the user
+// dismisses or completes the tour). Shared-types already declares it as
+// `.nullable().optional()`. Hand-written locally so we can layer
+// `.strict()` cleanly.
 
 export const UserPreferencesSchema = z.object({
   id: dbId,
@@ -911,13 +686,6 @@ export const UserPreferencesSchema = z.object({
   createdAt: isoDateString,
   updatedAt: isoDateString,
 });
-
-// ─── SETTINGS — DRIVER PREFERENCES (Phase 4 Group 4a) ─────────────
-//
-// Shared-types `DriverPreferencesSchema` exports createdAt/updatedAt as
-// `z.string()`. Live response matches — re-export as-is.
-
-export const DriverPreferencesSchema = SharedDriverPreferencesSchema;
 
 // ─── SETTINGS — SUPER ADMIN PREFERENCES (Phase 4 Group 4a) ────────
 //
@@ -1045,7 +813,7 @@ export const FeedbackBulkCategorizeSchema = z
 
 // ── PLANS (Phase 4 Group 4e — plans.spec.ts) ──────────────────────────
 //
-// Shape map (probed 2026-04-20 against demo-northstar-2026):
+// Shape map (per the platform controllers/services):
 //
 //   GET   /plans                                  → PlanConfigResponseSchema[]
 //     — 17 fields (shared-types PlanConfigSchema misses `isActive`,
@@ -1176,10 +944,9 @@ export const TenantPlanDetailsResponseSchema = z
     trialEndsAt: isoDateString.nullable(),
     planAssignedAt: isoDateString.nullable(),
     planAssignedBy: z.string().nullable(),
-    fleetLimitWarning: z.boolean(),
     planConfig: PlanConfigResponseSchema.nullable(),
-    vehicleCount: z.number().int().nonnegative(),
-    fleetLimit: z.number().nullable(),
+    userCount: z.number().int().nonnegative(),
+    seatLimit: z.number().nullable(),
     daysLeftInTrial: z.number().nullable(),
     planEvents: z.array(TenantPlanEventSchema),
   })
@@ -1275,244 +1042,6 @@ export const BroadcastActiveItemSchema = z
     targetIds: z.array(z.string()),
   })
   .strict();
-
-// ── ADD-ONS (Phase 4 Group 4f — add-ons.spec.ts + add-ons-admin.spec.ts) ──
-//
-// Add-ons surface spans FOUR response shapes — one for the catalog row,
-// one for the tenant-side subscription row, one for the request row, and
-// one for the public pricing-page projection. All four are hand-written
-// because shared-types has ZERO coverage for the add-on surface (verified
-// 2026-04-20 — no `add-on.schema.ts` or equivalent in
-// `packages/shared-types/src/platform/`). Finding #40.
-//
-// Shape map (probed 2026-04-20 against demo-northstar-2026):
-//
-//   GET   /add-ons                                → AddOnPricingRowSchema[]
-//     — public pricing projection: 15 fields (id, slug, name, description,
-//       icon, category, priceCents, billingInterval, featureKey, usageLimits,
-//       usageLimitUnit, overageRateCents, providerPriceId, isActive,
-//       displayOrder). NO timestamps (the service `select:` omits them).
-//
-//   GET   /admin/add-ons                          → AddOnCatalogRowSchema[]
-//     — full Prisma AddOn row: all 15 pricing fields + `createdAt`,
-//       `updatedAt`. 17 fields.
-//   PATCH /admin/add-ons/:slug                    → AddOnCatalogRowSchema
-//   PATCH /admin/add-ons/:slug/provider-price     → AddOnCatalogRowSchema
-//
-//   GET   /add-ons/my-add-ons                     → TenantAddOnRowSchema[]
-//   GET   /admin/tenants/:tenantId/add-ons        → TenantAddOnRowSchema[]
-//   GET   /admin/add-on-requests/tenant/:id/add-ons → TenantAddOnRowSchema[]
-//     — 19-field Prisma TenantAddOn row + `addOn: AddOnCatalogRowSchema`.
-//   POST  /add-ons/:slug/activate                 → TenantAddOnRowBareSchema
-//   POST  /add-ons/:slug/cancel                   → TenantAddOnRowBareSchema
-//   PATCH /add-ons/:slug/overage                  → TenantAddOnRowBareSchema
-//   POST  /admin/tenants/:id/add-ons/:slug/enable → TenantAddOnRowBareSchema
-//   POST  /admin/tenants/:id/add-ons/:slug/cancel → TenantAddOnRowBareSchema
-//   POST  /admin/add-on-requests/:id/approve      → TenantAddOnRowBareSchema
-//   POST  /admin/add-on-requests/tenant/:id/add-ons/:slug/activate → TenantAddOnRowBareSchema
-//   POST  /admin/add-on-requests/tenant/:id/add-ons/:slug/cancel   → TenantAddOnRowBareSchema
-//     — same 19-field Prisma row WITHOUT the `addOn` include (the service
-//       calls `prisma.tenantAddOn.update/upsert` directly on those paths,
-//       no `include: {addOn: true}` clause).
-//
-//   GET   /add-ons/:slug/status                   → AddOnStatusSchema
-//     — `{ addOn, enabled, source, usageRemaining?, tenantAddOn }` envelope.
-//       `addOn` is AddOnCatalogRowSchema. `tenantAddOn` is the 19-field row
-//       (nullable — null when the tenant never subscribed). `source` is one
-//       of 3 literals from the FeatureResolution type. `usageRemaining` is
-//       optional (omitted entirely when the source isn't `addon_active`).
-//
-//   GET   /add-ons/my-requests                    → AddOnRequestWithAddOnSchema[]
-//   POST  /add-ons/:slug/request                  → AddOnRequestWithAddOnSchema
-//     — 13-field AddOnRequest row + `addOn: AddOnCatalogRowSchema`.
-//
-//   GET   /admin/add-on-requests[?status=...]     → AddOnRequestAdminRowSchema[]
-//     — AddOnRequest row + `addOn` + `tenant: {id, tenantId, companyName}`
-//       + service-synthesised `addOnActive: boolean`.
-//
-//   POST  /admin/add-on-requests/:id/decline      → AddOnRequestRowBareSchema
-//     — bare AddOnRequest row (no relations).
-
-// ── Literal enums derived from live shapes. ─────────────────────────────
-const TenantAddOnStatusEnum = z.enum(['active', 'cancelled', 'suspended']);
-const TenantAddOnSourceEnum = z.enum(['purchased', 'gifted', 'admin']);
-const AddOnRequestStatusEnum = z.enum(['pending', 'approved', 'declined']);
-const AddOnFeatureResolutionSourceEnum = z.enum(['feature_flag_disabled', 'addon_active', 'not_enabled']);
-
-/**
- * Public `GET /add-ons` projection — 15 fields. `billingInterval` is a
- * free-form string in the DB schema (e.g. `monthly`) — not an enum — so we
- * keep it as `z.string()`. `usageLimits` is a tier-keyed JSON blob
- * (`{STARTER, PROFESSIONAL, ENTERPRISE, ...}`) or null when the add-on
- * isn't metered.
- */
-export const AddOnPricingRowSchema = z
-  .object({
-    id: z.string(),
-    slug: z.string(),
-    name: z.string(),
-    description: z.string().nullable(),
-    icon: z.string().nullable(),
-    category: z.string(),
-    priceCents: z.number().int().nullable(),
-    billingInterval: z.string(),
-    featureKey: z.string(),
-    usageLimits: z.record(z.string(), z.number()).nullable(),
-    usageLimitUnit: z.string().nullable(),
-    overageRateCents: z.number().int().nullable(),
-    providerPriceId: z.string().nullable(),
-    isActive: z.boolean(),
-    displayOrder: z.number().int(),
-  })
-  .strict();
-
-/**
- * Full Prisma `AddOn` row — returned by admin catalog list + patch +
- * provider-price patch. Same 15 pricing fields + createdAt/updatedAt.
- */
-export const AddOnCatalogRowSchema = AddOnPricingRowSchema.extend({
-  createdAt: isoDateString,
-  updatedAt: isoDateString,
-}).strict();
-
-/**
- * Full Prisma `TenantAddOn` row WITHOUT the `addOn` include — returned by
- * every mutation endpoint (activate, cancel, overage toggle, admin enable,
- * admin cancel, approve, admin activate). 19 fields.
- *
- * Notes:
- *   - `tenantId` is an integer FK (Prisma `Int`).
- *   - `source` is a VARCHAR on the DB side; `activatedBy` / `cancelledBy`
- *     accept any string (email addresses + raw userIds both appear in
- *     production data).
- *   - `activatedAt` is nullable — the initial seed in `demo-northstar-2026`
- *     has `activatedAt: null` on rows whose source is `gifted` and which
- *     were never explicitly activated after a cancel cycle.
- */
-export const TenantAddOnRowBareSchema = z
-  .object({
-    // Historical rows use cuid (`cm…`), fresh rows use UUID (`…-…-…-…`).
-    // Both are valid — kept as generic string with a length floor.
-    id: z.string().min(1),
-    tenantId: dbId,
-    addOnId: z.string(),
-    status: TenantAddOnStatusEnum,
-    source: z.string(),
-    priceCents: z.number().int(),
-    usageLimit: z.number().int().nullable(),
-    usageLimitUnit: z.string().nullable(),
-    currentUsage: z.number().int(),
-    overageUsage: z.number().int(),
-    allowOverage: z.boolean(),
-    usageResetAt: isoDateString.nullable(),
-    activatedAt: isoDateString.nullable(),
-    cancelledAt: isoDateString.nullable(),
-    activatedBy: z.string().nullable(),
-    cancelledBy: z.string().nullable(),
-    stripeSubscriptionItemId: z.string().nullable(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
-  })
-  .strict();
-
-/**
- * Full Prisma `TenantAddOn` row + `addOn: AddOnCatalogRowSchema` include —
- * returned by the tenant-list paths (`GET /add-ons/my-add-ons`, admin-side
- * `GET /admin/tenants/:id/add-ons`, and the request-admin
- * `GET /admin/add-on-requests/tenant/:id/add-ons`). The service's
- * `listTenantAddOns` uses `include: { addOn: true }`, so every row carries
- * the full catalog projection.
- */
-export const TenantAddOnRowSchema = TenantAddOnRowBareSchema.extend({
-  addOn: AddOnCatalogRowSchema,
-}).strict();
-
-/**
- * Alias — the list endpoints return an array of this shape.
- */
-export const TenantAddOnListSchema = z.array(TenantAddOnRowSchema);
-
-/**
- * `GET /add-ons/:slug/status` envelope. The service spreads a
- * `FeatureResolution` object (`{enabled, source, usageRemaining?}`) into
- * the response next to `addOn` + `tenantAddOn`. `usageRemaining` is only
- * set when `source === 'addon_active'`, so the field is `.optional()` on
- * the top level. `tenantAddOn` is the full row (with no addOn include) or
- * null when the tenant has never subscribed.
- *
- * The inner TenantAddOn row here matches `TenantAddOnRowBareSchema` (no
- * `addOn` include — `getAddOnStatus` uses `prisma.tenantAddOn.findUnique`
- * without an include clause).
- */
-export const AddOnStatusSchema = z
-  .object({
-    addOn: AddOnCatalogRowSchema,
-    enabled: z.boolean(),
-    source: AddOnFeatureResolutionSourceEnum,
-    usageRemaining: z.number().int().nullable().optional(),
-    tenantAddOn: TenantAddOnRowBareSchema.nullable(),
-  })
-  .strict();
-
-/**
- * Bare `AddOnRequest` Prisma row — 13 fields. Returned by the decline
- * endpoint (the service calls `prisma.addOnRequest.update` without any
- * include clause on the decline path).
- */
-export const AddOnRequestRowBareSchema = z
-  .object({
-    id: z.string(),
-    tenantId: dbId,
-    addOnId: z.string(),
-    status: AddOnRequestStatusEnum,
-    requestedByUserId: dbId,
-    requestedAt: isoDateString,
-    requestNote: z.string().nullable(),
-    reviewedByUserId: dbId.nullable(),
-    reviewedAt: isoDateString.nullable(),
-    declineReason: z.string().nullable(),
-    giftedPriceCents: z.number().int().nullable(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
-  })
-  .strict();
-
-/**
- * `AddOnRequest` row + `addOn: AddOnCatalogRowSchema` include — returned
- * by `POST /add-ons/:slug/request` (the service's `createRequest` uses
- * `include: { addOn: true }`) and by `GET /add-ons/my-requests` (same
- * include via `listMyRequests`). 14 fields total.
- */
-export const AddOnRequestWithAddOnSchema = AddOnRequestRowBareSchema.extend({
-  addOn: AddOnCatalogRowSchema,
-}).strict();
-
-/**
- * Admin tenant projection nested inside request-admin rows. The service
- * uses a thin `select: { id, tenantId, companyName }` clause so the
- * nested object is strictly 3 fields.
- */
-const AddOnRequestAdminTenantSchema = z
-  .object({
-    id: dbId,
-    tenantId: stringId,
-    companyName: z.string(),
-  })
-  .strict();
-
-/**
- * `GET /admin/add-on-requests[?status=...]` list row.
- *
- * AddOnRequest row + `addOn` + `tenant` (thin projection) + the
- * service-synthesised `addOnActive: boolean` field (`listRequests`
- * enriches each approved row with the current TenantAddOn status). 16
- * fields total.
- */
-export const AddOnRequestAdminRowSchema = AddOnRequestRowBareSchema.extend({
-  addOn: AddOnCatalogRowSchema,
-  tenant: AddOnRequestAdminTenantSchema,
-  addOnActive: z.boolean(),
-}).strict();
 
 // ── OAUTH (Phase 4 Group 4g — oauth.spec.ts) ──────────────────────────────
 //

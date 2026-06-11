@@ -7,7 +7,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 export interface RefreshJwtPayload {
   sub: string; // userId
-  tenantId: string;
+  tenantId?: string; // Optional — SUPER_ADMIN / tenant-less users have no tenant
   tokenId: string;
   iat: number;
   exp: number;
@@ -58,7 +58,9 @@ export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       throw new UnauthorizedException('Refresh token expired');
     }
 
-    if (!tokenRecord.user.isActive || !tokenRecord.user.tenant.isActive) {
+    // Tenant check is null-safe: SUPER_ADMIN and tenant-less single-tenant-mode
+    // users have user.tenant = null (mirrors jwt.strategy.ts).
+    if (!tokenRecord.user.isActive || (tokenRecord.user.tenant && !tokenRecord.user.tenant.isActive)) {
       throw new UnauthorizedException('User or tenant is inactive');
     }
 
@@ -66,8 +68,8 @@ export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
       userId: tokenRecord.user.userId,
       email: tokenRecord.user.email,
       role: tokenRecord.user.role,
-      tenantId: tokenRecord.user.tenant.tenantId,
-      tenantName: tokenRecord.user.tenant.companyName,
+      tenantId: tokenRecord.user.tenant?.tenantId,
+      tenantName: tokenRecord.user.tenant?.companyName,
       tokenId: payload.tokenId,
       isActive: tokenRecord.user.isActive,
     };

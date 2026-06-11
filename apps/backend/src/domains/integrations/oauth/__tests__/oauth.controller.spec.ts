@@ -62,7 +62,7 @@ describe('OAuthController', () => {
     });
 
     it('should throw BadRequestException for non-OAuth vendor', async () => {
-      await expect(controller.connect('PROJECT44_TMS', { tenantId: 'tenant-abc' })).rejects.toThrow(
+      await expect(controller.connect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -125,7 +125,7 @@ describe('OAuthController', () => {
     it('should extract vendor from state for error redirect', async () => {
       mockAuthTokenService.handleCallback.mockRejectedValue(new Error('fail'));
 
-      const statePayload = { vendor: 'SAMSARA_ELD', tenantId: 1, nonce: 'n' };
+      const statePayload = { vendor: 'QUICKBOOKS', tenantId: 1, nonce: 'n' };
       const state = Buffer.from(JSON.stringify(statePayload)).toString('base64');
 
       const mockRes = { redirect: jest.fn() };
@@ -133,7 +133,7 @@ describe('OAuthController', () => {
 
       await controller.callback('c', state, mockReq, mockRes as any);
 
-      expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('vendor=SAMSARA_ELD'));
+      expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('vendor=QUICKBOOKS'));
     });
   });
 
@@ -153,7 +153,7 @@ describe('OAuthController', () => {
     });
 
     it('should throw BadRequestException for non-OAuth vendor', async () => {
-      await expect(controller.disconnect('PROJECT44_TMS', { tenantId: 'tenant-abc' })).rejects.toThrow(
+      await expect(controller.disconnect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
         BadRequestException,
       );
     });

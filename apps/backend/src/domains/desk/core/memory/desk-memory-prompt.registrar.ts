@@ -11,7 +11,7 @@ import { DESK_MEMORY_EXTRACT_PROMPT } from './prompts/memory-extract.prompt';
  * DeskPromptRegistrar — LangFuse can override at any time without a
  * code change.
  *
- * Per-responsibility variants (e.g. desk.memory.extract.ar_followup.v1)
+ * Per-responsibility variants (e.g. desk.memory.extract.welcome.v1)
  * register their own fallbacks alongside the responsibility's other
  * step prompts.
  */

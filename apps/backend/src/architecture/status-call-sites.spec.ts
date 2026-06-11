@@ -6,42 +6,21 @@ const BACKEND_SRC = path.join(__dirname, '..');
 /**
  * Files / paths exempt from the guardrail. Each entry must come with a
  * justification — the goal is to keep the list short and the convention loud.
+ * Typical legitimate exemptions: derived lowercase UI labels (not DB columns)
+ * and comparisons against an external vendor API's lowercase wire format.
  */
 const ALLOW_LIST = [
-  // Tracking timeline emits lowercase UI labels for the public tracking
-  // page — synthesized state, not a DB column status.
-  'domains/fleet/loads/services/load-tracking.service.ts',
-  // payStatus is a derived UI label (lowercase) computed from settlement
-  // statuses — not a DB column.
-  'domains/fleet/loads/services/load-query.service.ts',
-  // HOS regulatory codes — FMCSA 49 CFR 395 §11(c)(2) wire format,
-  // matched by Samsara. See packages/shared-types/__tests__/status-conventions.spec.ts
-  // REGULATORY_LOWERCASE_ALLOWLIST.
-  'domains/operations/command-center/command-center.types.ts',
-  'domains/operations/command-center/services/overview.service.ts',
-  'domains/operations/alerts/alert-types.ts',
-  'domains/operations/monitoring/checks/hos/hos-violation.check.ts',
-  'domains/integrations/adapters/eld/samsara-eld.adapter.ts',
-  'domains/integrations/adapters/eld/eld-adapter.interface.ts',
   // Convention test infrastructure itself.
   'architecture/',
-  // MCP tool input enum exposed to the LLM ('active'/'assigned'/'unassigned').
-  // The lowercase values are tool-API param tokens; the actual Prisma write
-  // at line 145 maps to 'ACTIVE'.
-  'domains/ai/mcp/tools/comms-bulk-drivers.tool.ts',
-  // External vendor status comparisons (not DB columns):
-  //   - email-intake.service: function-return shape `{ status: 'approved', … }`
-  //   - twilio-verify.service: comparing Twilio API verificationCheck.status
-  //   - hos-sync.service: ELD sync attempt status (Job.status fixed; remaining
-  //     value is in retry-loop logic that is internal sync state)
-  'domains/integrations/email-intake/services/email-intake.service.ts',
+  // External vendor status comparison (not a DB column): comparing the
+  // Twilio API's verificationCheck.status ('approved', 'pending', …).
   'infrastructure/sms/twilio-verify.service.ts',
 ];
 
 /**
- * Lowercase tokens that, if found near a `status` field, indicate drift on
- * one of the 16 migrated tables. We deliberately list tokens (not regex
- * fragments) so allow-listed values like 'driving'/'on_duty' don't trigger.
+ * Lowercase tokens that, if found near a `status` field, indicate drift from
+ * the UPPER_SNAKE Prisma-enum convention. We deliberately list tokens (not
+ * regex fragments) so legitimately-lowercase values never trigger.
  */
 const SUSPICIOUS_LOWERCASE_TOKENS = new Set<string>([
   'pending',
@@ -106,7 +85,7 @@ function isAllowListed(absPath: string): boolean {
 
 /**
  * Find lowercase status assignments / comparisons / Prisma where-clause
- * literals that would target one of the 16 migrated tables. Patterns:
+ * literals that would target an UPPER_SNAKE Prisma status column. Patterns:
  *   - `status: 'pending'`             (write or where filter)
  *   - `status === 'pending'`          (comparison)
  *   - `status: { in: ['pending', …] }` (Prisma where IN)

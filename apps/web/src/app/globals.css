@@ -224,34 +224,6 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── Route Plan Map Popup Styling ────────────────────────────────────────── */
-.route-popup .mapboxgl-popup-content {
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.75rem;
-  padding: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.3);
-}
-
-.route-popup .mapboxgl-popup-tip {
-  border-top-color: hsl(var(--card));
-  border-bottom-color: hsl(var(--card));
-  border-left-color: hsl(var(--card));
-  border-right-color: hsl(var(--card));
-}
-
-.route-popup .mapboxgl-popup-close-button {
-  color: hsl(var(--muted-foreground));
-  font-size: 18px;
-  padding: 2px 6px;
-}
-
-.route-popup .mapboxgl-popup-close-button:hover {
-  color: hsl(var(--foreground));
-  background: transparent;
-}
-
 /* Assistant AI Chat */
 .assistant-hide-scrollbar::-webkit-scrollbar {
   display: none;

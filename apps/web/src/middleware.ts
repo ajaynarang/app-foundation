@@ -3,13 +3,10 @@ import type { NextRequest } from 'next/server';
 
 // Routes that require authentication.
 //
-// Keep in sync with protectedRoutePatterns in src/shared/lib/navigation.ts.
-// When adding a new protected route, update BOTH files.
-//
-// Note: this list is intentionally a superset of protectedRoutePatterns in
-// navigation.ts — /onboarding and /super-admin are protected here but not
-// surfaced in the nav config because they are not sidebar destinations.
-const PROTECTED_PREFIXES = ['/settings', '/onboarding', '/notifications'];
+// Keep in sync with protectedRoutePatterns in src/shared/lib/navigation.ts —
+// the two lists must match exactly. When adding a new protected route,
+// update BOTH files.
+const PROTECTED_PREFIXES = ['/admin', '/ai', '/onboarding', '/settings'];
 
 // Routes that are always public
 const PUBLIC_PREFIXES = [
@@ -73,6 +70,11 @@ async function isMaintenanceMode(): Promise<boolean> {
 
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost:3000';
 
+// Multi-tenant toggle — when false (single-tenant mode), no subdomain
+// parsing or subdomain login redirects happen. Mirrors the backend
+// MULTI_TENANT flag. Defaults to true.
+const MULTI_TENANT = process.env.NEXT_PUBLIC_MULTI_TENANT !== 'false';
+
 /**
  * Route-level role guard (UX convenience layer, NOT a security boundary).
  *
@@ -92,14 +94,16 @@ const ROLES = {
 } as const;
 
 const ROUTE_ROLE_MAP: Record<string, string[]> = {
-  // /settings, /onboarding, /notifications — accessible to all authenticated roles
+  // /ai, /onboarding, /settings — accessible to all authenticated roles
+  '/admin': [ROLES.SUPER_ADMIN],
 };
 
+// Mirrors getDefaultRouteForRole in src/shared/lib/navigation.ts.
 const ROLE_DEFAULT_ROUTES: Record<string, string> = {
-  [ROLES.MEMBER]: '/settings',
-  [ROLES.ADMIN]: '/settings',
-  [ROLES.OWNER]: '/settings',
-  [ROLES.SUPER_ADMIN]: '/settings',
+  [ROLES.MEMBER]: '/ai',
+  [ROLES.ADMIN]: '/ai',
+  [ROLES.OWNER]: '/ai',
+  [ROLES.SUPER_ADMIN]: '/admin/tenants',
 };
 
 function isPublicRoute(pathname: string): boolean {
@@ -135,14 +139,17 @@ function getRoleRedirect(pathname: string, role: string | undefined): string | n
  * Duplicated from shared/lib/tenant-url.ts because middleware runs on Edge
  * runtime and we want zero external dependencies here.
  *
- * "acme.staging.app.appshore.in" → "acme"
- * "staging.app.appshore.in"      → null
- * "localhost:3000"                  → null
+ * Returns null in single-tenant mode (NEXT_PUBLIC_MULTI_TENANT=false).
+ *
+ * "acme.staging.app.example.com" → "acme"
+ * "staging.app.example.com"      → null
+ * "localhost:3000"               → null
  */
 /** Valid DNS label: lowercase alphanumeric + hyphens, 1-63 chars. */
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
 function extractSubdomain(hostname: string): string | null {
+  if (!MULTI_TENANT) return null;
   const baseDomain = APP_DOMAIN.split(':')[0];
   if (baseDomain === 'localhost') return null;
 

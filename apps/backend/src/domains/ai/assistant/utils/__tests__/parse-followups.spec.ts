@@ -2,7 +2,7 @@ import { parseFollowups } from '../parse-followups';
 
 describe('parseFollowups', () => {
   it('returns original text and empty array when no followups block', () => {
-    const text = 'Hello, here is your fleet status.';
+    const text = 'Hello, here is your account status.';
     const result = parseFollowups(text);
     expect(result.cleanText).toBe(text);
     expect(result.followUps).toEqual([]);
@@ -12,15 +12,15 @@ describe('parseFollowups', () => {
     const text = `Here is your answer.
 
 <followups>
-What is the driver's HOS?
-Show me active loads
-Check fleet status
+What is my usage this month?
+Show me open invoices
+Check system status
 </followups>`;
     const result = parseFollowups(text);
     expect(result.cleanText).toBe('Here is your answer.');
     expect(result.followUps).toHaveLength(3);
-    expect(result.followUps).toContain("What is the driver's HOS?");
-    expect(result.followUps).toContain('Show me active loads');
+    expect(result.followUps).toContain('What is my usage this month?');
+    expect(result.followUps).toContain('Show me open invoices');
   });
 
   it('uses the last block when multiple followup blocks exist', () => {
@@ -71,22 +71,22 @@ Another good one
     const text = `Answer.
 
 <followups>
-<followup>What loads are active?</followup>
-<followup>Check driver HOS</followup>
+<followup>What items are active?</followup>
+<followup>Check usage limits</followup>
 </followups>`;
     const result = parseFollowups(text);
-    expect(result.followUps).toContain('What loads are active?');
-    expect(result.followUps).toContain('Check driver HOS');
+    expect(result.followUps).toContain('What items are active?');
+    expect(result.followUps).toContain('Check usage limits');
   });
 
   it('handles trailing content after closing tag', () => {
     const text = `Answer.
 
 <followups>
-Show fleet status
+Show system status
 </followups>
 Some trailing text`;
     const result = parseFollowups(text);
-    expect(result.followUps).toContain('Show fleet status');
+    expect(result.followUps).toContain('Show system status');
   });
 });

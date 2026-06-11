@@ -1,18 +1,14 @@
 import {
-  Activity,
   Bell,
   BookOpen,
   Bot,
   Building2,
   CreditCard,
-  Flag,
   Headset,
-  History,
   Home,
   Key,
   Link2,
   LucideIcon,
-  Radio,
   Receipt,
   Settings,
   Settings2,
@@ -22,9 +18,6 @@ import {
   Webhook,
   Send,
   DollarSign,
-  Cloud,
-  RefreshCw,
-  Zap,
 } from 'lucide-react';
 
 export const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';
@@ -139,8 +132,8 @@ export const superAdminSettingsSubPanel: SubPanelSection[] = [
   {
     label: 'Personal',
     items: [
-      { label: 'Profile', href: '/admin/settings/profile', icon: User },
-      { label: 'Preferences', href: '/admin/settings/preferences', icon: Settings2 },
+      { label: 'Profile', href: '/settings/profile', icon: User },
+      { label: 'Preferences', href: '/settings/general', icon: Settings2 },
     ],
   },
 ];
@@ -164,7 +157,6 @@ export function getSubPanelSections(_panelId: SubPanelId, role: UserRole | undef
  */
 export function getActiveSubPanel(pathname: string): SubPanelId | null {
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname.startsWith('/admin/settings')) return 'settings';
   return null;
 }
 
@@ -188,22 +180,15 @@ export const navigationConfig: Record<string, NavigationItem[]> = {
   admin: memberNav,
   owner: memberNav,
 
+  // Super-admin surfaces that ship with the starter: tenant lifecycle
+  // management and AI spend. The backend exposes more admin modules
+  // (feature flags, broadcasts, background jobs, events, login activity,
+  // plans, billing, cache) — add pages under apps/web/src/app/admin/ and
+  // list them here as you build their UIs.
   super_admin: [
     { label: 'Tenants', href: '/admin/tenants', icon: Building2 },
-    { type: 'separator', label: 'Operations' } as NavSeparator,
-    { label: 'Feature Flags', href: '/admin/feature-flags', icon: Flag },
-    { label: 'Broadcasts', href: '/admin/broadcasts', icon: Radio },
-    { label: 'Background Jobs', href: '/admin/background-jobs', icon: Activity },
-    { label: 'Events', href: '/admin/events', icon: Zap },
-    { label: 'Login Activity', href: '/admin/login-activity', icon: History },
     { label: 'AI Spend', href: '/admin/ai-spend', icon: DollarSign },
-    { type: 'separator', label: 'Revenue' } as NavSeparator,
-    { label: 'Plans & Entitlements', href: '/admin/plans', icon: CreditCard },
-    { label: 'Billing Pulse', href: '/admin/billing', icon: Receipt },
-    { type: 'separator', label: 'System' } as NavSeparator,
-    { label: 'Platform Health', href: '/admin/platform-health', icon: Cloud },
-    { label: 'Cache Management', href: '/admin/cache', icon: RefreshCw },
-    { label: 'Settings', href: '/admin/settings/profile', icon: Settings, subPanel: 'settings' },
+    { label: 'Settings', href: '/settings/profile', icon: Settings, subPanel: 'settings' },
   ],
 };
 
@@ -213,9 +198,11 @@ export const navigationConfig: Record<string, NavigationItem[]> = {
 export const publicRoutes = ['/', '/login'] as const;
 
 /**
- * Routes that require authentication
+ * Routes that require authentication.
+ * Keep in sync with PROTECTED_PREFIXES in src/middleware.ts — the two lists
+ * must match exactly.
  */
-export const protectedRoutePatterns = ['/admin', '/settings', '/ai', '/notifications', '/docs'] as const;
+export const protectedRoutePatterns = ['/admin', '/ai', '/onboarding', '/settings'] as const;
 
 /**
  * Get navigation items based on user role
@@ -243,7 +230,11 @@ export function isPublicRoute(pathname: string): boolean {
 }
 
 /**
- * Get default route for user role
+ * Get default route for user role — the post-login landing surface.
+ *
+ * Note: '/' is the public marketing/landing page, so authenticated tenant
+ * users land on the AI assistant instead. Keep ROLE_DEFAULT_ROUTES in
+ * src/middleware.ts aligned with this function.
  */
 export function getDefaultRouteForRole(role: UserRole | undefined): string {
   switch (role) {
@@ -252,7 +243,7 @@ export function getDefaultRouteForRole(role: UserRole | undefined): string {
     case 'OWNER':
     case 'ADMIN':
     case 'MEMBER':
-      return '/';
+      return '/ai';
     default:
       return '/login';
   }

@@ -3,13 +3,13 @@
 /**
  * Load Test Baseline — Platform API
  *
- * Hits the top 10 most-used endpoints with 50 concurrent users for 30 seconds.
+ * Hits the most-used platform endpoints with 50 concurrent users for 30 seconds.
  * Purpose: catch performance regressions (N+1 queries, slow joins, missing indexes).
  *
  * NOT a full load/stress test. Run monthly or before releases.
  *
  * Usage:
- *   API_BASE_URL=https://staging.appshore.in/api/v1 \
+ *   API_BASE_URL=https://api-staging.example.com/api/v1 \
  *   AUTH_TOKEN=<jwt> \
  *   node loadtest/run.mjs
  *
@@ -20,7 +20,7 @@
 
 import autocannon from 'autocannon';
 
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:8001/api/v1';
+const BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api/v1';
 const TOKEN = process.env.AUTH_TOKEN;
 
 if (!TOKEN) {
@@ -31,15 +31,13 @@ if (!TOKEN) {
 
 const ENDPOINTS = [
   { method: 'GET', path: '/health/ready', description: 'Health (baseline)' },
-  { method: 'GET', path: '/loads', description: 'List loads' },
-  { method: 'GET', path: '/drivers', description: 'List drivers' },
-  { method: 'GET', path: '/vehicles', description: 'List vehicles' },
-  { method: 'GET', path: '/customers', description: 'List customers' },
-  { method: 'GET', path: '/invoices', description: 'List invoices' },
-  { method: 'GET', path: '/settlements', description: 'List settlements' },
-  { method: 'GET', path: '/alerts', description: 'List alerts' },
+  { method: 'GET', path: '/auth/me', description: 'Current user' },
+  { method: 'GET', path: '/users', description: 'List users' },
   { method: 'GET', path: '/notifications', description: 'List notifications' },
-  { method: 'GET', path: '/command-center/overview', description: 'Command center' },
+  { method: 'GET', path: '/notifications/count', description: 'Notification count' },
+  { method: 'GET', path: '/feature-flags', description: 'Feature flags' },
+  { method: 'GET', path: '/support/tickets', description: 'List support tickets' },
+  { method: 'GET', path: '/billing/overview', description: 'Billing overview' },
 ];
 
 const DURATION_SECONDS = 30;

@@ -25,25 +25,17 @@ Get your API key from the **Platform Dashboard** under **Settings > API Keys**.
 Include your API key in the `Authorization` header:
 
 ```bash
-curl -X POST https://api-staging.appshore.in/api/v1/routes/plan \
-  -H "Authorization: Bearer sk_staging_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"origin": {...}, "destination": {...}}'
+curl https://api-staging.example.com/api/v1/users \
+  -H "Authorization: Bearer sk_staging_YOUR_KEY"
 ```
 
 ### JavaScript Example
 
 ```javascript
-const response = await fetch('https://api-staging.appshore.in/api/v1/routes/plan', {
-  method: 'POST',
+const response = await fetch('https://api-staging.example.com/api/v1/users', {
   headers: {
     'Authorization': `Bearer ${process.env.APP_API_KEY}`,
-    'Content-Type': 'application/json'
   },
-  body: JSON.stringify({
-    origin: { /* ... */ },
-    destination: { /* ... */ }
-  })
 })
 
 const data = await response.json()
@@ -57,16 +49,11 @@ import os
 
 headers = {
     'Authorization': f'Bearer {os.environ["APP_API_KEY"]}',
-    'Content-Type': 'application/json'
 }
 
-response = requests.post(
-    'https://api-staging.appshore.in/api/v1/routes/plan',
+response = requests.get(
+    'https://api-staging.example.com/api/v1/users',
     headers=headers,
-    json={
-        'origin': { ... },
-        'destination': { ... }
-    }
 )
 
 data = response.json()
