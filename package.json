@@ -5,6 +5,8 @@
   "description": "app-foundation — domain-free platform starter",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
+    "// — Make it yours (rename the template)": "",
+    "init-app": "node tools/init-app/init-app.mjs",
     "// — Turbo (all apps)": "",
     "dev": "turbo run dev",
     "build": "turbo run build",
