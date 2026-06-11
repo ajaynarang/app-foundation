@@ -9,6 +9,17 @@ environment variable.
 
 > This is a template. Use GitHub's **"Use this template"** button (or fork) to start a new app.
 
+## Make it yours
+
+```bash
+pnpm install
+pnpm init-app --name my-app --display-name "My App" --yes
+```
+
+One command renames everything — packages, docker containers, Terraform project, Doppler
+projects, branding, tenancy defaults. Run it with no flags for interactive prompts, or with
+`--dry-run` to preview. Details: [tools/init-app/README.md](./tools/init-app/README.md).
+
 ---
 
 ## What you get for free
@@ -51,6 +62,8 @@ pnpm prisma:migrate:deploy && pnpm db:seed
 # 5. Run everything (backend :8000, web :3000, console :3002)
 cd ../.. && pnpm dev
 ```
+
+> Prefer secrets injection over `.env` files? See [docs/doppler.md](./docs/doppler.md) for the full Doppler environment-variable guide.
 
 ---
 
