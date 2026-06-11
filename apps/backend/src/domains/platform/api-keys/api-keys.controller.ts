@@ -37,7 +37,10 @@ export class ApiKeysController extends BaseTenantController {
     super(prisma);
   }
 
+  // RolesGuard treats missing @Roles metadata as allow-any-authenticated-role;
+  // self-service endpoints must declare @Roles explicitly. (security audit SEC-21)
   @Post()
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Generate a new API key' })
   @ApiResponse({
     status: 201,
@@ -49,6 +52,7 @@ export class ApiKeysController extends BaseTenantController {
   }
 
   @Get()
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all API keys for current user' })
   @ApiResponse({
     status: 200,
@@ -60,6 +64,7 @@ export class ApiKeysController extends BaseTenantController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke an API key (owner self-service)' })
   @ApiResponse({ status: 204, description: 'API key revoked successfully' })
