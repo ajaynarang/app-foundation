@@ -50,7 +50,7 @@ export class DomainEventService {
         id: event.id,
         event: event.event,
         tenantId: event.tenantId,
-        data: event.data as unknown,
+        data: event.data,
         actor: event.actor
           ? {
               id: event.actor.id,

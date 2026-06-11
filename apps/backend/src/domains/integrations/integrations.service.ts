@@ -590,7 +590,7 @@ export class IntegrationsService {
   private mapSyncStatusToJobStatus(syncStatus: string): string | { in: string[] } {
     switch (syncStatus) {
       case 'running':
-        return { in: ['queued', 'processing'] } as any;
+        return { in: ['queued', 'processing'] };
       case 'success':
         return 'completed';
       case 'failed':

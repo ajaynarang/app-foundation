@@ -32,9 +32,13 @@ describe('HitlStepUpController', () => {
   it('completes step-up when PIN verifies', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 42, pinHash: '$2b$10$x' });
     pinService.verifyPin.mockResolvedValue(true);
-    const res = await ctrl.complete('tok-1', { pin: '1234' }, {
-      dbId: 42,
-    } as any);
+    const res = await ctrl.complete(
+      'tok-1',
+      { pin: '1234' },
+      {
+        dbId: 42,
+      },
+    );
     expect(pinService.verifyPin).toHaveBeenCalledWith('1234', '$2b$10$x');
     expect(challenges.markStepUpCompleted).toHaveBeenCalledWith('tok-1', 42);
     expect(res).toEqual({ status: 'step_up_verified' });

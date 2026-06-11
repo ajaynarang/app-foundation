@@ -26,7 +26,7 @@ import { executeStep } from '../execute.step';
 // These tests exercise the engine's scope-derivation + fail-closed paths
 // against it. Add tools to your own responsibilities and assert their derived
 // scope set the same way.
-const WELCOME = findResponsibilityDefinition('welcome')!;
+const WELCOME = findResponsibilityDefinition('welcome');
 
 const fromDeskResponsibilityMock = fromDeskResponsibility as jest.MockedFunction<typeof fromDeskResponsibility>;
 

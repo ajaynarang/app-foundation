@@ -37,37 +37,33 @@ describe('PlansController', () => {
   });
 
   it('assignPlan delegates to service', async () => {
-    await controller.assignPlan(
-      'tenant_abc',
-      { plan: 'PROFESSIONAL' as any, reason: 'Upgrade' },
-      { email: 'admin@test.com' },
-    );
+    await controller.assignPlan('tenant_abc', { plan: 'PROFESSIONAL', reason: 'Upgrade' }, { email: 'admin@test.com' });
     expect(service.assignPlan).toHaveBeenCalledWith('tenant_abc', 'PROFESSIONAL', 'admin@test.com', 'Upgrade');
   });
 
   it('assignPlan uses userId fallback when no email', async () => {
-    await controller.assignPlan('tenant_abc', { plan: 'PROFESSIONAL' as any }, { userId: 'user_1' });
+    await controller.assignPlan('tenant_abc', { plan: 'PROFESSIONAL' }, { userId: 'user_1' });
     expect(service.assignPlan).toHaveBeenCalledWith('tenant_abc', 'PROFESSIONAL', 'user_1', undefined);
   });
 
   it('updateProviderPrice delegates to service', async () => {
-    await controller.updateProviderPrice('STARTER' as any, {
+    await controller.updateProviderPrice('STARTER', {
       providerPriceId: 'price_123',
     });
     expect(service.updateProviderPriceId).toHaveBeenCalledWith('STARTER', 'price_123');
   });
 
   it('updatePlanConfig delegates to service', async () => {
-    await controller.updatePlanConfig('STARTER' as any, { displayName: 'New' } as any);
+    await controller.updatePlanConfig('STARTER', { displayName: 'New' });
     expect(service.updatePlanConfig).toHaveBeenCalledWith('STARTER', {
       displayName: 'New',
     });
   });
 
   it('toggleEntitlement delegates to service', async () => {
-    await controller.toggleEntitlement('STARTER' as any, 'shield', {
+    await controller.toggleEntitlement('STARTER', 'shield', {
       enabled: false,
-    } as any);
+    });
     expect(service.toggleEntitlement).toHaveBeenCalledWith('STARTER', 'shield', false);
   });
 });

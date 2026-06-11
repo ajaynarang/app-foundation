@@ -150,7 +150,7 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
   private toInputSchema(parameters: unknown): Record<string, unknown> {
     let schema: Record<string, unknown> = { type: 'object', properties: {} };
     if (parameters && typeof parameters === 'object' && 'shape' in (parameters as Record<string, unknown>)) {
-      schema = zodToJsonSchema(parameters as never) as Record<string, unknown>;
+      schema = zodToJsonSchema(parameters as never);
     }
     if (schema.properties && typeof schema.properties === 'object') {
       const props = schema.properties as Record<string, unknown>;

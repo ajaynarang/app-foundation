@@ -133,7 +133,7 @@ export async function gateStep(input: {
       gateDecision: {
         ...decision,
         approvalId: approval.id,
-      } as unknown as Record<string, unknown>,
+      },
     });
 
     return {
@@ -146,7 +146,7 @@ export async function gateStep(input: {
   // Not gated — mark step succeeded + record the decision
   await stepWriter.succeeded({
     stepId: step.id,
-    gateDecision: decision as unknown as Record<string, unknown>,
+    gateDecision: decision,
   });
 
   return { needsApproval: false, rule: decision.rule };

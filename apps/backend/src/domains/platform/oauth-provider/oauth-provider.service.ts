@@ -103,7 +103,7 @@ export class OAuthProviderService {
     try {
       challenge = this.jwtService.verify(challengeToken, {
         secret: this.oauthSecret,
-      } as any);
+      });
     } catch {
       throw new BadRequestException('Invalid or expired consent challenge');
     }
@@ -354,7 +354,7 @@ export class OAuthProviderService {
     try {
       const payload = this.jwtService.verify<OAuthAccessTokenPayload>(token, {
         secret: this.oauthSecret,
-      } as any);
+      });
 
       // Verify it has OAuth-specific claims
       if (!payload.clientId || !payload.scopes) {
@@ -421,7 +421,7 @@ export class OAuthProviderService {
       {
         secret: this.oauthSecret,
         expiresIn: accessTokenTtl,
-      } as any,
+      },
     );
 
     // Opaque refresh token

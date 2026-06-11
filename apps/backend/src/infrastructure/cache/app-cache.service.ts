@@ -56,7 +56,7 @@ export class AppCacheService implements OnModuleInit {
 
     this.recordHit(ns);
 
-    if (raw === CACHE_NULL_SENTINEL) return null as T;
+    if (raw === CACHE_NULL_SENTINEL) return null;
 
     try {
       return JSON.parse(raw) as T;

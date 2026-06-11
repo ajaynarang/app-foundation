@@ -22,20 +22,20 @@ describe('LoginActivityAdminController (super admin)', () => {
   });
 
   it('list: passes super-admin scope and forwards tenantId filter', async () => {
-    await controller.list({ from: '2026-05-19', to: '2026-05-26', tenantId: 42 } as any);
+    await controller.list({ from: '2026-05-19', to: '2026-05-26', tenantId: 42 });
     const [scope, params] = serviceList.mock.calls[0];
     expect(scope).toEqual({ isSuperAdmin: true, tenantId: 42 });
     expect(params.tenantId).toBe(42);
   });
 
   it('list: super-admin scope without tenantId means cross-tenant', async () => {
-    await controller.list({ from: '2026-05-19', to: '2026-05-26' } as any);
+    await controller.list({ from: '2026-05-19', to: '2026-05-26' });
     const [scope] = serviceList.mock.calls[0];
     expect(scope).toEqual({ isSuperAdmin: true, tenantId: undefined });
   });
 
   it('summary: passes super-admin scope', async () => {
-    await controller.summary({ from: '2026-05-19', to: '2026-05-26', tenantId: 42 } as any);
+    await controller.summary({ from: '2026-05-19', to: '2026-05-26', tenantId: 42 });
     expect(serviceSummary).toHaveBeenCalledTimes(1);
     const [scope] = serviceSummary.mock.calls[0];
     expect(scope.isSuperAdmin).toBe(true);

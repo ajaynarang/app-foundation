@@ -163,7 +163,7 @@ async function loadHydrateOutput(prisma: PrismaService, episodeId: string): Prom
     orderBy: { sequence: 'asc' },
     select: { output: true },
   });
-  return (row?.output ?? null) as unknown as SharedHydrateOutput | null;
+  return (row?.output ?? null) as unknown;
 }
 
 function serializeHydrate(hydrate: SharedHydrateOutput | null): string {

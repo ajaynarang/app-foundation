@@ -17,7 +17,7 @@ export class SnoozeEpisodeDto {
     enum: SNOOZE_DURATIONS,
     description: 'Canned snooze duration. "forever" maps to suppressUntil=null.',
   })
-  @IsIn(SNOOZE_DURATIONS as unknown as string[])
+  @IsIn(SNOOZE_DURATIONS)
   duration!: SnoozeDuration;
 
   @ApiProperty({

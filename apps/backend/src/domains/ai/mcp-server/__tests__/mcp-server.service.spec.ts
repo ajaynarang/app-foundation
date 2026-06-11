@@ -80,7 +80,7 @@ describe('McpServerService', () => {
     });
 
     it('should create a server and handle request', async () => {
-      await service.handleRequest(mockReq, mockRes, oauthUser as any);
+      await service.handleRequest(mockReq, mockRes, oauthUser);
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
@@ -90,7 +90,7 @@ describe('McpServerService', () => {
     it('should call transport.handleRequest with req, res, body', async () => {
       const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js'); // eslint-disable-line @typescript-eslint/no-require-imports
 
-      await service.handleRequest(mockReq, mockRes, oauthUser as any);
+      await service.handleRequest(mockReq, mockRes, oauthUser);
 
       const transportInstance = StreamableHTTPServerTransport.mock.results[0].value;
       expect(transportInstance.handleRequest).toHaveBeenCalledWith(mockReq, mockRes, mockReq.body);
@@ -101,7 +101,7 @@ describe('McpServerService', () => {
       const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
       const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js'); // eslint-disable-line @typescript-eslint/no-require-imports
 
-      await service.handleRequest(mockReq, mockRes, oauthUser as any);
+      await service.handleRequest(mockReq, mockRes, oauthUser);
 
       const serverInstance = Server.mock.results[0].value;
       const transportInstance = StreamableHTTPServerTransport.mock.results[0].value;
@@ -113,7 +113,7 @@ describe('McpServerService', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 
-      await service.handleRequest(mockReq, mockRes, oauthUser as any);
+      await service.handleRequest(mockReq, mockRes, oauthUser);
 
       const serverInstance = Server.mock.results[0].value;
       expect(serverInstance.setRequestHandler).toHaveBeenCalledTimes(2);
@@ -198,7 +198,7 @@ describe('McpServerService — pipeline routing', () => {
       content: [{ type: 'text', text: '{"count":0}' }],
     });
 
-    const res = await service.executeToolCall('query-items', { status: 'active' }, oauthUser as any);
+    const res = await service.executeToolCall('query-items', { status: 'active' }, oauthUser);
 
     expect(pipeline.run).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -215,7 +215,7 @@ describe('McpServerService — pipeline routing', () => {
   it('returns pipeline_error when pipeline throws PipelineError', async () => {
     pipeline.run.mockRejectedValue(new PipelineError('scope_denied'));
 
-    const res = await service.executeToolCall('query-items', {}, oauthUser as any);
+    const res = await service.executeToolCall('query-items', {}, oauthUser);
 
     expect(pipeline.run).toHaveBeenCalled();
     expect(res.isError).toBe(true);

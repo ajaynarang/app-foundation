@@ -44,3 +44,8 @@ Obsidian Vault/
 .git/
 .vscode/
 .idea/
+
+# Generated code (codegen output is the source of truth — see enum-codegen-parity.spec.ts)
+**/*.generated.*
+apps/backend/src/generated/
+packages/shared-types/src/generated/

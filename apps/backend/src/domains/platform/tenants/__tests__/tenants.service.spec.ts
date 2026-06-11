@@ -147,7 +147,7 @@ describe('TenantsService', () => {
       mockPrisma.user.create.mockResolvedValue({ id: 1, userId: 'USR-001' });
       mockPrisma.tenantPlanEvent.create.mockResolvedValue({});
 
-      const result = await service.registerTenant(dto as any);
+      const result = await service.registerTenant(dto);
 
       expect(result.status).toBe('PENDING_APPROVAL');
       expect(result.tenantId).toBe('TNT-001');
@@ -172,7 +172,7 @@ describe('TenantsService', () => {
       mockPrisma.user.create.mockResolvedValue({ id: 1 });
       mockPrisma.tenantPlanEvent.create.mockResolvedValue({});
 
-      await service.registerTenant(dto as any);
+      await service.registerTenant(dto);
 
       expect(mockNotification.sendTenantRegistrationConfirmation).toHaveBeenCalledWith(
         'TNT-001',
@@ -417,7 +417,7 @@ describe('TenantsService', () => {
         ownerLastName: 'Smith',
         ownerEmail: 'jane@acme.com',
         ownerPhone: '+12025559999',
-      } as any);
+      });
 
       expect(mockPrisma.tenant.update).toHaveBeenCalledWith(
         expect.objectContaining({

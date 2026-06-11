@@ -107,13 +107,13 @@ describe('AssistantAiService', () => {
     };
 
     service = new AssistantAiService(
-      mockPrisma as unknown as PrismaService,
-      mockMcpTools as unknown as McpToolService,
-      mockMastra as unknown as MastraProvider,
-      mockModeration as unknown as ModerationService,
-      mockPromptService as unknown as PromptingService,
-      mockAssistantRouter as unknown as AssistantRouterService,
-      mockAgentRegistry as unknown as AgentRegistry,
+      mockPrisma,
+      mockMcpTools,
+      mockMastra,
+      mockModeration,
+      mockPromptService,
+      mockAssistantRouter,
+      mockAgentRegistry,
       { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
     );
   });

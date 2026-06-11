@@ -24,4 +24,4 @@ export const ToolNames = {
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];
 
-export const TOOL_NAMES_LIST: readonly ToolName[] = Object.values(ToolNames) as ToolName[];
+export const TOOL_NAMES_LIST: readonly ToolName[] = Object.values(ToolNames);

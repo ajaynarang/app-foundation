@@ -122,7 +122,7 @@ export class NotificationTriggersService {
   async userJoined(tenantId: number, userName: string, role: string) {
     return this.trigger({
       tenantId,
-      type: 'USER_JOINED' as NotificationType,
+      type: 'USER_JOINED',
       category: 'TEAM',
       title: `${userName} Joined`,
       message: `New ${role.toLowerCase()} added to the team`,
@@ -144,7 +144,7 @@ export class NotificationTriggersService {
 
     return this.trigger({
       tenantId,
-      type: 'ROLE_CHANGED' as NotificationType,
+      type: 'ROLE_CHANGED',
       category: 'TEAM',
       title: `Role Changed — ${userName}`,
       message: `Changed from ${oldRole} to ${newRole}`,
@@ -156,7 +156,7 @@ export class NotificationTriggersService {
   async integrationSyncCompleted(tenantId: number, integrationName: string, summary: string) {
     return this.trigger({
       tenantId,
-      type: 'INTEGRATION_SYNC_COMPLETED' as NotificationType,
+      type: 'INTEGRATION_SYNC_COMPLETED',
       category: 'SYSTEM',
       title: `${integrationName} Sync Complete`,
       message: summary,
@@ -170,7 +170,7 @@ export class NotificationTriggersService {
   async integrationSyncFailed(tenantId: number, integrationName: string, error: string) {
     return this.trigger({
       tenantId,
-      type: 'INTEGRATION_SYNC_FAILED' as NotificationType,
+      type: 'INTEGRATION_SYNC_FAILED',
       category: 'SYSTEM',
       title: `${integrationName} Sync Failed`,
       message: error,

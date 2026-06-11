@@ -65,7 +65,7 @@ describe('PlansService', () => {
       del: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new PlansService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
+    service = new PlansService(prisma, cache);
   });
 
   describe('getAllPlanConfigs', () => {
@@ -91,28 +91,28 @@ describe('PlansService', () => {
 
   describe('isFeatureEnabled', () => {
     it('should return true for ENTERPRISE', async () => {
-      const result = await service.isFeatureEnabled('ENTERPRISE' as any, 'anything');
+      const result = await service.isFeatureEnabled('ENTERPRISE', 'anything');
       expect(result).toBe(true);
     });
 
     it('should return false for TRIAL_EXPIRED', async () => {
-      const result = await service.isFeatureEnabled('TRIAL_EXPIRED' as any, 'anything');
+      const result = await service.isFeatureEnabled('TRIAL_EXPIRED', 'anything');
       expect(result).toBe(false);
     });
 
     it('should return false for SUSPENDED', async () => {
-      const result = await service.isFeatureEnabled('SUSPENDED' as any, 'anything');
+      const result = await service.isFeatureEnabled('SUSPENDED', 'anything');
       expect(result).toBe(false);
     });
 
     it('should check entitlement for regular plans', async () => {
-      const result = await service.isFeatureEnabled('STARTER' as any, 'shield');
+      const result = await service.isFeatureEnabled('STARTER', 'shield');
       expect(result).toBe(true);
     });
 
     it('should return false when no entitlement found', async () => {
       prisma.planEntitlement.findUnique.mockResolvedValue(null);
-      const result = await service.isFeatureEnabled('STARTER' as any, 'nonexistent');
+      const result = await service.isFeatureEnabled('STARTER', 'nonexistent');
       expect(result).toBe(false);
     });
   });
@@ -125,7 +125,7 @@ describe('PlansService', () => {
       });
       prisma.tenantPlanEvent.create.mockResolvedValue({});
 
-      await service.assignPlan('tenant_abc', 'PROFESSIONAL' as any, 'admin@test.com', 'Upgrade');
+      await service.assignPlan('tenant_abc', 'PROFESSIONAL', 'admin@test.com', 'Upgrade');
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
     });
@@ -133,7 +133,7 @@ describe('PlansService', () => {
 
   describe('updateProviderPriceId', () => {
     it('should update provider price id', async () => {
-      await service.updateProviderPriceId('STARTER' as any, 'price_123');
+      await service.updateProviderPriceId('STARTER', 'price_123');
       expect(prisma.planConfig.update).toHaveBeenCalledWith({
         where: { plan: 'STARTER' },
         data: { providerPriceId: 'price_123' },
@@ -143,7 +143,7 @@ describe('PlansService', () => {
 
   describe('updatePlanConfig', () => {
     it('should update and invalidate cache', async () => {
-      await service.updatePlanConfig('STARTER' as any, {
+      await service.updatePlanConfig('STARTER', {
         displayName: 'New Name',
       });
       expect(prisma.planConfig.update).toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe('PlansService', () => {
 
   describe('toggleEntitlement', () => {
     it('should toggle and invalidate cache', async () => {
-      await service.toggleEntitlement('STARTER' as any, 'shield', false);
+      await service.toggleEntitlement('STARTER', 'shield', false);
       expect(prisma.planEntitlement.update).toHaveBeenCalledWith({
         where: { plan_feature: { plan: 'STARTER', feature: 'shield' } },
         data: { enabled: false },

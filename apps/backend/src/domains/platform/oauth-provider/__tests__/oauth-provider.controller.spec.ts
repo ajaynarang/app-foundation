@@ -113,7 +113,7 @@ describe('OAuthProviderController', () => {
         'cid',
         'secret',
         'verifier',
-        undefined as any,
+        undefined,
       );
       expect(oauthService.exchangeCode).toHaveBeenCalledWith('code1', 'verifier', 'cid', 'secret', 'http://localhost');
       expect(result.access_token).toBe('at_123');
@@ -128,11 +128,11 @@ describe('OAuthProviderController', () => {
     it('should refresh token', async () => {
       const result = await controller.token(
         'refresh_token',
-        undefined as any,
-        undefined as any,
+        undefined,
+        undefined,
         'cid',
         'secret',
-        undefined as any,
+        undefined,
         'rt_abc',
       );
       expect(oauthService.refreshToken).toHaveBeenCalledWith('rt_abc', 'cid', 'secret');

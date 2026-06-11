@@ -58,7 +58,7 @@ describe('FeedbackService', () => {
       };
       mockPrisma.feedback.create.mockResolvedValue({ id: 1, ...dto });
 
-      const result = await service.create(1, 10, dto as any);
+      const result = await service.create(1, 10, dto);
 
       expect(result.id).toBe(1);
       expect(mockPrisma.feedback.create).toHaveBeenCalledWith({
@@ -101,7 +101,7 @@ describe('FeedbackService', () => {
       mockPrisma.feedback.findMany.mockResolvedValue([]);
       mockPrisma.feedback.count.mockResolvedValue(0);
 
-      await service.listAll({ category: 'uncategorized' } as any);
+      await service.listAll({ category: 'uncategorized' });
 
       expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -114,7 +114,7 @@ describe('FeedbackService', () => {
       mockPrisma.feedback.findMany.mockResolvedValue([]);
       mockPrisma.feedback.count.mockResolvedValue(50);
 
-      const result = await service.listAll({ page: 2, limit: 10 } as any);
+      const result = await service.listAll({ page: 2, limit: 10 });
 
       expect(result.page).toBe(2);
       expect(result.limit).toBe(10);
@@ -156,7 +156,7 @@ describe('FeedbackService', () => {
 
       await service.resolve(1, 42, {
         note: 'Fixed in v2',
-      } as any);
+      });
 
       expect(mockPrisma.feedback.update).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -289,7 +289,7 @@ describe('FeedbackService', () => {
       mockPrisma.feedback.findMany.mockResolvedValue([]);
       mockPrisma.feedback.count.mockResolvedValue(0);
 
-      await service.listAll({ tenantId: 5 } as any);
+      await service.listAll({ tenantId: 5 });
 
       expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -302,7 +302,7 @@ describe('FeedbackService', () => {
       mockPrisma.feedback.findMany.mockResolvedValue([]);
       mockPrisma.feedback.count.mockResolvedValue(0);
 
-      await service.listAll({ sentimentMin: 3, sentimentMax: 5 } as any);
+      await service.listAll({ sentimentMin: 3, sentimentMax: 5 });
 
       expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -320,7 +320,7 @@ describe('FeedbackService', () => {
       await service.listAll({
         from: '2026-01-01',
         to: '2026-01-31',
-      } as any);
+      });
 
       expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

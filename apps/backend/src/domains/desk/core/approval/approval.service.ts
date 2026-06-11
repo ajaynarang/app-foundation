@@ -212,7 +212,7 @@ export class ApprovalService {
       await this.prisma.deskApproval.update({
         where: { id: row.id },
         data: {
-          decision: 'REJECTED' as ApprovalDecision,
+          decision: 'REJECTED',
           decidedAt: new Date(),
           rejectionReason: 'auto-expired',
           terminateEpisode: true,
@@ -221,7 +221,7 @@ export class ApprovalService {
       await this.inngest.send('app/desk.approval.decided', {
         approvalId: row.id,
         episodeId: row.episodeId,
-        decision: 'REJECTED' as ApprovalDecision,
+        decision: 'REJECTED',
         terminateEpisode: true,
         rejectionReason: 'auto-expired',
         decidedByUserId: 0, // 0 = system-decided

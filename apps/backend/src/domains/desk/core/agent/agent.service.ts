@@ -91,7 +91,7 @@ export class DeskAgentService {
     // any remaining seeded agents in insertion order. Every seeded agent
     // shows on Crew — agents with zero responsibilities simply rollup to
     // "coming soon" with 0 counts until their registry entries ship.
-    const registryKeys: string[] = Array.from(new Set(RESPONSIBILITY_REGISTRY.map((r) => r.agentKey as string)));
+    const registryKeys: string[] = Array.from(new Set(RESPONSIBILITY_REGISTRY.map((r) => r.agentKey)));
     const seededKeys: string[] = agents.map((a) => a.key);
     const orderedKeys: string[] = [
       ...registryKeys.filter((k) => agentsByKey.has(k)),
@@ -101,7 +101,7 @@ export class DeskAgentService {
     return orderedKeys.map((k) => {
       const agent = agentsByKey.get(k);
       return {
-        key: agent.key as AgentKey,
+        key: agent.key,
         name: agent.name,
         description: agent.description,
         supervisor: agent.supervisor
@@ -161,7 +161,7 @@ export class DeskAgentService {
     const isActive = agent.responsibilities.some((r) => r.enabled && r.lifecycle === 'AVAILABLE');
 
     return {
-      key: agent.key as AgentKey,
+      key: agent.key,
       name: agent.name,
       description: agent.description,
       isActive,
@@ -409,10 +409,10 @@ export class DeskAgentService {
   }
 
   private async assertEligibleSupervisor(tenantId: number, userId: number): Promise<void> {
-    const user = (await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { id: userId, tenantId, isActive: true, deletedAt: null },
       select: { role: true },
-    })) as SupervisorRoleRow | null;
+    });
     if (!user) throw new BadRequestException('Selected user is not part of this tenant');
     if (!SUPERVISOR_ELIGIBLE_ROLES.includes(user.role)) {
       throw new BadRequestException('Selected user is not eligible to supervise an agent');

@@ -37,7 +37,7 @@ describe('FeatureFlagsController', () => {
   it('updateFlag delegates to service', async () => {
     const result = await controller.updateFlag('shield', {
       enabled: false,
-    } as any);
+    });
     expect(service.toggleFlag).toHaveBeenCalledWith('shield', false);
     expect(result.enabled).toBe(false);
   });

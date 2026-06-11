@@ -69,7 +69,7 @@ describe('SuppressionService', () => {
     jest.clearAllMocks();
     prisma = createMockPrisma();
     events = createMockEventEmitter();
-    service = new SuppressionService(prisma as unknown as PrismaService, events as any);
+    service = new SuppressionService(prisma, events as any);
   });
 
   describe('snooze', () => {

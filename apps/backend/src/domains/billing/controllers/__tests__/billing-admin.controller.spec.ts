@@ -35,7 +35,7 @@ describe('BillingAdminController', () => {
   describe('createSubscription', () => {
     it('should create subscription for tenant', async () => {
       const result = await controller.createSubscription(1, {
-        plan: 'PROFESSIONAL' as any,
+        plan: 'PROFESSIONAL',
         quantity: 3,
         customPriceCents: 4500,
       });
@@ -108,7 +108,7 @@ describe('BillingAdminController', () => {
   describe('changeSubscriptionPlan', () => {
     it('should change subscription plan', async () => {
       const result = await controller.changeSubscriptionPlan(1, {
-        plan: 'ENTERPRISE' as any,
+        plan: 'ENTERPRISE',
         quantity: 5,
       });
       expect(result).toEqual({ action: 'upgraded' });

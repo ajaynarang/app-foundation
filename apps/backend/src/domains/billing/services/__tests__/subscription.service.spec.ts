@@ -111,7 +111,7 @@ describe('SubscriptionService', () => {
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
 
-      const result = await service.createSubscription('TNT-1', 1, 'STARTER' as any, 1, 'success', 'cancel');
+      const result = await service.createSubscription('TNT-1', 1, 'STARTER', 1, 'success', 'cancel');
 
       expect(mockAdapter.createCustomer).toHaveBeenCalled();
       expect(result.checkoutUrl).toContain('checkout.stripe.com');
@@ -145,7 +145,7 @@ describe('SubscriptionService', () => {
       });
       mockPrisma.billingSubscription.update.mockResolvedValue({});
 
-      await service.upgradePlan('TNT-1', 1, 'PROFESSIONAL' as any);
+      await service.upgradePlan('TNT-1', 1, 'PROFESSIONAL');
 
       expect(mockAdapter.updateSubscription).toHaveBeenCalledWith(
         'sub_1',

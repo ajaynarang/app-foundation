@@ -39,7 +39,7 @@ describe('AgentActivityController', () => {
   });
 
   it('delegates to service with tenantId resolved from user', async () => {
-    await controller.list(user as any, 'api_key', 'ak1', 'all', undefined, 50);
+    await controller.list(user, 'api_key', 'ak1', 'all', undefined, 50);
     expect(service.list).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 7,
@@ -53,7 +53,7 @@ describe('AgentActivityController', () => {
   });
 
   it('passes cursor to service when provided', async () => {
-    await controller.list(user as any, 'oauth_client', 'c1', 'approvals', '2026-01-01T00:00:00.000Z', 25);
+    await controller.list(user, 'oauth_client', 'c1', 'approvals', '2026-01-01T00:00:00.000Z', 25);
     expect(service.list).toHaveBeenCalledWith(
       expect.objectContaining({
         principalKind: 'oauth_client',

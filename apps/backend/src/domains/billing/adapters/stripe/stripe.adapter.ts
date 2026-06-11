@@ -98,7 +98,7 @@ export class StripeAdapter implements PaymentProviderAdapter {
       currentPeriodStart: new Date(sub.current_period_start * 1000),
       currentPeriodEnd: new Date(sub.current_period_end * 1000),
       cancelAtPeriodEnd: sub.cancel_at_period_end,
-      metadata: (sub.metadata as Record<string, string>) ?? {},
+      metadata: sub.metadata ?? {},
     };
   }
 

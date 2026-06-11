@@ -97,7 +97,7 @@ describe('JwtAuthGuard', () => {
       // handleRequest calls super.handleRequest which returns user,
       // then enriches log context
       mockSuperHandleRequest.mockReturnValue(user);
-      const result = guard.handleRequest(null, user, null, ctx as any);
+      const result = guard.handleRequest(null, user, null, ctx);
 
       expect(result).toEqual(user);
       // super.handleRequest returns what we told it to, guard then sets log context
@@ -114,7 +114,7 @@ describe('JwtAuthGuard', () => {
       });
 
       mockSuperHandleRequest.mockReturnValue(null);
-      guard.handleRequest(null, null as any, null, ctx as any);
+      guard.handleRequest(null, null as any, null, ctx);
 
       expect(setLogContext).not.toHaveBeenCalled();
     });
@@ -128,7 +128,7 @@ describe('JwtAuthGuard', () => {
       });
 
       mockSuperHandleRequest.mockReturnValue(user);
-      guard.handleRequest(null, user, null, ctx as any);
+      guard.handleRequest(null, user, null, ctx);
 
       expect(setLogContext).not.toHaveBeenCalled();
     });
@@ -138,7 +138,7 @@ describe('JwtAuthGuard', () => {
       const ctx = createMockContext({ request: { url: '/test' } });
 
       mockSuperHandleRequest.mockReturnValue(user);
-      const result = guard.handleRequest(null, user, null, ctx as any);
+      const result = guard.handleRequest(null, user, null, ctx);
 
       expect(result).toEqual(user);
     });

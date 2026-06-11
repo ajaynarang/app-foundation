@@ -91,7 +91,7 @@ describe('BillingController', () => {
   describe('upgradePlan', () => {
     it('should upgrade plan and return success', async () => {
       const result = await controller.upgradePlan({ tenantId: 'TNT-1' }, 1, {
-        newPlan: 'ENTERPRISE' as any,
+        newPlan: 'ENTERPRISE',
         newQuantity: 5,
       });
       expect(result).toEqual({ success: true });
@@ -102,7 +102,7 @@ describe('BillingController', () => {
   describe('downgradePlan', () => {
     it('should downgrade plan and return success', async () => {
       const result = await controller.downgradePlan({ tenantId: 'TNT-1' }, 1, {
-        newPlan: 'STARTER' as any,
+        newPlan: 'STARTER',
       });
       expect(result).toEqual({ success: true });
       expect(mockSubscriptionService.downgradePlan).toHaveBeenCalledWith('TNT-1', 1, 'STARTER');

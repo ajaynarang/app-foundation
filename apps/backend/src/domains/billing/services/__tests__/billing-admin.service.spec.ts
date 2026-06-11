@@ -214,7 +214,7 @@ describe('BillingAdminService', () => {
       });
       mockPrisma.billingSubscription.create.mockResolvedValue({});
 
-      const result = await service.createSubscriptionForTenant(1, 'PROFESSIONAL' as any, 3);
+      const result = await service.createSubscriptionForTenant(1, 'PROFESSIONAL', 3);
 
       expect(result).toEqual({ providerSubscriptionId: 'sub_new' });
       expect(mockAdapter.createCustomer).toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe('BillingAdminService', () => {
         tenantId: 'TNT-1',
       });
 
-      await service.createSubscriptionForTenant(1, 'STARTER' as any, 1);
+      await service.createSubscriptionForTenant(1, 'STARTER', 1);
 
       expect(mockAdapter.createCustomer).not.toHaveBeenCalled();
     });
@@ -262,7 +262,7 @@ describe('BillingAdminService', () => {
         tenantId: 'TNT-1',
       });
 
-      const result = await service.createSubscriptionForTenant(1, 'PROFESSIONAL' as any, 2, 3000);
+      const result = await service.createSubscriptionForTenant(1, 'PROFESSIONAL', 2, 3000);
 
       expect(result).toEqual({ providerSubscriptionId: 'sub_new' });
     });
@@ -525,7 +525,7 @@ describe('BillingAdminService', () => {
         tenantId: 'TNT-1',
       });
 
-      const result = await service.changeSubscriptionPlan(1, 'PROFESSIONAL' as any);
+      const result = await service.changeSubscriptionPlan(1, 'PROFESSIONAL');
 
       expect(result).toEqual({ action: 'created' });
     });
@@ -565,7 +565,7 @@ describe('BillingAdminService', () => {
       mockAdapter.updateSubscription.mockResolvedValue(undefined);
       mockPrisma.billingSubscription.update.mockResolvedValue({});
 
-      const result = await service.changeSubscriptionPlan(1, 'ENTERPRISE' as any, 5);
+      const result = await service.changeSubscriptionPlan(1, 'ENTERPRISE', 5);
 
       expect(result).toEqual({ action: 'upgraded' });
       expect(mockAdapter.updateSubscription).toHaveBeenCalledWith(
@@ -591,7 +591,7 @@ describe('BillingAdminService', () => {
       mockAdapter.updateSubscription.mockResolvedValue(undefined);
       mockPrisma.billingSubscription.update.mockResolvedValue({});
 
-      const result = await service.changeSubscriptionPlan(1, 'STARTER' as any);
+      const result = await service.changeSubscriptionPlan(1, 'STARTER');
 
       expect(result).toEqual({ action: 'downgraded' });
       expect(mockAdapter.updateSubscription).toHaveBeenCalledWith(

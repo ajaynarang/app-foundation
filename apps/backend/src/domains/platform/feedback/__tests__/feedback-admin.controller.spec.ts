@@ -55,7 +55,7 @@ describe('FeedbackAdminController', () => {
 
   it('resolve delegates to service', async () => {
     const dto = { note: 'Fixed' };
-    await controller.resolve(1, dto as any, { dbId: 5 });
+    await controller.resolve(1, dto, { dbId: 5 });
     expect(service.resolve).toHaveBeenCalledWith(1, 5, dto);
   });
 

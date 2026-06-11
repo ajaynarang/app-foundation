@@ -18,7 +18,7 @@ describe('ApprovalService', () => {
     prisma = createMockPrisma();
     prisma.deskApproval.findMany.mockResolvedValue([]);
     const enrichment = new ApprovalEnrichmentService();
-    service = new ApprovalService(prisma as unknown as PrismaService, new FakeInngest() as any, enrichment);
+    service = new ApprovalService(prisma, new FakeInngest() as any, enrichment);
   });
 
   describe('listPending scope', () => {
@@ -306,7 +306,7 @@ describe('ApprovalService', () => {
       const result = await service.decide({
         approvalId: 'app-1',
         userId: 42,
-        decision: 'APPROVED' as any,
+        decision: 'APPROVED',
       });
       expect(result.decision).toBe('APPROVED');
 
@@ -390,7 +390,7 @@ describe('ApprovalService', () => {
       const result = await service.decide({
         approvalId: 'app-1',
         userId: 42,
-        decision: 'REJECTED' as any,
+        decision: 'REJECTED',
         rejectionReason: 'bad numbers',
         terminate: true,
       });
@@ -461,7 +461,7 @@ describe('ApprovalService', () => {
     it('returns EpisodeListItem-shaped rows (no artifact / no assistantRead / no context)', async () => {
       const localPrisma = makePrismaWithOneApproval();
       const enrichment = { enrich: jest.fn() } as any;
-      const svc = new ApprovalService(localPrisma as unknown as PrismaService, new FakeInngest() as any, enrichment);
+      const svc = new ApprovalService(localPrisma, new FakeInngest() as any, enrichment);
 
       const rows = await svc.listPending(10, { limit: 10, scope: 'all' });
       expect(rows).toHaveLength(1);

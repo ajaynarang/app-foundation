@@ -136,7 +136,7 @@ export class McpToolService implements OnModuleInit {
 
       let rawSchema: Record<string, unknown>;
       if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
-        rawSchema = zodToJsonSchema(metadata.parameters) as Record<string, unknown>;
+        rawSchema = zodToJsonSchema(metadata.parameters);
       } else {
         rawSchema = { type: 'object', properties: {} };
       }
@@ -198,7 +198,7 @@ export class McpToolService implements OnModuleInit {
 
           return callTool();
         },
-      } as any;
+      };
     }
 
     return tools;
@@ -292,7 +292,7 @@ export class McpToolService implements OnModuleInit {
 
       let rawSchema: Record<string, unknown>;
       if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
-        rawSchema = zodToJsonSchema(metadata.parameters) as Record<string, unknown>;
+        rawSchema = zodToJsonSchema(metadata.parameters);
       } else {
         rawSchema = { type: 'object', properties: {} };
       }
@@ -349,7 +349,7 @@ export class McpToolService implements OnModuleInit {
 
           return callTool();
         },
-      } as any;
+      };
     }
 
     return tools;

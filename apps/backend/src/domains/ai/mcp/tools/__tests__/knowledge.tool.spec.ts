@@ -41,7 +41,7 @@ describe('KnowledgeTool', () => {
       ]),
     };
 
-    tool = new KnowledgeTool(mockKbService as unknown as KnowledgeBaseService);
+    tool = new KnowledgeTool(mockKbService);
   });
 
   describe('searchKB', () => {

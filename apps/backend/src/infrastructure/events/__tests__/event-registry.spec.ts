@@ -16,9 +16,9 @@ describe('EventRegistry', () => {
   it('getEventDefinition returns correct definition', () => {
     const def = getEventDefinition('app.notification.created');
     expect(def).toBeDefined();
-    expect(def!.constantName).toBe('NOTIFICATION_CREATED');
-    expect(def!.visibility).toBe('external');
-    expect(def!.category).toBe('Notifications');
+    expect(def.constantName).toBe('NOTIFICATION_CREATED');
+    expect(def.visibility).toBe('external');
+    expect(def.category).toBe('Notifications');
   });
 
   it('getEventDefinition returns undefined for unknown events', () => {
@@ -99,7 +99,7 @@ describe('EventRegistry', () => {
     for (const key of internalKeys) {
       const def = getEventDefinition(key);
       expect(def).toBeDefined();
-      expect(def!.visibility).toBe('internal');
+      expect(def.visibility).toBe('internal');
     }
   });
 });

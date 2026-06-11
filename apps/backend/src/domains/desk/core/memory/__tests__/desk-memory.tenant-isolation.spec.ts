@@ -32,7 +32,7 @@ describe('DeskMemoryService — tenant isolation', () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new DeskMemoryService(prisma as unknown as PrismaService, buildEmbedder());
+    service = new DeskMemoryService(prisma, buildEmbedder());
   });
 
   it('listForUI scopes the WHERE clause by tenantId (Tenant B sees no Tenant A rows)', async () => {

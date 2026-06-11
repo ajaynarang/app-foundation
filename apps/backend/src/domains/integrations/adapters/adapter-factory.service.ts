@@ -21,7 +21,7 @@ export class AdapterFactoryService {
    * @param vendor - Vendor ID from the vendor registry (e.g. 'QUICKBOOKS')
    * @returns adapter instance, or null if not supported
    */
-  getAccountingAdapter(vendor: string): unknown | null {
+  getAccountingAdapter(vendor: string): unknown {
     const adapterMap: Record<string, unknown> = {};
     return adapterMap[vendor] ?? null;
   }

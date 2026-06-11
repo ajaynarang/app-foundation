@@ -38,7 +38,7 @@ export function createDeskSchedulerFunction(inngest: Inngest): InngestFunction.A
       name: 'Desk Scheduler Heartbeat',
       triggers: [{ cron: HEARTBEAT_CRON }],
     },
-    deskSchedulerHandler as unknown as Parameters<Inngest['createFunction']>[1],
+    deskSchedulerHandler,
   );
 }
 

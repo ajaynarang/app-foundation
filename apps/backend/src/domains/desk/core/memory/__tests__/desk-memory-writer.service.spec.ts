@@ -49,12 +49,7 @@ function buildWriter(
   structured: StructuredMock,
   prompting: PromptingMock,
 ): DeskMemoryWriterService {
-  return new DeskMemoryWriterService(
-    prisma as unknown as PrismaService,
-    embedder as never,
-    structured as never,
-    prompting as never,
-  );
+  return new DeskMemoryWriterService(prisma, embedder as never, structured as never, prompting as never);
 }
 
 describe('DeskMemoryWriterService — close-step write map', () => {

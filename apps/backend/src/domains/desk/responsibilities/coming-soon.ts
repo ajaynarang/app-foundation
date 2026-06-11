@@ -14,7 +14,7 @@ import type { ResponsibilityDefinition } from './definition.types';
  */
 export function stub(key: string, agentKey: AgentKey, title: string, description: string): ResponsibilityDefinition {
   return {
-    key: key as ResponsibilityDefinition['key'],
+    key: key,
     agentKey,
     title,
     description,

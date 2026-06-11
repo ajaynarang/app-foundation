@@ -50,10 +50,7 @@ describe('IngestionService', () => {
       embedBatch: jest.fn().mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => [0.1, 0.2, 0.3]))),
     };
 
-    service = new IngestionService(
-      mockPrisma as unknown as PrismaService,
-      mockEmbedding as unknown as EmbeddingService,
-    );
+    service = new IngestionService(mockPrisma, mockEmbedding);
   });
 
   describe('chunkText', () => {

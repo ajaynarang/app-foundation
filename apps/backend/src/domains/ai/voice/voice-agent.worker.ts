@@ -83,7 +83,7 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
 
     let agents: any;
     try {
-      agents = await import('@livekit/agents' as string);
+      agents = await import('@livekit/agents');
     } catch {
       this.logger.warn('@livekit/agents not installed — voice agent worker disabled');
       return;

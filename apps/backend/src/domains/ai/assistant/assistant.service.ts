@@ -442,7 +442,7 @@ export class AssistantAiService {
     );
     // Resume targets the persona's default agent (the same agent the streaming
     // turn would have defaulted to). The Mastra agent key equals the agent id.
-    const agentId = this.assistantRouter.defaultAgentFor(conversation.userMode as UserMode);
+    const agentId = this.assistantRouter.defaultAgentFor(conversation.userMode);
     const agent = this.mastra.getMastra().getAgent(agentId);
 
     try {

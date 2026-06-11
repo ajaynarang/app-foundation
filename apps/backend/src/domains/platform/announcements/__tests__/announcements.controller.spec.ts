@@ -124,7 +124,7 @@ describe('AnnouncementsController', () => {
       const user = { dbId: 77, userId: 'firebase-uid' };
       service.create.mockResolvedValue({ id: 3 });
 
-      await controller.create({ title: 'T', body: 'B' } as any, user);
+      await controller.create({ title: 'T', body: 'B' }, user);
 
       expect(service.create).toHaveBeenCalledWith(
         { title: 'T', body: 'B' },
@@ -147,7 +147,7 @@ describe('AnnouncementsController', () => {
       const updated = { ...mockAnnouncement, title: 'Updated Title' };
       service.update.mockResolvedValue(updated);
 
-      const result = await controller.update(1, dto as any);
+      const result = await controller.update(1, dto);
 
       expect(service.update).toHaveBeenCalledWith(1, dto);
       expect(result.title).toBe('Updated Title');

@@ -22,7 +22,7 @@ export class VoiceService {
    */
   private async getAssistantAiService() {
     if (!this.assistantAiService) {
-      const { AssistantAiService } = await import('../assistant/assistant.service' as string);
+      const { AssistantAiService } = await import('../assistant/assistant.service');
       this.assistantAiService = this.moduleRef.get(AssistantAiService, {
         strict: false,
       });

@@ -54,8 +54,8 @@ export class AuthService {
         firstName: u.firstName,
         lastName: u.lastName,
         role: u.role,
-        tenantId: u.tenant!.tenantId,
-        tenantName: u.tenant!.companyName,
+        tenantId: u.tenant.tenantId,
+        tenantName: u.tenant.companyName,
       })),
       multiTenant: users.length > 1,
     };

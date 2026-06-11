@@ -48,21 +48,21 @@ describe('ApiKeysController', () => {
   });
 
   it('listForTenant resolves tenantId and delegates', async () => {
-    await controller.listForTenant(authUser as any);
+    await controller.listForTenant(authUser);
     expect(prisma.tenant.findUnique).toHaveBeenCalled();
     expect(service.listForTenant).toHaveBeenCalledWith(7);
   });
 
   it('rotate resolves tenantId and delegates', async () => {
-    await controller.rotate(authUser as any, 501);
+    await controller.rotate(authUser, 501);
     expect(service.rotate).toHaveBeenCalledWith(501, 7);
   });
 
   it('pause / resume / revokeForTenant / updateScopes delegate with tenantId', async () => {
-    await controller.pause(authUser as any, 501);
-    await controller.resume(authUser as any, 501);
-    await controller.revokeForTenant(authUser as any, 501);
-    await controller.updateScopes(authUser as any, 501, {
+    await controller.pause(authUser, 501);
+    await controller.resume(authUser, 501);
+    await controller.revokeForTenant(authUser, 501);
+    await controller.updateScopes(authUser, 501, {
       scopes: ['platform:read'],
     } as any);
     expect(service.pause).toHaveBeenCalledWith(501, 7);

@@ -49,7 +49,7 @@ describe('pipeAgentResponse', () => {
       textStream: createReadableStream([]),
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -68,7 +68,7 @@ describe('pipeAgentResponse', () => {
       textStream: createReadableStream(['Hello', ' world']),
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -95,7 +95,7 @@ describe('pipeAgentResponse', () => {
       textStream: createReadableStream([text]),
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -118,7 +118,7 @@ describe('pipeAgentResponse', () => {
       card: { type: 'summary', data: { items: 5 } },
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -139,7 +139,7 @@ describe('pipeAgentResponse', () => {
       runId: 'run_123',
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -163,7 +163,7 @@ describe('pipeAgentResponse', () => {
       moderate: jest.fn().mockResolvedValue({ redactedText: 'Redacted text' }),
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -188,7 +188,7 @@ describe('pipeAgentResponse', () => {
       textStream: createReadableStream([]),
     };
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -216,7 +216,7 @@ describe('pipeAgentResponse', () => {
       }
     });
 
-    await originalPipe(response as any, {
+    await originalPipe(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,
@@ -235,7 +235,7 @@ describe('pipeAgentResponse', () => {
 
     mockPrisma.conversationMessage.create.mockRejectedValue(new Error('DB error'));
 
-    await pipeAgentResponse(response as any, {
+    await pipeAgentResponse(response, {
       conversationDbId: 1,
       conversationId: 'conv_1',
       req: mockReq,

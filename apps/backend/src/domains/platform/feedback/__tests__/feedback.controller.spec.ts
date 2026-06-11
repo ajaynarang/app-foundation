@@ -25,7 +25,7 @@ describe('FeedbackController', () => {
   describe('create', () => {
     it('should delegate to service with user dbId, tenantDbId, and dto', async () => {
       const dto = { sentiment: 5, message: 'Great product!' };
-      const result = await controller.create(mockUser, dto as any);
+      const result = await controller.create(mockUser, dto);
 
       expect(service.create).toHaveBeenCalledWith(10, 42, dto);
       expect(result).toEqual({ id: 1, message: 'Great!' });

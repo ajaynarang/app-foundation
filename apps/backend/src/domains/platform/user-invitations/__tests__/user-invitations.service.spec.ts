@@ -553,7 +553,7 @@ describe('UserInvitationsService', () => {
           phone: '+15551234567',
           firstName: 'Sam',
           lastName: 'One',
-          role: 'MEMBER' as any,
+          role: 'MEMBER',
         },
         { userId: 'user_admin1', role: 'ADMIN', tenantId: 'tenant_abc' },
       );

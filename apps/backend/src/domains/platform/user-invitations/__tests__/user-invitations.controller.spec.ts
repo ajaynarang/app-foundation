@@ -46,7 +46,7 @@ describe('UserInvitationsController', () => {
     await controller.acceptInvitation({
       token: 'token_123',
       firebaseUid: 'fb_uid',
-    } as any);
+    });
     expect(invitationsService.acceptInvitation).toHaveBeenCalledWith('token_123', 'fb_uid');
   });
 

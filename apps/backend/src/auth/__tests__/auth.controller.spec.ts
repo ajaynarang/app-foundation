@@ -46,7 +46,7 @@ describe('AuthController', () => {
       const expected = { tenants: [{ tenantId: 'T-1', companyName: 'Acme' }] };
       mockAuthService.lookupUser.mockResolvedValue(expected);
 
-      const result = await controller.lookupUser(dto as any);
+      const result = await controller.lookupUser(dto);
 
       expect(result).toEqual(expected);
       expect(mockAuthService.lookupUser).toHaveBeenCalledWith(dto);
@@ -134,7 +134,7 @@ describe('AuthController', () => {
         sessionsRevoked: 3,
       });
 
-      const result = await controller.changePassword(user, dto as any);
+      const result = await controller.changePassword(user, dto);
 
       expect(result).toEqual({ success: true, sessionsRevoked: 3 });
     });
@@ -146,7 +146,7 @@ describe('AuthController', () => {
         sessionsRevoked: 0,
       });
 
-      await controller.changePassword(user, dto as any);
+      await controller.changePassword(user, dto);
 
       expect(mockAuthService.recordPasswordChange).toHaveBeenCalledWith('USR-001', 'rt_1', true);
     });
@@ -158,7 +158,7 @@ describe('AuthController', () => {
 
       const result = await controller.sendPhoneOtp({
         phone: '+12025551234',
-      } as any);
+      });
 
       expect(result.message).toContain('code has been sent');
     });
@@ -174,7 +174,7 @@ describe('AuthController', () => {
         user: { userId: 'USR-001' },
       });
 
-      const result = await controller.phoneLogin(dto as any, res);
+      const result = await controller.phoneLogin(dto, res);
 
       expect(result).toEqual({
         accessToken: 'at',
@@ -189,7 +189,7 @@ describe('AuthController', () => {
       const user = { userId: 'USR-001' };
       mockAuthService.setPin.mockResolvedValue(undefined);
 
-      const result = await controller.setPin(user, { pin: '5678' } as any);
+      const result = await controller.setPin(user, { pin: '5678' });
       expect(result.message).toBe('PIN set successfully');
     });
   });

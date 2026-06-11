@@ -48,11 +48,7 @@ describe('OAuthClientsService', () => {
     };
     events = { emit: jest.fn().mockResolvedValue(undefined) };
 
-    service = new OAuthClientsService(
-      prisma as unknown as PrismaService,
-      cache as unknown as AppCacheService,
-      events as unknown as DomainEventService,
-    );
+    service = new OAuthClientsService(prisma, cache, events);
   });
 
   describe('create', () => {

@@ -116,9 +116,13 @@ describe('TenantsController', () => {
 
   describe('suspendTenant', () => {
     it('should suspend with reason and user', async () => {
-      await controller.suspendTenant('t_1', { reason: 'Non-payment' } as any, {
-        email: 'admin@test.com',
-      });
+      await controller.suspendTenant(
+        't_1',
+        { reason: 'Non-payment' },
+        {
+          email: 'admin@test.com',
+        },
+      );
       expect(service.suspendTenant).toHaveBeenCalledWith('t_1', 'Non-payment', 'admin@test.com');
     });
   });
@@ -133,7 +137,7 @@ describe('TenantsController', () => {
   describe('updateTenant', () => {
     it('should update tenant', async () => {
       const dto = { companyName: 'New Name' };
-      await controller.updateTenant('t_1', dto as any);
+      await controller.updateTenant('t_1', dto);
       expect(service.updateTenant).toHaveBeenCalledWith('t_1', dto);
     });
   });

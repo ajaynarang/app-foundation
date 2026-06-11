@@ -38,7 +38,7 @@ describe('DeskMemoryReinforcer', () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    reinforcer = new DeskMemoryReinforcer(prisma as unknown as PrismaService);
+    reinforcer = new DeskMemoryReinforcer(prisma);
     findResponsibility.mockReset();
   });
 

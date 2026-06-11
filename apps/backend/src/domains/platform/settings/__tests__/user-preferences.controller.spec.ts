@@ -91,7 +91,7 @@ describe('UserPreferencesController', () => {
       };
       service.updateUserPreferences.mockResolvedValue(updated);
 
-      const result = await controller.updateUserPreferences(mockUser, dto as any);
+      const result = await controller.updateUserPreferences(mockUser, dto);
 
       expect(service.updateUserPreferences).toHaveBeenCalledWith('user_abc123', dto);
       expect(result.distanceUnit).toBe('KILOMETERS');
@@ -110,7 +110,7 @@ describe('UserPreferencesController', () => {
       const updated = { ...fullUserPrefs, ...dto };
       service.updateUserPreferences.mockResolvedValue(updated);
 
-      const result = await controller.updateUserPreferences(mockUser, dto as any);
+      const result = await controller.updateUserPreferences(mockUser, dto);
 
       expect(service.updateUserPreferences).toHaveBeenCalledWith('user_abc123', dto);
       expect(result.voiceMode).toBe('auto');

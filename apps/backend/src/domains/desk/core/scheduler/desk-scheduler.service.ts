@@ -108,9 +108,7 @@ export class DeskSchedulerService {
     const def = findResponsibilityDefinition(row.key);
     if (!def) return false;
 
-    const scheduled = def.triggers.find((t) => t.kind === 'scheduled') as
-      | { kind: 'scheduled'; cron: string; tz?: string }
-      | undefined;
+    const scheduled = def.triggers.find((t) => t.kind === 'scheduled');
     if (!scheduled) return false;
 
     const tz = scheduled.tz === TENANT_TZ_TOKEN ? (row.tenant.timezone ?? UTC) : (scheduled.tz ?? UTC);

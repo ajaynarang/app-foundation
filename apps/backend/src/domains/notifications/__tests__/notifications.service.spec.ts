@@ -72,7 +72,7 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'USER_INVITATION' as any,
+        type: 'USER_INVITATION',
         category: 'TEAM',
         title: 'Invitation #1',
         message: 'Sent',
@@ -96,7 +96,7 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'USER_INVITATION' as any,
+        type: 'USER_INVITATION',
         category: 'TEAM',
         title: 'Invitation #3',
         message: 'Sent',
@@ -120,7 +120,7 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'USER_INVITATION' as any,
+        type: 'USER_INVITATION',
         category: 'TEAM',
         title: 'Invitation #21',
         message: 'Sent',
@@ -136,7 +136,7 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'USER_JOINED' as any,
+        type: 'USER_JOINED',
         category: 'TEAM',
         title: 'New user',
         message: 'Welcome',
@@ -155,7 +155,7 @@ describe('InAppNotificationService', () => {
       await service.create({
         recipientId: 1,
         tenantId: 1,
-        type: 'SETTINGS_UPDATED' as any,
+        type: 'SETTINGS_UPDATED',
         category: 'SYSTEM',
         title: 'Settings updated',
         message: 'Updated',

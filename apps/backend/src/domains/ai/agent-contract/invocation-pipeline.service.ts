@@ -50,13 +50,13 @@ export class InvocationPipelineService {
 
     if (principal.kind !== 'user' && (NEVER_EXTERNAL_SCOPES as readonly string[]).includes(scope)) {
       this.logger.warn(`scope_denied (never-external): ${principal.auditId} attempted ${scope} via ${toolName}`);
-      return this.scopeDenied(scope, principal.scopes as string[]);
+      return this.scopeDenied(scope, principal.scopes);
     }
 
     const allowed = this.registry.toolsAllowedByScopes(principal.scopes);
     if (!allowed.has(toolName)) {
       this.logger.warn(`scope_denied: ${principal.auditId} lacks ${scope} for ${toolName}`);
-      return this.scopeDenied(scope, principal.scopes as string[]);
+      return this.scopeDenied(scope, principal.scopes);
     }
 
     const tier = this.hitl.resolveTier(scope, principal);

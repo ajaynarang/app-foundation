@@ -41,7 +41,7 @@ describe('AnnouncementsService', () => {
       getOrSet: jest.fn().mockImplementation((_key: string, factory: () => any) => factory()),
     };
 
-    service = new AnnouncementsService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
+    service = new AnnouncementsService(prisma, cache);
   });
 
   describe('findAll', () => {
@@ -77,14 +77,14 @@ describe('AnnouncementsService', () => {
   describe('create', () => {
     it('should create an announcement and invalidate cache', async () => {
       const dto = { title: 'Test', body: 'Body' };
-      await service.create(dto as any, 1);
+      await service.create(dto, 1);
       expect(prisma.announcement.create).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
     });
 
     it('should use defaults for optional fields', async () => {
       const dto = { title: 'Test', body: 'Body' };
-      await service.create(dto as any, 1);
+      await service.create(dto, 1);
       const createCall = prisma.announcement.create.mock.calls[0][0];
       expect(createCall.data.targetType).toBe('ALL');
       expect(createCall.data.targetIds).toEqual([]);
@@ -95,7 +95,7 @@ describe('AnnouncementsService', () => {
   describe('update', () => {
     it('should update an announcement and invalidate cache', async () => {
       const dto = { title: 'Updated' };
-      await service.update(1, dto as any);
+      await service.update(1, dto);
       expect(prisma.announcement.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { title: 'Updated' },

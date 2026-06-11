@@ -83,8 +83,8 @@ export class InngestClientService implements OnModuleInit {
    */
   async send<E extends keyof DeskEvents>(name: E, data: DeskEvents[E]['data'], opts?: { id?: string }) {
     await this._client.send({
-      name: name as string,
-      data: data as unknown as Record<string, unknown>,
+      name: name,
+      data: data,
       ...(opts?.id ? { id: opts.id } : {}),
     });
   }

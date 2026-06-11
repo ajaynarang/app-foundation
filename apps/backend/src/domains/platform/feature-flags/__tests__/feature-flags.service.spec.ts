@@ -35,11 +35,7 @@ describe('FeatureFlagsService', () => {
       emit: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new FeatureFlagsService(
-      prisma as unknown as PrismaService,
-      cache as unknown as AppCacheService,
-      eventEmitter as unknown as DomainEventService,
-    );
+    service = new FeatureFlagsService(prisma, cache, eventEmitter);
   });
 
   describe('getAllFlags', () => {

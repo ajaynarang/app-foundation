@@ -41,7 +41,7 @@ describe('Phase A pipeline integration', () => {
     try {
       pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
       const adapter = new PrismaPg(pool);
-      prisma = new PrismaClient({ adapter } as any);
+      prisma = new PrismaClient({ adapter });
       const anyTenant = await prisma.tenant.findFirst({
         orderBy: { id: 'asc' },
       });

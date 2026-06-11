@@ -275,7 +275,7 @@ export class LoginActivityService {
         }),
       ]);
 
-    const bruteForceSuspects = await this.resolveBruteSuspects(bruteRows as any[]);
+    const bruteForceSuspects = await this.resolveBruteSuspects(bruteRows);
     const newIpSignIns = await this.detectNewIpSignIns(recentSuccess as any[], baseWhere, range);
     const offHoursSignIns = this.detectOffHoursSignIns(recentSuccess as any[]);
 

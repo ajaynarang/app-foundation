@@ -26,7 +26,7 @@ describe('TrialExpiryService', () => {
       $transaction: jest.fn().mockImplementation((fn) => fn(txMock)),
     };
 
-    service = new TrialExpiryService(prisma as unknown as PrismaService);
+    service = new TrialExpiryService(prisma);
   });
 
   describe('run', () => {

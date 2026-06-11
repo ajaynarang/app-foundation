@@ -33,7 +33,7 @@ export class OAuthClientsService {
     userId: number | null,
     tenantId: number | null,
   ): Promise<OAuthClientCreatedResponse> {
-    this.assertScopesAreGrantable(input.scopes as AgentScope[]);
+    this.assertScopesAreGrantable(input.scopes);
 
     const clientIdValue = `app_${nanoid(32)}`;
     const rawSecret = crypto.randomBytes(32).toString('hex');
@@ -111,7 +111,7 @@ export class OAuthClientsService {
     await this.loadClientOrThrow(clientId, tenantId);
 
     if (input.scopes !== undefined) {
-      this.assertScopesAreGrantable(input.scopes as AgentScope[]);
+      this.assertScopesAreGrantable(input.scopes);
     }
 
     const updated = await this.prisma.oAuthClient.update({

@@ -170,7 +170,7 @@ describe('DeskEpisodeService', () => {
     prisma = createMockPrisma();
     events = makeEvents();
     const enrichment = new ApprovalEnrichmentService();
-    service = new DeskEpisodeService(prisma as unknown as PrismaService, enrichment, events);
+    service = new DeskEpisodeService(prisma, enrichment, events);
   });
 
   describe('listForTenant', () => {
@@ -179,7 +179,7 @@ describe('DeskEpisodeService', () => {
         { ...baseEpisode, id: 'ep-a' },
         { ...baseEpisode, id: 'ep-b' },
       ]);
-      const result = await service.listForTenant(10, { limit: 25 } as any);
+      const result = await service.listForTenant(10, { limit: 25 });
       expect(result.rows).toHaveLength(2);
       expect(result.nextCursor).toBeNull();
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
@@ -209,7 +209,7 @@ describe('DeskEpisodeService', () => {
 
     it('no status filter → defaults to the Needs-you set (handled episodes never leak in)', async () => {
       prisma.deskEpisode.findMany.mockResolvedValue([]);
-      await service.listForTenant(10, { limit: 25 } as any);
+      await service.listForTenant(10, { limit: 25 });
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
       // ESCALATED + WAITING_APPROVAL in; RESOLVED out.
       expect(call.where.status.in).toEqual(expect.arrayContaining(['RUNNING', 'WAITING_APPROVAL', 'ESCALATED']));
@@ -226,7 +226,7 @@ describe('DeskEpisodeService', () => {
     it('hasMore=true returns a cursor', async () => {
       const rows = Array.from({ length: 3 }, (_, i) => ({ ...baseEpisode, id: `ep-${i}` }));
       prisma.deskEpisode.findMany.mockResolvedValue(rows);
-      const result = await service.listForTenant(10, { limit: 2 } as any);
+      const result = await service.listForTenant(10, { limit: 2 });
       expect(result.rows).toHaveLength(2);
       expect(result.nextCursor).toContain('|ep-1');
     });
@@ -234,14 +234,14 @@ describe('DeskEpisodeService', () => {
     it('cursor parses and forwards into where', async () => {
       prisma.deskEpisode.findMany.mockResolvedValue([]);
       const cur = `${new Date('2026-04-24T09:00:00Z').toISOString()}|ep-last`;
-      await service.listForTenant(10, { limit: 25, cursor: cur } as any);
+      await service.listForTenant(10, { limit: 25, cursor: cur });
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
       expect(call.where.OR).toBeDefined();
     });
 
     it('malformed cursor is ignored', async () => {
       prisma.deskEpisode.findMany.mockResolvedValue([]);
-      await service.listForTenant(10, { limit: 25, cursor: 'garbage' } as any);
+      await service.listForTenant(10, { limit: 25, cursor: 'garbage' });
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
       expect(call.where.OR).toBeUndefined();
     });
@@ -457,7 +457,7 @@ describe('DeskEpisodeService', () => {
     it('returns rows closed today in tenant timezone with handled fields', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
       const enrichment = { enrich: jest.fn() } as any;
-      const svc = new DeskEpisodeService(localPrisma as unknown as PrismaService, enrichment, makeEvents());
+      const svc = new DeskEpisodeService(localPrisma, enrichment, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: 'today', limit: 50 },
@@ -475,11 +475,7 @@ describe('DeskEpisodeService', () => {
 
     it('Handled query excludes ESCALATED — escalations live on Needs-you, not Handled', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: 'today', limit: 50 },
@@ -522,11 +518,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: 'today', limit: 50 },
@@ -539,11 +531,7 @@ describe('DeskEpisodeService', () => {
     it('mine scope empty when currentUserId missing', async () => {
       const localPrisma = createMockPrisma();
       localPrisma.deskEpisode.findMany.mockResolvedValue([]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'mine', window: 'today', limit: 50 },
@@ -555,11 +543,7 @@ describe('DeskEpisodeService', () => {
 
     it('mine scope filters by supervisor when currentUserId provided', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'mine', window: 'today', limit: 50 },
@@ -571,11 +555,7 @@ describe('DeskEpisodeService', () => {
 
     it('humanDecision=EDITED when approval decision is EDITED', async () => {
       const localPrisma = makePrismaWithEditedApproval(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -588,11 +568,7 @@ describe('DeskEpisodeService', () => {
 
     it('activeSuppression is populated when an unexpired, unsuppressed row is joined', async () => {
       const localPrisma = makePrismaWithActiveSuppression(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '30d', limit: 50 },
@@ -606,11 +582,7 @@ describe('DeskEpisodeService', () => {
 
     it('activeSuppression.suppressUntil is null for a "forever" snooze', async () => {
       const localPrisma = makePrismaWithForeverSuppression(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '30d', limit: 50 },
@@ -635,11 +607,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '30d', limit: 50 },
@@ -656,11 +624,7 @@ describe('DeskEpisodeService', () => {
 
     it('summary.autonomousPct computed from rows (2 autonomous + 1 approved = 2/3)', async () => {
       const localPrisma = makePrismaForAutonomousPct(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -674,11 +638,7 @@ describe('DeskEpisodeService', () => {
     it('empty result returns autonomousPct=0 (no divide-by-zero)', async () => {
       const localPrisma = createMockPrisma();
       localPrisma.deskEpisode.findMany.mockResolvedValue([]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: 'today', limit: 50 },
@@ -690,11 +650,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=today resolves from ≈ tenant midnight to now', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: 'today', limit: 50 },
@@ -708,11 +664,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=7d spans now-7d → now', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(10, { scope: 'all', window: '7d', limit: 50 }, { currentUserId: 1, tenantTimezone: 'UTC' });
       const call = localPrisma.deskEpisode.findMany.mock.calls[0][0];
       const fromMs = (call.where.closedAt.gte as Date).getTime();
@@ -723,11 +675,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=30d spans now-30d → now', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: '30d', limit: 50 },
@@ -741,11 +689,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=this_month starts at tenant-local start of month', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: 'this_month', limit: 50 },
@@ -761,11 +705,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=custom honors from/to', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const from = '2026-04-01T00:00:00.000Z';
       const to = '2026-04-15T23:59:59.999Z';
       await svc.listHandled(
@@ -780,11 +720,7 @@ describe('DeskEpisodeService', () => {
 
     it('agent filter narrows by agent key while preserving scope', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'mine', window: '7d', agent: 'autumn', limit: 50 },
@@ -796,11 +732,7 @@ describe('DeskEpisodeService', () => {
 
     it('outcome filter narrows by outcome string', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: '7d', outcome: 'promise_recorded', limit: 50 },
@@ -812,11 +744,7 @@ describe('DeskEpisodeService', () => {
 
     it('q parameter searches entityLabel and responsibility.key', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: '7d', q: 'granite', limit: 50 },
@@ -841,11 +769,7 @@ describe('DeskEpisodeService', () => {
         entitySuppressions: [],
       }));
       localPrisma.deskEpisode.findMany.mockResolvedValue(rows);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 2 },
@@ -857,11 +781,7 @@ describe('DeskEpisodeService', () => {
 
     it('cursor parses and feeds OR clause', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const cur = `${new Date('2026-04-20T00:00:00Z').toISOString()}|ep-prev`;
       await svc.listHandled(
         10,
@@ -886,11 +806,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -912,11 +828,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -939,11 +851,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -963,11 +871,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -989,11 +893,7 @@ describe('DeskEpisodeService', () => {
           entitySuppressions: [],
         },
       ]);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       const result = await svc.listHandled(
         10,
         { scope: 'all', window: '7d', limit: 50 },
@@ -1004,11 +904,7 @@ describe('DeskEpisodeService', () => {
 
     it('window=custom without from/to falls back to start-of-day → now', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(
         10,
         { scope: 'all', window: 'custom', limit: 50 },
@@ -1021,11 +917,7 @@ describe('DeskEpisodeService', () => {
 
     it('no window query defaults to today', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
-      const svc = new DeskEpisodeService(
-        localPrisma as unknown as PrismaService,
-        { enrich: jest.fn() } as any,
-        makeEvents(),
-      );
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
       await svc.listHandled(10, { scope: 'all', limit: 50 }, { currentUserId: 1, tenantTimezone: 'UTC' });
       const call = localPrisma.deskEpisode.findMany.mock.calls[0][0];
       expect(call.where.closedAt.gte).toBeDefined();

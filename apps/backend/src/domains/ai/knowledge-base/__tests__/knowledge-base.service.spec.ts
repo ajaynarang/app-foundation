@@ -31,10 +31,7 @@ describe('KnowledgeBaseService', () => {
       embedText: jest.fn().mockResolvedValue(new Array(1536).fill(0.1)),
     };
 
-    service = new KnowledgeBaseService(
-      mockPrisma as unknown as PrismaService,
-      mockEmbedding as unknown as EmbeddingService,
-    );
+    service = new KnowledgeBaseService(mockPrisma, mockEmbedding);
   });
 
   describe('hybridSearch', () => {

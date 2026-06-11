@@ -50,7 +50,7 @@ describe('OAuthClientsController', () => {
   });
 
   it('update delegates to service', async () => {
-    await controller.update('app_abc', { name: 'Updated' } as any, adminReq);
+    await controller.update('app_abc', { name: 'Updated' }, adminReq);
     expect(clientsService.update).toHaveBeenCalledWith('app_abc', { name: 'Updated' }, 10);
   });
 

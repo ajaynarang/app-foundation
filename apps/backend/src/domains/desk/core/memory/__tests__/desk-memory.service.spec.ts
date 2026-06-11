@@ -70,7 +70,7 @@ describe('DeskMemoryService — listForUI', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     prisma.deskMemory.findMany.mockResolvedValue([]);
-    service = new DeskMemoryService(prisma as unknown as PrismaService, buildEmbedder());
+    service = new DeskMemoryService(prisma, buildEmbedder());
   });
 
   it('filters by scope and polarity (uppercase Prisma enum values)', async () => {
@@ -172,7 +172,7 @@ describe('DeskMemoryService — updateForTenant (C1: server-side enforce edit ga
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new DeskMemoryService(prisma as unknown as PrismaService, buildEmbedder());
+    service = new DeskMemoryService(prisma, buildEmbedder());
   });
 
   it('rejects content edits on LLM-extracted memories (authoredByUserId IS NULL)', async () => {
@@ -210,7 +210,7 @@ describe('DeskMemoryService — setPinned', () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
-    service = new DeskMemoryService(prisma as unknown as PrismaService, buildEmbedder());
+    service = new DeskMemoryService(prisma, buildEmbedder());
   });
 
   it('updates isPinned for in-tenant rows', async () => {
@@ -247,7 +247,7 @@ describe('DeskMemoryService — findRelevant scoring', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     embedder = buildEmbedder();
-    service = new DeskMemoryService(prisma as unknown as PrismaService, embedder);
+    service = new DeskMemoryService(prisma, embedder);
   });
 
   /**

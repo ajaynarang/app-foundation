@@ -32,7 +32,7 @@ describe('UserPreferencesService', () => {
       del: jest.fn().mockResolvedValue(undefined),
     };
 
-    service = new UserPreferencesService(prisma as unknown as PrismaService, cache as unknown as AppCacheService);
+    service = new UserPreferencesService(prisma, cache);
   });
 
   describe('getUserPreferences', () => {

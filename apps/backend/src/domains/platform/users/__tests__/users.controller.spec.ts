@@ -41,7 +41,7 @@ describe('UsersController', () => {
 
   it('updateUser delegates to service', async () => {
     const dto = { firstName: 'Jane' };
-    await controller.updateUser('usr_1', dto as any, currentUser);
+    await controller.updateUser('usr_1', dto, currentUser);
     expect(service.updateUser).toHaveBeenCalledWith('usr_1', dto, 'tenant_abc', currentUser);
   });
 

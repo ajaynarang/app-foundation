@@ -31,7 +31,7 @@ describe('LoginActivityController (tenant)', () => {
 
   it('calls service.list with caller tenant scope', async () => {
     const user = { tenantId: 'acme', userId: 'u1' };
-    await controller.list(user as any, { from: '2026-05-19', to: '2026-05-26' } as any);
+    await controller.list(user as any, { from: '2026-05-19', to: '2026-05-26' });
     expect(serviceList).toHaveBeenCalledTimes(1);
     const [scope] = serviceList.mock.calls[0];
     expect(scope).toEqual({ isSuperAdmin: false, tenantId: 1 });
@@ -39,14 +39,14 @@ describe('LoginActivityController (tenant)', () => {
 
   it('ignores client-supplied tenantId in the query', async () => {
     const user = { tenantId: 'acme', userId: 'u1' };
-    await controller.list(user as any, { from: '2026-05-19', to: '2026-05-26', tenantId: 9999 } as any);
+    await controller.list(user as any, { from: '2026-05-19', to: '2026-05-26', tenantId: 9999 });
     const [, params] = serviceList.mock.calls[0];
     expect(params.tenantId).toBeUndefined();
   });
 
   it('calls service.summary with caller tenant scope', async () => {
     const user = { tenantId: 'acme', userId: 'u1' };
-    await controller.summary(user as any, { from: '2026-05-19', to: '2026-05-26' } as any);
+    await controller.summary(user as any, { from: '2026-05-19', to: '2026-05-26' });
     expect(serviceSummary).toHaveBeenCalledTimes(1);
     const [scope] = serviceSummary.mock.calls[0];
     expect(scope.isSuperAdmin).toBe(false);
