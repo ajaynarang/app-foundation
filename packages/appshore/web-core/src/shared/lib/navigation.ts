@@ -110,6 +110,21 @@ export const settingsSubPanel: SubPanelSection[] = [
  * Workspace drawer — shown in the sidebar's bottom row above the profile,
  * for OWNER and ADMIN only.
  */
+/**
+ * Tenancy mode (NEXT_PUBLIC_TENANCY_MODE): 'multi' | 'single' | 'personal'.
+ * Personal products hide org-centric chrome (organization, members,
+ * invitations) — every user has exactly one personal workspace.
+ */
+export const TENANCY_MODE =
+  process.env.NEXT_PUBLIC_TENANCY_MODE || (process.env.NEXT_PUBLIC_MULTI_TENANT === 'false' ? 'single' : 'multi');
+
+const PERSONAL_HIDDEN_HREFS = new Set(['/settings/organization', '/settings/members', '/settings/invitations']);
+
+export function filterForTenancyMode<T extends { href: string }>(items: T[]): T[] {
+  if (TENANCY_MODE !== 'personal') return items;
+  return items.filter((i) => !PERSONAL_HIDDEN_HREFS.has(i.href));
+}
+
 export const workspaceDrawerSections: SubPanelSection[] = [
   {
     label: '',

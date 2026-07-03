@@ -51,12 +51,16 @@ Open `http://localhost:3000/login`, sign in as the owner, and you're inside a li
   "Sign in with X" for MCP clients like Claude).
 - Every route guarded by default: `Throttler → Jwt → Tenant → Roles → Plan`.
 
-**Multi-tenancy (or not) — one env var**
+**Four tenancy models — one env var (`TENANCY_MODE`)**
 
-- Multi-tenant (default): subdomain tenants, self-registration + super-admin approval,
-  per-tenant everything.
-- Single-tenant (`MULTI_TENANT=false`): one implicit workspace; registration endpoints and
-  UI disappear; the same code and queries run unchanged.
+| Model                   | Setting                 | What you get                                                                                                                                                                             |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-tenant (default)  | `TENANCY_MODE=multi`    | Orgs share the app: subdomain tenants, self-registration + super-admin approval                                                                                                          |
+| Workspace-based         | `multi` + memberships   | Slack/Notion style: one user in many workspaces with a role per workspace, live switcher in the sidebar (`WorkspaceMember` is the source of truth; the JWT carries the active workspace) |
+| Single-tenant           | `TENANCY_MODE=single`   | One implicit workspace; registration endpoints/UI disappear; deploy one stack per customer for full isolation                                                                            |
+| User-centric (personal) | `TENANCY_MODE=personal` | Consumer style: simple signup auto-creates a private workspace per user; org chrome (members, invitations, organization) hidden                                                          |
+
+Same code and the same `where: { tenantId }` queries run unchanged in every model.
 
 **Plans & billing**
 

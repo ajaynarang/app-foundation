@@ -29,3 +29,24 @@ export class ResetPasswordDto {
   @MinLength(8)
   newPassword: string;
 }
+
+export class PersonalRegisterDto {
+  @ApiProperty({ example: 'you@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  firstName: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  lastName: string;
+}

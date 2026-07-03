@@ -76,6 +76,37 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       };
     }
 
+    // Workspace-based tenancy: the token names the session's ACTIVE workspace.
+    // Resolve the membership so each session carries its own workspace + role
+    // (two tabs can live in two different workspaces). Falls back to the
+    // user's default tenant only for tokens that predate the workspace model.
+    if (payload.tenantId && user.role !== 'SUPER_ADMIN' && payload.tenantId !== user.tenant?.tenantId) {
+      const membership = await this.prisma.workspaceMember.findFirst({
+        where: { userId: user.id, tenant: { tenantId: payload.tenantId } },
+        include: { tenant: true },
+      });
+      if (!membership) {
+        // Membership revoked mid-session — kill the session rather than
+        // silently dropping the user into a different workspace.
+        throw new UnauthorizedException('Workspace access revoked');
+      }
+      if (!membership.tenant.isActive) {
+        throw new UnauthorizedException('Tenant is inactive');
+      }
+      return {
+        dbId: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: membership.role,
+        tenantId: membership.tenant.tenantId,
+        tenantDbId: membership.tenant.id,
+        tenantName: membership.tenant.companyName,
+        isActive: user.isActive,
+        authMethod: payload.authMethod,
+        tokenId: payload.sid,
+      };
+    }
+
     // Return user object that will be attached to request
     return {
       dbId: user.id, // Numeric DB id (for login event recording)

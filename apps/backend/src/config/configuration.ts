@@ -29,6 +29,8 @@ const configSchema = z.object({
   multiTenancy: z.object({
     enabled: z.boolean().default(true),
     implicitTenantId: z.number().default(1),
+    /** 'multi' (orgs, self-registration) | 'single' (one implicit workspace) | 'personal' (a workspace per user, no org UI) */
+    mode: z.enum(['multi', 'single', 'personal']).default('multi'),
   }),
 
   // JWT Configuration
@@ -103,6 +105,10 @@ export default (): Configuration => {
     multiTenancy: {
       enabled: process.env.MULTI_TENANT !== 'false',
       implicitTenantId: parseInt(process.env.IMPLICIT_TENANT_ID || '1', 10),
+      // TENANCY_MODE wins; MULTI_TENANT=false maps to 'single' for compat.
+      mode:
+        (process.env.TENANCY_MODE as 'multi' | 'single' | 'personal') ||
+        (process.env.MULTI_TENANT === 'false' ? 'single' : 'multi'),
     },
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     oauthJwtSecret: process.env.OAUTH_JWT_SECRET,

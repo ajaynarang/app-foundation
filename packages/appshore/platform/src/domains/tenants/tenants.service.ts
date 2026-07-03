@@ -147,6 +147,11 @@ export class TenantsService {
         },
       });
 
+      // Workspace membership — source of truth for workspace-based tenancy
+      await tx.workspaceMember.create({
+        data: { userId: ownerUser.id, tenantId: tenant.id, role: 'OWNER', isDefault: true },
+      });
+
       // Record the trial plan event for audit trail
       await tx.tenantPlanEvent.create({
         data: {

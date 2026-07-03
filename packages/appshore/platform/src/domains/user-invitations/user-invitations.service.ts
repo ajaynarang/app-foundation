@@ -88,8 +88,15 @@ export class UserInvitationsService {
       throw new BadRequestException('Either email or phone is required');
     }
 
-    // Check if user already exists (by email or phone)
+    // Block only when the invitee is already a member of THIS workspace —
+    // users belonging to other workspaces are invitable (workspace model).
     if (dto.email) {
+      const existingMember = await this.prisma.workspaceMember.findFirst({
+        where: { tenantId, user: { email: dto.email } },
+      });
+      if (existingMember) {
+        throw new ConflictException('User with this email is already a member of your workspace');
+      }
       const existingUser = await this.prisma.user.findFirst({
         where: { email: dto.email, tenantId },
       });
@@ -229,23 +236,40 @@ export class UserInvitationsService {
       throw new BadRequestException('Invitation has expired');
     }
 
-    // Create user and update invitation in transaction
     return this.prisma.$transaction(async (tx) => {
-      // Create user
-      const user = await tx.user.create({
-        data: {
-          userId: generateId('user'),
+      // Workspace model: an existing user accepting an invite JOINS the
+      // workspace (new membership) instead of erroring.
+      const existingUser = invitation.email
+        ? await tx.user.findFirst({ where: { email: invitation.email, deletedAt: null }, include: { tenant: true } })
+        : null;
+
+      const user =
+        existingUser ??
+        (await tx.user.create({
+          data: {
+            userId: generateId('user'),
+            tenantId: invitation.tenantId,
+            email: invitation.email,
+            firstName: invitation.firstName,
+            lastName: invitation.lastName,
+            role: invitation.role,
+            firebaseUid,
+            emailVerified: true,
+            isActive: true,
+          },
+          include: {
+            tenant: true,
+          },
+        }));
+
+      await tx.workspaceMember.upsert({
+        where: { userId_tenantId: { userId: user.id, tenantId: invitation.tenantId } },
+        update: { role: invitation.role },
+        create: {
+          userId: user.id,
           tenantId: invitation.tenantId,
-          email: invitation.email,
-          firstName: invitation.firstName,
-          lastName: invitation.lastName,
           role: invitation.role,
-          firebaseUid,
-          emailVerified: true,
-          isActive: true,
-        },
-        include: {
-          tenant: true,
+          isDefault: !existingUser,
         },
       });
 
@@ -305,6 +329,12 @@ export class UserInvitationsService {
           ...(invitation.email && { email: invitation.email }),
         },
         include: { tenant: true },
+      });
+
+      await tx.workspaceMember.upsert({
+        where: { userId_tenantId: { userId: user.id, tenantId: invitation.tenantId } },
+        update: { role: invitation.role },
+        create: { userId: user.id, tenantId: invitation.tenantId, role: invitation.role, isDefault: true },
       });
 
       await tx.userInvitation.update({

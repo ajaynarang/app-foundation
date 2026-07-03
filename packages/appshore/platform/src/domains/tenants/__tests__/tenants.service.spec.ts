@@ -21,6 +21,7 @@ const mockPrisma = {
     findMany: jest.fn(),
   },
   tenantPlanEvent: { create: jest.fn() },
+  workspaceMember: { create: jest.fn(), upsert: jest.fn() },
   userPreferences: { upsert: jest.fn() },
   $transaction: jest.fn((cb: any) => cb(mockPrisma)),
 };

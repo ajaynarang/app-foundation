@@ -9,10 +9,13 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Separator } from '@app/ui/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@app/ui/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
-import { useAuthStore } from '@/features/auth';
+import { useAuthStore, getProfile } from '@/features/auth';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useOnboardingStore } from '@/features/platform/onboarding';
-import { workspaceDrawerSections } from '@appshore/web-core/shared/lib/navigation';
+import { workspaceDrawerSections, filterForTenancyMode } from '@appshore/web-core/shared/lib/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check } from 'lucide-react';
+import { workspacesApi } from '@/features/platform/workspaces';
 
 interface WorkspaceSwitcherPopoverProps {
   isCollapsed: boolean;
@@ -35,7 +38,36 @@ export function WorkspaceSwitcherPopover({
   onExpand,
 }: WorkspaceSwitcherPopoverProps) {
   const [open, setOpen] = useState(false);
-  const { user } = useAuthStore();
+  const [switching, setSwitching] = useState<string | null>(null);
+  const { user, setTokens, setUser } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => workspacesApi.list(),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const workspaces = workspacesData?.workspaces ?? [];
+
+  const handleSwitch = async (tenantId: string) => {
+    if (tenantId === user?.tenantId || switching) return;
+    setSwitching(tenantId);
+    try {
+      const result = await workspacesApi.switch(tenantId);
+      setTokens(result.accessToken);
+      // Refresh the profile under the new token so the persisted user object
+      // (name/tenant labels) reflects the target workspace after reload.
+      const profile = await getProfile();
+      setUser(profile as Parameters<typeof setUser>[0]);
+      // Full reload: every query cache, SSE stream, and plan context belongs
+      // to the previous workspace — a clean re-hydration is the correct reset.
+      queryClient.clear();
+      window.location.assign('/');
+    } catch {
+      setSwitching(null);
+    }
+  };
   const { displayName: planDisplayName, hasFeature } = usePlan();
   const { milestone1Complete, milestone2Complete, milestone1IncompleteCount } = useOnboardingStore();
   const pathname = usePathname();
@@ -108,8 +140,43 @@ export function WorkspaceSwitcherPopover({
         </div>
         <Separator />
 
+        {workspaces.length > 1 && (
+          <>
+            <div className="p-1">
+              <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider px-3 pt-2 pb-1">
+                Switch workspace
+              </p>
+              {workspaces.map((ws) => {
+                const isCurrent = ws.tenantId === user.tenantId;
+                return (
+                  <button
+                    key={ws.tenantId}
+                    onClick={() => handleSwitch(ws.tenantId)}
+                    disabled={!!switching}
+                    className={cn(
+                      'flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm transition-colors text-left',
+                      isCurrent ? 'bg-muted text-foreground' : 'text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <WorkspaceAvatar initial={ws.name.charAt(0).toUpperCase()} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate">{ws.name}</span>
+                      <span className="block text-2xs text-muted-foreground">{ws.role}</span>
+                    </span>
+                    {isCurrent && <Check className="h-4 w-4 shrink-0" />}
+                    {switching === ws.tenantId && (
+                      <span className="h-3 w-3 shrink-0 animate-spin rounded-full border-b-2 border-foreground" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <Separator />
+          </>
+        )}
+
         {workspaceDrawerSections.map((section, sectionIdx) => {
-          const visibleItems = section.items.filter((item) => {
+          const visibleItems = filterForTenancyMode(section.items).filter((item) => {
             if (item.entitlements?.length) {
               return item.entitlements.some((e) => hasFeature(e));
             }

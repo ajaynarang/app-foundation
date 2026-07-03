@@ -151,6 +151,44 @@ export const seed = {
       created++;
     }
 
+    // Workspace memberships — source of truth for the workspace-based model.
+    const tenantUsers = await prisma.user.findMany({ where: { tenantId: tenantDbId } });
+    for (const u of tenantUsers) {
+      await prisma.workspaceMember.upsert({
+        where: { userId_tenantId: { userId: u.id, tenantId: tenantDbId } },
+        update: {},
+        create: { userId: u.id, tenantId: tenantDbId, role: u.role, isDefault: true },
+      });
+    }
+
+    // Multi-tenant demo: a second workspace with the owner as ADMIN, so the
+    // workspace switcher is demonstrable on a fresh clone.
+    if (MULTI_TENANT) {
+      let second = await prisma.tenant.findFirst({ where: { subdomain: 'demo-two' } });
+      if (!second) {
+        second = await prisma.tenant.create({
+          data: {
+            tenantId: 'demo-two',
+            companyName: 'Second Workspace',
+            subdomain: 'demo-two',
+            status: 'ACTIVE',
+            isActive: true,
+            plan: 'ENTERPRISE',
+            timezone: 'UTC',
+          },
+        });
+        created++;
+      }
+      const owner = await prisma.user.findFirst({ where: { tenantId: tenantDbId, role: 'OWNER' } });
+      if (owner) {
+        await prisma.workspaceMember.upsert({
+          where: { userId_tenantId: { userId: owner.id, tenantId: second.id } },
+          update: {},
+          create: { userId: owner.id, tenantId: second.id, role: 'ADMIN', isDefault: false },
+        });
+      }
+    }
+
     return { created, skipped: created === 0 ? 1 : 0 };
   },
 };

@@ -193,6 +193,7 @@ model Tenant {
   oauthClients                OAuthClient[]
   tenantAddOns                TenantAddOn[]
   pushSubscriptions           PushSubscription[]
+  members                     WorkspaceMember[]
   feedback                    Feedback[]
 
   // Billing & wallet
@@ -261,6 +262,7 @@ model User {
 
   // Relations
   refreshTokens           RefreshToken[]
+  memberships             WorkspaceMember[]
   passwordResetTokens     PasswordResetToken[]
   loginEvents             LoginEvent[]
   apiKeys                 ApiKey[]
@@ -299,6 +301,29 @@ model User {
   @@index([deletedAt])
   @@index([deletedBy])
   @@map("users")
+}
+
+/// A user's membership in a workspace (tenant) — the source of truth for the
+/// workspace-based tenancy model: one user can belong to many workspaces with
+/// a distinct role in each. The JWT carries the ACTIVE workspace, minted from
+/// one of these rows at login / switch time. `User.tenantId` + `User.role`
+/// remain the login-default cache, kept in sync by WorkspacesService.
+model WorkspaceMember {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  tenantId  Int      @map("tenant_id")
+  role      UserRole
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("workspace_members")
 }
 
 model SuperAdminPreferences {

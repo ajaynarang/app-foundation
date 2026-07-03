@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-07-03T09:56:11.533Z
- * Source: 0 domains, 86 endpoints
- * Controllers scanned: 256 total endpoints across all controllers
+ * Generated: 2026-07-03T16:43:04.084Z
+ * Source: 0 domains, 87 endpoints
+ * Controllers scanned: 262 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -500,174 +500,225 @@ export const RBAC_MATRIX: RbacEntry[] = [
   },
 
   // ═══════════════════════════════════════════════════════
-  // PLATFORM
+  // ANNOUNCEMENTS
   // ═══════════════════════════════════════════════════════
   {
     method: 'GET', path: '/admin/broadcasts',
     description: 'AnnouncementsController: GET /admin/broadcasts',
-    domain: 'platform',
+    domain: 'announcements',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
   },
   {
-    method: 'GET', path: '/admin/login-activity',
-    description: 'LoginActivityController: GET /admin/login-activity',
-    domain: 'platform',
+    method: 'GET', path: '/broadcasts/active',
+    description: 'BroadcastsPublicController: GET /broadcasts/active',
+    domain: 'announcements',
     featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 400, OWNER: 400, SUPER_ADMIN: 403 },
+    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
   {
-    method: 'GET', path: '/admin/login-activity/summary',
-    description: 'LoginActivityController: GET /admin/login-activity/summary',
-    domain: 'platform',
+    method: 'POST', path: '/admin/broadcasts',
+    description: 'AnnouncementsController: POST /admin/broadcasts',
+    domain: 'announcements',
     featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 400, OWNER: 400, SUPER_ADMIN: 403 },
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
   },
+
+  // ═══════════════════════════════════════════════════════
+  // API-KEYS
+  // ═══════════════════════════════════════════════════════
   {
     method: 'GET', path: '/api-keys',
     description: 'ApiKeysController: GET /api-keys',
-    domain: 'platform',
+    domain: 'api-keys',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
   {
     method: 'GET', path: '/api-keys/admin/tenant',
     description: 'ApiKeysController: GET /api-keys/admin/tenant',
-    domain: 'platform',
+    domain: 'api-keys',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
-  {
-    method: 'GET', path: '/broadcasts/active',
-    description: 'BroadcastsPublicController: GET /broadcasts/active',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
-  },
+
+  // ═══════════════════════════════════════════════════════
+  // FEATURE-FLAGS
+  // ═══════════════════════════════════════════════════════
   {
     method: 'GET', path: '/feature-flags',
     description: 'FeatureFlagsController: GET /feature-flags',
-    domain: 'platform',
+    domain: 'feature-flags',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
+
+  // ═══════════════════════════════════════════════════════
+  // LOGIN-ACTIVITY
+  // ═══════════════════════════════════════════════════════
   {
-    method: 'GET', path: '/invitations',
-    description: 'UserInvitationsController: GET /invitations',
-    domain: 'platform',
+    method: 'GET', path: '/admin/login-activity',
+    description: 'LoginActivityController: GET /admin/login-activity',
+    domain: 'login-activity',
     featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+    expectations: { MEMBER: 403, ADMIN: 400, OWNER: 400, SUPER_ADMIN: 403 },
   },
   {
-    method: 'GET', path: '/oauth/clients',
-    description: 'OAuthClientsController: GET /oauth/clients',
-    domain: 'platform',
+    method: 'GET', path: '/admin/login-activity/summary',
+    description: 'LoginActivityController: GET /admin/login-activity/summary',
+    domain: 'login-activity',
     featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
-  },
-  {
-    method: 'GET', path: '/onboarding/status',
-    description: 'OnboardingController: GET /onboarding/status',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
-  },
-  {
-    method: 'GET', path: '/plans',
-    description: 'PlansController: GET /plans',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
-  },
-  {
-    method: 'GET', path: '/plans/my-plan',
-    description: 'PlansController: GET /plans/my-plan',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
-  },
-  {
-    method: 'GET', path: '/settings/admin',
-    description: 'SuperAdminPreferencesController: GET /settings/admin',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+    expectations: { MEMBER: 403, ADMIN: 400, OWNER: 400, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/super-admin/login-activity',
     description: 'LoginActivityAdminController: GET /super-admin/login-activity',
-    domain: 'platform',
+    domain: 'login-activity',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/super-admin/login-activity/summary',
     description: 'LoginActivityAdminController: GET /super-admin/login-activity/summary',
-    domain: 'platform',
+    domain: 'login-activity',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 400 },
   },
+
+  // ═══════════════════════════════════════════════════════
+  // OAUTH-PROVIDER
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/oauth/clients',
+    description: 'OAuthClientsController: GET /oauth/clients',
+    domain: 'oauth-provider',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'POST', path: '/oauth/clients',
+    description: 'OAuthClientsController: POST /oauth/clients',
+    domain: 'oauth-provider',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: null },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // ONBOARDING
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/onboarding/status',
+    description: 'OnboardingController: GET /onboarding/status',
+    domain: 'onboarding',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // PLANS
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/plans',
+    description: 'PlansController: GET /plans',
+    domain: 'plans',
+    featureGate: null,
+    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/plans/my-plan',
+    description: 'PlansController: GET /plans/my-plan',
+    domain: 'plans',
+    featureGate: null,
+    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // SETTINGS
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/settings/admin',
+    description: 'SuperAdminPreferencesController: GET /settings/admin',
+    domain: 'settings',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'PUT', path: '/settings/admin',
+    description: 'SuperAdminPreferencesController: PUT /settings/admin',
+    domain: 'settings',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // TENANTS
+  // ═══════════════════════════════════════════════════════
   {
     method: 'GET', path: '/tenants',
     description: 'TenantsController: GET /tenants',
-    domain: 'platform',
+    domain: 'tenants',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
   },
   {
     method: 'GET', path: '/tenants/me/profile',
     description: 'TenantsController: GET /tenants/me/profile',
-    domain: 'platform',
+    domain: 'tenants',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
-  },
-  {
-    method: 'GET', path: '/users',
-    description: 'UsersController: GET /users',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
-  },
-  {
-    method: 'POST', path: '/admin/broadcasts',
-    description: 'AnnouncementsController: POST /admin/broadcasts',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
-  },
-  {
-    method: 'POST', path: '/invitations',
-    description: 'UserInvitationsController: POST /invitations',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
-  },
-  {
-    method: 'POST', path: '/oauth/clients',
-    description: 'OAuthClientsController: POST /oauth/clients',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: null },
-  },
-  {
-    method: 'PUT', path: '/settings/admin',
-    description: 'SuperAdminPreferencesController: PUT /settings/admin',
-    domain: 'platform',
-    featureGate: null,
-    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
   },
   {
     method: 'PATCH', path: '/tenants/me',
     description: 'TenantsController: PATCH /tenants/me',
-    domain: 'platform',
+    domain: 'tenants',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // USER-INVITATIONS
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/invitations',
+    description: 'UserInvitationsController: GET /invitations',
+    domain: 'user-invitations',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/invitations',
+    description: 'UserInvitationsController: POST /invitations',
+    domain: 'user-invitations',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // USERS
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/users',
+    description: 'UsersController: GET /users',
+    domain: 'users',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'POST', path: '/users',
     description: 'UsersController: POST /users',
-    domain: 'platform',
+    domain: 'users',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // WORKSPACES
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/workspaces',
+    description: 'WorkspacesController: GET /workspaces',
+    domain: 'workspaces',
+    featureGate: null,
+    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
 ];

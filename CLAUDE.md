@@ -30,9 +30,15 @@ removed. Everything cross-cutting remains and works:
 
 ---
 
-## Multi-tenant vs single-tenant (config toggle)
+## Tenancy models (config toggle)
 
-The same codebase runs either way:
+The same codebase runs four ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
+kept for compat). Workspace-based membership (one user ↔ many workspaces, per-workspace role,
+live switcher) is built in: `WorkspaceMember` is the source of truth and the JWT carries the
+session's ACTIVE workspace — so two tabs can live in two workspaces. Personal mode auto-creates
+a private workspace per user at signup (`POST /auth/register`) and hides org chrome.
+
+Modes in detail:
 
 - **Multi-tenant** (default): `MULTI_TENANT=true` (backend) + `NEXT_PUBLIC_MULTI_TENANT=true` (web).
   Tenants resolve from subdomain; tenant-scoped login; self-registration enabled.

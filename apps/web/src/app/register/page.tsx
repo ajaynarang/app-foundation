@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation';
 import { RegistrationForm } from '@/features/auth';
+import { PersonalRegisterForm } from '@/features/auth/components/personal-register-form';
+
+const TENANCY_MODE =
+  process.env.NEXT_PUBLIC_TENANCY_MODE || (process.env.NEXT_PUBLIC_MULTI_TENANT === 'false' ? 'single' : 'multi');
 
 // Placeholder marketing stats — replace with your product's real value props
 // before launch. These render in the left column of the registration page.
@@ -12,10 +16,18 @@ const valueProps = [
 ];
 
 export default function RegisterPage() {
-  // Self-registration is a multi-tenant feature — in single-tenant mode
-  // users are provisioned by an admin, so send visitors to login instead.
-  if (process.env.NEXT_PUBLIC_MULTI_TENANT === 'false') {
+  // Tenancy modes: 'multi' = full org registration wizard; 'personal' =
+  // simple signup (a workspace per user); 'single' = users are provisioned
+  // by an admin, so send visitors to login.
+  if (TENANCY_MODE === 'single') {
     redirect('/login');
+  }
+  if (TENANCY_MODE === 'personal') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <PersonalRegisterForm />
+      </div>
+    );
   }
 
   return (

@@ -59,7 +59,7 @@ export class TenantsController extends BaseTenantController {
 
   /** MT-only public endpoints 404 in single-tenant mode (parity with the hidden UI). */
   private assertMultiTenant(): void {
-    if (this.configService.get<boolean>('multiTenancy.enabled') === false) {
+    if (this.configService.get<string>('multiTenancy.mode') !== 'multi') {
       throw new NotFoundException();
     }
   }

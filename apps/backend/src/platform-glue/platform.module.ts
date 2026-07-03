@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TenantsModule } from '@appshore/platform/domains/tenants/tenants.module';
 import { UsersModule } from '@appshore/platform/domains/users/users.module';
+import { WorkspacesModule } from '@appshore/platform/domains/workspaces/workspaces.module';
 import { UserInvitationsModule } from '@appshore/platform/domains/user-invitations/user-invitations.module';
 import { SettingsModule } from '@appshore/platform/domains/settings/settings.module';
 import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/feature-flags.module';
@@ -28,6 +29,7 @@ import { LoginActivityModule } from '@appshore/platform/domains/login-activity/l
   imports: [
     TenantsModule,
     UsersModule,
+    WorkspacesModule,
     UserInvitationsModule,
     SettingsModule,
     FeatureFlagsModule,

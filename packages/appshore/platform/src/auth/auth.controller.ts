@@ -1,10 +1,23 @@
-import { Controller, Post, Get, Patch, Body, UseGuards, Res, Req, Logger, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Body,
+  UseGuards,
+  Res,
+  Req,
+  Logger,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { Response, Request as ExpressRequest } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginResponseDto, UserProfileDto } from './dto/login.dto';
-import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/password-login.dto';
+import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto, PersonalRegisterDto } from './dto/password-login.dto';
 import { FirebaseExchangeDto } from './dto/firebase-exchange.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -74,6 +87,32 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.loginWithPassword(dto, {
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    this.setRefreshTokenCookie(response, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
+  }
+
+  @Public()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
+  })
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Personal-mode signup — creates the user and their own workspace (404 unless TENANCY_MODE=personal)',
+  })
+  @ApiBody({ type: PersonalRegisterDto })
+  async registerPersonal(
+    @Body() dto: PersonalRegisterDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (this.configService.get<string>('multiTenancy.mode') !== 'personal') {
+      throw new NotFoundException();
+    }
+    const result = await this.authService.registerPersonal(dto, {
       ip: req.ip ?? null,
       userAgent: req.headers['user-agent'] ?? null,
     });

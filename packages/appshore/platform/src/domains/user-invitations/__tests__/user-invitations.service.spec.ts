@@ -12,6 +12,10 @@ describe('UserInvitationsService', () => {
   let service: UserInvitationsService;
 
   const mockPrismaService = {
+    workspaceMember: {
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
+    },
     userInvitation: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -178,6 +182,7 @@ describe('UserInvitationsService', () => {
       mockPrismaService.$transaction.mockImplementation(async (callback) => {
         return callback(mockPrismaService);
       });
+      mockPrismaService.user.findFirst.mockResolvedValue(null); // no existing account — invite creates one
       mockPrismaService.user.create.mockResolvedValue(mockUser);
       mockPrismaService.userInvitation.update.mockResolvedValue({
         ...mockInvitation,

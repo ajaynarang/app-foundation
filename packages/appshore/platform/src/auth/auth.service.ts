@@ -280,6 +280,66 @@ export class AuthService {
     ]);
   }
 
+  /**
+   * Personal-mode signup: every user gets their own workspace, created and
+   * activated immediately (no approval step, no org concepts). Gated by the
+   * controller to TENANCY_MODE=personal.
+   */
+  async registerPersonal(
+    dto: { email: string; password: string; firstName: string; lastName: string },
+    meta: { ip: string | null; userAgent: string | null },
+  ) {
+    const email = dto.email.toLowerCase().trim();
+    const existing = await this.prisma.user.findFirst({ where: { email, deletedAt: null } });
+    if (existing) throw new ConflictException('An account with this email already exists');
+    const passwordHash = await bcrypt.hash(dto.password, AuthService.PASSWORD_SALT_ROUNDS);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          tenantId: `ws_${crypto.randomUUID().slice(0, 12)}`,
+          companyName: `${dto.firstName}'s Workspace`,
+          status: 'ACTIVE',
+          isActive: true,
+          plan: 'STARTER',
+          timezone: 'UTC',
+        },
+      });
+      const created = await tx.user.create({
+        data: {
+          userId: `user_${crypto.randomUUID().slice(0, 18)}`,
+          tenantId: tenant.id,
+          email,
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: 'OWNER',
+          isActive: true,
+          emailVerified: false,
+        },
+        include: { tenant: true },
+      });
+      await tx.workspaceMember.create({
+        data: { userId: created.id, tenantId: tenant.id, role: 'OWNER', isDefault: true },
+      });
+      await tx.userPreferences.create({ data: { userId: created.id } });
+      return created;
+    });
+
+    const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
+      { id: user.id, userId: user.userId, email: user.email, role: user.role, tenantId: user.tenant?.tenantId },
+      'email_password' satisfies AuthMethod,
+    );
+    await this.loginEventService.recordSuccess({
+      userId: user.id,
+      tenantId: user.tenant?.id ?? null,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      sessionId: refreshTokenId,
+    });
+    return { accessToken, refreshToken, user: this.toUserProfile(user) };
+  }
+
   async exchangeFirebaseToken(dto: FirebaseExchangeDto, meta: { ip: string | null; userAgent: string | null }) {
     const decodedToken = await this.firebaseAuthService.verifyFirebaseToken(dto.firebaseToken);
     const user = await this.firebaseAuthService.findOrCreateUserByFirebaseUid(decodedToken.uid, decodedToken.email);

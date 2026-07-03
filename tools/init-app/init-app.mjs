@@ -60,7 +60,7 @@ if (flags.help) {
   --display-name <string>  Human name, e.g. "Acme CRM" (default: title-cased name)
   --scope <@scope>         Workspace package scope (default: @app — keeping it is safest)
   --db <snake_case>        Postgres database name (default: name with dashes as underscores)
-  --tenancy <mt|st>        Default tenancy mode written to .env.example files (default: mt)
+  --tenancy <mt|st|personal>  Tenancy mode written to .env.example files (default: mt)
   --mobile <yes|no>        Keep the Flutter mobile companion app at apps/mobile (default: yes)
   --yes                    Non-interactive; accept defaults for everything not passed
   --dry-run                Show per-file replacement counts; change nothing
@@ -136,7 +136,7 @@ async function gatherConfig() {
     cfg.displayName = cfg.displayName || (await ask('Display name', titleCase(cfg.name || '')));
     cfg.scope = cfg.scope || (await ask('Package scope (keep @app unless you have a reason)', '@app'));
     cfg.db = cfg.db || (await ask('Postgres database name', (cfg.name || '').replace(/-/g, '_')));
-    cfg.tenancy = cfg.tenancy || (await ask('Tenancy mode — mt (multi-tenant) or st (single-tenant)', 'mt'));
+    cfg.tenancy = cfg.tenancy || (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
     cfg.mobile = cfg.mobile || (await ask('Include the Flutter mobile companion app? (yes/no)', 'yes'));
     rl.close();
   }
@@ -151,7 +151,7 @@ async function gatherConfig() {
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
   if (!VALID.scope.test(cfg.scope)) fail(`Invalid --scope "${cfg.scope}" — must match ${VALID.scope}`);
   if (!VALID.db.test(cfg.db)) fail(`Invalid --db "${cfg.db}" — must match ${VALID.db}`);
-  if (!['mt', 'st'].includes(cfg.tenancy)) fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt or st`);
+  if (!['mt', 'st', 'personal'].includes(cfg.tenancy)) fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
   if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
   return cfg;
 }
@@ -175,7 +175,8 @@ const BRANDING_FILES = [
 function buildRules(cfg) {
   const { name, displayName, scope, db, tenancy } = cfg;
   void tenancy;
-  const mt = tenancy === 'mt' ? 'true' : 'false';
+  const mt = tenancy === 'st' ? 'false' : 'true';
+  const mode = tenancy === 'mt' ? 'multi' : tenancy === 'st' ? 'single' : 'personal';
   const rules = [
     {
       id: `${TEMPLATE_NAME} → ${name}`,
@@ -216,12 +217,13 @@ function buildRules(cfg) {
       apply: (s) =>
         s
           .replace(/^PROJECT_NAME=.*$/m, `PROJECT_NAME=${displayName} Backend`)
-          .replace(/^MULTI_TENANT=.*$/m, `MULTI_TENANT=${mt}`),
+          .replace(/^MULTI_TENANT=.*$/m, `MULTI_TENANT=${mt}`)
+          .replace(/^TENANCY_MODE=.*$/m, `TENANCY_MODE=${mode}`),
     },
     {
       id: `web .env.example NEXT_PUBLIC_MULTI_TENANT=${mt}`,
       files: ['apps/web/.env.example'],
-      apply: (s) => s.replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`),
+      apply: (s) => s.replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`).replace(/^NEXT_PUBLIC_TENANCY_MODE=.*$/m, `NEXT_PUBLIC_TENANCY_MODE=${mode}`),
     },
   ];
   if (cfg.mobile === 'yes') {
