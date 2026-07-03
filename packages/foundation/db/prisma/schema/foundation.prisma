@@ -1,3 +1,10 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// TENANT DELETION POLICY: tenants are never hard-deleted. Suspend them
+// (Tenant.status = SUSPENDED / isActive = false) instead. Child relations use
+// a mix of Cascade (ephemeral/audit data) and Restrict (business data) that
+// intentionally blocks a hard DELETE. If you need true offboarding, write an
+// explicit purge job — do not "fix" the Restrict edges.
+// ─────────────────────────────────────────────────────────────────────────────
 generator client {
   provider = "prisma-client-js"
   output   = "../../generated/client"
@@ -180,14 +187,12 @@ model Tenant {
   webhookSubscriptions        WebhookSubscription[]
   domainEventLogs             DomainEventLog[]
   deadLetters                 DeadLetterLog[]
-  documents                   Document[]
   conversationSessions        ConversationSession[]
   integrationExternalEntities IntegrationExternalEntity[]
   integrationEntityMappings   IntegrationEntityMapping[]
   oauthClients                OAuthClient[]
   tenantAddOns                TenantAddOn[]
-  tenantAddOnEvents           TenantAddOnEvent[]
-  addOnRequests               AddOnRequest[]
+  pushSubscriptions           PushSubscription[]
   feedback                    Feedback[]
 
   // Billing & wallet
@@ -256,6 +261,7 @@ model User {
 
   // Relations
   refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   loginEvents             LoginEvent[]
   apiKeys                 ApiKey[]
   preferences             UserPreferences?
@@ -283,6 +289,7 @@ model User {
   deskMemoriesAuthored    DeskMemory[]             @relation("DeskMemoryAuthoredBy")
   aiInvocations           AiInvocation[]
 
+  @@unique([tenantId, email])
   @@index([tenantId])
   @@index([email])
   @@index([phone])
@@ -290,6 +297,7 @@ model User {
   @@index([role])
   @@index([isActive])
   @@index([deletedAt])
+  @@index([deletedBy])
   @@map("users")
 }
 
@@ -305,7 +313,6 @@ model SuperAdminPreferences {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@index([userId])
   @@map("super_admin_preferences")
 }
 
@@ -324,6 +331,23 @@ model RefreshToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+/// One-time token for the first-party "forgot password" flow. Only the SHA-256
+/// hash is stored; the raw token goes into the emailed reset link.
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 enum LoginEventStatus {
@@ -376,9 +400,6 @@ model ApiKey {
   lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz
   requestCount Int       @default(0) @map("request_count")
 
-  // Rate limiting (legacy unused column — kept for backwards compatibility; new code uses rateLimitPerMinute)
-  rateLimit Int @default(1000) @map("rate_limit")
-
   // Phase B — scoped keys
   scopes              String[] @default([])
   ipAllowlist         String[] @default([]) @map("ip_allowlist")
@@ -393,7 +414,6 @@ model ApiKey {
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz
 
   @@index([userId])
-  @@index([key])
   @@index([userId, revokedAt])
   @@map("api_keys")
 }
@@ -431,48 +451,17 @@ model UserInvitation {
   notifications Notification[]
 
   @@index([tenantId])
-  @@index([token])
   @@index([email])
   @@index([expiresAt])
   @@index([status])
+  @@index([invitedBy])
+  @@index([acceptedByUserId])
   @@map("user_invitations")
 }
 
 // ============================================================================
 // DOCUMENTS (generic file store)
 // ============================================================================
-
-enum DocumentStatus {
-  PENDING_UPLOAD
-  CONFIRMED
-  EXPIRED
-  DELETED
-}
-
-model Document {
-  id           Int            @id @default(autoincrement())
-  entityType   String         @db.VarChar(30)
-  entityId     Int            @map("entity_id")
-  documentType String         @db.VarChar(50)
-  fileName     String         @map("file_name") @db.VarChar(255)
-  fileUrl      String         @map("file_url") @db.VarChar(500)
-  fileSize     Int?           @map("file_size")
-  mimeType     String?        @map("mime_type") @db.VarChar(100)
-  uploadedBy   Int?           @map("uploaded_by")
-  tenantId     Int            @map("tenant_id")
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  status       DocumentStatus @default(PENDING_UPLOAD)
-  s3Key        String?        @map("s3_key") @db.VarChar(500)
-  description  String?        @db.Text
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([entityType, entityId])
-  @@index([tenantId])
-  @@index([status])
-  @@map("documents")
-}
 
 // ============================================================================
 // INTEGRATIONS FRAMEWORK
@@ -519,18 +508,18 @@ model IntegrationExternalEntity {
 /// Not used by the starter itself — extension-point table for integration connectors
 /// (pairs with IntegrationExternalEntity above).
 model IntegrationEntityMapping {
-  id              Int       @id @default(autoincrement())
-  tenantId        Int       @map("tenant_id")
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  integrationId   String    @map("integration_id") @db.VarChar(50)
-  entityType      String    @map("entity_type") @db.VarChar(50)
-  internalEntityId   String    @map("internal_entity_id") @db.VarChar(50)
-  externalId      String?   @map("external_id") @db.VarChar(100)
-  externalName    String?   @map("external_name") @db.VarChar(500)
-  matchConfidence Float?    @map("match_confidence")
-  confirmedAt     DateTime? @map("confirmed_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id               Int       @id @default(autoincrement())
+  tenantId         Int       @map("tenant_id")
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  integrationId    String    @map("integration_id") @db.VarChar(50)
+  entityType       String    @map("entity_type") @db.VarChar(50)
+  internalEntityId String    @map("internal_entity_id") @db.VarChar(50)
+  externalId       String?   @map("external_id") @db.VarChar(100)
+  externalName     String?   @map("external_name") @db.VarChar(500)
+  matchConfidence  Float?    @map("match_confidence")
+  confirmedAt      DateTime? @map("confirmed_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([integrationId, entityType, internalEntityId], map: "iem_integration_type_internal_unique")
   @@index([tenantId])
@@ -554,6 +543,7 @@ model IntegrationConfig {
   credentials Json? @db.JsonB
 
   // Plaintext QB realm ID for fast webhook routing (not sensitive)
+  /// Vendor account / workspace identifier (e.g. a QuickBooks realm, a Xero org).
   realmId String? @map("realm_id") @db.VarChar(30)
 
   // Sync settings
@@ -603,7 +593,7 @@ model UserPreferences {
   // Display Preferences
   distanceUnit String @default("MILES") @map("distance_unit") @db.VarChar(20) // MILES | KILOMETERS
   timeFormat   String @default("12H") @map("time_format") @db.VarChar(10) // 12H | 24H
-  timezone     String @default("America/New_York") @db.VarChar(100)
+  timezone     String @default("UTC") @db.VarChar(100)
   dateFormat   String @default("MM/DD/YYYY") @map("date_format") @db.VarChar(20)
 
   // Alert Delivery (per-priority channel overrides)
@@ -733,13 +723,14 @@ model Notification {
   // Metadata
   metadata     Json?     @db.JsonB
   errorMessage String?   @map("error_message") @db.Text
-  sentAt       DateTime? @map("sent_at")
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz
 
   // Timestamps
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([userId])
+  @@index([invitationId])
   @@index([type])
   @@index([status])
   @@index([createdAt])
@@ -766,10 +757,12 @@ model PushSubscription {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([userId, endpoint])
   @@index([userId])
+  @@index([tenantId])
   @@map("push_subscriptions")
 }
 
@@ -824,7 +817,6 @@ model ConversationSession {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([conversationId])
-  @@index([token])
   @@index([tenantId, createdAt])
   @@map("conversation_sessions")
 }
@@ -854,6 +846,9 @@ model ConversationMessage {
 // AI KNOWLEDGE BASE (RAG)
 // ============================================================================
 
+/// Platform-global knowledge base (seeded from apps/backend/content/knowledge-base).
+/// Intentionally NOT tenant-scoped — every tenant's assistant shares it. Add a
+/// tenantId column if your product needs per-tenant knowledge.
 model KnowledgeDocument {
   id         Int    @id @default(autoincrement())
   documentId String @unique @map("document_id") @db.VarChar(50)
@@ -964,22 +959,22 @@ model JobSchedule {
 // ============================================================================
 
 model PlanConfig {
-  id              Int        @id @default(autoincrement())
-  plan            TenantPlan @unique
-  displayName     String     @map("display_name") @db.VarChar(100)
-  tagline         String     @db.VarChar(255)
-  pricePerUnit    Int?       @map("price_per_unit")
-  unitLabel       String     @default("seat/month") @map("unit_label") @db.VarChar(50)
-  fleetLimit      Int?       @map("fleet_limit")
-  userLimit       Int?       @map("user_limit")
-  isPopular       Boolean    @default(false) @map("is_popular")
-  ctaLabel        String     @map("cta_label") @db.VarChar(100)
-  ctaUrl          String?    @map("cta_url") @db.VarChar(500)
-  displayOrder    Int        @map("display_order")
-  providerPriceId String?    @map("provider_price_id") @db.VarChar(255)
-  isActive        Boolean    @default(true) @map("is_active")
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  id                Int        @id @default(autoincrement())
+  plan              TenantPlan @unique
+  displayName       String     @map("display_name") @db.VarChar(100)
+  tagline           String     @db.VarChar(255)
+  pricePerUnitCents Int?       @map("price_per_unit_cents")
+  unitLabel         String     @default("seat/month") @map("unit_label") @db.VarChar(50)
+  seatLimit         Int?       @map("seat_limit")
+  userLimit         Int?       @map("user_limit")
+  isPopular         Boolean    @default(false) @map("is_popular")
+  ctaLabel          String     @map("cta_label") @db.VarChar(100)
+  ctaUrl            String?    @map("cta_url") @db.VarChar(500)
+  displayOrder      Int        @map("display_order")
+  providerPriceId   String?    @map("provider_price_id") @db.VarChar(255)
+  isActive          Boolean    @default(true) @map("is_active")
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("plan_configs")
 }
@@ -1041,8 +1036,6 @@ model AddOn {
   displayOrder    Int     @default(0) @map("display_order")
 
   tenantAddOns       TenantAddOn[]
-  events             TenantAddOnEvent[]
-  requests           AddOnRequest[]
   walletTransactions WalletTransaction[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -1092,60 +1085,6 @@ model TenantAddOn {
   @@index([tenantId, status])
   @@index([addOnId])
   @@map("tenant_add_ons")
-}
-
-model TenantAddOnEvent {
-  /// App-generated UUIDv7 via generateUuidV7() — time-sortable PK. No
-  /// Prisma @default; every create() must pass `id: generateUuidV7()`.
-  id       String @id @db.Uuid
-  tenantId Int    @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  addOnId  String @map("add_on_id")
-  addOn    AddOn  @relation(fields: [addOnId], references: [id])
-
-  eventType String  @map("event_type") @db.VarChar(30)
-  // "activated" | "cancelled" | "usage_warning" | "usage_limit_hit" | "overage_enabled" | "overage_disabled" | "usage_reset"
-  changedBy String  @map("changed_by") @db.VarChar(100)
-  reason    String? @db.Text
-  metadata  Json?   @db.JsonB
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  @@index([tenantId])
-  @@index([addOnId])
-  @@map("tenant_add_on_events")
-}
-
-enum AddOnRequestStatus {
-  PENDING
-  APPROVED
-  DECLINED
-}
-
-model AddOnRequest {
-  id       String @id @default(cuid())
-  tenantId Int    @map("tenant_id")
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  addOnId  String @map("add_on_id")
-  addOn    AddOn  @relation(fields: [addOnId], references: [id])
-
-  status AddOnRequestStatus @default(PENDING)
-
-  requestedByUserId Int      @map("requested_by_user_id")
-  requestedAt       DateTime @default(now()) @map("requested_at") @db.Timestamptz
-  requestNote       String?  @map("request_note") @db.Text
-
-  reviewedByUserId Int?      @map("reviewed_by_user_id")
-  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz
-  declineReason    String?   @map("decline_reason") @db.Text
-  giftedPriceCents Int?      @map("gifted_price_cents")
-
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
-
-  @@index([tenantId, status])
-  @@index([status])
-  @@map("add_on_requests")
 }
 
 // ============================================================================
@@ -1279,6 +1218,7 @@ model OAuthClient {
   refreshTokens      OAuthRefreshToken[]
 
   @@index([tenantId])
+  @@index([createdByUserId])
   @@map("oauth_clients")
 }
 
@@ -1301,7 +1241,8 @@ model OAuthAuthorizationCode {
   usedAt      DateTime? @map("used_at") @db.Timestamptz
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([code])
+  @@index([userId])
+  @@index([clientId])
   @@index([expiresAt])
   @@map("oauth_authorization_codes")
 }
@@ -1321,8 +1262,8 @@ model OAuthAccessToken {
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  @@index([tokenHash])
   @@index([userId])
+  @@index([clientId])
   @@index([expiresAt])
   @@map("oauth_access_tokens")
 }
@@ -1345,8 +1286,8 @@ model OAuthRefreshToken {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   originalIssuedAt DateTime  @default(now()) @map("original_issued_at") @db.Timestamptz
 
-  @@index([tokenHash])
   @@index([userId])
+  @@index([clientId])
   @@index([expiresAt])
   @@map("oauth_refresh_tokens")
 }
@@ -1366,6 +1307,7 @@ model Feedback {
   tenantId   Int            @map("tenant_id")
   userId     Int            @map("user_id")
   category   String?        @db.VarChar(20)
+  /// 1–5 scale: 1 = very negative, 5 = very positive
   sentiment  Int            @default(3)
   message    String         @db.Text
   page       String?        @db.VarChar(500)
@@ -1383,6 +1325,7 @@ model Feedback {
   @@index([tenantId])
   @@index([status])
   @@index([createdAt])
+  @@index([resolvedBy])
   @@map("feedback")
 }
 
@@ -1447,6 +1390,7 @@ model SupportTicketMessage {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([ticketId, createdAt])
+  @@index([authorId])
   @@map("support_ticket_messages")
 }
 
@@ -1486,6 +1430,7 @@ model Announcement {
   @@index([status])
   @@index([createdAt])
   @@index([status, publishedAt])
+  @@index([createdById])
   @@map("announcements")
 }
 
@@ -1581,6 +1526,7 @@ model WalletTransaction {
   @@index([walletId, createdAt])
   @@index([tenantId])
   @@index([type])
+  @@index([relatedAddOnId])
   @@map("wallet_transactions")
 }
 
@@ -1653,7 +1599,7 @@ model ProcessedBillingEvent {
 //   • DeskApproval         — human decisions on gated steps
 //   • DeskMemory           — agent-scoped long-term learning (pgvector)
 //
-// Execution state lives in the durable workflow engine (linked via temporal_workflow_id).
+// Execution state lives in the durable workflow engine (linked via workflow_id).
 // These tables own config + audit only.
 // ============================================================================
 
@@ -1774,6 +1720,7 @@ model DeskResponsibility {
 
   @@unique([tenantId, key])
   @@index([tenantId, enabled, lifecycle])
+  @@index([agentId])
   @@map("desk_responsibilities")
 }
 
@@ -1835,8 +1782,8 @@ model DeskEpisode {
   outcomeNote String? @map("outcome_note") @db.Text
 
   // Workflow-engine linkage — the durable engine owns execution state
-  temporalWorkflowId String  @map("temporal_workflow_id") @db.VarChar(200)
-  temporalRunId      String? @map("temporal_run_id") @db.VarChar(100)
+  workflowId    String  @map("workflow_id") @db.VarChar(200)
+  workflowRunId String? @map("workflow_run_id") @db.VarChar(100)
 
   openedAt  DateTime  @default(now()) @map("opened_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -1851,6 +1798,7 @@ model DeskEpisode {
   steps              DeskEpisodeStep[]
   approvals          DeskApproval[]
   entitySuppressions DeskEntitySuppression[]
+  memories           DeskMemory[]            @relation("DeskMemorySource")
 
   // NOTE: (tenant_id, dedupe_key) uniqueness enforced by partial unique index
   // created in raw SQL (migration adds WHERE status IN ('RUNNING','WAITING_APPROVAL')).
@@ -1859,7 +1807,8 @@ model DeskEpisode {
   @@index([tenantId, status, priority])
   @@index([tenantId, responsibilityId, status])
   @@index([entityType, entityId])
-  @@index([temporalWorkflowId])
+  @@index([workflowId])
+  @@index([ownerAgentId])
   @@map("desk_episodes")
 }
 
@@ -1910,6 +1859,7 @@ model DeskEpisodeStep {
   @@index([episodeId])
   @@index([toolName])
   @@index([aiInvocationId])
+  @@index([agentId])
   @@map("desk_episode_steps")
 }
 
@@ -1941,6 +1891,8 @@ model DeskApproval {
 
   @@index([episodeId, decision])
   @@index([stepId])
+  @@index([claimedByUserId])
+  @@index([decidedByUserId])
   @@map("desk_approvals")
 }
 
@@ -1971,7 +1923,8 @@ model DeskMemory {
   entityRef        Json?                        @map("entity_ref") @db.JsonB // structural pointer for entity scope
   entityPredicate  Json?                        @map("entity_predicate") @db.JsonB // reserved for pattern scope
 
-  sourceEpisodeId String? @map("source_episode_id") @db.Uuid
+  sourceEpisodeId String?      @map("source_episode_id") @db.Uuid
+  sourceEpisode   DeskEpisode? @relation("DeskMemorySource", fields: [sourceEpisodeId], references: [id], onDelete: SetNull)
 
   // authoredByUserId IS NOT NULL → operator-authored playbook rule (Rules
   // tab). NULL → LLM-extracted memory (Memory tab). Single discriminator
@@ -1992,6 +1945,7 @@ model DeskMemory {
   @@index([scope, polarity])
   @@index([authoredByUserId])
   @@index([isActive, expiresAt])
+  @@index([sourceEpisodeId])
   @@map("desk_memories")
 }
 
@@ -2005,7 +1959,7 @@ model DeskMemory {
 // ============================================================================
 
 model DeskEntitySuppression {
-  id                   String       @id @default(uuid()) @db.Uuid
+  id                   String       @id @default(uuid(7)) @db.Uuid
   tenantId             Int          @map("tenant_id")
   tenant               Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   responsibilityKey    String       @map("responsibility_key")
@@ -2027,6 +1981,7 @@ model DeskEntitySuppression {
   // IS NULL); Prisma cannot express the WHERE clause. Lookup index for the
   // trigger-service hot path is also SQL-only.
   @@index([tenantId, responsibilityKey, entityType, entityId])
+  @@index([sourceEpisodeId])
   @@map("desk_entity_suppressions")
 }
 
@@ -2189,6 +2144,7 @@ model AiInvocation {
 
   deskEpisodeSteps DeskEpisodeStep[]
 
+  @@index([userId])
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, surface, createdAt(sort: Desc)])
   @@index([linkRefType, linkRefId])

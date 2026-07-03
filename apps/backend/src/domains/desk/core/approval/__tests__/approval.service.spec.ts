@@ -288,7 +288,7 @@ describe('ApprovalService', () => {
       episodeId: 'ep-1',
       decision: null,
       claimedByUserId: null,
-      episode: { id: 'ep-1', temporalWorkflowId: 'wf-1' },
+      episode: { id: 'ep-1', workflowId: 'wf-1' },
     };
 
     it('records an APPROVED decision and emits the inngest event', async () => {

@@ -60,31 +60,3 @@ export const AddOnStatusSchema = z.object({
 // ---------------------------------------------------------------------------
 // Add-on request
 // ---------------------------------------------------------------------------
-export const AddOnRequestStatusEnum = z.enum(['PENDING', 'APPROVED', 'DECLINED']);
-
-export const AddOnRequestSchema = z.object({
-  id: z.string(),
-  tenantId: z.number(),
-  addOnId: z.string(),
-  status: AddOnRequestStatusEnum,
-  requestedByUserId: z.number(),
-  requestedAt: z.string(),
-  requestNote: z.string().nullable(),
-  reviewedByUserId: z.number().nullable(),
-  reviewedAt: z.string().nullable(),
-  declineReason: z.string().nullable(),
-  giftedPriceCents: z.number().nullable(),
-});
-
-// ---------------------------------------------------------------------------
-// Inferred types
-// ---------------------------------------------------------------------------
-export type AddOn = z.infer<typeof AddOnSchema>;
-export type TenantAddOn = z.infer<typeof TenantAddOnSchema>;
-export type AddOnStatus = z.infer<typeof AddOnStatusSchema>;
-export type TenantAddOnStatusValue = z.infer<typeof TenantAddOnStatusEnum>;
-export type TenantAddOnSourceValue = z.infer<typeof TenantAddOnSourceEnum>;
-export type AddOnStatusSource = z.infer<typeof AddOnStatusSourceEnum>;
-export type AddOnRequest = z.infer<typeof AddOnRequestSchema>;
-// `AddOnRequestStatus` type comes from the generated Prisma mirror — not
-// re-declared here to avoid a barrel re-export collision.

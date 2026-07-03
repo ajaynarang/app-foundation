@@ -5,7 +5,7 @@
  *   pnpm run seed:model-pricing
  *
  * The full base seed list (`pnpm run setup:base`) already includes
- * `14-model-pricing`. This script exists so we can refresh pricing rows in
+ * `08-model-pricing`. This script exists so we can refresh pricing rows in
  * isolation when provider rates change, without re-running every other seed.
  *
  * Idempotent — re-runs without changes are no-ops.
@@ -15,7 +15,7 @@ import pg from 'pg';
 import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { seed } from '../prisma/seeds/14-model-pricing.seed';
+import { seed } from '../../../packages/foundation/db/prisma/seeds/08-model-pricing.seed';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local' });

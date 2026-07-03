@@ -383,8 +383,8 @@ interface EpisodeWithRels {
   dedupeKey: string;
   outcome: string | null;
   outcomeNote: string | null;
-  temporalWorkflowId: string;
-  temporalRunId: string | null;
+  workflowId: string;
+  workflowRunId: string | null;
   openedAt: Date;
   updatedAt: Date;
   closedAt: Date | null;
@@ -408,8 +408,8 @@ function toListItem(row: EpisodeWithRels): DeskEpisodeListItem {
     dedupeKey: row.dedupeKey,
     outcome: row.outcome,
     outcomeNote: row.outcomeNote,
-    temporalWorkflowId: row.temporalWorkflowId,
-    temporalRunId: row.temporalRunId,
+    workflowId: row.workflowId,
+    workflowRunId: row.workflowRunId,
     openedAt: row.openedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     closedAt: row.closedAt?.toISOString() ?? null,

@@ -18,7 +18,7 @@ interface PlanConfig {
   id: string;
   plan: string;
   displayName: string;
-  pricePerUnit: number | null;
+  pricePerUnitCents: number | null;
 }
 
 export interface RevenueByPlan {
@@ -53,13 +53,13 @@ export function useBillingPulse() {
   const plans: PlanConfig[] = useMemo(() => plansData ?? [], [plansData]);
 
   const computed = useMemo(() => {
-    // Build a price lookup: plan name -> pricePerUnit (cents)
-    const priceLookup = new Map<string, { displayName: string; pricePerUnit: number }>();
+    // Build a price lookup: plan name -> pricePerUnitCents (cents)
+    const priceLookup = new Map<string, { displayName: string; pricePerUnitCents: number }>();
     for (const plan of plans) {
-      if (plan.pricePerUnit != null) {
+      if (plan.pricePerUnitCents != null) {
         priceLookup.set(plan.plan, {
           displayName: plan.displayName,
-          pricePerUnit: plan.pricePerUnit,
+          pricePerUnitCents: plan.pricePerUnitCents,
         });
       }
     }
@@ -72,7 +72,7 @@ export function useBillingPulse() {
     for (const tenant of activeTenants) {
       const planKey = tenant.plan || 'UNKNOWN';
       const planInfo = priceLookup.get(planKey);
-      const price = planInfo?.pricePerUnit ?? 0;
+      const price = planInfo?.pricePerUnitCents ?? 0;
       const displayName = planInfo?.displayName ?? planKey;
 
       const existing = planRevMap.get(planKey);

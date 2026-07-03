@@ -50,7 +50,6 @@ import {
   useAdminExtendTrial,
   useAdminChangeSubscriptionPlan,
 } from '../hooks/use-admin-billing';
-import { TenantAddOnsTab } from './tenant-add-ons-tab';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 // ---------------------------------------------------------------------------
@@ -187,7 +186,6 @@ export function TenantPlanBillingTab({
   const [trialDays, setTrialDays] = useState('30');
 
   // --- Add-Ons collapsible ---
-  const [addOnsOpen, setAddOnsOpen] = useState(true);
 
   // --- Loading skeleton ---
   if (isLoading || isPlanLoading) {
@@ -706,23 +704,6 @@ export function TenantPlanBillingTab({
           </div>
         )}
       </div>
-
-      <Separator />
-
-      {/* ================================================================ */}
-      {/* SECTION 3: Add-Ons                                              */}
-      {/* ================================================================ */}
-      <Collapsible open={addOnsOpen} onOpenChange={setAddOnsOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between py-1">
-          <h4 className="text-sm font-medium text-foreground">Add-Ons</h4>
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition-transform ${addOnsOpen ? 'rotate-180' : ''}`}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-2">
-          <TenantAddOnsTab tenantId={tenantId} tenantNumericId={tenantNumericId} />
-        </CollapsibleContent>
-      </Collapsible>
 
       <Separator />
 

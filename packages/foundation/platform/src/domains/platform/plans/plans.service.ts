@@ -136,8 +136,8 @@ export class PlansService {
     data: {
       displayName?: string;
       tagline?: string;
-      pricePerUnit?: number | null;
-      fleetLimit?: number | null;
+      pricePerUnitCents?: number | null;
+      seatLimit?: number | null;
       userLimit?: number | null;
       isPopular?: boolean;
       ctaLabel?: string;

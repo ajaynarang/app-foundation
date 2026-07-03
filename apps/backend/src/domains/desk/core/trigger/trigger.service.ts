@@ -137,9 +137,9 @@ export class TriggerService {
         entityLabel: input.entityLabel,
         status: EPISODE_STATUS.RUNNING,
         dedupeKey: input.dedupeKey,
-        // Inngest owns the temporal_workflow_id field conceptually; we store the
+        // Inngest owns the workflow_id field conceptually; we store the
         // dedupe key for a stable cross-system reference the UI can deep-link to.
-        temporalWorkflowId: `inngest:${input.dedupeKey}`,
+        workflowId: `inngest:${input.dedupeKey}`,
       },
       select: { id: true },
     });

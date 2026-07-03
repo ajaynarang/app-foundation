@@ -188,7 +188,7 @@ describe('BillingAdminService', () => {
     it('should throw if tenant already has active subscription', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue({ id: 1 });
       await expect(service.createSubscriptionForTenant(1, 'PROFESSIONAL' as any, 3)).rejects.toThrow(
@@ -199,7 +199,7 @@ describe('BillingAdminService', () => {
     it('should create customer if not exists and create subscription', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
       mockPrisma.billingCustomer.findUnique.mockResolvedValue(null);
@@ -230,7 +230,7 @@ describe('BillingAdminService', () => {
     it('should use existing billing customer', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
       mockPrisma.billingCustomer.findUnique.mockResolvedValue({
@@ -250,7 +250,7 @@ describe('BillingAdminService', () => {
     it('should log custom price when different from catalog', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
       mockPrisma.billingCustomer.findUnique.mockResolvedValue({
@@ -270,7 +270,7 @@ describe('BillingAdminService', () => {
     it('should wrap non-HTTP errors in BadRequestException', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
       mockPrisma.billingCustomer.findUnique.mockResolvedValue({
@@ -287,7 +287,7 @@ describe('BillingAdminService', () => {
     it('should re-throw BadRequestException as-is', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
       mockPrisma.billingCustomer.findUnique.mockResolvedValue({
@@ -503,7 +503,7 @@ describe('BillingAdminService', () => {
     it('should create subscription if none exists', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst
         .mockResolvedValueOnce(null) // no active sub in changeSubscriptionPlan
@@ -533,7 +533,7 @@ describe('BillingAdminService', () => {
     it('should throw if already on the same plan', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue({
         id: 1,
@@ -551,7 +551,7 @@ describe('BillingAdminService', () => {
     it('should upgrade with proration', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_ent',
-        pricePerUnit: 10000,
+        pricePerUnitCents: 10000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue({
         id: 1,
@@ -577,7 +577,7 @@ describe('BillingAdminService', () => {
     it('should downgrade without proration', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_str',
-        pricePerUnit: 3000,
+        pricePerUnitCents: 3000,
       });
       mockPrisma.billingSubscription.findFirst.mockResolvedValue({
         id: 1,

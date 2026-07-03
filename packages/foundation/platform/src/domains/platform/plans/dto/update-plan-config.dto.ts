@@ -17,14 +17,14 @@ export class UpdatePlanConfigDto {
   @IsInt()
   @Min(0)
   @Transform(({ value }) => (value === null ? null : Number(value)))
-  pricePerUnit?: number | null;
+  pricePerUnitCents?: number | null;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsInt()
   @Min(1)
   @Transform(({ value }) => (value === null ? null : Number(value)))
-  fleetLimit?: number | null;
+  seatLimit?: number | null;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)

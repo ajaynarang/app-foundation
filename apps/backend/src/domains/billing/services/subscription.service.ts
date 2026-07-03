@@ -254,7 +254,7 @@ export class SubscriptionService {
         where: { id: subscription.id },
         data: {
           plan: newPlan,
-          unitPriceCents: newPlanConfig?.pricePerUnit ?? 0,
+          unitPriceCents: newPlanConfig?.pricePerUnitCents ?? 0,
           ...(newQuantity && { quantity: newQuantity }),
         },
       });

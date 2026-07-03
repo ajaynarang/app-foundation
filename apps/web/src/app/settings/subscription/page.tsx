@@ -165,7 +165,7 @@ function PlanSelectorSheet({
 
   const canSelfServePlan = !!selectedPlan?.providerPriceId;
   const isEnterprise = selectedPlan?.plan === 'ENTERPRISE';
-  const totalCents = selectedPlan?.pricePerUnit != null ? selectedPlan.pricePerUnit * seatQuantity : null;
+  const totalCents = selectedPlan?.pricePerUnitCents != null ? selectedPlan.pricePerUnitCents * seatQuantity : null;
 
   const handlePlanAction = () => {
     if (!selectedPlan) return;
@@ -269,9 +269,11 @@ function PlanSelectorSheet({
                         <p className="text-xs text-muted-foreground mt-1">{p.tagline}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        {p.pricePerUnit != null ? (
+                        {p.pricePerUnitCents != null ? (
                           <div>
-                            <span className="text-sm font-bold text-foreground">{formatCents(p.pricePerUnit)}</span>
+                            <span className="text-sm font-bold text-foreground">
+                              {formatCents(p.pricePerUnitCents)}
+                            </span>
                             <span className="text-xs text-muted-foreground">/{p.unitLabel}</span>
                           </div>
                         ) : (
@@ -305,8 +307,8 @@ function PlanSelectorSheet({
                   {totalCents != null && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {seatQuantity} seat{seatQuantity !== 1 ? 's' : ''} x {formatCents(selectedPlan.pricePerUnit!)}/
-                        {selectedPlan.unitLabel}
+                        {seatQuantity} seat{seatQuantity !== 1 ? 's' : ''} x{' '}
+                        {formatCents(selectedPlan.pricePerUnitCents!)}/{selectedPlan.unitLabel}
                       </span>
                       <span className="font-semibold text-foreground">{formatCents(totalCents)}/mo</span>
                     </div>
@@ -438,9 +440,9 @@ export default function SubscriptionPage() {
                 </div>
 
                 {/* Price */}
-                {planDetails?.planConfig?.pricePerUnit != null ? (
+                {planDetails?.planConfig?.pricePerUnitCents != null ? (
                   <p className="text-sm text-muted-foreground">
-                    {formatCents(planDetails.planConfig.pricePerUnit)} / {planDetails.planConfig.unitLabel}
+                    {formatCents(planDetails.planConfig.pricePerUnitCents)} / {planDetails.planConfig.unitLabel}
                     {subscription && (
                       <span className="ml-2">
                         · {subscription.quantity} seat

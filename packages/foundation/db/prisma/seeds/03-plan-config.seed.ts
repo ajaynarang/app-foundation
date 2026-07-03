@@ -5,9 +5,9 @@ const planConfigs = [
     plan: TenantPlan.TRIAL,
     displayName: 'Trial',
     tagline: 'Full platform access for 30 days',
-    pricePerUnit: null,
+    pricePerUnitCents: null,
     unitLabel: 'seat/month',
-    fleetLimit: 50, // Generous trial limit
+    seatLimit: 50, // Generous trial limit
     userLimit: 50,
     isPopular: false,
     ctaLabel: 'Start Free Trial',
@@ -19,9 +19,9 @@ const planConfigs = [
     plan: TenantPlan.STARTER,
     displayName: 'Starter',
     tagline: 'For teams getting started',
-    pricePerUnit: 2900, // $29/seat/month
+    pricePerUnitCents: 2900, // $29/seat/month
     unitLabel: 'seat/month',
-    fleetLimit: 10,
+    seatLimit: 10,
     userLimit: 5,
     isPopular: false,
     ctaLabel: 'Start Free Trial',
@@ -33,9 +33,9 @@ const planConfigs = [
     plan: TenantPlan.PROFESSIONAL,
     displayName: 'Professional',
     tagline: 'For growing teams',
-    pricePerUnit: 4900, // $49/seat/month
+    pricePerUnitCents: 4900, // $49/seat/month
     unitLabel: 'seat/month',
-    fleetLimit: 25,
+    seatLimit: 25,
     userLimit: 25,
     isPopular: true,
     ctaLabel: 'Start Free Trial',
@@ -47,9 +47,9 @@ const planConfigs = [
     plan: TenantPlan.ENTERPRISE,
     displayName: 'Enterprise',
     tagline: 'For enterprise-grade organizations',
-    pricePerUnit: null,
+    pricePerUnitCents: null,
     unitLabel: 'seat/month',
-    fleetLimit: null,
+    seatLimit: null,
     userLimit: null,
     isPopular: false,
     ctaLabel: 'Contact Sales',
@@ -78,9 +78,9 @@ export const seed = {
           data: {
             displayName: config.displayName,
             tagline: config.tagline,
-            pricePerUnit: config.pricePerUnit,
+            pricePerUnitCents: config.pricePerUnitCents,
             unitLabel: config.unitLabel,
-            fleetLimit: config.fleetLimit,
+            seatLimit: config.seatLimit,
             userLimit: config.userLimit,
             isPopular: config.isPopular,
             ctaLabel: config.ctaLabel,

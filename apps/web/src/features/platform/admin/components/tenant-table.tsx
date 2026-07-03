@@ -34,7 +34,7 @@ interface Tenant {
   suspensionReason?: string;
   // Plan fields (may be absent on older API responses)
   plan?: TenantPlan;
-  fleetLimitWarning?: boolean;
+  seatLimitWarning?: boolean;
   users?: Array<{
     userId: string;
     email: string;
@@ -157,7 +157,7 @@ export function TenantTable({
                     >
                       {PLAN_DISPLAY_NAMES[tenant.plan] ?? tenant.plan}
                     </Badge>
-                    {tenant.fleetLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-caution shrink-0" />}
+                    {tenant.seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-caution shrink-0" />}
                   </div>
                 ) : (
                   <span className="text-muted-foreground text-sm">—</span>

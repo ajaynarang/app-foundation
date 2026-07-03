@@ -1,13 +1,15 @@
-# app-foundation
+# AppShore Platform Starter
 
-A **domain-free, full-stack platform starter**. Clone it, drop in your business domain, and you
-start with authentication, multi-tenancy, billing, a working AI assistant, background jobs,
-observability, and cloud infrastructure already built and wired together.
+The **golden path for new AppShore products**: a domain-free, full-stack starter built on the
+reusable **AppShore Platform** packages (`@appshore/*`). Clone it, drop in your business domain,
+and you start with authentication, multi-tenancy, billing, a working AI assistant, background
+jobs, observability, and cloud infrastructure already built and wired together.
 
 It runs **multi-tenant** (the default) or **single-tenant** from the _same codebase_ — flip one
 environment variable.
 
-> This is a template. Use GitHub's **"Use this template"** button (or fork) to start a new app.
+> This is a starter, not a scaffold: the foundation lives in versioned packages your product
+> builds on. Use GitHub's **"Use this template"** button (or fork) to begin a new app.
 
 ## Make it yours
 

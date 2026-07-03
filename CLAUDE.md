@@ -1,4 +1,4 @@
-# AI Context — app-foundation
+# AI Context — AppShore Platform Starter (app-foundation)
 
 A domain-free **platform starter** built on the **AppShore foundation packages**: clone this,
 run `pnpm init-app`, drop in your domain, and you have auth, multi-tenancy, billing, AI chat +

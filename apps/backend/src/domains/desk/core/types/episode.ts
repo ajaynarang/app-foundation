@@ -39,8 +39,8 @@ export const DeskEpisodeListItemSchema = z.object({
   outcome: z.string().nullable(),
   outcomeNote: z.string().nullable(),
 
-  temporalWorkflowId: z.string(),
-  temporalRunId: z.string().nullable(),
+  workflowId: z.string(),
+  workflowRunId: z.string().nullable(),
 
   openedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

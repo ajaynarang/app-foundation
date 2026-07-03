@@ -16,12 +16,12 @@ const SEED_LIST = [
   '00-implicit-tenant',
   '01-super-admin',
   '02-feature-flags',
-  '07-plan-config',
-  '08-plan-entitlements',
-  '10-vendor-configs',
-  '12-add-ons',
-  '13-desk',
-  '14-model-pricing',
+  '03-plan-config',
+  '04-plan-entitlements',
+  '05-vendor-configs',
+  '06-add-ons',
+  '07-desk',
+  '08-model-pricing',
 ];
 
 // ---------------------------------------------------------------------------

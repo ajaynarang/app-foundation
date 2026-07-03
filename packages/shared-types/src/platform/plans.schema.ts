@@ -16,7 +16,7 @@ export const PlanConfigSchema = z.object({
   plan: TenantPlanSchema,
   displayName: z.string(),
   tagline: z.string(),
-  pricePerUnit: z.number().nullable(),
+  pricePerUnitCents: z.number().nullable(),
   unitLabel: z.string(),
   seatLimit: z.number().nullable(),
   userLimit: z.number().nullable(),

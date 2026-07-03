@@ -1,6 +1,6 @@
 // API
-export { adminAddOnsApi, adminBillingApi } from './api';
-export type { TenantAddOn, TenantBillingState } from './api';
+export { adminBillingApi } from './api';
+export type { TenantBillingState } from './api';
 
 // Components
 export { TenantList } from './components/tenant-list';

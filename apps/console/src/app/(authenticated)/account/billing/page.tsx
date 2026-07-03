@@ -58,9 +58,9 @@ export default function BillingPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Price */}
-            {planDetails?.planConfig?.pricePerUnit != null ? (
+            {planDetails?.planConfig?.pricePerUnitCents != null ? (
               <p className="text-sm text-muted-foreground">
-                ${planDetails.planConfig.pricePerUnit} / {planDetails.planConfig.unitLabel}
+                ${planDetails.planConfig.pricePerUnitCents} / {planDetails.planConfig.unitLabel}
               </p>
             ) : plan === 'ENTERPRISE' ? (
               <p className="text-sm text-muted-foreground">Custom pricing</p>

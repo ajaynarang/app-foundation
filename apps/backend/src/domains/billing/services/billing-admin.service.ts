@@ -127,9 +127,9 @@ export class BillingAdminService {
       });
 
       // If custom price differs from catalog, update locally
-      if (customPriceCents && customPriceCents !== planConfig.pricePerUnit) {
+      if (customPriceCents && customPriceCents !== planConfig.pricePerUnitCents) {
         this.logger.log(
-          `Custom price set for tenant ${tenantDbId}: $${(customPriceCents / 100).toFixed(2)}/unit (catalog: $${(planConfig.pricePerUnit / 100).toFixed(2)})`,
+          `Custom price set for tenant ${tenantDbId}: $${(customPriceCents / 100).toFixed(2)}/unit (catalog: $${(planConfig.pricePerUnitCents / 100).toFixed(2)})`,
         );
       }
 
@@ -572,7 +572,7 @@ export class BillingAdminService {
         where: { id: subscription.id },
         data: {
           plan: newPlan,
-          unitPriceCents: planConfig.pricePerUnit ?? 0,
+          unitPriceCents: planConfig.pricePerUnitCents ?? 0,
           ...(quantity && { quantity }),
         },
       });
@@ -598,7 +598,7 @@ export class BillingAdminService {
         where: { id: subscription.id },
         data: {
           plan: newPlan,
-          unitPriceCents: planConfig.pricePerUnit ?? 0,
+          unitPriceCents: planConfig.pricePerUnitCents ?? 0,
           cancelAtPeriodEnd: false,
           pendingDowngradePlan: null,
           ...(quantity && { quantity }),

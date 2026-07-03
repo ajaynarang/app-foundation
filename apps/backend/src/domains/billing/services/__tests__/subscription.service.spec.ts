@@ -141,7 +141,7 @@ describe('SubscriptionService', () => {
       });
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_pro',
-        pricePerUnit: 5000,
+        pricePerUnitCents: 5000,
       });
       mockPrisma.billingSubscription.update.mockResolvedValue({});
 

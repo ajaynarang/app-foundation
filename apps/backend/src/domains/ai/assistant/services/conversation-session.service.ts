@@ -38,7 +38,8 @@ export class ConversationSessionService {
         conversationId: conversation.id,
         tenantId: conversation.tenantId,
         token,
-        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        // Sessions always expire — default 24h when the caller doesn't say.
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 

@@ -1,6 +1,6 @@
-# What you get with app-foundation
+# What you get with the AppShore Platform Starter
 
-This repo is a **starter platform**. You clone it, run one command, and you have a working
+This repo is the **AppShore Platform Starter** — the golden path for new AppShore products. You clone it, run one command, and you have a working
 product skeleton — backend API, web app, admin console, and a mobile app — with all the boring,
 hard, cross-cutting stuff already built, tested, and wired together. You only write the part
 that makes your product _your product_.

@@ -144,7 +144,7 @@ export class ApprovalService {
   }) {
     const approval = await this.prisma.deskApproval.findUnique({
       where: { id: input.approvalId },
-      include: { episode: { select: { id: true, temporalWorkflowId: true } } },
+      include: { episode: { select: { id: true, workflowId: true } } },
     });
     if (!approval) throw new NotFoundException('Approval not found');
     if (approval.decision !== null) {

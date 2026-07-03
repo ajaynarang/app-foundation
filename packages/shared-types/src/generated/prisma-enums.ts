@@ -14,11 +14,6 @@
  */
 import { z } from 'zod';
 
-// AddOnRequestStatus
-export const AddOnRequestStatusSchema = z.enum(['PENDING', 'APPROVED', 'DECLINED'] as const);
-export type AddOnRequestStatus = z.infer<typeof AddOnRequestStatusSchema>;
-export const AddOnRequestStatus = AddOnRequestStatusSchema.enum;
-
 // AiInvocationStatus
 export const AiInvocationStatusSchema = z.enum(['OK', 'ERROR', 'TIMEOUT', 'RATE_LIMITED', 'BUDGET_BLOCKED'] as const);
 export type AiInvocationStatus = z.infer<typeof AiInvocationStatusSchema>;
@@ -73,11 +68,6 @@ export const DeskEpisodeStepKind = DeskEpisodeStepKindSchema.enum;
 export const DeskEpisodeStepStatusSchema = z.enum(['RUNNING', 'SUCCEEDED', 'FAILED', 'GATED', 'SKIPPED'] as const);
 export type DeskEpisodeStepStatus = z.infer<typeof DeskEpisodeStepStatusSchema>;
 export const DeskEpisodeStepStatus = DeskEpisodeStepStatusSchema.enum;
-
-// DocumentStatus
-export const DocumentStatusSchema = z.enum(['PENDING_UPLOAD', 'CONFIRMED', 'EXPIRED', 'DELETED'] as const);
-export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
-export const DocumentStatus = DocumentStatusSchema.enum;
 
 // FeedbackStatus
 export const FeedbackStatusSchema = z.enum(['NEW', 'REVIEWED', 'RESOLVED'] as const);
