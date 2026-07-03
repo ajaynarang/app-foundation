@@ -1,5 +1,5 @@
 import type { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 import type { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { ModerationService } from '../../moderation/moderation.service';
 import type { CardAccumulator } from '../../mcp/mcp-tool.service';

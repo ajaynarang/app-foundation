@@ -1,4 +1,4 @@
-import { DeskEpisodeStepKind } from '@prisma/client';
+import { DeskEpisodeStepKind } from '@appshore/db';
 import { scopeTier } from '@app/shared-types';
 
 import { nestApp } from '../core/inngest/nest-context';

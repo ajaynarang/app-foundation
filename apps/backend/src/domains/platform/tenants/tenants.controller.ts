@@ -7,7 +7,7 @@ import { SuspendTenantDto } from './dto/suspend-tenant.dto';
 import { UpdateOrganizationProfileDto } from './dto/update-organization-profile.dto';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { BaseTenantController } from '../../../shared/base/base-tenant.controller';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';

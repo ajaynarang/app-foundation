@@ -14,7 +14,7 @@
  * Or skip in unit test runs by default (describe.skip when no DATABASE_URL).
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@appshore/db';
 
 /**
  * This integration test requires a direct PostgreSQL connection via PrismaClient

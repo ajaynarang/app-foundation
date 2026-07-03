@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@appshore/db';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';

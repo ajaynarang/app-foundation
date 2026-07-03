@@ -1,5 +1,5 @@
 import { IsString, IsEmail, IsNotEmpty, IsEnum, IsOptional, IsNumber, Matches, Length } from 'class-validator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 export class InviteUserDto {
   @IsOptional()

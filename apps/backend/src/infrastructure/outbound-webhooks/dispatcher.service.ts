@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 import { randomUUID } from 'crypto';
 import { DomainEvent } from '../events/domain-event';
 import { getEventDefinition } from '../events/event-registry';

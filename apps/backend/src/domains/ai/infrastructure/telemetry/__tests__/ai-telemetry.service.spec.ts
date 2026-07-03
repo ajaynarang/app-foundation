@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';

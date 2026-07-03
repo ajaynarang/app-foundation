@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { Tenant } from '@prisma/client';
+import { Tenant } from '@appshore/db';
 
 /**
  * Base controller providing tenant-related utilities.

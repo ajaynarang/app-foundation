@@ -1,5 +1,5 @@
 import { IsEnum, IsString, IsOptional, IsObject } from 'class-validator';
-import { IntegrationType, IntegrationVendor } from '@prisma/client';
+import { IntegrationType, IntegrationVendor } from '@appshore/db';
 
 export { IntegrationType, IntegrationVendor };
 

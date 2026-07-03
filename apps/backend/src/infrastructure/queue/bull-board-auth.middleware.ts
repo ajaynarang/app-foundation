@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 @Injectable()
 export class BullBoardAuthMiddleware implements NestMiddleware {

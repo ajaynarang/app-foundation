@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { TenantPlan } from '@prisma/client';
+import { TenantPlan } from '@appshore/db';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M, CACHE_TTL_COLD_10M } from '../../../constants/cache.constants';

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { DeskEpisodeStepKind } from '@prisma/client';
+import { DeskEpisodeStepKind } from '@appshore/db';
 
 import { nestApp } from '../core/inngest/nest-context';
 import { DeskStepWriter } from '../core/episode/desk-step-writer.service';

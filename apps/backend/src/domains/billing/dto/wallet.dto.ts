@@ -1,6 +1,6 @@
 import { IsInt, IsOptional, IsBoolean, IsString, IsEnum, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { WalletTransactionType } from '@prisma/client';
+import { WalletTransactionType } from '@appshore/db';
 
 export class TopUpWalletDto {
   @IsInt()

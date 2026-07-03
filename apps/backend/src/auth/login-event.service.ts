@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LoginFailReason } from '@prisma/client';
+import { LoginFailReason } from '@appshore/db';
 import { createHash } from 'crypto';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 

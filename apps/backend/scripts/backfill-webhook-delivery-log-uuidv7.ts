@@ -5,7 +5,7 @@
  * row count > 10M, see the plan for the chunked-backfill template.
  */
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { uuidv7FromTimestamp } from '../src/shared/utils/uuidv7';

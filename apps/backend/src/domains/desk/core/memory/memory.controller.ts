@@ -15,7 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { ListMemoriesQuerySchema } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';

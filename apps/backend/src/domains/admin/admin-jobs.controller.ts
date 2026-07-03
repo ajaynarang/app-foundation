@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { JobStatus, UserRole } from '@prisma/client';
+import { JobStatus, UserRole } from '@appshore/db';
 import { JobStatusSchema } from '@app/shared-types';
 import { JobService } from '../../infrastructure/queue/job.service';
 import { ALL_CATEGORIES, JOB_CATEGORIES } from '../../infrastructure/queue/job.types';

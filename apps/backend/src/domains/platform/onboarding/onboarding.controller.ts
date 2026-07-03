@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../../auth/guards/roles.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { TenantDbId } from '../../../auth/decorators/tenant-db-id.decorator';
 import { OnboardingStatusResponse } from './dto/onboarding-status.dto';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';

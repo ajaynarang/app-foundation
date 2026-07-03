@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 import { getEventDefinition } from '../../infrastructure/events/event-registry';
 
 export interface ListEventsFilters {

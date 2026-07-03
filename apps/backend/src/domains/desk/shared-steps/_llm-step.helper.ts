@@ -1,8 +1,8 @@
-import type { DeskEpisodeStepKind } from '@prisma/client';
+import type { DeskEpisodeStepKind } from '@appshore/db';
 import type { ZodSchema } from 'zod';
 import type { ModelAlias } from '@app/shared-types';
 
-import { AiSurface } from '@prisma/client';
+import { AiSurface } from '@appshore/db';
 
 import { StructuredOutputService } from '../../ai/infrastructure/providers/structured-output.service';
 import { AI_LINK_REF_TYPES } from '../../ai/infrastructure/telemetry/ai-telemetry.constants';

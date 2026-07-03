@@ -1,7 +1,7 @@
 /**
  * Codegen: Prisma enums → @app/shared-types Zod mirrors.
  *
- * Reads `apps/backend/prisma/schema.prisma`, finds every `enum X { ... }`
+ * Reads every `packages/foundation/db/prisma/schema/*.prisma` file, finds every `enum X { ... }`
  * block, and writes `packages/shared-types/src/generated/prisma-enums.ts`
  * with a matching `z.enum([...])` schema, an inferred TypeScript type,
  * and a value-bag const for ergonomic member access.
@@ -19,18 +19,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SCHEMA_PATH = path.resolve(__dirname, '..', 'prisma', 'schema.prisma');
-const OUTPUT_PATH = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'packages',
-  'shared-types',
-  'src',
-  'generated',
-  'prisma-enums.ts',
-);
+const SCHEMA_DIR = path.resolve(__dirname, '..', 'prisma', 'schema');
+const OUTPUT_PATH = path.resolve(__dirname, '..', '..', '..', 'shared-types', 'src', 'generated', 'prisma-enums.ts');
 
 interface PrismaEnum {
   name: string;
@@ -61,11 +51,11 @@ function emit(enums: PrismaEnum[]): string {
 /**
  * AUTO-GENERATED — do not edit by hand.
  *
- * Run \`pnpm prisma:generate\` from \`apps/backend\` to regenerate from
- * \`prisma/schema.prisma\`.
+ * Run \`pnpm --filter @appshore/db prisma:generate\` to regenerate from
+ * \`packages/foundation/db/prisma/schema/*.prisma\`.
  *
- * Source:    apps/backend/prisma/schema.prisma
- * Generator: apps/backend/scripts/generate-shared-enums.ts
+ * Source:    packages/foundation/db/prisma/schema/*.prisma
+ * Generator: packages/foundation/db/scripts/generate-shared-enums.ts
  *
  * CI guarantees this file stays in sync via
  * apps/backend/src/architecture/enum-codegen-parity.spec.ts — it
@@ -85,7 +75,12 @@ export const ${e.name} = ${e.name}Schema.enum;`;
 }
 
 function main(): void {
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  const schema = fs
+    .readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.prisma'))
+    .sort()
+    .map((f) => fs.readFileSync(path.join(SCHEMA_DIR, f), 'utf8'))
+    .join('\n');
   const enums = parseEnums(schema);
   const output = emit(enums);
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });

@@ -7,7 +7,7 @@ import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { generateId } from '../../../shared/utils/id-generator';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
-import { Prisma, TenantPlan, TenantStatus } from '@prisma/client';
+import { Prisma, TenantPlan, TenantStatus } from '@appshore/db';
 import {
   DEFAULT_TENANT_TIMEZONE,
   type OrganizationProfile,

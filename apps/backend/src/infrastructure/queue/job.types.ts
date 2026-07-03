@@ -104,7 +104,7 @@ export interface JobMetrics {
 }
 
 export interface PaginatedJobs {
-  items: import('@prisma/client').Job[];
+  items: import('@appshore/db').Job[];
   total: number;
   limit: number;
   offset: number;

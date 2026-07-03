@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Lifecycle, type Prisma } from '@prisma/client';
+import { Lifecycle, type Prisma } from '@appshore/db';
 import {
   OPEN_EPISODE_STATUSES,
   type DeskResponsibilityDetail,

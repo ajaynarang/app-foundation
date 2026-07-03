@@ -56,7 +56,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Prepare reports dir
         run: mkdir -p tests/reports

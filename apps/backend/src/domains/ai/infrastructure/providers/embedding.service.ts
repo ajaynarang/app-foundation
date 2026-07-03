@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiInvocationStatus } from '@prisma/client';
+import { AiInvocationStatus } from '@appshore/db';
 import { embed, embedMany } from 'ai';
 import type { AiCallContext } from '@app/shared-types';
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AiSurface } from '@prisma/client';
+import type { AiSurface } from '@appshore/db';
 
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import type {

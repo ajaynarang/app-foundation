@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 import { PrismaService } from '../database/prisma.service';
 import { randomBytes } from 'crypto';
 import { assertSafeWebhookUrl } from './webhook-url.validator';

@@ -1,0 +1,11 @@
+// ---------------------------------------------------------------------------
+// YOUR DOMAIN MODELS — the app extension point.
+//
+// The foundation schema (foundation.prisma) is AppShore-owned: tenants, users,
+// auth, plans, billing, AI, jobs. Add your product's models HERE, in this
+// file (or add sibling *.prisma files — Prisma composes every file in this
+// folder into one schema).
+//
+// After editing:  pnpm --filter @appshore/db prisma:generate
+// New migration:  pnpm --filter @appshore/db prisma:migrate
+// ---------------------------------------------------------------------------

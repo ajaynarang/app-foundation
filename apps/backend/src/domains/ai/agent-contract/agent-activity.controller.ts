@@ -1,6 +1,6 @@
 import { Controller, Get, Query, ParseIntPipe, DefaultValuePipe, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { BaseTenantController } from '../../../shared/base/base-tenant.controller';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Roles } from '../../../auth/decorators/roles.decorator';

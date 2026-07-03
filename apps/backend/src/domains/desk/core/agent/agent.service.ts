@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import {
   OPEN_EPISODE_STATUSES,
   type AgentActivityStats,

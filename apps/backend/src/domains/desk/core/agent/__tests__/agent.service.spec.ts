@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';

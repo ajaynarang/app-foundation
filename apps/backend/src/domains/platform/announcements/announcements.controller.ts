@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe } from '
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { AnnouncementStatus, UserRole } from '@prisma/client';
+import { AnnouncementStatus, UserRole } from '@appshore/db';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';

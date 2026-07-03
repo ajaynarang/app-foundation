@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ApprovalDecision, DeskEpisodeStatus, DeskEpisodeStepKind, Prisma, UserRole } from '@prisma/client';
+import { ApprovalDecision, DeskEpisodeStatus, DeskEpisodeStepKind, Prisma, UserRole } from '@appshore/db';
 import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '../types';
 import { DateTime } from 'luxon';
 

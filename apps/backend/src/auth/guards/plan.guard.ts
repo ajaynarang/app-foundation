@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PlansService } from '../../domains/platform/plans/plans.service';
 import { FeatureFlagsService } from '../../domains/platform/feature-flags/feature-flags.service';
 import { FEATURE_KEY } from '../decorators/require-feature.decorator';
-import { TenantPlan } from '@prisma/client';
+import { TenantPlan } from '@appshore/db';
 import { Configuration } from '../../config/configuration';
 
 @Injectable()

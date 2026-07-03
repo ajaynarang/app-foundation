@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { MemoryPolarity, MemoryScope } from '@prisma/client';
+import type { MemoryPolarity, MemoryScope } from '@appshore/db';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../../responsibilities';

@@ -6,7 +6,7 @@
  * Local DB is the source of truth for invoice history and display.
  */
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BillingInvoiceStatus } from '@prisma/client';
+import { BillingInvoiceStatus } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';

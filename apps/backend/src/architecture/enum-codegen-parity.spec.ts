@@ -6,7 +6,7 @@ import * as path from 'path';
  * Codegen parity guardrail.
  *
  * The generated `packages/shared-types/src/generated/prisma-enums.ts`
- * file MUST stay in sync with `apps/backend/prisma/schema.prisma`.
+ * file MUST stay in sync with `packages/foundation/db/prisma/schema/*.prisma`.
  * If anyone edits the schema without running `pnpm prisma:generate`
  * (which chains the codegen script), this test fails CI — preventing
  * the drift class that produced the April-28 incident.
@@ -19,9 +19,9 @@ describe('Prisma → shared-types enum codegen parity', () => {
   // From apps/backend/src/architecture/ → repo root is 4 levels up.
   const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
   const generatedPath = path.join(repoRoot, 'packages', 'shared-types', 'src', 'generated', 'prisma-enums.ts');
-  const codegenScript = path.join(repoRoot, 'apps', 'backend', 'scripts', 'generate-shared-enums.ts');
+  const codegenScript = path.join(repoRoot, 'packages', 'foundation', 'db', 'scripts', 'generate-shared-enums.ts');
 
-  it('committed prisma-enums.ts is in sync with schema.prisma', () => {
+  it('committed prisma-enums.ts is in sync with the prisma schema', () => {
     const committed = fs.readFileSync(generatedPath, 'utf8');
 
     // Stash the committed file, regenerate, compare, restore.
@@ -39,8 +39,8 @@ describe('Prisma → shared-types enum codegen parity', () => {
         // Restore so the test doesn't leave a dirty checkout.
         fs.copyFileSync(tmpBackup, generatedPath);
         const message = [
-          'Generated prisma-enums.ts is out of sync with schema.prisma.',
-          'Run `pnpm prisma:generate` from apps/backend and commit the regenerated file.',
+          'Generated prisma-enums.ts is out of sync with the prisma schema.',
+          'Run `pnpm --filter @appshore/db prisma:generate` and commit the regenerated file.',
         ].join('\n');
         throw new Error(message);
       }

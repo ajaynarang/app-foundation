@@ -64,7 +64,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Lint
         run: pnpm --filter=backend lint
@@ -112,7 +112,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Lint
         run: pnpm --filter=@app/web lint

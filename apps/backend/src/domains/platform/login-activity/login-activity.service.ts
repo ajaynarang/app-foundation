@@ -1,5 +1,5 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { Prisma, LoginEventStatus, type UserRole } from '@prisma/client';
+import { Prisma, LoginEventStatus, type UserRole } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import type {

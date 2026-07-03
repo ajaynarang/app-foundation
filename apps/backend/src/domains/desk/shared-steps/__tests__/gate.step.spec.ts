@@ -1,4 +1,4 @@
-import { DeskEpisodeStepKind } from '@prisma/client';
+import { DeskEpisodeStepKind } from '@appshore/db';
 
 // nestApp() needs a live Nest container; replace it with a fake that
 // returns our per-test service mocks.

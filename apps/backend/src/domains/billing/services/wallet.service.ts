@@ -10,7 +10,7 @@
  * - All transactions are immutable audit records
  */
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { WalletTransactionType } from '@prisma/client';
+import { WalletTransactionType } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 

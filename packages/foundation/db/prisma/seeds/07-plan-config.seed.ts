@@ -1,4 +1,4 @@
-import { PrismaClient, TenantPlan } from '@prisma/client';
+import { PrismaClient, TenantPlan } from '../../generated/client';
 
 const planConfigs = [
   {

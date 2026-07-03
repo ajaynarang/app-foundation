@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { TenantPlan, TenantStatus } from '@prisma/client';
+import { TenantPlan, TenantStatus } from '@appshore/db';
 import { TenantAddOnStatusEnum } from '@app/shared-types';
 import { generateUuidV7 } from '../../../shared/utils/uuidv7';
 import type { QueueJobHandler } from '../../../infrastructure/queue/job-handler.contract';

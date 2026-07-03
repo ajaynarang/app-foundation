@@ -2,11 +2,11 @@
 /**
  * AUTO-GENERATED — do not edit by hand.
  *
- * Run `pnpm prisma:generate` from `apps/backend` to regenerate from
- * `prisma/schema.prisma`.
+ * Run `pnpm --filter @appshore/db prisma:generate` to regenerate from
+ * `packages/foundation/db/prisma/schema/*.prisma`.
  *
- * Source:    apps/backend/prisma/schema.prisma
- * Generator: apps/backend/scripts/generate-shared-enums.ts
+ * Source:    packages/foundation/db/prisma/schema/*.prisma
+ * Generator: packages/foundation/db/scripts/generate-shared-enums.ts
  *
  * CI guarantees this file stays in sync via
  * apps/backend/src/architecture/enum-codegen-parity.spec.ts — it

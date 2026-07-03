@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsInt, IsEnum, IsUrl, IsBoolean, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { TenantPlan } from '@prisma/client';
+import { TenantPlan } from '@appshore/db';
 
 export class CreateCheckoutDto {
   @IsEnum(TenantPlan)

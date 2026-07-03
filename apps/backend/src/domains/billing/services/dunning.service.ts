@@ -9,7 +9,7 @@
  * 3. After max retries -> suspend tenant (restricts platform access)
  */
 import { Injectable, Logger } from '@nestjs/common';
-import { BillingSubscriptionStatus, TenantPlan } from '@prisma/client';
+import { BillingSubscriptionStatus, TenantPlan } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PlansService } from '../../platform/plans/plans.service';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';

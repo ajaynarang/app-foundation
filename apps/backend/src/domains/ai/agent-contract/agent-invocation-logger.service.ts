@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma, AgentInvocationLog } from '@prisma/client';
+import { Prisma, AgentInvocationLog } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
 import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';

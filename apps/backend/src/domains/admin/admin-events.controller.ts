@@ -1,7 +1,7 @@
 import { Controller, Get, Logger, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { AdminEventsService } from './admin-events.service';
 
 @Controller('admin/events')

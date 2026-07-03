@@ -1,4 +1,4 @@
-import type { MemoryPolarity, MemoryScope } from '@prisma/client';
+import type { MemoryPolarity, MemoryScope } from '@appshore/db';
 
 /**
  * Reinforcement contract — per-responsibility verdict on a single memory

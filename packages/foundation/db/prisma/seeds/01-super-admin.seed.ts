@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 import * as admin from 'firebase-admin';
 
 // No hardcoded fallback: a publicly-known default password must never be used

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LoginFailReason } from '@prisma/client';
+import { LoginFailReason } from '@appshore/db';
 import { LoginEventService } from '../login-event.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 
 /**
  * Feature flags — operational kill-switches for every platform feature key.

@@ -16,7 +16,14 @@ import * as path from 'path';
  * removed from the allow-list as part of the same PR.
  */
 
-const SCHEMA_PATH = path.resolve(__dirname, '..', '..', 'prisma', 'schema.prisma');
+const SCHEMA_DIR = path.resolve(__dirname, '..', '..', '..', '..', 'packages', 'foundation', 'db', 'prisma', 'schema');
+const readSchema = (): string =>
+  fs
+    .readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.prisma'))
+    .sort()
+    .map((f) => fs.readFileSync(path.join(SCHEMA_DIR, f), 'utf8'))
+    .join('\n');
 
 const ENUM_SHAPED_COLUMN_NAMES = [
   'status',
@@ -115,7 +122,7 @@ describe('Prisma schema enum conventions', () => {
   let schema: string;
 
   beforeAll(() => {
-    schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+    schema = readSchema();
   });
 
   it('every enum-shaped column is a Prisma enum (or in ALLOWED_STRING_COLUMNS)', () => {

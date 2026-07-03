@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';

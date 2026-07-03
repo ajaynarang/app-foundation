@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DeskEpisodeStatus, Prisma } from '@prisma/client';
+import { DeskEpisodeStatus, Prisma } from '@appshore/db';
 import {
   HANDLED_EPISODE_STATUSES,
   NEEDS_YOU_EPISODE_STATUSES,

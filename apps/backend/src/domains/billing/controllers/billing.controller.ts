@@ -5,7 +5,7 @@
  * wallet operations, invoices, and payment methods.
  */
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { TenantDbId } from '../../../auth/decorators/tenant-db-id.decorator';

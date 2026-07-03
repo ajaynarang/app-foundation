@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiInvocationStatus } from '@prisma/client';
+import { AiInvocationStatus } from '@appshore/db';
 import { generateText, Output, type LanguageModel } from 'ai';
 import type { ZodSchema } from 'zod';
 import type { AiCallContext, ModelAlias } from '@app/shared-types';

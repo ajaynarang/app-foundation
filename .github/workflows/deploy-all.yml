@@ -91,7 +91,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Unit tests
         run: pnpm --filter=backend test
@@ -162,7 +162,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -290,7 +290,7 @@ jobs:
           TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
 
           # Resolve any previously failed migrations before deploying
-          cd apps/backend
+          cd packages/foundation/db
           FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
           if [ -n "$FAILED_MIGRATIONS" ]; then
             echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"
@@ -429,7 +429,7 @@ jobs:
         run: pnpm --filter=shared-types build
 
       - name: Generate Prisma client
-        run: pnpm --filter=backend exec prisma generate
+        run: pnpm --filter @appshore/db prisma:generate
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -552,7 +552,7 @@ jobs:
           TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
 
           # Resolve any previously failed migrations before deploying
-          cd apps/backend
+          cd packages/foundation/db
           FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
           if [ -n "$FAILED_MIGRATIONS" ]; then
             echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"

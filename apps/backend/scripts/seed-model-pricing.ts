@@ -12,7 +12,7 @@
  */
 import * as dotenv from 'dotenv';
 import pg from 'pg';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 import { seed } from '../prisma/seeds/14-model-pricing.seed';

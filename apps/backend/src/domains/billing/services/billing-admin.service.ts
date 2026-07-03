@@ -6,7 +6,7 @@
  * manual suspension/reactivation, and revenue analytics.
  */
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { BillingProviderType, BillingSubscriptionStatus, TenantPlan } from '@prisma/client';
+import { BillingProviderType, BillingSubscriptionStatus, TenantPlan } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PlansService } from '../../platform/plans/plans.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';

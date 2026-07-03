@@ -13,7 +13,7 @@ import * as crypto from 'crypto';
 import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { VoiceService } from './voice.service';
 import { VoiceTokenDto } from './dto/voice-token.dto';

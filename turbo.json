@@ -50,6 +50,10 @@
     },
     "clean": {
       "cache": false
+    },
+    "@appshore/db#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "generated/**"]
     }
   }
 }

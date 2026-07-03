@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 
 /**
  * Model pricing catalog — per-million-token rates for every provider/model

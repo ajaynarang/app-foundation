@@ -3,7 +3,7 @@ import { SuperAdminPreferencesService } from './super-admin-preferences.service'
 import { UpdateSuperAdminPreferencesDto } from './dto/super-admin-preferences.dto';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 @Controller('settings/admin')
 export class SuperAdminPreferencesController {

@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { BaseTenantController } from '../../../shared/base/base-tenant.controller';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { ConfigService } from '@nestjs/config';

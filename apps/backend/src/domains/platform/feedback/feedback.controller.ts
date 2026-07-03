@@ -4,7 +4,7 @@ import { FeedbackService } from './feedback.service';
 import { CreateFeedbackDto } from './dto';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 @ApiTags('Feedback')
 @Controller('feedback')

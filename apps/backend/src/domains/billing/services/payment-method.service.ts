@@ -5,7 +5,7 @@
  * Syncs with the payment provider and maintains local records.
  */
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PaymentMethodType } from '@prisma/client';
+import { PaymentMethodType } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 

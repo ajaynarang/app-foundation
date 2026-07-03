@@ -3,7 +3,7 @@ import { PlansService } from './plans.service';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { UserRole, TenantPlan } from '@prisma/client';
+import { UserRole, TenantPlan } from '@appshore/db';
 import { UpdatePlanConfigDto } from './dto/update-plan-config.dto';
 import { ToggleEntitlementDto } from './dto/toggle-entitlement.dto';
 

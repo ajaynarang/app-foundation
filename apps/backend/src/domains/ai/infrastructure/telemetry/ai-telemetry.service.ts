@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import type { AiInvocation, ModelPricing, TenantAiBudget } from '@prisma/client';
+import { Prisma } from '@appshore/db';
+import type { AiInvocation, ModelPricing, TenantAiBudget } from '@appshore/db';
 import type { AiBudgetState, AiCallContext, AiUsage } from '@app/shared-types';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';

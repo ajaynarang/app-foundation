@@ -5,7 +5,7 @@
  * All routes require SUPER_ADMIN role.
  */
 import { Controller, Get, Post, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { BillingAdminService } from '../services/billing-admin.service';

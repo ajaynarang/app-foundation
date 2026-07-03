@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import type { JobStatus } from '@prisma/client';
+import type { JobStatus } from '@appshore/db';
 import { PrismaService } from '../database/prisma.service';
 import { buildDateRangeFilter } from '../../shared/utils/date-range';
 import {

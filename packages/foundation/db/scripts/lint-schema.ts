@@ -3,7 +3,7 @@
  * See .claude/skills/app-backend-patterns/id-convention.md
  *     .claude/skills/app-backend-patterns/column-naming.md
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 
 export interface LintViolation {
@@ -197,8 +197,12 @@ function parseModelBlocks(text: string): ParsedModel[] {
 }
 
 if (require.main === module) {
-  const schemaPath = resolve(process.cwd(), 'prisma/schema.prisma');
-  const text = readFileSync(schemaPath, 'utf8');
+  const schemaDir = resolve(process.cwd(), 'prisma/schema');
+  const text = readdirSync(schemaDir)
+    .filter((f) => f.endsWith('.prisma'))
+    .sort()
+    .map((f) => readFileSync(resolve(schemaDir, f), 'utf8'))
+    .join('\n');
   const allowlistPath = resolve(process.cwd(), 'scripts/lint-schema.allowlist');
   let allowlist: string[] = [];
   try {

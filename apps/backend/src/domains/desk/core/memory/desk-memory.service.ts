@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { MemoryPolarity, MemoryScope, Prisma } from '@prisma/client';
+import { MemoryPolarity, MemoryScope, Prisma } from '@appshore/db';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { EmbeddingService } from '../../../ai/infrastructure/providers/embedding.service';

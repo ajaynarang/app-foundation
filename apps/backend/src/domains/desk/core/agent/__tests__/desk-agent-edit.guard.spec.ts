@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import type { ExecutionContext } from '@nestjs/common';
 
 import { PrismaService } from '../../../../../infrastructure/database/prisma.service';

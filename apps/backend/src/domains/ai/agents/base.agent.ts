@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { AiInvocationStatus, AiSurface } from '@prisma/client';
+import { AiInvocationStatus, AiSurface } from '@appshore/db';
 
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';

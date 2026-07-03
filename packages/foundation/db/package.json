@@ -12,23 +12,51 @@
   },
   "typesVersions": {
     "*": {
+      "dist/*": [
+        "dist/*"
+      ],
       "*": [
         "dist/*"
       ]
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "jest --passWithNoTests",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "// — Prisma": "",
+    "prisma:generate": "prisma generate && tsx scripts/generate-shared-enums.ts",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:status": "prisma migrate status",
+    "prisma:studio": "prisma studio",
+    "lint:schema": "tsx scripts/lint-schema.ts",
+    "// — Database (seed, reset, push)": "",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "db:push": "prisma db push",
+    "setup:base": "ts-node prisma/seeds/index.ts",
+    "setup:reset": "prisma migrate reset --force && ts-node prisma/seeds/index.ts",
+    "setup:status": "ts-node prisma/seeds/index.ts --status"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@prisma/adapter-pg": "7.3.0",
+    "@prisma/client": "7.3.0",
+    "dotenv": "17.2.3",
+    "pg": "8.17.2"
+  },
   "devDependencies": {
     "@types/jest": "30.0.0",
     "@types/node": "^22.10.7",
     "jest": "30.2.0",
     "ts-jest": "29.4.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "bcrypt": "6.0.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/pg": "^8.11.0",
+    "prisma": "7.3.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.0"
   }
 }

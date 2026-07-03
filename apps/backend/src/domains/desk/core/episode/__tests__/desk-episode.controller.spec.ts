@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { DeskEpisodeController } from '../desk-episode.controller';
 

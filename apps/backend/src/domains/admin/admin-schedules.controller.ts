@@ -1,7 +1,7 @@
 import { Controller, Get, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { ScheduleManagerService } from '../../infrastructure/queue/schedule-manager.service';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 

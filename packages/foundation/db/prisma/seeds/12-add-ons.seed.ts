@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/client';
 
 /**
  * Add-on catalog — purchasable add-ons.

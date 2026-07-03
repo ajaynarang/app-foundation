@@ -7,7 +7,7 @@ import { DOMAIN_EVENTS } from '../../infrastructure/events/domain-events.constan
 import { PushService } from '../../infrastructure/push/push.service';
 import { SmsService } from '../../infrastructure/sms/sms.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from '@appshore/db';
 
 interface DeliveryParams {
   recipientUserId?: string;

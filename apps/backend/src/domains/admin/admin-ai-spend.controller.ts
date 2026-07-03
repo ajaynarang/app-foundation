@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { AdminAiSpendService } from './admin-ai-spend.service';

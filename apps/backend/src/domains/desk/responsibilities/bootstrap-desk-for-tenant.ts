@@ -1,4 +1,4 @@
-import { type Prisma, type PrismaClient, UserRole } from '@prisma/client';
+import { type Prisma, type PrismaClient, UserRole } from '@appshore/db';
 
 import { RESPONSIBILITY_REGISTRY } from './index';
 

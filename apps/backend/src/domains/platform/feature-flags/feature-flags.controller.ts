@@ -4,7 +4,7 @@ import { FeatureFlagsService } from './feature-flags.service';
 import { FeatureFlagDto, FeatureFlagsResponse, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 @ApiTags('Feature Flags')
 @Controller('feature-flags')

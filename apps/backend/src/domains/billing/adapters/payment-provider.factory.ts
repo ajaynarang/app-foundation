@@ -5,7 +5,7 @@
  * Currently only Stripe is supported; add new adapters here as needed.
  */
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { BillingProviderType } from '@prisma/client';
+import { BillingProviderType } from '@appshore/db';
 import { PaymentProviderAdapter } from './payment-provider.interface';
 import { StripeAdapter } from './stripe/stripe.adapter';
 

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { JobStatus } from '@prisma/client';
+import type { JobStatus } from '@appshore/db';
 import { JobService } from '../job.service';
 import { PrismaService } from '../../database/prisma.service';
 

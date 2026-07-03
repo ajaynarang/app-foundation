@@ -2,7 +2,7 @@ import { Controller, Get, Post, Delete, Body, Param, Patch } from '@nestjs/commo
 import { UsersService } from './users.service';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 

@@ -16,7 +16,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { IntegrationsService } from './integrations.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';

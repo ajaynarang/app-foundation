@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe } from '
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { FeedbackService } from './feedback.service';
 import { ListFeedbackQueryDto, ResolveFeedbackDto, UpdateStatusDto, UpdateCategoryDto } from './dto';
 

@@ -12,6 +12,9 @@ ARG CACHEBUST=1
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/foundation/db/package.json ./packages/foundation/db/
+COPY packages/foundation/kernel/package.json ./packages/foundation/kernel/
+COPY packages/foundation/platform/package.json ./packages/foundation/platform/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
@@ -37,18 +40,25 @@ COPY apps/backend ./apps/backend
 WORKDIR /workspace/packages/shared-types
 RUN pnpm run build
 
-# Generate Prisma client and build backend
-WORKDIR /workspace/apps/backend
+# Generate Prisma client + build the foundation packages (kernel ← db ← platform)
+WORKDIR /workspace/packages/foundation/db
 RUN pnpm exec prisma generate
+RUN pnpm exec tsc -p tsconfig.build.json
+WORKDIR /workspace/packages/foundation/kernel
+RUN pnpm run build
+WORKDIR /workspace/packages/foundation/platform
+RUN pnpm run build
+
+# Build backend
+WORKDIR /workspace/apps/backend
 RUN pnpm run build
 
 # Use pnpm deploy to create a self-contained production bundle (no symlinks)
 WORKDIR /workspace
 RUN pnpm --filter @app/backend deploy /production --prod
 
-# Copy Prisma client into the production bundle
-RUN cp -r /workspace/node_modules/.pnpm/@prisma+client*/node_modules/.prisma /production/node_modules/.prisma 2>/dev/null || true
-RUN cp -r /workspace/node_modules/.pnpm/@prisma+client*/node_modules/@prisma /production/node_modules/@prisma 2>/dev/null || true
+# The generated Prisma client ships inside @appshore/db (generated/client),
+# which pnpm deploy bundles into /production/node_modules/@appshore/db.
 
 # Copy shared-types built output into production node_modules
 RUN rm -rf /production/node_modules/@app/shared-types && \
@@ -78,8 +88,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /production/node_modules ./node_modules
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/content ./content
-COPY --from=builder /workspace/apps/backend/prisma ./prisma
-COPY --from=builder /workspace/apps/backend/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /workspace/packages/foundation/db/prisma ./prisma
+COPY --from=builder /workspace/packages/foundation/db/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /workspace/apps/backend/package.json ./
 
 # Health check

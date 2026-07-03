@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 

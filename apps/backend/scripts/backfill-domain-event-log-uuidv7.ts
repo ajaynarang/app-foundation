@@ -7,7 +7,7 @@
  * chunked-backfill template from the plan.
  */
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { uuidv7FromTimestamp } from '../src/shared/utils/uuidv7';

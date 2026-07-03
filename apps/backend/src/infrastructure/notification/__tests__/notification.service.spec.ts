@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationService } from '../notification.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { EmailService } from '../services/email.service';
-import { NotificationType, NotificationStatus } from '@prisma/client';
+import { NotificationType, NotificationStatus } from '@appshore/db';
 
 describe('NotificationService', () => {
   let service: NotificationService;

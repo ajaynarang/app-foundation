@@ -1,13 +1,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SCHEMA_PATH = path.join(__dirname, '..', '..', 'prisma', 'schema.prisma');
+const SCHEMA_DIR = path.join(__dirname, '..', '..', '..', '..', 'packages', 'foundation', 'db', 'prisma', 'schema');
+const readSchema = (): string =>
+  fs
+    .readdirSync(SCHEMA_DIR)
+    .filter((f) => f.endsWith('.prisma'))
+    .sort()
+    .map((f) => fs.readFileSync(path.join(SCHEMA_DIR, f), 'utf8'))
+    .join('\n');
 
 describe('Prisma schema conventions', () => {
   let schema: string;
 
   beforeAll(() => {
-    schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+    schema = readSchema();
   });
 
   describe('status columns', () => {

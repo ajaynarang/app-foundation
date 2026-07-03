@@ -1,4 +1,4 @@
-import { DeskEpisodeStepKind } from '@prisma/client';
+import { DeskEpisodeStepKind } from '@appshore/db';
 import type { AgentScope } from '@app/shared-types';
 import { scopeTier } from '@app/shared-types';
 

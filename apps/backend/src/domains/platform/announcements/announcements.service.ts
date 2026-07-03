@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AnnouncementStatus } from '@prisma/client';
+import { AnnouncementStatus } from '@appshore/db';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { buildKey } from '../../../infrastructure/cache/cache-key.constants';

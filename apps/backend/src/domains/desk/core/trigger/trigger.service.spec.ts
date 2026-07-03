@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@appshore/db';
 
 import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
 

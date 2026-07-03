@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../generated/client';
 
 /**
  * Desk seed — generic, domain-free starter.

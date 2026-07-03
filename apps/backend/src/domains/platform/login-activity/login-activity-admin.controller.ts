@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { LoginActivityService } from './login-activity.service';
 import { ListLoginActivityQueryDto } from './dto/list-login-activity.query.dto';

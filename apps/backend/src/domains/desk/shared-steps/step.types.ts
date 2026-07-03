@@ -1,4 +1,4 @@
-import type { MemoryPolarity, MemoryScope } from '@prisma/client';
+import type { MemoryPolarity, MemoryScope } from '@appshore/db';
 
 /**
  * Generic I/O shapes for the shared Desk step engine (gate / execute /

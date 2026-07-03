@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Body, BadRequestException, Logger } from '@nestjs/common';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { CACHE_NAMESPACES, CacheNamespace } from '../../constants/cache.constants';
 

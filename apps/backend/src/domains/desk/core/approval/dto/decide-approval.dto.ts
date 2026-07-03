@@ -1,4 +1,4 @@
-import { ApprovalDecision } from '@prisma/client';
+import { ApprovalDecision } from '@appshore/db';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsObject, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 

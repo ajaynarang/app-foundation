@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum } from 'class-validator';
-import { NotificationType, NotificationStatus } from '@prisma/client';
+import { NotificationType, NotificationStatus } from '@appshore/db';
 
 export class NotificationFiltersDto {
   @IsOptional()

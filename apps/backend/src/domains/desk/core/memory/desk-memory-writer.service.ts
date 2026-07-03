@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiSurface, MemoryPolarity, MemoryScope, Prisma } from '@prisma/client';
+import { AiSurface, MemoryPolarity, MemoryScope, Prisma } from '@appshore/db';
 import { type AiCallContext } from '@app/shared-types';
 import { MemoryExtractSchema } from '../types';
 

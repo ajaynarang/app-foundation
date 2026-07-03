@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, Body, Req, Res, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AssistantAiService } from './assistant.service';
 import { AgentRegistry } from '../agents/agent.registry';

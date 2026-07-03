@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '../types';
 
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';

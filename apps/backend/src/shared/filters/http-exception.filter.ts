@@ -1,5 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@appshore/db';
 import { Request, Response } from 'express';
 import { isSilentPath } from '../../infrastructure/logging/log-filter';
 

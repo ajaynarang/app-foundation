@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 
 import { DeskAgentController } from '../agent.controller';
 

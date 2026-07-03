@@ -30,6 +30,7 @@ RDS_PORT="5432"
 TUNNEL_PORT="5433"
 PREFERRED_CONTAINER="worker"
 BACKEND_DIR="$(cd "$TOOLS_DIR/../apps/backend" && pwd)"
+DB_PKG_DIR="$(cd "$TOOLS_DIR/../packages/foundation/db" && pwd)"
 
 # Local DB config (from apps/backend/.env)
 LOCAL_DB_URL="postgresql://app_user:app_password@localhost:5432/app"
@@ -131,7 +132,7 @@ else
 fi
 
 # --- cd into backend once (all commands run from here) ---
-cd "$BACKEND_DIR"
+cd "$DB_PKG_DIR"
 
 # --- Cleanup handler ---
 cleanup() {
@@ -383,10 +384,11 @@ run_seed_langfuse() {
   fi
 
   local exit_code=0
-  LANGFUSE_SECRET_KEY="$secret_key" \
-  LANGFUSE_PUBLIC_KEY="$public_key" \
-  LANGFUSE_BASE_URL="$base_url" \
-    npx tsx scripts/seed-langfuse-prompts.ts 2>&1 || exit_code=$?
+  (cd "$BACKEND_DIR" &&
+    LANGFUSE_SECRET_KEY="$secret_key" \
+    LANGFUSE_PUBLIC_KEY="$public_key" \
+    LANGFUSE_BASE_URL="$base_url" \
+    npx tsx scripts/seed-langfuse-prompts.ts) 2>&1 || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
     echo ""

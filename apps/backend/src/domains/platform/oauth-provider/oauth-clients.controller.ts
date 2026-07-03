@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Req, HttpCode, 
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Roles } from '../../../auth/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@appshore/db';
 import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
 import type { CreateOAuthClientInput, UpdateOAuthClientInput } from '@app/shared-types';

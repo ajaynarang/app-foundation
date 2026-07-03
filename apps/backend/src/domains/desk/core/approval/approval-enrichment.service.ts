@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DeskEpisodeStepKind } from '@prisma/client';
+import { DeskEpisodeStepKind } from '@appshore/db';
 
 import type { ApprovalArtifact, ApprovalDecisionHeader } from '../types';
 

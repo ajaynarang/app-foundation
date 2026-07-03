@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DeskEpisodeStepStatus, type DeskEpisodeStepKind, type Prisma } from '@prisma/client';
+import { DeskEpisodeStepStatus, type DeskEpisodeStepKind, type Prisma } from '@appshore/db';
 
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
