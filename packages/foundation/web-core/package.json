@@ -1,0 +1,19 @@
+{
+  "name": "@appshore/web-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AppShore web foundation — api client, auth stores/providers, realtime, shared hooks/config (source-consumed via tsconfig paths)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint src/ --no-error-on-unmatched-pattern",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
