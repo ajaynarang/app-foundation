@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { Prisma } from '@appshore/db';
-import { getEventDefinition } from '../../infrastructure/events/event-registry';
+import { getEventDefinition } from '../../platform-glue/events/event-registry';
 
 export interface ListEventsFilters {
   search?: string;

@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { NOTIFICATIONS_JOB_NAMES } from '../../infrastructure/queue/queue.constants';
-import type { QueueJobHandler } from '../../infrastructure/queue/job-handler.contract';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { NOTIFICATIONS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { NotificationTriggersService } from './notification-triggers.service';
 
 /**

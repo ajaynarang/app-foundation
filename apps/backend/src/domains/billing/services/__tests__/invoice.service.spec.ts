@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { InvoiceService } from '../invoice.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../../adapters/payment-provider.factory';
 
 const mockAdapter = {

@@ -8,10 +8,10 @@ import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { InvocationPipelineService } from '../invocation-pipeline.service';
-import { fromUser } from '../agent-principal';
+import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { RequiresScope } from '../requires-scope.decorator';
 import type { AiPrismaService } from '../../rls/ai-prisma.service';
-import type { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
+import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row

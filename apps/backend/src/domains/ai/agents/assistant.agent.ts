@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
-import { PromptingService } from '../../../domains/prompting';
+import { PromptingService } from '../../prompting';
 import { AgentDefinition } from './agent.types';
 import { AbstractBaseAgent } from './base.agent';
 

@@ -1,9 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/domain-events.constants';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { ApprovalEnrichmentService } from '../../approval/approval-enrichment.service';
 import { DeskEpisodeService, pickMostRecentDecidedApproval } from '../desk-episode.service';

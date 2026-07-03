@@ -1,7 +1,7 @@
 import { UserRole } from '@appshore/db';
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { ApprovalEnrichmentService } from '../approval-enrichment.service';
 import { ApprovalService, resolveApprovalScope } from '../approval.service';

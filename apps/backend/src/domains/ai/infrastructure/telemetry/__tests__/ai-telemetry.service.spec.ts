@@ -1,10 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@appshore/db';
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
-import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/domain-events.constants';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 import { AiTelemetryService } from '../ai-telemetry.service';
 import type { AiCallContext, AiUsage } from '@app/shared-types';
 

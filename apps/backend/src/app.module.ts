@@ -3,21 +3,25 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
-import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
+import { HttpExceptionFilter } from '@appshore/platform/shared/filters/http-exception.filter';
 import configuration from './config/configuration';
-import { PrismaModule } from './infrastructure/database/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-import { TenantGuard } from './auth/guards/tenant.guard';
-import { RolesGuard } from './auth/guards/roles.guard';
-import { RequestContextMiddleware, requestContextStorage } from './infrastructure/logging/request-context.middleware';
-import { PlanGuard } from './auth/guards/plan.guard';
-import { shouldSkipRequestLog, maskUrlSecrets } from './infrastructure/logging/log-filter';
-import { getActiveTraceContext } from './infrastructure/logging/trace-context';
-import { buildPinoTransport } from './infrastructure/logging/pino-transport';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { AuthModule } from '@appshore/platform/auth/auth.module';
+import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
+import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
+import { RolesGuard } from '@appshore/platform/auth/guards/roles.guard';
+import {
+  RequestContextMiddleware,
+  requestContextStorage,
+} from '@appshore/kernel/infrastructure/logging/request-context.middleware';
+import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
+import { shouldSkipRequestLog, maskUrlSecrets } from '@appshore/kernel/infrastructure/logging/log-filter';
+import { getActiveTraceContext } from '@appshore/kernel/infrastructure/logging/trace-context';
+import { buildPinoTransport } from '@appshore/kernel/infrastructure/logging/pino-transport';
 
 // Domain Modules
-import { PlatformModule } from './domains/platform/platform.module';
+import { PlatformModule } from './platform-glue/platform.module';
+import { PlatformHooksModule } from './platform-glue/hooks.module';
 import { IntegrationsModule } from './domains/integrations/integrations.module';
 import { AiModule } from './domains/ai/ai.module';
 import { AdminJobsModule } from './domains/admin/admin-jobs.module';
@@ -27,22 +31,22 @@ import { BillingModule } from './domains/billing/billing.module';
 import { DeskModule } from './domains/desk/desk.module';
 
 // Infrastructure Modules
-import { CacheModule } from './infrastructure/cache/cache.module';
+import { CacheModule } from './platform-glue/cache/cache.module';
 import { SharedModule } from './shared/shared.module';
-import { NotificationModule } from './infrastructure/notification/notification.module';
-import { SseModule } from './infrastructure/sse/sse.module';
-import { PushModule } from './infrastructure/push/push.module';
-import { SmsModule } from './infrastructure/sms/sms.module';
-import { QueueModule } from './infrastructure/queue/queue.module';
-import { NotificationsQueueModule } from './infrastructure/queue/dispatchers/notifications-queue.module';
-import { BulkOpsQueueModule } from './infrastructure/queue/dispatchers/bulk-ops-queue.module';
-import { DataRetentionModule } from './infrastructure/queue/data-retention.module';
-import { HealthModule } from './health/health.module';
-import { EventBusModule } from './infrastructure/events/event-bus.module';
-import { OutboundWebhooksModule } from './infrastructure/outbound-webhooks/outbound-webhooks.module';
+import { NotificationModule } from '@appshore/platform/infrastructure/notification/notification.module';
+import { SseModule } from './platform-glue/sse/sse.module';
+import { PushModule } from '@appshore/platform/infrastructure/push/push.module';
+import { SmsModule } from '@appshore/platform/infrastructure/sms/sms.module';
+import { QueueModule } from './platform-glue/queue/queue.module';
+import { NotificationsQueueModule } from './platform-glue/queue/dispatchers/notifications-queue.module';
+import { BulkOpsQueueModule } from './platform-glue/queue/dispatchers/bulk-ops-queue.module';
+import { DataRetentionModule } from './platform-glue/queue/data-retention.module';
+import { HealthModule } from '@appshore/platform/health/health.module';
+import { EventBusModule } from './platform-glue/events/event-bus.module';
+import { OutboundWebhooksModule } from './platform-glue/webhooks/outbound-webhooks.module';
 import { DevModule } from './dev/dev.module';
-import { getEnvType } from './shared/utils/env-type';
-import { EventContextInterceptor } from './infrastructure/events/event-context.interceptor';
+import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
+import { EventContextInterceptor } from '@appshore/kernel/infrastructure/events/event-context.interceptor';
 import { PromptingModule } from './domains/prompting/prompting.module';
 
 @Module({
@@ -126,6 +130,7 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     HealthModule,
     PushModule,
     SmsModule,
+    PlatformHooksModule,
     PlatformModule,
     IntegrationsModule,
     AiModule,

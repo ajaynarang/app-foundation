@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
-import { CacheModule } from '../../../infrastructure/cache/cache.module';
-import { QueueModule } from '../../../infrastructure/queue/queue.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { CacheModule } from '../../../platform-glue/cache/cache.module';
+import { QueueModule } from '../../../platform-glue/queue/queue.module';
 import { CredentialsService } from '../credentials/credentials.service';
 import { AuthTokenService } from './auth-token.service';
 import { OAuthController } from './oauth.controller';

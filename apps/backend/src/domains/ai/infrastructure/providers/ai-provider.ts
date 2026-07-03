@@ -51,7 +51,7 @@ const anthropicOnlyMiddleware: LanguageModelMiddleware = {
  *   All AI calls go through Mastra agents — no manual telemetry flags needed.
  *
  * Usage:
- *   import { ai, aiEmbedding } from '../../infrastructure/providers/ai-provider';
+ *   import { ai, aiEmbedding } from './ai-provider';
  *   // Models are passed to Mastra Agent constructors in MastraProvider
  *   const { embedding } = await embed({ model: aiEmbedding('embedding'), value: text });
  */

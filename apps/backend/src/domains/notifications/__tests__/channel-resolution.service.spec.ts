@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ChannelResolutionService } from '../channel-resolution.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('ChannelResolutionService', () => {
   let service: ChannelResolutionService;

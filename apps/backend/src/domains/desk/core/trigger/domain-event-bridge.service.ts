@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 /**
  * DomainEventBridge — listens to domain events that might affect open Desk

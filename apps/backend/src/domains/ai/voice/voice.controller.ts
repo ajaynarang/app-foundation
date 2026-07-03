@@ -11,10 +11,10 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Throttle } from '@nestjs/throttler';
-import { Roles } from '../../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
-import { Public } from '../../../auth/decorators/public.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { VoiceService } from './voice.service';
 import { VoiceTokenDto } from './dto/voice-token.dto';
 import { VoiceRespondDto } from './dto/voice-respond.dto';

@@ -23,7 +23,7 @@ import { Test } from '@nestjs/testing';
 import { McpServerService } from '../mcp-server.service';
 import { InvocationPipelineService } from '../../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../agent-contract/scope-registry.service';
-import { fromApiKey } from '../../agent-contract/agent-principal';
+import { fromApiKey } from '@appshore/platform/auth/agent-principal';
 
 describe('McpServerService — API-key principal path', () => {
   let service: McpServerService;

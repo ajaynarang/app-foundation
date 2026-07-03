@@ -5,9 +5,9 @@ import { nestApp } from '../core/inngest/nest-context';
 import { DeskStepWriter } from '../core/episode/desk-step-writer.service';
 import { DeskMemoryReinforcer } from '../core/memory/desk-memory-reinforcer.service';
 import { DeskMemoryWriterService } from '../core/memory/desk-memory-writer.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
 
 import { TERMINAL_STATUS_BY_OUTCOME, type DeskOutcome } from './outcomes';
 import type { CloseInput, CloseOutput, SharedHydrateOutput } from './step.types';

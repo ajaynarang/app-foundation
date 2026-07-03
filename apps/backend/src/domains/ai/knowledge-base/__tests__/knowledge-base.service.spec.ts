@@ -1,6 +1,6 @@
 import { KnowledgeBaseService } from '../knowledge-base.service';
 import { EmbeddingService } from '../../infrastructure/providers/embedding.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('KnowledgeBaseService', () => {
   let service: KnowledgeBaseService;

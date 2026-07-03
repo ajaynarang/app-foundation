@@ -9,12 +9,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import crypto, { randomUUID } from 'crypto';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { CredentialsService } from '../credentials/credentials.service';
-import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { REDIS_CLIENT } from '../../../infrastructure/cache/redis-client.provider';
-import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_WARM_10M } from '../../../constants/cache.constants';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { REDIS_CLIENT } from '@appshore/platform/infrastructure/cache/redis-client.provider';
+import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
+import { CACHE_TTL_WARM_10M } from '@appshore/kernel/constants/cache.constants';
 import { VENDOR_REGISTRY, OAuthConfig, getVendorOAuth } from '../vendor-registry';
 
 @Injectable()

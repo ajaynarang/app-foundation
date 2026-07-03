@@ -4,14 +4,14 @@ jest.mock('ai', () => ({
 jest.mock('../../infrastructure/providers/ai-provider', () => ({
   ai: jest.fn().mockReturnValue('mock-model'),
 }));
-jest.mock('../../../../domains/prompting', () => ({
+jest.mock('../../../prompting', () => ({
   PromptingService: jest.fn(),
   PROMPT_NAMES: { SKILL_CLASSIFIER: 'assistant-skill-classifier' },
 }));
 
 import { SkillClassifierService } from '../skill-classifier.service';
 import { generateText } from 'ai';
-import type { PromptingService } from '../../../../domains/prompting';
+import type { PromptingService } from '../../../prompting';
 
 const mockGenerateText = generateText as jest.Mock;
 

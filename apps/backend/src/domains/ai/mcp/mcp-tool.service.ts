@@ -6,7 +6,7 @@ import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { AiPrismaService } from '../rls/ai-prisma.service';
 import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
-import { fromUser } from '../agent-contract/agent-principal';
+import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';
 
 /**

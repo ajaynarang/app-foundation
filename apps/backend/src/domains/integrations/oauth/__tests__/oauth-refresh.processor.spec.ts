@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { JobEnvelope } from '@app/shared-types';
 import { OAuthRefreshJobHandler } from '../oauth-refresh.processor';
 import { AuthTokenService } from '../auth-token.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { VendorCircuitBreakerService } from '../../../../infrastructure/queue/vendor-circuit-breaker.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 
 interface OAuthRefreshJobData {
   tenantId: number;

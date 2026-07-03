@@ -46,6 +46,8 @@
     "@ai-sdk/openai": "^3.0.52",
     "@app/shared-types": "workspace:*",
     "@appshore/db": "workspace:*",
+    "@appshore/kernel": "workspace:*",
+    "@appshore/platform": "workspace:*",
     "@aws-sdk/client-s3": "^3.995.0",
     "@aws-sdk/s3-request-presigner": "^3.995.0",
     "@bull-board/api": "^6.18.2",

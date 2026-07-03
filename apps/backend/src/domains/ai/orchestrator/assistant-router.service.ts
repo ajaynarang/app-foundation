@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AgentId, UserMode } from '../agents/agent.types';
-import { PromptingService } from '../../../domains/prompting';
+import { PromptingService } from '../../prompting';
 import { SkillClassifierService } from './skill-classifier.service';
 
 export interface RouteResult {

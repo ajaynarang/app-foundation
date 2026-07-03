@@ -2,9 +2,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { UserRole } from '@appshore/db';
 
-import { AppCacheService } from '../../../../../infrastructure/cache/app-cache.service';
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskAgentService } from '../agent.service';
 

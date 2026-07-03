@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Param, Body, BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
-import { TenantGuard } from '../../../auth/guards/tenant.guard';
-import { RolesGuard } from '../../../auth/guards/roles.guard';
-import { Roles } from '../../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
+import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
+import { RolesGuard } from '@appshore/platform/auth/guards/roles.guard';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
 import { HitlChallengeService, parseHitlTokenOrNull } from '../agent-contract/hitl-challenge.service';
-import { PinService } from '../../../auth/pin.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PinService } from '@appshore/platform/auth/pin.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
 
 @ApiTags('MCP HITL')

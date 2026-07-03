@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminSchedulesController } from '../admin-schedules.controller';
-import { ScheduleManagerService } from '../../../infrastructure/queue/schedule-manager.service';
+import { ScheduleManagerService } from '@appshore/platform/infrastructure/queue/schedule-manager.service';
 
 describe('AdminSchedulesController', () => {
   let controller: AdminSchedulesController;

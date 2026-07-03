@@ -2,7 +2,7 @@ import { All, Controller, Req, Res, Logger, OnApplicationBootstrap } from '@nest
 import type { Request, Response } from 'express';
 import { serve } from 'inngest/express';
 
-import { Public } from '../../../../auth/decorators/public.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { createDeskSchedulerFunction } from '../scheduler/desk-scheduler.function';
 import { InngestClientService } from './inngest.client';
 

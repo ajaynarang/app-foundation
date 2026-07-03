@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Param, Query, Body, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { Roles } from '../../auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { InAppNotificationService } from './notifications.service';
 

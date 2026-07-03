@@ -6,8 +6,8 @@
  */
 import { Controller, Get, Post, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
-import { Roles } from '../../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { BillingAdminService } from '../services/billing-admin.service';
 import {
   AddWalletCreditDto,

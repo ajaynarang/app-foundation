@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { OAuthController } from '../oauth.controller';
 import { AuthTokenService } from '../auth-token.service';
 import { OAuthTokenRefreshJob } from '../oauth-token-refresh.job';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 const TENANT = { id: 5, tenantId: 'tenant-abc' };
 

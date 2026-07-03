@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 
-import { PrismaModule } from '../../../../infrastructure/database/prisma.module';
-import { CacheModule } from '../../../../infrastructure/cache/cache.module';
-import { EventBusModule } from '../../../../infrastructure/events/event-bus.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { CacheModule } from '../../../../platform-glue/cache/cache.module';
+import { EventBusModule } from '../../../../platform-glue/events/event-bus.module';
 
 import { AiTelemetryService } from './ai-telemetry.service';
 

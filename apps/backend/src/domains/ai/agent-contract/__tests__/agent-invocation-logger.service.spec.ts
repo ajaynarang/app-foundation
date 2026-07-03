@@ -1,10 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
-import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
-import { fromUser } from '../agent-principal';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
+import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { digestArgs } from '../arg-redactor';
 
 describe('AgentInvocationLoggerService', () => {

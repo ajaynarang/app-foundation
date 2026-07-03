@@ -3,7 +3,7 @@ import { NotificationTriggersService } from '../notification-triggers.service';
 import { InAppNotificationService } from '../notifications.service';
 import { ChannelResolutionService } from '../channel-resolution.service';
 import { NotificationDeliveryService } from '../delivery.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('NotificationTriggersService', () => {
   let service: NotificationTriggersService;

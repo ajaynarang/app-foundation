@@ -8,18 +8,18 @@ import {
   NotFoundException,
   ParseIntPipe,
 } from '@nestjs/common';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { JobStatus, UserRole } from '@appshore/db';
 import { JobStatusSchema } from '@app/shared-types';
-import { JobService } from '../../infrastructure/queue/job.service';
-import { ALL_CATEGORIES, JOB_CATEGORIES } from '../../infrastructure/queue/job.types';
-import type { JobCategory } from '../../infrastructure/queue/job.types';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
+import { ALL_CATEGORIES, JOB_CATEGORIES } from '@appshore/kernel/infrastructure/queue/job.types';
+import type { JobCategory } from '@appshore/kernel/infrastructure/queue/job.types';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { QUEUE_NAMES, bullJobIdFromDbId } from '../../infrastructure/queue/queue.constants';
-import { buildJobEnvelope } from '../../infrastructure/queue/job-envelope.helper';
+import { QUEUE_NAMES, bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 
 const JOB_STATUS = JobStatusSchema.enum;
 

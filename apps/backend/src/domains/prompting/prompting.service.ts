@@ -5,9 +5,9 @@ import matter from 'gray-matter';
 import { Langfuse } from 'langfuse';
 import * as path from 'path';
 
-import { CACHE_TTL_COLD_30M } from '../../constants/cache.constants';
-import { buildKey } from '../../infrastructure/cache/cache-key.constants';
-import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
+import { CACHE_TTL_COLD_30M } from '@appshore/kernel/constants/cache.constants';
+import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { PROMPT_NAMES, ParsedSkill, SkillMetadata } from './prompting.types';
 
 const LANGFUSE_CACHE_TTL_SECONDS = 60;

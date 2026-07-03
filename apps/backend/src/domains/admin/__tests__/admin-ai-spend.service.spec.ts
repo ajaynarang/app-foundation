@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 
 import { AdminAiSpendService } from '../admin-ai-spend.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('AdminAiSpendService', () => {
   let service: AdminAiSpendService;

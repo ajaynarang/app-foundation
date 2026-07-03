@@ -1,10 +1,10 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, HttpException } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { generateId } from '../../../shared/utils/id-generator';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from './mastra/mastra.provider';
 import { ModerationService } from '../moderation/moderation.service';
-import { PromptingService } from '../../../domains/prompting';
+import { PromptingService } from '../../prompting';
 import { AssistantRouterService } from '../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../agents/agent.registry';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';

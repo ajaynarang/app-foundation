@@ -3,8 +3,8 @@ import { AiSurface, MemoryPolarity, MemoryScope, Prisma } from '@appshore/db';
 import { type AiCallContext } from '@app/shared-types';
 import { MemoryExtractSchema } from '../types';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { EmbeddingService } from '../../../ai/infrastructure/providers/embedding.service';
 import { StructuredOutputService } from '../../../ai/infrastructure/providers/structured-output.service';
 import { AI_LINK_REF_TYPES } from '../../../ai/infrastructure/telemetry/ai-telemetry.constants';

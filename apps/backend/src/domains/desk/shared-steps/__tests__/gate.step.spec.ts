@@ -32,7 +32,7 @@ jest.mock('../../responsibilities', () => {
 import { ScopeRegistryService } from '../../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../../core/episode/desk-step-writer.service';
 import { ApprovalService } from '../../core/approval/approval.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { gateStep } from '../gate.step';
 
 const EPISODE_ID = 'e1';

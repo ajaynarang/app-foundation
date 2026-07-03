@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 
-import { CacheModule } from '../../../../infrastructure/cache/cache.module';
-import { PrismaModule } from '../../../../infrastructure/database/prisma.module';
+import { CacheModule } from '../../../../platform-glue/cache/cache.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 
 import { DeskAgentController } from './agent.controller';
 import { DeskAgentService } from './agent.service';

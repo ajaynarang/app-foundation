@@ -4,7 +4,7 @@ import { ScopeRegistryService } from './scope-registry.service';
 import { HitlPolicyService } from './hitl-policy.service';
 import { ToolExecutorService, ToolResult } from './tool-executor.service';
 import { AgentInvocationLoggerService } from './agent-invocation-logger.service';
-import { AgentPrincipal } from './agent-principal';
+import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { redactArgs, digestArgs } from './arg-redactor';
 import { HitlChallengeService } from './hitl-challenge.service';
 

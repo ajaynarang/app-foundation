@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { InAppNotificationService } from '../notifications.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 
 describe('InAppNotificationService', () => {
   let service: InAppNotificationService;

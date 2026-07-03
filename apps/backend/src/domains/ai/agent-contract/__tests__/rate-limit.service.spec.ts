@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { RateLimitService } from '../rate-limit.service';
-import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
-import { fromUser, fromOAuthUser, fromApiKey, fromDeskResponsibility } from '../agent-principal';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { fromUser, fromOAuthUser, fromApiKey, fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
 
 describe('RateLimitService', () => {
   const cache = { increment: jest.fn() };

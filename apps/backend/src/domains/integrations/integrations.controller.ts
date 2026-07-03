@@ -14,16 +14,16 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { Roles } from '../../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { IntegrationsService } from './integrations.service';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
-import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
-import { JobService } from '../../infrastructure/queue/job.service';
-import { buildJobEnvelope } from '../../infrastructure/queue/job-envelope.helper';
+import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
+import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 
 /** BullMQ job name for a manually-triggered integration sync. */
 const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';

@@ -1,9 +1,9 @@
 import { IngestionService } from '../ingestion.service';
 import { EmbeddingService } from '../../infrastructure/providers/embedding.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { loadAllEntries } from '../content/content-loader';
 
-jest.mock('../../../../shared/utils/id-generator', () => ({
+jest.mock('@appshore/kernel/shared/utils/id-generator', () => ({
   generateId: jest.fn().mockReturnValue('doc_mock_id'),
 }));
 

@@ -12,10 +12,10 @@ import {
   type UpdateAgentRequest,
 } from '../types';
 
-import { CACHE_TTL_HOT_60S, CACHE_TTL_WARM_5M } from '../../../../constants/cache.constants';
-import { buildKey } from '../../../../infrastructure/cache/cache-key.constants';
-import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { CACHE_TTL_HOT_60S, CACHE_TTL_WARM_5M } from '@appshore/kernel/constants/cache.constants';
+import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 
 type SupervisorRoleRow = { role: UserRole };

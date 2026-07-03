@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { QUEUE_NAMES } from '../../../infrastructure/queue/queue.constants';
-import { buildJobEnvelope } from '../../../infrastructure/queue/job-envelope.helper';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { AuthTokenService } from './auth-token.service';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
 

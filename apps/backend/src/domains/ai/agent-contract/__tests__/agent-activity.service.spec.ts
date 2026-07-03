@@ -1,5 +1,5 @@
 import { AgentActivityService } from '../agent-activity.service';
-import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 describe('AgentActivityService', () => {
   let prisma: ReturnType<typeof createMockPrisma>;

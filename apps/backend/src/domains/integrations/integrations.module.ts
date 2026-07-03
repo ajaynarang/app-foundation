@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
-import { PrismaModule } from '../../infrastructure/database/prisma.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 import { CredentialsService } from './credentials/credentials.service';
 import { IntegrationDataService } from './services/integration-data.service';
 import { AdaptersModule } from './adapters/adapters.module';
-import { QueueModule } from '../../infrastructure/queue/queue.module';
+import { QueueModule } from '../../platform-glue/queue/queue.module';
 import { OAuthModule } from './oauth/oauth.module';
 
 /**

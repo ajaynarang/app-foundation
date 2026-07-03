@@ -5,7 +5,7 @@ import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { HitlChallengeService } from '../hitl-challenge.service';
-import { fromUser, fromOAuthUser, fromDeskResponsibility } from '../agent-principal';
+import { fromUser, fromOAuthUser, fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
 
 const mockRegistry = {
   scopeForTool: jest.fn(),

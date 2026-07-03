@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 import { VoiceController } from './voice.controller';
 import { VoiceService } from './voice.service';
 import { VoiceAgentWorker } from './voice-agent.worker';

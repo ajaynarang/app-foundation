@@ -8,7 +8,7 @@ import { StructuredOutputService } from '../../ai/infrastructure/providers/struc
 import { AI_LINK_REF_TYPES } from '../../ai/infrastructure/telemetry/ai-telemetry.constants';
 import { PromptingService } from '../../prompting/prompting.service';
 import { DeskStepWriter } from '../core/episode/desk-step-writer.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 /**
  * Thin helper for Desk LLM steps that need structured (Zod-validated)

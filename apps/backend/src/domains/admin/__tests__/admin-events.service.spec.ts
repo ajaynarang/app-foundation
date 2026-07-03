@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { AdminEventsService } from '../admin-events.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('AdminEventsService', () => {
   let service: AdminEventsService;

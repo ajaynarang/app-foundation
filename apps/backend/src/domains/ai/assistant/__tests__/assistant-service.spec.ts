@@ -24,11 +24,11 @@ jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { AssistantAiService } from '../assistant.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { McpToolService } from '../../mcp/mcp-tool.service';
 import { MastraProvider } from '../mastra/mastra.provider';
 import { ModerationService } from '../../moderation/moderation.service';
-import { PromptingService } from '../../../../domains/prompting';
+import { PromptingService } from '../../../prompting';
 import { AssistantRouterService } from '../../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../../agents/agent.registry';
 import { AiTelemetryService } from '../../infrastructure/telemetry/ai-telemetry.service';

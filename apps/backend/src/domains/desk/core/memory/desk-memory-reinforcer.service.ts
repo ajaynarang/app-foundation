@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { MemoryPolarity, MemoryScope } from '@appshore/db';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../../responsibilities';
 
 import type { ReinforcementJudge, ReinforcementJudgeContext } from './reinforcement.types';

@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@appshore/db';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
-import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
 import { OPEN_EPISODE_STATUSES, EpisodeStatusSchema } from '../types';
 

@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query, Logger, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
-import { Public } from '../auth/decorators/public.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { DevService } from './dev.service';
 import { SwitchUserDto } from './dto/switch-user.dto';

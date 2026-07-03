@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, AgentInvocationLog } from '@appshore/db';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../infrastructure/events/domain-events.constants';
-import { generateUuidV7 } from '../../../shared/utils/uuidv7';
-import { AgentPrincipal, principalAuditLabel } from './agent-principal';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { AgentPrincipal, principalAuditLabel } from '@appshore/platform/auth/agent-principal';
 import { HitlTier } from './hitl-policy.service';
 import { redactArgs, digestArgs } from './arg-redactor';
 import type { AgentScope } from '@app/shared-types';

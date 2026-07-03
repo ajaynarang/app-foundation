@@ -2,9 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AdminJobsController } from '../admin-jobs.controller';
-import { JobService } from '../../../infrastructure/queue/job.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { QUEUE_NAMES } from '../../../infrastructure/queue/queue.constants';
+import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 
 describe('AdminJobsController', () => {
   let controller: AdminJobsController;

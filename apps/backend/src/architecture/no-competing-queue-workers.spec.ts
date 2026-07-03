@@ -21,6 +21,13 @@ import * as path from 'path';
  */
 
 const SRC_DIR = path.resolve(__dirname, '..');
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
+// @Processor classes can live in the app OR in the foundation packages.
+const SCAN_ROOTS = [
+  SRC_DIR,
+  path.join(REPO_ROOT, 'packages', 'foundation', 'kernel', 'src'),
+  path.join(REPO_ROOT, 'packages', 'foundation', 'platform', 'src'),
+];
 
 // Queues still pending dispatcher conversion. EMPTY — every shared queue uses
 // a single dispatcher. A new entry here would mark a regression awaiting
@@ -45,7 +52,16 @@ function listTsFiles(dir: string): string[] {
 // Resolve QUEUE_NAMES.X tokens to their string values so the scan keys on the
 // actual queue name (single source of truth) rather than the alias.
 function loadQueueNameMap(): Record<string, string> {
-  const constantsPath = path.join(SRC_DIR, 'infrastructure', 'queue', 'queue.constants.ts');
+  const constantsPath = path.join(
+    REPO_ROOT,
+    'packages',
+    'foundation',
+    'kernel',
+    'src',
+    'infrastructure',
+    'queue',
+    'queue.constants.ts',
+  );
   const text = fs.readFileSync(constantsPath, 'utf8');
   const block = text.slice(text.indexOf('export const QUEUE_NAMES'));
   const map: Record<string, string> = {};
@@ -62,11 +78,13 @@ describe('No competing BullMQ queue workers', () => {
   // queueName -> list of files declaring a @Processor on it
   const byQueue: Record<string, string[]> = {};
 
-  for (const file of listTsFiles(SRC_DIR)) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const m of text.matchAll(processorRe)) {
-      const queue = queueNameMap[m[1]] ?? m[1];
-      (byQueue[queue] ??= []).push(path.relative(SRC_DIR, file));
+  for (const root of SCAN_ROOTS) {
+    for (const file of listTsFiles(root)) {
+      const text = fs.readFileSync(file, 'utf8');
+      for (const m of text.matchAll(processorRe)) {
+        const queue = queueNameMap[m[1]] ?? m[1];
+        (byQueue[queue] ??= []).push(path.relative(REPO_ROOT, file));
+      }
     }
   }
 

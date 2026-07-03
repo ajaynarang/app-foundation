@@ -6,10 +6,10 @@ import { McpServerService } from './mcp-server.service';
 import { AgentRateLimitGuard } from './guards/agent-rate-limit.guard';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
 import { RlsModule } from '../rls/rls.module';
-import { OAuthProviderModule } from '../../platform/oauth-provider/oauth-provider.module';
+import { OAuthProviderModule } from '@appshore/platform/domains/platform/oauth-provider/oauth-provider.module';
 import { AgentContractModule } from '../agent-contract/agent-contract.module';
-import { AuthModule } from '../../../auth/auth.module';
-import { ApiKeysModule } from '../../platform/api-keys/api-keys.module';
+import { AuthModule } from '@appshore/platform/auth/auth.module';
+import { ApiKeysModule } from '@appshore/platform/domains/platform/api-keys/api-keys.module';
 
 /**
  * MCP Server Module — Exposes app tools to external AI clients

@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Param, Query, Req, Res, Logger, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
-import { Public } from '../../../auth/decorators/public.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { Roles } from '../../../auth/decorators/roles.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
-import { BaseTenantController } from '../../../shared/base/base-tenant.controller';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { AuthTokenService } from './auth-token.service';
 import { OAuthTokenRefreshJob } from './oauth-token-refresh.job';

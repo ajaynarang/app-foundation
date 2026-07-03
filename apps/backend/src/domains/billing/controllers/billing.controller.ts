@@ -6,9 +6,9 @@
  */
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
-import { Roles } from '../../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { TenantDbId } from '../../../auth/decorators/tenant-db-id.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { TenantDbId } from '@appshore/platform/auth/decorators/tenant-db-id.decorator';
 import { SubscriptionService } from '../services/subscription.service';
 import { WalletService } from '../services/wallet.service';
 import { InvoiceService } from '../services/invoice.service';

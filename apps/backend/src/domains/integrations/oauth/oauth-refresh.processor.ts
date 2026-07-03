@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
-import type { QueueJobHandler } from '../../../infrastructure/queue/job-handler.contract';
-import { VendorCircuitBreakerService } from '../../../infrastructure/queue/vendor-circuit-breaker.service';
+import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 import { AuthTokenService } from './auth-token.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 /** BullMQ job name for the repeatable OAuth token refresh. */
 const OAUTH_REFRESH_JOB_NAME = 'oauth-refresh';

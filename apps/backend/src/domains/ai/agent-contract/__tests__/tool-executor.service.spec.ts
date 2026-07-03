@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import { ToolExecutorService } from '../tool-executor.service';
 import { ScopeRegistryService } from '../scope-registry.service';
 import { AiPrismaService } from '../../rls/ai-prisma.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ModuleRef } from '@nestjs/core';
-import { fromUser } from '../agent-principal';
+import { fromUser } from '@appshore/platform/auth/agent-principal';
 
 const mockScopeRegistry = {
   resolveProvider: jest.fn(),

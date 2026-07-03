@@ -30,7 +30,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { McpServerService } from '../mcp-server.service';
 import { InvocationPipelineService, PipelineError } from '../../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../agent-contract/scope-registry.service';
-import { fromOAuthUser } from '../../agent-contract/agent-principal';
+import { fromOAuthUser } from '@appshore/platform/auth/agent-principal';
 
 const mockPipeline = { run: jest.fn() };
 const mockScopeRegistry = {

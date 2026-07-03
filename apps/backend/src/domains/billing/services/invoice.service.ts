@@ -7,7 +7,7 @@
  */
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BillingInvoiceStatus } from '@appshore/db';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';
 

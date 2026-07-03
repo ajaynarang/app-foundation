@@ -3,9 +3,9 @@ import { DESK_OUTCOMES } from '../../shared-steps/outcomes';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { SnoozeDuration } from '../types';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { DomainEvent } from '../../../../infrastructure/events/domain-event';
-import { DOMAIN_EVENTS } from '../../../../infrastructure/events/domain-events.constants';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { closeStep } from '../../shared-steps/close.step';
 
 /**

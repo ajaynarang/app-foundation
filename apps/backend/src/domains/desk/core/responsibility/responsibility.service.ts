@@ -7,7 +7,7 @@ import {
   type UpdateDeskResponsibilityRequest,
 } from '../types';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition, RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 import type { ResponsibilityDefinition } from '../../responsibilities/definition.types';
 

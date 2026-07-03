@@ -1,8 +1,8 @@
 import { Controller, Get, Patch, Param, Body, ParseIntPipe } from '@nestjs/common';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
-import { ScheduleManagerService } from '../../infrastructure/queue/schedule-manager.service';
+import { ScheduleManagerService } from '@appshore/platform/infrastructure/queue/schedule-manager.service';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 
 @Controller('admin/schedules')

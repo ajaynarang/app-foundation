@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../../responsibilities';
 import { TriggerService } from '../trigger/trigger.service';
 
-import { isCronDueInWindow } from '../../../../shared/utils/cron-window';
+import { isCronDueInWindow } from '@appshore/kernel/shared/utils/cron-window';
 
 /** Trigger `tz: 'tenant'` resolves to the tenant's IANA timezone; any other
  *  value (or absence) evaluates the cron in UTC. */

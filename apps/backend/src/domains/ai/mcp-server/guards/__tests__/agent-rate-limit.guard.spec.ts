@@ -2,7 +2,7 @@ import { Test } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { AgentRateLimitGuard } from '../agent-rate-limit.guard';
 import { RateLimitService } from '../../../agent-contract/rate-limit.service';
-import { fromOAuthUser, fromApiKey } from '../../../agent-contract/agent-principal';
+import { fromOAuthUser, fromApiKey } from '@appshore/platform/auth/agent-principal';
 
 function execCtx(req: any, res: any = { setHeader: jest.fn() }) {
   return {

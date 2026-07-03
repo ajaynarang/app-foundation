@@ -4,10 +4,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../agent-contract/scope-registry.service';
-import { fromOAuthUser } from '../agent-contract/agent-principal';
-import type { AgentPrincipal } from '../agent-contract/agent-principal';
+import { fromOAuthUser } from '@appshore/platform/auth/agent-principal';
+import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { scopeTier, SCOPE_TIERS, type AgentScope } from '@app/shared-types';
-import type { OAuthUser } from '../../platform/oauth-provider/oauth-token.guard';
+import type { OAuthUser } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
 import type { Request, Response } from 'express';
 
 type McpToolResult = {

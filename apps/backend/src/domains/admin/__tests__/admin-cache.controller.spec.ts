@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AdminCacheController } from '../admin-cache.controller';
-import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { CACHE_NAMESPACES } from '../../../constants/cache.constants';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { CACHE_NAMESPACES } from '@appshore/kernel/constants/cache.constants';
 
 describe('AdminCacheController', () => {
   let controller: AdminCacheController;

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DEFAULT_TENANT_TIMEZONE } from '@app/shared-types';
 import { type DeskScheduleState } from '../types';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 /**
  * Reads + writes the tenant-wide Desk schedule master switch

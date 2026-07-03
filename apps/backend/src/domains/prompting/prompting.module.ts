@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { CacheModule } from '../../infrastructure/cache/cache.module';
+import { CacheModule } from '../../platform-glue/cache/cache.module';
 import { PromptingService } from './prompting.service';
 import { ChatPromptRegistrar } from './registrars/chat-prompt.registrar';
 import { ServiceFallbackRegistrar } from './registrars/service-fallback.registrar';

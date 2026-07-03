@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { DEV_AUTH_HEADER, DEV_AUTH_SECRET_ENV } from '../dev-auth.constants';
-import { getEnvType } from '../../shared/utils/env-type';
+import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 
 @Injectable()
 export class DevAuthGuard implements CanActivate {

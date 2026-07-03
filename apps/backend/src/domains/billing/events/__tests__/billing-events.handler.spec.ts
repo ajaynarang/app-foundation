@@ -4,7 +4,7 @@ import { SubscriptionService } from '../../services/subscription.service';
 import { InvoiceService } from '../../services/invoice.service';
 import { DunningService } from '../../services/dunning.service';
 import { PaymentMethodService } from '../../services/payment-method.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { BillingEventType, NormalizedBillingEvent } from '../../adapters/payment-provider.interface';
 
 const mockSubscriptionService = {

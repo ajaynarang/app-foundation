@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { buildKey } from '../../../infrastructure/cache/cache-key.constants';
-import { AgentPrincipal } from './agent-principal';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
+import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { AGENT_RATE_LIMIT_DEFAULTS, AGENT_RATE_LIMIT_WINDOW_SECONDS } from './agent-rate-limit.constants';
 
 export interface ConsumeOverrides {

@@ -27,7 +27,7 @@ jest.mock('@nestjs/config', () => ({
   },
 }));
 
-jest.mock('../../../../infrastructure/database/prisma.module', () => ({
+jest.mock('@appshore/platform/infrastructure/database/prisma.module', () => ({
   PrismaModule: class MockPrismaModule {},
 }));
 
@@ -97,7 +97,7 @@ describe('IngestionCommand (module structure)', () => {
     const { ConfigModule } = require('@nestjs/config');
     expect(ConfigModule.forRoot).toBeDefined();
 
-    const { PrismaModule } = require('../../../../infrastructure/database/prisma.module'); // eslint-disable-line @typescript-eslint/no-require-imports
+    const { PrismaModule } = require('@appshore/platform/infrastructure/database/prisma.module'); // eslint-disable-line @typescript-eslint/no-require-imports
     expect(PrismaModule).toBeDefined();
   });
 

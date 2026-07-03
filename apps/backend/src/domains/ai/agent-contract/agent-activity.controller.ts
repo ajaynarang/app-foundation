@@ -1,10 +1,10 @@
 import { Controller, Get, Query, ParseIntPipe, DefaultValuePipe, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { BaseTenantController } from '../../../shared/base/base-tenant.controller';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { Roles } from '../../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { AgentActivityService } from './agent-activity.service';
 import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@app/shared-types';
 

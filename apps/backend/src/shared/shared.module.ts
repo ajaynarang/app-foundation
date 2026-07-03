@@ -1,8 +1,8 @@
 import { Global, Module } from '@nestjs/common';
-import { TimezoneService } from './services/timezone.service';
-import { TenantJobRunService } from './services/tenant-job-run.service';
-import { PrismaModule } from '../infrastructure/database/prisma.module';
-import { CacheModule } from '../infrastructure/cache/cache.module';
+import { TimezoneService } from '@appshore/platform/shared/services/timezone.service';
+import { TenantJobRunService } from '@appshore/platform/shared/services/tenant-job-run.service';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { CacheModule } from '../platform-glue/cache/cache.module';
 
 /**
  * SharedModule provides common utilities, base classes, guards, and filters

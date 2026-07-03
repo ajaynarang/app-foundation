@@ -12,10 +12,10 @@
 
 import { NotFoundException } from '@nestjs/common';
 
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
-import { createMockEventEmitter } from '../../../../../test/mocks/event-emitter.mock';
-import { DomainEvent } from '../../../../../infrastructure/events/domain-event';
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
+import { createMockEventEmitter } from '@appshore/platform/test/mocks/event-emitter.mock';
+import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 // Mock closeStep at module boundary — the shared-steps module pulls in
 // nestApp() which requires a live Nest container, so we replace it with

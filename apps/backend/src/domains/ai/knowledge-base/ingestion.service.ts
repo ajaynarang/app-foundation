@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { EmbeddingService } from '../infrastructure/providers/embedding.service';
 import { loadAllEntries, type KnowledgeEntry } from './content/content-loader';
-import { generateId } from '../../../shared/utils/id-generator';
+import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 
 const MAX_CHUNK_SIZE = 1000; // ~250 tokens (4 chars/token)
 const CHUNK_OVERLAP = 100; // ~25 tokens overlap

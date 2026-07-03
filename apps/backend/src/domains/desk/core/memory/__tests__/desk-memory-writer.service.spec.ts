@@ -5,8 +5,8 @@ jest.mock('../../../../prompting/prompting.service', () => ({
   PromptingService: class MockPromptingService {},
 }));
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskMemoryWriterService } from '../desk-memory-writer.service';
 

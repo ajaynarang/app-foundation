@@ -10,8 +10,8 @@ import { ApprovalDecision, DeskEpisodeStatus, DeskEpisodeStepKind, Prisma, UserR
 import { HANDLED_EPISODE_STATUSES, type ApprovalScope, type HandoffCounts } from '../types';
 import { DateTime } from 'luxon';
 
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { generateUuidV7 } from '../../../../shared/utils/uuidv7';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
 
 import { ApprovalEnrichmentService, type EnrichedApprovalPayload } from './approval-enrichment.service';

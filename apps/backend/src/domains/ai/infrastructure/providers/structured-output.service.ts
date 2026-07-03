@@ -7,7 +7,7 @@ import { ai, MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from './ai-provider';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { redactMessages } from '../redaction/pii-redactor';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
-import { getAiLangfuseTracer } from '../../../../infrastructure/telemetry/telemetry';
+import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 interface ExtractOptions {
   messages: any[];

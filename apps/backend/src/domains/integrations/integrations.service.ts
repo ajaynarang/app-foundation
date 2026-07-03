@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JobStatusSchema } from '@app/shared-types';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 const JOB_STATUS = JobStatusSchema.enum;
 import { CredentialsService } from './credentials/credentials.service';
@@ -10,9 +10,9 @@ import { IntegrationDataService } from './services/integration-data.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { VENDOR_REGISTRY, getVendorCredentialFields, type ConnectionMethod } from './vendor-registry';
-import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
-import { JobService } from '../../infrastructure/queue/job.service';
-import { buildJobEnvelope } from '../../infrastructure/queue/job-envelope.helper';
+import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
+import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { randomUUID } from 'crypto';
 
 /** BullMQ job name for a manually-triggered integration sync. */

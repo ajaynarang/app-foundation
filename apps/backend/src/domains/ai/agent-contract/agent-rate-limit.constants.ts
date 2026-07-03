@@ -1,4 +1,4 @@
-import type { AgentPrincipal } from './agent-principal';
+import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 export const AGENT_RATE_LIMIT_DEFAULTS: Record<AgentPrincipal['kind'], number> = {
   user: 600,

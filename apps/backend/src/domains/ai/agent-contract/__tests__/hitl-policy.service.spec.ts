@@ -1,5 +1,5 @@
 import { HitlPolicyService, HitlTier } from '../hitl-policy.service';
-import { fromUser, fromOAuthUser, fromApiKey, fromDeskResponsibility } from '../agent-principal';
+import { fromUser, fromOAuthUser, fromApiKey, fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
 
 describe('HitlPolicyService', () => {
   const svc = new HitlPolicyService();

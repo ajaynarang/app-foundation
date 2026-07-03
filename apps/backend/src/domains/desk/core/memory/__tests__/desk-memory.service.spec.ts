@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 import { EmbeddingService } from '../../../../ai/infrastructure/providers/embedding.service';
 
 import { DeskMemoryService } from '../desk-memory.service';

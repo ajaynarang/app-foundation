@@ -1,8 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { CacheModule } from '../../../infrastructure/cache/cache.module';
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
-import { EventBusModule } from '../../../infrastructure/events/event-bus.module';
+import { CacheModule } from '../../../platform-glue/cache/cache.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { EventBusModule } from '../../../platform-glue/events/event-bus.module';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { AgentsModule } from '../agents/agents.module';

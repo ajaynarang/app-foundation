@@ -2,8 +2,8 @@ import { Test } from '@nestjs/testing';
 import { UserRole } from '@appshore/db';
 import type { ExecutionContext } from '@nestjs/common';
 
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskAgentEditGuard } from '../desk-agent-edit.guard';
 

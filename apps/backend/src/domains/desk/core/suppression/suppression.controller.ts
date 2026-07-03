@@ -2,10 +2,10 @@ import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } fr
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 
-import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
-import { Roles } from '../../../../auth/decorators/roles.decorator';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { BaseTenantController } from '../../../../shared/base/base-tenant.controller';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
 
 import { SnoozeEpisodeDto } from './dto/snooze.dto';
 import { SuppressionService } from './suppression.service';

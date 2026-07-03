@@ -1,4 +1,4 @@
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 // The starter registry ships no scheduled responsibility (its one example is
 // manual-trigger only), so stub the registry with a test definition carrying a

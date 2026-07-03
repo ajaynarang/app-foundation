@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { OAuthTokenRefreshJob } from '../oauth-token-refresh.job';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { AuthTokenService } from '../auth-token.service';
-import { QUEUE_NAMES } from '../../../../infrastructure/queue/queue.constants';
+import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 
 describe('OAuthTokenRefreshJob', () => {
   let job: OAuthTokenRefreshJob;

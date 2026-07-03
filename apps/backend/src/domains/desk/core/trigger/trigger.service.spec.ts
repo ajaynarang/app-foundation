@@ -1,6 +1,6 @@
 import type { Prisma } from '@appshore/db';
 
-import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { TriggerService } from './trigger.service';
 

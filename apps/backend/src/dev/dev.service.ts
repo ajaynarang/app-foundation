@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../infrastructure/database/prisma.service';
-import { AuthService } from '../auth/auth.service';
-import { LoginEventService } from '../auth/login-event.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { AuthService } from '@appshore/platform/auth/auth.service';
+import { LoginEventService } from '@appshore/platform/auth/login-event.service';
 
 export interface DevUserDto {
   userId: string;

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 
 import { DeskBootstrapService } from './desk-bootstrap.service';
 import { DeskPromptRegistrar } from './desk-prompt.registrar';

@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { RateLimitService } from '../../agent-contract/rate-limit.service';
-import type { AgentPrincipal } from '../../agent-contract/agent-principal';
+import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 @Injectable()
 export class AgentRateLimitGuard implements CanActivate {

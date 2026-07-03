@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { McpModule } from '@rekog/mcp-nest';
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
-import { CacheModule } from '../../../infrastructure/cache/cache.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { HealthTool } from './tools/health.tool';
 import { KnowledgeTool } from './tools/knowledge.tool';
 import { McpToolService } from './mcp-tool.service';

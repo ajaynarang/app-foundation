@@ -5,7 +5,7 @@ import { nestApp } from '../core/inngest/nest-context';
 import { ScopeRegistryService } from '../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../core/episode/desk-step-writer.service';
 import { ApprovalService } from '../core/approval/approval.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../responsibilities';
 import type { ConditionsResult } from '../responsibilities/definition.types';
 

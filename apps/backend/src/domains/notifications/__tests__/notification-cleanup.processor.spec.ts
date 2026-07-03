@@ -2,9 +2,9 @@ import { Test } from '@nestjs/testing';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { NotificationJobsHandler } from '../notification-cleanup.processor';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { NotificationTriggersService } from '../notification-triggers.service';
-import { NOTIFICATIONS_JOB_NAMES } from '../../../infrastructure/queue/queue.constants';
+import { NOTIFICATIONS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 
 function makeEnvelope<P>(payload: P): JobEnvelope<P> {
   return {

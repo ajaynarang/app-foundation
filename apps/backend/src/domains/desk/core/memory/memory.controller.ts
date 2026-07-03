@@ -18,10 +18,10 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 import { UserRole } from '@appshore/db';
 import { ListMemoriesQuerySchema } from '../types';
 
-import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
-import { Roles } from '../../../../auth/decorators/roles.decorator';
-import { BaseTenantController } from '../../../../shared/base/base-tenant.controller';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 import { DeskAgentEditGuard } from '../agent/desk-agent-edit.guard';
 

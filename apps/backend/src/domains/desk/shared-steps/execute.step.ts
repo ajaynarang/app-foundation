@@ -3,11 +3,11 @@ import type { AgentScope } from '@app/shared-types';
 import { scopeTier } from '@app/shared-types';
 
 import { nestApp } from '../core/inngest/nest-context';
-import { fromDeskResponsibility } from '../../ai/agent-contract/agent-principal';
+import { fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
 import { InvocationPipelineService } from '../../ai/agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../core/episode/desk-step-writer.service';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../responsibilities';
 
 import type { ExecuteInput, ExecuteOutput } from './step.types';

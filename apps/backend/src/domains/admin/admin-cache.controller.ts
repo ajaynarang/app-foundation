@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Param, Body, BadRequestException, Logger } from '@nestjs/common';
-import { Roles } from '../../auth/decorators/roles.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
-import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
-import { CACHE_NAMESPACES, CacheNamespace } from '../../constants/cache.constants';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { CACHE_NAMESPACES, CacheNamespace } from '@appshore/kernel/constants/cache.constants';
 
 @Controller('admin/cache')
 @Roles(UserRole.SUPER_ADMIN)

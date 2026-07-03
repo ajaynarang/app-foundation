@@ -10,15 +10,15 @@ jest.mock('../../core/inngest/nest-context', () => ({
 // fromDeskResponsibility validates DB ids and builds the principal; we
 // spy on it to assert the scope set derived from the responsibility's
 // tool inventory.
-jest.mock('../../../ai/agent-contract/agent-principal', () => ({
+jest.mock('@appshore/platform/auth/agent-principal', () => ({
   fromDeskResponsibility: jest.fn(() => ({ kind: 'desk_responsibility' })),
 }));
 
-import { fromDeskResponsibility } from '../../../ai/agent-contract/agent-principal';
+import { fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
 import { InvocationPipelineService } from '../../../ai/agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../../ai/agent-contract/scope-registry.service';
 import { DeskStepWriter } from '../../core/episode/desk-step-writer.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { findResponsibilityDefinition } from '../../responsibilities';
 import { executeStep } from '../execute.step';
 

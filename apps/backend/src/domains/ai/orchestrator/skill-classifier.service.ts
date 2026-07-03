@@ -3,8 +3,8 @@ import { generateText } from 'ai';
 
 import { ai } from '../infrastructure/providers/ai-provider';
 import { AGENT_IDS, AgentId } from '../agents/agent.types';
-import { PromptingService, PROMPT_NAMES } from '../../../domains/prompting';
-import { getAiLangfuseTracer } from '../../../infrastructure/telemetry/telemetry';
+import { PromptingService, PROMPT_NAMES } from '../../prompting';
+import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 interface ClassificationResult {
   agentId: AgentId;

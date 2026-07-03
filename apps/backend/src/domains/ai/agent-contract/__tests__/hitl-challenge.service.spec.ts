@@ -1,9 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { HitlChallengeService } from '../hitl-challenge.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../../infrastructure/events/domain-event.service';
-import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
-import { fromOAuthUser, fromApiKey } from '../agent-principal';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
+import { fromOAuthUser, fromApiKey } from '@appshore/platform/auth/agent-principal';
 
 describe('HitlChallengeService', () => {
   const prisma = createMockPrisma();

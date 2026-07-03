@@ -7,7 +7,7 @@ import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.ser
 import { MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from '../infrastructure/providers/ai-provider';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
-import { PromptingService } from '../../../domains/prompting';
+import { PromptingService } from '../../prompting';
 import {
   AgentContext,
   AgentDefinition,

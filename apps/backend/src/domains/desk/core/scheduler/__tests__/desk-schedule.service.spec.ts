@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskScheduleService } from '../desk-schedule.service';
 

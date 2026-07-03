@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Delete, Req, Res, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { Public } from '../../../auth/decorators/public.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
-import { OAuthTokenGuard } from '../../platform/oauth-provider/oauth-token.guard';
+import { OAuthTokenGuard } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
 import { AgentRateLimitGuard } from './guards/agent-rate-limit.guard';
-import { ApiKeyAuthGuard } from '../../platform/api-keys/guards/api-key-auth.guard';
+import { ApiKeyAuthGuard } from '@appshore/platform/domains/platform/api-keys/guards/api-key-auth.guard';
 import { McpServerService } from './mcp-server.service';
-import type { OAuthUser } from '../../platform/oauth-provider/oauth-token.guard';
-import type { AgentPrincipal } from '../agent-contract/agent-principal';
+import type { OAuthUser } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 @ApiTags('MCP')
 @Controller('mcp')

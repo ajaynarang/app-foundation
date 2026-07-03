@@ -10,7 +10,7 @@
  */
 import { Controller, Post, Req, Headers, HttpCode, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { Public } from '../../../auth/decorators/public.decorator';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { BillingEventsHandler } from '../events/billing-events.handler';
 import { BillingEventType } from '../adapters/payment-provider.interface';

@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '../../../infrastructure/database/prisma.module';
+import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 import { EmbeddingService } from '../infrastructure/providers/embedding.service';
 import { IngestionService } from './ingestion.service';
 

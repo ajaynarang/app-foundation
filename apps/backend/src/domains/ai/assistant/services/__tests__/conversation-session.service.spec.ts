@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ConversationSessionService } from '../conversation-session.service';
-import { PrismaService } from '../../../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '../../../../../infrastructure/events/domain-event.service';
-import { DOMAIN_EVENTS } from '../../../../../infrastructure/events/domain-events.constants';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 
 describe('ConversationSessionService', () => {
   let service: ConversationSessionService;

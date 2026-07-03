@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
-import { buildKey } from '../../infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_HOT_30S } from '../../constants/cache.constants';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
+import { CACHE_TTL_HOT_30S } from '@appshore/kernel/constants/cache.constants';
 import { NotificationType } from '@appshore/db';
 
 interface ListParams {

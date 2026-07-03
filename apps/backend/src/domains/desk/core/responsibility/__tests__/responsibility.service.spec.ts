@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskResponsibilityService } from '../responsibility.service';
 

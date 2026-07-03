@@ -11,8 +11,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';
-import { initializeFirebase } from './config/firebase.config';
-import { shutdownTelemetry } from './infrastructure/telemetry/telemetry';
+import { initializeFirebase } from '@appshore/platform/config/firebase.config';
+import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 async function bootstrap() {
   initializeFirebase();

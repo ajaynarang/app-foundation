@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AuthTokenService } from '../auth-token.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { CredentialsService } from '../../credentials/credentials.service';
-import { AppCacheService } from '../../../../infrastructure/cache/app-cache.service';
-import { REDIS_CLIENT } from '../../../../infrastructure/cache/redis-client.provider';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { REDIS_CLIENT } from '@appshore/platform/infrastructure/cache/redis-client.provider';
 
 // Mock fetch globally
 const mockFetch = jest.fn();

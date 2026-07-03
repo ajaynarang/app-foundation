@@ -1,15 +1,15 @@
-import { shutdownTelemetry } from './infrastructure/telemetry/telemetry';
+import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { validationExceptionFactory } from './shared/utils/validation-exception-factory';
+import { validationExceptionFactory } from '@appshore/kernel/shared/utils/validation-exception-factory';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from './config/configuration';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { initializeFirebase } from './config/firebase.config';
+import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
 import { OAUTH_SCOPES } from '@app/shared-types';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';

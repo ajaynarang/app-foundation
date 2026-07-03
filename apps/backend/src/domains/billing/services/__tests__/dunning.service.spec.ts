@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DunningService } from '../dunning.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { PlansService } from '../../../platform/plans/plans.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { PlansService } from '@appshore/platform/domains/platform/plans/plans.service';
 
 const mockPrisma = {
   billingCustomer: { findUnique: jest.fn() },

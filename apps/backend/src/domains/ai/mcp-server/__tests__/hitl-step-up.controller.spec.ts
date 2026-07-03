@@ -3,9 +3,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HitlStepUpController } from '../hitl-step-up.controller';
 import { HitlChallengeService } from '../../agent-contract/hitl-challenge.service';
-import { PinService } from '../../../../auth/pin.service';
-import { PrismaService } from '../../../../infrastructure/database/prisma.service';
-import { createMockPrisma } from '../../../../test/mocks/prisma.mock';
+import { PinService } from '@appshore/platform/auth/pin.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 describe('HitlStepUpController', () => {
   const prisma = createMockPrisma();

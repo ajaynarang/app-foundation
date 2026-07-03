@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ScopeRegistryService } from './scope-registry.service';
 import { AiPrismaService } from '../rls/ai-prisma.service';
-import { AgentPrincipal } from './agent-principal';
+import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;

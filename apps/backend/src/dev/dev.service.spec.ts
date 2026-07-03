@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DevService } from './dev.service';
-import { PrismaService } from '../infrastructure/database/prisma.service';
-import { AuthService } from '../auth/auth.service';
-import { LoginEventService } from '../auth/login-event.service';
+import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { AuthService } from '@appshore/platform/auth/auth.service';
+import { LoginEventService } from '@appshore/platform/auth/login-event.service';
 
 const mockPrisma = {
   user: {

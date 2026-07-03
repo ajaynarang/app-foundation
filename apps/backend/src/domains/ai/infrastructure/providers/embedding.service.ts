@@ -6,7 +6,7 @@ import type { AiCallContext } from '@app/shared-types';
 import { aiEmbedding, EMBEDDING_MODEL_ID, EMBEDDING_PROVIDER_LABEL } from './ai-provider';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
-import { getAiLangfuseTracer } from '../../../../infrastructure/telemetry/telemetry';
+import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 const EMBEDDING_DIMENSIONS = 1536;
 
