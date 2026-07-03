@@ -28,6 +28,7 @@ import { AdminJobsModule } from './domains/admin/admin-jobs.module';
 import { AdminEventsModule } from './domains/admin/admin-events.module';
 import { AdminAiSpendModule } from './domains/admin/admin-ai-spend.module';
 import { BillingModule } from './domains/billing/billing.module';
+import { SupportModule } from './domains/support/support.module';
 import { DeskModule } from './domains/desk/desk.module';
 
 // Infrastructure Modules
@@ -138,6 +139,7 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     AdminEventsModule,
     AdminAiSpendModule,
     BillingModule,
+    SupportModule,
     DeskModule,
     OutboundWebhooksModule,
     DataRetentionModule,

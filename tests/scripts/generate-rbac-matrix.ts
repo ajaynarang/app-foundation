@@ -28,6 +28,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Resolved from tests/scripts/ (two levels up = repo root).
 const BACKEND_SRC = process.env.BACKEND_SRC || path.resolve(__dirname, '../../apps/backend/src');
+// Platform controllers moved into the foundation packages — scan those too.
+const SCAN_ROOTS = [
+  BACKEND_SRC,
+  path.resolve(__dirname, '../../packages/foundation/platform/src'),
+  path.resolve(__dirname, '../../packages/foundation/kernel/src'),
+];
 const OUTPUT_PATH = path.join(__dirname, '..', 'rbac', 'rbac-matrix.generated.ts');
 
 // ── Types ──
@@ -209,6 +215,34 @@ function parseController(filePath: string): EndpointInfo[] {
 
 const ALL_ROLES = ['MEMBER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'];
 
+// GET endpoints that 400 without required query params (list filters, tenant
+// selectors). Auth still runs first, so for ALLOWED roles we assert 400 —
+// "authorized, but validation rejected the empty query" — and keep the full
+// 401/403 coverage for anonymous/denied roles.
+const REQUIRED_QUERY_PARAM_PATHS = new Set([
+  '/agent-activity',
+  '/admin/login-activity',
+  '/admin/login-activity/summary',
+  '/super-admin/login-activity',
+  '/super-admin/login-activity/summary',
+]);
+
+// Tenant-scoped GETs that succeed for tenant roles but 400 for SUPER_ADMIN,
+// whose token carries no tenant — these endpoints demand an explicit
+// tenant selector query param from super admins.
+const SUPER_ADMIN_TENANT_SELECTOR_PATHS = new Set([
+  '/api-keys/admin/tenant',
+  '/desk/agents',
+  '/desk/agents/eligible-supervisors',
+  '/desk/approvals',
+  '/desk/approvals/counts',
+  '/desk/episodes',
+  '/desk/episodes/handled',
+  '/desk/memories',
+  '/desk/responsibilities',
+  '/desk/schedule',
+]);
+
 function generateExpectations(ep: EndpointInfo): Record<string, number | null> {
   const expectations: Record<string, number | null> = {};
 
@@ -228,7 +262,11 @@ function generateExpectations(ep: EndpointInfo): Record<string, number | null> {
     } else if (ep.roles.includes(role)) {
       // Role is allowed
       if (ep.method === 'GET') {
-        expectations[role] = 200;
+        expectations[role] = REQUIRED_QUERY_PARAM_PATHS.has(ep.path)
+          ? 400
+          : SUPER_ADMIN_TENANT_SELECTOR_PATHS.has(ep.path) && role === 'SUPER_ADMIN'
+            ? 400
+            : 200;
       } else {
         // Mutations may fail validation but should NOT be 403
         expectations[role] = null; // Tested in workflow tests
@@ -369,9 +407,9 @@ async function main(): Promise<void> {
   const shouldWrite = args.includes('--write');
   const shouldDiff = args.includes('--diff');
 
-  console.log(`\n🔍 Scanning controllers in ${BACKEND_SRC}...\n`);
+  console.log(`\n🔍 Scanning controllers in ${SCAN_ROOTS.join(', ')}...\n`);
 
-  const controllerFiles = findControllerFiles(BACKEND_SRC);
+  const controllerFiles = SCAN_ROOTS.flatMap((root) => findControllerFiles(root));
   console.log(`   Found ${controllerFiles.length} controller files`);
 
   const allEndpoints: EndpointInfo[] = [];
