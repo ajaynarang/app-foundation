@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { searchEntities } from '@/shared/lib/search';
-import { useDebounce } from '@/shared/hooks/use-debounce';
-import { queryKeys } from '@/shared/constants/query-keys';
+import { searchEntities } from '@appshore/web-core/shared/lib/search';
+import { useDebounce } from '@appshore/web-core/shared/hooks/use-debounce';
+import { queryKeys } from '@appshore/web-core/shared/constants/query-keys';
 
 const MIN_QUERY = 2;
 const DEBOUNCE_MS = 250;

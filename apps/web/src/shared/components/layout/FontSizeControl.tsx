@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
-import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants/storage-keys';
 
 const BASE_FONT_SIZE = 13;
 const MIN_SCALE = 80;

@@ -5,7 +5,7 @@ import { showMutationError } from '@app/ui';
 import { useState } from 'react';
 import { AuthProvider } from '@/shared/components/common/providers/auth-provider';
 import { PreferencesProvider } from '@/shared/providers/PreferencesProvider';
-import { SseProvider } from '@/shared/realtime';
+import { SseProvider } from '@appshore/web-core/shared/realtime';
 import { TooltipProvider } from '@app/ui/components/ui/tooltip';
 
 export function Providers({ children }: { children: React.ReactNode }) {

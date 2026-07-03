@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getUserPreferences, updateUserPreferences, resetToDefaults } from '../api';
 import type { UserPreferences } from '../api';
 import { showSuccess, showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 export function useUserPreferences() {
   return useQuery({

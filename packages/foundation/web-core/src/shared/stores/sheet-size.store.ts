@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
+import { STORAGE_KEYS } from '../constants/storage-keys';
 
 export const SHEET_SIZE_MODE_OPTIONS = ['side-panel', 'half', 'full'] as const;
 export type SheetSizeMode = (typeof SHEET_SIZE_MODE_OPTIONS)[number];

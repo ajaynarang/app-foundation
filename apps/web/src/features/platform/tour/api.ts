@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type { UserPreferences } from '@app/shared-types';
 
 export async function getTourStatus(): Promise<UserPreferences> {

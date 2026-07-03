@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { toast } from '@app/ui';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 
 const TOAST_DELAY_MS = 1500;
 

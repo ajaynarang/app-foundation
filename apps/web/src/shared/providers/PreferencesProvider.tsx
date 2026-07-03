@@ -11,7 +11,7 @@ import {
   formatDateTime as rawFormatDateTime,
   formatCurrency as rawFormatCurrency,
   formatCents as rawFormatCents,
-} from '@/shared/lib/utils/formatters';
+} from '@appshore/web-core/shared/lib/utils/formatters';
 import {
   formatCalendarDate as rawFormatCalendarDate,
   formatTimestamp as rawFormatTimestamp,
@@ -19,7 +19,7 @@ import {
   isCalendarDateBefore,
   calendarDateToDate as rawCalendarDateToDate,
   dateToCalendarDate as rawDateToCalendarDate,
-} from '@/shared/lib/utils/date-utils';
+} from '@appshore/web-core/shared/lib/utils/date-utils';
 
 interface Formatters {
   formatDistance: (miles: number) => string;

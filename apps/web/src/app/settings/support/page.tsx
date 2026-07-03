@@ -3,8 +3,8 @@
 import { Button } from '@app/ui/components/ui/button';
 import { BookOpen, ExternalLink, Mail, MessageSquare, CreditCard, Plug, Settings, Users } from 'lucide-react';
 
-import { CONSOLE_URL } from '@/shared/lib/navigation';
-import { mailto } from '@/shared/lib/contacts';
+import { CONSOLE_URL } from '@appshore/web-core/shared/lib/navigation';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 
 // ─── Help Center topics ───
 

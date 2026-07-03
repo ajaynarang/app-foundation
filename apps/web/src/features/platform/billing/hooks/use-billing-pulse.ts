@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { billingApi } from '../api';
-import { QUERY_TIERS } from '@/shared/config/query-tiers';
-import { queryKeys } from '@/shared/constants';
+import { QUERY_TIERS } from '@appshore/web-core/shared/config/query-tiers';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 
 interface Tenant {
   tenantId: string;

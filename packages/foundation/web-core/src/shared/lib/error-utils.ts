@@ -1,5 +1,5 @@
-import { ApiError } from '@/shared/lib/api/client';
-import { captureError } from '@/shared/lib/sentry';
+import { ApiError } from './api/client';
+import { captureError } from './sentry';
 
 /**
  * Extract a domain error code from an ApiError, if the backend included one.

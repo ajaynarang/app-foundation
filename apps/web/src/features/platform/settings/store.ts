@@ -6,7 +6,7 @@ import {
   resetToDefaults as resetToDefaultsAPI,
 } from '@/features/platform/settings';
 import { showSuccess, showError } from '@app/ui';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface PreferencesState {
   // Preferences data

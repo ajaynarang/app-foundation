@@ -9,7 +9,7 @@ import { AssistantMessage } from './AssistantMessage';
 import { AssistantActionBar } from './AssistantActionBar';
 import { AssistantInput } from './AssistantInput';
 import { AssistantOrb } from './AssistantOrb';
-import { formatRelativeTime } from '@/shared/lib/utils/formatters';
+import { formatRelativeTime } from '@appshore/web-core/shared/lib/utils/formatters';
 
 interface AssistantChatProps {
   /**

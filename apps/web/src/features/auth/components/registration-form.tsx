@@ -12,10 +12,10 @@ import { Checkbox } from '@app/ui/components/ui/checkbox';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import { PhoneInput } from '@app/ui/components/ui/phone-input';
-import { isValidE164 } from '@/shared/lib/utils/phone';
+import { isValidE164 } from '@app/ui/lib/phone';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '@/features/auth';
-import { showSuccess, showError } from '@/shared/lib/toast';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { PasswordStrengthMeter } from './password-strength-meter';
 
 const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost:3000';

@@ -32,11 +32,11 @@ import {
   useDowngradePlan,
 } from '@/features/billing/hooks/use-billing';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
-import { formatCents } from '@/shared/lib/utils/formatters';
+import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import { useQuery } from '@tanstack/react-query';
 import type { PlanConfig, TenantPlan } from '@app/shared-types';
 import { cn } from '@app/ui';
-import { mailto } from '@/shared/lib/contacts';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 
 // ---------------------------------------------------------------------------
 // Helpers

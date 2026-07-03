@@ -3,7 +3,7 @@
 import * as React from 'react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { Tabs } from '@/shared/components/ui/tabs';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 /**
  * PageTabs — underline-styled content tabs for Zone 2 (Control bar) of the page chrome.

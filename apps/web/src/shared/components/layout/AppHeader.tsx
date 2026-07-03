@@ -11,7 +11,7 @@ import { NotificationSheet } from './NotificationSheet';
 import { DynamicIsland } from './DynamicIsland';
 import { useAuthStore } from '@/features/auth';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
-import { useLongPress } from '@/shared/hooks/use-long-press';
+import { useLongPress } from '@appshore/web-core/shared/hooks/use-long-press';
 
 interface AppHeaderProps {
   onToggleSidebar: () => void;

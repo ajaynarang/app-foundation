@@ -13,11 +13,11 @@ import { PinInput } from '@/components/ui/pin-input';
 import { CheckCircle2, AlertCircle, Mail, Phone, Shield } from 'lucide-react';
 import { ChangePasswordDialog } from '@/features/auth/components/change-password-dialog';
 import { PhoneInput } from '@app/ui/components/ui/phone-input';
-import { formatPhone } from '@/shared/lib/utils/phone';
+import { formatPhone } from '@app/ui/lib/phone';
 import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 function formatRelativeTime(
   isoString: string,

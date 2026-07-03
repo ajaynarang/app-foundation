@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
 import { Card, CardHeader, CardTitle, CardContent } from '@app/ui/components/ui/card';
@@ -29,9 +29,9 @@ import {
 import { Textarea } from '@app/ui/components/ui/textarea';
 import { Label } from '@app/ui/components/ui/label';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
+import { DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { useAuth } from '@/features/auth';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 export function TenantList() {
   const { formatTimestamp } = useFormatters();

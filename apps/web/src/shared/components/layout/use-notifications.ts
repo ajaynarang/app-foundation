@@ -10,8 +10,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/shared/lib/api';
-import { queryKeys } from '@/shared/constants/query-keys';
+import { api } from '@appshore/web-core/shared/lib/api';
+import { queryKeys } from '@appshore/web-core/shared/constants/query-keys';
 
 export interface Notification {
   notificationId: string;

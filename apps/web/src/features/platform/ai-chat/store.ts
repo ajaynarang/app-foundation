@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 import type { ChatMessage, OrbState, UserMode, InputMode, Intent, ChatLayout } from './engine/types';
 import { DEFAULT_VOICE_PREFS, type VoicePreferences } from './voice/types';
 import {

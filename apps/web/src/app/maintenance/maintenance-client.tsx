@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { CONTACTS, mailto } from '@/shared/lib/contacts';
+import { CONTACTS, mailto } from '@appshore/web-core/shared/lib/contacts';
 
 export interface MaintenanceState {
   enabled: boolean;

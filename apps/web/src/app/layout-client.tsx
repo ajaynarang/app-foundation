@@ -7,7 +7,7 @@ import { AppLayout } from '@/shared/components/layout/AppLayout';
 import { PublicLayout } from '@/shared/components/layout/PublicLayout';
 import { AppAIProvider, useAssistantStore } from '@/features/platform/ai-chat';
 import { useAuthStore } from '@/features/auth';
-import { isProtectedRoute } from '@/shared/lib/navigation';
+import { isProtectedRoute } from '@appshore/web-core/shared/lib/navigation';
 
 function PassthroughLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface PageShellProps {
   /** Zone 1 — typically <PageHeader /> */

@@ -16,10 +16,10 @@ import { PhoneInput } from '@app/ui/components/ui/phone-input';
 import { useAuth } from '@/features/auth';
 import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { queryKeys } from '@/shared/constants';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 import { plansApi } from '@/features/platform/plans';
 import { TenantPlanBillingTab } from './tenant-billing-tab';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface TenantDetailsSheetProps {
   open: boolean;

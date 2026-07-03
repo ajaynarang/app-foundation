@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { create } from 'zustand';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/features/auth/store';
-import { resolvePostLoginRedirect } from '@/shared/lib/navigation';
-import { buildTenantRedirectUrl, buildTenantUrl } from '@/shared/lib/tenant-url';
+import { resolvePostLoginRedirect } from '@appshore/web-core/shared/lib/navigation';
+import { buildTenantRedirectUrl, buildTenantUrl } from '@appshore/web-core/shared/lib/tenant-url';
 import { showError } from '@app/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SESSION_KEYS } from '@/shared/constants';
+import { SESSION_KEYS } from '@appshore/web-core/shared/constants';
 
 /**
  * Dev tools visibility store.

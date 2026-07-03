@@ -5,7 +5,7 @@ import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
 import { USER_ROLES, type UserRoleValue } from '@app/shared-types';
 
-import { mailto, CONTACTS } from '@/shared/lib/contacts';
+import { mailto, CONTACTS } from '@appshore/web-core/shared/lib/contacts';
 import { useAuthStore } from '@/features/auth';
 import { useOrganization, useUpdateOrganization } from '@/features/platform/settings';
 import { OrganizationForm } from '@/features/platform/settings/components/organization-form';

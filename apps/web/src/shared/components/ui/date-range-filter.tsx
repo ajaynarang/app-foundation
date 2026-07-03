@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { CalendarIcon } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
+import { DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { Button } from '@/shared/components/ui/button';
 import { Calendar } from '@/shared/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';

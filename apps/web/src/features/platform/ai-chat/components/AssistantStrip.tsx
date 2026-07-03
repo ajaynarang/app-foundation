@@ -7,7 +7,7 @@ import { AssistantOrb } from './AssistantOrb';
 import { AssistantChat } from './AssistantChat';
 import { VoiceProvider } from '../voice/voice-provider';
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 import type { ChatLayout } from '../engine/types';
 import { AssistantVoiceSettings } from './AssistantVoiceSettings';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';

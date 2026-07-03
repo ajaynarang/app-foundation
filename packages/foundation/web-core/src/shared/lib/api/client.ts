@@ -7,7 +7,7 @@
  * - Concurrent 401s are deduplicated via a shared refresh promise
  */
 
-import { useAuthStore } from '@/features/auth';
+import { getSessionStore } from '@appshore/web-core/auth/session-bridge';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -48,7 +48,7 @@ export async function refreshAccessToken(): Promise<string | null> {
       if (refreshResponse.ok) {
         const data = await refreshResponse.json();
         if (data?.accessToken) {
-          const store = useAuthStore.getState();
+          const store = getSessionStore().getState();
           store.setTokens(data.accessToken);
           // Refresh also returns updated user — sync store + renew auth cookie
           if (data.user) {
@@ -73,7 +73,7 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
   const { _isRetry, ...fetchOptions } = options;
 
   // Get token from authStore directly (not a React hook, so use store access)
-  const accessToken = useAuthStore.getState().accessToken;
+  const accessToken = getSessionStore().getState().accessToken;
 
   // Add Authorization header
   const headers = {
@@ -98,7 +98,7 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
     }
 
     // Refresh failed — session is truly expired
-    await useAuthStore.getState().signOut();
+    await getSessionStore().getState().signOut();
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }

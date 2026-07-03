@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { PageActionsMenu, type ActionItem } from './page-actions-menu';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface PageToolbarProps {
   /** LEFT slot: content tabs (a <PageTabsList> with <PageTabsTrigger>s). Optional. */

@@ -1,4 +1,4 @@
-import { SEMANTIC_COLORS, getSyncFreshnessColor } from '@/shared/lib/colors';
+import { SEMANTIC_COLORS, getSyncFreshnessColor } from './colors';
 
 /**
  * Format a date string as a relative time (e.g., "5m ago", "2h ago")

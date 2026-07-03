@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
-import { auth } from '@/shared/lib/firebase';
+import { auth } from '@appshore/web-core/shared/lib/firebase';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import { PasswordInput } from './password-input';
 import { PasswordStrengthMeter } from './password-strength-meter';
 import { showSuccess, showError } from '@app/ui';
 import { authApi } from '@/features/auth/api';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface ChangePasswordDialogProps {
   open: boolean;

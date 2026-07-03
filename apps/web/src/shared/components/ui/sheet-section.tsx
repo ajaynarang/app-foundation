@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 interface SheetSectionProps {
   icon: LucideIcon;

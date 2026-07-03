@@ -3,7 +3,7 @@
 import { AlertTriangle, Clock, ShieldOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Button } from '@app/ui/components/ui/button';
-import { mailto } from '@/shared/lib/contacts';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { usePlan } from '../hooks/use-plan';
 import { useUpgradeUrl } from '../hooks/use-upgrade-url';
 

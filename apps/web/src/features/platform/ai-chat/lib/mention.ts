@@ -1,4 +1,4 @@
-import type { SearchApiResult } from '@/shared/lib/search';
+import type { SearchApiResult } from '@appshore/web-core/shared/lib/search';
 
 export interface MentionFragment {
   /** index of the '@' in the value */

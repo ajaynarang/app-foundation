@@ -7,7 +7,7 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
 import { cn } from '@app/ui';
 import { useRouter } from 'next/navigation';
-import { openConsole } from '@/shared/lib/console-url';
+import { openConsole } from '@appshore/web-core/shared/lib/console-url';
 import type { MilestoneStatus, OnboardingItem, OnboardingPath } from '../types';
 
 interface MilestoneCardProps {

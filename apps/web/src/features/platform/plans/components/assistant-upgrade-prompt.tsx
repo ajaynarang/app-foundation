@@ -5,11 +5,11 @@ import { useMutation } from '@tanstack/react-query';
 import { upgradeRegistry } from '../config/upgrade-registry';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
-import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@/shared/lib/toast';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { useUpgradeUrl } from '../hooks/use-upgrade-url';
-import { CONTACTS, mailto } from '@/shared/lib/contacts';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { CONTACTS, mailto } from '@appshore/web-core/shared/lib/contacts';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface AssistantUpgradePromptProps {
   feature: string;

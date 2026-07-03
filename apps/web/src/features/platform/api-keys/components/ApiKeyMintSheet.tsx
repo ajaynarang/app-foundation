@@ -10,9 +10,9 @@ import { showSuccess, showError } from '@app/ui';
 import type { AgentScope } from '@app/shared-types';
 import { ScopeMultiSelect } from '@/features/ai/agent-scope-ui';
 import { SecretCopyDialog } from '@/features/ai/agent-detail-sheet';
-import { apiClient } from '@/shared/lib/api';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface Props {
   open: boolean;

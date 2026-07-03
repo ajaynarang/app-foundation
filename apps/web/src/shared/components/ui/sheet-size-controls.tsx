@@ -1,10 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo } from 'react';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 import { Button } from '@app/ui/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/tooltip';
-import { useSheetSizeStore, SHEET_SIZE_MODE_OPTIONS, type SheetSizeMode } from '@/shared/stores/sheet-size.store';
+import {
+  useSheetSizeStore,
+  SHEET_SIZE_MODE_OPTIONS,
+  type SheetSizeMode,
+} from '@appshore/web-core/shared/stores/sheet-size.store';
 import { useSheetContext } from '@app/ui/components/ui/sheet';
 
 interface SheetSizeControlsProps {

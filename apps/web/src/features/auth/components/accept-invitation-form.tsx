@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/shared/lib/firebase';
+import { auth } from '@appshore/web-core/shared/lib/firebase';
 import { Button } from '@app/ui/components/ui/button';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
@@ -13,8 +13,8 @@ import { useAuthStore } from '@/features/auth';
 import { authApi } from '../api';
 import { OtpInput } from '@/components/ui/otp-input';
 import { PinInput } from '@/components/ui/pin-input';
-import { getDefaultRouteForRole, type UserRole } from '@/shared/lib/navigation';
-import { buildTenantRedirectUrl } from '@/shared/lib/tenant-url';
+import { getDefaultRouteForRole, type UserRole } from '@appshore/web-core/shared/lib/navigation';
+import { buildTenantRedirectUrl } from '@appshore/web-core/shared/lib/tenant-url';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 

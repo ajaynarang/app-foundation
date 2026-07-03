@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { cn } from '@app/ui';
 
-import { formatUsdPrecise } from '@/shared/lib/utils/formatters';
+import { formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
 
 import { useAiSpendBySurface } from '../hooks';
 import { SURFACE_LABELS } from '../constants';

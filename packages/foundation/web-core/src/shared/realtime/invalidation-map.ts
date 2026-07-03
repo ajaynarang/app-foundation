@@ -1,6 +1,6 @@
 import type { QueryKey } from '@tanstack/react-query';
 import { SSE_EVENTS, type SseEventType } from '@app/shared-types';
-import { queryKeys } from '@/shared/constants/query-keys';
+import { queryKeys } from '../constants/query-keys';
 
 /**
  * Map SSE event types to TanStack Query keys to invalidate.

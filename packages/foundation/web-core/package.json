@@ -14,6 +14,19 @@
     "react": ">=18",
     "react-dom": ">=18"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@app/shared-types": "workspace:*",
+    "@app/ui": "workspace:*",
+    "@date-fns/tz": "^1.5.0",
+    "@tanstack/react-query": "^5.62.9",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "firebase": "12.8.0",
+    "framer-motion": "12.29.2",
+    "lucide-react": "^0.468.0",
+    "next": "15.1.12",
+    "tailwind-merge": "^2.6.1",
+    "zustand": "^5.0.2"
+  },
   "devDependencies": {}
 }

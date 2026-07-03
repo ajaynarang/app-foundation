@@ -2,7 +2,7 @@
  * Platform Motion System — Reusable Framer Motion Variants
  *
  * Usage:
- *   import { fadeIn, slideUp, staggerContainer } from '@/shared/lib/motion';
+ *   import { fadeIn, slideUp, staggerContainer } from './index';
  *   <motion.div variants={fadeIn} initial="hidden" animate="visible" />
  */
 

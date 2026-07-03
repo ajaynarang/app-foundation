@@ -8,7 +8,7 @@ import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useQuery } from '@tanstack/react-query';
 import { useRecents, ICON_MAP } from './use-recents';
 import { isAddOnFeature } from '@app/shared-types';
-import { searchEntities } from '@/shared/lib/search';
+import { searchEntities } from '@appshore/web-core/shared/lib/search';
 import { defaultProviders, searchResultsToPaletteItems } from './command-registry';
 import type { PaletteItem } from './command-registry';
 

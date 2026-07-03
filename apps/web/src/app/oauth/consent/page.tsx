@@ -25,10 +25,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/features/auth';
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import { OAUTH_SCOPE_DESCRIPTIONS } from '@app/shared-types';
 import { showError } from '@app/ui';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface ConsentChallenge {
   clientName: string;

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@app/ui/components/ui/card';
 import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
 import { cn } from '@app/ui';
-import { mailto } from '@/shared/lib/contacts';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 
 interface UpgradePromptProps {
   feature: string;

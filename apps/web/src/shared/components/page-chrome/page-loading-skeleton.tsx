@@ -1,7 +1,7 @@
 'use client';
 
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface PageLoadingSkeletonProps {
   variant: 'table' | 'board' | 'cards';

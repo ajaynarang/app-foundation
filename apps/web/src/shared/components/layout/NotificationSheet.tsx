@@ -19,7 +19,7 @@ import {
   type Notification,
 } from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
-import { openConsole } from '@/shared/lib/console-url';
+import { openConsole } from '@appshore/web-core/shared/lib/console-url';
 
 interface NotificationSheetProps {
   open: boolean;

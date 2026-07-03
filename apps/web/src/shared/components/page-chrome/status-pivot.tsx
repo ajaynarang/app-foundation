@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface StatusPivotSegment<T extends string = string> {
   value: T;

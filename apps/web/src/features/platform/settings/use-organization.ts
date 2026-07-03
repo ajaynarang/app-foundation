@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
 import type { OrganizationProfile, UpdateOrganizationProfileInput } from '@app/shared-types';
 
-import { apiClient } from '@/shared/lib/api';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
-import { queryKeys } from '@/shared/constants';
-import { QUERY_TIERS } from '@/shared/config/query-tiers';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { QUERY_TIERS } from '@appshore/web-core/shared/config/query-tiers';
 
 export const organizationApi = {
   get: () => apiClient<OrganizationProfile>('/tenants/me/profile'),

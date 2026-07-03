@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/shared/components/ui/input';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface FilterBarProps {
   /** Controlled search value. Omit search entirely by not passing searchValue + onSearchChange. */

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { FileText, Home, Settings, Sparkles, User, Users, type LucideIcon } from 'lucide-react';
-import { getNavigationForRole, type NavItem, type UserRole } from '@/shared/lib/navigation';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { getNavigationForRole, type NavItem, type UserRole } from '@appshore/web-core/shared/lib/navigation';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -5,7 +5,7 @@ import { type DialogProps } from '@radix-ui/react-dialog';
 import { Command as CommandPrimitive } from 'cmdk';
 import { Search } from 'lucide-react';
 
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 

@@ -8,7 +8,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 
-import { formatRelativeTime, formatUsdPrecise } from '@/shared/lib/utils/formatters';
+import { formatRelativeTime, formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
 
 import { useAiSpendInvocations } from '../hooks';
 import { SURFACE_LABELS, getLangfuseTraceUrl, getLangfuseSessionUrl, buildLangfuseSessionId } from '../constants';

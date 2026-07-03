@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getTourStatus, updateTourStatus } from '../api';
 import { useTourStore } from '../store';
 import { showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 import { useEffect } from 'react';
 import type { TourStatus } from '../types';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 export function useTourStatus() {
   const { setTourStatus, setLoading } = useTourStore();

@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 
-import { formatUsdPrecise } from '@/shared/lib/utils/formatters';
+import { formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
 
 import { useAiCostVsQuota } from '../hooks';
 

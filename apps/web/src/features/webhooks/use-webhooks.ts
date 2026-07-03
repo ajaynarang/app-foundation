@@ -15,8 +15,8 @@ import {
   type WebhookDeliveryLog,
 } from './api';
 import { showSuccess, showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 const webhookLogsKey = (id: string) => ['webhooks', id, 'logs'] as const;
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Search } from 'lucide-react';
 import { Command, CommandGroup, CommandItem, CommandList } from '@app/ui/components/ui/command';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
-import type { SearchApiResult } from '@/shared/lib/search';
+import type { SearchApiResult } from '@appshore/web-core/shared/lib/search';
 
 /** Title-case a backend entity `type` discriminator into a group heading. */
 function groupLabel(type: string): string {

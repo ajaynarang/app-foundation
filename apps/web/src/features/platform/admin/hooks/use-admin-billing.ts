@@ -2,9 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 import { adminBillingApi } from '../api';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 export function useAdminTenantBilling(tenantId: number | undefined) {
   return useQuery({

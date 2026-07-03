@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createOAuthClient } from '../api';
 import type { CreateOAuthClientInput } from '@app/shared-types';
 import { showSuccess, showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 /**
  * Create a new OAuth client. Used by {@link OAuthClientRegisterSheet} to

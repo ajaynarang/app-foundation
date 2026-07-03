@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { CONTACTS } from '@/shared/lib/contacts';
+import { CONTACTS } from '@appshore/web-core/shared/lib/contacts';
 
 export const metadata: Metadata = {
   title: 'Cookie Policy',

@@ -8,13 +8,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/t
 import { Send, Sparkles } from 'lucide-react';
 import { useAssistantStore } from '../store';
 import { useVoice } from '../voice/voice-provider';
-import { showError } from '@/shared/lib/toast';
+import { showError } from '@appshore/web-core/shared/lib/toast';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import type { UserMode } from '../engine/types';
 import { MentionPicker } from './MentionPicker';
 import { useMentionSearch } from '../hooks/use-mention-search';
 import { getMentionFragment, buildMentionText } from '../lib/mention';
-import type { SearchApiResult } from '@/shared/lib/search';
+import type { SearchApiResult } from '@appshore/web-core/shared/lib/search';
 
 // ── Placeholder questions ──────────────────────────────────────────────────
 

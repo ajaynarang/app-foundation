@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CookiePreferences {

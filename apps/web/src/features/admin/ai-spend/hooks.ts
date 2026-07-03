@@ -8,9 +8,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
 
-import { queryKeys } from '@/shared/constants/query-keys';
-import { QUERY_TIERS } from '@/shared/config/query-tiers';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants/query-keys';
+import { QUERY_TIERS } from '@appshore/web-core/shared/config/query-tiers';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { aiSpendApi } from './api';
 import type { UpdateAiBudgetInput } from './types';
 

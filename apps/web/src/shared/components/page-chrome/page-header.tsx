@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Settings } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface PageHeaderProps {
   /** REQUIRED page title (h1). */

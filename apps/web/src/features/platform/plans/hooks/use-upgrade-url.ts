@@ -2,7 +2,7 @@
 
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags';
 import { useAuth } from '@/features/auth';
-import { mailto } from '@/shared/lib/contacts';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 
 /**
  * Returns the correct upgrade URL based on the payment_system feature flag,

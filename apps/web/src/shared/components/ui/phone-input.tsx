@@ -4,8 +4,8 @@ import { useState, useRef, useCallback } from 'react';
 import { CountryCode, parsePhoneNumber } from 'libphonenumber-js';
 import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { cn } from '@/shared/lib/utils';
-import { toE164, formatAsYouType } from '@/shared/lib/utils/phone';
+import { cn } from '@appshore/web-core/shared/lib/utils';
+import { toE164, formatAsYouType } from '@app/ui/lib/phone';
 
 interface Country {
   code: CountryCode;

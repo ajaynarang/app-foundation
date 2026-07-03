@@ -1,9 +1,9 @@
 import type { LucideIcon } from 'lucide-react';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 import { FileText, Moon, Package, Plus, Sun, Users } from 'lucide-react';
-import type { UserRole, NavigationItem, NavItem } from '@/shared/lib/navigation';
-import { getNavigationForRole, getSubPanelSections } from '@/shared/lib/navigation';
-import type { SearchApiResult } from '@/shared/lib/search';
+import type { UserRole, NavigationItem, NavItem } from '@appshore/web-core/shared/lib/navigation';
+import { getNavigationForRole, getSubPanelSections } from '@appshore/web-core/shared/lib/navigation';
+import type { SearchApiResult } from '@appshore/web-core/shared/lib/search';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -20,11 +20,11 @@ import {
 } from '@app/ui/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { Check, X, Clock, Package, Ban, Info } from 'lucide-react';
-import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@/shared/lib/toast';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 type RequestStatus = 'pending' | 'approved' | 'declined';
 type DisplayStatus = RequestStatus | 'cancelled';

@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/features/auth';
 import type { TenantBranding } from '@/features/auth';
 import { useAuthStore } from '@/features/auth';
-import { getValidToken, resolvePostLoginRedirect } from '@/shared/lib/navigation';
-import { buildTenantRedirectUrl, extractSubdomain } from '@/shared/lib/tenant-url';
+import { getValidToken, resolvePostLoginRedirect } from '@appshore/web-core/shared/lib/navigation';
+import { buildTenantRedirectUrl, extractSubdomain } from '@appshore/web-core/shared/lib/tenant-url';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 

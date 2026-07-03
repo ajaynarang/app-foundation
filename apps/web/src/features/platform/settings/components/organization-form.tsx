@@ -12,7 +12,7 @@ import {
   UpdateOrganizationProfileSchema,
 } from '@app/shared-types';
 
-import { extractFieldErrors } from '@/shared/lib/error-utils';
+import { extractFieldErrors } from '@appshore/web-core/shared/lib/error-utils';
 
 import { TIMEZONE_OPTIONS } from '../organization-constants';
 

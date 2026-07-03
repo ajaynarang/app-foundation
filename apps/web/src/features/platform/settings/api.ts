@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type { PreferencesResetResponse } from './types';
 
 // Re-export domain types from @app/shared-types

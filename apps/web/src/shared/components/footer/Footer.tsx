@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
-import { mailto } from '@/shared/lib/contacts';
+import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 
 const consoleUrl = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';

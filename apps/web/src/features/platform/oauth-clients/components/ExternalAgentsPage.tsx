@@ -7,7 +7,7 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import type { OAuthClientResponse } from '@app/shared-types';
-import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants/storage-keys';
 import { useTenantOAuthClients } from '../hooks/use-tenant-oauth-clients';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
 import { OAuthClientRegisterSheet } from './OAuthClientRegisterSheet';

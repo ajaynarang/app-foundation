@@ -7,7 +7,7 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Card, CardContent } from '@app/ui/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { UrlRow } from '@app/ui/components/ui/url-row';
-import { getApiBaseUrl, getEnvironmentLabel } from '@/shared/lib/access-environments';
+import { getApiBaseUrl, getEnvironmentLabel } from '@appshore/web-core/shared/lib/access-environments';
 
 export default function ApiKeysSettingsPage() {
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);

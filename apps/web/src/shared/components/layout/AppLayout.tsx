@@ -10,7 +10,7 @@ import { usePlan } from '@/features/platform/plans';
 import { useAuthStore } from '@/features/auth';
 import { useOnboardingStore } from '@/features/platform/onboarding';
 import { PlatformTour } from '@/features/platform/tour';
-import { PageTransition } from '@/shared/lib/motion';
+import { PageTransition } from '@appshore/web-core/shared/lib/motion';
 import { CommandPalette } from '@/shared/components/command-palette/CommandPalette';
 import { useRecents } from '@/shared/components/command-palette/use-recents';
 import { useAppHotkeys } from '@/shared/hooks/use-app-hotkeys';

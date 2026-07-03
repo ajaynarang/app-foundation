@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import { useAuthStore } from '@/features/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';

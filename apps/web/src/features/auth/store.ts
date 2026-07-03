@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { registerSessionStore, type SessionStoreHook } from '@appshore/web-core/auth/session-bridge';
 import { persist } from 'zustand/middleware';
 import {
   signInWithEmailAndPassword,
@@ -7,8 +8,8 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '@/shared/lib/firebase';
-import { getCookieDomain, isLocalhost } from '@/shared/lib/tenant-url';
+import { auth } from '@appshore/web-core/shared/lib/firebase';
+import { getCookieDomain, isLocalhost } from '@appshore/web-core/shared/lib/tenant-url';
 
 interface User {
   dbId?: number; // Numeric DB id — used by UI permission checks (e.g. agent supervisor match)
@@ -231,3 +232,8 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// Register this store as the session source for @appshore/web-core (api
+// client, SSE provider, console-url). Runs at module load — any consumer of
+// the auth feature wires the bridge automatically.
+registerSessionStore(useAuthStore as unknown as SessionStoreHook);

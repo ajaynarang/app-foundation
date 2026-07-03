@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '../lib/api';
 import { showSuccess, showError } from '@app/ui';
 
 export function usePushNotifications() {

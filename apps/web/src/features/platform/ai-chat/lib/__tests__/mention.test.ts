@@ -1,5 +1,5 @@
 import { getMentionFragment, buildMentionText } from '../mention';
-import type { SearchApiResult } from '@/shared/lib/search';
+import type { SearchApiResult } from '@appshore/web-core/shared/lib/search';
 
 describe('getMentionFragment', () => {
   const at = (value: string, caret = value.length) => getMentionFragment(value, caret);

@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { queryKeys } from '@/shared/constants';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 import { plansApi } from '@/features/platform/plans/api';
 import {
   useAdminTenantBilling,
@@ -51,7 +51,7 @@ import {
   useAdminChangeSubscriptionPlan,
 } from '../hooks/use-admin-billing';
 import { TenantAddOnsTab } from './tenant-add-ons-tab';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 // ---------------------------------------------------------------------------
 // Types

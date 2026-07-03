@@ -21,6 +21,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
+      "@appshore/web-core/*": ["../../packages/foundation/web-core/src/*"],
       "@/features/*": ["./src/features/*"],
       "@/shared/*": ["./src/shared/*"],
       "@/config/*": ["./src/config/*"]

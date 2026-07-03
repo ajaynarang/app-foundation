@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SSE_EVENTS, type SseEventType, getSsePayloadSchema } from '@app/shared-types';
-import { useAuthStore } from '@/features/auth';
-import { captureError } from '@/shared/lib/sentry';
+import { useSession } from '@appshore/web-core/auth/session-bridge';
+import { captureError } from '../lib/sentry';
 import { SseBus } from './sse-bus';
 import { SseBusContext } from './sse-context';
 import { SseConnectionContext, type SseConnectionState } from './sse-connection-context';
@@ -36,7 +36,7 @@ interface SseProviderProps {
 export function SseProvider({ children }: SseProviderProps) {
   const bus = useMemo(() => new SseBus(), []);
   const queryClient = useQueryClient();
-  const { accessToken, isAuthenticated } = useAuthStore();
+  const { accessToken, isAuthenticated } = useSession();
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [connection, setConnection] = useState<SseConnectionState>({

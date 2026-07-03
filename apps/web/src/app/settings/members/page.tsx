@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { formatRelativeTime } from '@/shared/lib/utils/formatters';
+import { formatRelativeTime } from '@appshore/web-core/shared/lib/utils/formatters';
 import { Card, CardContent } from '@app/ui/components/ui/card';
 import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
@@ -31,9 +31,9 @@ import { Label } from '@app/ui/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { UserPlus } from 'lucide-react';
 import { useAuthStore } from '@/features/auth';
-import { apiClient, api } from '@/shared/lib/api';
-import { showSuccess, showError } from '@/shared/lib/toast';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { apiClient, api } from '@appshore/web-core/shared/lib/api';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 // ---------------------------------------------------------------------------
 // Types

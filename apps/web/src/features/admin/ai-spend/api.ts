@@ -4,7 +4,7 @@
  * Mirrors the backend `admin/ai-spend` controller. The invocation list is
  * cursor-paginated; pass `cursor` from the previous page's `nextCursor`.
  */
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type {
   AiSpendTenantSummary,
   AiSpendSurfaceRow,

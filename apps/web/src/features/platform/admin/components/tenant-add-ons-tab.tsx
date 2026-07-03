@@ -35,9 +35,9 @@ import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/use-feature-flags';
 import { adminAddOnsApi } from '../api';
 import type { TenantAddOn } from '../api';
-import { apiClient } from '@/shared/lib/api';
-import { QUERY_TIERS } from '@/shared/config/query-tiers';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { QUERY_TIERS } from '@appshore/web-core/shared/config/query-tiers';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 
 interface AddOn {
   id: string;

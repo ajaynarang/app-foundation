@@ -9,7 +9,7 @@ import { TourWelcomeDialog } from './TourWelcomeDialog';
 import { useTourStore } from '../store';
 import { useTourStatus } from '../hooks/use-tour-status';
 import { getStepsForRole, TOUR_ID } from '../tour-steps';
-import { useIsMobile } from '@/shared/hooks/use-is-mobile';
+import { useIsMobile } from '@appshore/web-core/shared/hooks/use-is-mobile';
 import { usePlan } from '@/features/platform/plans';
 
 interface PlatformTourProps {

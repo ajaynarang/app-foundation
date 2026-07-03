@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { AgentActivityFilter, AgentPrincipalKind } from '@app/shared-types';
-import { queryKeys } from '@/shared/constants';
+import { queryKeys } from '@appshore/web-core/shared/constants';
 import { agentActivityApi } from '../api';
 
 interface UseAgentActivityParams {

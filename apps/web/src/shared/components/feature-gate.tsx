@@ -6,10 +6,10 @@ import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { upgradeRegistry } from '@/features/platform/plans/config/upgrade-registry';
-import { apiClient } from '@/shared/lib/api';
-import { showSuccess, showError } from '@/shared/lib/toast';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
-import { CONTACTS } from '@/shared/lib/contacts';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { CONTACTS } from '@appshore/web-core/shared/lib/contacts';
 
 // ---------------------------------------------------------------------------
 // Default benefit bullets per category (fallback)

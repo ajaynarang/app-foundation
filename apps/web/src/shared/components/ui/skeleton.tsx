@@ -1,4 +1,4 @@
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (

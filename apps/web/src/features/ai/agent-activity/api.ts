@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type { AgentActivityFilter, AgentActivityPage, AgentPrincipalKind } from '@app/shared-types';
 
 export interface AgentActivityQueryParams {

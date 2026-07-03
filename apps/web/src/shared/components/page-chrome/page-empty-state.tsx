@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType, ReactNode } from 'react';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 
 export interface PageEmptyStateProps {
   /** lucide icon component, e.g. `Inbox`. Optional. */

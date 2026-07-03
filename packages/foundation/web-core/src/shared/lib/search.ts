@@ -1,4 +1,4 @@
-import { apiClient } from '@/shared/lib/api';
+import { apiClient } from './api';
 
 // ---------------------------------------------------------------------------
 // Entity Search API — shared by the ⌘K command palette and the AI chat

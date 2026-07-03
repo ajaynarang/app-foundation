@@ -33,7 +33,7 @@ import {
   useRemovePaymentMethod,
   useSetupPaymentMethod,
 } from '@/features/billing/hooks/use-billing';
-import { formatCents } from '@/shared/lib/utils/formatters';
+import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import { formatTransactionType, getTransactionTypeVariant } from '@/features/billing/utils';
 import { cn } from '@app/ui';
 

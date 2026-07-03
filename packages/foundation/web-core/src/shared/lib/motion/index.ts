@@ -1,5 +1,5 @@
 // Platform Motion System — Unified Animation Architecture
-// Import from '@/shared/lib/motion' for all animation needs.
+// Import from './index' for all animation needs.
 
 // Constants & presets
 export { duration, easing, spring, stagger, transition, distance } from './config';

@@ -13,7 +13,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { Checkbox } from '@app/ui/components/ui/checkbox';
 import { Label } from '@app/ui/components/ui/label';
 import { UrlRow } from '@app/ui/components/ui/url-row';
-import { STORAGE_KEYS } from '@/shared/constants/storage-keys';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants/storage-keys';
 
 const DEFAULT_MCP_URL = 'https://api.example.com/mcp';
 

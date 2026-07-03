@@ -1,6 +1,6 @@
 'use client';
 
-import { useNetworkStatus } from '@/shared/hooks/use-network-status';
+import { useNetworkStatus } from '@appshore/web-core/shared/hooks/use-network-status';
 import { WifiOff, Wifi } from 'lucide-react';
 
 /**

@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AgentScope } from '@app/shared-types';
 import { showSuccess, showError } from '@app/ui';
-import { queryKeys } from '@/shared/constants';
-import { extractErrorMessage } from '@/shared/lib/error-utils';
+import { queryKeys } from '@appshore/web-core/shared/constants';
+import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { oauthClientsApi } from '../api';
 
 /** Tenant-admin list of OAuth clients. Mirrors useOAuthClients but keyed to the tenant-admin list key. */

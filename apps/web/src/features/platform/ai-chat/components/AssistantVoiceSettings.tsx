@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/shared/components/ui/radio-group';
 import { Settings, Check, Mic } from 'lucide-react';
 import { getUserPreferences, updateUserPreferences } from '../../settings/api';
 import { getVoiceStatus } from '../api';
-import { showSuccess, showError } from '@/shared/lib/toast';
+import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { useAssistantStore } from '../store';
 import { type VoicePreferences } from '../voice/types';
 

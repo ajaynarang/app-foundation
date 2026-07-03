@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@app/ui';
-import { duration, easing } from '@/shared/lib/motion';
+import { duration, easing } from '@appshore/web-core/shared/lib/motion';
 import { useAuthStore } from '@/features/auth';
 import { Badge } from '@app/ui/components/ui/badge';
 import { ScrollArea } from '@app/ui/components/ui/scroll-area';
@@ -41,8 +41,8 @@ import {
   type NavItem,
   type SubPanelId,
   type UserRole,
-} from '@/shared/lib/navigation';
-import { openDocs } from '@/shared/lib/console-url';
+} from '@appshore/web-core/shared/lib/navigation';
+import { openDocs } from '@appshore/web-core/shared/lib/console-url';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 import { useOnboardingStore } from '@/features/platform/onboarding';
 import { CheckCircle2 } from 'lucide-react';

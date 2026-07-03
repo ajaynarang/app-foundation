@@ -14,7 +14,7 @@
 
 import { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '@/shared/lib/firebase';
+import { auth, isFirebaseConfigured } from '@appshore/web-core/shared/lib/firebase';
 import { useAuthStore } from '@/features/auth';
 
 const SSO_RELAY_PREFIX = '#sso-relay=';

@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@app/ui/components/ui/t
 import { useAuthStore } from '@/features/auth';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { useOnboardingStore } from '@/features/platform/onboarding';
-import { workspaceDrawerSections } from '@/shared/lib/navigation';
+import { workspaceDrawerSections } from '@appshore/web-core/shared/lib/navigation';
 
 interface WorkspaceSwitcherPopoverProps {
   isCollapsed: boolean;

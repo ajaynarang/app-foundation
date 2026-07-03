@@ -5,7 +5,7 @@ import { CountryCode, parsePhoneNumber } from 'libphonenumber-js';
 import { Input } from './input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 import { cn } from '../../lib/utils';
-import { toE164, formatAsYouType } from '@/shared/lib/utils/phone';
+import { toE164, formatAsYouType } from '../../lib/phone';
 
 interface Country {
   code: CountryCode;

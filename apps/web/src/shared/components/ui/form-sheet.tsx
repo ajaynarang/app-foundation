@@ -5,9 +5,9 @@ import { useEffect, useCallback } from 'react';
 import { Check } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/shared/components/ui/sheet';
 import { Button } from '@/shared/components/ui/button';
-import { cn } from '@/shared/lib/utils';
+import { cn } from '@appshore/web-core/shared/lib/utils';
 import { SheetSizeControls } from '@/shared/components/ui/sheet-size-controls';
-import { useSheetSizing, sizeModeToPixels } from '@/shared/hooks/use-sheet-sizing';
+import { useSheetSizing, sizeModeToPixels } from '@appshore/web-core/shared/hooks/use-sheet-sizing';
 
 type SheetMode = 'view' | 'edit';
 

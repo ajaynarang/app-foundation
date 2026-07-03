@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuthStore } from '@/features/auth';
+import { getSessionStore } from '@appshore/web-core/auth/session-bridge';
 
 const CONSOLE_BASE = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';
 
@@ -26,7 +26,7 @@ export function consoleUrl(path: string = '/'): string {
  * pre-fills the console's Zustand store so there's zero flash.
  */
 export function openConsole(path: string = '/'): void {
-  const { accessToken, user } = useAuthStore.getState();
+  const { accessToken, user } = getSessionStore().getState();
   const base = `${CONSOLE_BASE}${path}`;
 
   if (accessToken && user) {
@@ -44,7 +44,7 @@ export function openConsole(path: string = '/'): void {
  * Uses token relay for seamless SSO.
  */
 export function openDocs(path: string = ''): void {
-  const { accessToken, user } = useAuthStore.getState();
+  const { accessToken, user } = getSessionStore().getState();
   const base = `${CONSOLE_BASE}/docs/manual${path}`;
 
   if (accessToken && user) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSheetSizeStore, type SheetSizeMode } from '@/shared/stores/sheet-size.store';
+import { useSheetSizeStore, type SheetSizeMode } from '../stores/sheet-size.store';
 
 const LG_BREAKPOINT = 1024;
 

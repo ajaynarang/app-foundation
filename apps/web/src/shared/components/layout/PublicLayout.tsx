@@ -18,8 +18,8 @@ import {
 } from '@app/ui/components/ui/dropdown-menu';
 import { ThemeToggle } from './ThemeToggle';
 import { DevSwitcherTrigger } from '@/shared/components/common';
-import { getDefaultRouteForRole } from '@/shared/lib/navigation';
-import { isMultiTenant } from '@/shared/lib/tenant-url';
+import { getDefaultRouteForRole } from '@appshore/web-core/shared/lib/navigation';
+import { isMultiTenant } from '@appshore/web-core/shared/lib/tenant-url';
 import { Footer } from '@/shared/components/footer';
 
 const navItems = [

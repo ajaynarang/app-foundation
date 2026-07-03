@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@app/ui/components/ui/button';
-import { SEMANTIC_COLORS } from '@/shared/lib/colors';
+import { SEMANTIC_COLORS } from '@appshore/web-core/shared/lib/colors';
 import type { ChatMessage } from '../engine/types';
 import { RichCardRenderer } from './cards/RichCardRenderer';
 

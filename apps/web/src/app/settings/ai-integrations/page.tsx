@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
 import { Separator } from '@app/ui/components/ui/separator';
 import { UrlRow } from '@app/ui/components/ui/url-row';
-import { getApiBaseUrl, getEnvironmentLabel, getMcpBaseUrl } from '@/shared/lib/access-environments';
+import { getApiBaseUrl, getEnvironmentLabel, getMcpBaseUrl } from '@appshore/web-core/shared/lib/access-environments';
 
 interface Platform {
   id: string;

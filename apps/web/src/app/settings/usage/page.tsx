@@ -13,7 +13,7 @@ import {
   useWalletTransactions,
   useDownloadBillingInvoice,
 } from '@/features/billing/hooks/use-billing';
-import { formatCents } from '@/shared/lib/utils/formatters';
+import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import {
   getInvoiceStatusVariant,
   getTransactionTypeVariant,
@@ -21,7 +21,7 @@ import {
   formatInvoiceStatus,
 } from '@/features/billing/utils';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-import { formatTimestampDate, DISPLAY_FORMATS } from '@/shared/lib/utils/date-utils';
+import { formatTimestampDate, DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { cn } from '@app/ui';
 
 // ---------------------------------------------------------------------------

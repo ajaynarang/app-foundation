@@ -6,10 +6,10 @@ import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Pin, PinOff, X } from 'lucide-react';
 
-import { cn } from '@/shared/lib/utils';
-import { useIsDesktop } from '@/shared/hooks/use-is-mobile';
+import { cn } from '@appshore/web-core/shared/lib/utils';
+import { useIsDesktop } from '@appshore/web-core/shared/hooks/use-is-mobile';
 import { Button } from '@/shared/components/ui/button';
-import { STORAGE_KEYS } from '@/shared/constants';
+import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 
 // -- Constants for resizable sheets --
 const MIN_SHEET_WIDTH = 380;
