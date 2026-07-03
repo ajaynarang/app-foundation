@@ -87,21 +87,25 @@ just resolves to the one implicit tenant). No query rewrites — only guard/stra
 
 ## Where you plug in your domain
 
-| To add…                  | Do this                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| A backend domain         | New module under `apps/backend/src/domains/<domain>/` + models in `prisma/schema.prisma` |
-| A frontend feature       | New folder under `apps/web/src/features/<domain>/`                                       |
-| AI tools                 | Register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`      |
-| Workflow automation      | Add to the registry in `apps/backend/src/domains/desk/responsibilities/`                 |
-| An integration connector | Add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`                     |
-| AI knowledge             | Drop Markdown in `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`       |
+| To add…                  | Do this                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| A backend domain         | New module under `apps/backend/src/domains/<domain>/` + models in `packages/foundation/db/prisma/schema/app.prisma` |
+| A frontend feature       | New folder under `apps/web/src/features/<domain>/`                                                                  |
+| A domain event           | Add to `APP_EVENT_REGISTRY` in `apps/backend/src/platform-glue/events/event-registry.ts`                            |
+| A mobile screen          | New folder under `apps/mobile/lib/features/<domain>/`                                                               |
+| AI tools                 | Register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`                                 |
+| Workflow automation      | Add to the registry in `apps/backend/src/domains/desk/responsibilities/`                                            |
+| An integration connector | Add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`                                                |
+| AI knowledge             | Drop Markdown in `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`                                  |
 
 ---
 
 ## Structure
 
 ```
-apps/{backend,web,console}   packages/{ui,shared-types,test-utils}
+apps/{backend,web,console,mobile}
+packages/foundation/{kernel,db,platform,web-core}   ← @appshore/* — the reusable platform
+packages/{ui,shared-types,test-utils}
 infra/{terraform,observability}   tests/   docker-compose.yml
 ```
 

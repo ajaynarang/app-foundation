@@ -24,6 +24,7 @@ pnpm init-app --name acme-crm --yes --dry-run
 | `--scope`        | `@app`                    | Workspace package scope. Keeping `@app` is safest — renaming it rewrites every import and requires `pnpm install` |
 | `--db`           | name with `-` → `_`       | Postgres database name                                                                                            |
 | `--tenancy`      | `mt`                      | `mt` (multi-tenant) or `st` (single-tenant) — sets the `MULTI_TENANT` defaults in `.env.example` files            |
+| `--mobile`       | `yes`                     | `yes` keeps the Flutter companion app (renames `app_mobile` → `<name>_mobile`); `no` deletes `apps/mobile`        |
 | `--yes`          | off                       | Non-interactive; accept defaults for anything not passed                                                          |
 | `--dry-run`      | off                       | Print per-rule replacement counts; write nothing                                                                  |
 | `--force`        | off                       | Skip the git-clean and already-initialized guards                                                                 |
@@ -40,9 +41,11 @@ pnpm init-app --name acme-crm --yes --dry-run
 | branding `Platform`                             | `<display-name>` | web/console layout metadata, login, landing page (targeted files only)          |
 | `MULTI_TENANT` / `NEXT_PUBLIC_MULTI_TENANT`     | per `--tenancy`  | `.env.example` files                                                            |
 | `@app/`                                         | `<scope>/`       | only when `--scope` differs from `@app`                                         |
+| flutter `app_mobile`                            | `<name>_mobile`  | `apps/mobile` (pubspec, bundle ids, imports) — only with `--mobile yes`         |
 
 Never touched: `.git`, `node_modules`, `pnpm-lock.yaml` (regenerate with `pnpm install`),
-`docs/superpowers/` (historical design docs), and this tool itself.
+`docs/superpowers/` (historical design docs), **`packages/foundation/` package names**
+(`@appshore/*` is the platform brand, not your app), and this tool itself.
 
 ## Safety
 

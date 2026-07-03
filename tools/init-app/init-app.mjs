@@ -45,6 +45,7 @@ const { values: flags } = parseArgs({
     scope: { type: 'string' },
     db: { type: 'string' },
     tenancy: { type: 'string' }, // mt | st
+    mobile: { type: 'string' }, // yes | no — keep the Flutter companion app?
     yes: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
@@ -60,6 +61,7 @@ if (flags.help) {
   --scope <@scope>         Workspace package scope (default: @app — keeping it is safest)
   --db <snake_case>        Postgres database name (default: name with dashes as underscores)
   --tenancy <mt|st>        Default tenancy mode written to .env.example files (default: mt)
+  --mobile <yes|no>        Keep the Flutter mobile companion app at apps/mobile (default: yes)
   --yes                    Non-interactive; accept defaults for everything not passed
   --dry-run                Show per-file replacement counts; change nothing
   --force                  Skip the git-clean and already-initialized guards
@@ -119,6 +121,7 @@ async function gatherConfig() {
     scope: flags.scope,
     db: flags.db,
     tenancy: flags.tenancy,
+    mobile: flags.mobile,
   };
 
   if (flags.yes) {
@@ -134,6 +137,7 @@ async function gatherConfig() {
     cfg.scope = cfg.scope || (await ask('Package scope (keep @app unless you have a reason)', '@app'));
     cfg.db = cfg.db || (await ask('Postgres database name', (cfg.name || '').replace(/-/g, '_')));
     cfg.tenancy = cfg.tenancy || (await ask('Tenancy mode — mt (multi-tenant) or st (single-tenant)', 'mt'));
+    cfg.mobile = cfg.mobile || (await ask('Include the Flutter mobile companion app? (yes/no)', 'yes'));
     rl.close();
   }
 
@@ -141,12 +145,14 @@ async function gatherConfig() {
   cfg.scope = cfg.scope || '@app';
   cfg.db = cfg.db || cfg.name.replace(/-/g, '_');
   cfg.tenancy = cfg.tenancy || 'mt';
+  cfg.mobile = cfg.mobile || 'yes';
 
   if (!VALID.name.test(cfg.name)) fail(`Invalid --name "${cfg.name}" — must match ${VALID.name}`);
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
   if (!VALID.scope.test(cfg.scope)) fail(`Invalid --scope "${cfg.scope}" — must match ${VALID.scope}`);
   if (!VALID.db.test(cfg.db)) fail(`Invalid --db "${cfg.db}" — must match ${VALID.db}`);
   if (!['mt', 'st'].includes(cfg.tenancy)) fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt or st`);
+  if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
   return cfg;
 }
 
@@ -161,12 +167,14 @@ const BRANDING_FILES = [
   'apps/web/src/app/layout.tsx',
   'apps/web/src/app/page.tsx',
   'apps/web/src/features/auth/components/login-form.tsx',
-  'apps/web/src/features/auth/components/PublicLayout.tsx',
+  'apps/web/src/shared/components/layout/PublicLayout.tsx',
   'apps/console/src/app/layout.tsx',
+  'apps/mobile/lib/core/app_config.dart',
 ];
 
 function buildRules(cfg) {
   const { name, displayName, scope, db, tenancy } = cfg;
+  void tenancy;
   const mt = tenancy === 'mt' ? 'true' : 'false';
   const rules = [
     {
@@ -216,6 +224,13 @@ function buildRules(cfg) {
       apply: (s) => s.replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`),
     },
   ];
+  if (cfg.mobile === 'yes') {
+    const snake = name.replace(/-/g, '_');
+    rules.push({
+      id: `flutter app_mobile → ${snake}_mobile`,
+      apply: (s, rel) => (rel.startsWith('apps/mobile') ? s.replaceAll('app_mobile', `${snake}_mobile`) : s),
+    });
+  }
   if (scope !== '@app') {
     rules.push({
       id: `@app/ scope → ${scope}/`,
@@ -229,7 +244,7 @@ function buildRules(cfg) {
 // File walk
 // ---------------------------------------------------------------------------
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.turbo', '.next', 'dist', 'build', 'coverage', '.screenshots']);
+const SKIP_DIRS = new Set(['node_modules', '.git', '.turbo', '.next', 'dist', 'build', 'coverage', '.screenshots', '.dart_tool', 'ephemeral', '.gradle', 'generated']);
 const SKIP_REL = ['docs/superpowers', 'tools/init-app'];
 const SKIP_FILES = new Set(['pnpm-lock.yaml']);
 const BINARY_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.gz', '.tar', '.mp4', '.mov', '.dump', '.jar']);
@@ -286,7 +301,7 @@ for (const { abs, rel } of walk(ROOT)) {
   let updated = content;
   for (const rule of rules) {
     if (rule.files && !rule.files.includes(rel)) continue;
-    const next = rule.apply(updated);
+    const next = rule.apply(updated, rel);
     if (next !== updated) {
       const s = stats.get(rule.id);
       s.files += 1;
@@ -306,6 +321,18 @@ for (const [id, s] of stats) {
 }
 console.log(`\n  ${dryRun ? 'Would touch' : 'Touched'} ${touched} file(s).`);
 
+if (cfg.mobile === 'no') {
+  const mobileDir = path.join(ROOT, 'apps', 'mobile');
+  if (fs.existsSync(mobileDir)) {
+    if (dryRun) {
+      console.log('  Would delete apps/mobile (--mobile no).');
+    } else {
+      fs.rmSync(mobileDir, { recursive: true, force: true });
+      console.log('  Deleted apps/mobile (--mobile no).');
+    }
+  }
+}
+
 if (!dryRun) {
   console.log(`
   Next steps:
@@ -315,7 +342,8 @@ if (!dryRun) {
        Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend, ${cfg.name}-console
     3. pnpm docker:up
     4. cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed
-    5. pnpm dev                           # web :3000, backend :8000
+    5. pnpm dev                           # web :3000, backend :8000${cfg.mobile === 'yes' ? `
+    5b. cd apps/mobile && flutter run     # mobile companion (needs a device/simulator)` : ''}
     6. Replace the landing page (apps/web/src/app/page.tsx) with your product's home,
        and update the Documentation link there to your repo.
     7. Review the diff, commit, and optionally delete tools/init-app/.
