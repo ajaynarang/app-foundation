@@ -12,7 +12,7 @@
 ## 1. Goal
 
 Re-shape **app-foundation** so the reusable cross-cutting foundation lives in **`@appshore/*` packages**
-under `packages/foundation/`, and `apps/*` are thin product shells. The end goal is unchanged:
+under `packages/appshore/`, and `apps/*` are thin product shells. The end goal is unchanged:
 
 > Clone the repo → run `pnpm init-app` → answer a few prompts (name, display name, multi-tenant or
 > single-tenant, include mobile app?) → you have a working backend + web app (+ Flutter mobile app)
@@ -102,7 +102,7 @@ Role-named `mobile` (consistent with `web`/`console` — named by role, not tech
 Existing prompts stay (name, display-name, scope, db, tenancy mt/st). New:
 
 - `--mobile yes|no` — include or delete `apps/mobile`; renames pubspec/app title when kept.
-- `@appshore/*` scope and `packages/foundation/` are **never renamed** — they are the platform brand.
+- `@appshore/*` scope and `packages/appshore/` are **never renamed** — they are the platform brand.
 - Rename rules extended to cover new package paths.
 
 ## 6. Phased execution (each phase gated on green)

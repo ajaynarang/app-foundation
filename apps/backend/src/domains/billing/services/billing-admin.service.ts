@@ -8,7 +8,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { BillingProviderType, BillingSubscriptionStatus, TenantPlan } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { PlansService } from '@appshore/platform/domains/platform/plans/plans.service';
+import { PlansService } from '@appshore/platform/domains/plans/plans.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { WalletService } from './wallet.service';
 import { PLAN_ORDER } from '../constants';

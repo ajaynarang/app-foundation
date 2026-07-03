@@ -31,8 +31,8 @@ const BACKEND_SRC = process.env.BACKEND_SRC || path.resolve(__dirname, '../../ap
 // Platform controllers moved into the foundation packages — scan those too.
 const SCAN_ROOTS = [
   BACKEND_SRC,
-  path.resolve(__dirname, '../../packages/foundation/platform/src'),
-  path.resolve(__dirname, '../../packages/foundation/kernel/src'),
+  path.resolve(__dirname, '../../packages/appshore/platform/src'),
+  path.resolve(__dirname, '../../packages/appshore/kernel/src'),
 ];
 const OUTPUT_PATH = path.join(__dirname, '..', 'rbac', 'rbac-matrix.generated.ts');
 

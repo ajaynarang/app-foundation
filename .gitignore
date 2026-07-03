@@ -33,5 +33,5 @@ firebase-admin-sdk.json
 playwright-report/
 test-results/
 .screenshots/
-packages/foundation/db/generated/
+packages/appshore/db/generated/
 .playwright-mcp/

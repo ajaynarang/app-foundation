@@ -15,7 +15,7 @@ import pg from 'pg';
 import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { seed } from '../../../packages/foundation/db/prisma/seeds/08-model-pricing.seed';
+import { seed } from '../../../packages/appshore/db/prisma/seeds/08-model-pricing.seed';
 
 dotenv.config({ path: '.env' });
 dotenv.config({ path: '.env.local' });

@@ -7,7 +7,7 @@ import { ScopeRegistryService } from '../agent-contract/scope-registry.service';
 import { fromOAuthUser } from '@appshore/platform/auth/agent-principal';
 import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { scopeTier, SCOPE_TIERS, type AgentScope } from '@app/shared-types';
-import type { OAuthUser } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import type { OAuthUser } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 import type { Request, Response } from 'express';
 
 type McpToolResult = {

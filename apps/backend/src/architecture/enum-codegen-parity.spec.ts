@@ -6,7 +6,7 @@ import * as path from 'path';
  * Codegen parity guardrail.
  *
  * The generated `packages/shared-types/src/generated/prisma-enums.ts`
- * file MUST stay in sync with `packages/foundation/db/prisma/schema/*.prisma`.
+ * file MUST stay in sync with `packages/appshore/db/prisma/schema/*.prisma`.
  * If anyone edits the schema without running `pnpm prisma:generate`
  * (which chains the codegen script), this test fails CI — preventing
  * the drift class that produced the April-28 incident.
@@ -19,7 +19,7 @@ describe('Prisma → shared-types enum codegen parity', () => {
   // From apps/backend/src/architecture/ → repo root is 4 levels up.
   const repoRoot = path.resolve(__dirname, '..', '..', '..', '..');
   const generatedPath = path.join(repoRoot, 'packages', 'shared-types', 'src', 'generated', 'prisma-enums.ts');
-  const codegenScript = path.join(repoRoot, 'packages', 'foundation', 'db', 'scripts', 'generate-shared-enums.ts');
+  const codegenScript = path.join(repoRoot, 'packages', 'appshore', 'db', 'scripts', 'generate-shared-enums.ts');
 
   it('committed prisma-enums.ts is in sync with the prisma schema', () => {
     const committed = fs.readFileSync(generatedPath, 'utf8');

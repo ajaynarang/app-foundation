@@ -2,9 +2,9 @@ import { Controller, Get, Post, Delete, Req, Res, UseGuards, HttpCode, HttpStatu
 import { Request, Response } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
-import { OAuthTokenGuard } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import { OAuthTokenGuard } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 import { McpServerService } from './mcp-server.service';
-import type { OAuthUser } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import type { OAuthUser } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 
 /**
  * Root-level MCP controller — handles requests at `/` (no api/v1 prefix).

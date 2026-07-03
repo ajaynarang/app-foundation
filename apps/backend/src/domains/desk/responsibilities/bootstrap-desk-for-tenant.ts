@@ -24,7 +24,7 @@ const AGENT_SEED: Array<{ key: string; name: string; systemPromptKey: string; de
  * to run repeatedly; upserts by the unique (tenantId, key) constraint.
  *
  * Called from:
- *   - platform seed (packages/foundation/db/prisma/seeds/07-desk.seed.ts) on fresh install
+ *   - platform seed (packages/appshore/db/prisma/seeds/07-desk.seed.ts) on fresh install
  *   - tenant onboarding flow (future) after a new tenant is approved
  */
 export async function bootstrapDeskForTenant(

@@ -290,7 +290,7 @@ jobs:
           TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
 
           # Resolve any previously failed migrations before deploying
-          cd packages/foundation/db
+          cd packages/appshore/db
           FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
           if [ -n "$FAILED_MIGRATIONS" ]; then
             echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"
@@ -552,7 +552,7 @@ jobs:
           TUNNEL_URL=$(echo "$DATABASE_URL" | sed "s|@${RDS_HOST}:5432|@127.0.0.1:${TUNNEL_PORT}|")
 
           # Resolve any previously failed migrations before deploying
-          cd packages/foundation/db
+          cd packages/appshore/db
           FAILED_MIGRATIONS=$(DATABASE_URL="$TUNNEL_URL" pnpm exec prisma migrate status 2>&1 | grep "failed" | grep -oP '\d{14}_\S+' || true)
           if [ -n "$FAILED_MIGRATIONS" ]; then
             echo "⚠ Found failed migration(s), marking as rolled back: $FAILED_MIGRATIONS"

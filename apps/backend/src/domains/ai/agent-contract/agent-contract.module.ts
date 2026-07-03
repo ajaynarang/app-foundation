@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
 import { RlsModule } from '../rls/rls.module';
-import { FeatureFlagsModule } from '@appshore/platform/domains/platform/feature-flags/feature-flags.module';
+import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/feature-flags.module';
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { ScopeRegistryService } from './scope-registry.service';
 import { HitlPolicyService } from './hitl-policy.service';

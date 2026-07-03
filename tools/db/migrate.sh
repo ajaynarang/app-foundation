@@ -30,7 +30,7 @@ RDS_PORT="5432"
 TUNNEL_PORT="5433"
 PREFERRED_CONTAINER="worker"
 BACKEND_DIR="$(cd "$TOOLS_DIR/../apps/backend" && pwd)"
-DB_PKG_DIR="$(cd "$TOOLS_DIR/../packages/foundation/db" && pwd)"
+DB_PKG_DIR="$(cd "$TOOLS_DIR/../packages/appshore/db" && pwd)"
 
 # Local DB config (from apps/backend/.env)
 LOCAL_DB_URL="postgresql://app_user:app_password@localhost:5432/app"

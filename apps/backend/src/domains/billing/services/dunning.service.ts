@@ -11,7 +11,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BillingSubscriptionStatus, TenantPlan } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { PlansService } from '@appshore/platform/domains/platform/plans/plans.service';
+import { PlansService } from '@appshore/platform/domains/plans/plans.service';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 

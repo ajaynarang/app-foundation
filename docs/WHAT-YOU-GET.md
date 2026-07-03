@@ -103,7 +103,7 @@ an AI assistant, and an ops console — before you've written a single line of c
 
 ## The default Postgres schema (what's already in your database)
 
-The schema lives in `packages/foundation/db/prisma/schema/` — `foundation.prisma` is the
+The schema lives in `packages/appshore/db/prisma/schema/` — `foundation.prisma` is the
 platform's (don't edit), **`app.prisma` is yours** (empty, waiting for your models).
 Everything is Prisma; the client is imported from `@appshore/db`.
 
@@ -133,7 +133,7 @@ fields with `@map` for snake_case columns.
 ## How the code is organized (30-second tour)
 
 ```
-packages/foundation/     ← the platform (@appshore/*). You rarely touch this.
+packages/appshore/     ← the platform (@appshore/*). You rarely touch this.
   kernel/    pure mechanics: logging, events, retry, SSE, utils
   db/        THE Prisma package: schema, migrations, seeds, client
   platform/  auth, tenancy, queues, storage, health, users/tenants/plans APIs
@@ -155,7 +155,7 @@ it exposes a hook and `platform-glue/hooks.module.ts` binds your implementation.
 
 Say you're building "projects":
 
-1. **Models** — add `Project` to `packages/foundation/db/prisma/schema/app.prisma`
+1. **Models** — add `Project` to `packages/appshore/db/prisma/schema/app.prisma`
    (include `tenantId`), then `pnpm --filter @appshore/db prisma:migrate` and
    `pnpm --filter @appshore/db prisma:generate`.
 2. **Backend** — create `apps/backend/src/domains/projects/` (module, controller,

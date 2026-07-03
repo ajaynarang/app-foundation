@@ -25,8 +25,8 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 // @Processor classes can live in the app OR in the foundation packages.
 const SCAN_ROOTS = [
   SRC_DIR,
-  path.join(REPO_ROOT, 'packages', 'foundation', 'kernel', 'src'),
-  path.join(REPO_ROOT, 'packages', 'foundation', 'platform', 'src'),
+  path.join(REPO_ROOT, 'packages', 'appshore', 'kernel', 'src'),
+  path.join(REPO_ROOT, 'packages', 'appshore', 'platform', 'src'),
 ];
 
 // Queues still pending dispatcher conversion. EMPTY — every shared queue uses
@@ -55,7 +55,7 @@ function loadQueueNameMap(): Record<string, string> {
   const constantsPath = path.join(
     REPO_ROOT,
     'packages',
-    'foundation',
+    'appshore',
     'kernel',
     'src',
     'infrastructure',

@@ -5,7 +5,7 @@ run `pnpm init-app`, drop in your domain, and you have auth, multi-tenancy, bill
 MCP, background jobs, observability, and IaC already built. There is intentionally **no business
 domain** here — add yours under `apps/backend/src/domains/` and `apps/web/src/features/`.
 
-The reusable cross-cutting foundation lives in `packages/foundation/` (`@appshore/*`) — those
+The reusable cross-cutting foundation lives in `packages/appshore/` (`@appshore/*`) — those
 packages are the platform, not your app. Layer rule (enforced by
 `apps/backend/src/architecture/foundation-boundaries.spec.ts`):
 `kernel ← db ← platform ← apps` and `kernel ← web-core ← web`. Packages never import app code.
@@ -88,7 +88,7 @@ tests/         — Playwright QA suite (@app/qa)
 | `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
 
 Tenants/users/plans/flags/api-keys/oauth-provider now live in `@appshore/platform`
-(`packages/foundation/platform/src/domains/platform/`). `apps/backend/src/platform-glue/` holds the
+(`packages/appshore/platform/src/domains/platform/`). `apps/backend/src/platform-glue/` holds the
 app-side composition: the merged event registry + DOMAIN_EVENTS (your vocabulary), queue topology
 (queue.module + dispatchers), SSE bridge, outbound webhooks, cache invalidation map, and
 `hooks.module.ts` — where platform lifecycle hooks (USER_LIFECYCLE_HOOKS, TENANT_PROVISION_HOOKS)
@@ -98,7 +98,7 @@ bind to app implementations.
 
 - **New domain:** add a module under `apps/backend/src/domains/<your-domain>/`, a feature under
   `apps/web/src/features/<your-domain>/`, and models in
-  `packages/foundation/db/prisma/schema/app.prisma` (composed with foundation.prisma).
+  `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma).
 - **Domain events:** add entries to `APP_EVENT_REGISTRY` in
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
   automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events).
@@ -148,7 +148,7 @@ the `@Query('snake_case')` decorator argument (the TS variable is still camelCas
 
 ### Enums = Prisma (single source of truth)
 
-All enums live in `packages/foundation/db/prisma/schema/*.prisma`. Backend code imports enums and
+All enums live in `packages/appshore/db/prisma/schema/*.prisma`. Backend code imports enums and
 the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); frontend/shared-types
 import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
 Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
@@ -165,7 +165,7 @@ success + error toasts; every loading state shows a Skeleton.
 
 ## Testing
 
-- **Unit:** co-located `**/*.spec.ts` in `apps/backend/src` AND `packages/foundation/*/src`
+- **Unit:** co-located `**/*.spec.ts` in `apps/backend/src` AND `packages/appshore/*/src`
   (Jest per package). Run `pnpm test` (turbo runs all). Platform test fixtures (prisma/cache/queue
   mocks, tenant/user factories) come from `@appshore/platform/test/*`.
 - **Mobile:** `cd apps/mobile && flutter analyze && flutter test`.

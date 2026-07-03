@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SCHEMA_DIR = path.join(__dirname, '..', '..', '..', '..', 'packages', 'foundation', 'db', 'prisma', 'schema');
+const SCHEMA_DIR = path.join(__dirname, '..', '..', '..', '..', 'packages', 'appshore', 'db', 'prisma', 'schema');
 const readSchema = (): string =>
   fs
     .readdirSync(SCHEMA_DIR)

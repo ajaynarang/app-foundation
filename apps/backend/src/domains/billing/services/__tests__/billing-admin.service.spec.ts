@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BillingAdminService } from '../billing-admin.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { PlansService } from '@appshore/platform/domains/platform/plans/plans.service';
+import { PlansService } from '@appshore/platform/domains/plans/plans.service';
 import { PaymentProviderFactory } from '../../adapters/payment-provider.factory';
 import { WalletService } from '../wallet.service';
 

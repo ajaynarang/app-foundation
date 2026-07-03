@@ -17,7 +17,7 @@ import * as path from 'path';
  */
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
-const FOUNDATION = path.join(REPO_ROOT, 'packages', 'foundation');
+const FOUNDATION = path.join(REPO_ROOT, 'packages', 'appshore');
 
 function listTsFiles(dir: string): string[] {
   const out: string[] = [];

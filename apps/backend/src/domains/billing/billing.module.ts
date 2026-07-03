@@ -8,7 +8,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
 import { CacheModule } from '../../platform-glue/cache/cache.module';
-import { PlansModule } from '@appshore/platform/domains/platform/plans/plans.module';
+import { PlansModule } from '@appshore/platform/domains/plans/plans.module';
 
 // Config
 import stripeConfig from './adapters/stripe/stripe.config';

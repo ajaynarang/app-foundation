@@ -3,7 +3,7 @@ import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AgentInvocationLoggerService } from '../../../domains/ai/agent-contract/agent-invocation-logger.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { FeatureFlagsService } from '@appshore/platform/domains/platform/feature-flags/feature-flags.service';
+import { FeatureFlagsService } from '@appshore/platform/domains/feature-flags/feature-flags.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { WebhookDispatcher } from '../dispatcher.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';

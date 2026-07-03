@@ -44,7 +44,7 @@ pnpm init-app --name acme-crm --yes --dry-run
 | flutter `app_mobile`                            | `<name>_mobile`  | `apps/mobile` (pubspec, bundle ids, imports) — only with `--mobile yes`         |
 
 Never touched: `.git`, `node_modules`, `pnpm-lock.yaml` (regenerate with `pnpm install`),
-`docs/superpowers/` (historical design docs), **`packages/foundation/` package names**
+`docs/superpowers/` (historical design docs), **`packages/appshore/` package names**
 (`@appshore/*` is the platform brand, not your app), and this tool itself.
 
 ## Safety

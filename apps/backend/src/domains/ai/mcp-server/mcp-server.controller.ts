@@ -3,11 +3,11 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
-import { OAuthTokenGuard } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import { OAuthTokenGuard } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 import { AgentRateLimitGuard } from './guards/agent-rate-limit.guard';
-import { ApiKeyAuthGuard } from '@appshore/platform/domains/platform/api-keys/guards/api-key-auth.guard';
+import { ApiKeyAuthGuard } from '@appshore/platform/domains/api-keys/guards/api-key-auth.guard';
 import { McpServerService } from './mcp-server.service';
-import type { OAuthUser } from '@appshore/platform/domains/platform/oauth-provider/oauth-token.guard';
+import type { OAuthUser } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 @ApiTags('MCP')

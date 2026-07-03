@@ -37,13 +37,13 @@ importers:
         version: link:../../packages/shared-types
       '@appshore/db':
         specifier: workspace:*
-        version: link:../../packages/foundation/db
+        version: link:../../packages/appshore/db
       '@appshore/kernel':
         specifier: workspace:*
-        version: link:../../packages/foundation/kernel
+        version: link:../../packages/appshore/kernel
       '@appshore/platform':
         specifier: workspace:*
-        version: link:../../packages/foundation/platform
+        version: link:../../packages/appshore/platform
       '@aws-sdk/client-s3':
         specifier: ^3.995.0
         version: 3.1063.0
@@ -495,7 +495,7 @@ importers:
         version: link:../../packages/ui
       '@appshore/web-core':
         specifier: workspace:*
-        version: link:../../packages/foundation/web-core
+        version: link:../../packages/appshore/web-core
       '@bprogress/next':
         specifier: ^3.2.12
         version: 3.2.12(next@15.1.12(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -714,7 +714,7 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/foundation/db:
+  packages/appshore/db:
     dependencies:
       '@prisma/adapter-pg':
         specifier: 7.3.0
@@ -763,7 +763,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/foundation/kernel:
+  packages/appshore/kernel:
     dependencies:
       '@app/shared-types':
         specifier: workspace:*
@@ -848,7 +848,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/foundation/platform:
+  packages/appshore/platform:
     dependencies:
       '@app/shared-types':
         specifier: workspace:*
@@ -963,7 +963,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/foundation/web-core:
+  packages/appshore/web-core:
     dependencies:
       '@app/shared-types':
         specifier: workspace:*

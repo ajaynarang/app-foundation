@@ -4,7 +4,7 @@ import {
   TENANT_PROVISION_HOOKS,
   type UserLifecycleHooks,
   type TenantProvisionHooks,
-} from '@appshore/platform/domains/platform/platform-hooks';
+} from '@appshore/platform/domains/platform-hooks';
 import { NotificationTriggersService } from '../domains/notifications/notification-triggers.service';
 import { InAppNotificationsModule } from '../domains/notifications/notifications.module';
 import { DeskBootstrapService } from '../domains/desk/responsibilities/desk-bootstrap.service';

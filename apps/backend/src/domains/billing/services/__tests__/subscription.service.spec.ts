@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { SubscriptionService } from '../subscription.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { PlansService } from '@appshore/platform/domains/platform/plans/plans.service';
+import { PlansService } from '@appshore/platform/domains/plans/plans.service';
 import { PaymentProviderFactory } from '../../adapters/payment-provider.factory';
 
 const mockAdapter = {
