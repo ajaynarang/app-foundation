@@ -5,8 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
-import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
-import { auth } from '@appshore/web-core/shared/lib/firebase';
 import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { PasswordInput } from '@/features/auth/components/password-input';
@@ -16,33 +14,20 @@ type PageState = 'verifying' | 'form' | 'success' | 'error';
 
 function ResetPasswordInner() {
   const searchParams = useSearchParams();
-  const oobCode = searchParams.get('oobCode') || '';
+  // First-party flow token (?token=). Legacy Firebase links used ?oobCode=.
+  const token = searchParams.get('token') || '';
 
   const [pageState, setPageState] = useState<PageState>('verifying');
-  const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordScore, setPasswordScore] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Verify the reset code on mount
+  // Token validity is checked on submit (no pre-verification round-trip).
   useEffect(() => {
-    const mode = searchParams.get('mode');
-    if (!oobCode || (mode && mode !== 'resetPassword')) {
-      setPageState('error');
-      return;
-    }
-
-    verifyPasswordResetCode(auth, oobCode)
-      .then((verifiedEmail) => {
-        setEmail(verifiedEmail);
-        setPageState('form');
-      })
-      .catch(() => {
-        setPageState('error');
-      });
-  }, [oobCode, searchParams]);
+    setPageState(token ? 'form' : 'error');
+  }, [token]);
 
   const passwordsMatch = newPassword === confirmPassword;
   const confirmTouched = confirmPassword.length > 0;
@@ -56,17 +41,22 @@ function ResetPasswordInner() {
     setError('');
 
     try {
-      await confirmPasswordReset(auth, oobCode, newPassword);
-      setPageState('success');
-    } catch (err) {
-      const code = (err as { code?: string })?.code;
-      if (code === 'auth/weak-password') {
-        setError('Password is too weak. Please choose a stronger password.');
-      } else if (code === 'auth/expired-action-code') {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${apiUrl}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword }),
+      });
+      if (response.ok) {
+        setPageState('success');
+      } else if (response.status === 401) {
         setPageState('error');
       } else {
-        setError('Failed to reset password. Please try again.');
+        const err = await response.json().catch(() => ({}));
+        setError(err.message || 'Failed to reset password. Please try again.');
       }
+    } catch {
+      setError('Failed to reset password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -149,9 +139,7 @@ function ResetPasswordInner() {
                   <Lock className="h-7 w-7 text-muted-foreground" />
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">Set new password</h1>
-                <p className="text-muted-foreground text-sm">
-                  Create a new password for <span className="text-foreground font-medium">{email}</span>
-                </p>
+                <p className="text-muted-foreground text-sm">Choose a strong password for your account.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">

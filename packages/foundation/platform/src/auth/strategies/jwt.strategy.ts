@@ -99,12 +99,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   private implicitTenant: { tenantId: string; companyName: string } | null | undefined;
 
   private async getImplicitTenant(implicitTenantId: number) {
-    if (this.implicitTenant !== undefined) return this.implicitTenant;
+    if (this.implicitTenant != null) return this.implicitTenant;
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: implicitTenantId },
       select: { tenantId: true, companyName: true },
     });
-    this.implicitTenant = tenant ?? null;
-    return this.implicitTenant;
+    // Only memoize a HIT. Booting before the seed ran must not poison the
+    // cache for the process lifetime — retry on the next request.
+    if (tenant) this.implicitTenant = tenant;
+    return tenant ?? null;
   }
 }

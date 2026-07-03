@@ -6,12 +6,13 @@ import { PrismaService } from '../infrastructure/database/prisma.service';
 const USER_AGENT_MAX_LENGTH = 5000;
 
 const FAIL_REASON_MAP: Record<
-  'account_disabled' | 'tenant_inactive' | 'invalid_token' | 'user_not_found',
+  'account_disabled' | 'tenant_inactive' | 'invalid_token' | 'invalid_credentials' | 'user_not_found',
   LoginFailReason
 > = {
   account_disabled: LoginFailReason.ACCOUNT_DISABLED,
   tenant_inactive: LoginFailReason.TENANT_INACTIVE,
   invalid_token: LoginFailReason.INVALID_TOKEN,
+  invalid_credentials: LoginFailReason.INVALID_CREDENTIALS,
   user_not_found: LoginFailReason.USER_NOT_FOUND,
 };
 
@@ -46,7 +47,7 @@ export class LoginEventService {
     tenantId: number | null;
     ip: string | null;
     userAgent: string | null;
-    failReason: 'account_disabled' | 'tenant_inactive' | 'invalid_token' | 'user_not_found';
+    failReason: 'account_disabled' | 'tenant_inactive' | 'invalid_token' | 'invalid_credentials' | 'user_not_found';
   }): Promise<void> {
     await this.prisma.loginEvent.create({
       data: {

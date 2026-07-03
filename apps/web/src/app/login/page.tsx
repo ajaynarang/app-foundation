@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/features/auth';
+import { DevSwitcherTrigger } from '@/shared/components/common';
 import type { TenantBranding } from '@/features/auth';
 import { useAuthStore } from '@/features/auth';
 import { getValidToken, resolvePostLoginRedirect } from '@appshore/web-core/shared/lib/navigation';
@@ -136,6 +137,10 @@ function LoginPageInner() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <LoginForm returnTo={returnTo} tenantBranding={tenantBranding} />
+      {/* Dev-only user switcher (renders nothing unless NEXT_PUBLIC_DEV_SWITCHER=true) */}
+      <div className="fixed bottom-4 left-4">
+        <DevSwitcherTrigger />
+      </div>
     </div>
   );
 }

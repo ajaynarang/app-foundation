@@ -158,6 +158,7 @@ export function AssistantOrb({
               <motion.circle
                 r={1.2}
                 className="fill-muted-foreground/50"
+                initial={{ cx: edge.from.x, cy: edge.from.y, opacity: 0 }}
                 animate={{
                   cx: [edge.from.x, edge.to.x],
                   cy: [edge.from.y, edge.to.y],
@@ -193,6 +194,7 @@ export function AssistantOrb({
               <motion.circle
                 r={1.5}
                 className="fill-muted-foreground/60"
+                initial={{ cx: edge.from.x, cy: edge.from.y, opacity: 0 }}
                 animate={{
                   cx: [edge.from.x, edge.to.x],
                   cy: [edge.from.y, edge.to.y],

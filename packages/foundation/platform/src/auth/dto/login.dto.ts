@@ -1,57 +1,6 @@
 import { IsString, IsOptional, IsEmail } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class UserLookupDto {
-  @ApiProperty({
-    description: 'Email address to lookup',
-    example: 'dispatcher1@swift.com',
-    required: false,
-  })
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @ApiProperty({
-    description: 'Phone number to lookup (future enhancement)',
-    example: '+1234567890',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  phone?: string;
-}
-
-export class UserLookupResultDto {
-  @ApiProperty()
-  userId: string;
-
-  @ApiProperty()
-  email: string;
-
-  @ApiProperty()
-  firstName: string;
-
-  @ApiProperty()
-  lastName: string;
-
-  @ApiProperty()
-  role: string;
-
-  @ApiProperty()
-  tenantId: string;
-
-  @ApiProperty()
-  tenantName: string;
-}
-
-export class UserLookupResponseDto {
-  @ApiProperty({ type: [UserLookupResultDto] })
-  users: UserLookupResultDto[];
-
-  @ApiProperty({ description: 'True if user exists in multiple tenants' })
-  multiTenant: boolean;
-}
-
 export class UserProfileDto {
   @ApiProperty({ description: 'Numeric database id — used by UI permission checks (e.g. Desk agent supervisor match)' })
   dbId: number;
@@ -78,6 +27,9 @@ export class UserProfileDto {
 
   @ApiProperty()
   tenantId: string;
+
+  @ApiProperty({ required: false, description: 'Tenant subdomain (multi-tenant mode) — drives post-login redirect' })
+  subdomain?: string;
 
   @ApiProperty()
   tenantName: string;

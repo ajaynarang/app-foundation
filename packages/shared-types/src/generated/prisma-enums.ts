@@ -115,7 +115,7 @@ export type LoginEventStatus = z.infer<typeof LoginEventStatusSchema>;
 export const LoginEventStatus = LoginEventStatusSchema.enum;
 
 // LoginFailReason
-export const LoginFailReasonSchema = z.enum(['ACCOUNT_DISABLED', 'TENANT_INACTIVE', 'INVALID_TOKEN', 'USER_NOT_FOUND', 'OTHER'] as const);
+export const LoginFailReasonSchema = z.enum(['ACCOUNT_DISABLED', 'TENANT_INACTIVE', 'INVALID_TOKEN', 'INVALID_CREDENTIALS', 'USER_NOT_FOUND', 'OTHER'] as const);
 export type LoginFailReason = z.infer<typeof LoginFailReasonSchema>;
 export const LoginFailReason = LoginFailReasonSchema.enum;
 

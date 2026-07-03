@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { TwilioVerifyService } from '../twilio-verify.service';
 
+beforeAll(() => {
+  process.env.ENV_TYPE = process.env.ENV_TYPE || 'development';
+});
+
 describe('TwilioVerifyService', () => {
   let service: TwilioVerifyService;
   let configService: jest.Mocked<ConfigService>;

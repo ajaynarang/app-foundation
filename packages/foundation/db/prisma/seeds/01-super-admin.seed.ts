@@ -1,4 +1,5 @@
 import { PrismaClient } from '../../generated/client';
+import { DEV_SUPERADMIN_PHONE, devCredentialColumns } from './dev-credentials';
 import * as admin from 'firebase-admin';
 
 // No hardcoded fallback: a publicly-known default password must never be used
@@ -67,6 +68,13 @@ export const seed = {
     });
 
     if (existing) {
+      if (!existing.passwordHash) {
+        const credentials = await devCredentialColumns(SUPER_ADMIN_PASSWORD, DEV_SUPERADMIN_PHONE);
+        if (Object.keys(credentials).length > 0) {
+          await prisma.user.update({ where: { id: existing.id }, data: credentials });
+          return { created: 1, skipped: 0 };
+        }
+      }
       return { created: 0, skipped: 1 };
     }
 
@@ -82,6 +90,9 @@ export const seed = {
       superAdminFirebaseUid = await createFirebaseUser('admin@example.com', SUPER_ADMIN_PASSWORD, 'Platform Admin');
     }
 
+    // First-party credentials: SUPER_ADMIN_PASSWORD if set, else the shared
+    // dev default outside production (see dev-credentials.ts).
+    const credentials = await devCredentialColumns(SUPER_ADMIN_PASSWORD, DEV_SUPERADMIN_PHONE);
     const superAdmin = await prisma.user.create({
       data: {
         userId: 'user_platform_superadmin_001',
@@ -93,6 +104,7 @@ export const seed = {
         firebaseUid: superAdminFirebaseUid,
         isActive: true,
         emailVerified: true,
+        ...credentials,
       },
     });
 

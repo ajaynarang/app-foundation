@@ -487,7 +487,7 @@ App - Your team, organized.
    */
   private getLoginUrl(subdomain: string): string {
     const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
-    const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false; // Default true
+    const useSubdomains = this.configService.get<string>('USE_TENANT_SUBDOMAINS') !== 'false'; // Default true
 
     if (useSubdomains) {
       // Multi-tenant: https://acme.app.example.com/login
@@ -503,7 +503,7 @@ App - Your team, organized.
    */
   private getDisplayUrl(subdomain: string): string {
     const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
-    const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false;
+    const useSubdomains = this.configService.get<string>('USE_TENANT_SUBDOMAINS') !== 'false';
 
     if (useSubdomains) {
       return `${subdomain}.${baseUrl}`;
@@ -517,7 +517,7 @@ App - Your team, organized.
    */
   private getSubdomainInstructionText(subdomain: string): string {
     const baseUrl = this.configService.get<string>('TENANT_BASE_URL') || 'app.example.com';
-    const useSubdomains = this.configService.get<boolean>('USE_TENANT_SUBDOMAINS') !== false;
+    const useSubdomains = this.configService.get<string>('USE_TENANT_SUBDOMAINS') !== 'false';
 
     if (useSubdomains) {
       return `Or visit ${baseUrl} and enter your subdomain: <strong>${subdomain}</strong>`;

@@ -5,11 +5,6 @@ export const LoginSchema = z.object({
   userId: z.string().min(1),
 });
 
-export const UserLookupSchema = z.object({
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-});
-
 export const UserProfileSchema = z.object({
   userId: z.string(),
   email: z.string(),
@@ -49,16 +44,6 @@ export const UserSummarySchema = z.object({
   role: z.string(),
 });
 
-export const UserLookupResultSchema = UserSummarySchema.extend({
-  tenantId: z.string(),
-  tenantName: z.string(),
-});
-
-export const UserLookupResponseSchema = z.object({
-  users: z.array(UserLookupResultSchema),
-  multiTenant: z.boolean(),
-});
-
 export const UpdateProfileSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
@@ -88,13 +73,10 @@ export const FirebaseExchangeSchema = z.object({
 
 // Inferred types
 export type LoginInput = z.infer<typeof LoginSchema>;
-export type UserLookupInput = z.infer<typeof UserLookupSchema>;
 export type UserProfile = z.infer<typeof UserProfileSchema>;
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 export type Tenant = z.infer<typeof TenantSchema>;
 export type UserSummary = z.infer<typeof UserSummarySchema>;
-export type UserLookupResult = z.infer<typeof UserLookupResultSchema>;
-export type UserLookupResponse = z.infer<typeof UserLookupResponseSchema>;
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
 export type SendOtpInput = z.infer<typeof SendOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof VerifyOtpSchema>;

@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsNotEmpty, IsOptional, Matches } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, IsOptional, Matches, MinLength } from 'class-validator';
 
 export class RegisterTenantDto {
   // Company information
@@ -25,9 +25,17 @@ export class RegisterTenantDto {
   @IsEmail()
   email: string;
 
+  // Primary credential: first-party password (min 8 chars). Either password
+  // or firebaseUid must be provided.
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  firebaseUid: string;
+  @MinLength(8)
+  password?: string;
+
+  // Optional alternative: pre-created Firebase account
+  @IsOptional()
+  @IsString()
+  firebaseUid?: string;
 
   // Contact information
   @IsString()

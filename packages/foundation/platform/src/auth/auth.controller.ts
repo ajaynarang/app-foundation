@@ -3,7 +3,8 @@ import { Response, Request as ExpressRequest } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { LoginResponseDto, UserProfileDto, UserLookupDto, UserLookupResponseDto } from './dto/login.dto';
+import { LoginResponseDto, UserProfileDto } from './dto/login.dto';
+import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/password-login.dto';
 import { FirebaseExchangeDto } from './dto/firebase-exchange.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -61,15 +62,52 @@ export class AuthController {
   @Throttle({
     default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
   })
-  @Post('lookup-user')
-  @ApiOperation({
-    summary: 'Lookup user by email or phone to detect tenant(s)',
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'First-party email + password login' })
+  @ApiBody({ type: PasswordLoginDto })
+  @ApiResponse({ status: 200, type: LoginResponseDto })
+  @ApiResponse({ status: 401 })
+  async login(
+    @Body() dto: PasswordLoginDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.loginWithPassword(dto, {
+      ip: req.ip ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
+    });
+    this.setRefreshTokenCookie(response, result.refreshToken);
+    return { accessToken: result.accessToken, user: result.user };
+  }
+
+  @Public()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
   })
-  @ApiBody({ type: UserLookupDto })
-  @ApiResponse({ status: 200, type: UserLookupResponseDto })
-  @ApiResponse({ status: 404 })
-  async lookupUser(@Body() lookupDto: UserLookupDto): Promise<UserLookupResponseDto> {
-    return this.authService.lookupUser(lookupDto);
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset link (always 200 — no account enumeration)' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: 200 })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto);
+    return { success: true };
+  }
+
+  @Public()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
+  })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Complete a password reset with a one-time token' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 401 })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto);
+    return { success: true };
   }
 
   @Public()
@@ -150,6 +188,7 @@ export class AuthController {
       user.userId,
       user.tokenId || null,
       revokeOtherSessions,
+      { currentPassword: dto.currentPassword, newPassword: dto.newPassword },
     );
     return { success: true, sessionsRevoked };
   }

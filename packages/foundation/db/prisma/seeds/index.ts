@@ -3,17 +3,27 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import * as dotenv from 'dotenv';
 import { detectEnvironment, checkSafety, logSeedResult, logHeader, getDatabaseName } from './utils';
+import { printCredentialSummary } from './dev-credentials';
 
-// Load environment variables
-dotenv.config({ path: '.env' });
-dotenv.config({ path: '.env.local' });
+// Load environment variables. The db package usually has no .env of its own —
+// runtime configuration (MULTI_TENANT, SUPER_ADMIN_PASSWORD, …) lives in the
+// backend's env, so fall back to it (same chain as prisma.config.ts).
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+for (const envPath of [
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../.env.local'),
+  path.resolve(__dirname, '../../../../../apps/backend/.env'),
+]) {
+  if (fs.existsSync(envPath)) dotenv.config({ path: envPath });
+}
 
 // ---------------------------------------------------------------------------
 // Seeds — single list of platform reference data.
 // ---------------------------------------------------------------------------
 
 const SEED_LIST = [
-  '00-implicit-tenant',
+  '00-first-tenant',
   '01-super-admin',
   '02-feature-flags',
   '03-plan-config',
@@ -99,6 +109,7 @@ async function runSeeds(prisma: PrismaClient): Promise<void> {
 
   console.log('');
   console.log('  Setup complete.');
+  printCredentialSummary();
   console.log('');
 }
 

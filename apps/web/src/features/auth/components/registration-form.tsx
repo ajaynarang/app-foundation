@@ -55,7 +55,6 @@ type Step = 1 | 2 | 3;
 
 export function RegistrationForm() {
   const router = useRouter();
-  const { signUp } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
@@ -178,12 +177,8 @@ export function RegistrationForm() {
     setError(null);
 
     try {
-      // eslint-disable-next-line no-console
-      console.log('[RegistrationForm] Starting registration...');
-      // 1. Create Firebase account
-      const firebaseUser = await signUp(data.email, data.password);
-
-      // 2. Register tenant in the platform backend
+      // Register tenant + owner in the platform backend (first-party
+      // password credential — no external identity provider needed).
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
       const response = await fetch(`${apiUrl}/tenants/register`, {
         method: 'POST',
@@ -195,7 +190,7 @@ export function RegistrationForm() {
           lastName: data.lastName,
           email: data.email,
           phone: data.phone,
-          firebaseUid: firebaseUser.uid,
+          password: data.password,
           turnstileToken: turnstileToken || undefined,
         }),
       });
@@ -205,8 +200,6 @@ export function RegistrationForm() {
         throw new Error(errorData.message || 'Registration failed');
       }
 
-      // eslint-disable-next-line no-console
-      console.log('[RegistrationForm] Registration successful, redirecting...');
       // Success! Redirect to pending approval page
       showSuccess('Account created successfully!');
       router.push('/registration/pending-approval');

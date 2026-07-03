@@ -4,9 +4,6 @@ export type {
   UserProfile,
   LoginResponse,
   Tenant,
-  UserLookupResult,
-  UserLookupResponse,
-  UserLookupInput as UserLookupRequest,
   SendOtpInput as SendOtpRequest,
   VerifyOtpInput as VerifyOtpRequest,
 } from '@app/shared-types';

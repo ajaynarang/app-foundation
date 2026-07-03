@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -56,8 +57,9 @@ export class TwilioVerifyService {
   async checkVerification(phone: string, code: string): Promise<boolean> {
     this.validateE164(phone);
 
-    // If mock OTP matches, allow immediately (dev shortcut)
-    if (this.mockOtp && code === this.mockOtp) {
+    // If mock OTP matches, allow immediately (dev shortcut). NEVER in
+    // production — a leaked TWILIO_MOCK_OTP would be a universal login code.
+    if (this.mockOtp && code === this.mockOtp && getEnvType() !== 'production') {
       this.logger.debug(`[MOCK] OTP matched for ${phone}`);
       return true;
     }

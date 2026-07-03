@@ -1,3 +1,4 @@
+import * as bcrypt from 'bcrypt';
 import {
   Inject,
   Injectable,
@@ -93,10 +94,14 @@ export class TenantsService {
       throw new ConflictException('Subdomain is already taken or reserved');
     }
 
+    if (!dto.password && !dto.firebaseUid) {
+      throw new BadRequestException('A password (or Firebase account) is required');
+    }
+
     // Check if email already registered (across all tenants)
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: dto.email }, { firebaseUid: dto.firebaseUid }],
+        OR: [{ email: dto.email }, ...(dto.firebaseUid ? [{ firebaseUid: dto.firebaseUid }] : [])],
       },
     });
 
@@ -106,6 +111,7 @@ export class TenantsService {
 
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 12) : undefined;
 
     // Create tenant and admin user in transaction
     const result = await this.prisma.$transaction(async (tx) => {
@@ -134,7 +140,8 @@ export class TenantsService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: 'OWNER', // Owner role - created during registration, cannot be deleted
-          firebaseUid: dto.firebaseUid,
+          firebaseUid: dto.firebaseUid ?? null,
+          passwordHash,
           emailVerified: false,
           isActive: false, // Inactive until tenant approved
         },

@@ -8,12 +8,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { JwtTokenService, AuthMethod } from './jwt.service';
-import { UserProfileDto, UserLookupDto, UserLookupResponseDto } from './dto/login.dto';
+import { UserProfileDto } from './dto/login.dto';
 import { FirebaseExchangeDto } from './dto/firebase-exchange.dto';
 import { FirebaseAuthService } from './firebase-auth.service';
 import { PinService } from './pin.service';
 import { TwilioVerifyService } from '../infrastructure/sms/twilio-verify.service';
 import { PhoneLoginDto } from './dto/phone-login.dto';
+import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/password-login.dto';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { EmailService } from '../infrastructure/notification/services/email.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -29,37 +33,11 @@ export class AuthService {
     private pinService: PinService,
     private twilioVerifyService: TwilioVerifyService,
     private loginEventService: LoginEventService,
+    private emailService: EmailService,
   ) {}
 
-  async lookupUser(lookupDto: UserLookupDto): Promise<UserLookupResponseDto> {
-    if (!lookupDto.email && !lookupDto.phone) {
-      throw new BadRequestException('Email or phone is required');
-    }
-    // Only tenant-backed users are eligible for the tenant picker —
-    // tenant-less rows (SUPER_ADMIN, single-tenant-mode users) are never
-    // disclosed here and would otherwise null-deref below.
-    const where: any = { isActive: true, tenantId: { not: null } };
-    if (lookupDto.email) where.email = lookupDto.email.toLowerCase().trim();
-    if (lookupDto.phone) where.phone = lookupDto.phone.trim();
-    const users = await this.prisma.user.findMany({
-      where,
-      include: { tenant: true },
-      orderBy: [{ tenant: { companyName: 'asc' } }, { role: 'asc' }, { firstName: 'asc' }],
-    });
-    if (users.length === 0) throw new NotFoundException('No user found with this email or phone');
-    return {
-      users: users.map((u) => ({
-        userId: u.userId,
-        email: u.email,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        role: u.role,
-        tenantId: u.tenant.tenantId,
-        tenantName: u.tenant.companyName,
-      })),
-      multiTenant: users.length > 1,
-    };
-  }
+  private static readonly PASSWORD_SALT_ROUNDS = 12;
+  private static readonly RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
   async refreshAccessToken(userId: string, tokenId: string) {
     const user = await this.prisma.user.findUnique({
@@ -121,6 +99,7 @@ export class AuthService {
     userId: string,
     currentTokenId: string | null,
     revokeOtherSessions: boolean,
+    passwords?: { currentPassword?: string; newPassword?: string },
   ): Promise<{ sessionsRevoked: number }> {
     const user = await this.prisma.user.findUnique({
       where: { userId },
@@ -130,9 +109,21 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
+    // First-party accounts change the password here; Firebase accounts only
+    // record the change (Firebase owns the credential).
+    let newPasswordHash: string | undefined;
+    if (passwords?.newPassword) {
+      if (user.passwordHash) {
+        if (!passwords.currentPassword || !(await bcrypt.compare(passwords.currentPassword, user.passwordHash))) {
+          throw new UnauthorizedException('Current password is incorrect');
+        }
+      }
+      newPasswordHash = await bcrypt.hash(passwords.newPassword, AuthService.PASSWORD_SALT_ROUNDS);
+    }
+
     await this.prisma.user.update({
       where: { userId },
-      data: { passwordChangedAt: new Date() },
+      data: { passwordChangedAt: new Date(), ...(newPasswordHash ? { passwordHash: newPasswordHash } : {}) },
     });
 
     let sessionsRevoked = 0;
@@ -153,6 +144,140 @@ export class AuthService {
     }
 
     return { sessionsRevoked };
+  }
+
+  /**
+   * First-party email + password login. Works with zero external services —
+   * this is the starter's primary credential. Firebase exchange and phone
+   * OTP/PIN remain as optional alternatives.
+   */
+  async loginWithPassword(dto: PasswordLoginDto, meta: { ip: string | null; userAgent: string | null }) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      include: { tenant: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!user) throw new UnauthorizedException('Invalid email or password');
+    if (!user.passwordHash) {
+      // Account exists but authenticates via Firebase/phone. The web client
+      // uses this code to fall back to the Firebase flow when configured.
+      throw new UnauthorizedException({
+        message: 'This account does not use password sign-in.',
+        code: 'PASSWORD_NOT_SET',
+      });
+    }
+    const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordOk) {
+      await this.loginEventService.recordFailure({
+        userId: user.id,
+        tenantId: user.tenant?.id ?? null,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        failReason: 'invalid_credentials' as const,
+      });
+      throw new UnauthorizedException('Invalid email or password');
+    }
+    if (!user.isActive) {
+      await this.loginEventService.recordFailure({
+        userId: user.id,
+        tenantId: user.tenant?.id ?? null,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        failReason: 'account_disabled' as const,
+      });
+      throw new UnauthorizedException('Account is deactivated. Please contact support.');
+    }
+    if (user.tenant && (user.tenant.status !== 'ACTIVE' || !user.tenant.isActive)) {
+      await this.loginEventService.recordFailure({
+        userId: user.id,
+        tenantId: user.tenant?.id ?? null,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        failReason: 'tenant_inactive' as const,
+      });
+      throw new UnauthorizedException('Your organization account is pending approval. Please check back later.');
+    }
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
+      {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant?.tenantId,
+      },
+      'email_password' satisfies AuthMethod,
+    );
+    await this.loginEventService.recordSuccess({
+      userId: user.id,
+      tenantId: user.tenant?.id ?? null,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      sessionId: refreshTokenId,
+    });
+    return { accessToken, refreshToken, user: this.toUserProfile(user) };
+  }
+
+  /**
+   * Forgot-password: always resolves 200 (no account enumeration). Stores a
+   * SHA-256 hash of a one-time token; the raw token goes into the emailed
+   * link. Without SMTP configured (local dev) the link is logged instead.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { email, isActive: true, deletedAt: null },
+      orderBy: { id: 'asc' },
+    });
+    if (!user) return; // do not reveal whether the email exists
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + AuthService.RESET_TOKEN_TTL_MS),
+      },
+    });
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+    try {
+      await this.emailService.sendEmail({
+        to: email,
+        subject: 'Reset your password',
+        html: `<p>Hi ${user.firstName},</p><p>Someone requested a password reset for your account. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
+        text: `Hi ${user.firstName},\n\nReset your password (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
+      });
+    } catch (err) {
+      // No SMTP in local dev — surface the link in the server log so the
+      // flow still works end-to-end.
+      this.logger.warn(`Email delivery unavailable — password reset link for ${email}: ${resetUrl}`);
+    }
+  }
+
+  /** Complete a password reset: consumes the one-time token, revokes all sessions. */
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
+    }
+    const passwordHash = await bcrypt.hash(dto.newPassword, AuthService.PASSWORD_SALT_ROUNDS);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash, passwordChangedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: record.userId, isRevoked: false },
+        data: { isRevoked: true, revokedAt: new Date() },
+      }),
+    ]);
   }
 
   async exchangeFirebaseToken(dto: FirebaseExchangeDto, meta: { ip: string | null; userAgent: string | null }) {
@@ -215,6 +340,7 @@ export class AuthService {
         tenantId: user.tenant?.tenantId,
         tenantName: user.tenant?.companyName,
         tenantTimezone: user.tenant?.timezone ?? undefined,
+        subdomain: user.tenant?.subdomain ?? undefined,
       },
     };
   }
@@ -267,6 +393,9 @@ export class AuthService {
       include: { tenant: true },
     });
     if (!user) throw new UnauthorizedException('User not found');
+    if (user.tenant && (user.tenant.status !== 'ACTIVE' || !user.tenant.isActive)) {
+      throw new UnauthorizedException('Your organization account is pending approval. Please check back later.');
+    }
     if (!user.phoneVerified)
       await this.prisma.user.update({
         where: { id: user.id },
@@ -364,6 +493,7 @@ export class AuthService {
       tenantId: user.tenant?.tenantId,
       tenantName: user.tenant?.companyName,
       tenantTimezone: user.tenant?.timezone ?? undefined,
+      subdomain: user.tenant?.subdomain ?? undefined,
       isActive: user.isActive,
       phone: user.phone,
       phoneVerified: user.phoneVerified,

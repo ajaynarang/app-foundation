@@ -7,6 +7,7 @@ import { FirebaseAuthService } from '../firebase-auth.service';
 import { PinService } from '../pin.service';
 import { TwilioVerifyService } from '../../infrastructure/sms/twilio-verify.service';
 import { LoginEventService } from '../login-event.service';
+import { EmailService } from '../../infrastructure/notification/services/email.service';
 
 const mockLoginEventService = {
   recordLoginEvent: jest.fn(),
@@ -72,6 +73,7 @@ describe('AuthService - Phone Auth', () => {
         { provide: PinService, useValue: mockPinService },
         { provide: TwilioVerifyService, useValue: mockTwilioVerifyService },
         { provide: LoginEventService, useValue: mockLoginEventService },
+        { provide: EmailService, useValue: { sendEmail: jest.fn() } },
       ],
     }).compile();
 
@@ -86,7 +88,7 @@ describe('AuthService - Phone Auth', () => {
       phoneVerified: true,
       pinHash: 'hashed-pin',
       isActive: true,
-      tenant: { isActive: true, tenantId: 'TNT-001', companyName: 'ACME' },
+      tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
       driver: null,
     };
 
@@ -159,7 +161,7 @@ describe('AuthService - Phone Auth', () => {
       phoneVerified: true,
       pinHash: 'hashed-pin',
       isActive: true,
-      tenant: { isActive: true, tenantId: 'TNT-001', companyName: 'ACME' },
+      tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
       driver: null,
     };
 
@@ -326,47 +328,6 @@ describe('AuthService - Phone Auth', () => {
     });
   });
 
-  describe('lookupUser', () => {
-    it('should throw BadRequestException when neither email nor phone', async () => {
-      await expect(service.lookupUser({} as any)).rejects.toThrow('Email or phone is required');
-    });
-
-    it('should throw NotFoundException when no users found', async () => {
-      mockPrismaService.user.findMany.mockResolvedValue([]);
-      await expect(service.lookupUser({ email: 'test@test.com' })).rejects.toThrow(
-        'No user found with this email or phone',
-      );
-    });
-
-    it('should return users and multiTenant flag', async () => {
-      const users = [
-        {
-          userId: 'USR-001',
-          email: 'test@test.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          role: 'ADMIN',
-          tenant: { tenantId: 'TNT-001', companyName: 'ACME' },
-        },
-        {
-          userId: 'USR-002',
-          email: 'test@test.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          role: 'MEMBER',
-          tenant: { tenantId: 'TNT-002', companyName: 'Other' },
-        },
-      ];
-      mockPrismaService.user.findMany.mockResolvedValue(users);
-
-      const result = await service.lookupUser({ email: 'test@test.com' });
-
-      expect(result.multiTenant).toBe(true);
-      expect(result.users).toHaveLength(2);
-      expect(result.users[1].tenantId).toBe('TNT-002');
-    });
-  });
-
   describe('refreshAccessToken', () => {
     it('should return new access token and profile', async () => {
       const user = {
@@ -374,7 +335,7 @@ describe('AuthService - Phone Auth', () => {
         email: 'test@test.com',
         role: 'ADMIN',
         isActive: true,
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null },
+        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
         driver: null,
         createdAt: new Date(),
         lastLoginAt: new Date(),
@@ -424,7 +385,7 @@ describe('AuthService - Phone Auth', () => {
         phone: '+12025551234',
         phoneVerified: true,
         pinHash: 'hashed',
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: 'acme' },
+        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: 'acme', status: 'ACTIVE', isActive: true },
         driver: null,
         createdAt: new Date(),
         lastLoginAt: new Date(),
@@ -457,7 +418,7 @@ describe('AuthService - Phone Auth', () => {
         phone: null,
         phoneVerified: false,
         pinHash: null,
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null },
+        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
         driver: null,
         createdAt: new Date(),
         lastLoginAt: null,
@@ -482,7 +443,7 @@ describe('AuthService - Phone Auth', () => {
         phone: null,
         phoneVerified: false,
         pinHash: null,
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null },
+        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
         driver: null,
         createdAt: new Date(),
         lastLoginAt: null,
@@ -559,6 +520,7 @@ describe('AuthService - Phone Auth', () => {
           companyName: 'ACME',
           subdomain: 'acme',
           status: 'ACTIVE',
+          isActive: true,
         },
         driver: null,
       };
@@ -633,7 +595,7 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: false,
         pinHash: null,
         isActive: true,
-        tenant: { isActive: true, tenantId: 'TNT-001', companyName: 'ACME' },
+        tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
         driver: null,
       };
       mockTwilioVerifyService.checkVerification.mockResolvedValue(true);
@@ -676,7 +638,7 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: true,
         pinHash: null,
         isActive: true,
-        tenant: { isActive: true },
+        tenant: { isActive: true, status: 'ACTIVE' },
         driver: null,
       });
 
@@ -700,7 +662,7 @@ describe('AuthService - Phone Auth', () => {
         phone: null,
         phoneVerified: false,
         pinHash: null,
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null },
+        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
         driver: null,
         createdAt: new Date(),
         lastLoginAt: null,

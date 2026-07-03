@@ -1,16 +1,8 @@
 // API
-export { authApi, lookupUser, logout, getProfile } from './api';
+export { authApi, logout, getProfile } from './api';
 
 // Types
-export type {
-  Tenant,
-  User,
-  UserSummary,
-  UserLookupRequest,
-  UserLookupResult,
-  UserLookupResponse,
-  LoginResponse,
-} from './types';
+export type { Tenant, User, UserSummary, LoginResponse } from './types';
 
 // Hooks
 export { useAuth } from './hooks/use-auth';

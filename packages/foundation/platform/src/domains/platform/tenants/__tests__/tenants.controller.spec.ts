@@ -26,7 +26,7 @@ describe('TenantsController', () => {
       user: { findUnique: jest.fn() },
       tenant: { findUnique: jest.fn().mockResolvedValue({ id: 42 }) },
     };
-    controller = new TenantsController(prisma as any, service);
+    controller = new TenantsController(prisma as any, service, { get: jest.fn().mockReturnValue(true) } as any);
   });
 
   describe('register', () => {

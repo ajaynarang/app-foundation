@@ -1,4 +1,16 @@
-import { Controller, Logger, Post, Get, Patch, Body, Param, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Logger,
+  Post,
+  Get,
+  Patch,
+  Body,
+  Param,
+  Query,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
 import { RegisterTenantDto } from './dto/register-tenant.dto';
@@ -21,6 +33,7 @@ export class TenantsController extends BaseTenantController {
   constructor(
     prisma: PrismaService,
     private readonly tenantsService: TenantsService,
+    private readonly configService: ConfigService,
   ) {
     super(prisma);
   }
@@ -44,9 +57,17 @@ export class TenantsController extends BaseTenantController {
     return this.tenantsService.updateMyOrganizationProfile(tenantDbId, dto);
   }
 
+  /** MT-only public endpoints 404 in single-tenant mode (parity with the hidden UI). */
+  private assertMultiTenant(): void {
+    if (this.configService.get<boolean>('multiTenancy.enabled') === false) {
+      throw new NotFoundException();
+    }
+  }
+
   @Public()
   @Post('register')
   async register(@Body() dto: RegisterTenantDto) {
+    this.assertMultiTenant();
     // Verify Turnstile token if configured
     if (process.env.TURNSTILE_SECRET_KEY) {
       if (!dto.turnstileToken) {
@@ -82,6 +103,7 @@ export class TenantsController extends BaseTenantController {
   @Public()
   @Get('check-subdomain/:subdomain')
   async checkSubdomain(@Param('subdomain') subdomain: string) {
+    this.assertMultiTenant();
     const available = await this.tenantsService.checkSubdomainAvailability(subdomain);
     return { available };
   }
@@ -89,6 +111,7 @@ export class TenantsController extends BaseTenantController {
   @Public()
   @Get('branding/:subdomain')
   async getTenantBranding(@Param('subdomain') subdomain: string) {
+    this.assertMultiTenant();
     return this.tenantsService.getTenantBranding(subdomain);
   }
 

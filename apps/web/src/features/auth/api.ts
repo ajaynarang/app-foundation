@@ -1,16 +1,10 @@
 import { apiClient } from '@appshore/web-core/shared/lib/api';
-import type { UserLookupRequest, UserLookupResponse, LoginResponse } from './types';
+import type { LoginResponse } from './types';
 
 export const authApi = {
   /**
    * Lookup user by email or phone (simplified login flow)
    */
-  lookupUser: async (data: UserLookupRequest): Promise<UserLookupResponse> => {
-    return apiClient<UserLookupResponse>('/auth/lookup-user', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
 
   /**
    * Logout and revoke refresh token
@@ -122,6 +116,5 @@ export const authApi = {
 };
 
 // Re-export functions for backwards compatibility
-export const lookupUser = authApi.lookupUser;
 export const logout = authApi.logout;
 export const getProfile = authApi.getProfile;

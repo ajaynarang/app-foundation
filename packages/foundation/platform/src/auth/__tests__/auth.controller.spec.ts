@@ -40,19 +40,6 @@ describe('AuthController', () => {
     controller = module.get<AuthController>(AuthController);
   });
 
-  describe('lookupUser', () => {
-    it('should delegate to auth service', async () => {
-      const dto = { email: 'test@example.com' };
-      const expected = { tenants: [{ tenantId: 'T-1', companyName: 'Acme' }] };
-      mockAuthService.lookupUser.mockResolvedValue(expected);
-
-      const result = await controller.lookupUser(dto);
-
-      expect(result).toEqual(expected);
-      expect(mockAuthService.lookupUser).toHaveBeenCalledWith(dto);
-    });
-  });
-
   describe('exchangeFirebaseToken', () => {
     it('should exchange token and set cookie', async () => {
       const dto = { idToken: 'firebase-token', tenantId: 'T-1' };
@@ -148,7 +135,10 @@ describe('AuthController', () => {
 
       await controller.changePassword(user, dto);
 
-      expect(mockAuthService.recordPasswordChange).toHaveBeenCalledWith('USR-001', 'rt_1', true);
+      expect(mockAuthService.recordPasswordChange).toHaveBeenCalledWith('USR-001', 'rt_1', true, {
+        currentPassword: undefined,
+        newPassword: undefined,
+      });
     });
   });
 

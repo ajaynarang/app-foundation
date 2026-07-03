@@ -5,10 +5,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { auth } from '@appshore/web-core/shared/lib/firebase';
+import { auth, isFirebaseConfigured } from '@appshore/web-core/shared/lib/firebase';
 import { getCookieDomain, isLocalhost } from '@appshore/web-core/shared/lib/tenant-url';
 
 interface User {
@@ -92,24 +91,41 @@ export const useAuthStore = create<AuthState>()(
       _hasHydrated: false,
       isInitialized: false,
 
-      // Sign in with email/password
+      // Sign in with email/password. First-party backend login is the primary
+      // path (works with zero external services); Firebase is the fallback for
+      // accounts that were created there (error code PASSWORD_NOT_SET).
       signIn: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          const firebaseToken = await userCredential.user.getIdToken();
-
-          // Exchange Firebase token for the platform JWT
-          await get().exchangeFirebaseToken(firebaseToken);
-
-          set({
-            firebaseUser: userCredential.user,
-            isLoading: false,
-            isInitialized: true,
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const response = await fetch(`${apiUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email, password }),
           });
-
-          // Return the user object for redirect logic
-          return get().user;
+          if (response.ok) {
+            const data = await response.json();
+            set({
+              user: data.user,
+              accessToken: data.accessToken,
+              isAuthenticated: true,
+              isLoading: false,
+              isInitialized: true,
+            });
+            setAuthCookie(true, data.user?.role);
+            return get().user;
+          }
+          const error = await response.json().catch(() => ({}));
+          if (error?.code === 'PASSWORD_NOT_SET' && isFirebaseConfigured) {
+            // Account authenticates via Firebase — fall back.
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const firebaseToken = await userCredential.user.getIdToken();
+            await get().exchangeFirebaseToken(firebaseToken);
+            set({ firebaseUser: userCredential.user, isLoading: false, isInitialized: true });
+            return get().user;
+          }
+          throw new Error(error.message || 'Invalid email or password');
         } catch (error) {
           set({ isLoading: false, isInitialized: false });
           throw error;
@@ -158,11 +174,13 @@ export const useAuthStore = create<AuthState>()(
         setAuthCookie(false);
       },
 
-      // Reset password
+      // Request a password-reset email (first-party flow; always resolves)
       resetPassword: async (email: string) => {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        await sendPasswordResetEmail(auth, email, {
-          url: `${appUrl}/reset-password`,
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+        await fetch(`${apiUrl}/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
         });
       },
 
