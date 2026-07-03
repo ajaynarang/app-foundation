@@ -109,6 +109,10 @@ packages/{ui,shared-types,test-utils}
 infra/{terraform,observability}   tests/   docker-compose.yml
 ```
 
+**Start here: [`docs/WHAT-YOU-GET.md`](./docs/WHAT-YOU-GET.md)** — a plain-language tour of
+everything the foundation ships (features, the default Postgres schema, and how to carve out
+your application).
+
 See [`CLAUDE.md`](./CLAUDE.md) for conventions and the full domain map, and
 [`docs/superpowers/specs/`](./docs/superpowers/specs/) for the design spec and the platform/domain
 seam report this starter was built from.

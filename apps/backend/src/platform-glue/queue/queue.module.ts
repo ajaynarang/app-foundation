@@ -12,12 +12,10 @@ import { BullBoardAuthMiddleware } from '@appshore/platform/infrastructure/queue
 import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
 import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } from './placeholder.processors';
-import { CacheModule } from '../cache/cache.module';
 
 @Global()
 @Module({
   imports: [
-    CacheModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

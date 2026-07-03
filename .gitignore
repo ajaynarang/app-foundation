@@ -34,3 +34,4 @@ playwright-report/
 test-results/
 .screenshots/
 packages/foundation/db/generated/
+.playwright-mcp/

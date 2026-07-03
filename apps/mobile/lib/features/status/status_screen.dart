@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/app_config.dart';
 
-/// Platform status — calls the backend /health endpoint and renders the
+/// Platform status — calls the backend /health/ready endpoint and renders the
 /// component checks. Works unauthenticated, so it doubles as the "is my
 /// stack wired correctly?" screen for a freshly-cloned foundation.
 class StatusScreen extends StatefulWidget {
@@ -21,11 +21,11 @@ class _StatusScreenState extends State<StatusScreen> {
   @override
   void initState() {
     super.initState();
-    _health = widget.api.get('/health');
+    _health = widget.api.get('/health/ready');
   }
 
   void _refresh() {
-    setState(() => _health = widget.api.get('/health'));
+    setState(() => _health = widget.api.get('/health/ready'));
   }
 
   @override
