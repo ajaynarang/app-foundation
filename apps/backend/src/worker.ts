@@ -2,9 +2,17 @@
  * Worker entry point — runs the same NestJS AppModule as the API
  * but without starting an HTTP listener.
  *
- * Bull queue processors (sync, ratecon, document-cleanup, lane-generation,
- * shield-audit, webhook-delivery, login-event-cleanup) automatically register
- * via their parent modules and begin consuming jobs from Redis.
+ * BullMQ queue processors (events, notifications, webhooks, ai-interactive,
+ * ai-background, bulk-ops — see @appshore/kernel queue.constants.ts)
+ * automatically register via their parent modules and begin consuming jobs
+ * from Redis.
+ *
+ * Worker/API contract: both main.ts and worker.ts boot the same AppModule,
+ * so BOTH processes consume every BullMQ queue — there is no worker-mode
+ * gate that disables processors in the API process. Running this worker is
+ * optional extra capacity, not a required separation. Inngest (Desk)
+ * functions are the exception: they execute over HTTP via /api/inngest and
+ * therefore run in the API process only.
  *
  * ECS task definition: command = ["node", "dist/worker.js"]
  */

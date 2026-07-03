@@ -4,14 +4,14 @@ import { apiClient } from './api';
 // Entity Search API — shared by the ⌘K command palette and the AI chat
 // @-mention picker.
 //
-// EXTENSION POINT: the starter backend ships no `GET /search` endpoint.
-// Implement a tenant-scoped `GET /search?q=...&limit=...` returning
-// `SearchApiResult[]` for your domain entities, then flip
-// ENTITY_SEARCH_ENABLED to true. Until then, searchEntities resolves to an
-// empty list so consumers don't fire a 404 on every keystroke.
+// Backed by the backend's `GET /search?q=...&limit=...` endpoint
+// (apps/backend/src/platform-glue/search/). The starter ships no search
+// providers, so the endpoint returns `{ results: [] }` until you register
+// domain searchers under the SEARCH_PROVIDERS token — see
+// `SearchModule.register()` in the backend.
 // ---------------------------------------------------------------------------
 
-export const ENTITY_SEARCH_ENABLED = false;
+export const ENTITY_SEARCH_ENABLED = true;
 
 export interface SearchApiResult {
   type: string;
@@ -25,5 +25,6 @@ export interface SearchApiResult {
 export async function searchEntities(query: string): Promise<SearchApiResult[]> {
   if (!ENTITY_SEARCH_ENABLED) return [];
   if (!query || query.length < 2) return [];
-  return apiClient<SearchApiResult[]>(`/search?q=${encodeURIComponent(query)}&limit=8`);
+  const response = await apiClient<{ results: SearchApiResult[] }>(`/search?q=${encodeURIComponent(query)}&limit=8`);
+  return response?.results ?? [];
 }

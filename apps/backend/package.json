@@ -13,6 +13,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:worker": "node dist/worker",
     "// — Code Quality": "",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"prisma/**/*.ts\" \"scripts/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"prisma/**/*.ts\" \"scripts/**/*.ts\"",

@@ -1,11 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { CreditCard, Users, Plug } from 'lucide-react';
+import { CreditCard, Users } from 'lucide-react';
 import { cn } from '@app/ui';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/plans/use-plan';
-import { useIntegrationHealth } from '@/hooks/use-integrations';
 import { useTeamMembers, useInvitations } from '@/hooks/use-team';
 
 function CardSkeleton() {
@@ -23,16 +22,14 @@ function CardSkeleton() {
 
 export function OverviewCards() {
   const { plan, displayName, isLoading: planLoading } = usePlan();
-  const { data: health, isLoading: healthLoading } = useIntegrationHealth();
   const { data: members, isLoading: membersLoading } = useTeamMembers();
   const { data: invitations, isLoading: invitationsLoading } = useInvitations();
 
-  const isLoading = planLoading || healthLoading || membersLoading || invitationsLoading;
+  const isLoading = planLoading || membersLoading || invitationsLoading;
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <CardSkeleton />
+      <div className="grid gap-4 sm:grid-cols-2">
         <CardSkeleton />
         <CardSkeleton />
       </div>
@@ -50,17 +47,6 @@ export function OverviewCards() {
       ? `${pendingInvitations} pending invitation${pendingInvitations !== 1 ? 's' : ''}`
       : 'All invitations accepted';
 
-  // Integrations — connected count + health status
-  const errorCount = health?.integrations?.filter((i) => i.hasError).length ?? 0;
-  const configuredTypes: string[] = health?.configuredTypes ?? [];
-  const connectedCount = configuredTypes.length;
-  const integrationDetail =
-    errorCount > 0
-      ? `${errorCount} sync error${errorCount !== 1 ? 's' : ''}`
-      : connectedCount > 0
-        ? 'All healthy'
-        : 'None configured';
-
   const cards = [
     {
       title: 'Plan & Usage',
@@ -76,23 +62,10 @@ export function OverviewCards() {
       detail: teamDetail,
       href: '/team/members',
     },
-    {
-      title: 'Integrations',
-      icon: Plug,
-      value: `${connectedCount} connected`,
-      detail: integrationDetail,
-      detailColor:
-        errorCount > 0
-          ? 'text-red-500 dark:text-red-400'
-          : connectedCount > 0
-            ? 'text-green-600 dark:text-green-400'
-            : undefined,
-      href: '/integrations/connections',
-    },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
@@ -110,14 +83,7 @@ export function OverviewCards() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
               <p className="mt-1 text-2xl font-bold text-foreground">{card.value}</p>
-              <p
-                className={cn(
-                  'mt-0.5 text-sm',
-                  'detailColor' in card && card.detailColor ? card.detailColor : 'text-muted-foreground',
-                )}
-              >
-                {card.detail}
-              </p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{card.detail}</p>
             </div>
           </Link>
         );

@@ -17,7 +17,7 @@ export interface NamespaceMetrics {
  * Backed by **one** ioredis client (REDIS_CLIENT). Every read, write, scan, lock,
  * rate-limit increment, and INFO call goes through this same connection. There
  * is no separate cache-manager layer — that abstraction caused a silent
- * in-memory fallback bug (see .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md).
+ * in-memory fallback bug.
  *
  * If you need a new Redis command, add it as a method here. Do NOT inject
  * REDIS_CLIENT into a domain service and bypass this facade — the ESLint

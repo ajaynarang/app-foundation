@@ -106,6 +106,51 @@ export const seed = {
       created++;
     }
 
+    // A teammate for each remaining role — lets you try role-based UI (and
+    // run the RBAC QA suite) on a fresh clone. Same dev credentials.
+    const teammates: Array<{
+      role: 'ADMIN' | 'MEMBER';
+      email: string;
+      userId: string;
+      phone: string;
+      firstName: string;
+    }> = [
+      {
+        role: 'ADMIN',
+        email: 'admin-user@example.com',
+        userId: 'user_demo_admin_001',
+        phone: '+15555550101',
+        firstName: 'Admin',
+      },
+      {
+        role: 'MEMBER',
+        email: 'member@example.com',
+        userId: 'user_demo_member_001',
+        phone: '+15555550102',
+        firstName: 'Member',
+      },
+    ];
+    for (const t of teammates) {
+      const existing = await prisma.user.findFirst({ where: { tenantId: tenantDbId, role: t.role } });
+      if (existing) continue;
+      const credentials = await devCredentialColumns(DEFAULT_ADMIN_PASSWORD, t.phone);
+      const user = await prisma.user.create({
+        data: {
+          userId: t.userId,
+          email: t.email,
+          firstName: t.firstName,
+          lastName: 'User',
+          role: t.role,
+          tenantId: tenantDbId,
+          isActive: true,
+          emailVerified: true,
+          ...credentials,
+        },
+      });
+      await prisma.userPreferences.create({ data: { userId: user.id } });
+      created++;
+    }
+
     return { created, skipped: created === 0 ? 1 : 0 };
   },
 };

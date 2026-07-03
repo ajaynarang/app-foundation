@@ -3,8 +3,6 @@
  *
  * Palette: Primary (black/white) | Info (blue) | Caution (yellow) | Critical (red)
  * Principle: Neutral-first — healthy/normal states get NO color.
- *
- * @see .docs/plans/2026-03-17-color-theming-standardization-design.md
  */
 
 // ---------------------------------------------------------------------------

@@ -12,10 +12,10 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 
 /**
  * Thin helper for Desk LLM steps that need structured (Zod-validated)
- * output. v1 AR Follow-up's 3 LLM steps all fit this shape:
- *   perceive → ArFollowupPerceiveSchema
- *   decide   → ArFollowupDecideSchema
- *   draft    → ArFollowupDraftSchema
+ * output. A responsibility's LLM steps typically fit this shape:
+ *   perceive → <Responsibility>PerceiveSchema
+ *   decide   → <Responsibility>DecideSchema
+ *   draft    → <Responsibility>DraftSchema
  *
  * If a future step needs free-text LLM output, add a sibling
  * `runFreeTextLlmStep` helper — don't generalize this one.

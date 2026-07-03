@@ -83,7 +83,7 @@ export class ApprovalController extends BaseTenantController {
   @Post(':id/claim')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Claim an approval for the current dispatcher. First-write-wins; returns 409 if already claimed.',
+    summary: 'Claim an approval for the current operator. First-write-wins; returns 409 if already claimed.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   async claim(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {

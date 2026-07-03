@@ -25,7 +25,7 @@ const EPISODE_STATUS = DeskEpisodeStatus;
  * is deliberately excluded — escalated episodes belong to the Needs You side
  * (they carry a `.escalated` aggregate on the same counts endpoint), and
  * counting them here would inflate the Handled badge whenever there's an open
- * escalation. `FAILED` + `CANCELLED` are included because a dispatcher
+ * escalation. `FAILED` + `CANCELLED` are included because an operator
  * scanning "how much was resolved today" cares that the episode terminated at
  * all, not just happily.
  *
@@ -60,8 +60,8 @@ export function resolveApprovalScope(scope: ApprovalScope | undefined, role: Use
  *   • expire(...)  — nightly cron closes approvals past expiresAt
  *
  * Publishing 'app/desk.approval.decided' is how we wake the workflow —
- * arFollowupFunction (P1.7) awaits this event via step.waitForEvent,
- * matching on data.approvalId.
+ * the responsibility's Inngest workflow function awaits this event via
+ * step.waitForEvent, matching on data.approvalId.
  */
 @Injectable()
 export class ApprovalService {
@@ -101,8 +101,8 @@ export class ApprovalService {
   }
 
   /**
-   * Claim an approval for a dispatcher. First-write-wins via DB update
-   * with a where-clause on `claimedByUserId IS NULL`. If another dispatcher
+   * Claim an approval for an operator. First-write-wins via DB update
+   * with a where-clause on `claimedByUserId IS NULL`. If another operator
    * claimed first, throws ConflictException.
    */
   async claim(approvalId: string, userId: number) {

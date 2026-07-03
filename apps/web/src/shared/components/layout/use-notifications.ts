@@ -83,7 +83,7 @@ export function useMarkAsUnread() {
 export function useDismissNotification() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (notificationId: string) => api.delete(`/notifications/${notificationId}`),
+    mutationFn: (notificationId: string) => api.post(`/notifications/${notificationId}/dismiss`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.root }),
   });
 }
@@ -91,7 +91,7 @@ export function useDismissNotification() {
 export function useMarkAllRead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (category?: string) => api.post('/notifications/read-all', category ? { category } : undefined),
+    mutationFn: (category?: string) => api.post('/notifications/mark-all-read', category ? { category } : {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.root }),
   });
 }

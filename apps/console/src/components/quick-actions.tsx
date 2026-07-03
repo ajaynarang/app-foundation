@@ -1,10 +1,9 @@
 import Link from 'next/link';
-import { UserPlus, Plug, Key } from 'lucide-react';
+import { UserPlus, Key } from 'lucide-react';
 import { cn } from '@app/ui';
 
 const actions = [
   { label: 'Invite Team Member', href: '/team/invitations', icon: UserPlus },
-  { label: 'Connect Integration', href: '/integrations/connections', icon: Plug },
   { label: 'Generate API Key', href: '/developer/api-keys', icon: Key },
 ];
 
@@ -12,7 +11,7 @@ export function QuickActions() {
   return (
     <div>
       <h2 className="mb-4 text-sm font-semibold text-foreground">Quick Actions</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {actions.map((action) => {
           const Icon = action.icon;
           return (

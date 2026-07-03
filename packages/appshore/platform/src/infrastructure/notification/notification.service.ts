@@ -115,9 +115,13 @@ export class NotificationService {
   }
 
   /**
-   * Send tenant suspension notification
+   * Send tenant suspension notification email.
+   *
+   * No Notification row is written: NotificationType has no TENANT_SUSPENDED
+   * value. Failures are logged and swallowed (same contract as
+   * createAndSendNotification) so a failed email never rolls back the
+   * suspension itself.
    */
-  // eslint-disable-next-line @typescript-eslint/require-await -- async signature reserved for future email provider
   async sendTenantSuspensionNotification(
     tenantId: string,
     email: string,
@@ -125,28 +129,34 @@ export class NotificationService {
     companyName: string,
     reason: string,
   ): Promise<void> {
-    this.logger.log(`Sending tenant suspension notification to ${email}`);
-    this.logger.log(`Tenant: ${companyName} (${tenantId})`);
-    this.logger.log(`Reason: ${reason}`);
-    // TODO: Implement actual email sending via SendGrid/AWS SES
-    // For now, just log the notification
+    this.logger.log(`Sending tenant suspension notification to ${email} (tenant ${tenantId})`);
+    try {
+      await this.emailService.sendTenantSuspensionEmail(email, firstName, companyName, reason);
+    } catch (error) {
+      this.logger.error(`Failed to send suspension email to ${email}`, error.message);
+    }
   }
 
   /**
-   * Send tenant reactivation notification
+   * Send tenant reactivation notification email.
+   *
+   * No Notification row is written: NotificationType has no TENANT_REACTIVATED
+   * value. Failures are logged and swallowed (same contract as
+   * createAndSendNotification) so a failed email never rolls back the
+   * reactivation itself.
    */
-  // eslint-disable-next-line @typescript-eslint/require-await -- async signature reserved for future email provider
   async sendTenantReactivationNotification(
     tenantId: string,
     email: string,
     firstName: string,
     companyName: string,
   ): Promise<void> {
-    this.logger.log(`Sending tenant reactivation notification to ${email}`);
-    this.logger.log(`Tenant: ${companyName} (${tenantId})`);
-    this.logger.log(`Your account has been reactivated and is now active.`);
-    // TODO: Implement actual email sending via SendGrid/AWS SES
-    // For now, just log the notification
+    this.logger.log(`Sending tenant reactivation notification to ${email} (tenant ${tenantId})`);
+    try {
+      await this.emailService.sendTenantReactivationEmail(email, firstName, companyName);
+    } catch (error) {
+      this.logger.error(`Failed to send reactivation email to ${email}`, error.message);
+    }
   }
 
   /**

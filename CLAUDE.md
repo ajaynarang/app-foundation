@@ -17,7 +17,9 @@ packages are the platform, not your app. Layer rule (enforced by
 A full-stack monorepo extracted from a production platform with all business-domain code
 removed. Everything cross-cutting remains and works:
 
-- **Auth** — JWT + refresh, Firebase exchange, phone PIN/OTP, login-event tracking, OAuth provider.
+- **Auth** — first-party email+password (primary, zero external services), phone PIN/OTP,
+  optional Firebase exchange, JWT + rotating refresh, login-event tracking, OAuth 2.1 provider.
+  Seeds print dev credentials (owner@example.com / admin@example.com / Password123!).
 - **Multi-tenancy** — tenant-scoped data + a global guard chain. Toggle with `MULTI_TENANT`
   (see below) to run single-tenant from the same code.
 - **AI** — a working streaming chat assistant (Mastra + AI SDK + Anthropic, Langfuse tracing,
@@ -53,7 +55,7 @@ apps/
   console/   — Platform management hub (Next.js 15) — super-admin/ops
   mobile/    — Flutter companion app (status + auth scaffold; API client in lib/core/)
 packages/
-  foundation/    — the AppShore platform (@appshore/* — reusable, app-blind; init-app never renames these)
+  appshore/      — the AppShore Platform (@appshore/* — reusable, app-blind; init-app never renames these)
     kernel/        — @appshore/kernel: DB-free mechanics (logging, event/queue/cache mechanics,
                      retry, SSE/SMS transport, telemetry, utils/validators, foundation event catalog)
     db/            — @appshore/db: THE prisma package — multi-file schema (foundation.prisma +
@@ -88,7 +90,7 @@ tests/         — Playwright QA suite (@app/qa)
 | `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
 
 Tenants/users/plans/flags/api-keys/oauth-provider now live in `@appshore/platform`
-(`packages/appshore/platform/src/domains/platform/`). `apps/backend/src/platform-glue/` holds the
+(`packages/appshore/platform/src/domains/`). `apps/backend/src/platform-glue/` holds the
 app-side composition: the merged event registry + DOMAIN_EVENTS (your vocabulary), queue topology
 (queue.module + dispatchers), SSE bridge, outbound webhooks, cache invalidation map, and
 `hooks.module.ts` — where platform lifecycle hooks (USER_LIFECYCLE_HOOKS, TENANT_PROVISION_HOOKS)
@@ -128,13 +130,13 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 ## Tech stack
 
-| Layer    | Tech                                                                                      |
-| -------- | ----------------------------------------------------------------------------------------- |
-| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ, Inngest |
-| Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                  |
-| Auth     | JWT + refresh, Firebase, Twilio OTP                                                       |
-| AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                  |
-| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), Loki + Tempo + Grafana                  |
+| Layer    | Tech                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------- |
+| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ, Inngest   |
+| Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                    |
+| Auth     | First-party email+password, phone PIN/OTP (Twilio optional), Firebase optional, JWT+refresh |
+| AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                    |
+| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), Loki + Tempo + Grafana                    |
 
 ---
 

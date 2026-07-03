@@ -16,7 +16,7 @@ import { UpdateDeskScheduleDto } from './dto/update-desk-schedule.dto';
  * GET is readable by any desk role so the UI can show whether automatic runs
  * are armed. PATCH is OWNER/ADMIN/SUPER_ADMIN only — pausing or arming every
  * schedule tenant-wide is an account-level safety control, not a per-agent
- * tweak a dispatcher makes.
+ * tweak an operator makes.
  */
 @ApiTags('Desk — Schedule')
 @ApiBearerAuth()

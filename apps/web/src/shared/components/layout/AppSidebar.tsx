@@ -44,8 +44,6 @@ import {
 } from '@appshore/web-core/shared/lib/navigation';
 import { openDocs } from '@appshore/web-core/shared/lib/console-url';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
-import { useOnboardingStore } from '@/features/platform/onboarding';
-import { CheckCircle2 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { FontSizeControl } from './FontSizeControl';
 import { TourTriggerButton } from '@/features/platform/tour';
@@ -64,7 +62,6 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuthStore();
-  const { status, milestone1Complete, milestone2Complete, milestone1IncompleteCount } = useOnboardingStore();
   const { hasFeature } = usePlan();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -79,29 +76,6 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
   if (!hasSwitchedPanel.current && activeSubPanel !== undefined) {
     hasSwitchedPanel.current = true;
   }
-
-  // Setup Hub badge logic
-  const getSetupHubBadge = () => {
-    if (!status) return null;
-
-    if (!milestone1Complete && milestone1IncompleteCount > 0) {
-      return (
-        <Badge variant="destructive" className="h-5 min-w-5 px-1">
-          {milestone1IncompleteCount}
-        </Badge>
-      );
-    }
-
-    if (milestone1Complete && !milestone2Complete) {
-      return <Badge className="h-5 min-w-5 px-1 bg-caution text-white">1</Badge>;
-    }
-
-    if (milestone1Complete && milestone2Complete) {
-      return <CheckCircle2 className="h-4 w-4 text-muted-foreground" />;
-    }
-
-    return null;
-  };
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -281,8 +255,6 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                           ? pathname?.startsWith(settingsPrefix)
                           : pathname === navItem.href || pathname?.startsWith(navItem.href + '/');
                     const Icon = navItem.icon;
-                    const isSetupHub = navItem.href === '/onboarding';
-                    const showSetupBadge = isSetupHub && (user?.role === 'OWNER' || user?.role === 'ADMIN');
                     const navBadge = getNavItemBadge(navItem);
                     const isGated = (() => {
                       if (navItem.entitlements?.length) {
@@ -333,9 +305,6 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                         )}
                         {!isCollapsed && hasSubPanel && (
                           <ChevronRight className="h-4 w-4 ml-auto flex-shrink-0 text-muted-foreground" />
-                        )}
-                        {!isCollapsed && showSetupBadge && !isGated && !hasSubPanel && (
-                          <div className="ml-auto">{getSetupHubBadge()}</div>
                         )}
                         {!isCollapsed && navBadge && !isGated && !hasSubPanel && (
                           <div className="ml-auto">{navBadge}</div>

@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+// Config ownership rule:
+// - App-owned config lives HERE, in the typed zod schema below — validated at
+//   boot, accessed as `configService.get('jwt.accessExpiry')` etc.
+// - Foundation/vendor-owned settings (Twilio, SMTP, Deepgram, DB pool tuning,
+//   OAuth TTLs, ...) are read raw via ConfigService/process.env at their point
+//   of use and are documented in .env.example instead.
+
 // Development-only fallback secrets. These strings are public (this is a
 // template repo), so production boot MUST fail if any of them is still in
 // use — see the superRefine below.

@@ -18,7 +18,7 @@ export const ENV = {
   webBaseUrl: process.env.WEB_BASE_URL || 'http://localhost:3000',
 
   /** Required at runtime: tenant slug (not DB id) to target. Use pnpm qa:list-tenants to discover. */
-  tenantId: process.env.TENANT_ID || '',
+  tenantId: process.env.TENANT_ID || 'demo' /* seeded demo tenant */,
 
   /** Browser test credentials */
   memberEmail: process.env.TEST_MEMBER_EMAIL || 'member@example.com',

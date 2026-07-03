@@ -137,8 +137,8 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
 /**
  * Build the entityRef used by the memory writer + reinforcer. Merges the
  * responsibility's relationship keys (from its hydrate output's
- * `relationshipRef`) so memories key at the counterparty level — customer
- * for invoices, driver for settlements — rather than only the one-off
+ * `relationshipRef`) so memories key at the counterparty level (e.g. the
+ * customer behind an invoice) rather than only the one-off
  * entity. Job-blind: the shared close step never reads a per-responsibility
  * entity shape; each responsibility names its own keys on its hydrate output.
  */

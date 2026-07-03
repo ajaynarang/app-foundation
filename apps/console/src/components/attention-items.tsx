@@ -2,11 +2,10 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { CheckCircle2, AlertTriangle, Key, UserPlus, CreditCard } from 'lucide-react';
+import { CheckCircle2, Key, UserPlus, CreditCard } from 'lucide-react';
 import { cn } from '@app/ui';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { usePlan } from '@/features/plans/use-plan';
-import { useIntegrationHealth } from '@/hooks/use-integrations';
 import { useInvitations } from '@/hooks/use-team';
 import { useApiKeys } from '@/features/api-keys/use-api-keys';
 
@@ -36,32 +35,17 @@ function ItemSkeleton() {
 
 export function AttentionItems() {
   const { isLoading: planLoading, ...planData } = usePlan();
-  const { data: health, isLoading: healthLoading } = useIntegrationHealth();
   const { data: invitations, isLoading: invitationsLoading } = useInvitations();
   const { data: apiKeys, isLoading: apiKeysLoading } = useApiKeys();
 
-  const isLoading = planLoading || healthLoading || invitationsLoading || apiKeysLoading;
+  const isLoading = planLoading || invitationsLoading || apiKeysLoading;
 
   const items = useMemo(() => {
     if (isLoading) return [];
 
     const result: AttentionItem[] = [];
 
-    // 1. Integration sync errors (highest priority)
-    for (const integration of health?.integrations ?? []) {
-      if (!integration.hasError) continue;
-      result.push({
-        id: `integration-error-${integration.id}`,
-        icon: AlertTriangle,
-        iconColor: 'text-red-500 dark:text-red-400',
-        title: `${integration.displayName ?? integration.vendor} sync error`,
-        detail: integration.lastErrorMessage ?? 'Sync failed',
-        href: '/integrations/sync',
-        priority: 1,
-      });
-    }
-
-    // 2. API keys expiring within 30 days
+    // 1. API keys expiring within 30 days
     const now = new Date();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const expiringKeys =
@@ -85,7 +69,7 @@ export function AttentionItems() {
       });
     }
 
-    // 3. Trial ending within 7 days
+    // 2. Trial ending within 7 days
     if (planData.isOnTrial && planData.daysLeftInTrial !== null && planData.daysLeftInTrial <= 7) {
       result.push({
         id: 'trial-ending',
@@ -98,7 +82,7 @@ export function AttentionItems() {
       });
     }
 
-    // 4. Pending invitations
+    // 3. Pending invitations
     const pending = invitations?.filter((i) => i.status === 'PENDING') ?? [];
     for (const inv of pending) {
       const createdAt = new Date(inv.createdAt);
@@ -118,7 +102,7 @@ export function AttentionItems() {
     result.sort((a, b) => a.priority - b.priority);
 
     return result;
-  }, [isLoading, health, apiKeys, planData, invitations]);
+  }, [isLoading, apiKeys, planData, invitations]);
 
   return (
     <div>

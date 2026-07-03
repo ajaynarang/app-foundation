@@ -37,7 +37,7 @@ export class PromptingService implements OnModuleInit {
 
     // Resolve local skills directory. In `ts-node`/dev the `src/` layout wins;
     // in bundled/dist environments fall back to a sibling of the compiled service.
-    const srcSkillsDir = path.join(process.cwd(), 'src', 'platform', 'prompting', 'prompts', 'skills');
+    const srcSkillsDir = path.join(process.cwd(), 'src', 'domains', 'prompting', 'prompts', 'skills');
     this.skillsDir = fs.existsSync(srcSkillsDir) ? srcSkillsDir : path.join(__dirname, 'prompts', 'skills');
   }
 

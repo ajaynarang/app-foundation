@@ -66,6 +66,10 @@ cd apps/backend && pnpm prisma:generate && pnpm prisma:migrate:deploy && pnpm db
 cd ../.. && pnpm dev
 ```
 
+**Log in immediately** — the seed prints dev credentials (non-production only):
+`owner@example.com / Password123!` (workspace owner) · `admin@example.com / Password123!`
+(super admin) · phone `+1 555 555 0100` PIN `1234`.
+
 > Prefer secrets injection over `.env` files? See [docs/doppler.md](./docs/doppler.md) for the full Doppler environment-variable guide.
 
 ---

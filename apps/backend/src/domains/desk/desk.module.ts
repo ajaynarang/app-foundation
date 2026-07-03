@@ -12,35 +12,23 @@ import { DeskTriggerModule } from './core/trigger/trigger.module';
 import { DeskResponsibilityModule } from './responsibilities/desk-responsibility.module';
 
 /**
- * the Desk (v3) — top-level module.
+ * Desk — durable workflow engine (Inngest-backed), top-level module.
  *
- * Folder layout (see .docs/plans/06-assistant/2026-04-20-desk-architecture-v3.md §8):
+ * Desk runs long-lived, human-in-the-loop "responsibilities": each one is an
+ * Inngest workflow that perceives events, decides via LLM steps, pauses for
+ * human approval when needed, and records everything as an episode. The
+ * responsibility registry ships empty — add your own under responsibilities/.
+ *
+ * Folder layout:
  *   core/             — generic Desk infra (inngest client/controller,
  *                       approval, episode step-writer, memory, trigger,
- *                       gate algorithm)
+ *                       scheduler, suppression)
  *   shared-steps/     — reusable step handlers (gate.step, execute.step,
  *                       close.step) + helpers (_llm-step.helper,
  *                       step.types) used by every responsibility
  *   responsibilities/ — one folder per responsibility (definition,
  *                       fan-out, workflow/, steps/, prompts/). New
  *                       responsibilities land here.
- *
- * Phased composition status:
- *   P1.4 ✅ DeskInngestModule      (Inngest client + /api/inngest endpoint)
- *   P1.5 ✅ DeskApprovalModule     (approval service + controller + DTO)
- *   P1.6 ✅ DeskEpisodeModule + DeskMemoryModule
- *            (step writer + memory service used by step handlers)
- *   P1.7 ✅ AR Follow-up function registered in InngestController's serve()
- *   P1.8 ✅ DeskTriggerModule      (fan-out + domain event bridge)
- *   P1.8b ✅ DeskSchedulerModule   (every-minute heartbeat → cron-due
- *                                   responsibility runs, gated behind the
- *                                   tenant master + per-responsibility
- *                                   schedule switches, both default OFF)
- *   P1.9 ✅ Responsibility registry (definitions + seed)
- *   P1.10 ✅ DeskResponsibilityModule (prompt registrar)
- *   P1.11 ✅ DeskResponsibilityApiModule + episode read API
- *            (list/detail/update responsibilities, manual-run, episode
- *            list/detail with steps + approvals)
  */
 @Module({
   imports: [

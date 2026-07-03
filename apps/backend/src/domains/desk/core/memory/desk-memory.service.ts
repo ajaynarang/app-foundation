@@ -51,8 +51,8 @@ export class DeskMemoryService {
    *   summary). Embedded once and cosine-compared against every candidate row.
    * @param queryIntent — when provided, candidates whose polarity opposes the
    *   intent are penalised by `CONTRADICTION_PENALTY`. Used by hydrate.step
-   *   when the responsibility's intent is well-defined (e.g. AR Follow-up's
-   *   default intent is `MemoryPolarity.REINFORCE` — keep nudging customers).
+   *   when the responsibility's intent is well-defined (e.g. a follow-up
+   *   responsibility might default to `MemoryPolarity.REINFORCE` — keep nudging).
    */
   async findRelevant(input: {
     tenantId: number;

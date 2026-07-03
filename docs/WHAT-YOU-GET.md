@@ -1,194 +1,226 @@
-# What you get with the AppShore Platform Starter
+# What you get — and what you build
 
-This repo is the **AppShore Platform Starter** — the golden path for new AppShore products. You clone it, run one command, and you have a working
-product skeleton — backend API, web app, admin console, and a mobile app — with all the boring,
-hard, cross-cutting stuff already built, tested, and wired together. You only write the part
-that makes your product _your product_.
+This repo is the **AppShore Platform Starter** — the golden path for new AppShore products.
+Clone it, run one command, and you have a working product skeleton: backend API, web app,
+admin console, and a mobile app, with the hard cross-cutting work already done, tested, and
+wired together. **There is no business logic in here** — no "orders", no "projects". That
+empty space is yours.
 
-There is deliberately **no business logic** in here. No "orders", no "projects", no "patients".
-That empty space is where your app goes.
+This page is the whole map: what's already built ✅, what turns on with an API key ⚙️, and
+what you build ✎. Read it top to bottom and you know exactly where you stand.
 
 ---
 
-## Start a new app in 5 minutes
+## Start in 5 minutes (and log in immediately)
 
 ```bash
 git clone <this-repo> my-app && cd my-app
-pnpm init-app          # answers: name, display name, multi-tenant or not, keep mobile app?
 pnpm install
-pnpm docker:up         # Postgres + Redis (+ optional Grafana stack)
+pnpm init-app                                  # name, display name, multi-tenant?, mobile app?
+pnpm docker:up                                 # Postgres 16 (pgvector) + Redis 7
+cd apps/backend && cp .env.example .env && cd ../..
+cp apps/web/.env.example apps/web/.env.local
+pnpm backend:prisma:generate
 cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed && cd ../..
-pnpm dev               # backend :8000, web :3000, console :3002
+pnpm dev                                       # backend :8000 · web :3000 · console :3002
 ```
 
-`init-app` asks a few questions and rewrites the whole repo for you:
+The seed prints ready-to-use **dev credentials** (non-production only):
 
-| Question               | What it changes                                                    |
-| ---------------------- | ------------------------------------------------------------------ |
-| App name (`acme-crm`)  | package names, docker containers, Terraform, Doppler project names |
-| Display name           | every place the UI says "Platform"                                 |
-| Multi-tenant? (mt/st)  | `MULTI_TENANT` env defaults — same code runs either way            |
-| Keep mobile app? (y/n) | keeps + renames `apps/mobile`, or deletes it                       |
-| Database name          | `DATABASE_URL` / `POSTGRES_DB` everywhere                          |
+| Who                  | Email               | Password       |
+| -------------------- | ------------------- | -------------- |
+| Workspace owner      | `owner@example.com` | `Password123!` |
+| Platform super admin | `admin@example.com` | `Password123!` |
 
-After that you have a running product with a login page, registration, settings, billing,
-an AI assistant, and an ops console — before you've written a single line of code.
+Phone sign-in also works out of the box: `+1 555 555 0100`, PIN `1234` (mock OTP `123456`).
+Open `http://localhost:3000/login`, sign in as the owner, and you're inside a live workspace
+("Demo Workspace" in multi-tenant mode; "Default Workspace" in single-tenant mode).
 
 ---
 
-## What your new app already has
+## ✅ What's already built (you ship this on day one)
 
-### Sign-in and users (done)
+**Identity & access**
 
-- JWT auth with refresh tokens, phone OTP (Twilio), and Firebase token exchange.
-- Registration + invitations (email/SMS), roles (`OWNER / ADMIN / MEMBER / SUPER_ADMIN`),
-  login-event history ("new device signed in"), API keys, and a full **OAuth provider**
-  (your app can be "Sign in with X" for others, including MCP clients like Claude).
-- Every route is guarded by default: `Throttler → Jwt → Tenant → Roles → Plan`.
+- First-party **email + password** auth (bcrypt, forgot/reset password, change password,
+  session revocation) — works with zero external services.
+- Phone **OTP** and **PIN** login; **Firebase** token exchange as an optional alternative.
+- JWT access + rotating refresh tokens (hashed at rest, httpOnly cookie), login-event history.
+- Roles (`OWNER / ADMIN / MEMBER / SUPER_ADMIN`), invitations (email/SMS), **API keys**
+  with scopes/rotation, and a full **OAuth 2.1 provider** (PKCE — your app can be
+  "Sign in with X" for MCP clients like Claude).
+- Every route guarded by default: `Throttler → Jwt → Tenant → Roles → Plan`.
 
-### Multi-tenancy (done, optional)
+**Multi-tenancy (or not) — one env var**
 
-- Tenants resolve from the subdomain (`acme.yourapp.com`); every table is tenant-scoped.
-- Flip `MULTI_TENANT=false` + `IMPLICIT_TENANT_ID=1` and the exact same code runs
-  single-tenant — no query changes needed.
+- Multi-tenant (default): subdomain tenants, self-registration + super-admin approval,
+  per-tenant everything.
+- Single-tenant (`MULTI_TENANT=false`): one implicit workspace; registration endpoints and
+  UI disappear; the same code and queries run unchanged.
 
-### Plans, billing, and money (done)
+**Plans & billing**
 
-- Stripe subscriptions, invoices, payment methods, a credit **wallet**, add-ons,
-  plan entitlements ("PRO gets 10 seats"), trial handling, and dunning.
-- `@RequirePlan()`-style gating is already enforced by the guard chain.
+- Plan configs + entitlements (feature gating enforced in the guard chain), trials, add-ons
+  data model, Stripe subscriptions/invoices/payment methods, credit **wallet**, dunning.
 
-### AI assistant (done, extend it)
+**AI**
 
-- A streaming chat assistant (Anthropic + AI SDK + Mastra) with conversation history,
-  a Markdown **knowledge base** (drop files, run `pnpm seed:knowledge`), moderation,
-  per-tenant **AI budgets** (soft/hard caps), model-pricing ledger, Langfuse tracing,
-  and human-in-the-loop approval for risky agent actions.
-- An **MCP server** with an empty toolset — add `@Tool` providers and your app is
-  instantly usable from Claude and other MCP clients.
-- **Desk**: an Inngest-powered durable agent workflow engine (episodes, approvals,
-  memory, suppressions) with an empty responsibility registry to fill in.
+- Streaming chat assistant (Anthropic + AI SDK + Mastra) with conversation history, voice
+  (Deepgram/Cartesia/LiveKit scaffolding), @-mentions, product tour.
+- Markdown **knowledge base** (pgvector RAG) — drop files, run `pnpm seed:knowledge`.
+- Per-tenant **AI budgets** (soft/hard caps), model-pricing spend ledger, moderation,
+  human-in-the-loop approval for risky agent actions, Langfuse tracing.
+- **MCP server** with two sample tools (health, knowledge search) — add `@Tool` providers
+  and your app is callable from Claude.
+- **Desk**: durable agent workflow engine on Inngest (episodes, approvals, memory,
+  suppression) with one sample responsibility (`welcome`).
 
-### The plumbing every product needs (done)
+**The plumbing**
 
-- **Background jobs**: BullMQ queues with schedules, retries, dead-letter handling,
-  a Bull Board dashboard, and data-retention cleanup.
-- **Notifications**: one dispatcher, four channels — in-app, push, SMS, email.
-- **Realtime**: SSE streams to the browser, bridged from domain events.
-- **Domain events**: an event registry + outbound **webhooks** (per-tenant
-  subscriptions with delivery logs and SSRF protection).
-- **Files**: S3 uploads with presigned URLs.
-- **Observability**: OpenTelemetry traces, structured pino logs, Loki/Tempo/Grafana
-  docker profile, health endpoints (`/api/v1/health/live`, `/health/ready`).
-- **Support & feedback**: ticketing + in-app feedback with AI summarization.
-- **Admin console** (`apps/console`): super-admin app for tenants, jobs, events,
-  cache, schedules, announcements, and AI spend.
+- BullMQ **background jobs** (queues: events, notifications, webhooks, ai-interactive,
+  ai-background, bulk-ops) with schedules, retries, dead-letter log, Bull Board dashboard.
+- **Domain events**: typed registry → SSE realtime to the browser + per-tenant outbound
+  **webhooks** (delivery logs, SSRF-guarded).
+- **Notifications**: one dispatcher — in-app inbox, browser push, SMS, email.
+- S3 **file storage** with presigned URLs; **integrations framework** with one worked
+  example connector (QuickBooks OAuth) showing the adapter pattern.
+- **Search endpoint** with a provider extension point (returns empty until you register
+  your domain searchers).
+- **Support tickets** + in-app **feedback** (AI-summarized) + announcements/banners.
+- OpenTelemetry traces, structured pino logs, Loki/Tempo/Grafana docker profile, health
+  endpoints (`/api/v1/health/live`, `/health/ready`).
 
-### Four apps out of the box
+**Four apps**
 
-| App            | What it is                                                     |
-| -------------- | -------------------------------------------------------------- |
-| `apps/backend` | NestJS 11 API — your domains live in `src/domains/`            |
-| `apps/web`     | Next.js 15 product app — login, register, settings, AI chat    |
-| `apps/console` | Next.js 15 super-admin/ops hub                                 |
-| `apps/mobile`  | Flutter companion — status screen + phone-OTP sign-in scaffold |
+| App            | What it is                                                                            |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `apps/backend` | NestJS 11 API — your domains go in `src/domains/`                                     |
+| `apps/web`     | Next.js 15 product app — login, registration, settings (15 pages), AI chat, admin     |
+| `apps/console` | Next.js 15 super-admin/ops hub + API docs playground                                  |
+| `apps/mobile`  | Flutter companion — status screen + phone sign-in, your screens go in `lib/features/` |
 
-### Infrastructure as code (done)
+**Delivery**
 
-- `docker-compose.yml` for local dev (Postgres 16 + pgvector, Redis 7, Inngest, Grafana stack).
-- Terraform for AWS (ECS, RDS, ElastiCache, S3, ALB, CloudWatch) — parameterized by app name.
-- GitHub Actions CI (lint, type-check, tests, migrations) and a deploy pipeline.
-
----
-
-## The default Postgres schema (what's already in your database)
-
-The schema lives in `packages/appshore/db/prisma/schema/` — `foundation.prisma` is the
-platform's (don't edit), **`app.prisma` is yours** (empty, waiting for your models).
-Everything is Prisma; the client is imported from `@appshore/db`.
-
-~68 foundation tables, in plain words:
-
-| Group                | Tables (main ones)                                                                                                                                                | What they store                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Identity & tenancy   | `Tenant`, `User`, `RefreshToken`, `LoginEvent`, `UserInvitation`, `ApiKey`, `UserPreferences`, `SuperAdminPreferences`                                            | who your users are, which tenant they belong to        |
-| OAuth provider       | `OAuthClient`, `OAuthAuthorizationCode`, `OAuthAccessToken`, `OAuthRefreshToken`                                                                                  | third-party apps signing in through you                |
-| Plans & entitlements | `PlanConfig`, `PlanEntitlement`, `TenantPlanEvent`, `AddOn`, `TenantAddOn`, `AddOnRequest`                                                                        | what each plan allows, plan history, add-ons           |
-| Billing & money      | `BillingCustomer`, `BillingSubscription`, `BillingInvoice`, `PaymentMethod`, `Wallet`, `WalletTransaction`, `ProcessedBillingEvent`                               | Stripe mirror + credit wallet                          |
-| Feature flags        | `FeatureFlag`                                                                                                                                                     | per-tenant on/off switches                             |
-| Notifications        | `Notification`, `PushSubscription`                                                                                                                                | in-app inbox + browser push targets                    |
-| AI                   | `Conversation`, `ConversationMessage`, `ConversationSession`, `KnowledgeDocument`, `AiInvocation`, `ModelPricing`, `TenantAiBudget`                               | chat history, RAG docs (pgvector), spend ledger + caps |
-| Desk (agent engine)  | `DeskAgent`, `DeskResponsibility`, `DeskEpisode`, `DeskEpisodeStep`, `DeskApproval`, `DeskMemory`, `DeskEntitySuppression`, `AgentInvocationLog`, `HitlChallenge` | durable agent workflows + approvals                    |
-| Jobs & events        | `Job`, `JobSchedule`, `TenantJobRun`, `DomainEventLog`, `DeadLetterLog`, `TenantCounter`                                                                          | background-job state + event audit trail               |
-| Webhooks             | `WebhookSubscription`, `WebhookDeliveryLog`                                                                                                                       | tenants subscribing to your events                     |
-| Integrations         | `IntegrationConfig`, `IntegrationVendor`, `IntegrationEntityMapping`, `VendorConfig`                                                                              | connector framework (vendor registry is empty — yours) |
-| Support & comms      | `SupportTicket`, `SupportTicketMessage`, `Feedback`, `Announcement`, `Document`                                                                                   | tickets, feedback, banners, file metadata              |
-
-Rules the schema linter enforces: every table is tenant-scoped (`tenantId`) unless it's global
-reference data; IDs are Int autoincrement (operational) or UUIDv7 (audit/event tables); camelCase
-fields with `@map` for snake_case columns.
+- docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache/S3/ALB), GitHub Actions
+  CI (lint, type-check, unit suites, Flutter analyze/test) + deploy pipeline, Playwright QA
+  suite (auto-generated RBAC matrix over every controller, smoke, API tests).
 
 ---
 
-## How the code is organized (30-second tour)
+## ⚙️ Works when you add a key (all optional)
+
+| Capability        | Env keys (see `apps/backend/.env.example`) | Without it                         |
+| ----------------- | ------------------------------------------ | ---------------------------------- |
+| Real SMS / OTP    | `TWILIO_*`                                 | mock OTP `123456` (non-prod only)  |
+| Email delivery    | `SMTP_*` or `RESEND_API_KEY`               | emails logged to server console    |
+| AI assistant      | `ANTHROPIC_API_KEY`                        | chat UI loads, replies unavailable |
+| Firebase login    | `FIREBASE_*` (backend + web)               | email/password + phone still work  |
+| Stripe billing    | `STRIPE_*`                                 | plans/entitlements still enforced  |
+| File uploads      | `AWS_*` / S3 bucket                        | uploads unavailable                |
+| Voice assistant   | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`    | text chat only                     |
+| LLM observability | `LANGFUSE_*`                               | local prompt fallback used         |
+| Bot protection    | `TURNSTILE_SECRET_KEY`                     | registration unprotected           |
+| Error tracking    | Sentry (scaffold in web-core)              | console logging                    |
+
+---
+
+## ✎ What you build (the actual product)
+
+1. **Your data** — models in `packages/appshore/db/prisma/schema/app.prisma`
+   (`foundation.prisma` is platform-owned; don't edit). Every tenant-owned table gets a
+   `tenantId`. Then `pnpm --filter @appshore/db prisma:migrate` + `prisma:generate`.
+2. **Your backend domain** — a module under `apps/backend/src/domains/<your-domain>/`
+   (controller extends `BaseTenantController` from `@appshore/platform`, Prisma client from
+   `@appshore/db`), registered in `app.module.ts`.
+3. **Your events** — entries in `APP_EVENT_REGISTRY`
+   (`apps/backend/src/platform-glue/events/event-registry.ts`); typed `DOMAIN_EVENTS`
+   constants, SSE and webhooks come free.
+4. **Your web features** — `apps/web/src/features/<your-domain>/` (TanStack Query +
+   `apiClient` from `@appshore/web-core`, shadcn/ui components). Replace the landing page
+   (`apps/web/src/app/page.tsx`) and the legal placeholder copy.
+5. **Your mobile screens** — `apps/mobile/lib/features/<your-domain>/`.
+6. **Your AI surface** — `@Tool` providers in `domains/ai/mcp/mcp-tools.module.ts`, desk
+   responsibilities in `domains/desk/responsibilities/`, knowledge-base content, search
+   providers for @-mentions.
+7. **Your integrations** — connectors in `domains/integrations/` `VENDOR_REGISTRY`
+   (QuickBooks sample shows the pattern).
+8. **Branding** — `init-app` does the renames; you bring logo, colors (tailwind preset in
+   `packages/ui`), and real legal pages.
+
+### Your first domain, end to end (~an hour)
+
+Say you're building "projects": add a `Project` model to `app.prisma` → migrate → create
+`domains/projects/` module with CRUD (copy the support domain as a reference — it's the
+smallest) → add `app.project.created` to the event registry → build
+`features/projects/` list+detail pages in web → done: auth, tenant scoping, rate limits,
+plan gating, toasts, realtime, and observability were already handled around your code.
+
+---
+
+## The default Postgres schema (~60 tables, all foundation)
+
+Lives in `packages/appshore/db/prisma/schema/` — **`app.prisma` is yours**, everything else
+is platform-owned. Import the client and enums from **`@appshore/db`** (never
+`@prisma/client` directly).
+
+| Group                   | Main tables                                                                                                                                                                            | Purpose                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Identity & tenancy      | `Tenant`, `User`, `RefreshToken`, `PasswordResetToken`, `LoginEvent`, `UserInvitation`, `ApiKey`, `UserPreferences`                                                                    | who users are, which tenant owns them     |
+| OAuth provider          | `OAuthClient`, `OAuthAuthorizationCode`, `OAuthAccessToken`, `OAuthRefreshToken`                                                                                                       | third-party / MCP sign-in through you     |
+| Plans & billing         | `PlanConfig`, `PlanEntitlement`, `TenantPlanEvent`, `AddOn`, `TenantAddOn`, `BillingCustomer`, `BillingSubscription`, `BillingInvoice`, `PaymentMethod`, `Wallet`, `WalletTransaction` | entitlements, Stripe mirror, credits      |
+| Feature flags           | `FeatureFlag`                                                                                                                                                                          | per-tenant switches                       |
+| Notifications           | `Notification`, `PushSubscription`                                                                                                                                                     | inbox + push targets                      |
+| AI                      | `Conversation`, `ConversationMessage`, `ConversationSession`, `KnowledgeDocument`, `AiInvocation`, `ModelPricing`, `TenantAiBudget`                                                    | chat, RAG (pgvector), spend ledger + caps |
+| Desk (agent engine)     | `DeskAgent`, `DeskResponsibility`, `DeskEpisode`, `DeskEpisodeStep`, `DeskApproval`, `DeskMemory`, `DeskEntitySuppression`, `AgentInvocationLog`, `HitlChallenge`                      | durable agent workflows + approvals       |
+| Jobs & events           | `Job`, `JobSchedule`, `TenantJobRun`, `DomainEventLog`, `DeadLetterLog`, `TenantCounter`                                                                                               | background-job state + audit trail        |
+| Webhooks & integrations | `WebhookSubscription`, `WebhookDeliveryLog`, `IntegrationConfig`, `IntegrationVendor`, `VendorConfig`                                                                                  | outbound events, connector framework      |
+| Support & comms         | `SupportTicket`, `SupportTicketMessage`, `Feedback`, `Announcement`                                                                                                                    | tickets, feedback, banners                |
+
+Conventions (enforced by the schema linter + CI guardrail tests): tenant scoping on every
+non-global table; Int autoincrement for operational tables, UUIDv7 for audit/event tables;
+camelCase fields `@map`ped to snake_case columns; money in integer cents; **tenants are
+suspended, never hard-deleted**.
+
+---
+
+## How the code is organized (30 seconds)
 
 ```
-packages/appshore/     ← the platform (@appshore/*). You rarely touch this.
-  kernel/    pure mechanics: logging, events, retry, SSE, utils
-  db/        THE Prisma package: schema, migrations, seeds, client
-  platform/  auth, tenancy, queues, storage, health, users/tenants/plans APIs
-  web-core/  web api client, realtime, hooks, session bridge
+packages/appshore/      ← the AppShore Platform (@appshore/*). Build ON it, don't edit it.
+  kernel/    pure mechanics: logging, event/queue/cache mechanics, retry, SSE, utils
+  db/        THE Prisma package: schema, migrations, seeds, generated client
+  platform/  auth, tenancy, database, queues, storage, health, users/tenants/plans APIs
+  web-core/  web api client, realtime/SSE, hooks, session bridge
+packages/{ui,shared-types,test-utils}   ← yours (renamed/themed per product)
 apps/
-  backend/src/domains/       ← YOUR backend code goes here
-  backend/src/platform-glue/ ← your event names, queue topology, hook bindings
-  web/src/features/          ← YOUR web features go here
-  mobile/lib/features/       ← YOUR mobile screens go here
+  backend/src/domains/        ← YOUR backend code
+  backend/src/platform-glue/  ← your event names, queue topology, hook bindings, search providers
+  web/src/features/           ← YOUR web features
+  mobile/lib/features/        ← YOUR mobile screens
 ```
 
-One rule keeps it clean (and a CI test enforces it): **foundation packages never import app
-code**. Where the platform needs app behavior (e.g. "send a notification when a user joins"),
-it exposes a hook and `platform-glue/hooks.module.ts` binds your implementation.
-
----
-
-## Carving out your application (your first domain)
-
-Say you're building "projects":
-
-1. **Models** — add `Project` to `packages/appshore/db/prisma/schema/app.prisma`
-   (include `tenantId`), then `pnpm --filter @appshore/db prisma:migrate` and
-   `pnpm --filter @appshore/db prisma:generate`.
-2. **Backend** — create `apps/backend/src/domains/projects/` (module, controller,
-   service; extend `BaseTenantController` from `@appshore/platform`; import the
-   Prisma client from `@appshore/db`). Register the module in `app.module.ts`.
-3. **Events** — add `app.project.created` to `APP_EVENT_REGISTRY` in
-   `apps/backend/src/platform-glue/events/event-registry.ts`; you get typed
-   `DOMAIN_EVENTS.PROJECT_CREATED`, SSE + webhooks for free.
-4. **Web** — create `apps/web/src/features/projects/` (pages, hooks with TanStack
-   Query calling `apiClient` from `@appshore/web-core`, shadcn/ui components).
-5. **Mobile (optional)** — `apps/mobile/lib/features/projects/` using the same
-   `ApiClient`.
-6. **AI (optional)** — expose it to the assistant with a `@Tool` provider in
-   `domains/ai/mcp/mcp-tools.module.ts`.
-
-That's the whole loop. Auth, tenant scoping, rate limits, plan gating, toasts, and
-observability are already handled around your code.
+One rule, CI-enforced (`apps/backend/src/architecture/foundation-boundaries.spec.ts`):
+**platform packages never import app code** — `kernel ← db ← platform ← apps`. Where the
+platform needs app behavior (a user joined, a tenant was approved), it exposes a hook and
+`platform-glue/hooks.module.ts` binds your implementation.
 
 ---
 
 ## Day-to-day commands
 
-| Task                    | Command                                      |
-| ----------------------- | -------------------------------------------- |
-| Run everything          | `pnpm dev`                                   |
-| DB migration            | `pnpm --filter @appshore/db prisma:migrate`  |
-| Regenerate client+enums | `pnpm --filter @appshore/db prisma:generate` |
-| Seed platform data      | `pnpm backend:seed`                          |
-| All tests               | `pnpm test` (backend + foundation packages)  |
-| E2E / RBAC / smoke      | `pnpm test:qa`                               |
-| Mobile                  | `pnpm mobile:dev` / `pnpm mobile:test`       |
-| Prisma Studio           | `pnpm backend:prisma:studio`                 |
+| Task                      | Command                                      |
+| ------------------------- | -------------------------------------------- |
+| Run everything            | `pnpm dev`                                   |
+| New migration             | `pnpm --filter @appshore/db prisma:migrate`  |
+| Regenerate client+enums   | `pnpm --filter @appshore/db prisma:generate` |
+| Seed (prints credentials) | `pnpm backend:seed`                          |
+| All unit tests            | `pnpm test`                                  |
+| E2E / RBAC / smoke        | `pnpm test:qa`                               |
+| Mobile                    | `pnpm mobile:dev` / `pnpm mobile:test`       |
+| Prisma Studio             | `pnpm backend:prisma:studio`                 |
+| Background worker (prod)  | `pnpm --filter @app/backend start:worker`    |
 
-More depth: [`CLAUDE.md`](../CLAUDE.md) (conventions + full map),
-[`docs/superpowers/specs/`](./superpowers/specs/) (architecture decisions),
-[`tools/init-app/README.md`](../tools/init-app/README.md) (the rename tool).
+Deeper reading: [`CLAUDE.md`](../CLAUDE.md) (conventions + full domain map) ·
+[`docs/superpowers/specs/`](./superpowers/specs/) (architecture decision records) ·
+[`tools/init-app/README.md`](../tools/init-app/README.md) (the rename tool) ·
+[`docs/doppler.md`](./doppler.md) (secrets).

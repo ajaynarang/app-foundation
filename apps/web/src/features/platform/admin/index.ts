@@ -3,7 +3,6 @@ export { adminBillingApi } from './api';
 export type { TenantBillingState } from './api';
 
 // Components
-export { TenantList } from './components/tenant-list';
 export { TenantManagementTabs } from './components/tenant-management-tabs';
 export { TenantTable } from './components/tenant-table';
 export { RejectTenantDialog } from './components/reject-tenant-dialog';

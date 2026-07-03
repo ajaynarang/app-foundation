@@ -24,12 +24,12 @@ import { PlatformModule } from './platform-glue/platform.module';
 import { PlatformHooksModule } from './platform-glue/hooks.module';
 import { IntegrationsModule } from './domains/integrations/integrations.module';
 import { AiModule } from './domains/ai/ai.module';
-import { AdminJobsModule } from './domains/admin/admin-jobs.module';
-import { AdminEventsModule } from './domains/admin/admin-events.module';
-import { AdminAiSpendModule } from './domains/admin/admin-ai-spend.module';
+import { AdminModule } from './domains/admin/admin.module';
 import { BillingModule } from './domains/billing/billing.module';
 import { SupportModule } from './domains/support/support.module';
 import { DeskModule } from './domains/desk/desk.module';
+import { FeedbackModule } from './domains/feedback/feedback.module';
+import { InAppNotificationsModule } from './domains/notifications/notifications.module';
 
 // Infrastructure Modules
 import { CacheModule } from './platform-glue/cache/cache.module';
@@ -45,6 +45,7 @@ import { DataRetentionModule } from './platform-glue/queue/data-retention.module
 import { HealthModule } from '@appshore/platform/health/health.module';
 import { EventBusModule } from './platform-glue/events/event-bus.module';
 import { OutboundWebhooksModule } from './platform-glue/webhooks/outbound-webhooks.module';
+import { SearchModule } from './platform-glue/search/search.module';
 import { DevModule } from './dev/dev.module';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { EventContextInterceptor } from '@appshore/kernel/infrastructure/events/event-context.interceptor';
@@ -122,6 +123,9 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     PrismaModule,
     AuthModule,
     NotificationModule,
+    // Three notification modules coexist: NotificationModule (platform email transport),
+    // InAppNotificationsModule (app multi-channel domain), NotificationsQueueModule (queue dispatcher glue).
+    InAppNotificationsModule,
     SseModule,
     QueueModule,
     NotificationsQueueModule,
@@ -135,13 +139,13 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     PlatformModule,
     IntegrationsModule,
     AiModule,
-    AdminJobsModule,
-    AdminEventsModule,
-    AdminAiSpendModule,
+    AdminModule,
     BillingModule,
     SupportModule,
     DeskModule,
+    FeedbackModule,
     OutboundWebhooksModule,
+    SearchModule,
     DataRetentionModule,
     ...(getEnvType() !== 'production' ? [DevModule] : []),
   ],

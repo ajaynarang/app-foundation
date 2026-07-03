@@ -11,9 +11,9 @@ import { ServiceFallbackRegistrar } from './registrars/service-fallback.registra
  * without importing this module — removes the old forwardRef cycle between
  * SkillsModule and AssistantAiModule.
  *
- * NOTE: DeskPromptRegistrar removed during v3 rewrite. AR Follow-up prompts
- * are registered by the backend-worker's AR Follow-up responsibility module
- * (P1.10) — they live with the workflow code, not here.
+ * NOTE: Desk responsibility prompts are registered by each responsibility's
+ * own module under domains/desk/responsibilities/ — they live with the
+ * workflow code, not here.
  */
 @Global()
 @Module({

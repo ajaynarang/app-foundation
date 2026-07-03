@@ -8,7 +8,7 @@
     "webpack": false,
     "assets": [
       {
-        "include": "domains/ai/skills/**/*.md",
+        "include": "domains/prompting/prompts/skills/**/*.md",
         "watchAssets": false
       }
     ],

@@ -5,17 +5,10 @@ import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.
 import { CacheModule } from '../platform-glue/cache/cache.module';
 
 /**
- * SharedModule provides common utilities, base classes, guards, and filters
- * that are used across multiple domains.
- *
- * This module is marked as @Global() so it's available everywhere without
- * explicit imports in every module.
- *
- * Exports:
+ * SharedModule re-exports two cross-domain services from @appshore/platform
+ * as @Global() providers so domains can inject them without explicit imports:
  * - TimezoneService: Single source of truth for tenant-local date/hour resolution
  * - TenantJobRunService: Per-(tenant, job) idempotency stamps for time-of-day jobs
- * - BaseTenantController: Base controller with tenant utilities (imported directly)
- * - HttpExceptionFilter: Global exception filter (registered in AppModule)
  */
 @Global()
 @Module({

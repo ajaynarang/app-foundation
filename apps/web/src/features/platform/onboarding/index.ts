@@ -12,4 +12,3 @@ export { useOnboardingStore } from './store';
 
 // Components
 export { default as OnboardingBanner } from './components/OnboardingBanner';
-export { default as OnboardingWidget } from './components/OnboardingWidget';

@@ -9,11 +9,12 @@ import {
 } from '../src/platform/login-activity.schema';
 
 describe('LoginFailReasonSchema', () => {
-  it('enumerates the 5 known values in the expected order', () => {
+  it('enumerates the 6 known values in the expected order', () => {
     expect(LoginFailReasonSchema.options).toEqual([
       'ACCOUNT_DISABLED',
       'TENANT_INACTIVE',
       'INVALID_TOKEN',
+      'INVALID_CREDENTIALS',
       'USER_NOT_FOUND',
       'OTHER',
     ]);

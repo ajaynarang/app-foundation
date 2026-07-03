@@ -11,7 +11,7 @@ export interface SendEmailOptions {
   text?: string;
   from?: string;
   /** Reply-To header — customer replies route here instead of `from`.
-   * Used by Desk v3 AR Follow-up so customer replies land in the
+   * Used by Desk responsibilities so customer replies land in the
    * supervisor's inbox, not the generic noreply@ address. */
   replyTo?: string;
 }
@@ -474,6 +474,145 @@ Reason: ${rejectionReason}
 If you believe this is an error or would like to discuss this further, please don't hesitate to contact our support team at support@example.com.
 
 We appreciate your understanding.
+
+---
+App - Your team, organized.
+    `.trim();
+
+    await this.sendEmail({ to: email, subject, html, text });
+  }
+
+  /**
+   * Send tenant suspension notification email
+   */
+  async sendTenantSuspensionEmail(
+    email: string,
+    firstName: string,
+    companyName: string,
+    reason: string,
+  ): Promise<void> {
+    const subject = `Your account has been suspended`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #000; color: #fff; padding: 20px; text-align: center; }
+            .content { padding: 30px; background-color: #f9f9f9; }
+            .button {
+              display: inline-block;
+              padding: 12px 30px;
+              background-color: #666;
+              color: #fff;
+              text-decoration: none;
+              border-radius: 5px;
+              margin: 20px 0;
+            }
+            .reason-box {
+              background-color: #fff;
+              border-left: 4px solid #666;
+              padding: 15px;
+              margin: 20px 0;
+            }
+            .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>App</h1>
+              <p>Your team, organized.</p>
+            </div>
+            <div class="content">
+              <h2>Hi ${firstName},</h2>
+              <p>Your account for <strong>${companyName}</strong> has been suspended and access to the platform is temporarily disabled.</p>
+              <div class="reason-box">
+                <strong>Reason:</strong><br>
+                ${reason}
+              </div>
+              <p>If you believe this is an error or would like to discuss reactivating your account, please contact our support team.</p>
+              <div style="text-align: center;">
+                <a href="mailto:support@example.com" class="button">Contact Support</a>
+              </div>
+              <p>We appreciate your understanding.</p>
+            </div>
+            <div class="footer">
+              <p>&copy; 2026 App. All rights reserved.</p>
+              <p>Questions? Email us at support@example.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `
+Hi ${firstName},
+
+Your account for ${companyName} has been suspended and access to the platform is temporarily disabled.
+
+Reason: ${reason}
+
+If you believe this is an error or would like to discuss reactivating your account, please contact our support team at support@example.com.
+
+We appreciate your understanding.
+
+---
+App - Your team, organized.
+    `.trim();
+
+    await this.sendEmail({ to: email, subject, html, text });
+  }
+
+  /**
+   * Send tenant reactivation notification email
+   */
+  async sendTenantReactivationEmail(email: string, firstName: string, companyName: string): Promise<void> {
+    const subject = `Your account has been reactivated`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #000; color: #fff; padding: 20px; text-align: center; }
+            .content { padding: 30px; background-color: #f9f9f9; }
+            .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>App</h1>
+              <p>Your team, organized.</p>
+            </div>
+            <div class="content">
+              <h2>Hi ${firstName},</h2>
+              <p>Good news — your account for <strong>${companyName}</strong> has been reactivated and is now active.</p>
+              <p>You and your team can sign in and pick up right where you left off.</p>
+              <p>If you have any questions, our support team is here to help.</p>
+            </div>
+            <div class="footer">
+              <p>&copy; 2026 App. All rights reserved.</p>
+              <p>Need help? Contact us at support@example.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const text = `
+Hi ${firstName},
+
+Good news — your account for ${companyName} has been reactivated and is now active.
+
+You and your team can sign in and pick up right where you left off.
+
+If you have any questions, our support team is here to help.
 
 ---
 App - Your team, organized.

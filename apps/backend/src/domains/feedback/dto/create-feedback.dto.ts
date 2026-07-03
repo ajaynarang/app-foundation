@@ -17,7 +17,7 @@ export class CreateFeedbackDto {
   @MaxLength(5000)
   message: string;
 
-  @ApiPropertyOptional({ example: '/dispatcher/route-planning' })
+  @ApiPropertyOptional({ example: '/projects/route-planning' })
   @IsOptional()
   @IsString()
   @MaxLength(500)

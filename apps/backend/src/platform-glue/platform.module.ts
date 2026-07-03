@@ -7,7 +7,6 @@ import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/fea
 import { OnboardingModule } from '@appshore/platform/domains/onboarding/onboarding.module';
 import { ApiKeysModule } from '@appshore/platform/domains/api-keys/api-keys.module';
 import { PlansModule } from '@appshore/platform/domains/plans/plans.module';
-import { FeedbackModule } from '../domains/feedback/feedback.module';
 import { OAuthProviderModule } from '@appshore/platform/domains/oauth-provider/oauth-provider.module';
 import { AnnouncementsModule } from '@appshore/platform/domains/announcements/announcements.module';
 import { LoginActivityModule } from '@appshore/platform/domains/login-activity/login-activity.module';
@@ -35,7 +34,6 @@ import { LoginActivityModule } from '@appshore/platform/domains/login-activity/l
     OnboardingModule,
     ApiKeysModule,
     PlansModule,
-    FeedbackModule,
     OAuthProviderModule,
     AnnouncementsModule,
     LoginActivityModule,
@@ -49,7 +47,6 @@ import { LoginActivityModule } from '@appshore/platform/domains/login-activity/l
     OnboardingModule,
     ApiKeysModule,
     PlansModule,
-    FeedbackModule,
     OAuthProviderModule,
     AnnouncementsModule,
     LoginActivityModule,

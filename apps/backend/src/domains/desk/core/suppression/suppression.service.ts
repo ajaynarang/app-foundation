@@ -40,7 +40,7 @@ const DURATION_MS: Record<SnoozeDuration, number | null> = {
  *
  * Double-snooze extends existing active suppression to `max(current, new)`
  * — never shortens. `null` (forever) beats any timestamp. This prevents a
- * dispatcher who already said "hide for a month" from accidentally
+ * operator who already said "hide for a month" from accidentally
  * shortening the window by clicking "1 day" the next morning.
  *
  * DomainEvents:
