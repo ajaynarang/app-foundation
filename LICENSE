@@ -1,48 +1,21 @@
-Copyright (c) 2024-2026 Appshore LLP. All rights reserved.
+MIT License
 
-PROPRIETARY SOFTWARE LICENSE
+Copyright (c) 2024-2026 Appshore LLP
 
-This software and associated documentation files (the "Software") are the
-proprietary and confidential property of Appshore LLP.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-RESTRICTIONS
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-You may NOT, without the prior written consent of Appshore LLP:
-
-1. Copy, reproduce, or duplicate any part of the Software.
-2. Modify, adapt, translate, reverse engineer, decompile, or disassemble the Software.
-3. Distribute, sublicense, lease, rent, loan, or otherwise transfer the Software to any third party.
-4. Use the Software for any purpose other than as expressly authorized by Appshore LLP.
-5. Remove or alter any proprietary notices, labels, or marks on the Software.
-
-INTELLECTUAL PROPERTY
-
-All intellectual property rights in and to the Software, including but not limited
-to patents, copyrights, trademarks, trade secrets, and any other proprietary rights,
-are and shall remain the exclusive property of Appshore LLP.
-
-CONFIDENTIALITY
-
-The Software contains trade secrets and confidential information of Appshore LLP.
-You agree to maintain the confidentiality of the Software and not to disclose it
-to any third party without the prior written consent of Appshore LLP.
-
-NO WARRANTY
-
-THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE, AND NONINFRINGEMENT.
-
-LIMITATION OF LIABILITY
-
-IN NO EVENT SHALL APPSHORE LLP BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-GOVERNING LAW
-
-This license shall be governed by and construed in accordance with the laws of the
-jurisdiction in which Appshore LLP is incorporated, without regard to its conflict
-of law provisions.
-
-For licensing inquiries, contact: legal@appshore.in
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

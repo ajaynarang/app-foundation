@@ -1,130 +1,165 @@
 # AppShore Platform Starter
 
-The **golden path for new AppShore products**: a domain-free, full-stack starter built on the
-reusable **AppShore Platform** packages (`@appshore/*`). Clone it, drop in your business domain,
-and you start with authentication, multi-tenancy, billing, a working AI assistant, background
-jobs, observability, and cloud infrastructure already built and wired together.
+**A production-grade, full-stack SaaS starter with the hard parts already built** — auth,
+four tenancy models, billing, a working AI assistant, background jobs, realtime, and cloud
+infrastructure — so you only write the code that makes your product _your product_.
 
-It runs **multi-tenant** (the default) or **single-tenant** from the _same codebase_ — flip one
-environment variable.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-> This is a starter, not a scaffold: the foundation lives in versioned packages your product
-> builds on. Use GitHub's **"Use this template"** button (or fork) to begin a new app.
+There is deliberately **no business logic in here** — no "orders", no "projects", no
+"patients". That empty space is where your app goes. Everything cross-cutting works on
+day one and is covered by ~2,250 unit tests plus a generated RBAC matrix over every
+endpoint.
 
-## Make it yours
-
-```bash
-pnpm install
-pnpm init-app --name my-app --display-name "My App" --yes
-```
-
-One command renames everything — packages, docker containers, Terraform project, Doppler
-projects, branding, tenancy defaults. Run it with no flags for interactive prompts, or with
-`--dry-run` to preview. Details: [tools/init-app/README.md](./tools/init-app/README.md).
+> **Start a new project:** click **"Use this template"** on GitHub (or fork), then follow
+> the quickstart below. One command renames everything to your product.
 
 ---
 
-## What you get for free
+## What you get on day one
 
-| Capability           | Included                                                                                                                                                                          |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auth**             | JWT + refresh tokens, Firebase exchange, phone PIN/OTP, login-event tracking, OAuth provider                                                                                      |
-| **Multi-tenancy**    | Tenant-scoped data, global guard chain, subdomain resolution — toggle to single-tenant with one env var                                                                           |
-| **AI**               | Streaming chat assistant (Mastra + AI SDK + Anthropic), Langfuse tracing, moderation, per-tenant AI budgets, human-in-the-loop, and an **empty MCP toolset** ready for your tools |
-| **Billing**          | Stripe subscriptions, wallet, plan entitlements, add-ons                                                                                                                          |
-| **Jobs & workflows** | BullMQ queues, Inngest "Desk" durable workflow engine (empty registry)                                                                                                            |
-| **Realtime**         | Server-Sent Events bus with per-tenant/user routing                                                                                                                               |
-| **Storage & comms**  | S3 file storage, email, SMS, web push                                                                                                                                             |
-| **Observability**    | OpenTelemetry, pino logging, Loki + Tempo + Grafana                                                                                                                               |
-| **Infra**            | Docker Compose (dev), Terraform for AWS (ECS, RDS, ElastiCache, S3, ALB, CloudWatch)                                                                                              |
-| **DX**               | Turborepo, pnpm workspaces, shared Zod types with Prisma-enum codegen, architecture fitness tests, CI workflows                                                                   |
+- 🔐 **Auth that just works** — email+password out of the box (zero external services),
+  phone OTP/PIN, optional Firebase; JWT + rotating refresh tokens; full **OAuth 2.1
+  provider** (PKCE) so MCP clients like Claude can "Sign in with _your app_".
+- 🏢 **Four tenancy models, one env var** — classic multi-tenant, Slack-style
+  workspaces (one user ↔ many workspaces with a role in each), dedicated single-tenant,
+  or consumer-style personal workspaces. Same code, same queries.
+- 🤖 **A working AI product surface** — streaming assistant (Anthropic + AI SDK + Mastra),
+  RAG knowledge base (pgvector), per-tenant AI budgets, human-in-the-loop approvals, an
+  **MCP server** with sample tools, and a durable agent workflow engine (Inngest).
+- 💳 **Plans & billing** — entitlements enforced in the guard chain, Stripe
+  subscriptions/invoices, credit wallet, trials, dunning.
+- 🧰 **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
+  realtime + outbound webhooks, multi-channel notifications (in-app/push/SMS/email), S3
+  file storage, OpenTelemetry + Grafana stack, health endpoints.
+- 📱 **Four apps** — NestJS API, Next.js product app, Next.js admin console, and a
+  Flutter mobile companion.
+- 🚀 **Delivery** — docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache),
+  GitHub Actions CI, Playwright QA suite that runs on a fresh clone.
 
-There is **no business domain** — that's the point. You add yours.
+The full inventory — including the default Postgres schema, what needs an API key, and
+exactly what you build — lives in **[docs/WHAT-YOU-GET.md](docs/WHAT-YOU-GET.md)**.
 
 ---
 
-## Quick start
+## Quickstart (5 minutes to a working login)
 
 ```bash
-# 1. Infra (Postgres+pgvector on :5499, Redis on :6399)
-docker compose up -d postgres redis
-
-# 2. Install + build shared types
+git clone <your-repo> my-app && cd my-app
 pnpm install
-pnpm --filter @app/shared-types build
+pnpm init-app          # prompts: name, display name, tenancy mode, keep mobile app?
+pnpm docker:up         # Postgres 16 (pgvector) + Redis 7
 
-# 3. Configure env files
-cp apps/backend/.env.example apps/backend/.env
-#    set DATABASE_URL=postgresql://postgres:postgres@localhost:5499/app?schema=public
-#    set ANTHROPIC_API_KEY=... (for the AI assistant)
+cd apps/backend && cp .env.example .env && cd ../..
 cp apps/web/.env.example apps/web/.env.local
 
-# 4. Generate Prisma client, migrate + seed
-cd apps/backend && pnpm prisma:generate && pnpm prisma:migrate:deploy && pnpm db:seed
-
-# 5. Run everything (backend :8000, web :3000, console :3002)
-cd ../.. && pnpm dev
+pnpm backend:prisma:generate
+cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed && cd ../..
+pnpm dev               # backend :8000 · web :3000 · console :3002
 ```
 
-**Log in immediately** — the seed prints dev credentials (non-production only):
-`owner@example.com / Password123!` (workspace owner) · `admin@example.com / Password123!`
-(super admin) · phone `+1 555 555 0100` PIN `1234`.
+The seed prints **ready-to-use dev credentials** (non-production only):
 
-> Prefer secrets injection over `.env` files? See [docs/doppler.md](./docs/doppler.md) for the full Doppler environment-variable guide.
+| Who                  | Email               | Password       |
+| -------------------- | ------------------- | -------------- |
+| Workspace owner      | `owner@example.com` | `Password123!` |
+| Platform super admin | `admin@example.com` | `Password123!` |
 
----
-
-## Multi-tenant vs single-tenant
-
-The same code runs either way — choose at boot:
-
-|                   | Multi-tenant (default)          | Single-tenant                                 |
-| ----------------- | ------------------------------- | --------------------------------------------- |
-| Backend env       | `MULTI_TENANT=true`             | `MULTI_TENANT=false` + `IMPLICIT_TENANT_ID=1` |
-| Web env           | `NEXT_PUBLIC_MULTI_TENANT=true` | `NEXT_PUBLIC_MULTI_TENANT=false`              |
-| Tenant resolution | from subdomain                  | one implicit tenant, no subdomain             |
-| Login             | tenant-scoped                   | plain origin                                  |
-| Self-registration | enabled                         | hidden                                        |
-
-Tenant data isolation works identically in both modes (every query is tenant-scoped; single-tenant
-just resolves to the one implicit tenant). No query rewrites — only guard/strategy short-circuits.
+Open `http://localhost:3000/login` and you're inside a live workspace — the seeded owner
+even belongs to **two** workspaces so you can try the workspace switcher immediately.
 
 ---
 
-## Where you plug in your domain
+## Architecture: the platform vs. your app
 
-| To add…                  | Do this                                                                                                           |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| A backend domain         | New module under `apps/backend/src/domains/<domain>/` + models in `packages/appshore/db/prisma/schema/app.prisma` |
-| A frontend feature       | New folder under `apps/web/src/features/<domain>/`                                                                |
-| A domain event           | Add to `APP_EVENT_REGISTRY` in `apps/backend/src/platform-glue/events/event-registry.ts`                          |
-| A mobile screen          | New folder under `apps/mobile/lib/features/<domain>/`                                                             |
-| AI tools                 | Register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`                               |
-| Workflow automation      | Add to the registry in `apps/backend/src/domains/desk/responsibilities/`                                          |
-| An integration connector | Add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`                                              |
-| AI knowledge             | Drop Markdown in `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`                                |
+The reusable foundation lives in versioned `@appshore/*` packages. The dependency
+direction is enforced by a CI test — platform packages can never import your code:
 
----
+```mermaid
+flowchart TB
+    subgraph platform["packages/appshore — the platform (build ON it, don't edit it)"]
+        kernel["@appshore/kernel<br/><i>DB-free mechanics: logging, events,<br/>queues, retry, SSE, utils</i>"]
+        db["@appshore/db<br/><i>Prisma schema + client<br/>migrations, seeds</i>"]
+        plat["@appshore/platform<br/><i>auth, tenancy, billing APIs,<br/>storage, health, queues</i>"]
+        webcore["@appshore/web-core<br/><i>api client, realtime,<br/>hooks, session bridge</i>"]
+    end
 
-## Structure
+    subgraph yours["your product"]
+        backend["apps/backend<br/><i>your domains + platform-glue</i>"]
+        web["apps/web<br/><i>your features</i>"]
+        console["apps/console<br/><i>ops hub</i>"]
+        mobile["apps/mobile<br/><i>Flutter companion</i>"]
+    end
 
-```
-apps/{backend,web,console,mobile}
-packages/appshore/{kernel,db,platform,web-core}   ← @appshore/* — the reusable platform
-packages/{ui,shared-types,test-utils}
-infra/{terraform,observability}   tests/   docker-compose.yml
+    kernel --> db --> plat --> backend
+    kernel --> webcore --> web
+    plat --> console
+    backend -.REST + SSE.-> web
+    backend -.REST.-> mobile
 ```
 
-**Start here: [`docs/WHAT-YOU-GET.md`](./docs/WHAT-YOU-GET.md)** — a plain-language tour of
-everything the foundation ships (features, the default Postgres schema, and how to carve out
-your application).
+Where the platform needs _app_ behavior (a user joined, a tenant was approved), it
+exposes a **hook token** and your app binds the implementation — the platform stays
+app-blind.
 
-See [`CLAUDE.md`](./CLAUDE.md) for conventions and the full domain map, and
-[`docs/superpowers/specs/`](./docs/superpowers/specs/) for the design spec and the platform/domain
-seam report this starter was built from.
+### Where your code goes
+
+Adding a feature ("projects", say) touches exactly these extension points — everything
+around them (auth, tenant scoping, rate limits, plan gating, realtime, observability) is
+already handled:
+
+```mermaid
+flowchart LR
+    schema["1 · Model<br/>db/prisma/schema/<b>app.prisma</b>"]
+    domain["2 · API<br/>backend/src/domains/<b>projects/</b>"]
+    events["3 · Events<br/>platform-glue/events<br/><b>APP_EVENT_REGISTRY</b>"]
+    feature["4 · UI<br/>web/src/features/<b>projects/</b>"]
+    extras["5 · Optional<br/>MCP tool · mobile screen<br/>desk responsibility · connector"]
+
+    schema --> domain --> events --> feature --> extras
+```
 
 ---
 
-## License
+## Tenancy: four models, one switch
 
-MIT
+| Model                      | `TENANCY_MODE`     | What you get                                                                           |
+| -------------------------- | ------------------ | -------------------------------------------------------------------------------------- |
+| **Multi-tenant** (default) | `multi`            | Orgs share the app: subdomain tenants, self-registration + admin approval              |
+| **Workspace-based**        | `multi` (built in) | Slack/Notion style: users belong to many workspaces, role per workspace, live switcher |
+| **Single-tenant**          | `single`           | One implicit workspace; deploy a dedicated stack per customer                          |
+| **User-centric**           | `personal`         | Consumer style: simple signup auto-creates a private workspace per user                |
+
+Your domain code is identical in all four — every query is `where: { tenantId }` and the
+guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what that means.
+
+---
+
+## Tech stack
+
+| Layer    | Tech                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------- |
+| Backend  | NestJS 11 · TypeScript 5.9 · Prisma 7 · PostgreSQL 16 (pgvector) · Redis 7 · BullMQ · Inngest |
+| Frontend | Next.js 15 (App Router) · Tailwind · shadcn/ui · TanStack Query · Zustand                     |
+| Mobile   | Flutter 3                                                                                     |
+| AI       | Anthropic · AI SDK · Mastra · MCP · Langfuse                                                  |
+| Infra    | Docker Compose (dev) · Terraform + AWS ECS (prod) · Loki/Tempo/Grafana                        |
+
+---
+
+## Learn more
+
+- **[What you get & what you build](docs/WHAT-YOU-GET.md)** — start here: full feature
+  inventory, default schema, and the step-by-step path to your first domain.
+- **[CLAUDE.md](CLAUDE.md)** — conventions, domain map, and AI-assistant context (this
+  repo is optimized for AI-assisted development).
+- **[Architecture decision records](docs/superpowers/specs/)** — why things are the way
+  they are.
+- **[init-app](tools/init-app/README.md)** — the one-command rename tool.
+- **[Doppler secrets guide](docs/doppler.md)** — production-grade env management.
+
+## Contributing & license
+
+PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under
+[MIT](LICENSE) © Appshore LLP.
