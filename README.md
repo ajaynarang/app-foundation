@@ -19,23 +19,23 @@ endpoint.
 
 ## What you get on day one
 
-- 🔐 **Auth that just works** — email+password out of the box (zero external services),
+- **Auth that just works** — email+password out of the box (zero external services),
   phone OTP/PIN, optional Firebase; JWT + rotating refresh tokens; full **OAuth 2.1
   provider** (PKCE) so MCP clients like Claude can "Sign in with _your app_".
-- 🏢 **Four tenancy models, one env var** — classic multi-tenant, Slack-style
+- **Four tenancy models, one env var** — classic multi-tenant, Slack-style
   workspaces (one user ↔ many workspaces with a role in each), dedicated single-tenant,
   or consumer-style personal workspaces. Same code, same queries.
-- 🤖 **A working AI product surface** — streaming assistant (Anthropic + AI SDK + Mastra),
+- **A working AI product surface** — streaming assistant (Anthropic + AI SDK + Mastra),
   RAG knowledge base (pgvector), per-tenant AI budgets, human-in-the-loop approvals, an
   **MCP server** with sample tools, and a durable agent workflow engine (Inngest).
-- 💳 **Plans & billing** — entitlements enforced in the guard chain, Stripe
+- **Plans & billing** — entitlements enforced in the guard chain, Stripe
   subscriptions/invoices, credit wallet, trials, dunning.
-- 🧰 **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
+- **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
   realtime + outbound webhooks, multi-channel notifications (in-app/push/SMS/email), S3
   file storage, OpenTelemetry + Grafana stack, health endpoints.
-- 📱 **Four apps** — NestJS API, Next.js product app, Next.js admin console, and a
+- **Four apps** — NestJS API, Next.js product app, Next.js admin console, and a
   Flutter mobile companion.
-- 🚀 **Delivery** — docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache),
+- **Delivery** — docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache),
   GitHub Actions CI, Playwright QA suite that runs on a fresh clone.
 
 The full inventory — including the default Postgres schema, what needs an API key, and
