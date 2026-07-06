@@ -1,104 +1,104 @@
 -- DropTable
-DROP TABLE "mastra_agent_versions";
+DROP TABLE IF EXISTS "mastra_agent_versions";
 
 -- DropTable
-DROP TABLE "mastra_agents";
+DROP TABLE IF EXISTS "mastra_agents";
 
 -- DropTable
-DROP TABLE "mastra_ai_spans";
+DROP TABLE IF EXISTS "mastra_ai_spans";
 
 -- DropTable
-DROP TABLE "mastra_background_tasks";
+DROP TABLE IF EXISTS "mastra_background_tasks";
 
 -- DropTable
-DROP TABLE "mastra_channel_config";
+DROP TABLE IF EXISTS "mastra_channel_config";
 
 -- DropTable
-DROP TABLE "mastra_channel_installations";
+DROP TABLE IF EXISTS "mastra_channel_installations";
 
 -- DropTable
-DROP TABLE "mastra_dataset_items";
+DROP TABLE IF EXISTS "mastra_dataset_items";
 
 -- DropTable
-DROP TABLE "mastra_dataset_versions";
+DROP TABLE IF EXISTS "mastra_dataset_versions";
 
 -- DropTable
-DROP TABLE "mastra_datasets";
+DROP TABLE IF EXISTS "mastra_datasets";
 
 -- DropTable
-DROP TABLE "mastra_experiment_results";
+DROP TABLE IF EXISTS "mastra_experiment_results";
 
 -- DropTable
-DROP TABLE "mastra_experiments";
+DROP TABLE IF EXISTS "mastra_experiments";
 
 -- DropTable
-DROP TABLE "mastra_favorites";
+DROP TABLE IF EXISTS "mastra_favorites";
 
 -- DropTable
-DROP TABLE "mastra_mcp_client_versions";
+DROP TABLE IF EXISTS "mastra_mcp_client_versions";
 
 -- DropTable
-DROP TABLE "mastra_mcp_clients";
+DROP TABLE IF EXISTS "mastra_mcp_clients";
 
 -- DropTable
-DROP TABLE "mastra_mcp_server_versions";
+DROP TABLE IF EXISTS "mastra_mcp_server_versions";
 
 -- DropTable
-DROP TABLE "mastra_mcp_servers";
+DROP TABLE IF EXISTS "mastra_mcp_servers";
 
 -- DropTable
-DROP TABLE "mastra_messages";
+DROP TABLE IF EXISTS "mastra_messages";
 
 -- DropTable
-DROP TABLE "mastra_notifications";
+DROP TABLE IF EXISTS "mastra_notifications";
 
 -- DropTable
-DROP TABLE "mastra_observational_memory";
+DROP TABLE IF EXISTS "mastra_observational_memory";
 
 -- DropTable
-DROP TABLE "mastra_prompt_block_versions";
+DROP TABLE IF EXISTS "mastra_prompt_block_versions";
 
 -- DropTable
-DROP TABLE "mastra_prompt_blocks";
+DROP TABLE IF EXISTS "mastra_prompt_blocks";
 
 -- DropTable
-DROP TABLE "mastra_resources";
+DROP TABLE IF EXISTS "mastra_resources";
 
 -- DropTable
-DROP TABLE "mastra_schedule_triggers";
+DROP TABLE IF EXISTS "mastra_schedule_triggers";
 
 -- DropTable
-DROP TABLE "mastra_schedules";
+DROP TABLE IF EXISTS "mastra_schedules";
 
 -- DropTable
-DROP TABLE "mastra_scorer_definition_versions";
+DROP TABLE IF EXISTS "mastra_scorer_definition_versions";
 
 -- DropTable
-DROP TABLE "mastra_scorer_definitions";
+DROP TABLE IF EXISTS "mastra_scorer_definitions";
 
 -- DropTable
-DROP TABLE "mastra_scorers";
+DROP TABLE IF EXISTS "mastra_scorers";
 
 -- DropTable
-DROP TABLE "mastra_skill_blobs";
+DROP TABLE IF EXISTS "mastra_skill_blobs";
 
 -- DropTable
-DROP TABLE "mastra_skill_versions";
+DROP TABLE IF EXISTS "mastra_skill_versions";
 
 -- DropTable
-DROP TABLE "mastra_skills";
+DROP TABLE IF EXISTS "mastra_skills";
 
 -- DropTable
-DROP TABLE "mastra_threads";
+DROP TABLE IF EXISTS "mastra_threads";
 
 -- DropTable
-DROP TABLE "mastra_workflow_snapshot";
+DROP TABLE IF EXISTS "mastra_workflow_snapshot";
 
 -- DropTable
-DROP TABLE "mastra_workspace_versions";
+DROP TABLE IF EXISTS "mastra_workspace_versions";
 
 -- DropTable
-DROP TABLE "mastra_workspaces";
+DROP TABLE IF EXISTS "mastra_workspaces";
 
 -- CreateTable
 CREATE TABLE "workspace_members" (
