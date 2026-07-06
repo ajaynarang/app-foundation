@@ -242,6 +242,22 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
+        // Guard against stale/foreign persisted state: localhost origins are shared
+        // across apps and app versions, so a rehydrated user may not match this
+        // app's user shape. A user without the required fields would crash any
+        // consumer that dereferences them (e.g. initials in the header) — treat
+        // it as logged out instead of trusting it. Cleanup goes through setState
+        // (deferred past hydration) so subscribers re-render and the purge persists.
+        const u = state?.user as { email?: unknown; firstName?: unknown; lastName?: unknown } | null;
+        const validUser =
+          !!u && typeof u.email === 'string' && typeof u.firstName === 'string' && typeof u.lastName === 'string';
+        if (state?.user && !validUser) {
+          queueMicrotask(() => {
+            useAuthStore.setState({ user: null, accessToken: null, isAuthenticated: false, isInitialized: false });
+            setAuthCookie(false);
+          });
+          return;
+        }
         // If we have valid auth data after hydration, mark as initialized
         if (state?.accessToken && state?.user) {
           state?.setInitialized(true);

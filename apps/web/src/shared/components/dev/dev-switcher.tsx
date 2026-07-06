@@ -34,8 +34,8 @@ const ROLE_COLOR: Record<string, string> = {
   SUPER_ADMIN: 'bg-red-600',
 };
 
-function getInitials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || '??';
+function getInitials(firstName?: string | null, lastName?: string | null): string {
+  return `${firstName?.charAt(0) ?? ''}${lastName?.charAt(0) ?? ''}`.toUpperCase() || '??';
 }
 
 /**

@@ -77,8 +77,9 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
     hasSwitchedPanel.current = true;
   }
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    // Never crash on partial user shapes (stale sessions, partial profiles)
+    return `${firstName?.charAt(0) ?? ''}${lastName?.charAt(0) ?? ''}`.toUpperCase() || 'U';
   };
 
   const getRoleLabel = (role: string | undefined) => {

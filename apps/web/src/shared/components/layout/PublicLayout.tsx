@@ -21,6 +21,7 @@ import { DevSwitcherTrigger } from '@/shared/components/common';
 import { getDefaultRouteForRole } from '@appshore/web-core/shared/lib/navigation';
 import { isMultiTenant } from '@appshore/web-core/shared/lib/tenant-url';
 import { Footer } from '@/shared/components/footer';
+import { getInitials } from '@/shared/utils/initials';
 
 const navItems = [
   { label: 'Home', href: '/', external: false },
@@ -144,7 +145,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                     <button className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600">
                       <Avatar className="h-9 w-9">
                         <AvatarFallback className="bg-black dark:bg-white text-white dark:text-black text-sm">
-                          {user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() : 'U'}
+                          {getInitials(user?.firstName, user?.lastName)}
                         </AvatarFallback>
                       </Avatar>
                     </button>
@@ -262,7 +263,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-border mb-2">
                     <Avatar className="h-9 w-9">
                       <AvatarFallback className="bg-black dark:bg-white text-white dark:text-black text-sm">
-                        {user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() : 'U'}
+                        {getInitials(user?.firstName, user?.lastName)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
