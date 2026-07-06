@@ -35,3 +35,6 @@ test-results/
 .screenshots/
 packages/appshore/db/generated/
 .playwright-mcp/
+
+# Local AI planning artifacts (specs/plans) — kept out of the public repo
+docs/superpowers/

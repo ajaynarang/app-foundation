@@ -154,8 +154,6 @@ guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what tha
   inventory, default schema, and the step-by-step path to your first domain.
 - **[CLAUDE.md](CLAUDE.md)** — conventions, domain map, and AI-assistant context (this
   repo is optimized for AI-assisted development).
-- **[Architecture decision records](docs/superpowers/specs/)** — why things are the way
-  they are.
 - **[init-app](tools/init-app/README.md)** — the one-command rename tool.
 - **[Doppler secrets guide](docs/doppler.md)** — production-grade env management.
 

@@ -225,6 +225,5 @@ platform needs app behavior (a user joined, a tenant was approved), it exposes a
 | Background worker (prod)  | `pnpm --filter @app/backend start:worker`    |
 
 Deeper reading: [`CLAUDE.md`](../CLAUDE.md) (conventions + full domain map) ·
-[`docs/superpowers/specs/`](./superpowers/specs/) (architecture decision records) ·
 [`tools/init-app/README.md`](../tools/init-app/README.md) (the rename tool) ·
 [`docs/doppler.md`](./doppler.md) (secrets).
