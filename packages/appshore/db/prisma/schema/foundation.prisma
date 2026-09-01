@@ -768,6 +768,117 @@ model Notification {
   @@map("notifications")
 }
 
+// Per-channel delivery: devices, the ledger, WhatsApp consent. Platform channels, not app models.
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+/// One row per mobile device that can receive FCM push (E8). The web push path
+/// uses the foundation's PushSubscription (VAPID); this registry is the
+/// app-side FCM complement. Token is the natural key: a device that changes
+/// hands (logout → another user logs in) is reassigned by the upsert, never
+/// duplicated.
+model NotificationDevice {
+  id       Int @id @default(autoincrement())
+  tenantId Int @map("tenant_id")
+
+  userId   Int            @map("user_id")
+  token    String         @unique @db.VarChar(512)
+  platform DevicePlatform
+
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("notification_devices")
+}
+
+/// The channels a trigger fans out to. Not the foundation `NotificationChannel`
+/// — that column is a label on the stored in-app row; this is what was attempted.
+/// A Postgres enum because adding a channel IS a schema event (E95 adds WHATSAPP).
+enum DeliveryChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+  WHATSAPP
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+model NotificationDelivery {
+  /// App-generated UUIDv7 via generateUuidV7() — time-sortable PK. No
+  /// Prisma @default; every create() must pass `id: generateUuidV7()`.
+  id       String           @id @db.Uuid
+  tenantId Int              @map("tenant_id")
+  userId   Int              @map("user_id")
+  type     NotificationType
+  channel  DeliveryChannel
+  status   DeliveryStatus
+
+  /// The BSP's id (WhatsApp/SMS) once one exists — what a status webhook keys on.
+  providerMessageId String? @map("provider_message_id") @db.VarChar(100)
+  /// A String, not an enum: reasons are vocabulary that grows with every
+  /// provider quirk (see DELIVERY_SKIP_REASONS). Never a user-facing string.
+  failureReason     String? @map("failure_reason") @db.VarChar(60)
+  attemptCount      Int     @default(1) @map("attempt_count")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz
+  readAt      DateTime? @map("read_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  /// Support lookup by user, newest first — across every club they belong to.
+  @@index([userId, createdAt])
+  /// Support lookup by club, newest first.
+  @@index([tenantId, createdAt])
+  /// Retention sweep and per-day status counts.
+  @@index([createdAt])
+  /// Webhook lookup; NULLs are distinct so channels without a provider id never collide.
+  @@unique([channel, providerMessageId])
+  @@map("notification_deliveries")
+}
+
+enum WhatsAppConsentSource {
+  SIGNUP
+  SETTINGS
+  INBOUND_STOP
+}
+
+/// Per PERSON, not per club: one user, one number, one yes. Meta requires the
+/// business to hold the opt-in; this row is where it is held.
+model WhatsAppConsent {
+  id     Int @id @default(autoincrement())
+  userId Int @unique @map("user_id")
+
+  optedInAt  DateTime? @map("opted_in_at") @db.Timestamptz
+  optedOutAt DateTime? @map("opted_out_at") @db.Timestamptz
+  /// Where the LAST change came from — an inbound STOP outranks nothing, it just records.
+  source WhatsAppConsentSource
+
+  /// Marketing (E95-4) is a separate yes: Meta prices and caps it separately.
+  marketingOptedInAt  DateTime? @map("marketing_opted_in_at") @db.Timestamptz
+  marketingOptedOutAt DateTime? @map("marketing_opted_out_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("whatsapp_consents")
+}
+
 // ============================================================================
 // PUSH SUBSCRIPTIONS
 // ============================================================================

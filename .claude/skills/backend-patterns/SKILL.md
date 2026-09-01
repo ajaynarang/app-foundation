@@ -743,14 +743,14 @@ When adding a new domain → SSE mapping, decide scope first. Tenant-scoped even
 
 **Queue topology** — queues are grouped by failure-domain tier. Source of truth: `@appshore/kernel`, `infrastructure/queue/queue.constants.ts`.
 
-| Tier                             | Queue            | Purpose                                            |
-| -------------------------------- | ---------------- | -------------------------------------------------- |
-| 1 — Real-time (humans waiting)   | `events`         | Durable event bus, fan-out spine                   |
-|                                  | `notifications`  | Outbound SMS/push/email/in-app (priority enforced) |
-|                                  | `webhooks`       | Outbound webhooks to customer systems              |
-| 2 — Compute                      | `ai-interactive` | User-blocking AI (chat, copilot)                   |
-|                                  | `ai-background`  | Autonomous/background AI work                      |
-| 3 — Slow lane (eventual is fine) | `bulk-ops`       | Mass operations + system cleanup                   |
+| Tier                            | Queue            | Purpose                                            |
+| ------------------------------- | ---------------- | -------------------------------------------------- |
+| 1 — Real-time (humans waiting)  | `events`         | Durable event bus, fan-out spine                   |
+|                                 | `notifications`  | Outbound SMS/push/email/in-app (priority enforced) |
+|                                 | `webhooks`       | Outbound webhooks to customer systems              |
+| 2 — Compute                     | `ai-interactive` | User-blocking AI (chat, copilot)                   |
+|                                 | `ai-background`  | Autonomous/background AI work                      |
+| 3 — Background (eventual is ok) | `bulk-ops`       | Mass operations + system cleanup                   |
 
 Add your own queues to `QUEUE_NAMES` as your domains need them — keep the tier discipline (isolate slow/vendor work from user-facing work).
 

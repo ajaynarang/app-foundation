@@ -1,7 +1,7 @@
 import { Controller, Post, Delete, Get, Body, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { PushService } from './push.service';
+import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
+import { PushService } from './web-push.service';
 
 @ApiTags('Push Notifications')
 @Controller('push')

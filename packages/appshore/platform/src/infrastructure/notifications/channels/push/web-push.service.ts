@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../database/prisma.service';
+import { PrismaService } from '../../../database/prisma.service';
 import * as webpush from 'web-push';
 
 interface PushSubscriptionInput {
@@ -38,11 +38,32 @@ export class PushService {
   }
 
   async saveSubscription(userId: number, tenantId: number, subscription: PushSubscriptionInput) {
-    return this.prisma.pushSubscription.create({
-      data: {
+    // An endpoint identifies a BROWSER, not a person, and a browser has exactly
+    // one owner at a time. If someone else still claims this endpoint they signed
+    // out of it — leaving their row in place would push their draws and match
+    // times to whoever is sitting at this machine now.
+    await this.prisma.pushSubscription.deleteMany({
+      where: { endpoint: subscription.endpoint, userId: { not: userId } },
+    });
+
+    // Upsert, not create. A browser's push endpoint is STABLE, so subscribing
+    // twice — toggling off then on, or simply re-opening settings on a browser
+    // that already subscribed — sends the same endpoint again. Against the
+    // @@unique([userId, endpoint]) that is a 409, which surfaced to the user as
+    // "couldn't turn on push notifications" on the most ordinary path there is.
+    // The keys can legitimately rotate for a stable endpoint, so refresh them.
+    return this.prisma.pushSubscription.upsert({
+      where: { userId_endpoint: { userId, endpoint: subscription.endpoint } },
+      create: {
         userId,
         tenantId,
         endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+        userAgent: subscription.userAgent,
+      },
+      update: {
+        tenantId,
         p256dh: subscription.keys.p256dh,
         auth: subscription.keys.auth,
         userAgent: subscription.userAgent,
@@ -62,13 +83,18 @@ export class PushService {
     });
   }
 
-  async sendPushToUser(userId: number, payload: { title: string; body: string; url?: string; tag?: string }) {
+  /** Returns how many subscriptions were actually reached — zero is not success. */
+  async sendPushToUser(
+    userId: number,
+    payload: { title: string; body: string; url?: string; tag?: string },
+  ): Promise<number> {
     if (!this.isConfigured) {
       this.logger.warn('Push not sent — VAPID not configured');
-      return;
+      return 0;
     }
 
     const subscriptions = await this.getSubscriptionsForUser(userId);
+    let delivered = 0;
 
     for (const sub of subscriptions) {
       try {
@@ -79,6 +105,7 @@ export class PushService {
           },
           JSON.stringify(payload),
         );
+        delivered += 1;
       } catch (error: any) {
         if (error.statusCode === 410 || error.statusCode === 404) {
           await this.prisma.pushSubscription.delete({ where: { id: sub.id } });
@@ -88,6 +115,8 @@ export class PushService {
         }
       }
     }
+
+    return delivered;
   }
 
   getPublicKey(): string | undefined {

@@ -111,6 +111,10 @@ bind to app implementations.
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
   automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
+- **Notification policies + WhatsApp templates:** bind `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES`
+  (and optionally `PLATFORM_TIMEZONE`) in `apps/backend/src/platform-glue/hooks.module.ts`; add your
+  named triggers to `apps/backend/src/domains/notifications/notification-triggers.service.ts`. The
+  pipeline and every channel live in `@appshore/platform/infrastructure/notifications/`.
 - **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`.
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
 - **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`.

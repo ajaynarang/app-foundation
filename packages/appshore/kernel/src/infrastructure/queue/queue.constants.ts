@@ -24,6 +24,8 @@ export const QUEUE_NAMES = {
   AI_INTERACTIVE: 'ai-interactive',
   AI_BACKGROUND: 'ai-background',
   BULK_OPS: 'bulk-ops',
+  /** One vendor round trip per job, rate-limited under the BSP's ceiling. */
+  WHATSAPP: 'whatsapp',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

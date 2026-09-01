@@ -1,360 +1,72 @@
 import { Test } from '@nestjs/testing';
+import { NotificationType, UserRole } from '@appshore/db';
 import { NotificationTriggersService } from '../notification-triggers.service';
-import { InAppNotificationService } from '../notifications.service';
-import { ChannelResolutionService } from '../channel-resolution.service';
-import { NotificationDeliveryService } from '../delivery.service';
-import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { NotificationDispatcherService } from '@appshore/platform/infrastructure/notifications/pipeline/notification-dispatcher.service';
+import { RecipientResolutionService } from '@appshore/platform/infrastructure/notifications/pipeline/recipient-resolution.service';
+
+const staff = [
+  { id: 1, userId: 'u1', firebaseUid: null, email: 'o@x.com', phone: null },
+  { id: 2, userId: 'u2', firebaseUid: null, email: 'a@x.com', phone: null },
+];
 
 describe('NotificationTriggersService', () => {
   let service: NotificationTriggersService;
-  let channelResolution: { resolveForNotification: jest.Mock };
-  let inAppService: { create: jest.Mock };
-  let deliveryService: { deliver: jest.Mock };
-  let prisma: {
-    user: { findMany: jest.Mock };
+  const dispatcher = { dispatch: jest.fn().mockResolvedValue(undefined) };
+  const recipients = {
+    resolveByRoles: jest.fn().mockResolvedValue(staff),
+    resolveByUserIds: jest
+      .fn()
+      .mockImplementation(async (_t: number, ids: number[]) =>
+        ids.map((id) => ({ id, userId: `u${id}`, firebaseUid: null, email: null, phone: null })),
+      ),
   };
 
   beforeEach(async () => {
-    channelResolution = { resolveForNotification: jest.fn() };
-    inAppService = {
-      create: jest.fn().mockResolvedValue({ notificationId: 'test-notif-id' }),
-    };
-    deliveryService = {
-      deliver: jest.fn().mockResolvedValue({ in_app: true }),
-    };
-    prisma = {
-      user: { findMany: jest.fn() },
-    };
-
+    jest.clearAllMocks();
     const module = await Test.createTestingModule({
       providers: [
         NotificationTriggersService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: InAppNotificationService, useValue: inAppService },
-        { provide: ChannelResolutionService, useValue: channelResolution },
-        { provide: NotificationDeliveryService, useValue: deliveryService },
+        { provide: NotificationDispatcherService, useValue: dispatcher },
+        { provide: RecipientResolutionService, useValue: recipients },
       ],
     }).compile();
     service = module.get(NotificationTriggersService);
   });
 
-  it('delivers via DeliveryService with resolved preferences', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      { id: 1, userId: 'uid-1', firebaseUid: 'uid-1', email: 'test@example.com', phone: null },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: false,
-      showBrowserNotification: true,
-      flashTab: true,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: false,
-      skipSms: false,
-    });
-
-    await service.trigger({
-      tenantId: 1,
-      type: 'INVOICE_GENERATED' as any,
-      category: 'BILLING',
-      title: 'Test',
-      message: 'Test message',
-      recipientUserIds: [1],
-    });
-
-    expect(channelResolution.resolveForNotification).toHaveBeenCalledWith({
-      userId: 1,
-      category: 'BILLING',
-    });
-    expect(deliveryService.deliver).toHaveBeenCalledWith(
+  it('userJoined reaches the staff roles with the TEAM-typed message', async () => {
+    await service.userJoined(7, 'Priya', 'ADMIN');
+    expect(recipients.resolveByRoles).toHaveBeenCalledWith(7, [UserRole.OWNER, UserRole.ADMIN]);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
-        recipientUserId: 'uid-1',
-        recipientDbId: 1,
-        channels: expect.arrayContaining(['in_app', 'email', 'sms', 'push']),
-        recipientEmail: 'test@example.com',
+        tenantId: 7,
+        type: NotificationType.USER_JOINED,
+        title: 'Priya Joined',
+        recipients: staff,
       }),
     );
   });
 
-  it('skips all channels when all are disabled for the category', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      { id: 1, userId: 'uid-1', firebaseUid: 'uid-1', email: 'test@example.com', phone: null },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: false,
-      showBrowserNotification: false,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: true,
-      skipEmail: true,
-      skipSms: true,
-    });
-
-    await service.trigger({
-      tenantId: 1,
-      type: 'INVOICE_GENERATED' as any,
-      category: 'BILLING',
-      title: 'Test',
-      message: 'Test message',
-      recipientUserIds: [1],
-    });
-
-    // When all channels disabled, deliveryService should not be called
-    expect(deliveryService.deliver).not.toHaveBeenCalled();
+  it('userRoleChanged notifies the person and every admin, once each', async () => {
+    await service.userRoleChanged(7, 2, 'Arun', 'MEMBER', 'ADMIN');
+    expect(recipients.resolveByUserIds).toHaveBeenCalledWith(7, [2, 1], { scopeToMembership: true });
+    const { recipients: sent, type } = dispatcher.dispatch.mock.calls[0][0];
+    expect(type).toBe(NotificationType.ROLE_CHANGED);
+    expect(sent.map((r: { id: number }) => r.id)).toEqual([2, 1]);
   });
 
-  it('resolves recipients by role and delivers to each', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      {
-        id: 10,
-        userId: 'uid-10',
-        firebaseUid: 'uid-10',
-        email: 'admin1@example.com',
-        phone: null,
-      },
-      {
-        id: 20,
-        userId: 'uid-20',
-        firebaseUid: 'uid-20',
-        email: 'admin2@example.com',
-        phone: null,
-      },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: true,
-      showBrowserNotification: true,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: false,
-      skipSms: false,
-    });
-
-    await service.trigger({
-      tenantId: 5,
-      type: 'SETTLEMENT_READY' as any,
-      category: 'BILLING',
-      title: 'Test',
-      message: 'Test',
-      recipientRoles: ['OWNER', 'ADMIN'],
-    });
-
-    expect(prisma.user.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          tenantId: 5,
-          role: { in: ['OWNER', 'ADMIN'] },
-        }),
-      }),
-    );
-    expect(deliveryService.deliver).toHaveBeenCalledTimes(2);
-  });
-
-  it('includes SMS channel when skipSms is false and phone exists', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      {
-        id: 1,
-        firebaseUid: 'uid-1',
-        email: 'test@example.com',
-        phone: '+15551234567',
-      },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: true,
-      showBrowserNotification: true,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: false,
-      skipSms: false,
-    });
-
-    await service.trigger({
-      tenantId: 1,
-      type: 'PAYMENT_RECEIVED' as any,
-      category: 'BILLING',
-      title: 'Payment',
-      message: 'Payment received',
-      recipientUserIds: [1],
-    });
-
-    expect(deliveryService.deliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        channels: expect.arrayContaining(['in_app', 'email', 'sms', 'push']),
-        recipientPhone: '+15551234567',
-      }),
+  it.each([
+    ['integrationSyncCompleted', NotificationType.INTEGRATION_SYNC_COMPLETED, 'Sync Complete'],
+    ['integrationSyncFailed', NotificationType.INTEGRATION_SYNC_FAILED, 'Sync Failed'],
+  ] as const)('%s deep-links staff to the connections page', async (method, type, titleTail) => {
+    await (service as any)[method](7, 'HubSpot', 'details');
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: 'console:/integrations/connections' }),
     );
   });
 
-  it('passes undefined recipientUserId when userId is missing', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      { id: 1, userId: '', firebaseUid: null, email: 'test@example.com', phone: null },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: true,
-      showBrowserNotification: true,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: false,
-      skipSms: false,
-    });
-
-    await service.trigger({
-      tenantId: 1,
-      type: 'INVOICE_GENERATED' as any,
-      category: 'BILLING',
-      title: 'Test',
-      message: 'Test',
-      recipientUserIds: [1],
-    });
-
-    expect(deliveryService.deliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        recipientUserId: undefined,
-        recipientDbId: 1,
-      }),
-    );
-  });
-
-  it('does not include email/sms/push channels when skipEmail and skipSms are true', async () => {
-    prisma.user.findMany.mockResolvedValue([
-      {
-        id: 1,
-        firebaseUid: 'uid-1',
-        email: 'test@example.com',
-        phone: '+15551234567',
-      },
-    ]);
-    channelResolution.resolveForNotification.mockResolvedValue({
-      playSound: false,
-      showBrowserNotification: false,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: true,
-      skipSms: true,
-    });
-
-    await service.trigger({
-      tenantId: 1,
-      type: 'INVOICE_GENERATED' as any,
-      category: 'BILLING',
-      title: 'Test',
-      message: 'Test',
-      recipientUserIds: [1],
-    });
-
-    expect(deliveryService.deliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        channels: ['in_app'],
-        recipientEmail: undefined,
-        recipientPhone: undefined,
-      }),
-    );
-  });
-
-  // ─── Convenience methods ───
-
-  describe('convenience trigger methods', () => {
-    const allChannelsPrefs = {
-      playSound: false,
-      showBrowserNotification: true,
-      flashTab: false,
-      suppressedByQuietHours: false,
-      skipInApp: false,
-      skipEmail: false,
-      skipSms: false,
-    };
-
-    beforeEach(() => {
-      prisma.user.findMany.mockResolvedValue([
-        { id: 1, userId: 'uid-1', firebaseUid: 'uid-1', email: 'admin@test.com', phone: null },
-      ]);
-      channelResolution.resolveForNotification.mockResolvedValue(allChannelsPrefs);
-    });
-
-    it('userJoined sends TEAM notification', async () => {
-      await service.userJoined(1, 'Jane Doe', 'MEMBER');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'USER_JOINED',
-          category: 'TEAM',
-          title: expect.stringContaining('Jane Doe'),
-        }),
-      );
-    });
-
-    it('integrationSyncFailed sends SYSTEM notification', async () => {
-      await service.integrationSyncFailed(1, 'QuickBooks', 'API key expired');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'INTEGRATION_SYNC_FAILED',
-          category: 'SYSTEM',
-          message: 'API key expired',
-        }),
-      );
-    });
-
-    it('userRoleChanged notifies both user and admins', async () => {
-      prisma.user.findMany
-        .mockResolvedValueOnce([{ id: 5 }, { id: 10 }]) // admins
-        .mockResolvedValueOnce([
-          { id: 5, userId: 'uid-5', firebaseUid: 'uid-5', email: 'a@t.com', phone: null },
-          { id: 10, userId: 'uid-10', firebaseUid: 'uid-10', email: 'b@t.com', phone: null },
-          { id: 42, userId: 'uid-42', firebaseUid: 'uid-42', email: 'c@t.com', phone: null },
-        ]);
-
-      await service.userRoleChanged(1, 42, 'Jane Doe', 'MEMBER', 'ADMIN');
-
-      expect(deliveryService.deliver).toHaveBeenCalled();
-    });
-
-    it('integrationSyncCompleted sends SYSTEM notification', async () => {
-      await service.integrationSyncCompleted(1, 'QuickBooks', '10 records synced');
-
-      expect(deliveryService.deliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'INTEGRATION_SYNC_COMPLETED',
-          category: 'SYSTEM',
-        }),
-      );
-    });
-  });
-
-  // ─── Error handling ───
-
-  describe('error handling', () => {
-    it('should not throw when recipient delivery fails', async () => {
-      prisma.user.findMany.mockResolvedValue([
-        { id: 1, userId: 'uid-1', firebaseUid: 'uid-1', email: 'test@test.com', phone: null },
-      ]);
-      channelResolution.resolveForNotification.mockRejectedValue(new Error('Channel resolution failed'));
-
-      // Should not throw
-      await service.trigger({
-        tenantId: 1,
-        type: 'INVOICE_GENERATED' as any,
-        category: 'BILLING',
-        title: 'Test',
-        message: 'Test',
-        recipientUserIds: [1],
-      });
-
-      expect(deliveryService.deliver).not.toHaveBeenCalled();
-    });
-
-    it('should return empty recipients when no roles or user IDs specified', async () => {
-      await service.trigger({
-        tenantId: 1,
-        type: 'INVOICE_GENERATED' as any,
-        category: 'BILLING',
-        title: 'Test',
-        message: 'Test',
-      });
-
-      expect(deliveryService.deliver).not.toHaveBeenCalled();
-    });
+  it('with neither roles nor ids there is nobody to resolve, and dispatch still runs the ledger path', async () => {
+    recipients.resolveByRoles.mockResolvedValueOnce([]);
+    await service.trigger({ tenantId: 7, type: NotificationType.SETTINGS_UPDATED, title: 't', message: 'm' });
+    expect(dispatcher.dispatch).toHaveBeenCalledWith(expect.objectContaining({ recipients: [] }));
   });
 });

@@ -2,6 +2,11 @@ import { z } from 'zod';
 
 // ── User Preferences ──
 
+export const NotificationChannelPrefsSchema = z
+  .object({ inApp: z.boolean(), push: z.boolean(), email: z.boolean(), sms: z.boolean(), whatsapp: z.boolean() })
+  .partial();
+export type NotificationChannelPrefs = z.infer<typeof NotificationChannelPrefsSchema>;
+
 export const UserPreferencesSchema = z.object({
   id: z.number(),
   userId: z.number(),
@@ -16,15 +21,8 @@ export const UserPreferencesSchema = z.object({
   ),
   // Sound (per-category mute map)
   soundSettings: z.record(z.string(), z.boolean()),
-  // Notification Preferences (redesign)
-  notificationPreferences: z
-    .object({
-      system: z.object({ inApp: z.boolean(), email: z.boolean(), sms: z.boolean() }),
-      team: z.object({ inApp: z.boolean(), email: z.boolean(), sms: z.boolean() }),
-      billing: z.object({ inApp: z.boolean(), email: z.boolean(), sms: z.boolean() }),
-    })
-    .optional()
-    .nullable(),
+  // Notification Preferences — keyed by lowercase NotificationCategory; a missing key or channel falls back to the policy default
+  notificationPreferences: z.record(z.string(), NotificationChannelPrefsSchema).optional().nullable(),
   // Quiet Hours
   quietHoursEnabled: z.boolean(),
   quietHoursStart: z.string().nullable(),

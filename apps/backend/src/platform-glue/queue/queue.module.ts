@@ -72,6 +72,8 @@ import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } f
       { name: QUEUE_NAMES.AI_INTERACTIVE, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.AI_BACKGROUND, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.BULK_OPS, adapter: BullMQAdapter },
+      // Registered by PlatformNotificationsModule; listed here so the ops UI shows it.
+      { name: QUEUE_NAMES.WHATSAPP, adapter: BullMQAdapter },
     ),
     // JwtModule is re-registered here because AuthModule does not export it.
     // BullBoardAuthMiddleware needs JwtService to verify access tokens but

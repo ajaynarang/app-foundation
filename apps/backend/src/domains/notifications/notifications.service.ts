@@ -12,19 +12,6 @@ interface ListParams {
   limit?: number;
 }
 
-interface CreateNotificationParams {
-  recipientId: number;
-  tenantId?: number;
-  type: NotificationType;
-  category: string;
-  title: string;
-  message: string;
-  actionUrl?: string;
-  actionLabel?: string;
-  iconType?: string;
-  metadata?: Record<string, any>;
-}
-
 @Injectable()
 export class InAppNotificationService {
   private readonly logger = new Logger(InAppNotificationService.name);
@@ -158,107 +145,5 @@ export class InAppNotificationService {
     });
     await this.cache.del(buildKey('app:notifications', 'count', userId));
     return result;
-  }
-
-  async create(params: CreateNotificationParams) {
-    const result = await this.prisma.$transaction(
-      async (tx) => {
-        const now = new Date();
-        const bucketStart = new Date(now.getTime() - 10 * 60 * 1000); // 10 min window
-
-        // Check for existing group
-        const existingGroup = await tx.notification.findFirst({
-          where: {
-            type: params.type,
-            userId: params.recipientId,
-            tenantId: params.tenantId ?? undefined,
-            groupKey: { not: null },
-            createdAt: { gte: bucketStart },
-            dismissedAt: null,
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        if (existingGroup && existingGroup.groupCount < 20) {
-          const meta = (existingGroup.metadata as Record<string, any>) ?? {};
-          const items = meta.items ?? [];
-          items.push({
-            title: params.title,
-            message: params.message,
-            actionUrl: params.actionUrl,
-          });
-          const newCount = existingGroup.groupCount + 1;
-
-          return tx.notification.update({
-            where: { id: existingGroup.id },
-            data: {
-              groupCount: newCount,
-              message: `${newCount} ${this.getGroupLabel(params.type)}`,
-              metadata: { ...meta, items },
-              readAt: null,
-            },
-          });
-        }
-
-        // Create new notification
-        const groupKey = `${params.type}:${params.tenantId ?? 0}:${Math.floor(now.getTime() / 600000)}`;
-        return tx.notification.create({
-          data: {
-            type: params.type,
-            channel: 'IN_APP',
-            recipient: '',
-            status: 'SENT',
-            userId: params.recipientId,
-            tenantId: params.tenantId,
-            category: params.category as any,
-            title: params.title,
-            message: params.message,
-            actionUrl: params.actionUrl,
-            actionLabel: params.actionLabel,
-            iconType: params.iconType,
-            metadata: params.metadata
-              ? {
-                  ...params.metadata,
-                  items: [
-                    {
-                      title: params.title,
-                      message: params.message,
-                      actionUrl: params.actionUrl,
-                    },
-                  ],
-                }
-              : {
-                  items: [
-                    {
-                      title: params.title,
-                      message: params.message,
-                      actionUrl: params.actionUrl,
-                    },
-                  ],
-                },
-            sentAt: new Date(),
-            groupKey,
-            groupCount: 1,
-          },
-        });
-      },
-      { isolationLevel: 'Serializable' },
-    );
-
-    await this.cache.del(buildKey('app:notifications', 'count', params.recipientId));
-
-    return result;
-  }
-
-  private getGroupLabel(type: string): string {
-    const labels: Record<string, string> = {
-      INTEGRATION_SYNC_COMPLETED: 'syncs completed',
-      INTEGRATION_SYNC_FAILED: 'sync failures',
-      USER_JOINED: 'users joined',
-      USER_INVITATION: 'invitations sent',
-      ROLE_CHANGED: 'role changes',
-      SETTINGS_UPDATED: 'settings updates',
-    };
-    return labels[type] ?? 'notifications';
   }
 }

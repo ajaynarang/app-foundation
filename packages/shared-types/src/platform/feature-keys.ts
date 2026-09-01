@@ -1,4 +1,6 @@
 export const FEATURE_KEYS = {
+  /** The WhatsApp channel is a plan feature; the flag is the platform's launch lever. */
+  WHATSAPP_NOTIFICATIONS: 'whatsapp_notifications',
   // Core platform (PlanEntitlement only — never purchasable)
   TEAM_MANAGEMENT: 'team_management',
   API_KEYS: 'api_keys',
