@@ -54,6 +54,16 @@ export const BillingSubscriptionStatusSchema = z.enum(['ACTIVE', 'PAST_DUE', 'CA
 export type BillingSubscriptionStatus = z.infer<typeof BillingSubscriptionStatusSchema>;
 export const BillingSubscriptionStatus = BillingSubscriptionStatusSchema.enum;
 
+// DeliveryChannel
+export const DeliveryChannelSchema = z.enum(['IN_APP', 'EMAIL', 'PUSH', 'SMS', 'WHATSAPP'] as const);
+export type DeliveryChannel = z.infer<typeof DeliveryChannelSchema>;
+export const DeliveryChannel = DeliveryChannelSchema.enum;
+
+// DeliveryStatus
+export const DeliveryStatusSchema = z.enum(['QUEUED', 'SENT', 'DELIVERED', 'READ', 'FAILED', 'SKIPPED'] as const);
+export type DeliveryStatus = z.infer<typeof DeliveryStatusSchema>;
+export const DeliveryStatus = DeliveryStatusSchema.enum;
+
 // DeskEpisodeStatus
 export const DeskEpisodeStatusSchema = z.enum(['RUNNING', 'WAITING_APPROVAL', 'RESOLVED', 'ESCALATED', 'FAILED', 'REJECTED_BY_OPERATOR', 'CANCELLED', 'EXPIRED'] as const);
 export type DeskEpisodeStatus = z.infer<typeof DeskEpisodeStatusSchema>;
@@ -68,6 +78,11 @@ export const DeskEpisodeStepKind = DeskEpisodeStepKindSchema.enum;
 export const DeskEpisodeStepStatusSchema = z.enum(['RUNNING', 'SUCCEEDED', 'FAILED', 'GATED', 'SKIPPED'] as const);
 export type DeskEpisodeStepStatus = z.infer<typeof DeskEpisodeStepStatusSchema>;
 export const DeskEpisodeStepStatus = DeskEpisodeStepStatusSchema.enum;
+
+// DevicePlatform
+export const DevicePlatformSchema = z.enum(['IOS', 'ANDROID'] as const);
+export type DevicePlatform = z.infer<typeof DevicePlatformSchema>;
+export const DevicePlatform = DevicePlatformSchema.enum;
 
 // FeedbackStatus
 export const FeedbackStatusSchema = z.enum(['NEW', 'REVIEWED', 'RESOLVED'] as const);
@@ -208,3 +223,8 @@ export const UserRole = UserRoleSchema.enum;
 export const WalletTransactionTypeSchema = z.enum(['TOP_UP', 'OVERAGE_DEDUCTION', 'ADMIN_CREDIT', 'REFUND', 'AUTO_RELOAD'] as const);
 export type WalletTransactionType = z.infer<typeof WalletTransactionTypeSchema>;
 export const WalletTransactionType = WalletTransactionTypeSchema.enum;
+
+// WhatsAppConsentSource
+export const WhatsAppConsentSourceSchema = z.enum(['SIGNUP', 'SETTINGS', 'INBOUND_STOP'] as const);
+export type WhatsAppConsentSource = z.infer<typeof WhatsAppConsentSourceSchema>;
+export const WhatsAppConsentSource = WhatsAppConsentSourceSchema.enum;

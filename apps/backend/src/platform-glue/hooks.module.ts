@@ -5,6 +5,8 @@ import {
   type UserLifecycleHooks,
   type TenantProvisionHooks,
 } from '@appshore/platform/domains/platform-hooks';
+import { NOTIFICATION_POLICIES } from '@appshore/platform/infrastructure/notifications/notification-policy';
+import { WHATSAPP_TEMPLATES } from '@appshore/platform/infrastructure/notifications/channels/whatsapp/whatsapp-template.registry';
 import { NotificationTriggersService } from '../domains/notifications/notification-triggers.service';
 import { InAppNotificationsModule } from '../domains/notifications/notifications.module';
 import { DeskBootstrapService } from '../domains/desk/responsibilities/desk-bootstrap.service';
@@ -42,7 +44,14 @@ class DeskTenantProvisionHooks implements TenantProvisionHooks {
     DeskTenantProvisionHooks,
     { provide: USER_LIFECYCLE_HOOKS, useExisting: NotificationUserLifecycleHooks },
     { provide: TENANT_PROVISION_HOOKS, useExisting: DeskTenantProvisionHooks },
+    // Your notification types' policies (category, urgency, channel rules) — see
+    // platform-notification-policies.ts for the shape; the platform's own types are already covered.
+    { provide: NOTIFICATION_POLICIES, useValue: {} },
+    // Your Meta-approved WhatsApp templates, keyed by NotificationType. Empty = no type sends on WhatsApp.
+    { provide: WHATSAPP_TEMPLATES, useValue: {} },
+    // Bind PLATFORM_TIMEZONE (from @appshore/platform/config/platform-timezone) to run wall-clock
+    // derivations in a zone other than UTC.
   ],
-  exports: [USER_LIFECYCLE_HOOKS, TENANT_PROVISION_HOOKS],
+  exports: [USER_LIFECYCLE_HOOKS, TENANT_PROVISION_HOOKS, NOTIFICATION_POLICIES, WHATSAPP_TEMPLATES],
 })
 export class PlatformHooksModule {}

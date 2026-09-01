@@ -1,33 +1,28 @@
 import { Module } from '@nestjs/common';
-import { NotificationsController } from './notifications.controller';
-import { InAppNotificationService } from './notifications.service';
-import { NotificationDeliveryService } from './delivery.service';
-import { ChannelResolutionService } from './channel-resolution.service';
-import { NotificationTriggersService } from './notification-triggers.service';
-import { NotificationJobsHandler } from './notification-cleanup.processor';
 import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.module';
+import { PlatformNotificationsModule } from '@appshore/platform/infrastructure/notifications/notifications.module';
 import { CacheModule } from '../../platform-glue/cache/cache.module';
 import { SseModule } from '../../platform-glue/sse/sse.module';
-import { PushModule } from '@appshore/platform/infrastructure/push/push.module';
-import { SmsModule } from '@appshore/platform/infrastructure/sms/sms.module';
 import { QueueModule } from '../../platform-glue/queue/queue.module';
+import { NotificationsController } from './notifications.controller';
+import { InAppNotificationService } from './notifications.service';
+import { NotificationTriggersService } from './notification-triggers.service';
+import { NotificationJobsHandler } from './notification-cleanup.processor';
 
+/**
+ * The app's side of notifications: the inbox, the cleanup sweep, and the named
+ * triggers that speak this product's vocabulary. Channels, policy resolution,
+ * delivery and the ledger are the platform's — see PlatformNotificationsModule.
+ */
 @Module({
-  imports: [PrismaModule, CacheModule, SseModule, PushModule, SmsModule, QueueModule],
+  imports: [PrismaModule, CacheModule, SseModule, QueueModule, PlatformNotificationsModule],
   controllers: [NotificationsController],
-  providers: [
-    InAppNotificationService,
-    NotificationDeliveryService,
-    ChannelResolutionService,
-    NotificationTriggersService,
-    NotificationJobsHandler,
-  ],
+  providers: [InAppNotificationService, NotificationTriggersService, NotificationJobsHandler],
   exports: [
+    PlatformNotificationsModule,
     InAppNotificationService,
-    NotificationJobsHandler,
-    NotificationDeliveryService,
-    ChannelResolutionService,
     NotificationTriggersService,
+    NotificationJobsHandler,
   ],
 })
 export class InAppNotificationsModule {}

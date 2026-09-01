@@ -111,6 +111,28 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 
 ---
 
+## 🔔 Notifications (in-app, email, web push, FCM, SMS, WhatsApp)
+
+One pipeline, every channel, policy-driven. `PlatformNotificationsModule` (in `@appshore/platform`)
+resolves _who gets what, where_ and writes a per-channel delivery ledger you can query from the
+console. Your app contributes three things, all bound in `apps/backend/src/platform-glue/hooks.module.ts`:
+
+| Token                   | What you bind                                                                                                                                                                                                 | Default                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `NOTIFICATION_POLICIES` | Per `NotificationType`: category, urgency (`critical` pierces quiet hours), and a rule per channel — `always · default · optIn · fallback · never`. SMS as `fallback` fires only when push reached no device. | The platform's own 9 types are covered; yours must be too (a parity spec enforces it). |
+| `WHATSAPP_TEMPLATES`    | Your Meta-approved templates, keyed by type. A type may only use WhatsApp if it has one.                                                                                                                      | none                                                                                   |
+| `PLATFORM_TIMEZONE`     | The IANA zone for quiet hours, reminder windows, daily ceilings.                                                                                                                                              | `UTC`                                                                                  |
+
+Then call `NotificationDispatcherService.dispatch(...)` from your own trigger methods (see
+`apps/backend/src/domains/notifications/notification-triggers.service.ts` for the four built-in ones).
+Users manage preferences per **category**; `GET /notifications/preferences/options` tells the settings
+page which categories and channels the policy actually offers, so the grid can never drift.
+
+Channel switches: `WHATSAPP_PROVIDER` (`meta` | `interakt`) + `WHATSAPP_API_KEY` + `WHATSAPP_WEBHOOK_SECRET`
+(+ `WHATSAPP_PHONE_NUMBER_ID` for Meta), the `whatsapp_channel` feature flag and the `whatsapp_notifications`
+plan feature; `FIREBASE_*` for FCM; `VAPID_*` for web push; `TWILIO_*` for SMS. Unset = that channel
+records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still delivers.
+
 ## ⚙️ Works when you add a key (all optional)
 
 | Capability        | Env keys (see `apps/backend/.env.example`) | Without it                         |

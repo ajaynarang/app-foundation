@@ -36,7 +36,6 @@ import { CacheModule } from './platform-glue/cache/cache.module';
 import { SharedModule } from './shared/shared.module';
 import { NotificationModule } from '@appshore/platform/infrastructure/notification/notification.module';
 import { SseModule } from './platform-glue/sse/sse.module';
-import { PushModule } from '@appshore/platform/infrastructure/push/push.module';
 import { SmsModule } from '@appshore/platform/infrastructure/sms/sms.module';
 import { QueueModule } from './platform-glue/queue/queue.module';
 import { NotificationsQueueModule } from './platform-glue/queue/dispatchers/notifications-queue.module';
@@ -123,8 +122,8 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     PrismaModule,
     AuthModule,
     NotificationModule,
-    // Three notification modules coexist: NotificationModule (platform email transport),
-    // InAppNotificationsModule (app multi-channel domain), NotificationsQueueModule (queue dispatcher glue).
+    // NotificationModule sends the templated tenant-lifecycle emails; InAppNotificationsModule is the app's
+    // inbox + triggers over the platform pipeline (PlatformNotificationsModule); NotificationsQueueModule is queue glue.
     InAppNotificationsModule,
     SseModule,
     QueueModule,
@@ -133,7 +132,6 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     PromptingModule,
     EventBusModule,
     HealthModule,
-    PushModule,
     SmsModule,
     PlatformHooksModule,
     PlatformModule,

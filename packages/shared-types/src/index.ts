@@ -25,6 +25,8 @@ export * from './platform/billing.schema';
 export * from './platform/wallet.schema';
 export * from './platform/feature-flags.schema';
 export * from './platform/preferences.schema';
+export * from './platform/notification-preference-options.schema';
+export * from './platform/whatsapp-consent.schema';
 export * from './platform/conversation.schema';
 export * from './platform/oauth.schema';
 export * from './platform/feedback.schema';
