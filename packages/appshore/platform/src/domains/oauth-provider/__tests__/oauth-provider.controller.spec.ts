@@ -239,6 +239,31 @@ describe('OAuthProviderController', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // The tenant-subdomain helper once skipped `console`, the host of an app
+    // this repo no longer has. No rule reserves that name at sign-up, so a
+    // tenant can hold it, and its clients must bind to it like any other.
+    it.each(['console', 'acme'])('binds the client to the tenant whose subdomain is the host (%s)', async (sub) => {
+      prismaService.tenant.findUnique.mockResolvedValue({ id: 42, status: 'ACTIVE' });
+
+      await controller.register({ client_name: 'Agent', redirect_uris: ['https://agent.example.com/cb'] }, {
+        hostname: `${sub}.example.com`,
+      } as any);
+
+      expect(prismaService.tenant.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { subdomain: sub } }),
+      );
+      expect(oauthClientsService.create).toHaveBeenCalledWith(expect.anything(), null, 42);
+    });
+
+    it.each(['www', 'api', 'app'])('treats the system host %s as no tenant', async (sub) => {
+      await controller.register({ client_name: 'Agent', redirect_uris: ['https://agent.example.com/cb'] }, {
+        hostname: `${sub}.example.com`,
+      } as any);
+
+      expect(prismaService.tenant.findUnique).not.toHaveBeenCalled();
+      expect(oauthClientsService.create).toHaveBeenCalledWith(expect.anything(), null, null);
+    });
+
     it('should throw for invalid redirect_uri format', async () => {
       await expect(
         controller.register(

@@ -42,7 +42,7 @@ function extractTenantSubdomain(hostname: string | undefined): string | null {
 
   const sub = parts[0];
   // Marketing/system subdomains aren't tenants.
-  if (sub === 'www' || sub === 'api' || sub === 'app' || sub === 'console') {
+  if (sub === 'www' || sub === 'api' || sub === 'app') {
     return null;
   }
   return sub;
