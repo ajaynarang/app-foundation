@@ -8,17 +8,36 @@ const MILESTONE_IDS = {
   INTEGRATIONS: 'integrations',
 } as const;
 
-interface OnboardingStore {
-  status: OnboardingStatusResponse | null;
-  loading: boolean;
-  error: string | null;
-
-  // Computed helpers
+interface OnboardingDerived {
   milestone1Complete: boolean;
   milestone2Complete: boolean;
   milestone1IncompleteCount: number;
   milestone2IncompleteCount: number;
   activeMilestone: MilestoneStatus | null;
+}
+
+/**
+ * Plain values, not object getters: zustand copies state with Object.assign on
+ * every set(), which would freeze a getter at the value it had on the first call.
+ */
+function deriveFromStatus(status: OnboardingStatusResponse | null): OnboardingDerived {
+  const milestones = status?.milestones ?? [];
+  const m1 = milestones.find((m) => m.id === MILESTONE_IDS.SETUP);
+  const m2 = milestones.find((m) => m.id === MILESTONE_IDS.INTEGRATIONS);
+  return {
+    milestone1Complete: m1?.status === 'complete',
+    milestone2Complete: m2?.status === 'complete',
+    milestone1IncompleteCount: m1?.items.filter((i) => !i.complete).length ?? 0,
+    milestone2IncompleteCount: m2?.items.filter((i) => !i.complete).length ?? 0,
+    activeMilestone:
+      milestones.find((m) => m.status === 'in_progress') ?? milestones.find((m) => m.status === 'available') ?? null,
+  };
+}
+
+interface OnboardingStore extends OnboardingDerived {
+  status: OnboardingStatusResponse | null;
+  loading: boolean;
+  error: string | null;
 
   // Actions
   fetchStatus: () => Promise<void>;
@@ -27,44 +46,18 @@ interface OnboardingStore {
   isBannerDismissed: () => boolean;
 }
 
-export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
+export const useOnboardingStore = create<OnboardingStore>((set) => ({
   status: null,
   loading: false,
   error: null,
 
-  get milestone1Complete() {
-    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.SETUP);
-    return m1?.status === 'complete' || false;
-  },
-
-  get milestone2Complete() {
-    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.INTEGRATIONS);
-    return m2?.status === 'complete' || false;
-  },
-
-  get milestone1IncompleteCount() {
-    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.SETUP);
-    return m1?.items.filter((i) => !i.complete).length ?? 0;
-  },
-
-  get milestone2IncompleteCount() {
-    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.INTEGRATIONS);
-    return m2?.items.filter((i) => !i.complete).length ?? 0;
-  },
-
-  get activeMilestone() {
-    const milestones = get().status?.milestones;
-    if (!milestones) return null;
-    return (
-      milestones.find((m) => m.status === 'in_progress') ?? milestones.find((m) => m.status === 'available') ?? null
-    );
-  },
+  ...deriveFromStatus(null),
 
   fetchStatus: async () => {
     set({ loading: true, error: null });
     try {
       const status = await onboardingApi.getStatus();
-      set({ status, loading: false });
+      set({ status, loading: false, ...deriveFromStatus(status) });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ error: message, loading: false });
@@ -74,7 +67,7 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
   refetchStatus: async () => {
     try {
       const status = await onboardingApi.getStatus();
-      set({ status });
+      set({ status, ...deriveFromStatus(status) });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to refetch onboarding status:', error);
