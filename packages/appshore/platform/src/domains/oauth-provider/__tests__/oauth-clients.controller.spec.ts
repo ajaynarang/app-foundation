@@ -15,7 +15,7 @@ describe('OAuthClientsController', () => {
   beforeEach(() => {
     clientsService = {
       create: jest.fn().mockResolvedValue({ clientId: 'app_new' }),
-      findAll: jest.fn().mockResolvedValue([]),
+      findAll: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       findByClientId: jest.fn().mockResolvedValue({ clientId: 'app_abc' }),
       update: jest.fn().mockResolvedValue({ clientId: 'app_abc' }),
       revoke: jest.fn().mockResolvedValue(undefined),
@@ -38,13 +38,14 @@ describe('OAuthClientsController', () => {
   });
 
   it('findAll uses tenant for ADMIN', async () => {
-    await controller.findAll(adminReq);
-    expect(clientsService.findAll).toHaveBeenCalledWith(10);
+    const page = await controller.findAll(adminReq, { limit: 10, cursor: 'abc' });
+    expect(clientsService.findAll).toHaveBeenCalledWith(10, { limit: 10, cursor: 'abc' });
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });
 
   it('findAll uses null tenant for SUPER_ADMIN', async () => {
-    await controller.findAll(superAdminReq);
-    expect(clientsService.findAll).toHaveBeenCalledWith(null);
+    await controller.findAll(superAdminReq, {});
+    expect(clientsService.findAll).toHaveBeenCalledWith(null, {});
   });
 
   it('findOne delegates to service', async () => {

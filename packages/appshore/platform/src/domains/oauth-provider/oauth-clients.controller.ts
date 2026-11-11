@@ -1,8 +1,22 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Req,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
+import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
 import type { OAuthClientResponse } from '@app/shared-types';
@@ -31,9 +45,9 @@ export class OAuthClientsController {
   }
 
   @Get()
-  @ApiOperation({ summary: "List tenant's OAuth clients" })
-  async findAll(@Req() req: Request) {
-    return this.clientsService.findAll(this.resolveTenantId(req));
+  @ApiOperation({ summary: "List tenant's OAuth clients, newest first (cursor-paged)" })
+  async findAll(@Req() req: Request, @Query() query: CursorQueryDto) {
+    return this.clientsService.findAll(this.resolveTenantId(req), query);
   }
 
   @Get(':client_id')

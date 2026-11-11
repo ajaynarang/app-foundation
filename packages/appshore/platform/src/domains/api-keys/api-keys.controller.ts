@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  Query,
   UseGuards,
   Request,
   HttpCode,
@@ -19,6 +20,8 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { BaseTenantController } from '../../shared/base/base-tenant.controller';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import type { CursorList } from '@app/shared-types';
 import { ApiKeysService } from './api-keys.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
@@ -54,14 +57,9 @@ export class ApiKeysController extends BaseTenantController {
 
   @Get()
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'List all API keys for current user' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of API keys',
-    type: [ApiKeyDto],
-  })
-  async findAll(@Request() req): Promise<ApiKeyDto[]> {
-    return this.apiKeysService.findAll(req.user.dbId);
+  @ApiOperation({ summary: "List the current user's API keys, newest first (cursor-paged)" })
+  async findAll(@Request() req, @Query() query: CursorQueryDto): Promise<CursorList<ApiKeyDto>> {
+    return this.apiKeysService.findAll(req.user.dbId, query);
   }
 
   @Delete(':api_key_id')
@@ -78,11 +76,14 @@ export class ApiKeysController extends BaseTenantController {
   @Get('admin/tenant')
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
-    summary: 'List every API key in the tenant (admin view)',
+    summary: 'List every API key in the tenant, newest first (admin view, cursor-paged)',
   })
-  async listForTenant(@CurrentUser() user: { tenantId: string }): Promise<TenantApiKeyListItemDto[]> {
+  async listForTenant(
+    @CurrentUser() user: { tenantId: string },
+    @Query() query: CursorQueryDto,
+  ): Promise<CursorList<TenantApiKeyListItemDto>> {
     const tenantId = await this.getTenantDbId(user);
-    return this.apiKeysService.listForTenant(tenantId);
+    return this.apiKeysService.listForTenant(tenantId, query);
   }
 
   @Post(':api_key_id/rotate')

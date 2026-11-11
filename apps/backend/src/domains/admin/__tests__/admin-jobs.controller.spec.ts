@@ -19,7 +19,7 @@ describe('AdminJobsController', () => {
 
   beforeEach(async () => {
     jobService = {
-      listAllJobsPaginated: jest.fn().mockResolvedValue({ jobs: [], total: 0 }),
+      listAllJobs: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getMetrics: jest.fn().mockResolvedValue({ total: 0 }),
       getCategorySummary: jest.fn().mockResolvedValue([]),
       getJob: jest.fn(),
@@ -81,19 +81,13 @@ describe('AdminJobsController', () => {
   const tenantQuery = (raw: Record<string, unknown> = {}) => readQueryDto(AdminJobsTenantQueryDto, raw);
 
   describe('listJobs', () => {
-    it('should list jobs with default pagination', async () => {
-      await controller.listJobs(await listQuery());
+    it('lists with no filter and leaves the page size to the service default', async () => {
+      const result = await controller.listJobs(await listQuery());
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
-        tenantId: undefined,
-        category: undefined,
-        type: undefined,
-        status: undefined,
-        limit: 20,
-        offset: 0,
-        dateFrom: undefined,
-        dateTo: undefined,
-      });
+      const passed = jobService.listAllJobs.mock.calls[0][0];
+      expect(passed.limit).toBeUndefined();
+      expect(passed.cursor).toBeUndefined();
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
     });
 
     it('should parse query parameters correctly', async () => {
@@ -104,22 +98,24 @@ describe('AdminJobsController', () => {
           type: 'ratecon',
           status: 'COMPLETED,FAILED',
           limit: '50',
-          offset: '10',
+          cursor: 'abc',
           date_from: '2026-01-01',
           date_to: '2026-01-31',
         }),
       );
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
-        tenantId: 5,
-        category: 'documents',
-        type: 'ratecon',
-        status: ['COMPLETED', 'FAILED'],
-        limit: 50,
-        offset: 10,
-        dateFrom: '2026-01-01',
-        dateTo: '2026-01-31',
-      });
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 5,
+          category: 'documents',
+          type: 'ratecon',
+          statuses: ['COMPLETED', 'FAILED'],
+          limit: 50,
+          cursor: 'abc',
+          dateFrom: '2026-01-01',
+          dateTo: '2026-01-31',
+        }),
+      );
     });
 
     it('answers 400 naming tenant_id when it is not a number', async () => {
@@ -135,13 +131,12 @@ describe('AdminJobsController', () => {
     it('should cap limit at 100', async () => {
       await controller.listJobs(await listQuery({ limit: '999' }));
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
     });
 
-    it('answers 400 naming limit or offset when it is not a whole number', async () => {
+    it('answers 400 naming limit when it is not a whole number, and refuses offset paging', async () => {
       expect(await fieldErrorsOf(listQuery({ limit: 'bad' }))).toHaveProperty('limit');
-      expect(await fieldErrorsOf(listQuery({ offset: 'bad' }))).toHaveProperty('offset');
-      expect(await fieldErrorsOf(listQuery({ offset: '-1' }))).toHaveProperty('offset');
+      expect(await fieldErrorsOf(listQuery({ offset: '10' }))).toHaveProperty('offset');
     });
 
     it('answers 400 naming a date that is not a date', async () => {
@@ -150,8 +145,8 @@ describe('AdminJobsController', () => {
 
     it('splits a comma-joined status and answers 400 on an unknown value', async () => {
       await controller.listJobs(await listQuery({ status: 'QUEUED,PROCESSING' }));
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ status: ['QUEUED', 'PROCESSING'] }),
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(
+        expect.objectContaining({ statuses: ['QUEUED', 'PROCESSING'] }),
       );
 
       expect(await fieldErrorsOf(listQuery({ status: 'QUEUED,bogus' }))).toHaveProperty('status');
@@ -353,11 +348,13 @@ describe('AdminJobsController', () => {
         id: 1,
         companyName: 'Test',
       });
+      const pausedAt = new Date();
       prisma.tenant.update.mockResolvedValue({
         id: 1,
+        tenantId: 'acme',
         companyName: 'Test',
         jobsPaused: true,
-        jobsPausedAt: new Date(),
+        jobsPausedAt: pausedAt,
       });
 
       const result = await controller.pauseJobs(1, mockUser);
@@ -369,14 +366,10 @@ describe('AdminJobsController', () => {
           jobsPausedAt: expect.any(Date),
           jobsPausedBy: 1,
         },
-        select: {
-          id: true,
-          companyName: true,
-          jobsPaused: true,
-          jobsPausedAt: true,
-        },
+        select: { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true },
       });
-      expect(result.jobsPaused).toBe(true);
+      // The tenant is named by its public slug; the Int key never leaves the handler.
+      expect(result).toEqual({ tenantId: 'acme', companyName: 'Test', jobsPaused: true, jobsPausedAt: pausedAt });
     });
   });
 
@@ -396,8 +389,10 @@ describe('AdminJobsController', () => {
       });
       prisma.tenant.update.mockResolvedValue({
         id: 1,
+        tenantId: 'acme',
         companyName: 'Test',
         jobsPaused: false,
+        jobsPausedAt: null,
       });
 
       const result = await controller.resumeJobs(1);
@@ -405,9 +400,9 @@ describe('AdminJobsController', () => {
       expect(prisma.tenant.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { jobsPaused: false, jobsPausedAt: null, jobsPausedBy: null },
-        select: { id: true, companyName: true, jobsPaused: true },
+        select: { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true },
       });
-      expect(result.jobsPaused).toBe(false);
+      expect(result).toEqual({ tenantId: 'acme', companyName: 'Test', jobsPaused: false, jobsPausedAt: null });
     });
   });
 });

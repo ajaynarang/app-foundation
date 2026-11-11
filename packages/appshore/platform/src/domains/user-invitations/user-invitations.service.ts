@@ -8,6 +8,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { CursorList } from '@app/shared-types';
+import type { InvitationStatus, Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { INVITATION_LIST_SELECT, toPublicInvitation, type InvitationListItem } from './invitation.serializer';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
@@ -20,6 +29,15 @@ import { customAlphabet } from 'nanoid';
 import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+
+const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /invitations`. */
+export interface InvitationListQuery {
+  status?: InvitationStatus;
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class UserInvitationsService {
@@ -181,40 +199,39 @@ export class UserInvitationsService {
   }
 
   /**
-   * Get all invitations for a tenant
-   * If tenantIdString is undefined, returns all invitations (for SUPER_ADMIN)
+   * A workspace's invitations (or, with no tenant, every tenant's), newest first, as a cursor list. The tiebreak
+   * is the public `invitationId`, never the Int key. The acceptance token is never read: it is a bearer secret.
    */
-  async getInvitations(tenantIdString?: string, status?: string) {
-    let tenantDbId: number | undefined;
+  async listInvitations(
+    tenantIdString?: string,
+    query: InvitationListQuery = {},
+  ): Promise<CursorList<InvitationListItem>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...INVITATION_KEYSET, cursor: query.cursor }) : undefined;
 
-    // If tenant ID string provided, look up database ID
+    let tenantDbId: number | undefined;
     if (tenantIdString) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { tenantId: tenantIdString },
-      });
-      if (!tenant) {
-        throw new NotFoundException('Tenant not found');
-      }
+      const tenant = await this.prisma.tenant.findUnique({ where: { tenantId: tenantIdString } });
+      if (!tenant) throw new NotFoundException('Tenant not found');
       tenantDbId = tenant.id;
     }
 
-    return this.prisma.userInvitation.findMany({
-      where: {
-        ...(tenantDbId && { tenantId: tenantDbId }),
-        ...(status && { status: status as any }),
-      },
-      include: {
-        invitedByUser: {
-          select: {
-            userId: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const scope: Prisma.UserInvitationWhereInput = {
+      ...(tenantDbId !== undefined && { tenantId: tenantDbId }),
+      ...(query.status && { status: query.status }),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.userInvitation.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        select: INVITATION_LIST_SELECT,
+        orderBy: [{ createdAt: 'desc' }, { invitationId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.userInvitation.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.invitationId));
+    return { items: page.items.map(toPublicInvitation), nextCursor: page.nextCursor, total };
   }
 
   /**

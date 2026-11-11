@@ -11,6 +11,9 @@ export interface WorkspaceSummary {
   isDefault: boolean;
 }
 
+/** The most workspaces the switcher lists for one user: the default first, then by name. */
+export const MAX_WORKSPACES_LISTED = 200;
+
 /**
  * Workspace-based tenancy: a user can belong to many workspaces (tenants),
  * with a distinct role in each. `WorkspaceMember` is the source of truth;
@@ -30,6 +33,7 @@ export class WorkspacesService {
       where: { userId: userDbId, tenant: { isActive: true } },
       include: { tenant: true },
       orderBy: [{ isDefault: 'desc' }, { tenant: { companyName: 'asc' } }],
+      take: MAX_WORKSPACES_LISTED,
     });
     return memberships.map((m) => ({
       tenantId: m.tenant.tenantId,

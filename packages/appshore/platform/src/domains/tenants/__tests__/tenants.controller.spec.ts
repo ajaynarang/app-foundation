@@ -14,7 +14,7 @@ describe('TenantsController', () => {
       registerTenant: jest.fn().mockResolvedValue({ tenantId: 't_new' }),
       checkSubdomainAvailability: jest.fn().mockResolvedValue(true),
       getTenantBranding: jest.fn().mockResolvedValue({ logo: null }),
-      getAllTenants: jest.fn().mockResolvedValue([]),
+      listTenants: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       approveTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
       rejectTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
       suspendTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
@@ -101,10 +101,20 @@ describe('TenantsController', () => {
 
   describe('getAllTenants', () => {
     it('should delegate to service', async () => {
-      await controller.getAllTenants(await readQueryDto(TenantListQueryDto, { status: 'ACTIVE' }));
-      expect(service.getAllTenants).toHaveBeenCalledWith('ACTIVE');
+      const page = await controller.getAllTenants(
+        await readQueryDto(TenantListQueryDto, { status: 'ACTIVE', q: ' acme ', limit: '10', cursor: 'abc' }),
+      );
+      expect(service.listTenants).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'ACTIVE', q: 'acme', limit: 10, cursor: 'abc' }),
+      );
+      expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
       await controller.getAllTenants(await readQueryDto(TenantListQueryDto, {}));
-      expect(service.getAllTenants).toHaveBeenLastCalledWith(undefined);
+      expect(service.listTenants.mock.calls[1][0].status).toBeUndefined();
+    });
+
+    it('answers 400 naming limit when it is not a whole number, and refuses offset paging', async () => {
+      expect(await fieldErrorsOf(readQueryDto(TenantListQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
+      expect(await fieldErrorsOf(readQueryDto(TenantListQueryDto, { offset: '10' }))).toHaveProperty('offset');
     });
 
     it('answers 400 naming status for an unknown one (it used to reach the database)', async () => {

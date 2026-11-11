@@ -124,7 +124,7 @@ export class TenantsController extends BaseTenantController {
   @Roles(UserRole.SUPER_ADMIN)
   @Get()
   async getAllTenants(@Query() query: TenantListQueryDto) {
-    return this.tenantsService.getAllTenants(query.status);
+    return this.tenantsService.listTenants(query);
   }
 
   @Roles(UserRole.SUPER_ADMIN)

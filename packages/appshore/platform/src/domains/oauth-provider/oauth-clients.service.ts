@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_WARM_5M } from '@appshore/kernel/constants/cache.constants';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 import * as crypto from 'crypto';
@@ -11,6 +10,7 @@ import { nanoid } from 'nanoid';
 import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 import type {
   AgentScope,
+  CursorList,
   CreateOAuthClientInput,
   UpdateOAuthClientInput,
   OAuthClientResponse,
@@ -18,6 +18,21 @@ import type {
 } from '@app/shared-types';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import type { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+
+const OAUTH_CLIENT_KEYSET = { field: 'createdAt', idField: 'clientId', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /oauth/clients`. */
+export interface OAuthClientListQuery {
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class OAuthClientsService {
@@ -69,29 +84,35 @@ export class OAuthClientsService {
     };
   }
 
-  async findAll(tenantId: number | null): Promise<OAuthClientResponse[]> {
-    const cacheKey = buildKey('app:oauth', 'clients', String(tenantId ?? 'global'));
-    return this.cache.getOrSet(
-      cacheKey,
-      async () => {
-        const clients = await this.prisma.oAuthClient.findMany({
-          where: tenantId ? { tenantId } : { tenantId: null },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        return clients.map((c) => ({
-          clientId: c.clientId,
-          name: c.name,
-          description: c.description,
-          redirectUris: c.redirectUris,
-          scopes: c.scopes,
-          clientType: c.clientType,
-          isActive: c.isActive,
-          createdAt: c.createdAt.toISOString(),
-        }));
-      },
-      CACHE_TTL_WARM_5M,
-    );
+  /**
+   * A workspace's OAuth clients (the global ones for a super admin), newest first, as a cursor list. The
+   * tiebreak is the public `clientId`, never the Int key.
+   */
+  async findAll(tenantId: number | null, query: OAuthClientListQuery = {}): Promise<CursorList<OAuthClientResponse>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...OAUTH_CLIENT_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.OAuthClientWhereInput = tenantId ? { tenantId } : { tenantId: null };
+    const [rows, total] = await Promise.all([
+      this.prisma.oAuthClient.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { clientId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.oAuthClient.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.clientId));
+    const items = page.items.map((c) => ({
+      clientId: c.clientId,
+      name: c.name,
+      description: c.description,
+      redirectUris: c.redirectUris,
+      scopes: c.scopes,
+      clientType: c.clientType,
+      isActive: c.isActive,
+      createdAt: c.createdAt.toISOString(),
+    }));
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   async findByClientId(clientId: string, tenantId: number | null): Promise<OAuthClientResponse> {
@@ -317,7 +338,7 @@ export class OAuthClientsService {
     }
   }
 
-  /** Invalidate the OAuth clients list cache. */
+  /** Clears the key the client list was cached under before it became a cursor list; nothing fills it now. */
   private async invalidateOAuthClientsCache(tenantId: number | null): Promise<void> {
     await this.cache.del(buildKey('app:oauth', 'clients', String(tenantId ?? 'global')));
   }

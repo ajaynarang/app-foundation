@@ -19,12 +19,20 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { Prisma, TenantPlan, TenantStatus } from '@appshore/db';
 import {
   DEFAULT_TENANT_TIMEZONE,
+  type CursorList,
   type OrganizationProfile,
   type UpdateOrganizationProfileInput,
 } from '@app/shared-types';
 import { NotificationService } from '../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { containsText } from '@appshore/kernel/shared/utils/list-query';
 
 /** Prisma select for the editable organization-profile field set. */
 const ORGANIZATION_PROFILE_SELECT = {
@@ -33,6 +41,27 @@ const ORGANIZATION_PROFILE_SELECT = {
   contactPhone: true,
   timezone: true,
 } satisfies Prisma.TenantSelect;
+
+/** By company name; a stored name may hold a tab, so the cursor carries it as text. */
+const TENANT_KEYSET = { field: 'companyName', idField: 'tenantId', kind: 'text', direction: 'asc' } as const;
+
+const TENANT_LIST_INCLUDE = {
+  users: {
+    where: { role: { in: ['OWNER', 'ADMIN'] } },
+    select: { userId: true, email: true, firstName: true, lastName: true, role: true },
+  },
+  _count: { select: { users: true } },
+} satisfies Prisma.TenantInclude;
+
+export type TenantListRow = Prisma.TenantGetPayload<{ include: typeof TENANT_LIST_INCLUDE }>;
+
+/** `GET /tenants`: `q` searches name, subdomain, public id and contact email. */
+export interface TenantListQuery {
+  status?: TenantStatus;
+  q?: string;
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class TenantsService {
@@ -186,36 +215,36 @@ export class TenantsService {
   }
 
   /**
-   * Get all tenants (SUPER_ADMIN only)
+   * Every tenant (super admin), by company name, as a cursor list. The tiebreak is the tenant's public id
+   * (`tenantId`), never the Int key. `total` counts what matches the search and status.
    */
-  async getAllTenants(status?: string) {
-    const cacheKey = buildKey('app:tenants', 'list', status || 'all');
-    return this.cache.getOrSet(
-      cacheKey,
-      () =>
-        this.prisma.tenant.findMany({
-          where: status ? { status: status as TenantStatus } : undefined,
-          include: {
-            users: {
-              where: { role: { in: ['OWNER', 'ADMIN'] } },
-              select: {
-                userId: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-            _count: {
-              select: {
-                users: true,
-              },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-      CACHE_TTL_WARM_5M,
-    );
+  async listTenants(query: TenantListQuery = {}): Promise<CursorList<TenantListRow>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...TENANT_KEYSET, cursor: query.cursor }) : undefined;
+
+    const scope: Prisma.TenantWhereInput = {};
+    if (query.status) scope.status = query.status;
+    if (query.q) {
+      // `containsText` escapes LIKE wildcards: unescaped, `_` or `%` would match every tenant.
+      scope.OR = [
+        { companyName: containsText(query.q) },
+        { subdomain: containsText(query.q) },
+        { tenantId: containsText(query.q) },
+        { contactEmail: containsText(query.q) },
+      ];
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        include: TENANT_LIST_INCLUDE,
+        orderBy: [{ companyName: 'asc' }, { tenantId: 'asc' }],
+        take: take + 1,
+      }),
+      this.prisma.tenant.count({ where: scope }),
+    ]);
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.companyName, row.tenantId)), total };
   }
 
   /**
@@ -647,18 +676,9 @@ export class TenantsService {
     await this.cache.del(buildKey('app:tenants', 'me-settings', tenantDbId));
   }
 
-  /** Invalidate all tenant-related caches after a mutation. */
+  /** Invalidate a tenant's cached detail after a mutation. The list is read live, so it has no cache to clear. */
   private async invalidateTenantCache(tenantId?: string): Promise<void> {
-    const keys = [
-      buildKey('app:tenants', 'list', 'all'),
-      buildKey('app:tenants', 'list', 'ACTIVE'),
-      buildKey('app:tenants', 'list', 'PENDING_APPROVAL'),
-      buildKey('app:tenants', 'list', 'SUSPENDED'),
-      buildKey('app:tenants', 'list', 'REJECTED'),
-    ];
-    if (tenantId) {
-      keys.push(buildKey('app:tenants', 'detail', tenantId));
-    }
-    await Promise.allSettled(keys.map((k) => this.cache.del(k)));
+    if (!tenantId) return;
+    await Promise.allSettled([this.cache.del(buildKey('app:tenants', 'detail', tenantId))]);
   }
 }

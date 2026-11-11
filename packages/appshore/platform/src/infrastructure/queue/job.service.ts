@@ -1,8 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import type { JobStatus } from '@appshore/db';
+import type { JobStatus, Prisma } from '@appshore/db';
+import type { CursorList } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 import { PrismaService } from '../database/prisma.service';
 import { buildDateRangeFilter } from '@appshore/kernel/shared/utils/date-range';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import {
   CategorySummary,
   ScheduledTypeInfo,
@@ -44,6 +52,22 @@ export interface PaginatedJobs {
   offset: number;
 }
 
+const JOB_KEYSET = { field: 'createdAt', idField: 'publicId', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /admin/jobs`: every filter is optional. */
+export interface AdminJobListQuery {
+  tenantId?: number;
+  category?: string;
+  type?: string;
+  statuses?: JobStatus[];
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export type AdminJobListItem = JobRecord & { tenant: { id: number; companyName: string } };
+
 @Injectable()
 export class JobService {
   private readonly logger = new Logger(JobService.name);
@@ -66,6 +90,7 @@ export class JobService {
   async createJob(params: CreateJobParams) {
     const job = await this.prisma.job.create({
       data: {
+        publicId: generateUuidV7(),
         tenantId: params.tenantId,
         submittedBy: params.submittedBy,
         category: params.category,
@@ -200,41 +225,32 @@ export class JobService {
     };
   }
 
-  async listAllJobsPaginated(filters?: {
-    tenantId?: number;
-    category?: string;
-    type?: string;
-    status?: JobStatus[];
-    limit?: number;
-    offset?: number;
-    dateFrom?: string;
-    dateTo?: string;
-  }): Promise<PaginatedJobs> {
-    const where: any = {};
-    if (filters?.tenantId) where.tenantId = filters.tenantId;
-    if (filters?.category) where.category = filters.category;
-    if (filters?.type) where.type = filters.type;
-    if (filters?.status !== undefined) where.status = { in: filters.status };
-    const dateFilter = buildDateRangeFilter(filters?.dateFrom, filters?.dateTo);
+  /**
+   * Every tenant's jobs (super admin), newest first, as a cursor list. The keyset tiebreak is the job's public
+   * id: its Int key stays in the row (the listed `/admin/jobs/:job_id` address) but never in a cursor.
+   */
+  async listAllJobs(filters: AdminJobListQuery = {}): Promise<CursorList<AdminJobListItem>> {
+    const take = clampCursorLimit(filters.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = filters.cursor ? keysetWhere({ ...JOB_KEYSET, cursor: filters.cursor }) : undefined;
+    const where: Prisma.JobWhereInput = {};
+    if (filters.tenantId) where.tenantId = filters.tenantId;
+    if (filters.category) where.category = filters.category;
+    if (filters.type) where.type = filters.type;
+    if (filters.statuses) where.status = { in: filters.statuses };
+    const dateFilter = buildDateRangeFilter(filters.dateFrom, filters.dateTo);
     if (dateFilter) where.createdAt = dateFilter;
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.job.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: filters?.limit ?? 20,
-        skip: filters?.offset ?? 0,
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: take + 1,
         include: { tenant: { select: { id: true, companyName: true } } },
       }),
       this.prisma.job.count({ where }),
     ]);
-
-    return {
-      items,
-      total,
-      limit: filters?.limit ?? 20,
-      offset: filters?.offset ?? 0,
-    };
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.publicId)), total };
   }
 
   /**

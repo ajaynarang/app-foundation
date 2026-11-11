@@ -33,14 +33,13 @@ describe('ListLoginActivityQueryDto', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('rejects limit > 100', async () => {
-    const dto = await build({
-      from: '2026-05-19',
-      to: '2026-05-26',
-      limit: 200,
+  it('clamps limit > 100 to 100, as every cursor list does, and refuses offset paging', async () => {
+    const range = { from: '2026-05-19', to: '2026-05-26' };
+    const dto = await readQueryDto(ListLoginActivityQueryDto, { ...range, limit: '200' });
+    expect(dto.limit).toBe(100);
+    await expect(readQueryDto(ListLoginActivityQueryDto, { ...range, offset: '50' })).rejects.toMatchObject({
+      status: 400,
     });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
   });
 
   it('accepts valid statuses array', async () => {

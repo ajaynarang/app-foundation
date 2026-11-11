@@ -4,6 +4,7 @@ import { ApiKeysService } from '../api-keys.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 
 /**
@@ -49,17 +50,55 @@ describe('ApiKeysService — Phase D admin surface', () => {
   describe('listForTenant', () => {
     it('returns only keys whose user belongs to the tenant, masking the secret', async () => {
       prisma.apiKey.findMany.mockResolvedValue([baseRow]);
+      prisma.apiKey.count.mockResolvedValue(1);
       const result = await svc.listForTenant(7);
       expect(prisma.apiKey.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { user: { tenantId: 7 } },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 51,
         }),
       );
-      expect(result).toHaveLength(1);
-      expect(result[0].keyMasked).toBe('sk_live_…AbCd');
-      expect(result[0]).not.toHaveProperty('key');
-      expect(result[0]).not.toHaveProperty('keyHash');
+      expect(result).toMatchObject({ nextCursor: null, total: 1 });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].keyMasked).toBe('sk_live_…AbCd');
+      expect(result.items[0]).not.toHaveProperty('key');
+      expect(result.items[0]).not.toHaveProperty('keyHash');
+    });
+
+    describe('walking pages over a fixture', () => {
+      // Keys minted in one batch share a timestamp. One belongs to another tenant, one is revoked.
+      const stamps = tiedTimestamps(8);
+      const rows = stamps.map((createdAt, index) => ({
+        ...baseRow,
+        id: ((index * 5) % 8) + 1,
+        userId: index === 7 ? 99 : 42,
+        user: { tenantId: index === 7 ? 99 : 7 },
+        revokedAt: index === 0 ? new Date('2026-03-02T00:00:00.000Z') : null,
+        createdAt,
+      }));
+
+      beforeEach(() => Object.assign(prisma.apiKey, fixtureModel(rows)));
+
+      it('returns every key of the tenant once, ties included, and none of another tenant', async () => {
+        const { pages, items } = await walkCursorList((cursor) => svc.listForTenant(7, { limit: 3, cursor }));
+
+        expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+        expect(new Set(items.map((key) => key.id)).size).toBe(7);
+        const times = items.map((key) => Date.parse(key.createdAt));
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+      });
+
+      it("pages the caller's own live keys and leaves revoked ones out of the page and the total", async () => {
+        const { items } = await walkCursorList((cursor) => svc.findAll(42, { limit: 4, cursor }));
+        expect(items).toHaveLength(6);
+        expect((await svc.findAll(42, { limit: 1 })).total).toBe(6);
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(svc.listForTenant(7, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        expect(prisma.apiKey.findMany).not.toHaveBeenCalled();
+      });
     });
   });
 

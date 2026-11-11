@@ -7,11 +7,45 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import type { Prisma } from '@appshore/db';
+import type { CursorList } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { containsText } from '@appshore/kernel/shared/utils/list-query';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as crypto from 'crypto';
 import { USER_LIFECYCLE_HOOKS, type UserLifecycleHooks } from '../platform-hooks';
+
+const USER_KEYSET = { field: 'createdAt', idField: 'userId', kind: 'date', direction: 'desc' } as const;
+
+/** What a user list row carries: the public `userId`, never the Int key. */
+const USER_LIST_SELECT = {
+  userId: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  isActive: true,
+  emailVerified: true,
+  createdAt: true,
+  lastLoginAt: true,
+  tenant: { select: { tenantId: true, companyName: true } },
+} satisfies Prisma.UserSelect;
+
+export type UserListItem = Prisma.UserGetPayload<{ select: typeof USER_LIST_SELECT }>;
+
+/** `GET /users`: `q` searches email and name. */
+export interface UserListQuery {
+  q?: string;
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class UsersService {
@@ -22,71 +56,44 @@ export class UsersService {
     @Optional() @Inject(USER_LIFECYCLE_HOOKS) private readonly lifecycleHooks?: UserLifecycleHooks,
   ) {}
 
-  async getAllUsers(tenantIdString?: string, _currentUser?: any) {
-    // Get tenant database ID if tenantIdString provided
+  /**
+   * A workspace's users (or, with no tenant, every tenant's), newest first, as a cursor list. Super admins are
+   * never listed. The tiebreak is the public `userId`; the Int key never leaves the service.
+   */
+  async listUsers(tenantIdString?: string, query: UserListQuery = {}): Promise<CursorList<UserListItem>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...USER_KEYSET, cursor: query.cursor }) : undefined;
+
     let tenantDbId: number | undefined;
     if (tenantIdString) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { tenantId: tenantIdString },
-      });
-      if (!tenant) {
-        throw new NotFoundException('Tenant not found');
-      }
+      const tenant = await this.prisma.tenant.findUnique({ where: { tenantId: tenantIdString } });
+      if (!tenant) throw new NotFoundException('Tenant not found');
       tenantDbId = tenant.id;
     }
 
-    // SUPER_ADMIN can see all users across all tenants (except other super admins)
-    // ADMIN can only see users in their tenant
-    const where: any = tenantDbId
-      ? {
-          tenantId: tenantDbId,
-          NOT: {
-            role: 'SUPER_ADMIN', // Exclude super admins from tenant user list
-          },
-        }
-      : {
-          NOT: {
-            role: 'SUPER_ADMIN', // When no tenantId, still exclude super admins
-          },
-        };
+    const scope: Prisma.UserWhereInput = {
+      ...(tenantDbId !== undefined && { tenantId: tenantDbId }),
+      NOT: { role: 'SUPER_ADMIN' },
+    };
+    if (query.q) {
+      scope.OR = [
+        { email: containsText(query.q) },
+        { firstName: containsText(query.q) },
+        { lastName: containsText(query.q) },
+      ];
+    }
 
-    const users = await this.prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        userId: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        emailVerified: true,
-        createdAt: true,
-        lastLoginAt: true,
-        tenant: {
-          select: {
-            tenantId: true,
-            companyName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    return users.map((user) => ({
-      userId: user.userId,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      lastLoginAt: user.lastLoginAt,
-      tenant: user.tenant,
-    }));
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        select: USER_LIST_SELECT,
+        orderBy: [{ createdAt: 'desc' }, { userId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.user.count({ where: scope }),
+    ]);
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.userId)), total };
   }
 
   async getUser(userId: string, tenantIdString?: string) {

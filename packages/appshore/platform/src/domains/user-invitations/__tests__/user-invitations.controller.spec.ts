@@ -14,7 +14,7 @@ describe('UserInvitationsController', () => {
   beforeEach(() => {
     invitationsService = {
       inviteUser: jest.fn().mockResolvedValue({ invitationId: 'inv_1' }),
-      getInvitations: jest.fn().mockResolvedValue([]),
+      listInvitations: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getInvitationByToken: jest.fn().mockResolvedValue({ invitationId: 'inv_1' }),
       acceptInvitation: jest.fn().mockResolvedValue({ userId: 'user_1' }),
       cancelInvitation: jest.fn().mockResolvedValue({ status: 'cancelled' }),
@@ -37,8 +37,15 @@ describe('UserInvitationsController', () => {
   });
 
   it('getInvitations delegates to service', async () => {
-    await controller.getInvitations(currentUser, await readQueryDto(InvitationListQueryDto, { status: 'PENDING' }));
-    expect(invitationsService.getInvitations).toHaveBeenCalledWith('tenant_abc', 'PENDING');
+    const page = await controller.getInvitations(
+      currentUser,
+      await readQueryDto(InvitationListQueryDto, { status: 'PENDING', limit: '10', cursor: 'abc' }),
+    );
+    expect(invitationsService.listInvitations).toHaveBeenCalledWith(
+      'tenant_abc',
+      expect.objectContaining({ status: 'PENDING', limit: 10, cursor: 'abc' }),
+    );
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });
 
   it('getInvitations answers 400 naming status for an unknown one', async () => {

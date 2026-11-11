@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { JobStatus } from '@appshore/db';
 import { JobService } from '../job.service';
 import { PrismaService } from '../../database/prisma.service';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 
 const mockPrisma = {
   job: {
@@ -70,6 +71,57 @@ describe('JobService', () => {
       expect(mockPrisma.job.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ priority: 5, maxAttempts: 1 }),
       });
+    });
+  });
+
+  describe('listAllJobs: a cursor list, newest first', () => {
+    const stamps = tiedTimestamps(8);
+    const rows = stamps.map((createdAt, index) => ({
+      id: index + 1,
+      // Deliberately not in id order: the tiebreak is the public id, not the Int key.
+      publicId: `00000000-0000-7000-8000-00000000000${(index * 5) % 8}`,
+      tenantId: index % 2 === 0 ? 1 : 2,
+      category: 'webhooks',
+      type: 'deliver',
+      status: index === 7 ? 'FAILED' : 'COMPLETED',
+      createdAt,
+    }));
+
+    beforeEach(() => Object.assign(mockPrisma.job, fixtureModel(rows)));
+
+    it('walks every row once across pages, ties included, and the total ignores the cursor', async () => {
+      const seenTotals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listAllJobs({ limit: 2, cursor });
+        seenTotals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([2, 2, 2, 2]);
+      expect(new Set(items.map((job) => job.publicId)).size).toBe(8);
+      expect(items.map((job) => job.createdAt.getTime())).toEqual(
+        [...stamps].map((d) => d.getTime()).sort((a, b) => b - a),
+      );
+      expect(seenTotals).toEqual([8, 8, 8, 8]);
+    });
+
+    it('orders by created_at then public id, never the Int key', async () => {
+      await service.listAllJobs({});
+      expect(mockPrisma.job.findMany.mock.calls[0][0]).toMatchObject({
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: 51,
+      });
+    });
+
+    it('filters by tenant and status, and counts only what matches', async () => {
+      const page = await service.listAllJobs({ tenantId: 2, statuses: ['FAILED'] as JobStatus[] });
+      expect(page.items.map((job) => job.id)).toEqual([8]);
+      expect(page).toMatchObject({ total: 1, nextCursor: null });
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listAllJobs({ cursor: 'not-a-cursor' })).rejects.toMatchObject({ status: 400 });
+      expect(mockPrisma.job.findMany).not.toHaveBeenCalled();
     });
   });
 

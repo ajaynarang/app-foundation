@@ -8,7 +8,14 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
 import { TenantApiKeyListItemDto } from './dto/list-api-keys.dto';
 import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
-import { AgentScope, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
+import { AgentScope, NEVER_EXTERNAL_SCOPES, type CursorList } from '@app/shared-types';
+import type { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /**
@@ -56,6 +63,20 @@ export interface ValidateKeyContext {
   ip?: string;
 }
 
+/**
+ * Newest first. An API key has no public id of its own: its numeric id is already its address
+ * (`/api-keys/:api_key_id`, listed in the id-boundary allowlist), so the cursor carries that and nothing new.
+ * The key hash is unique too, but it is the stored secret and never goes on the wire.
+ */
+const API_KEY_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+const API_KEY_ORDER: Prisma.ApiKeyOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }];
+
+/** `GET /api-keys` and `GET /api-keys/admin/tenant`. */
+export interface ApiKeyListQuery {
+  limit?: number;
+  cursor?: string;
+}
+
 @Injectable()
 export class ApiKeysService {
   private readonly logger = new Logger(ApiKeysService.name);
@@ -99,41 +120,59 @@ export class ApiKeysService {
     return this.toDto(apiKey, plaintext);
   }
 
-  async findAll(userId: number): Promise<ApiKeyDto[]> {
-    const keys = await this.prisma.apiKey.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-    });
-    return keys.map((k) => this.toDto(k));
+  /** The caller's own live keys, newest first, as a cursor list. */
+  async findAll(userId: number, query: ApiKeyListQuery = {}): Promise<CursorList<ApiKeyDto>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...API_KEY_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.ApiKeyWhereInput = { userId, revokedAt: null };
+    const [rows, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: API_KEY_ORDER,
+        take: take + 1,
+      }),
+      this.prisma.apiKey.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    return { items: page.items.map((k) => this.toDto(k)), nextCursor: page.nextCursor, total };
   }
 
   /**
-   * List every API key in a tenant, scoped via `user.tenantId`. Used by the
-   * the Desk admin view (Phase D). The plaintext key is not stored, so it cannot be returned.
+   * Every API key in a tenant, scoped via `user.tenantId`, newest first, as a cursor list. Used by the
+   * admin view. The plaintext key is not stored, so it cannot be returned.
    */
-  async listForTenant(tenantId: number): Promise<TenantApiKeyListItemDto[]> {
-    const keys = await this.prisma.apiKey.findMany({
-      where: { user: { tenantId } },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        keyPrefix: true,
-        keyLast4: true,
-        name: true,
-        userId: true,
-        scopes: true,
-        ipAllowlist: true,
-        rateLimitPerMinute: true,
-        isWriteEnabled: true,
-        isActive: true,
-        lastUsedAt: true,
-        requestCount: true,
-        createdAt: true,
-        expiresAt: true,
-        revokedAt: true,
-      },
-    });
-    return keys.map((k) => ({
+  async listForTenant(tenantId: number, query: ApiKeyListQuery = {}): Promise<CursorList<TenantApiKeyListItemDto>> {
+    const take = clampCursorLimit(query.limit);
+    const keyset = query.cursor ? keysetWhere({ ...API_KEY_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.ApiKeyWhereInput = { user: { tenantId } };
+    const [rows, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: API_KEY_ORDER,
+        take: take + 1,
+        select: {
+          id: true,
+          keyPrefix: true,
+          keyLast4: true,
+          name: true,
+          userId: true,
+          scopes: true,
+          ipAllowlist: true,
+          rateLimitPerMinute: true,
+          isWriteEnabled: true,
+          isActive: true,
+          lastUsedAt: true,
+          requestCount: true,
+          createdAt: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      }),
+      this.prisma.apiKey.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    const items = page.items.map((k) => ({
       id: k.id,
       name: k.name,
       keyMasked: maskKey(k),
@@ -149,6 +188,7 @@ export class ApiKeysService {
       expiresAt: k.expiresAt?.toISOString() ?? null,
       revokedAt: k.revokedAt?.toISOString() ?? null,
     }));
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   async revoke(id: number, userId: number): Promise<void> {

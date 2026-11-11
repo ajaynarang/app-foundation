@@ -220,6 +220,7 @@ model Tenant {
   // Serves the every-minute scheduler heartbeat scan for tenants with the
   // master Desk-autonomy switch on (desk-scheduler.processor.ts).
   @@index([deskScheduleEnabled])
+  @@index([companyName, tenantId]) // keyset: GET /tenants
   @@map("tenants")
 }
 
@@ -394,6 +395,8 @@ enum LoginFailReason {
 
 model LoginEvent {
   id         Int              @id @default(autoincrement())
+  /// Keyset tiebreak of the login-activity lists. Writers pass a UUIDv7 so the unique index fills in order.
+  publicId   String           @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   userId     Int              @map("user_id")
   tenantId   Int?             @map("tenant_id")
   status     LoginEventStatus
@@ -1049,6 +1052,8 @@ enum JobStatus {
 
 model Job {
   id           Int       @id @default(autoincrement()) @map("id")
+  /// Keyset tiebreak of the job list. Writers pass a UUIDv7 so the unique index fills in order.
+  publicId     String    @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   tenantId     Int       @map("tenant_id")
   submittedBy  Int?      @map("submitted_by")
   category     String    @map("category") @db.VarChar(30)
@@ -1271,6 +1276,7 @@ model WebhookDeliveryLog {
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, createdAt])
+  @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:subscription_id/logs
   @@map("webhook_delivery_logs")
 }
 
@@ -1449,6 +1455,8 @@ enum FeedbackStatus {
 
 model Feedback {
   id         Int            @id @default(autoincrement())
+  /// The id in URLs and the keyset tiebreak of the feedback lists. The Int key never leaves the API.
+  publicId   String         @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   tenantId   Int            @map("tenant_id")
   userId     Int            @map("user_id")
   category   String?        @db.VarChar(20)
@@ -1557,6 +1565,8 @@ enum AnnouncementPriority {
 
 model Announcement {
   id          Int                  @id @default(autoincrement())
+  /// The id in URLs and the keyset tiebreak of the broadcast list. The Int key never leaves the API.
+  publicId    String               @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   title       String               @db.VarChar(500)
   body        String               @db.Text
   targetType  String               @default("ALL") @map("target_type") @db.VarChar(20) // ALL, PLAN, TENANT
@@ -1672,6 +1682,7 @@ model WalletTransaction {
   @@index([tenantId])
   @@index([type])
   @@index([relatedAddOnId])
+  @@index([tenantId, createdAt, id]) // keyset: GET /billing/wallet/transactions
   @@map("wallet_transactions")
 }
 
@@ -1699,6 +1710,7 @@ model BillingInvoice {
   @@index([tenantId])
   @@index([billingCustomerId])
   @@index([status])
+  @@index([tenantId, createdAt, id]) // keyset: GET /billing/invoices
   @@map("billing_invoices")
 }
 

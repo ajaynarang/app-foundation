@@ -34,7 +34,7 @@ export class UserInvitationsController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Get()
   async getInvitations(@CurrentUser() currentUser: any, @Query() query: InvitationListQueryDto) {
-    return this.userInvitationsService.getInvitations(currentUser.tenantId, query.status);
+    return this.userInvitationsService.listInvitations(currentUser.tenantId, query);
   }
 
   /**

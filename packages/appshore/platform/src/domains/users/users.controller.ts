@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Delete, Body, Param, Patch, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Patch, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserListQueryDto } from './dto/user-list-query.dto';
 
 @Controller('users')
 export class UsersController {
@@ -12,8 +13,8 @@ export class UsersController {
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Get()
-  async getAllUsers(@CurrentUser() currentUser: any) {
-    return this.usersService.getAllUsers(currentUser.tenantId, currentUser);
+  async getAllUsers(@CurrentUser() currentUser: any, @Query() query: UserListQueryDto) {
+    return this.usersService.listUsers(currentUser.tenantId, query);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)

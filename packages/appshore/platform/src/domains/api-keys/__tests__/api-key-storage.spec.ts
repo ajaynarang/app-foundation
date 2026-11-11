@@ -125,9 +125,10 @@ describe('API key storage', () => {
     it('lists return the masked form and never a key or hash', async () => {
       const row = storedRow({ keyHash: 'a'.repeat(64), keyPrefix: 'sk_live_', keyLast4: 'AbCd' });
       prisma.apiKey.findMany.mockResolvedValue([row]);
+      prisma.apiKey.count.mockResolvedValue(1);
 
-      const [own] = await svc.findAll(42);
-      const [tenant] = await svc.listForTenant(7);
+      const [own] = (await svc.findAll(42)).items;
+      const [tenant] = (await svc.listForTenant(7)).items;
 
       for (const item of [own, tenant]) {
         expect(item.keyMasked).toBe('sk_live_…AbCd');

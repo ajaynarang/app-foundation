@@ -26,6 +26,23 @@ import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from './dto/admin-jobs-
 
 const JOB_STATUS = JobStatusSchema.enum;
 
+const JOBS_PAUSE_SELECT = { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true } as const;
+
+/** A tenant's job-pause state, named by its public slug: the handler answers this, never the Prisma row. */
+export function toJobsPauseState(tenant: {
+  tenantId: string;
+  companyName: string;
+  jobsPaused: boolean;
+  jobsPausedAt: Date | null;
+}) {
+  return {
+    tenantId: tenant.tenantId,
+    companyName: tenant.companyName,
+    jobsPaused: tenant.jobsPaused,
+    jobsPausedAt: tenant.jobsPausedAt,
+  };
+}
+
 @Controller('admin/jobs')
 @Roles(UserRole.SUPER_ADMIN)
 export class AdminJobsController {
@@ -60,16 +77,7 @@ export class AdminJobsController {
 
   @Get()
   async listJobs(@Query() query: AdminJobListQueryDto) {
-    return this.jobService.listAllJobsPaginated({
-      tenantId: query.tenantId,
-      category: query.category,
-      type: query.type,
-      status: query.statuses,
-      limit: query.limit,
-      offset: query.offset,
-      dateFrom: query.dateFrom,
-      dateTo: query.dateTo,
-    });
+    return this.jobService.listAllJobs(query);
   }
 
   @Get('metrics')
@@ -140,20 +148,12 @@ export class AdminJobsController {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    return this.prisma.tenant.update({
+    const updated = await this.prisma.tenant.update({
       where: { id },
-      data: {
-        jobsPaused: true,
-        jobsPausedAt: new Date(),
-        jobsPausedBy: user.dbId,
-      },
-      select: {
-        id: true,
-        companyName: true,
-        jobsPaused: true,
-        jobsPausedAt: true,
-      },
+      data: { jobsPaused: true, jobsPausedAt: new Date(), jobsPausedBy: user.dbId },
+      select: JOBS_PAUSE_SELECT,
     });
+    return toJobsPauseState(updated);
   }
 
   @Post('tenants/:tenant_id/resume-jobs')
@@ -162,10 +162,11 @@ export class AdminJobsController {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    return this.prisma.tenant.update({
+    const updated = await this.prisma.tenant.update({
       where: { id },
       data: { jobsPaused: false, jobsPausedAt: null, jobsPausedBy: null },
-      select: { id: true, companyName: true, jobsPaused: true },
+      select: JOBS_PAUSE_SELECT,
     });
+    return toJobsPauseState(updated);
   }
 }
