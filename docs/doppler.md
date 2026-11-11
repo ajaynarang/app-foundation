@@ -246,6 +246,7 @@ remember a rebuild (not just a restart) is needed for changes to take effect.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`       | No                                                      | No      | Stripe.js on billing pages                                           | Stripe dashboard → API keys                               |
 | `NEXT_PUBLIC_LANGFUSE_BASE_URL`            | No                                                      | No      | Langfuse deep-links on the AI Spend page                             | —                                                         |
 | `NEXT_PUBLIC_LANGFUSE_PROJECT_ID`          | No (deep-link hidden without it)                        | No      | Langfuse deep-links                                                  | Langfuse project URL                                      |
+| `NEXT_PUBLIC_DOCS_URL`                     | No (landing-page button hidden without it)              | No      | "Documentation" link on the landing page                             | Your docs site or repository URL                          |
 
 ## Per-environment guidance
 
