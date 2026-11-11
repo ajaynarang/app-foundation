@@ -200,6 +200,10 @@
         }
       ]
     },
+    "transformIgnorePatterns": [
+      "/node_modules/",
+      "/packages/appshore/db/generated/"
+    ],
     "collectCoverageFrom": [
       "src/**/*.(t|j)s"
     ],

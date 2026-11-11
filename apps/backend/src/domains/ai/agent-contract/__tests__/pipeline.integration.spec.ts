@@ -16,10 +16,28 @@ import type { DomainEventService } from '@appshore/kernel/infrastructure/events/
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row
  * into agent_invocation_logs, with mocked registry/moduleRef/aiPrisma. The
- * pipeline is always on. Skipped when local Postgres is unreachable or no
- * tenant is seeded.
+ * pipeline is always on. Skipped only when there is no usable database: Postgres
+ * is unreachable, refuses the login, has no such database, is not migrated, or
+ * holds no seeded tenant. Any other failure in setup fails the spec.
  */
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
+
+/** Error codes that mean "no usable database here", as opposed to a defect. */
+const NO_DATABASE_CODES = new Set([
+  'ECONNREFUSED', // nothing listens on the port
+  'ENOTFOUND', // host does not resolve
+  'ETIMEDOUT',
+  'P1000', // login refused
+  'P1001', // server unreachable
+  'P1003', // database does not exist
+  'P1010', // access denied
+  'P2021', // table missing: not migrated
+]);
+
+function isNoDatabase(err: unknown): boolean {
+  const code = (err as { code?: string }).code;
+  return code !== undefined && NO_DATABASE_CODES.has(code);
+}
 
 class TestRecordsReadTool {
   @RequiresScope('platform:read')
@@ -52,7 +70,8 @@ describe('Phase A pipeline integration', () => {
       testTenantId = anyTenant.id;
       dbReachable = true;
     } catch (err) {
-      console.warn(`pipeline.integration: DB unreachable (${(err as Error).message}) — skipping`);
+      if (!isNoDatabase(err)) throw err;
+      console.warn(`pipeline.integration: no usable database (${(err as Error).message}) — skipping`);
       return;
     }
 
@@ -105,7 +124,7 @@ describe('Phase A pipeline integration', () => {
 
   it('writes an AgentInvocationLog row on a successful read-tool invocation', async () => {
     if (!dbReachable) {
-      console.warn('pipeline.integration: skipped — DB unreachable');
+      console.warn('pipeline.integration: skipped — no usable database');
       return;
     }
 
