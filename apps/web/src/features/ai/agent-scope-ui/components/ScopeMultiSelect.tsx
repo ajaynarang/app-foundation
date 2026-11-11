@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@app/ui/components/ui/p
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '@app/ui';
 import { ScopeChip } from './ScopeChip';
+import { ScopesReference } from './ScopesReference';
 import { groupScopesByDomain } from '../utils/scope-copy';
 
 const NEVER_SET: ReadonlySet<string> = new Set(NEVER_EXTERNAL_SCOPES);
@@ -30,7 +31,8 @@ interface ScopeMultiSelectProps {
 /**
  * Combobox multi-select for agent scopes. Grouped by domain prefix
  * (platform, documents, comms, etc.). Filters out NEVER_EXTERNAL_SCOPES
- * (platform:admin) so they cannot be chosen at all.
+ * (platform:admin) so they cannot be chosen at all. The scopes reference
+ * sits under it, so what a scope grants is one click from where it is chosen.
  */
 export function ScopeMultiSelect({ value, onChange, disabled, placeholder = 'Add scope…' }: ScopeMultiSelectProps) {
   const [open, setOpen] = useState(false);
@@ -123,6 +125,8 @@ export function ScopeMultiSelect({ value, onChange, disabled, placeholder = 'Add
           ))}
         </div>
       )}
+
+      <ScopesReference />
     </div>
   );
 }
