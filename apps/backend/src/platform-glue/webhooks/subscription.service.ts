@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -99,9 +99,10 @@ export class WebhookSubscriptionService {
     return { subscriptions, total };
   }
 
+  /** Scoped by tenant in the read itself: another tenant's subscription is 404, the same as a missing one. */
   async findOne(tenantId: number, id: string) {
-    const sub = await this.prisma.webhookSubscription.findUnique({
-      where: { id },
+    const sub = await this.prisma.webhookSubscription.findFirst({
+      where: { id, tenantId },
       select: {
         id: true,
         tenantId: true,
@@ -116,7 +117,6 @@ export class WebhookSubscriptionService {
       },
     });
     if (!sub) throw new NotFoundException('Webhook subscription not found');
-    if (sub.tenantId !== tenantId) throw new ForbiddenException();
     return sub;
   }
 
@@ -256,19 +256,28 @@ export class WebhookSubscriptionService {
       payload: innerPayload,
     };
 
-    await this.deliveryQueue.add(
-      WEBHOOKS_JOB_NAMES.DELIVER,
-      buildJobEnvelope(jobPayload, {
-        // The original payload carries the wire-format tenant slug; reuse it
-        // so the worker (and dead-letter logger) sees the same identifier.
-        tenantId: String(innerPayload?.tenantId ?? tenantId),
-        source: 'replay',
-      }),
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 30_000 },
-      },
-    );
+    try {
+      await this.deliveryQueue.add(
+        WEBHOOKS_JOB_NAMES.DELIVER,
+        buildJobEnvelope(jobPayload, {
+          // The original payload carries the wire-format tenant slug; reuse it
+          // so the worker (and dead-letter logger) sees the same identifier.
+          tenantId: String(innerPayload?.tenantId ?? tenantId),
+          source: 'replay',
+        }),
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 30_000 },
+        },
+      );
+    } catch (error) {
+      // No job stands behind the row: put the failure back, or it reads as pending for ever and the next retry is
+      // refused as "not failed".
+      await this.prisma.webhookDeliveryLog
+        .update({ where: { id: logId }, data: { failedAt: log.failedAt } })
+        .catch(() => this.logger.error(`Could not restore the failed state of webhook delivery ${logId}`));
+      throw error;
+    }
 
     // 202 with the record to poll: the delivery as it is now, pending again.
     return pending;

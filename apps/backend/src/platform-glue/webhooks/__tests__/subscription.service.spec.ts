@@ -28,7 +28,6 @@ describe('WebhookSubscriptionService', () => {
     (dns.lookup as unknown as jest.Mock).mockReset();
     prisma = {
       webhookSubscription: {
-        findUnique: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
@@ -38,6 +37,7 @@ describe('WebhookSubscriptionService', () => {
       },
       webhookDeliveryLog: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
@@ -73,7 +73,7 @@ describe('WebhookSubscriptionService', () => {
 
     beforeEach(() => {
       prisma.webhookSubscription.create.mockImplementation(({ data }: any) => ({ id: 'sub-new', ...data }));
-      prisma.webhookSubscription.findUnique.mockResolvedValue({ id: 'sub-1', tenantId, active: true });
+      prisma.webhookSubscription.findFirst.mockResolvedValue({ id: 'sub-1', tenantId, active: true });
       prisma.webhookSubscription.update.mockResolvedValue({ id: 'sub-1' });
     });
 
@@ -136,9 +136,11 @@ describe('WebhookSubscriptionService', () => {
     const stored = { id: 'sub-1', tenantId, url: 'https://partner.com/hook', events: ['*'], active: true };
 
     beforeEach(() => {
-      prisma.webhookSubscription.findFirst.mockResolvedValue({ secret: 'old-secret' });
+      // Both reads are tenant-scoped `findFirst`s: the rotation reads the secret, `findOne` reads the public columns.
+      prisma.webhookSubscription.findFirst.mockImplementation(({ select }: any) =>
+        Promise.resolve(select.secret ? { secret: 'old-secret' } : { ...stored, _count: { deliveryLogs: 3 } }),
+      );
       prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 1 });
-      prisma.webhookSubscription.findUnique.mockResolvedValue({ ...stored, _count: { deliveryLogs: 3 } });
     });
 
     it('issues a whsec_ secret on create and returns it once', async () => {
@@ -205,12 +207,68 @@ describe('WebhookSubscriptionService', () => {
 
       for (const select of [
         prisma.webhookSubscription.findMany.mock.calls[0][0].select,
-        prisma.webhookSubscription.findUnique.mock.calls[0][0].select,
+        prisma.webhookSubscription.findFirst.mock.calls[0][0].select,
       ]) {
         expect(select).not.toHaveProperty('secret');
         expect(select).not.toHaveProperty('previousSecret');
         expect(select.previousSecretExpiresAt).toBe(true);
       }
+    });
+  });
+
+  describe("another tenant's subscription", () => {
+    const otherTenantId = 2;
+
+    beforeEach(() => {
+      // The read is scoped by tenant, so another tenant's id finds nothing.
+      prisma.webhookSubscription.findFirst.mockResolvedValue(null);
+    });
+
+    it('reads as not found, with the same answer as an id that does not exist', async () => {
+      const error = await service.findOne(otherTenantId, 'sub-1').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Webhook subscription not found');
+      expect(prisma.webhookSubscription.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'sub-1', tenantId: otherTenantId } }),
+      );
+    });
+
+    it('is not found on every route that goes through the read, and nothing is written or queued', async () => {
+      const calls: Array<() => Promise<unknown>> = [
+        () => service.update(otherTenantId, 'sub-1', { active: false }),
+        () => service.softDelete(otherTenantId, 'sub-1'),
+        () => service.findLogs(otherTenantId, 'sub-1', { limit: 20, offset: 0 }),
+        () => service.retryDelivery(otherTenantId, 'sub-1', 'log-1'),
+        () => service.replayEvents(otherTenantId, 'sub-1', { since: '2026-04-01T00:00:00Z' }),
+      ];
+
+      for (const call of calls) await expect(call()).rejects.toThrow(NotFoundException);
+
+      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+      expect(prisma.webhookDeliveryLog.findMany).not.toHaveBeenCalled();
+      expect(prisma.webhookDeliveryLog.update).not.toHaveBeenCalled();
+      expect(prisma.webhookDeliveryLog.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getDeliveryLog', () => {
+    it("returns the delivery, read through the subscription's tenant", async () => {
+      const log = { id: 'log-1', subscriptionId: 'sub-1', failedAt: null, deliveredAt: null };
+      prisma.webhookDeliveryLog.findFirst.mockResolvedValue(log);
+
+      await expect(service.getDeliveryLog(1, 'sub-1', 'log-1')).resolves.toBe(log);
+
+      expect(prisma.webhookDeliveryLog.findFirst).toHaveBeenCalledWith({
+        where: { id: 'log-1', subscriptionId: 'sub-1', subscription: { tenantId: 1 } },
+      });
+    });
+
+    it("is not found for a delivery of another tenant's subscription, or one that does not exist", async () => {
+      prisma.webhookDeliveryLog.findFirst.mockResolvedValue(null);
+
+      await expect(service.getDeliveryLog(2, 'sub-1', 'log-1')).rejects.toThrow('Delivery log not found');
     });
   });
 
@@ -238,7 +296,7 @@ describe('WebhookSubscriptionService', () => {
     const logId = 'log-1';
 
     beforeEach(() => {
-      prisma.webhookSubscription.findUnique.mockResolvedValue({
+      prisma.webhookSubscription.findFirst.mockResolvedValue({
         id: subId,
         tenantId,
         active: true,
@@ -268,6 +326,43 @@ describe('WebhookSubscriptionService', () => {
       );
       // 202 answers the record to poll (the delivery, pending again), not an acknowledgement.
       expect(result).toBe(pending);
+    });
+
+    it('puts the failure back when the job cannot be queued, so the delivery can be retried again', async () => {
+      const failedAt = new Date('2026-04-02T10:00:00Z');
+      prisma.webhookDeliveryLog.findUnique.mockResolvedValue({
+        id: logId,
+        subscriptionId: subId,
+        failedAt,
+        payload: { event: 'app.load.created', data: {} },
+      });
+      prisma.webhookDeliveryLog.update.mockResolvedValue({ id: logId, failedAt: null });
+      const redisDown = new Error('Connection is closed.');
+      queue.add.mockRejectedValue(redisDown);
+
+      await expect(service.retryDelivery(tenantId, subId, logId)).rejects.toBe(redisDown);
+
+      // Reset first, then restored: the row is failed again, not pending with no job behind it.
+      expect(prisma.webhookDeliveryLog.update.mock.calls.map(([args]: any) => args)).toEqual([
+        { where: { id: logId }, data: { failedAt: null } },
+        { where: { id: logId }, data: { failedAt } },
+      ]);
+    });
+
+    it('still reports the queue failure when the failure cannot be put back either', async () => {
+      prisma.webhookDeliveryLog.findUnique.mockResolvedValue({
+        id: logId,
+        subscriptionId: subId,
+        failedAt: new Date(),
+        payload: {},
+      });
+      prisma.webhookDeliveryLog.update
+        .mockResolvedValueOnce({ id: logId, failedAt: null })
+        .mockRejectedValueOnce(new Error('database is down'));
+      const redisDown = new Error('Connection is closed.');
+      queue.add.mockRejectedValue(redisDown);
+
+      await expect(service.retryDelivery(tenantId, subId, logId)).rejects.toBe(redisDown);
     });
 
     it('throws NotFoundException for missing log', async () => {
@@ -309,7 +404,7 @@ describe('WebhookSubscriptionService', () => {
     const subId = 'sub-1';
 
     beforeEach(() => {
-      prisma.webhookSubscription.findUnique.mockResolvedValue({
+      prisma.webhookSubscription.findFirst.mockResolvedValue({
         id: subId,
         tenantId,
         active: true,
@@ -388,7 +483,7 @@ describe('WebhookSubscriptionService', () => {
     });
 
     it('filters replay by subscription event list', async () => {
-      prisma.webhookSubscription.findUnique.mockResolvedValue({
+      prisma.webhookSubscription.findFirst.mockResolvedValue({
         id: subId,
         tenantId,
         active: true,
