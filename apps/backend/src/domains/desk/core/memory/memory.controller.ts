@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,11 +11,11 @@ import {
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { ListMemoriesQuerySchema } from '../types';
 
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -30,6 +29,7 @@ import { DeskMemoryWriterService } from './desk-memory-writer.service';
 import { AddPlaybookRuleDto } from './dto/add-playbook-rule.dto';
 import { SetMemoryPinnedDto } from './dto/set-pinned.dto';
 import { UpdateMemoryDto } from './dto/update-memory.dto';
+import { MemoryListQueryDto } from './dto/memory-list-query.dto';
 
 /**
  * HTTP surface for the Crew → Agent sheet.
@@ -55,35 +55,17 @@ export class DeskMemoryController extends BaseTenantController {
 
   @Get()
   @ApiOperation({ summary: 'List memories (Memory tab and Rules tab use the same endpoint with different filters)' })
-  async list(
-    @CurrentUser() user: any,
-    @Query('agentKey') agentKey?: string,
-    @Query('scope') scope?: string,
-    @Query('polarity') polarity?: string,
-    @Query('authoredByOperatorOnly') authoredByOperatorOnly?: string,
-    @Query('sourceEpisodeId') sourceEpisodeId?: string,
-    @Query('activeOnly') activeOnly?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async list(@CurrentUser() user: any, @Query() query: MemoryListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    const parsed = ListMemoriesQuerySchema.parse({
-      agentKey,
-      scope,
-      polarity,
-      authoredByOperatorOnly,
-      sourceEpisodeId,
-      activeOnly,
-      limit,
-    });
     const rows = await this.memories.listForUI({
       tenantId: tenantDbId,
-      agentKey: parsed.agentKey,
-      scope: parsed.scope,
-      polarity: parsed.polarity,
-      authoredByOperatorOnly: parsed.authoredByOperatorOnly,
-      sourceEpisodeId: parsed.sourceEpisodeId,
-      activeOnly: parsed.activeOnly,
-      limit: parsed.limit,
+      agentKey: query.agentKey,
+      scope: query.scope,
+      polarity: query.polarity,
+      authoredByOperatorOnly: query.authoredByOperatorOnly,
+      sourceEpisodeId: query.sourceEpisodeId,
+      activeOnly: query.activeOnly,
+      limit: query.limit,
     });
     return { rows };
   }
@@ -142,10 +124,9 @@ export class DeskMemoryController extends BaseTenantController {
     }
     const authoredByUserId = user?.dbId;
     if (typeof authoredByUserId !== 'number') {
-      // Should never happen — JwtAuthGuard always sets dbId — but throw a
-      // user-friendly error rather than persisting a NULL author and
-      // disguising an operator-authored rule as LLM-extracted.
-      throw new BadRequestException('Cannot identify rule author');
+      // Should never happen: JwtAuthGuard always sets dbId. No field of the request is at fault, the session
+      // is: a 401, never a NULL author that would disguise an operator's rule as one the model extracted.
+      throw new UnauthorizedException('Sign in again to add a rule');
     }
     const created = await this.writer.writeOperatorRule({
       tenantId: tenantDbId,

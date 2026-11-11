@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,9 +10,9 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { APPROVAL_SCOPES, type ApprovalScope, type HandoffCounts } from '../types';
+import type { HandoffCounts } from '../types';
 
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -22,6 +21,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 
 import { ApprovalService, resolveApprovalScope } from './approval.service';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
+import { ApprovalListQueryDto } from './dto/approval-list-query.dto';
 
 /**
  * HTTP surface for Desk approvals. Consumed by the Desk UI's
@@ -47,17 +47,11 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'List pending Desk approvals for the tenant (queue view)',
   })
-  @ApiQuery({ name: 'scope', required: false, enum: APPROVAL_SCOPES })
-  @ApiQuery({ name: 'limit', required: false })
-  async listPending(@CurrentUser() user: any, @Query('limit') limit?: string, @Query('scope') scope?: string) {
+  async listPending(@CurrentUser() user: any, @Query() query: ApprovalListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    const parsedLimit = limit ? Math.min(Math.max(parseInt(limit, 10), 1), 100) : 50;
-    if (scope !== undefined && !APPROVAL_SCOPES.includes(scope as ApprovalScope)) {
-      throw new BadRequestException(`Invalid scope ${scope}. Expected one of: ${APPROVAL_SCOPES.join(', ')}`);
-    }
-    const resolvedScope = resolveApprovalScope(scope as ApprovalScope | undefined, user.role);
+    const resolvedScope = resolveApprovalScope(query.scope, user.role);
     return this.approvals.listPending(tenantDbId, {
-      limit: parsedLimit,
+      limit: query.limit,
       scope: resolvedScope,
       currentUserId: user.dbId,
     });

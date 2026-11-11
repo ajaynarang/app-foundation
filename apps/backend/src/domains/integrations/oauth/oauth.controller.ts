@@ -8,6 +8,7 @@ import {
   Res,
   Logger,
   BadRequestException,
+  NotFoundException,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -48,7 +49,7 @@ export class OAuthController extends BaseTenantController {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     const oauthConfig = vendorMeta ? getVendorOAuth(vendorMeta) : undefined;
     if (!oauthConfig) {
-      throw new BadRequestException(`Vendor ${vendor} does not support OAuth`);
+      throw new NotFoundException('This integration does not connect with OAuth');
     }
 
     const tenantDbId = await this.getTenantDbId(user);
@@ -129,7 +130,7 @@ export class OAuthController extends BaseTenantController {
   async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any): Promise<void> {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     if (!vendorMeta || !getVendorOAuth(vendorMeta)) {
-      throw new BadRequestException(`Vendor ${vendor} does not support OAuth`);
+      throw new NotFoundException('This integration does not connect with OAuth');
     }
 
     const tenantDbId = await this.getTenantDbId(user);

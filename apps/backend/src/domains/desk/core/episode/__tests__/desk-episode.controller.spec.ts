@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { DeskEpisodeListQueryDto, HandledEpisodeListQueryDto } from '../dto/episode-list-query.dto';
 import { UserRole } from '@appshore/db';
 
 import { DeskEpisodeController } from '../desk-episode.controller';
@@ -27,7 +30,7 @@ describe('DeskEpisodeController', () => {
   describe('list (legacy episodes)', () => {
     it('resolves scope via role → MEMBER defaults to mine', async () => {
       const { controller, service } = makeController();
-      await controller.list({ role: UserRole.MEMBER, dbId: 42 });
+      await controller.list({ role: UserRole.MEMBER, dbId: 42 }, await readQueryDto(DeskEpisodeListQueryDto, {}));
       expect(service.listForTenant).toHaveBeenCalledWith(10, expect.objectContaining({ scope: 'mine' }), {
         currentUserId: 42,
       });
@@ -35,12 +38,40 @@ describe('DeskEpisodeController', () => {
 
     it('forwards status + cursor + limit params', async () => {
       const { controller, service } = makeController();
-      await controller.list({ role: UserRole.ADMIN, dbId: 1 }, 'RUNNING', '25', 'cursor-xyz');
+      await controller.list(
+        { role: UserRole.ADMIN, dbId: 1 },
+        await readQueryDto(DeskEpisodeListQueryDto, { status: 'RUNNING', limit: '25', cursor: 'cursor-xyz' }),
+      );
       expect(service.listForTenant).toHaveBeenCalledWith(
         10,
         expect.objectContaining({ status: 'RUNNING', limit: 25, cursor: 'cursor-xyz', scope: 'all' }),
         expect.any(Object),
       );
+    });
+  });
+
+  describe('query DTOs', () => {
+    it('answers 400 with fieldErrors for a bad status, scope or limit (it was an uncaught ZodError)', async () => {
+      const read = (raw: Record<string, unknown>) => readQueryDto(DeskEpisodeListQueryDto, raw);
+      expect((await read({})).limit).toBe(25);
+      expect(await fieldErrorsOf(read({ status: 'nope' }))).toHaveProperty('status');
+      expect(await fieldErrorsOf(read({ scope: 'theirs' }))).toHaveProperty('scope');
+      expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
+    });
+
+    it('reads the handled list filters and refuses a bound that is not an ISO instant', async () => {
+      const read = (raw: Record<string, unknown>) => readQueryDto(HandledEpisodeListQueryDto, raw);
+      expect(
+        await read({ window: 'custom', from: '2026-04-01T00:00:00.000Z', to: '2026-04-30T00:00:00.000Z', q: ' x ' }),
+      ).toMatchObject({
+        window: 'custom',
+        from: '2026-04-01T00:00:00.000Z',
+        to: '2026-04-30T00:00:00.000Z',
+        q: 'x',
+        limit: 50,
+      });
+      expect(await fieldErrorsOf(read({ from: '2026-04-01' }))).toHaveProperty('from');
+      expect(await fieldErrorsOf(read({ window: 'forever' }))).toHaveProperty('window');
     });
   });
 
@@ -82,15 +113,14 @@ describe('DeskEpisodeController', () => {
       const { controller, service } = makeController();
       await controller.listHandled(
         { role: UserRole.MEMBER, dbId: 42 },
-        'all',
-        '7d',
-        undefined,
-        undefined,
-        'autumn',
-        'followup_sent',
-        'granite',
-        '50',
-        undefined,
+        await readQueryDto(HandledEpisodeListQueryDto, {
+          scope: 'all',
+          window: '7d',
+          agent: 'autumn',
+          outcome: 'followup_sent',
+          q: 'granite',
+          limit: '50',
+        }),
       );
       expect(service.listHandled).toHaveBeenCalledWith(
         10,
@@ -108,7 +138,10 @@ describe('DeskEpisodeController', () => {
 
     it('defaults scope by role when missing — MEMBER → mine', async () => {
       const { controller, service } = makeController();
-      await controller.listHandled({ role: UserRole.MEMBER, dbId: 42 });
+      await controller.listHandled(
+        { role: UserRole.MEMBER, dbId: 42 },
+        await readQueryDto(HandledEpisodeListQueryDto, {}),
+      );
       expect(service.listHandled).toHaveBeenCalledWith(
         10,
         expect.objectContaining({ scope: 'mine' }),
@@ -118,7 +151,10 @@ describe('DeskEpisodeController', () => {
 
     it('defaults scope by role when missing — ADMIN → all', async () => {
       const { controller, service } = makeController();
-      await controller.listHandled({ role: UserRole.ADMIN, dbId: 1 });
+      await controller.listHandled(
+        { role: UserRole.ADMIN, dbId: 1 },
+        await readQueryDto(HandledEpisodeListQueryDto, {}),
+      );
       expect(service.listHandled).toHaveBeenCalledWith(
         10,
         expect.objectContaining({ scope: 'all' }),
@@ -129,7 +165,10 @@ describe('DeskEpisodeController', () => {
     it('falls back to UTC when tenant has no timezone', async () => {
       const { controller, service, prisma } = makeController();
       prisma.tenant.findUnique.mockResolvedValue(null);
-      await controller.listHandled({ role: UserRole.ADMIN, dbId: 1 });
+      await controller.listHandled(
+        { role: UserRole.ADMIN, dbId: 1 },
+        await readQueryDto(HandledEpisodeListQueryDto, {}),
+      );
       expect(service.listHandled).toHaveBeenCalledWith(
         10,
         expect.any(Object),
@@ -141,10 +180,12 @@ describe('DeskEpisodeController', () => {
       const { controller, service } = makeController();
       await controller.listHandled(
         { role: UserRole.ADMIN, dbId: 1 },
-        'all',
-        'custom',
-        '2026-04-01T00:00:00.000Z',
-        '2026-04-15T23:59:59.999Z',
+        await readQueryDto(HandledEpisodeListQueryDto, {
+          scope: 'all',
+          window: 'custom',
+          from: '2026-04-01T00:00:00.000Z',
+          to: '2026-04-15T23:59:59.999Z',
+        }),
       );
       expect(service.listHandled).toHaveBeenCalledWith(
         10,

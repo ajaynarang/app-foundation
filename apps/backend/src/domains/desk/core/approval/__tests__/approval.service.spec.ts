@@ -1,3 +1,4 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
@@ -278,7 +279,11 @@ describe('ApprovalService', () => {
         decision: null,
         claimedByUserId: 42,
       });
-      await expect(service.claim('app-1', 99)).rejects.toThrow(/already claimed/);
+      const error = await service.claim('app-1', 99).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({ code: 'INVALID_STATE' });
+      // The copy names nobody: the claimant's numeric id is not for the wire.
+      expect((error as Error).message).toBe('Someone else has already claimed this approval');
     });
   });
 
@@ -344,9 +349,12 @@ describe('ApprovalService', () => {
         ...baseApproval,
         claimedByUserId: 1,
       });
-      await expect(service.decide({ approvalId: 'app-1', userId: 2, decision: 'APPROVED' as any })).rejects.toThrow(
-        /claimed by another user/,
-      );
+      const error = await service
+        .decide({ approvalId: 'app-1', userId: 2, decision: 'APPROVED' as any })
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ForbiddenException);
+      // The copy names nobody: the claimant's numeric id is not for the wire.
+      expect((error as Error).message).toBe('Someone else has claimed this approval');
     });
 
     it('requires editedAction when decision=EDITED', async () => {

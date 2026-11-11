@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuthController } from '../oauth.controller';
 import { AuthTokenService } from '../auth-token.service';
@@ -63,10 +63,8 @@ describe('OAuthController', () => {
       expect(mockAuthTokenService.getConnectUrl).toHaveBeenCalledWith('QUICKBOOKS', 5);
     });
 
-    it('should throw BadRequestException for non-OAuth vendor', async () => {
-      await expect(controller.connect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
-        BadRequestException,
-      );
+    it('answers 404 for a vendor that does not connect with OAuth', async () => {
+      await expect(controller.connect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -179,9 +177,9 @@ describe('OAuthController', () => {
       expect(mockTokenRefreshJob.removeForIntegration).toHaveBeenCalledWith('QUICKBOOKS', 5);
     });
 
-    it('should throw BadRequestException for non-OAuth vendor', async () => {
+    it('answers 404 for a vendor that does not connect with OAuth', async () => {
       await expect(controller.disconnect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
     });
   });

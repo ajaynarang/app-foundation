@@ -12,6 +12,7 @@ import { DateTime } from 'luxon';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { InngestClientService } from '../inngest/inngest.client';
 
 import { ApprovalEnrichmentService, type EnrichedApprovalPayload } from './approval-enrichment.service';
@@ -118,7 +119,7 @@ export class ApprovalService {
       if (existing.decision !== null) {
         throw new ConflictException('Approval already decided');
       }
-      throw new ConflictException(`Approval already claimed by user ${existing.claimedByUserId}`);
+      throw invalidState('Someone else has already claimed this approval');
     }
     return this.prisma.deskApproval.findUniqueOrThrow({
       where: { id: approvalId },
@@ -151,7 +152,7 @@ export class ApprovalService {
       throw new ConflictException('Approval already decided');
     }
     if (approval.claimedByUserId !== null && approval.claimedByUserId !== input.userId) {
-      throw new ForbiddenException(`Approval is claimed by another user (${approval.claimedByUserId})`);
+      throw new ForbiddenException('Someone else has claimed this approval');
     }
 
     // Enforce semantic rules

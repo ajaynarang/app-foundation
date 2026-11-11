@@ -19,49 +19,16 @@
     "packages/appshore/platform/src/infrastructure/notifications/channels/push/push-subscription.controller.ts :: POST /push/subscribe"
   ],
   "input/query-is-a-dto": [
-    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: GET /desk/agents/:key/activity :: window",
-    "apps/backend/src/domains/desk/core/approval/approval.controller.ts :: GET /desk/approvals :: limit",
-    "apps/backend/src/domains/desk/core/approval/approval.controller.ts :: GET /desk/approvals :: scope",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes :: cursor",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes :: limit",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes :: scope",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes :: status",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: agent",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: cursor",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: from",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: limit",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: outcome",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: q",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: scope",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: to",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: GET /desk/episodes/handled :: window",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: activeOnly",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: agentKey",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: authoredByOperatorOnly",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: limit",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: polarity",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: scope",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories :: sourceEpisodeId",
     "packages/appshore/platform/src/domains/announcements/announcements.controller.ts :: GET /admin/broadcasts :: status",
     "packages/appshore/platform/src/domains/tenants/tenants.controller.ts :: GET /tenants :: status",
     "packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts :: GET /invitations :: status"
   ],
-  "input/no-number-parse-in-controllers": [
-    "apps/backend/src/domains/desk/core/approval/approval.controller.ts :: parseInt(limit, 10), 1), 100) : 50;"
-  ],
-  "input/no-schema-parse-in-controllers": [
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: ListDeskEpisodesQuerySchema.parse({ status, limit, cursor, scope });",
-    "apps/backend/src/domains/desk/core/episode/desk-episode.controller.ts :: ListHandledEpisodesQuerySchema.parse({",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: ListMemoriesQuerySchema.parse({"
-  ],
+  "input/no-number-parse-in-controllers": [],
+  "input/no-schema-parse-in-controllers": [],
   "errors/no-hand-built-error-body": [],
   "errors/no-plain-error-in-controllers": [],
   "errors/transition-is-409": [],
   "errors/controller-400-names-its-field": [
-    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: new BadRequestException(`Invalid window ${window}. Expected one of: ${AGENT_ACTIVITY_WINDOWS.join(', ')}`);",
-    "apps/backend/src/domains/desk/core/approval/approval.controller.ts :: new BadRequestException(`Invalid scope ${scope}. Expected one of: ${APPROVAL_SCOPES.join(', ')}`);",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: new BadRequestException('Cannot identify rule author');",
-    "apps/backend/src/domains/integrations/oauth/oauth.controller.ts :: new BadRequestException(`Vendor ${vendor} does not support OAuth`);",
     "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: new BadRequestException('Missing challenge token');",
     "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: new BadRequestException('selectedScopes must be an array of strings when provided');",
     "packages/appshore/platform/src/domains/plans/plans.controller.ts :: new BadRequestException('This endpoint requires a tenant context');",
@@ -70,8 +37,6 @@
     "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-consent.controller.ts :: new BadRequestException('Nothing to change');"
   ],
   "errors/no-internals-in-messages": [
-    "apps/backend/src/domains/desk/core/approval/approval.service.ts :: Exception(`Approval already claimed by user ${existing.claimedByUserId}`);",
-    "apps/backend/src/domains/desk/core/approval/approval.service.ts :: Exception(`Approval is claimed by another user (${approval.claimedByUserId})`);",
     "packages/appshore/platform/src/infrastructure/storage/file-storage.service.ts :: Exception(`S3 object not found: ${s3Key}`);"
   ],
   "errors/cross-tenant-is-404": [],
@@ -156,10 +121,6 @@
   "naming/one-param-name-per-collection": [],
   "naming/param-matches-route": [],
   "naming/snake-case-query-keys": [
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories (?activeOnly)",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories (?agentKey)",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories (?authoredByOperatorOnly)",
-    "apps/backend/src/domains/desk/core/memory/memory.controller.ts :: GET /desk/memories (?sourceEpisodeId)",
     "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?excludeSuperAdmin)",
     "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?tenantId)",
     "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?userQuery)",

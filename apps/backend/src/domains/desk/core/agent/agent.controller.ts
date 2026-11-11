@@ -1,17 +1,6 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  Patch,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { AGENT_ACTIVITY_WINDOWS, type AgentActivityWindow } from '../types';
 
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -21,6 +10,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { DeskAgentService } from './agent.service';
 import { DeskAgentEditGuard } from './desk-agent-edit.guard';
 import { UpdateAgentDto } from './dto/update-agent.dto';
+import { AgentActivityWindowQueryDto } from './dto/agent-activity-query.dto';
 
 const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
 
@@ -71,13 +61,9 @@ export class DeskAgentController extends BaseTenantController {
   @Get(':key/activity')
   @ApiOperation({ summary: 'Windowed activity stats for the Crew row + sheet tri-cell' })
   @ApiParam({ name: 'key', type: 'string' })
-  @ApiQuery({ name: 'window', required: false, enum: AGENT_ACTIVITY_WINDOWS })
-  async activity(@CurrentUser() user: any, @Param('key') key: string, @Query('window') window: string = '7d') {
-    if (!AGENT_ACTIVITY_WINDOWS.includes(window as AgentActivityWindow)) {
-      throw new BadRequestException(`Invalid window ${window}. Expected one of: ${AGENT_ACTIVITY_WINDOWS.join(', ')}`);
-    }
+  async activity(@CurrentUser() user: any, @Param('key') key: string, @Query() query: AgentActivityWindowQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    return this.agents.getActivity(tenantDbId, key, window as AgentActivityWindow);
+    return this.agents.getActivity(tenantDbId, key, query.window ?? '7d');
   }
 
   @Patch(':key')
