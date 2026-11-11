@@ -1,9 +1,9 @@
 import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { validationExceptionFactory } from '@appshore/kernel/shared/utils/validation-exception-factory';
+import { AppValidationPipe } from '@appshore/kernel/shared/utils/app-validation-pipe';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from './config/configuration';
@@ -86,15 +86,9 @@ async function bootstrap() {
     next();
   });
 
-  // Global validation pipe - enables class-validator DTO validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: validationExceptionFactory,
-    }),
-  );
+  // Global validation pipe: strict class-validator DTOs for bodies and query strings. A failure is a 400
+  // VALIDATION_FAILED whose `fieldErrors` names each field.
+  app.useGlobalPipes(new AppValidationPipe());
 
   // Global API prefix
   // MCP root controller is excluded because Claude.ai sends POST/GET/DELETE

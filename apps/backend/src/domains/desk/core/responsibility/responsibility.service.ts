@@ -8,6 +8,7 @@ import {
 } from '../types';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { fieldErrors, zodFieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { findResponsibilityDefinition, RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 import type { ResponsibilityDefinition } from '../../responsibilities/definition.types';
 
@@ -192,10 +193,11 @@ export class DeskResponsibilityService {
       }
       const result = def.conditionsSchema.safeParse(patch.conditions);
       if (!result.success) {
-        throw new BadRequestException({
-          message: 'Invalid conditions',
-          issues: result.error.issues,
-        });
+        // The envelope carries no `issues` key: each bad condition is named in `fieldErrors` under `conditions.`.
+        throw fieldErrors(
+          zodFieldErrors(result.error.issues.map((issue) => ({ ...issue, path: ['conditions', ...issue.path] }))),
+          'Invalid conditions',
+        );
       }
     }
 

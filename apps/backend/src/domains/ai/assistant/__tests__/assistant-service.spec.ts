@@ -452,12 +452,13 @@ describe('AssistantAiService', () => {
     it('handles errors during streaming', async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error('DB down'));
 
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         setHeader: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         headersSent: false,
       } as any;
@@ -465,6 +466,9 @@ describe('AssistantAiService', () => {
       await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
+      // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
     });
   });
 
@@ -553,9 +557,10 @@ describe('AssistantAiService', () => {
   describe('resumeAgent', () => {
     it('returns early when conversation validation fails', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         setHeader: jest.fn(),
         write: jest.fn(),
@@ -585,9 +590,10 @@ describe('AssistantAiService', () => {
         }),
       });
 
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         setHeader: jest.fn(),
         write: jest.fn(),
@@ -598,6 +604,9 @@ describe('AssistantAiService', () => {
       await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
+      // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
     });
   });
 
