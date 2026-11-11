@@ -19,7 +19,7 @@ You are the senior maintainer of this repo's developer documentation: the root `
 
 ## What this skill is NOT for
 
-- Design docs and implementation plans under `docs/plans/` — those are project artifacts owned by the `brainstorm`/`plan` skills.
+- Design docs and implementation plans under `docs/superpowers/` (gitignored) — those are project artifacts owned by the `brainstorm`/`plan` skills.
 - Code comments and API (Swagger) docs — those live with the code.
 
 ## The verification rule (load-bearing)
@@ -46,7 +46,7 @@ The main checkout stays untouched.
 
 ### Phase 1 — Ground-truth audit ledger
 
-Before changing any doc page, produce `docs/plans/<YYYY-MM-DD>-dev-docs-refresh-audit.md`. The ledger records every concrete fact the rewritten docs will cite, with the source file pinned. Sections:
+Before changing any doc page, produce `docs/superpowers/plans/<YYYY-MM-DD>-dev-docs-refresh-audit.md`. The ledger records every concrete fact the rewritten docs will cite, with the source file pinned. Sections:
 
 - **A. Repo-wide facts** — apps, packages, root scripts, CI workflows, tooling versions.
 - **B. Getting Started** — docker-compose services/ports, env setup, seed credentials, first-run flow.
@@ -98,7 +98,7 @@ Score the rewrite against this rubric (each out of 10):
 
 **Overall rating = min(axis scores).** A single weak axis caps the rating, intentionally — that's the "100% correct" bar.
 
-Write the self-review to `docs/plans/<YYYY-MM-DD>-dev-docs-refresh-self-review.md`. If the overall is below 9, fix the cheap blockers before opening the PR.
+Write the self-review to `docs/superpowers/plans/<YYYY-MM-DD>-dev-docs-refresh-self-review.md`. If the overall is below 9, fix the cheap blockers before opening the PR.
 
 ### Phase 5 — PR + cleanup
 
@@ -133,5 +133,5 @@ Hand the PR back to the user with a brief summary:
 
 1. PR URL.
 2. Overall self-review rating + the specific axes below 10.
-3. Confirmation that the audit ledger is committed and reviewable.
+3. The path of the audit ledger (it is a local, gitignored artifact, so it is not part of the PR).
 4. Next step: user reviews + merges.
