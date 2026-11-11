@@ -2,7 +2,6 @@ import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, UnrecoverableError } from 'bullmq';
-import { createHmac } from 'crypto';
 import axios from 'axios';
 import type { JobEnvelope } from '@app/shared-types';
 import {
@@ -14,6 +13,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
 import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -67,11 +67,6 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     this.agents = createSafeWebhookAgents({ allowPrivate: this.allowPrivate });
   }
 
-  computeSignature(secret: string, body: string): string {
-    const hex = createHmac('sha256', secret).update(body).digest('hex');
-    return `sha256=${hex}`;
-  }
-
   async process(job: Job<JobEnvelope<WebhookDeliveryPayload>>): Promise<void> {
     // `withJobLogContext` reads `tenantId` straight off `job.data`, which
     // matches the envelope shape (envelope.tenantId is the wire-format slug).
@@ -110,15 +105,15 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     }
 
     const body = JSON.stringify(payload);
-    const signature = this.computeSignature(subscription.secret, body);
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Webhook-Signature': signature,
-      'X-Webhook-Event': payload.event,
-      'X-Webhook-Delivery': logId,
-      'X-Webhook-Event-Version': String(payload.version ?? 1),
-    };
+    // The delivery log id is the message id (stable across retries, so receivers can de-duplicate); the timestamp
+    // is this attempt's, so receivers can refuse replays.
+    const headers = buildWebhookHeaders(signingSecrets(subscription), {
+      id: logId,
+      timestamp: Math.floor(Date.now() / 1000),
+      body,
+      event: payload.event,
+      eventVersion: payload.version ?? 1,
+    });
 
     let response: { status: number; data: unknown };
     try {

@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import * as dns from 'node:dns';
 import { getQueueToken } from '@nestjs/bullmq';
 import { WebhookSubscriptionService } from '../subscription.service';
@@ -33,6 +33,8 @@ describe('WebhookSubscriptionService', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
       },
       webhookDeliveryLog: {
         findUnique: jest.fn(),
@@ -117,6 +119,90 @@ describe('WebhookSubscriptionService', () => {
 
       expect(dns.lookup).not.toHaveBeenCalled();
       expect(prisma.webhookSubscription.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('signing secret', () => {
+    const tenantId = 1;
+    const HOUR_MS = 60 * 60 * 1000;
+    const stored = { id: 'sub-1', tenantId, url: 'https://partner.com/hook', events: ['*'], active: true };
+
+    beforeEach(() => {
+      prisma.webhookSubscription.findFirst.mockResolvedValue({ secret: 'old-secret' });
+      prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 1 });
+      prisma.webhookSubscription.findUnique.mockResolvedValue({ ...stored, _count: { deliveryLogs: 3 } });
+    });
+
+    it('issues a whsec_ secret on create and returns it once', async () => {
+      resolveTo('93.184.216.34');
+      prisma.webhookSubscription.create.mockImplementation(({ data }: any) => ({ id: 'sub-new', ...data }));
+
+      const created = await service.create(tenantId, { url: 'https://partner.com/hook', events: ['*'] });
+
+      expect(created.signingSecret).toMatch(/^whsec_[A-Za-z0-9+/]{43}=$/);
+      expect(prisma.webhookSubscription.create.mock.calls[0][0].data.secret).toBe(created.signingSecret);
+    });
+
+    it('rotates: stores a new secret, keeps the old one signing for 24 hours by default, and returns the new one once', async () => {
+      const before = Date.now();
+
+      const rotated = await service.rotateSecret(tenantId, 'sub-1', {});
+
+      const { where, data } = prisma.webhookSubscription.updateMany.mock.calls[0][0];
+      expect(where).toEqual({ id: 'sub-1', tenantId, secret: 'old-secret' });
+      expect(data.secret).toMatch(/^whsec_/);
+      expect(data.previousSecret).toBe('old-secret');
+      expect(data.previousSecretExpiresAt.getTime()).toBeGreaterThanOrEqual(before + 24 * HOUR_MS);
+      expect(data.previousSecretExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 24 * HOUR_MS);
+      expect(rotated.signingSecret).toBe(data.secret);
+      expect(rotated).not.toHaveProperty('secret');
+      expect(rotated).not.toHaveProperty('previousSecret');
+    });
+
+    it('honours the chosen overlap, and an overlap of 0 retires the old secret at once', async () => {
+      await service.rotateSecret(tenantId, 'sub-1', { overlapHours: 2 });
+      const withOverlap = prisma.webhookSubscription.updateMany.mock.calls[0][0].data;
+      expect(withOverlap.previousSecretExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 2 * HOUR_MS);
+      expect(withOverlap.previousSecretExpiresAt.getTime()).toBeGreaterThan(Date.now() + HOUR_MS);
+
+      await service.rotateSecret(tenantId, 'sub-1', { overlapHours: 0 });
+      const immediate = prisma.webhookSubscription.updateMany.mock.calls[1][0].data;
+      expect(immediate.previousSecret).toBeNull();
+      expect(immediate.previousSecretExpiresAt).toBeNull();
+    });
+
+    it('rejects a rotation that lost a race with another one, so no overwritten secret is shown', async () => {
+      prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.rotateSecret(tenantId, 'sub-1', {})).rejects.toThrow(ConflictException);
+    });
+
+    it("does not rotate another tenant's subscription", async () => {
+      prisma.webhookSubscription.findFirst.mockResolvedValue(null);
+
+      await expect(service.rotateSecret(2, 'sub-1', {})).rejects.toThrow(NotFoundException);
+
+      expect(prisma.webhookSubscription.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'sub-1', tenantId: 2 } }),
+      );
+      expect(prisma.webhookSubscription.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('never selects a secret when listing or reading a subscription', async () => {
+      prisma.webhookSubscription.findMany.mockResolvedValue([]);
+      prisma.webhookSubscription.count.mockResolvedValue(0);
+
+      await service.findAll(tenantId, { limit: 20, offset: 0 });
+      await service.findOne(tenantId, 'sub-1');
+
+      for (const select of [
+        prisma.webhookSubscription.findMany.mock.calls[0][0].select,
+        prisma.webhookSubscription.findUnique.mock.calls[0][0].select,
+      ]) {
+        expect(select).not.toHaveProperty('secret');
+        expect(select).not.toHaveProperty('previousSecret');
+        expect(select.previousSecretExpiresAt).toBe(true);
+      }
     });
   });
 

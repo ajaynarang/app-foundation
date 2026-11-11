@@ -1096,7 +1096,8 @@ Don't `process.exit()` in shutdown paths — it kills the process before flush. 
 
 - Subscription-based: tenants register webhook URLs + event patterns
 - BullMQ queue delivery (the `webhooks` queue)
-- HMAC-SHA256 signed payloads
+- Signed per Standard Webhooks: `webhook-id`, `webhook-timestamp`, `webhook-signature` (`v1,` + base64 HMAC-SHA256 over `id.timestamp.body`); secrets are `whsec_…` and rotate with an overlap window (`POST /webhooks/:id/rotate-secret`)
+- SSRF guard (`@appshore/kernel` `webhook-url.validator`): the URL and every resolved address must be public, checked on save and again on the delivery's own connection; no redirects
 - 3 attempts with exponential backoff
 - Wildcard event matching (e.g., `app.project.*`)
 - Only `visibility: 'external'` registry events appear in the subscription catalog
