@@ -4,9 +4,8 @@ import { onboardingApi } from './api';
 import type { OnboardingStatusResponse, MilestoneStatus } from './types';
 
 const MILESTONE_IDS = {
-  CONNECT_FLEET: 'connect-fleet',
-  BRING_LOADS: 'bring-loads',
-  OPTIMIZE: 'optimize',
+  SETUP: 'setup',
+  INTEGRATIONS: 'integrations',
 } as const;
 
 interface OnboardingStore {
@@ -34,22 +33,22 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
   error: null,
 
   get milestone1Complete() {
-    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.CONNECT_FLEET);
+    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.SETUP);
     return m1?.status === 'complete' || false;
   },
 
   get milestone2Complete() {
-    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.BRING_LOADS);
+    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.INTEGRATIONS);
     return m2?.status === 'complete' || false;
   },
 
   get milestone1IncompleteCount() {
-    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.CONNECT_FLEET);
+    const m1 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.SETUP);
     return m1?.items.filter((i) => !i.complete).length ?? 0;
   },
 
   get milestone2IncompleteCount() {
-    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.BRING_LOADS);
+    const m2 = get().status?.milestones.find((m) => m.id === MILESTONE_IDS.INTEGRATIONS);
     return m2?.items.filter((i) => !i.complete).length ?? 0;
   },
 

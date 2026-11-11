@@ -44,7 +44,6 @@ interface Tenant {
   }>;
   _count?: {
     users: number;
-    drivers: number;
   };
 }
 
