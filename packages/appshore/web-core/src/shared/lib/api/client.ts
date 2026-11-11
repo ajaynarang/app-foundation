@@ -112,7 +112,7 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
     }));
     throw new ApiError(
       response.status,
-      error.detail || error.message || 'Request failed',
+      error.detail || 'Request failed', // the error envelope's copy is `detail`; there is no `message`
       error, // Full response object — includes fieldErrors, debugDetail (dev), etc.
     );
   }

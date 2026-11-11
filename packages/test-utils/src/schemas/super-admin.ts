@@ -23,7 +23,7 @@
  * promote the stable ones to shared-types once admin UI stabilises.
  */
 import { z } from 'zod';
-import { isoDateString } from './helpers.js';
+import { apiErrorEnvelope, isoDateString } from './helpers.js';
 
 // ── admin/cache ──────────────────────────────────────────────────────
 
@@ -257,22 +257,7 @@ export const AdminScheduleListSchema = z.array(AdminScheduleRowSchema);
 // ── Common error envelope (shared across all 400 guards) ─────────────
 
 /**
- * The platform's standard error envelope thrown by NestJS exception filters
- * — verified shape from `POST /admin/cache/flush` (no `confirm`) and
- * `POST /admin/cache/flush/:invalid-namespace` (2026-05-15).
- *
- * `detail` and `message` are usually the same string; `detail` is the
- * structured field. Permissive enough to absorb upstream filter
- * tweaks without breaking unrelated tests.
+ * The platform's standard error envelope: `statusCode, code, detail, fieldErrors?, timestamp, path, method,
+ * debugDetail?`. The global exception filter emits these keys and no others.
  */
-export const AppErrorEnvelopeSchema = z
-  .object({
-    statusCode: z.number().int().positive(),
-    timestamp: isoDateString,
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    message: z.string(),
-    error: z.string(),
-  })
-  .strict();
+export const AppErrorEnvelopeSchema = apiErrorEnvelope();

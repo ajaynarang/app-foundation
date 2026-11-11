@@ -53,7 +53,7 @@ function ResetPasswordInner() {
         setPageState('error');
       } else {
         const err = await response.json().catch(() => ({}));
-        setError(err.message || 'Failed to reset password. Please try again.');
+        setError(err.detail || 'Failed to reset password. Please try again.');
       }
     } catch {
       setError('Failed to reset password. Please try again.');

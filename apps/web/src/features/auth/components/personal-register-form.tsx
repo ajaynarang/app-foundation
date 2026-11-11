@@ -43,7 +43,7 @@ export function PersonalRegisterForm() {
         body: JSON.stringify(form),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Registration failed');
+      if (!response.ok) throw new Error(data.detail || 'Registration failed');
       setTokens(data.accessToken);
       setUser(data.user);
       router.push('/');

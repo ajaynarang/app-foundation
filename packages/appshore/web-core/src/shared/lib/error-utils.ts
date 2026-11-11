@@ -1,12 +1,22 @@
 import { ApiError } from './api/client';
 import { captureError } from './sentry';
 
+/** What Nest says on a bare 403 — not worth showing over our own copy. */
+const NEST_DEFAULT_FORBIDDEN = new Set(['Forbidden', 'Forbidden resource']);
+/** The throttler's bare 429 text is never shown as-is; only a thrower's own 429 detail is. */
+// …and the client's own stand-in for a 429 whose body was not our envelope (a proxy or WAF page).
+const NEST_DEFAULT_THROTTLED = new Set([
+  'ThrottlerException: Too Many Requests',
+  'Too Many Requests',
+  'Request failed with status 429',
+]);
+
 /**
  * Extract a domain error code from an ApiError, if the backend included one.
  * Returns undefined for non-ApiError or for errors without a `code` field.
  *
- * Backends throw `new BadRequestException({ detail, code: 'XYZ' })` and the
- * global filter spreads `code` into the response body alongside `detail`.
+ * Every API error carries a machine `code` (`ApiErrorCode` in @app/shared-types, or a domain code such as
+ * `FEATURE_DISABLED`) beside its user-facing `detail`.
  */
 export function extractErrorCode(error: unknown): string | undefined {
   if (error instanceof ApiError && typeof error.data?.code === 'string') {
@@ -37,15 +47,22 @@ export function extractErrorMessage(error: unknown): string {
       case 401:
         return 'Your session has expired. Please log in again.';
       case 403:
-        return "You don't have permission to perform this action.";
+        // A refusal the backend explained (owner-only, a plan limit, …) says why; Nest's bare default does not.
+        return detail && !NEST_DEFAULT_FORBIDDEN.has(detail)
+          ? detail
+          : "You don't have permission to perform this action.";
       case 404:
         return detail || 'This record was not found. It may have been deleted.';
       case 409:
-        return detail || 'A record with this value already exists.';
+        // 409 is any state conflict: INVALID_STATE, STALE, DUPLICATE — the detail says which.
+        return detail || 'This changed since you opened it. Refresh and try again.';
       case 422:
         return detail || 'The submitted data is invalid. Please check your input.';
       case 429:
-        return 'Too many requests. Please wait a moment and try again.';
+        // A limit the backend explained ("A code was sent 3 minutes ago") says when; the throttler's does not.
+        return detail && !NEST_DEFAULT_THROTTLED.has(detail)
+          ? detail
+          : 'Too many requests. Please wait a moment and try again.';
       default:
         if (error.status >= 500) {
           return 'Something went wrong on our end. Please try again.';

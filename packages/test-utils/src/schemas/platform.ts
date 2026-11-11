@@ -47,7 +47,7 @@ import {
   OnboardingStatusResponseSchema as SharedOnboardingStatusResponseSchema,
   AgentScopeSchema,
 } from '@app/shared-types';
-import { dbId, stringId, isoDateString } from './helpers.js';
+import { apiErrorEnvelope, dbId, stringId, isoDateString } from './helpers.js';
 
 // Note: `SuperAdminPreferencesSchema` is NOT exported from shared-types —
 // hand-written below.
@@ -308,22 +308,13 @@ export const TenantRegisterResponseSchema = z
   .strict();
 
 /**
- * 400 error envelope for `POST /tenants/register` with empty body. Nest's
- * `ValidationPipe` returns `{ statusCode, timestamp, path, method, detail,
- * fieldErrors }`. The fieldErrors map has a string message per field.
- * Hand-written — the envelope shape is the ApiException middleware output
- * and not in shared-types.
+ * 400 for `POST /tenants/register` with an empty body: the standard error envelope with code
+ * `VALIDATION_FAILED` and one message per field in `fieldErrors`.
  */
-export const TenantRegisterValidationErrorSchema = z
-  .object({
-    statusCode: z.literal(400),
-    timestamp: isoDateString,
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    fieldErrors: z.record(z.string(), z.string()),
-  })
-  .strict();
+export const TenantRegisterValidationErrorSchema = apiErrorEnvelope(400).extend({
+  code: z.literal('VALIDATION_FAILED'),
+  fieldErrors: z.record(z.string(), z.string()),
+});
 
 // ── USERS — response shapes that reference TenantRowSchema (Phase 4 Group 4d)
 //
@@ -1069,12 +1060,9 @@ export const BroadcastActiveItemSchema = z
 //   - shared-types has NO RFC 7591 DCR response schema. The register endpoint
 //     synthesises its own wire shape (snake_case, different field set for
 //     public vs confidential clients). Hand-written below.
-//   - shared-types has NO RFC 7009 / RFC 6749 error-envelope schemas. The
-//     live error envelope is the platform `HttpExceptionFilter` envelope
-//     (`{statusCode, timestamp, path, method, detail, error?, error_description?,
-//     message?}`) which preserves the RFC `{error, error_description}` keys
-//     when the controller throws `BadRequestException({error, error_description})`.
-//     Hand-written below — same shape also matches the revoke 200 `{}` body.
+//   - An error on a protocol route is `{error, error_description}` and nothing else (RFC 6749
+//     section 5.2, RFC 7591 section 3.2.2), written by the platform's `OAuthErrorFilter`.
+//     Hand-written below.
 
 /**
  * Admin-visible OAuth client row (list + detail + update). Hand-written
@@ -1144,38 +1132,13 @@ export const OAuthDCRResponseSchema = z
 export const OAuthRevokeResponseSchema = z.object({}).strict();
 
 /**
- * OAuth error envelope — the platform `HttpExceptionFilter` output when a
- * controller throws `BadRequestException({error, error_description})` with
- * a structured object payload (RFC 6749 §5.2 / §4.1.2.1 / RFC 7591 §3.2.2).
- *
- * The filter preserves the RFC keys via the `extra` spread at
- * `http-exception.filter.ts:143`, but layers them ON TOP of the platform
- * envelope (`statusCode`, `timestamp`, `path`, `method`, `detail`). The
- * `detail` field will typically be `'Request failed'` (fallback used when
- * neither `obj.detail` nor `obj.message` is set on the object payload).
- *
- * For string-form `BadRequestException('some message')` throws, the shape
- * is different: the filter emits `{error: 'Bad Request', message: '...'}`
- * (Nest default) alongside `detail` and no `error_description`. Modelled
- * `.optional()` on all four RFC/Nest keys so one schema accepts both
- * variants — each test asserts the specific key presence it expects via
- * dedicated semantic expectations.
- *
- * Also covers the RFC 7009 revoke `{error: 'invalid_token'}` branch and
- * the DCR `{error: 'invalid_client_metadata'}` branch.
+ * An error from an OAuth protocol route (`/oauth/authorize`, `/oauth/token`, `/oauth/revoke`,
+ * `/oauth/register`): the shape the standards define (RFC 6749 section 5.2, RFC 7591 section 3.2.2), written by
+ * `OAuthErrorFilter`. Exactly these two keys; never the app's error envelope.
  */
 export const OAuthErrorResponseSchema = z
   .object({
-    statusCode: z.number().int(),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    // RFC-structured BadRequest: `{error, error_description}`.
-    error: z.string().optional(),
-    error_description: z.string().optional(),
-    // Nest string-BadRequest: `{error: 'Bad Request', message: '<msg>'}`.
-    message: z.string().optional(),
-    fieldErrors: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().regex(/^[a-z][a-z_]*$/),
+    error_description: z.string(),
   })
   .strict();

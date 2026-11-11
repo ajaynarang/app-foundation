@@ -129,7 +129,7 @@ export function TenantDetailsSheet({
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to update tenant');
+        throw new Error(err.detail || 'Failed to update tenant');
       }
       return response.json();
     },

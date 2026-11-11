@@ -197,7 +197,7 @@ export function RegistrationForm() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+        throw new Error(errorData.detail || 'Registration failed');
       }
 
       // Success! Redirect to pending approval page

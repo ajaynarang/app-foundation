@@ -41,7 +41,7 @@
  * the raw line). A strict discriminated union over the 4 known kinds.
  */
 import { z } from 'zod';
-import { isoDateString, stringId } from './helpers.js';
+import { apiErrorEnvelope, isoDateString, stringId } from './helpers.js';
 
 // ── CONVERSATION ROW (POST /conversations) ───────────────────────────
 
@@ -252,29 +252,9 @@ export type AssistantAiStreamFrame = z.infer<typeof AssistantAiStreamFrameSchema
 // ── ERROR ENVELOPE (shared for cross-tenant 404 assertion) ───────────
 
 /**
- * the platform's global exception filter envelope (not the default Nest one).
- * Live-probed 2026-04-24: backend emits
- *   { statusCode, timestamp, path, method, detail, message }
- * on any thrown `HttpException`. The filter enriches the default Nest
- * body with observability fields (`timestamp` ISO, `path`, `method`,
- * `detail`) — used by the cross-tenant 404 test (test 7) and by any
- * later Group 6b-6f test that asserts an error envelope.
- *
- * `message` can be a string OR an array of strings (validation errors).
- * `error` is the legacy Nest shorthand; included `.optional()` because
- * the platform filter omits it but stock Nest responses retain it.
+ * The standard error envelope, as the AI routes answer it (the same shape every route answers).
  */
-export const AiErrorEnvelopeSchema = z
-  .object({
-    statusCode: z.number().int(),
-    message: z.union([z.string(), z.array(z.string())]),
-    timestamp: z.string().optional(),
-    path: z.string().optional(),
-    method: z.string().optional(),
-    detail: z.string().optional(),
-    error: z.string().optional(),
-  })
-  .strict();
+export const AiErrorEnvelopeSchema = apiErrorEnvelope();
 
 // ── PHASE 6 GROUP 6c — AGENT ACTIVITY + DEV SCOPES ───────────────────
 
@@ -376,22 +356,9 @@ export const VoiceTokenSchema = z
   .strict();
 
 /**
- * 503 envelope when voice is unavailable — controller line 44 throws
- * `ServiceUnavailableException('Voice mode not available')`. the platform's
- * global exception filter wraps it in the standard envelope (same shape
- * as `AiErrorEnvelopeSchema`, but `statusCode` is the literal 503).
+ * 503 when voice is unavailable: the standard error envelope with code `UNAVAILABLE`.
  */
-export const VoiceUnavailableErrorSchema = z
-  .object({
-    statusCode: z.literal(503),
-    message: z.union([z.string(), z.array(z.string())]),
-    timestamp: z.string().optional(),
-    path: z.string().optional(),
-    method: z.string().optional(),
-    detail: z.string().optional(),
-    error: z.string().optional(),
-  })
-  .strict();
+export const VoiceUnavailableErrorSchema = apiErrorEnvelope(503);
 
 /**
  * `POST /voice/internal/respond` first NDJSON frame —
@@ -419,95 +386,25 @@ export const VoiceInternalRespondFrameSchema = z
 // error-path assertions — zero LLM cost, zero positive-flow assertions
 // (those are deferred to Phase 8/9 once real OAuth + PIN seeding lands).
 //
-// Three distinct envelope shapes show up across the 7 tests:
+// Two shapes show up across the 7 tests:
 //
-// 1. `OAuthTokenGuard` 401 — `oauth-token.guard.ts:28-32` throws
-//    `UnauthorizedException({error: 'invalid_token', error_description: '...'})`.
-//    The HttpException's response body is the OBJECT form, so the
-//    `HttpExceptionFilter` (else branch, line 73-85) spreads it onto
-//    the envelope. Notably the obj does NOT carry `message` or `detail`,
-//    so the filter falls back to `detail: 'Request failed'` (line 80).
-//    Live (2026-04-27): `{statusCode: 401, timestamp, path, method,
-//    detail: "Request failed", error: "invalid_token",
-//    error_description: "Bearer token required"}`.
+// 1. Every thrown error (the `OAuthTokenGuard` 401, the `ApiKeyAuthGuard` 401, the HITL 404 and 400) leaves
+//    as the standard error envelope: `statusCode, code, detail, fieldErrors?, timestamp, path, method,
+//    debugDetail?`. No `message`, `error` or `error_description` key is on the wire.
 //
-// 2. `ApiKeyAuthGuard` 401 — `api-key-auth.guard.ts:23,29` throws
-//    `UnauthorizedException('API key required')` or
-//    `UnauthorizedException('Invalid, expired, or IP-blocked API key')`.
-//    NestJS wraps the string into the standard object form
-//    `{statusCode: 401, message: '<msg>', error: 'Unauthorized'}`. Filter
-//    spreads onto the envelope: `detail` is filled from `obj.message`.
-//    Live (2026-04-27 with bogus key): `{statusCode: 401, timestamp,
-//    path, method, detail: "Invalid, expired, or IP-blocked API key",
-//    message: same, error: "Unauthorized"}`.
-//
-// 3. `GET /mcp` 405 — controller calls `res.status(405).json({...})`
-//    DIRECTLY (mcp-server.controller.ts:54-57), bypassing the global
-//    HttpExceptionFilter. So the envelope is the bare controller body:
-//    `{error: "Method Not Allowed", message: "...stateless mode..."}`.
-//    No `statusCode` / `timestamp` / `path` / `method` keys.
-//
-// 4. HITL `NotFoundException('Challenge not found')` — wrapped by Nest
-//    into the standard object form `{statusCode: 404, message: 'Challenge
-//    not found', error: 'Not Found'}`. Filter spreads onto the envelope:
-//    `detail` is filled from `obj.message`. Result: `{statusCode: 404,
-//    timestamp, path, method, detail: "Challenge not found", message:
-//    same, error: "Not Found"}`.
-//
-// Each schema below is `.strict()` and pinned against the live shape.
-// All fields that are filter-supplied (`timestamp`, `path`, `method`)
-// are kept REQUIRED (the filter ALWAYS adds them on any HttpException
-// path); fields that vary by exception construction are `.optional()`.
-//
-// Phase 6 rubric is contract-shape only — no semantic assertion on the
-// content of `error_description` or `message` text beyond non-empty.
+// 2. `GET /mcp` 405 — the controller writes `res.status(405).json({...})` itself, as the MCP transport
+//    expects, so that body is bare: `{error: "Method Not Allowed", message: "..."}`.
 
 /**
- * 401 envelope from `OAuthTokenGuard` — used by tests 26 (POST /mcp)
- * and 28 (DELETE /mcp). The OAuth-style `error` + `error_description`
- * are guard-supplied; `message` is absent (the obj passed to the
- * UnauthorizedException ctor doesn't include it). `detail` is the
- * filter's fallback string `'Request failed'`.
+ * 401 from `OAuthTokenGuard` on the MCP routes: the standard error envelope with code `UNAUTHENTICATED`.
+ * The guard's `error_description` becomes `detail`; the RFC keys themselves are not on the wire.
  */
-export const McpAuthErrorOAuthSchema = z
-  .object({
-    statusCode: z.literal(401),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    error: z.string(),
-    error_description: z.string(),
-    // The filter's optional dev-only `debugDetail` is NOT emitted on
-    // pure auth failures (no `debugMsg` is passed to sendResponse for
-    // the string-or-obj branches above), but be tolerant for forward-compat.
-    debugDetail: z.string().optional(),
-    // Forward-compat — `message` would appear if a future guard refactor
-    // shifts to `UnauthorizedException('msg')` form.
-    message: z.union([z.string(), z.array(z.string())]).optional(),
-  })
-  .strict();
+export const McpAuthErrorOAuthSchema = apiErrorEnvelope(401);
 
 /**
- * 401 envelope from `ApiKeyAuthGuard` — used by test 29 (POST
- * /mcp/apikey with bogus Bearer). The guard throws
- * `UnauthorizedException('Invalid, expired, or IP-blocked API key')`
- * — a string ctor, so Nest wraps it in `{statusCode, message, error:
- * 'Unauthorized'}`. The filter then spreads onto the envelope; `detail`
- * mirrors `message`.
+ * 401 from `ApiKeyAuthGuard` (`POST /mcp/apikey` with a bad key): the standard error envelope.
  */
-export const McpAuthErrorApiKeySchema = z
-  .object({
-    statusCode: z.literal(401),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    message: z.union([z.string(), z.array(z.string())]),
-    error: z.string(),
-    debugDetail: z.string().optional(),
-  })
-  .strict();
+export const McpAuthErrorApiKeySchema = apiErrorEnvelope(401);
 
 /**
  * 405 envelope from `GET /mcp` — controller writes
@@ -523,42 +420,11 @@ export const McpMethodNotAllowedSchema = z
   .strict();
 
 /**
- * 404 envelope from HITL `NotFoundException('Challenge not found')` —
- * used by tests 30 (GET /mcp/hitl/:token) and 31 (POST /mcp/hitl/:token/
- * step-up). NestJS wraps the string ctor into
- * `{statusCode, message, error: 'Not Found'}`; filter spreads it.
+ * 404 from the HITL routes for an unknown challenge: the standard error envelope.
  */
-export const McpHitlNotFoundSchema = z
-  .object({
-    statusCode: z.literal(404),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    message: z.union([z.string(), z.array(z.string())]),
-    error: z.string(),
-    debugDetail: z.string().optional(),
-  })
-  .strict();
+export const McpHitlNotFoundSchema = apiErrorEnvelope(404);
 
 /**
- * 400 envelope from HITL no-PIN branch — used by test 32 (gated on
- * `@requires:data-hitl-token`). The controller throws
- * `BadRequestException({code: 'no_pin', message: 'No PIN set...'})`
- * — an OBJECT ctor, so the filter spreads `code` + `message` onto the
- * envelope. NestJS does NOT auto-add `error: 'Bad Request'` for the
- * object-ctor form (only for string-ctor); `error` is `.optional()`.
+ * 400 from the HITL no-PIN branch: the standard error envelope carrying the route's own `code`.
  */
-export const McpHitlNoPinSchema = z
-  .object({
-    statusCode: z.literal(400),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    code: z.string(),
-    message: z.union([z.string(), z.array(z.string())]),
-    error: z.string().optional(),
-    debugDetail: z.string().optional(),
-  })
-  .strict();
+export const McpHitlNoPinSchema = apiErrorEnvelope(400);
