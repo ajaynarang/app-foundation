@@ -114,6 +114,14 @@ describe('WebhookSubscriptionService', () => {
       },
     );
 
+    it('refuses an empty URL on create and on update instead of saving it', async () => {
+      await expect(service.create(tenantId, input(''))).rejects.toThrow(BadRequestException);
+      await expect(service.update(tenantId, 'sub-1', { url: '' })).rejects.toThrow(BadRequestException);
+
+      expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+    });
+
     it('does not check the URL when an update leaves it unchanged', async () => {
       await service.update(tenantId, 'sub-1', { active: false });
 

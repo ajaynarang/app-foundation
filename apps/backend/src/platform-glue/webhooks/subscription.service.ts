@@ -137,7 +137,8 @@ export class WebhookSubscriptionService {
     },
   ) {
     await this.findOne(tenantId, id);
-    if (data.url) await this.assertSafeTarget(data.url);
+    // `!== undefined`, not truthiness: an empty url must reach the guard and be refused, not be saved.
+    if (data.url !== undefined) await this.assertSafeTarget(data.url);
     return this.prisma.webhookSubscription.update({
       where: { id },
       data,
