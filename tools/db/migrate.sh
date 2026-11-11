@@ -127,7 +127,7 @@ else
     echo "Create it from .env.aws.staging.example or ask a team member."
     exit 1
   fi
-  DB_URL=$(grep -E '^DATABASE_URL=' "$STAGING_ENV_FILE" | head -1 | cut -d= -f2-)
+  DB_URL=$(grep -E '^DATABASE_URL=' "$STAGING_ENV_FILE" | head -1 | cut -d= -f2- || true)
   if [[ -z "$DB_URL" ]]; then
     echo "ERROR: DATABASE_URL not found in $STAGING_ENV_FILE"
     exit 1
@@ -439,8 +439,23 @@ if [[ "$MODE" != "seed-langfuse" ]]; then
     if ! check_tunnel_already_running; then
       start_tunnel
     fi
-    # Rewrite DB_URL to go through the local SSM tunnel instead of direct RDS
-    DB_URL=$(echo "$DB_URL" | sed "s|@${RDS_HOST}:${RDS_PORT}|@127.0.0.1:${TUNNEL_PORT}|")
+    # Point DB_URL at the local SSM tunnel instead of the private RDS host.
+    # The URL is parsed, not pattern-matched: it may carry no port, a host in
+    # another case, or a host that differs from an RDS_HOST override.
+    TUNNEL_DB_URL=$(DB_URL="$DB_URL" python3 -c "
+import os, sys, urllib.parse as u
+parts = u.urlsplit(os.environ['DB_URL'].strip().strip('\"'))
+if not parts.scheme or not parts.hostname:
+    sys.exit(1)
+userinfo, at, _ = parts.netloc.rpartition('@')
+print(u.urlunsplit(parts._replace(netloc=userinfo + at + '127.0.0.1:' + sys.argv[1])))
+" "$TUNNEL_PORT" || true)
+    if [[ -z "$TUNNEL_DB_URL" || "$TUNNEL_DB_URL" == "$DB_URL" ]]; then
+      echo "ERROR: Could not point DATABASE_URL at the tunnel (127.0.0.1:${TUNNEL_PORT})."
+      echo "Check the DATABASE_URL in $STAGING_ENV_FILE: expected postgresql://user:password@host[:port]/db."
+      exit 1
+    fi
+    DB_URL="$TUNNEL_DB_URL"
   else
     check_local_db
   fi
