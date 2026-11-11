@@ -21,6 +21,7 @@
     "// — Gates (CI is manual-only: these run locally)": "",
     "lint:schema": "pnpm --filter @appshore/db lint:schema",
     "verify": "bash tools/verify/verify.sh",
+    "verify:api": "bash tools/verify/api-qa.sh",
     "verify:arch": "turbo run build --filter=@app/backend^... --output-logs=errors-only && pnpm --filter @app/backend exec jest src/architecture",
     "// — Backend shortcuts": "",
     "backend:dev": "turbo run dev --filter=@app/backend",

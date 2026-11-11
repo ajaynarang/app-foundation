@@ -177,12 +177,19 @@ function parseController(filePath: string): EndpointInfo[] {
       // Build full path
       const fullPath = `/${controllerPath}${subPath ? '/' + subPath : ''}`.replace(/\/+/g, '/');
 
-      // Look at surrounding lines (up to 5 before, 1 after) for decorators
+      // Read the route's whole decorator block: up to the blank line, closing brace or class line above it, down to
+      // the handler's signature. A fixed window missed @Roles once a decorator (@HttpCode) sat between it and the verb.
       let methodRoles: string[] = [];
       let isPublic = false;
       let methodFeatureGate: string | null = null;
 
-      for (let j = Math.max(0, i - 5); j <= Math.min(lines.length - 1, i + 1); j++) {
+      let blockStart = i;
+      while (blockStart > 0 && !/^(\}|)$|\bclass\s|\bconstructor\(|\{\}$/.test(lines[blockStart - 1].trim()))
+        blockStart--;
+      let blockEnd = i;
+      while (blockEnd < lines.length - 1 && !/^(async\s+)?\w+\s*\(/.test(lines[blockEnd + 1].trim())) blockEnd++;
+
+      for (let j = blockStart; j <= blockEnd; j++) {
         const nearby = lines[j].trim();
 
         if (nearby === '@Public()') isPublic = true;
@@ -334,7 +341,7 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
     // Skip general user preferences (accessible by all authenticated users, no @Roles)
     if (ep.path === '/settings/general') return false;
     // Skip admin tenant add-ons with path params (PATCH needs specific slug)
-    if (ep.path.includes('/admin/tenants/:tenantId/add-ons/') && ep.method === 'PATCH') return false;
+    if (ep.path.includes('/admin/tenants/:tenant_id/add-ons/') && ep.method === 'PATCH') return false;
     // Include GET endpoints without params (list/summary endpoints)
     if (ep.method === 'GET' && !ep.hasParams) return true;
     // Include mutation endpoints that test RBAC guard (denied roles)

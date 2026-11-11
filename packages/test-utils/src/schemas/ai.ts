@@ -407,17 +407,10 @@ export const McpAuthErrorOAuthSchema = apiErrorEnvelope(401);
 export const McpAuthErrorApiKeySchema = apiErrorEnvelope(401);
 
 /**
- * 405 envelope from `GET /mcp` — controller writes
- * `res.status(405).json({error, message})` DIRECTLY, bypassing the
- * global filter. So the envelope is BARE — no statusCode / timestamp
- * / path / method keys. Strict — any drift trips the assertion.
+ * 405 from `GET /mcp` and `GET /`: the server is stateless and opens no server-sent stream. The usual error
+ * envelope, with `code: "METHOD_NOT_ALLOWED"`.
  */
-export const McpMethodNotAllowedSchema = z
-  .object({
-    error: z.literal('Method Not Allowed'),
-    message: z.string(),
-  })
-  .strict();
+export const McpMethodNotAllowedSchema = apiErrorEnvelope(405);
 
 /**
  * 404 from the HITL routes for an unknown challenge: the standard error envelope.
@@ -425,6 +418,6 @@ export const McpMethodNotAllowedSchema = z
 export const McpHitlNotFoundSchema = apiErrorEnvelope(404);
 
 /**
- * 400 from the HITL no-PIN branch: the standard error envelope carrying the route's own `code`.
+ * 409 `INVALID_STATE` from the HITL no-PIN branch: no field of the request is at fault, the account has no PIN yet.
  */
-export const McpHitlNoPinSchema = apiErrorEnvelope(400);
+export const McpHitlNoPinSchema = apiErrorEnvelope(409);

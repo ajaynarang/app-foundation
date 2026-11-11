@@ -55,18 +55,18 @@ import { apiErrorEnvelope, dbId, stringId, isoDateString } from './helpers.js';
 // ── USERS (Phase 4 Group 4d — tightened from Phase-0 placeholders) ───
 //
 // Schemas cover the GET /users list (projected list-row shape),
-// GET /users/:userId detail (list-row + full Prisma tenant row),
+// GET /users/:user_id detail (list-row + full Prisma tenant row),
 // POST /users create (list-row + full tenant row), and
-// PATCH /users/:userId update (list-row + full tenant row).
+// PATCH /users/:user_id update (list-row + full tenant row).
 //
 // Live shape map:
 //
 //   GET /users            → UserListRowSchema[]    — list projection incl. nested `{tenantId, companyName}`.
-//   GET /users/:userId    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema).
+//   GET /users/:user_id    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema).
 //   POST /users           → UserCreateResponseSchema — list-row + full Prisma tenant row (no `emailVerified`, no `createdAt`, no `lastLoginAt`).
-//   PATCH /users/:userId  → UserDetailSchema       — same as GET /users/:userId.
-//   POST /users/:userId/{activate,deactivate} → `{message: string}`.
-//   DELETE /users/:userId → `{message: string}`.
+//   PATCH /users/:user_id  → UserDetailSchema       — same as GET /users/:user_id.
+//   POST /users/:user_id/{activate,deactivate} → UserDetailSchema — the user as they are now.
+//   DELETE /users/:user_id → 204, no body.
 //
 // `tenant` nested on detail/create/patch is the full `TenantRowSchema`
 // (declared further down in this file). To avoid a forward-reference
@@ -112,15 +112,15 @@ export const UserListItemSchema = UserListRowSchema;
 // `SubdomainCheckSchema` were wide `z.any()` placeholders — they would
 // accept almost any shape, which is exactly what the rubric forbids
 // (`.strict()` everywhere). Group 4c rewrites them against the live
-// `GET /tenants`, `GET /tenants/:tenantId/details`, `GET /tenants/check-
+// `GET /tenants`, `GET /tenants/:tenant_id/details`, `GET /tenants/check-
 // subdomain`, `GET /tenants/branding`, `POST /tenants/:id/approve |
-// /reject | /suspend | /reactivate`, and `PATCH /tenants/:tenantId`
+// /reject | /suspend | /reactivate`, and `PATCH /tenants/:tenant_id`
 // responses of the platform tenants controller.
 //
 // Schema map:
 //   - `TenantListItemSchema` — `GET /tenants[?status=...]` row. List items
 //     carry the full Prisma row + nested owner/admin `users` + `_count`.
-//   - `TenantDetailResponseSchema` — `GET /tenants/:tenantId/details`. A
+//   - `TenantDetailResponseSchema` — `GET /tenants/:tenant_id/details`. A
 //     projected envelope `{ tenant, users, metrics }` — NOT the raw row.
 //   - `TenantRowSchema` — the raw Prisma row returned by the mutation
 //     endpoints (approve / reject / suspend / reactivate / updateTenant
@@ -211,7 +211,7 @@ export const TenantListItemSchema = TenantRowSchema.extend({
 }).strict();
 
 /**
- * `GET /tenants/:tenantId/details` envelope — a projected shape, NOT the
+ * `GET /tenants/:tenant_id/details` envelope — a projected shape, NOT the
  * raw row. Service manually cherry-picks the row fields and embeds a
  * rich `users[]` + scalar `metrics`.
  */
@@ -322,7 +322,7 @@ export const TenantRegisterValidationErrorSchema = apiErrorEnvelope(400).extend(
 // detail / create / update responses embed the full Prisma tenant row.
 
 /**
- * `GET /users/:userId` detail + `PATCH /users/:userId` response.
+ * `GET /users/:user_id` detail + `PATCH /users/:user_id` response.
  *
  * Live shape = list-row projection + full Prisma tenant row. The service's
  * manual re-projection drops the Prisma-row numeric `id`, `tenantId`
@@ -363,7 +363,7 @@ export const UserCreateResponseSchema = z
   .strict();
 
 /**
- * `PATCH /users/:userId` response — the service's updateUser projection
+ * `PATCH /users/:user_id` response — the service's updateUser projection
  * emits `{userId, email, firstName, lastName, role, isActive, tenant}`.
  * It drops `emailVerified` / `createdAt` / `lastLoginAt` (unlike detail).
  * Distinct from both — hand-written.
@@ -377,17 +377,6 @@ export const UserUpdateResponseSchema = z
     role: z.string(),
     isActive: z.boolean(),
     tenant: TenantRowSchema.nullable(),
-  })
-  .strict();
-
-/**
- * `POST /users/:userId/activate`, `POST /users/:userId/deactivate`, and
- * `DELETE /users/:userId` all return `{ message: string }`. One shape
- * for all three — cheap schema, tight contract.
- */
-export const UserMessageResponseSchema = z
-  .object({
-    message: z.string(),
   })
   .strict();
 
@@ -813,7 +802,7 @@ export const FeedbackBulkCategorizeSchema = z
 //   GET   /plans/my-plan                          → TenantPlanDetailsResponseSchema
 //     — 11 fields including `planConfig` (nullable; same 17-field shape)
 //       + `planEvents[]` (7 fields; shared-types `PlanEventSchema` is missing `tenantId`).
-//   GET   /plans/tenant/:tenantId                 → TenantPlanDetailsResponseSchema
+//   GET   /plans/tenant/:tenant_id                 → TenantPlanDetailsResponseSchema
 //     — same as /my-plan shape.
 //   PATCH /plans/:plan                            → PlanConfigBareSchema
 //     — 17 fields, NO `entitlements` (service's updatePlanConfig returns the
@@ -823,7 +812,7 @@ export const FeedbackBulkCategorizeSchema = z
 //   PATCH /plans/:plan/entitlements/:feature      → PlanEntitlementRowSchema
 //     — 8 fields (raw Prisma row incl. `type`, `createdAt`, `updatedAt`).
 //       Shared-types PlanEntitlementSchema has only {feature, displayName, enabled}.
-//   PATCH /plans/tenant/:tenantId                 → TenantRowSchema (already
+//   PATCH /plans/tenant/:tenant_id                 → TenantRowSchema (already
 //     declared above for tenants.spec.ts — full Prisma row, no includes).
 //
 // Shared-types drift: shared-types `PlanConfigSchema` + `PlanEventSchema`
@@ -925,7 +914,7 @@ const TenantPlanEventSchema = z
 
 /**
  * TenantPlanDetails envelope — returned by GET /plans/my-plan and
- * GET /plans/tenant/:tenantId. `planConfig` is nullable (it's null when
+ * GET /plans/tenant/:tenant_id. `planConfig` is nullable (it's null when
  * the tenant plan is TRIAL_EXPIRED or another plan without a config row).
  * `planEvents` is always an array, up to 10 rows, descending by createdAt.
  */
@@ -1042,9 +1031,9 @@ export const BroadcastActiveItemSchema = z
 //   Admin CRUD (`/oauth/clients/*`, tenant-scoped CRUD, camelCase):
 //     - GET    /oauth/clients              → OAuthClientResponseSchema[]
 //     - POST   /oauth/clients              → OAuthClientCreatedResponseSchema (secret ONCE)
-//     - GET    /oauth/clients/:clientId    → OAuthClientResponseSchema
-//     - PUT    /oauth/clients/:clientId    → OAuthClientResponseSchema
-//     - DELETE /oauth/clients/:clientId    → 204 no-body (no schema)
+//     - GET    /oauth/clients/:client_id    → OAuthClientResponseSchema
+//     - PUT    /oauth/clients/:client_id    → OAuthClientResponseSchema
+//     - DELETE /oauth/clients/:client_id    → 204 no-body (no schema)
 //
 //   RFC public (`/oauth/*`, RFC 6749/7009/7591, snake_case):
 //     - POST   /oauth/register             → OAuthDCRResponseSchema (RFC 7591)
