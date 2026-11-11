@@ -9,7 +9,7 @@ distributed under the same license.
 1. Create a feature branch from `main`.
 2. Make your changes following the project's code conventions (see [CLAUDE.md](CLAUDE.md)).
 3. Submit a pull request to `main` with a clear description of the changes.
-4. All contributions must pass CI checks before merging.
+4. All contributions must pass CI before merging. CI is manual by default: run the `CI` workflow on your branch from the Actions tab (or `gh workflow run ci.yml --ref <branch>`).
 
 ## Guidelines
 

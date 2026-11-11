@@ -1,14 +1,15 @@
 # .github/workflows/ci.yml
-# Runs on every push to main and every PR targeting it.
-# Blocks merge if lint, type-check, test, or build fails.
+# Manual by default: run it from the Actions tab (or `gh workflow run ci.yml`).
+# To run on every push to main and every PR targeting it, uncomment the two
+# triggers below. Fails if lint, type-check, test, or build fails.
 
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
 
 jobs:
