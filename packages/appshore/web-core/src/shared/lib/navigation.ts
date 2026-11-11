@@ -216,6 +216,36 @@ export const publicRoutes = ['/', '/login'] as const;
 export const protectedRoutePatterns = ['/admin', '/ai', '/onboarding', '/settings'] as const;
 
 /**
+ * Routes outside Settings that only some roles can open. `/admin` is also held
+ * by ROUTE_ROLE_MAP in src/middleware.ts (the edge runtime cannot import this
+ * file); `/onboarding` is held by the Setup Hub page, which reads this rule.
+ */
+const ROLE_GATED_ROUTES: ReadonlyArray<{ prefix: string; roles: ReadonlyArray<UserRole> }> = [
+  { prefix: '/admin', roles: ['SUPER_ADMIN'] },
+  { prefix: '/onboarding', roles: ['OWNER', 'ADMIN'] },
+];
+
+/**
+ * Whether a role can open an in-app route. Use it before linking a user
+ * somewhere, so nobody is sent to a screen that turns them away.
+ *
+ * A Settings screen is open to the roles whose Settings panel lists it. Any
+ * other route is open unless ROLE_GATED_ROUTES restricts it. The backend
+ * enforces real access; this only keeps links honest.
+ */
+export function canRoleOpen(href: string, role: UserRole | undefined): boolean {
+  if (!role) return false;
+  const path = href.split(/[?#]/)[0];
+
+  if (path.startsWith('/settings/')) {
+    return getSubPanelSections('settings', role).some((section) => section.items.some((item) => item.href === path));
+  }
+
+  const gate = ROLE_GATED_ROUTES.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`));
+  return gate ? gate.roles.includes(role) : true;
+}
+
+/**
  * Get navigation items based on user role
  */
 export function getNavigationForRole(role: UserRole | undefined): NavigationItem[] {
