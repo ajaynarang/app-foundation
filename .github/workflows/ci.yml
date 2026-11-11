@@ -41,7 +41,7 @@ jobs:
   # Backend CI
   # ─────────────────────────────────────────────────────────────
   backend:
-    name: Backend — Lint, Type-check, Test, Build
+    name: Backend and foundation packages — Lint, Type-check, Test, Build
     runs-on: ubuntu-latest # runs-on: self-hosted
     env:
       # ESLint and tsc over the whole backend can exceed Node's default heap on the runner.
@@ -87,6 +87,14 @@ jobs:
 
       - name: Unit tests
         run: pnpm --filter=backend test
+
+      # Most platform behaviour (auth, guards, notifications, cache, queues) lives in
+      # the foundation packages, and their specs are type-checked only here.
+      - name: Foundation packages — type-check
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform type-check
+
+      - name: Foundation packages — unit tests
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform test
 
       - name: RBAC gap audit
         run: npx tsx tests/scripts/audit-rbac-gaps.ts --ci
