@@ -87,6 +87,26 @@ const configSchema = z.object({
     })
     .default({}),
 
+  // Edge protection: the global rate limit and how many proxy hops in front of the API are trusted.
+  edge: z
+    .object({
+      /** Requests per window, per principal (signed-in user, OAuth client + user, otherwise client IP), per route. */
+      throttleLimit: z.number().int().positive().default(100),
+      throttleTtlMs: z.number().int().positive().default(60_000),
+      /**
+       * Express `trust proxy`: a hop count, `false`, or a subnet list. Unset, production trusts one hop (the load
+       * balancer) and other environments trust none. See bootstrap/trust-proxy.ts.
+       */
+      trustProxy: z
+        .string()
+        .refine((value) => value.trim() !== 'true', {
+          message:
+            'TRUST_PROXY=true trusts every X-Forwarded-For hop, so any client can choose its own IP. Set the hop count (1 behind one load balancer).',
+        })
+        .optional(),
+    })
+    .default({}),
+
   // Outbound webhooks. Development escape hatch: with this on, a subscription may use http and point at
   // localhost or a private address, so a receiver on a laptop works. Production refuses to boot with it.
   webhooks: z
@@ -270,6 +290,12 @@ function env(name: string): string | undefined {
   return value !== undefined && value.trim() !== '' ? value : undefined;
 }
 
+/** A numeric env var as a number (the schema rejects anything that is not a positive integer); unset stays unset. */
+function positiveIntEnv(name: string): number | undefined {
+  const value = env(name);
+  return value === undefined ? undefined : Number(value);
+}
+
 export default (): Configuration => {
   const raw = {
     environment: process.env.NODE_ENV,
@@ -307,6 +333,11 @@ export default (): Configuration => {
     inngest: {
       dev: env('INNGEST_DEV'),
       signingKey: env('INNGEST_SIGNING_KEY'),
+    },
+    edge: {
+      throttleLimit: positiveIntEnv('THROTTLE_LIMIT'),
+      throttleTtlMs: positiveIntEnv('THROTTLE_TTL_MS'),
+      trustProxy: env('TRUST_PROXY'),
     },
     webhooks: {
       allowPrivateTargets: env('WEBHOOK_ALLOW_PRIVATE_TARGETS') === 'true',

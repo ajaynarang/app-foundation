@@ -15,6 +15,7 @@ import { OAUTH_SCOPES } from '@app/shared-types';
 import { resolveOAuthIssuer } from '@appshore/platform/domains/oauth-provider/oauth-settings';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
 import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
+import { applyTrustProxy } from './bootstrap/trust-proxy';
 
 async function bootstrap() {
   // Initialize Firebase Admin SDK
@@ -40,6 +41,9 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const configService = app.get(ConfigService<Configuration>);
+
+  // The real client IP behind the load balancer: the rate limit and the API-key IP allowlist read req.ip.
+  applyTrustProxy(app, configService.get('edge', { infer: true })?.trustProxy, configService.get('environment'));
 
   const corsOrigins = configService.get<string>('corsOrigins') || 'http://localhost:3000';
 

@@ -38,6 +38,9 @@ describe('configuration — production boot guard', () => {
     'INNGEST_DEV',
     'INNGEST_SIGNING_KEY',
     'WEBHOOK_ALLOW_PRIVATE_TARGETS',
+    'THROTTLE_LIMIT',
+    'THROTTLE_TTL_MS',
+    'TRUST_PROXY',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -275,6 +278,34 @@ describe('configuration — production boot guard', () => {
       expect(config.oauthIssuer).toBe('https://api.acme.io');
       expect(config.oauthJwtSecret).toBe(SECRET_D);
       expect(config.oauthConsentSecret).toBe(SECRET_E);
+    });
+  });
+
+  describe('edge rate limit and trust proxy', () => {
+    const dev = (overrides: Record<string, string>) =>
+      load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', ...overrides });
+
+    it('defaults to 100 requests per minute and no explicit trust-proxy setting', () => {
+      expect(dev({}).edge).toEqual({ throttleLimit: 100, throttleTtlMs: 60_000 });
+    });
+
+    it('takes the limit, the window and trust proxy from the environment', () => {
+      const config = dev({ THROTTLE_LIMIT: '600', THROTTLE_TTL_MS: '30000', TRUST_PROXY: '2' });
+      expect(config.edge).toEqual({ throttleLimit: 600, throttleTtlMs: 30_000, trustProxy: '2' });
+    });
+
+    it.each([
+      ['THROTTLE_LIMIT', '0'],
+      ['THROTTLE_LIMIT', 'lots'],
+      ['THROTTLE_LIMIT', '10.5'],
+      ['THROTTLE_TTL_MS', '-1'],
+    ])('refuses to boot with %s=%s', (envVar, value) => {
+      expect(() => dev({ [envVar]: value })).toThrow();
+    });
+
+    it('refuses TRUST_PROXY=true in any environment', () => {
+      expect(() => dev({ TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY=true trusts every X-Forwarded-For hop/);
+      expect(() => load({ ...validProduction(), TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY=true/);
     });
   });
 
