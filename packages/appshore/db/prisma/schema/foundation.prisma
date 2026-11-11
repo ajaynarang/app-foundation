@@ -301,6 +301,8 @@ model User {
   @@index([isActive])
   @@index([deletedAt])
   @@index([deletedBy])
+  @@index([tenantId, createdAt, userId]) // keyset: GET /users
+  @@index([tenantId, lastName, userId]) // keyset: GET /desk/agents/eligible-supervisors
   @@map("users")
 }
 
@@ -449,6 +451,7 @@ model ApiKey {
 
   @@index([userId])
   @@index([userId, revokedAt])
+  @@index([userId, createdAt, id]) // keyset: GET /api-keys
   @@map("api_keys")
 }
 
@@ -490,6 +493,7 @@ model UserInvitation {
   @@index([status])
   @@index([invitedBy])
   @@index([acceptedByUserId])
+  @@index([tenantId, createdAt, invitationId]) // keyset: GET /invitations
   @@map("user_invitations")
 }
 
@@ -773,6 +777,7 @@ model Notification {
   @@index([userId, readAt, dismissedAt])
   @@index([userId, category, createdAt])
   @@index([type, userId, tenantId, createdAt], map: "idx_notification_grouping")
+  @@index([userId, createdAt, notificationId]) // keyset: GET /notifications
   @@map("notifications")
 }
 
@@ -1083,6 +1088,7 @@ model Job {
   @@index([submittedBy, status])
   @@index([tenantId, inputHash])
   @@index([tenantId, category, createdAt], map: "jobs_tenant_category_created")
+  @@index([createdAt, publicId]) // keyset: GET /admin/jobs
   @@map("jobs")
 }
 
@@ -1256,6 +1262,7 @@ model WebhookSubscription {
   deliveryLogs WebhookDeliveryLog[]
 
   @@index([tenantId, active])
+  @@index([tenantId, active, createdAt, id]) // keyset: GET /webhooks
   @@map("webhook_subscriptions")
 }
 
@@ -1303,6 +1310,7 @@ model DomainEventLog {
   @@index([tenantId, event])
   @@index([tenantId, aggregateType, aggregateId])
   @@index([correlationId])
+  @@index([createdAt, id]) // keyset: GET /admin/events
   @@map("domain_event_log")
 }
 
@@ -1370,6 +1378,7 @@ model OAuthClient {
 
   @@index([tenantId])
   @@index([createdByUserId])
+  @@index([tenantId, createdAt, clientId]) // keyset: GET /oauth/clients
   @@map("oauth_clients")
 }
 
@@ -1479,6 +1488,7 @@ model Feedback {
   @@index([status])
   @@index([createdAt])
   @@index([resolvedBy])
+  @@index([tenantId, userId, createdAt, publicId]) // keyset: GET /feedback
   @@map("feedback")
 }
 
@@ -1523,6 +1533,7 @@ model SupportTicket {
   @@index([status, priority])
   @@index([tenantId, createdAt])
   @@index([createdById])
+  @@index([createdAt, ticketNumber]) // keyset: GET /support/admin/tickets
   @@map("support_tickets")
 }
 
@@ -1966,6 +1977,8 @@ model DeskEpisode {
   @@index([entityType, entityId])
   @@index([workflowId])
   @@index([ownerAgentId])
+  @@index([tenantId, openedAt, id]) // keyset: GET /desk/episodes
+  @@index([tenantId, closedAt, id]) // keyset: GET /desk/episodes/handled
   @@map("desk_episodes")
 }
 
@@ -2050,6 +2063,7 @@ model DeskApproval {
   @@index([stepId])
   @@index([claimedByUserId])
   @@index([decidedByUserId])
+  @@index([decision, requestedAt, id]) // keyset: GET /desk/approvals
   @@map("desk_approvals")
 }
 
