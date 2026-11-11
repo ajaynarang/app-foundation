@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { OAuthProviderController } from '../oauth-provider.controller';
+import { OAuthErrorFilter } from '../oauth-error.filter';
 
 describe('OAuthProviderController', () => {
   let controller: OAuthProviderController;
@@ -274,6 +275,54 @@ describe('OAuthProviderController', () => {
           mockReq,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('protocol errors (RFC 6749 section 5.2, RFC 7591 section 3.2.2)', () => {
+    const filtersOf = (method: keyof OAuthProviderController) =>
+      (Reflect.getMetadata('__exceptionFilters__', OAuthProviderController.prototype[method]) as unknown[]) ?? [];
+
+    it.each(['authorize', 'token', 'revoke', 'register'] as const)(
+      '%s answers errors through OAuthErrorFilter',
+      (method) => {
+        expect(filtersOf(method)).toEqual([OAuthErrorFilter]);
+      },
+    );
+
+    it('the consent route, which the web app calls, keeps the usual error envelope', () => {
+      expect(filtersOf('approveConsent')).toEqual([]);
+    });
+
+    const errorOf = async (call: Promise<unknown>) => {
+      try {
+        await call;
+      } catch (e) {
+        return (e as BadRequestException).getResponse() as Record<string, unknown>;
+      }
+      throw new Error('expected a throw');
+    };
+
+    it('names the RFC code on each refusal the controller makes itself', async () => {
+      const res = { redirect: jest.fn() } as any;
+      expect(await errorOf(controller.authorize('token', 'c', 'r', 's', 'st', 'ch', 'S256', res))).toMatchObject({
+        error: 'unsupported_response_type',
+      });
+      expect(await errorOf(controller.token('password', '', '', '', '', '', ''))).toMatchObject({
+        error: 'unsupported_grant_type',
+        error_description: 'Only authorization_code and refresh_token are supported',
+      });
+      expect(await errorOf(controller.token('refresh_token', '', '', '', '', '', ''))).toMatchObject({
+        error: 'invalid_request',
+      });
+      expect(await errorOf(controller.revoke(''))).toMatchObject({ error: 'invalid_request' });
+      expect(
+        await errorOf(controller.register({ redirect_uris: ['https://a.example.com/cb'] }, mockReq)),
+      ).toMatchObject({
+        error: 'invalid_client_metadata',
+      });
+      expect(
+        await errorOf(controller.register({ client_name: 'T', redirect_uris: ['http://evil.com/cb'] }, mockReq)),
+      ).toMatchObject({ error: 'invalid_redirect_uri' });
     });
   });
 });

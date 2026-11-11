@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UseFilters,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -16,9 +17,14 @@ import { Public } from '../../auth/decorators/public.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
 import { OAuthProviderService } from './oauth-provider.service';
+import { OAuthErrorFilter, oauthError, OAUTH_ERROR } from './oauth-error.filter';
 import { OAuthClientsService } from './oauth-clients.service';
 import { OAUTH_SCOPES } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+
+// The four protocol routes below (authorize, token, revoke, register) answer errors in the shape the standards
+// define, `{ error, error_description }`, through OAuthErrorFilter. The consent route is called by the web app
+// and keeps the usual error envelope.
 
 /**
  * Extract the tenant subdomain from a hostname.
@@ -61,6 +67,7 @@ export class OAuthProviderController {
    * GET /oauth/authorize — Validates request, returns redirect to consent page.
    */
   @Get('authorize')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @SkipThrottle()
   @ApiOperation({ summary: 'OAuth 2.1 authorization endpoint' })
@@ -76,13 +83,13 @@ export class OAuthProviderController {
   ) {
     // Validate required params
     if (responseType !== 'code') {
-      throw new BadRequestException('response_type must be "code"');
+      throw oauthError(OAUTH_ERROR.UNSUPPORTED_RESPONSE_TYPE, 'response_type must be "code"');
     }
     if (!clientId || !redirectUri || !scope || !state) {
-      throw new BadRequestException('Missing required parameters');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'client_id, redirect_uri, scope and state are required');
     }
     if (!codeChallenge || codeChallengeMethod !== 'S256') {
-      throw new BadRequestException('PKCE with S256 is required');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'PKCE with S256 is required');
     }
 
     const challengeToken = await this.oauthService.authorize({
@@ -130,6 +137,7 @@ export class OAuthProviderController {
    * Rate limited: 10 req/min per IP (targets brute-force).
    */
   @Post('token')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
@@ -145,23 +153,20 @@ export class OAuthProviderController {
   ) {
     if (grantType === 'authorization_code') {
       if (!code || !clientId || !codeVerifier || !redirectUri) {
-        throw new BadRequestException('Missing required parameters');
+        throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'code, client_id, code_verifier and redirect_uri are required');
       }
       return this.oauthService.exchangeCode(code, codeVerifier, clientId, clientSecret, redirectUri);
     }
 
     if (grantType === 'refresh_token') {
       if (!refreshToken || !clientId) {
-        throw new BadRequestException('Missing required parameters');
+        throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'refresh_token and client_id are required');
       }
       return this.oauthService.refreshToken(refreshToken, clientId, clientSecret);
     }
 
     // RFC 6749 Section 5.2: errors use 400
-    throw new BadRequestException({
-      error: 'unsupported_grant_type',
-      error_description: 'Only authorization_code and refresh_token are supported',
-    });
+    throw oauthError(OAUTH_ERROR.UNSUPPORTED_GRANT_TYPE, 'Only authorization_code and refresh_token are supported');
   }
 
   /**
@@ -169,13 +174,14 @@ export class OAuthProviderController {
    * Rate limited to prevent abuse.
    */
   @Post('revoke')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token revocation' })
   async revoke(@Body('token') token: string) {
     if (!token) {
-      throw new BadRequestException('Missing token');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'token is required');
     }
     await this.oauthService.revokeToken(token);
     return {};
@@ -187,6 +193,7 @@ export class OAuthProviderController {
    * to self-register without manual setup.
    */
   @Post('register')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @SkipThrottle()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -195,10 +202,7 @@ export class OAuthProviderController {
   async register(@Body() body: Record<string, any>, @Req() req: Request) {
     const clientName = body.client_name;
     if (!clientName || typeof clientName !== 'string') {
-      throw new BadRequestException({
-        error: 'invalid_client_metadata',
-        error_description: 'client_name is required',
-      });
+      throw oauthError(OAUTH_ERROR.INVALID_CLIENT_METADATA, 'client_name is required');
     }
 
     const redirectUris = body.redirect_uris;
@@ -207,10 +211,7 @@ export class OAuthProviderController {
       redirectUris.length === 0 ||
       !redirectUris.every((u: unknown) => typeof u === 'string')
     ) {
-      throw new BadRequestException({
-        error: 'invalid_client_metadata',
-        error_description: 'redirect_uris must be a non-empty array of strings',
-      });
+      throw oauthError(OAUTH_ERROR.INVALID_CLIENT_METADATA, 'redirect_uris must be a non-empty array of strings');
     }
 
     // Validate redirect URIs: must be localhost or HTTPS (per MCP spec)
@@ -219,17 +220,11 @@ export class OAuthProviderController {
         const parsed = new URL(uri);
         const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
         if (!isLocalhost && parsed.protocol !== 'https:') {
-          throw new BadRequestException({
-            error: 'invalid_client_metadata',
-            error_description: 'redirect_uris must use HTTPS or be localhost URLs',
-          });
+          throw oauthError(OAUTH_ERROR.INVALID_REDIRECT_URI, 'redirect_uris must use HTTPS or be localhost URLs');
         }
       } catch (e) {
         if (e instanceof BadRequestException) throw e;
-        throw new BadRequestException({
-          error: 'invalid_client_metadata',
-          error_description: `Invalid redirect_uri: ${uri}`,
-        });
+        throw oauthError(OAUTH_ERROR.INVALID_REDIRECT_URI, `Invalid redirect_uri: ${uri}`);
       }
     }
 
