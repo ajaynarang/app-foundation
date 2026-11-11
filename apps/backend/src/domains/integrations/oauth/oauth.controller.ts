@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthTokenService } from './auth-token.service';
 import { OAuthTokenRefreshJob } from './oauth-token-refresh.job';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
+import { INTEGRATIONS_WEB_PATH } from '../../../shared/web-routes';
 
 @Controller('integrations/oauth')
 export class OAuthController extends BaseTenantController {
@@ -49,7 +50,9 @@ export class OAuthController extends BaseTenantController {
   @Get('callback')
   @Public()
   async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: any, @Res() res: Response) {
-    const consoleUrl = this.config.get<string>('CONSOLE_URL', 'http://localhost:3002');
+    // The browser returns to the web app: APP_URL is the origin every other web link uses.
+    const appUrl = (this.config.get<string>('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');
+    const returnTo = `${appUrl}${INTEGRATIONS_WEB_PATH}`;
 
     try {
       if (!code || !state) {
@@ -84,7 +87,7 @@ export class OAuthController extends BaseTenantController {
         }
       }
 
-      res.redirect(`${consoleUrl}/integrations/connections?oauth=connected&vendor=${vendor}`);
+      res.redirect(`${returnTo}?oauth=connected&vendor=${encodeURIComponent(vendor)}`);
     } catch (err) {
       this.logger.error(`OAuth callback failed: ${(err as Error).message}`);
 
@@ -97,7 +100,7 @@ export class OAuthController extends BaseTenantController {
         /* ignore */
       }
 
-      res.redirect(`${consoleUrl}/integrations/connections?oauth=error&vendor=${vendor}`);
+      res.redirect(`${returnTo}?oauth=error&vendor=${encodeURIComponent(vendor)}`);
     }
   }
 

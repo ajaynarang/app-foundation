@@ -36,12 +36,10 @@ The repo's scripts and `doppler.yaml` files assume these exact project names:
 | --------------- | -------------- | --------------------------- |
 | `app-backend`   | `apps/backend` | `apps/backend/doppler.yaml` |
 | `app-frontend`  | `apps/web`     | `apps/web/doppler.yaml`     |
-| `app-console`   | `apps/console` | `apps/console/doppler.yaml` |
 
 ```bash
 doppler projects create app-backend
 doppler projects create app-frontend
-doppler projects create app-console
 ```
 
 New Doppler projects come with the three root configs this repo expects: `dev`, `stg`, `prd`.
@@ -55,7 +53,6 @@ work from that cwd with no flags:
 ```bash
 cd apps/backend  && doppler setup    # → app-backend / dev
 cd ../web        && doppler setup    # → app-frontend / dev
-cd ../console    && doppler setup    # → app-console / dev
 ```
 
 ### 4. Run the apps through Doppler
@@ -65,7 +62,6 @@ From the repo root:
 ```bash
 pnpm doppler:backend     # cd apps/backend && doppler run -- pnpm run dev
 pnpm doppler:frontend    # cd apps/web     && doppler run -- pnpm run dev
-pnpm doppler:console     # cd apps/console && doppler run -- pnpm run dev
 ```
 
 The QA suite scripts pin project/config explicitly instead of relying on cwd:
@@ -86,7 +82,6 @@ real values:
 ```bash
 doppler secrets upload apps/backend/.env.example --project app-backend  --config dev
 doppler secrets upload apps/web/.env.example     --project app-frontend --config dev
-doppler secrets upload apps/console/.env.example --project app-console  --config dev
 ```
 
 Notes:
@@ -161,7 +156,6 @@ public https URL of the API, `CORS_ORIGINS` lists no local origin, `INNGEST_DEV`
 | `SWAGGER_UI_ENABLED`                | No (on outside production, off when `NODE_ENV=production`)                                           | No      | Interactive Swagger UI at `/api`. Set `true` to serve it in production deliberately                                                                       | —                                                                                                            |
 | `PROJECT_NAME`                      | No                                                                                                   | No      | Display name (Swagger, emails)                                                                                                                            | —                                                                                                            |
 | `APP_URL`                           | No                                                                                                   | No      | Public web app URL (links in emails/invites)                                                                                                              | —                                                                                                            |
-| `CONSOLE_URL`                       | No                                                                                                   | No      | Console app URL                                                                                                                                           | —                                                                                                            |
 | `COOKIE_DOMAIN`                     | No (leave unset)                                                                                     | No      | Legacy. The refresh cookie is host-only; if set, used only to expire cookies an earlier version issued with this `Domain`                                 | —                                                                                                            |
 | `JWT_ACCESS_EXPIRY`                 | No (default `15m`)                                                                                   | No      | Access-token TTL                                                                                                                                          | —                                                                                                            |
 | `JWT_REFRESH_EXPIRY`                | No (default `7d`)                                                                                    | No      | Refresh-token TTL                                                                                                                                         | —                                                                                                            |
@@ -238,7 +232,6 @@ remember a rebuild (not just a restart) is needed for changes to take effect.
 | ------------------------------------------ | ------------------------------------------------------- | ------- | -------------------------------------------------------------------- | --------------------------------------------------------- |
 | `NEXT_PUBLIC_API_URL`                      | No locally (localhost fallback); **yes** in stg/prd     | No      | Backend API base URL                                                 | Your backend's public URL                                 |
 | `NEXT_PUBLIC_MULTI_TENANT`                 | No (default `true`)                                     | No      | Mirrors backend `MULTI_TENANT`                                       | —                                                         |
-| `NEXT_PUBLIC_CONSOLE_URL`                  | No                                                      | No      | Link target for the console app                                      | —                                                         |
 | `NODE_ENV`                                 | No                                                      | No      | Runtime mode                                                         | —                                                         |
 | `NEXT_PUBLIC_APP_DOMAIN`                   | No locally; needed in multi-tenant stg/prd              | No      | Base domain for tenant-slug extraction + parent-domain cookies       | —                                                         |
 | `NEXT_PUBLIC_DEV_SWITCHER`                 | No (dev/stg only)                                       | No      | Floating user/role-switch toolbar (bypasses Firebase/OTP)            | —                                                         |
@@ -253,14 +246,6 @@ remember a rebuild (not just a restart) is needed for changes to take effect.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`       | No                                                      | No      | Stripe.js on billing pages                                           | Stripe dashboard → API keys                               |
 | `NEXT_PUBLIC_LANGFUSE_BASE_URL`            | No                                                      | No      | Langfuse deep-links on the AI Spend page                             | —                                                         |
 | `NEXT_PUBLIC_LANGFUSE_PROJECT_ID`          | No (deep-link hidden without it)                        | No      | Langfuse deep-links                                                  | Langfuse project URL                                      |
-
-### Console (`app-console`)
-
-The contract lives in `apps/console/.env.example`. The console reads `NEXT_PUBLIC_API_URL`,
-`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONSOLE_URL`, `NEXT_PUBLIC_TENANT_APP_URL`,
-`NEXT_PUBLIC_DOCS_ONLY_MODE`, and the same `NEXT_PUBLIC_FIREBASE_*` set as the web app. All
-have localhost or empty fallbacks; seed `app-console/dev` with at least `NEXT_PUBLIC_API_URL`
-and `NEXT_PUBLIC_APP_URL`.
 
 ## Per-environment guidance
 
@@ -313,10 +298,10 @@ Store them as GitHub repository secrets (Settings → Secrets and variables → 
 
 ### Frontends (Vercel)
 
-The deploy workflow triggers Vercel deploy hooks for web and console; Vercel builds read env
+The deploy workflow triggers the web app's Vercel deploy hook; Vercel builds read env
 vars from the Vercel project, not from `doppler run`. Either maintain the `NEXT_PUBLIC_*` vars
 directly in Vercel, or connect Doppler's **Vercel integration** (Doppler dashboard →
-Integrations → Vercel) and map `app-frontend`/`app-console` `stg` → Preview and `prd` →
+Integrations → Vercel) and map `app-frontend` `stg` → Preview and `prd` →
 Production so the configs stay in sync automatically.
 
 ## Fallback without Doppler
@@ -326,7 +311,6 @@ Plain `.env` files work fine for local dev — Doppler is optional:
 ```bash
 cp apps/backend/.env.example apps/backend/.env        # then fill in values
 cp apps/web/.env.example     apps/web/.env.local
-cp apps/console/.env.example apps/console/.env.local  # optional — console has localhost fallbacks
 pnpm dev                                              # instead of pnpm doppler:*
 ```
 

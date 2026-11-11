@@ -12,7 +12,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { Input } from '@app/ui/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import { useAuth } from '@/features/auth';
-import { getValidToken, resolvePostLoginRedirect } from '@appshore/web-core/shared/lib/navigation';
+import { resolvePostLoginRedirect } from '@appshore/web-core/shared/lib/navigation';
 import { buildTenantRedirectUrl, isMultiTenant } from '@appshore/web-core/shared/lib/tenant-url';
 import { formatAsYouType } from '@app/ui/lib/phone';
 import { authApi } from '../api';
@@ -66,22 +66,7 @@ export function LoginForm({
 
   const redirectAfterLogin = (role: string, subdomain?: string) => {
     const redirect = searchParams.get('redirect');
-    const { url, isExternal } = resolvePostLoginRedirect({ redirect, returnTo: returnTo ?? null, role });
-
-    if (isExternal) {
-      const { accessToken, user } = useAuthStore.getState();
-      const validToken = getValidToken(accessToken);
-      if (validToken && user) {
-        const hash = `#token=${encodeURIComponent(validToken)}&user=${encodeURIComponent(JSON.stringify(user))}`;
-        // Add ?sso=1 so the target app's middleware lets the request through
-        // (hash fragments aren't sent to the server, so middleware can't see them)
-        const separator = url.includes('?') ? '&' : '?';
-        window.location.href = url + separator + 'sso=1' + hash;
-      } else {
-        window.location.href = url;
-      }
-      return;
-    }
+    const url = resolvePostLoginRedirect({ redirect, returnTo: returnTo ?? null, role });
 
     // If tenant has a subdomain, redirect to their subdomain URL with auth relay.
     // localStorage is origin-scoped, so we must relay the token in the URL hash.

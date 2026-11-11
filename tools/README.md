@@ -28,11 +28,11 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ### `dev/`
 
-| Script             | What it does                                                        |
-| ------------------ | ------------------------------------------------------------------- |
-| `dev/app-dev.sh`   | Open iTerm2 tabs running backend + web + console with custom ports. |
-| `dev/install.sh`   | One-time project bootstrap (run from repo root).                    |
-| `dev/kill-port.sh` | Kill the process holding a given port.                              |
+| Script             | What it does                                              |
+| ------------------ | --------------------------------------------------------- |
+| `dev/app-dev.sh`   | Open iTerm2 tabs running backend + web with custom ports. |
+| `dev/install.sh`   | One-time project bootstrap (run from repo root).          |
+| `dev/kill-port.sh` | Kill the process holding a given port.                    |
 
 ## Common tasks
 

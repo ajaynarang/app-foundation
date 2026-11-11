@@ -9,12 +9,14 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { apiClient, api } from '@appshore/web-core/shared/lib/api';
 import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { useCopyInviteLink } from '@/features/platform/settings/hooks/use-copy-invite-link';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 interface Invitation {
-  id: string;
+  /** Public id (uuid): the one every /invitations/:invitationId route takes. */
+  invitationId: string;
   email: string | null;
   firstName: string;
   lastName: string;
@@ -109,8 +111,8 @@ export default function InvitationsPage() {
 
   // Cancel invitation
   const cancelInvitation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient(`/invitations/${id}`, {
+    mutationFn: (invitationId: string) =>
+      apiClient(`/invitations/${invitationId}`, {
         method: 'DELETE',
         body: JSON.stringify({ reason: 'Cancelled by admin' }),
       }),
@@ -123,13 +125,15 @@ export default function InvitationsPage() {
 
   // Resend invitation
   const resendInvitation = useMutation({
-    mutationFn: (id: string) => api.post(`/invitations/${id}/resend`),
+    mutationFn: (invitationId: string) => api.post(`/invitations/${invitationId}/resend`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invitations'] });
       showSuccess('Invitation resent');
     },
     onError: (e: Error) => showError('Failed to resend', extractErrorMessage(e)),
   });
+
+  const copyInviteLink = useCopyInviteLink();
 
   // Only show actionable invitations (pending or expired)
   const activeInvitations = useMemo(
@@ -172,7 +176,7 @@ export default function InvitationsPage() {
               {activeInvitations.map((inv) => {
                 const isPending = inv.status.toLowerCase() === 'pending';
                 return (
-                  <TableRow key={inv.id}>
+                  <TableRow key={inv.invitationId}>
                     <TableCell className="font-medium text-foreground">
                       {inv.firstName} {inv.lastName}
                       <div className="sm:hidden text-xs text-muted-foreground font-normal">{inv.email || '--'}</div>
@@ -196,7 +200,7 @@ export default function InvitationsPage() {
                           variant="ghost"
                           size="sm"
                           loading={resendInvitation.isPending}
-                          onClick={() => resendInvitation.mutate(inv.id)}
+                          onClick={() => resendInvitation.mutate(inv.invitationId)}
                         >
                           Resend
                         </Button>
@@ -204,9 +208,19 @@ export default function InvitationsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            loading={copyInviteLink.isPending && copyInviteLink.variables === inv.invitationId}
+                            onClick={() => copyInviteLink.mutate(inv.invitationId)}
+                          >
+                            Copy link
+                          </Button>
+                        )}
+                        {isPending && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
                             loading={cancelInvitation.isPending}
-                            onClick={() => cancelInvitation.mutate(inv.id)}
+                            onClick={() => cancelInvitation.mutate(inv.invitationId)}
                           >
                             Cancel
                           </Button>

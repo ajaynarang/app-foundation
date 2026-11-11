@@ -7,7 +7,7 @@ export const OnboardingItemSchema = z.object({
   complete: z.boolean(),
   statusText: z.string(),
   actionLink: z.string(),
-  actionType: z.enum(['link', 'chat', 'sheet', 'console']),
+  actionType: z.enum(['link', 'chat', 'sheet']),
 });
 
 export const OnboardingPathSchema = z.object({
@@ -15,7 +15,7 @@ export const OnboardingPathSchema = z.object({
   title: z.string(),
   description: z.string(),
   actionLink: z.string(),
-  actionType: z.enum(['link', 'sheet', 'dialog', 'console']),
+  actionType: z.enum(['link', 'sheet', 'dialog']),
 });
 
 export const MilestoneStatusSchema = z.object({

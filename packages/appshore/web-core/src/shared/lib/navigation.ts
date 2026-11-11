@@ -1,6 +1,5 @@
 import {
   Bell,
-  BookOpen,
   Bot,
   Building2,
   CreditCard,
@@ -19,8 +18,6 @@ import {
   Send,
   DollarSign,
 } from 'lucide-react';
-
-export const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';
 
 /**
  * Generic platform roles. Tenant members map to MEMBER.
@@ -63,7 +60,7 @@ export interface SubPanelNavItem {
   icon: LucideIcon;
   entitlement?: string;
   entitlements?: string[];
-  external?: boolean; // Opens in new context (e.g., API Docs)
+  external?: boolean; // Opens in a new tab
 }
 
 export type SubPanelId = 'settings';
@@ -100,7 +97,6 @@ export const settingsSubPanel: SubPanelSection[] = [
       { label: 'Webhooks', href: '/settings/webhooks', icon: Webhook, entitlement: 'webhooks' },
       { label: 'OAuth Clients', href: '/settings/oauth-clients', icon: Link2, entitlement: 'oauth_clients' },
       { label: 'AI Assistants', href: '/settings/ai-integrations', icon: Bot },
-      { label: 'API Docs', href: `${CONSOLE_URL}/docs`, icon: BookOpen, external: true },
     ],
     roles: ['ADMIN', 'OWNER'],
   },
@@ -272,58 +268,31 @@ export function isSafeInternalPath(path: string | null | undefined): path is str
 }
 
 /**
- * Validate and return a returnTo URL if it points to an allowed domain.
- * Used by the login flow to redirect back to other platform apps (e.g. docs).
- * Returns null if the URL is missing, invalid, or points to an untrusted domain.
- */
-export function getReturnToUrl(returnTo: string | null | undefined): string | null {
-  if (!returnTo) return null;
-  try {
-    const url = new URL(returnTo);
-    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN;
-    const allowed = url.hostname === 'localhost' || (!!appDomain && url.hostname.endsWith(appDomain));
-    return allowed ? returnTo : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve the post-login redirect destination.
+ * Resolve the post-login redirect destination: always a path inside this app.
  *
  * Priority:
  *  1. ?redirect= (middleware-supplied, internal path only)
  *  2. ?returnTo= starting with / (internal path, e.g. /oauth/consent)
- *  3. ?returnTo= absolute URL on an allowed domain (external, e.g. docs portal)
- *  4. Role-based default route
+ *  3. Role-based default route
  *
- * Returns { url, isExternal } so the caller knows whether to use router.push
- * or window.location.href (with token relay for external).
+ * An absolute ?returnTo= is ignored. Login never sends the browser, or the
+ * session token, to another origin.
  */
-export function resolvePostLoginRedirect(params: { redirect: string | null; returnTo: string | null; role: string }): {
-  url: string;
-  isExternal: boolean;
-} {
+export function resolvePostLoginRedirect(params: {
+  redirect: string | null;
+  returnTo: string | null;
+  role: string;
+}): string {
   const { redirect, returnTo, role } = params;
 
   // 1. Middleware-supplied ?redirect= (always an internal path)
-  if (isSafeInternalPath(redirect)) {
-    return { url: redirect, isExternal: false };
-  }
+  if (isSafeInternalPath(redirect)) return redirect;
 
   // 2. Internal returnTo path (e.g. /oauth/consent?challenge=...)
-  if (isSafeInternalPath(returnTo)) {
-    return { url: returnTo, isExternal: false };
-  }
+  if (isSafeInternalPath(returnTo)) return returnTo;
 
-  // 3. External returnTo URL on an allowed domain
-  const externalUrl = getReturnToUrl(returnTo);
-  if (externalUrl) {
-    return { url: externalUrl, isExternal: true };
-  }
-
-  // 4. Default role-based route
-  return { url: getDefaultRouteForRole(role as UserRole), isExternal: false };
+  // 3. Default role-based route
+  return getDefaultRouteForRole(role as UserRole);
 }
 
 /**

@@ -87,6 +87,9 @@ export const queryKeys = {
   webhooks: {
     root: ['webhooks'] as const,
   },
+  developerScopes: {
+    root: ['developer-scopes'] as const,
+  },
   oauthClients: {
     root: ['oauth-clients'] as const,
     list: (tenantId?: number) =>
