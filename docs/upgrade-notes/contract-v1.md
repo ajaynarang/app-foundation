@@ -35,6 +35,7 @@ Each section says what changed, who notices, and what to do.
 | An uncaught `ZodError` was a 500                                                                | 400 `VALIDATION_FAILED` with `fieldErrors`                                                |
 | Prisma foreign-key conflict (P2003) and required-relation violation (P2014): **400**            | **409** `INVALID_STATE`                                                                   |
 | Prisma P2007 (a value the column cannot hold): 500                                              | 400 `VALIDATION_FAILED`                                                                   |
+| A request body over the parser limit: 500                                                       | 413 `PAYLOAD_TOO_LARGE`                                                                   |
 | The assistant stream and the queue board answered a failure with `{ statusCode, message }`      | The envelope                                                                              |
 | Desk responsibility update with bad conditions: `{ message, issues }`                           | 400 `VALIDATION_FAILED`; each bad condition is in `fieldErrors` under `conditions.<path>` |
 

@@ -138,6 +138,14 @@ function fromPrismaKnown(exception: Prisma.PrismaClientKnownRequestError): Error
   }
 }
 
+/**
+ * The body parser's "over the limit" error. It is an `http-errors` error raised in middleware, not a Nest
+ * `HttpException`, and Nest passes it to the filter as it is. Recognised by its `type` alone: a status on any other
+ * plain error is not trusted.
+ */
+const isBodyTooLarge = (exception: unknown): exception is Error =>
+  exception instanceof Error && (exception as { type?: unknown }).type === 'entity.too.large';
+
 /** Map any thrown value to its error shape. Unknown errors never leak their message (it goes to `debugDetail`). */
 export function errorShapeOf(exception: unknown): ErrorShape {
   if (exception instanceof HttpException) return fromHttpException(exception);
@@ -158,6 +166,14 @@ export function errorShapeOf(exception: unknown): ErrorShape {
       code: ApiErrorCode.VALIDATION_FAILED,
       detail: messages.length === 1 ? messages[0] : `${messages.length} fields are missing or invalid`,
       fieldErrors,
+    };
+  }
+  if (isBodyTooLarge(exception)) {
+    return {
+      status: HttpStatus.PAYLOAD_TOO_LARGE,
+      code: ApiErrorCode.PAYLOAD_TOO_LARGE,
+      detail: 'This request is too large. Send less data and try again.',
+      debugDetail: exception.message,
     };
   }
   return {

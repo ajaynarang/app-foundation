@@ -60,6 +60,31 @@ describe('error-envelope', () => {
     expect(Logger.prototype.warn).toHaveBeenCalledTimes(1);
   });
 
+  it("maps the body parser's over-limit error to 413 PAYLOAD_TOO_LARGE, logged as a warning", () => {
+    // What body-parser raises (an http-errors error, not a Nest HttpException) when a body passes the limit.
+    const tooLarge = Object.assign(new Error('request entity too large'), {
+      type: 'entity.too.large',
+      status: 413,
+      statusCode: 413,
+      limit: 102400,
+      length: 300000,
+    });
+    expect(errorShapeOf(tooLarge)).toEqual({
+      status: 413,
+      code: 'PAYLOAD_TOO_LARGE',
+      detail: 'This request is too large. Send less data and try again.',
+      debugDetail: 'request entity too large',
+    });
+    buildErrorEnvelope(tooLarge, req);
+    expect(Logger.prototype.error).not.toHaveBeenCalled();
+    expect(Logger.prototype.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('trusts no other status a plain error carries: it stays a generic 500', () => {
+    const odd = Object.assign(new Error('upstream said no'), { status: 403, statusCode: 403 });
+    expect(errorShapeOf(odd)).toMatchObject({ status: 500, code: 'INTERNAL' });
+  });
+
   it('stringifies a non-Error throw into debugDetail only', () => {
     expect(errorShapeOf({ weird: true })).toMatchObject({ status: 500, debugDetail: '{"weird":true}' });
   });
