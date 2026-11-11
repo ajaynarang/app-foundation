@@ -23,9 +23,12 @@ export function buildUserInvitation(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// The API resolves the host when a subscription is saved and refuses one with no public address, so the
+// default must be a name that resolves (example.com does; test.example.com has no A record). To receive the
+// deliveries, pass `url` for a local receiver and run the backend with WEBHOOK_ALLOW_PRIVATE_TARGETS=true.
 export function buildWebhookSubscription(overrides: Record<string, unknown> = {}) {
   return {
-    url: `https://test.example.com/webhooks/${unique('wh')}`,
+    url: `https://example.com/webhooks/${unique('wh')}`,
     events: ['user.created', 'user.updated'],
     ...overrides,
   };
