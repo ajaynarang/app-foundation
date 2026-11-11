@@ -59,7 +59,6 @@ when `MULTI_TENANT=false`.
 apps/
   backend/   — NestJS 11 API: YOUR domains + app shell + platform-glue (composition/vocabulary)
   web/       — Next.js 15 (App Router, Tailwind, shadcn/ui, TanStack Query, Zustand)
-  console/   — Platform management hub (Next.js 15) — super-admin/ops
   mobile/    — Flutter companion app (status + auth scaffold; API client in lib/core/)
 packages/
   appshore/      — the AppShore Platform (@appshore/* — reusable, app-blind; init-app never renames these)
@@ -134,7 +133,7 @@ pnpm prisma:generate                           # Prisma client + shared-enum cod
 pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
                                                # foundation packages (the backend consumes their dist)
 pnpm prisma:migrate:deploy && pnpm db:seed     # apply migration + seed platform data
-cd ../.. && pnpm dev                           # backend + web + console
+cd ../.. && pnpm dev                           # backend + web
 ```
 
 Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=public`.

@@ -29,7 +29,7 @@ export function ExternalAgentsPage() {
   const [quickstartOpen, setQuickstartOpen] = useState(false);
 
   // Auto-open the quickstart modal when the page is reached via
-  // `?quickstart=true` (e.g. from the console MCP deep-link) UNLESS the user
+  // `?quickstart=true` (a deep link to the quickstart) UNLESS the user
   // previously checked "Don't show again".
   useEffect(() => {
     if (searchParams.get('quickstart') !== 'true') return;

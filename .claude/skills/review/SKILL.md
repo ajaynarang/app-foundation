@@ -27,7 +27,7 @@ Parse `$ARGUMENTS` to determine review mode:
 **Classify every changed file:**
 
 - **Backend** → `apps/backend/`, `packages/appshore/kernel|db|platform/`, or `packages/shared-types/`
-- **Frontend** → `apps/web/`, `apps/console/`, `packages/appshore/web-core/`, or `packages/ui/`
+- **Frontend** → `apps/web/`, `packages/appshore/web-core/`, or `packages/ui/`
 - **Both** → changes span both
 - **Other** → `apps/mobile/`, `infra/`, `tests/`, config files — apply general checks only (mobile: see `mobile-patterns`)
 
