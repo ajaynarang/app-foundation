@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { FormSheet } from '@/shared/components/ui/form-sheet';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import { Textarea } from '@app/ui/components/ui/textarea';

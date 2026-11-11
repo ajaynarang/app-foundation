@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from '@app/ui/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
-import { FormSheet } from '@/shared/components/ui/form-sheet';
+import { FormSheet } from '@app/ui/components/ui/form-sheet';
 import {
   useWalletBalance,
   usePaymentMethods,

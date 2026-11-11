@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '@app/shared-types';
 import { useAgentActivity } from '@/features/ai/agent-activity';
 import { ScopeChip } from '@/features/ai/agent-scope-ui';
-import { DateRangeFilter, HISTORY_PRESETS } from '@/shared/components/ui/date-range-filter';
+import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
 
 interface ActivityTabProps {
   principalKind: AgentPrincipalKind;

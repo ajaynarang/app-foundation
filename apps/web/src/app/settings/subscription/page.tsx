@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@app/ui/components/ui/alert-dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/shared/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@app/ui/components/ui/sheet';
 import { usePlan } from '@/features/platform/plans/hooks/use-plan';
 import { plansApi } from '@/features/platform/plans/api';
 import {

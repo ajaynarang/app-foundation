@@ -39,7 +39,7 @@ import {
 } from '../use-webhooks';
 import { EventPicker } from './event-picker';
 import { RotateWebhookSecretDialog } from './rotate-webhook-secret-dialog';
-import { DateRangeFilter, HISTORY_PRESETS } from '@/shared/components/ui/date-range-filter';
+import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
 
 interface Props {
   webhook: WebhookSubscription | null;

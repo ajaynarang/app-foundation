@@ -82,5 +82,5 @@ export {
 export * from '@appshore/web-core/shared/list';
 export { SearchSelect, type SearchSelectOption, type SearchSelectProps } from './search-select';
 
-// apps/web's own TabsContent (unchanged behaviour), beside PageTabs.
-export { TabsContent } from '@/shared/components/ui/tabs';
+// TabsContent beside PageTabs, so a page gets its tab panels from the same import.
+export { TabsContent } from '@app/ui/components/ui/tabs';

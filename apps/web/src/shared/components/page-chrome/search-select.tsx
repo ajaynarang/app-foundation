@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { cn } from '@appshore/web-core/shared/lib/utils';
-import { Button } from '@/shared/components/ui/button';
+import { Button } from '@app/ui/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -12,9 +12,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/shared/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
-import { Skeleton } from '@/shared/components/ui/skeleton';
+} from '@app/ui/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@app/ui/components/ui/popover';
+import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useResultHighlight } from '@/shared/hooks/use-result-highlight';
 import { usePickerSearch, type PickerSearchSource } from '@appshore/web-core/shared/list';
 
