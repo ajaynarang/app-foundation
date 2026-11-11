@@ -373,7 +373,7 @@ describe('UserInvitationsService', () => {
       await expect(service.resendInvitation('inv_abc', 'bad_tenant')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -386,7 +386,11 @@ describe('UserInvitationsService', () => {
         invitedByUser: { firstName: 'A', lastName: 'B' },
       });
 
-      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.resendInvitation('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 
@@ -599,7 +603,7 @@ describe('UserInvitationsService', () => {
       await expect(service.cancelInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('already cancelled');
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -610,7 +614,11 @@ describe('UserInvitationsService', () => {
         status: 'PENDING',
       });
 
-      await expect(service.cancelInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.cancelInvitation('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 
@@ -946,7 +954,7 @@ describe('UserInvitationsService', () => {
       await expect(service.getInvitationLink('inv_nonexistent', 'tenant_abc')).rejects.toThrow('Invitation not found');
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -957,7 +965,11 @@ describe('UserInvitationsService', () => {
         status: 'PENDING',
       });
 
-      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.getInvitationLink('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -372,8 +372,9 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status === 'ACCEPTED') {
@@ -418,8 +419,9 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status !== 'PENDING') {
@@ -478,8 +480,9 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status !== 'PENDING') {
