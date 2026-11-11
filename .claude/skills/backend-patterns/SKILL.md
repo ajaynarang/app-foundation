@@ -285,7 +285,9 @@ Rules:
 - **An action verb is the last segment after a param** (`/invitations/:invitation_id/resend`). It is never 201. The
   verbs the ratchet knows are in `ACTION_VERBS` in `api-contract.spec.ts`; add yours there.
 - **An illegal state transition is 409**: `throw invalidState('Only failed jobs can be retried')`, never a 400 or a 403. A 400 is for a field of the request that is wrong.
-- **Another tenant's record is 404**, with the same text as a missing one. A 403 confirms that it exists.
+- **Another tenant's record is 404**, with the same text as a missing one. A 403 or a 400 confirms that it exists.
+  Scope the read itself (`findFirst({ where: { id, tenantId } })`); the ratchet flags a tenant comparison answered
+  with either status, whatever the message.
 
 **Provider routes.** A route whose wire format a third party sets (a vendor webhook, the MCP transport, OAuth
 protocol routes, a vendor's OAuth redirect, an SSE stream) keeps the format the standard or vendor document fixes.

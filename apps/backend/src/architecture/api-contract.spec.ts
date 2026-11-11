@@ -178,6 +178,21 @@ function scan(
   return [...out];
 }
 
+/**
+ * Lines that compare a record's tenant (`x.tenantId !== tenantId`, `x.tenantId !== tenant.id`) and answer the mismatch
+ * with a 403 or a 400 on that line or the two after it. Either status confirms that the record exists.
+ */
+function crossTenantRefusals(src: string): string[] {
+  const lines = src.split('\n');
+  return lines
+    .filter(
+      (line, i) =>
+        /\btenant\w*(?:\??\.\w+)*\s*!==?|!==?\s*(?:\w+\??\.)*tenant\w*/i.test(line) &&
+        /new (?:Forbidden|BadRequest)Exception\(/.test(lines.slice(i, i + 3).join('\n')),
+    )
+    .map((line) => line.replace(/\s+/g, ' ').trim().slice(0, 160));
+}
+
 /** The bodies (from the opening line) of every function whose header matches `header` — brace-counted. */
 function functionBodies(src: string, header: RegExp): string[] {
   const bodies: string[] = [];
@@ -445,11 +460,14 @@ const RULES: Record<string, { why: string; violations: () => string[] }> = {
   },
   'errors/cross-tenant-is-404': {
     why: "Section 2: another tenant's record is 404. A 403 confirms it exists",
-    violations: () =>
-      scan(
+    violations: () => [
+      ...scan(
         FILES,
         /new ForbiddenException\(\s*['"`]([^'"`]*(different|another|other) (tenant|workspace)[^'"`]*|Access denied|You do not have access to this resource)['"`]/gi,
       ),
+      // Whatever the message (or none): a tenant comparison answered with a 403 or a 400.
+      ...FILES.flatMap((f) => crossTenantRefusals(f.src).map((line) => `${f.rel} :: ${line}`)),
+    ],
   },
   'output/no-raw-prisma-from-controllers': {
     why: 'Section 3: controllers return serialized DTOs, never a Prisma row',
@@ -602,6 +620,33 @@ describe('API contract (ratchet)', () => {
     // A multi-line signature with an inline type still yields the whole handler body.
     const pause = route('api-keys.controller.ts :: POST /api-keys/:api_key_id/pause');
     expect(pause?.body).toMatch(/apiKeysService\.pause\(/);
+  });
+
+  it('the cross-tenant check sees a 403 or 400 after a tenant comparison, whatever its message (sanity)', () => {
+    const bare = 'if (sub.tenantId !== tenantId) throw new ForbiddenException();';
+    expect(crossTenantRefusals(bare)).toEqual([bare]);
+    expect(
+      crossTenantRefusals(
+        ['if (invitation.tenantId !== tenant.id) {', "  throw new BadRequestException('Not yours');", '}'].join('\n'),
+      ),
+    ).toEqual(['if (invitation.tenantId !== tenant.id) {']);
+    expect(
+      crossTenantRefusals('if (user.tenantDbId != row.tenant?.id) throw new ForbiddenException("no");'),
+    ).toHaveLength(1);
+    // A 404 is the rule; a 400 for something else further down is not a tenant refusal.
+    expect(crossTenantRefusals("if (row.tenantId !== tenantId) throw new NotFoundException('Not found');")).toEqual([]);
+    expect(
+      crossTenantRefusals(
+        [
+          'if (row.tenantId !== tenantId) {',
+          "  throw new NotFoundException('Not found');",
+          '}',
+          "if (!dto.name) throw new BadRequestException('Name is required');",
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+    // A filter built from an optional tenant is not a comparison of a record.
+    expect(crossTenantRefusals('if (tenantId !== undefined) where.tenantId = tenantId;')).toEqual([]);
   });
 
   describe('api-contract.allowlist.json', () => {
