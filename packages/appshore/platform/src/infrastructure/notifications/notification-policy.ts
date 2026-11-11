@@ -2,7 +2,7 @@ import { DeliveryChannel, type NotificationCategory, type NotificationType } fro
 
 /**
  * What a channel does for a type when nothing else intervenes. Each layer below
- * the policy (role default, stored preference, quiet hours, consent) may only
+ * the policy (the default, stored preference, quiet hours, consent) may only
  * narrow it — never widen it.
  */
 export const CHANNEL_RULES = {

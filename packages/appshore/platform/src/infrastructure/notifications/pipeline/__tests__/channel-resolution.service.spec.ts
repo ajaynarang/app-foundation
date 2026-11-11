@@ -308,7 +308,7 @@ describe('ChannelResolutionService', () => {
       expect(CHANNEL_DEFAULTS).toEqual({ inApp: true, push: true, email: true, sms: true, whatsapp: true });
     });
 
-    it('a stored opt-in still wins where the policy asks for one', async () => {
+    it('a stored opt-out beats the default', async () => {
       storedPrefs({ billing: { email: false, sms: false } });
 
       const result = await resolve(NotificationType.TENANT_APPROVED);

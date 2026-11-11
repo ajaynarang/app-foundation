@@ -24,7 +24,7 @@ export const DELIVERY_SKIP_REASONS = {
   DROPPED_TEST_MARKER: 'DROPPED_TEST_MARKER',
   /** The type's policy does not offer this channel. */
   POLICY_NEVER: 'POLICY_NEVER',
-  /** The user (or their role default) has this channel off for the category. */
+  /** The user has this channel off for the category. */
   USER_OPT_OUT: 'USER_OPT_OUT',
   /** WhatsApp without the consent kind this type needs. */
   NO_CONSENT: 'NO_CONSENT',
