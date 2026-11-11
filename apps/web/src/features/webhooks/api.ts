@@ -16,6 +16,8 @@ export interface WebhookSubscription {
   description: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set while a rotated-out secret still signs deliveries alongside the current one. */
+  previousSecretExpiresAt?: string | null;
   _count?: { deliveryLogs: number };
 }
 
@@ -106,6 +108,14 @@ export async function getWebhookLogs(
 export async function testWebhook(id: string): Promise<{ message: string }> {
   return apiClient<{ message: string }>(`/webhooks/${id}/test`, {
     method: 'POST',
+  });
+}
+
+/** A new signing secret, shown once; the old one keeps signing for `overlapHours`. */
+export async function rotateWebhookSecret(id: string, overlapHours: number): Promise<WebhookCreatedResponse> {
+  return apiClient<WebhookCreatedResponse>(`/webhooks/${id}/rotate-secret`, {
+    method: 'POST',
+    body: JSON.stringify({ overlapHours }),
   });
 }
 

@@ -1,11 +1,13 @@
 import { Test } from '@nestjs/testing';
-import { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import { Job, UnrecoverableError } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { WebhookDeliveryProcessor, WebhookDeliveryPayload } from '../delivery.processor';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
-import * as crypto from 'crypto';
+import { signLegacyWebhook, signStandardWebhook } from '../standard-webhooks';
 import axios from 'axios';
+import { UnsafeWebhookTargetError } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -65,28 +67,11 @@ describe('WebhookDeliveryProcessor', () => {
         WebhookDeliveryProcessor,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DeadLetterService, useValue: mockDeadLetter },
+        { provide: ConfigService, useValue: { get: () => false } },
       ],
     }).compile();
 
     processor = module.get(WebhookDeliveryProcessor);
-  });
-
-  describe('computeSignature', () => {
-    it('produces sha256=<hex> matching HMAC-SHA256 of JSON payload', () => {
-      const secret = 'my-secret';
-      const payload = {
-        id: 'evt-1',
-        event: 'app.notification.created',
-        tenantId: 'tenant_x',
-        data: {},
-      };
-      const body = JSON.stringify(payload);
-      const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
-
-      const result = processor.computeSignature(secret, body);
-
-      expect(result).toBe(expected);
-    });
   });
 
   describe('process', () => {
@@ -179,6 +164,171 @@ describe('WebhookDeliveryProcessor', () => {
           data: expect.objectContaining({ failedAt: expect.any(Date) }),
         }),
       );
+    });
+  });
+
+  describe('Standard Webhooks signature', () => {
+    const jobPayload: WebhookDeliveryPayload = {
+      subscriptionId: 'sub-1',
+      logId: 'log-1',
+      payload: {
+        id: 'evt-1',
+        event: 'app.notification.created',
+        version: 2,
+        tenantId: 'tenant_x',
+        timestamp: '2026-11-11T12:00:00.000Z',
+        data: { hello: 'world' },
+      },
+    };
+    const NOW_MS = Date.parse('2026-11-11T12:00:00Z');
+    const NOW_SECONDS = NOW_MS / 1000;
+    const secret = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
+    const oldSecret = 'ab'.repeat(32);
+    const base = { id: 'sub-1', tenantId: 1, url: 'https://partner.com/hook', active: true };
+
+    const deliver = async (subscription: Record<string, unknown>) => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue({ ...base, ...subscription });
+      mockPrisma.webhookDeliveryLog.update.mockResolvedValue({});
+      mockedAxios.post.mockResolvedValue({ status: 200, data: 'ok' });
+      await processor.process(makeJob(jobPayload, 0));
+      const [, body, options] = mockedAxios.post.mock.calls[0] as [string, string, { headers: Record<string, string> }];
+      return { body, headers: options.headers };
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(NOW_MS);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('sends webhook-id, webhook-timestamp and a v1 signature over "id.timestamp.body"', async () => {
+      const { body, headers } = await deliver({ secret, previousSecret: null, previousSecretExpiresAt: null });
+
+      expect(body).toBe(JSON.stringify(jobPayload.payload));
+      expect(headers['webhook-id']).toBe('log-1');
+      expect(headers['webhook-timestamp']).toBe(String(NOW_SECONDS));
+      expect(headers['webhook-signature']).toBe(signStandardWebhook(secret, 'log-1', NOW_SECONDS, body));
+      expect(headers['webhook-signature']).toMatch(/^v1,[A-Za-z0-9+/]+=*$/);
+    });
+
+    it('still sends the legacy headers, signed over the body with the current secret', async () => {
+      const { body, headers } = await deliver({ secret, previousSecret: null, previousSecretExpiresAt: null });
+
+      expect(headers['X-Webhook-Signature']).toBe(signLegacyWebhook(secret, body));
+      expect(headers['X-Webhook-Event']).toBe('app.notification.created');
+      expect(headers['X-Webhook-Delivery']).toBe('log-1');
+      expect(headers['X-Webhook-Event-Version']).toBe('2');
+    });
+
+    it('signs with the new and the previous secret during a rotation overlap', async () => {
+      const { body, headers } = await deliver({
+        secret,
+        previousSecret: oldSecret,
+        previousSecretExpiresAt: new Date(NOW_MS + 60_000),
+      });
+
+      expect(headers['webhook-signature'].split(' ')).toEqual([
+        signStandardWebhook(secret, 'log-1', NOW_SECONDS, body),
+        signStandardWebhook(oldSecret, 'log-1', NOW_SECONDS, body),
+      ]);
+    });
+
+    it('stops signing with the previous secret once the overlap has ended', async () => {
+      const { body, headers } = await deliver({
+        secret,
+        previousSecret: oldSecret,
+        previousSecretExpiresAt: new Date(NOW_MS - 1),
+      });
+
+      expect(headers['webhook-signature']).toBe(signStandardWebhook(secret, 'log-1', NOW_SECONDS, body));
+    });
+  });
+
+  describe('SSRF guard at delivery', () => {
+    const jobPayload: WebhookDeliveryPayload = {
+      subscriptionId: 'sub-1',
+      logId: 'log-1',
+      payload: {
+        id: 'evt-1',
+        event: 'app.notification.created',
+        tenantId: 'tenant_x',
+        timestamp: new Date().toISOString(),
+        data: {},
+      },
+    };
+    const subscriptionAt = (url: string) => ({ id: 'sub-1', tenantId: 1, url, secret: 'my-secret', active: true });
+
+    beforeEach(() => {
+      mockPrisma.webhookDeliveryLog.update.mockResolvedValue({});
+    });
+
+    it.each([
+      ['the metadata address', 'http://169.254.169.254/latest/meta-data/'],
+      ['loopback', 'https://127.0.0.1/hook'],
+      ['a private address', 'https://10.0.0.5/hook'],
+      ['an IPv6-mapped private address', 'https://[::ffff:192.168.1.10]/hook'],
+      ['an internal name', 'https://redis.internal/hook'],
+    ])('refuses a stored URL that names %s without sending, and does not retry', async (_label, url) => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscriptionAt(url));
+
+      await expect(processor.process(makeJob(jobPayload, 0))).rejects.toThrow(UnrecoverableError);
+
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(mockPrisma.webhookDeliveryLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: expect.objectContaining({
+          responseStatus: null,
+          responseBody: expect.stringMatching(/^Refused: /),
+          failedAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('refuses, without retry, when the host resolves to a blocked address on connect', async () => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscriptionAt('https://partner.com/hook'));
+      // What axios throws when the agent's lookup refuses: an AxiosError carrying the cause.
+      mockedAxios.post.mockRejectedValue(
+        Object.assign(new Error('request failed'), {
+          cause: new UnsafeWebhookTargetError('resolves to a non-public address (10.0.0.5)'),
+        }),
+      );
+
+      await expect(processor.process(makeJob(jobPayload, 0))).rejects.toThrow(UnrecoverableError);
+
+      expect(mockPrisma.webhookDeliveryLog.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ failedAt: expect.any(Date) }) }),
+      );
+    });
+
+    it('sends through the guarded agents, follows no redirect and uses no environment proxy', async () => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscriptionAt('https://partner.com/hook'));
+      mockedAxios.post.mockResolvedValue({ status: 200, data: 'ok' });
+
+      await processor.process(makeJob(jobPayload, 0));
+
+      const options = mockedAxios.post.mock.calls[0][2] as Record<string, any>;
+      expect(options.maxRedirects).toBe(0);
+      expect(options.proxy).toBe(false);
+      expect(options.httpAgent.options.lookup).toEqual(expect.any(Function));
+      expect(options.httpsAgent.options.lookup).toEqual(expect.any(Function));
+    });
+
+    it('treats a redirect response as a failed delivery', async () => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscriptionAt('https://partner.com/hook'));
+      mockedAxios.post.mockResolvedValue({ status: 302, data: '' });
+
+      await expect(processor.process(makeJob(jobPayload, 0))).rejects.toThrow('Webhook delivery failed with HTTP 302');
+    });
+
+    it('records a refused delivery in the dead-letter log at once', async () => {
+      const job = makeJob(jobPayload, 1, 3);
+      const err = new UnrecoverableError('Refused');
+
+      await processor.onFailed(job, err);
+
+      expect(mockDeadLetter.recordPermanentFailure).toHaveBeenCalledWith(job, err);
     });
   });
 

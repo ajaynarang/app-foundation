@@ -18,7 +18,7 @@ import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.dec
 import { WebhookSubscriptionService } from './subscription.service';
 import { WebhookDispatcher } from './dispatcher.service';
 import { DOMAIN_EVENTS } from '../events/domain-events.constants';
-import { CreateWebhookSubscriptionDto, UpdateWebhookSubscriptionDto } from './dto';
+import { CreateWebhookSubscriptionDto, RotateWebhookSecretDto, UpdateWebhookSubscriptionDto } from './dto';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 
 @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
@@ -74,6 +74,15 @@ export class SubscriptionController {
   @ApiOperation({ summary: 'Soft-delete (deactivate) a webhook subscription' })
   async remove(@CurrentUser() user: any, @Param('id') id: string) {
     await this.subscriptionService.softDelete(user.tenantDbId, id);
+  }
+
+  @Post(':id/rotate-secret')
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({
+    summary: 'Rotate the signing secret. The new secret is shown once; the old one keeps signing for the overlap',
+  })
+  async rotateSecret(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: RotateWebhookSecretDto) {
+    return this.subscriptionService.rotateSecret(user.tenantDbId, id, dto);
   }
 
   @Get(':id/logs')

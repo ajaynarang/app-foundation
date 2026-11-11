@@ -78,6 +78,20 @@ describe('ApiKeyAuthGuard', () => {
     // After the int migration, auditId is the stringified DB id.
   });
 
+  it.each([
+    ['::ffff:10.0.0.1', '10.0.0.1'],
+    ['10.0.0.1', '10.0.0.1'],
+    ['2001:db8::1', '2001:db8::1'],
+    // No address at all is sent as 'unknown', which matches no allowlist entry (the service skips the check on a missing ip).
+    [undefined, 'unknown'],
+  ])('checks the allowlist against %s as %s (IPv4-mapped IPv6 folded to IPv4)', async (reqIp, expected) => {
+    service.validateKey.mockResolvedValue(null);
+    await expect(
+      guard.canActivate(execCtx({ headers: { authorization: 'Bearer sk_live_x' }, ip: reqIp })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(service.validateKey).toHaveBeenCalledWith('sk_live_x', { ip: expected });
+  });
+
   it('when ipAllowlist is empty, principal has ipAllowlist=undefined (not []) per AgentPrincipal type', async () => {
     service.validateKey.mockResolvedValue({
       id: 2,

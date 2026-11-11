@@ -42,6 +42,14 @@ export class FileStorageService {
     return name + ext;
   }
 
+  /** A file name that is safe inside a quoted `Content-Disposition` value: printable ASCII, no quote or backslash. */
+  private downloadFileName(fileName?: string): string {
+    const safe = this.sanitizeFileName(fileName ?? '')
+      .replace(/[^\x20-\x7e]/g, '_')
+      .replace(/["\\;]/g, '_');
+    return safe || 'download';
+  }
+
   async generatePresignedUploadUrl(s3Key: string, mimeType: string, expiresInSeconds = 300): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -54,10 +62,21 @@ export class FileStorageService {
     });
   }
 
-  async generatePresignedDownloadUrl(s3Key: string, expiresInSeconds = 3600): Promise<string> {
+  /**
+   * Presigned GET for a stored file. The URL overrides the response headers to
+   * `Content-Disposition: attachment` and `Content-Type: application/octet-stream`,
+   * whatever type the object was uploaded with, so a browser always downloads
+   * it and never renders it. Without this an uploaded HTML or SVG file would
+   * run as a page on the bucket's origin when its link is opened.
+   *
+   * `fileName` is the name the browser saves the file under.
+   */
+  async generatePresignedDownloadUrl(s3Key: string, expiresInSeconds = 3600, fileName?: string): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: s3Key,
+      ResponseContentDisposition: `attachment; filename="${this.downloadFileName(fileName)}"`,
+      ResponseContentType: 'application/octet-stream',
     });
 
     return getSignedUrl(this.s3Client, command, {

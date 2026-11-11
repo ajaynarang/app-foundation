@@ -19,8 +19,9 @@ const mockAuthService = {
   verifyAndAddPhone: jest.fn(),
 };
 
+const defaultConfig = (key: string) => (key === 'environment' ? 'development' : undefined);
 const mockConfigService = {
-  get: jest.fn().mockReturnValue('development'),
+  get: jest.fn(defaultConfig),
 };
 
 describe('AuthController', () => {
@@ -38,6 +39,46 @@ describe('AuthController', () => {
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
+  });
+
+  /**
+   * The refresh cookie must be host-only. These fail if a `Domain` attribute
+   * comes back, even with COOKIE_DOMAIN still configured by a deployment.
+   */
+  describe('refresh cookie is host-only', () => {
+    const withCookieDomain = (key: string) => (key === 'COOKIE_DOMAIN' ? '.acme.io' : defaultConfig(key));
+
+    it('login sets the cookie with no Domain attribute', async () => {
+      mockConfigService.get.mockImplementation(withCookieDomain);
+      const req = { ip: '127.0.0.1', headers: { 'user-agent': 'test' } } as any;
+      const res = { cookie: jest.fn(), clearCookie: jest.fn() } as any;
+      mockAuthService.exchangeFirebaseToken.mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', user: {} });
+
+      await controller.exchangeFirebaseToken({ idToken: 'firebase-token', tenantId: 'T-1' } as any, req, res);
+
+      expect(res.cookie).toHaveBeenCalledTimes(1);
+      const [name, value, options] = res.cookie.mock.calls[0];
+      expect(name).toBe('refreshToken');
+      expect(value).toBe('rt');
+      expect(options).not.toHaveProperty('domain');
+      expect(options).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/api/v1/auth' });
+    });
+
+    it('logout clears the host-only cookie with no Domain attribute', async () => {
+      mockConfigService.get.mockImplementation(withCookieDomain);
+      const res = { clearCookie: jest.fn() } as any;
+
+      await controller.logout({ tokenId: null, dbId: 1, tenantDbId: null }, res);
+
+      const hostOnly = res.clearCookie.mock.calls.filter(([, options]: [string, object]) => !('domain' in options));
+      expect(hostOnly).toHaveLength(1);
+      expect(hostOnly[0][0]).toBe('refreshToken');
+      expect(hostOnly[0][1]).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/api/v1/auth' });
+    });
+
+    afterEach(() => {
+      mockConfigService.get.mockReset().mockImplementation(defaultConfig);
+    });
   });
 
   describe('exchangeFirebaseToken', () => {

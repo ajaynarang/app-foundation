@@ -135,6 +135,59 @@ describe('AppCacheService (integration, real Redis)', () => {
     expect(count).toBeGreaterThanOrEqual(2);
   });
 
+  describe('throttleHit (the rate-limit script)', () => {
+    const key = `${TEST_PREFIX}:throttle`;
+
+    it('counts hits in one fixed window and sets its expiry once', async () => {
+      if (!available) return;
+
+      const first = await service.throttleHit(key, 60_000, 3, 60_000);
+      const second = await service.throttleHit(key, 60_000, 3, 60_000);
+
+      expect(first).toMatchObject({ totalHits: 1, isBlocked: false, blockLeftMs: 0 });
+      expect(second).toMatchObject({ totalHits: 2, isBlocked: false });
+      expect(first.windowMs).toBe(60_000);
+      expect(second.windowMs).toBeLessThanOrEqual(60_000);
+      expect(await probe.get(key)).toBe('2');
+      expect(await probe.pttl(key)).toBeGreaterThan(0);
+    });
+
+    it('blocks the hit that passes the limit, and every hit after it, for the block duration', async () => {
+      if (!available) return;
+
+      await service.throttleHit(key, 60_000, 2, 30_000);
+      await service.throttleHit(key, 60_000, 2, 30_000);
+      const over = await service.throttleHit(key, 60_000, 2, 30_000);
+      const stillBlocked = await service.throttleHit(key, 60_000, 2, 30_000);
+
+      expect(over).toMatchObject({ totalHits: 3, isBlocked: true, blockLeftMs: 30_000 });
+      expect(stillBlocked.isBlocked).toBe(true);
+      expect(stillBlocked.blockLeftMs).toBeGreaterThan(0);
+      expect(stillBlocked.blockLeftMs).toBeLessThanOrEqual(30_000);
+      expect(await probe.pttl(`${key}:blocked`)).toBeGreaterThan(0);
+    });
+
+    it('starts a fresh window once the block has lifted', async () => {
+      if (!available) return;
+
+      await service.throttleHit(key, 60_000, 1, 50);
+      expect((await service.throttleHit(key, 60_000, 1, 50)).isBlocked).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      expect(await service.throttleHit(key, 60_000, 1, 50)).toMatchObject({ totalHits: 1, isBlocked: false });
+    });
+
+    it('a second client on the same Redis shares the count (what replicas need)', async () => {
+      if (!available) return;
+      const otherReplica = new AppCacheService(probe);
+
+      await service.throttleHit(key, 60_000, 5, 60_000);
+      const fromOther = await otherReplica.throttleHit(key, 60_000, 5, 60_000);
+
+      expect(fromOther.totalHits).toBe(2);
+    });
+  });
+
   it('increment is atomic — INCRBY then first-touch EXPIRE', async () => {
     if (!available) return;
 

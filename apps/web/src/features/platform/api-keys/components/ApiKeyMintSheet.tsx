@@ -7,7 +7,7 @@ import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import { FormSheet } from '@app/ui/components/ui/form-sheet';
 import { showSuccess, showError } from '@app/ui';
-import type { AgentScope } from '@app/shared-types';
+import type { AgentScope, ApiKeyResponse } from '@app/shared-types';
 import { ScopeMultiSelect } from '@/features/ai/agent-scope-ui';
 import { SecretCopyDialog } from '@/features/ai/agent-detail-sheet';
 import { apiClient } from '@appshore/web-core/shared/lib/api';
@@ -17,13 +17,6 @@ import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface CreateKeyResponse {
-  id: string;
-  key?: string;
-  name: string;
-  scopes: AgentScope[];
 }
 
 /**
@@ -38,7 +31,7 @@ export function ApiKeyMintSheet({ open, onOpenChange }: Props) {
   const [scopes, setScopes] = useState<AgentScope[]>([]);
   const [ipAllowlistText, setIpAllowlistText] = useState('');
   const [rateLimit, setRateLimit] = useState('300');
-  const [created, setCreated] = useState<CreateKeyResponse | null>(null);
+  const [created, setCreated] = useState<ApiKeyResponse | null>(null);
 
   const mutation = useMutation({
     mutationFn: async (payload: {
@@ -47,7 +40,7 @@ export function ApiKeyMintSheet({ open, onOpenChange }: Props) {
       ipAllowlist: string[];
       rateLimitPerMinute: number;
     }) =>
-      apiClient<CreateKeyResponse>('/api-keys', {
+      apiClient<ApiKeyResponse>('/api-keys', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
@@ -189,7 +182,7 @@ export function ApiKeyMintSheet({ open, onOpenChange }: Props) {
             if (!v) handleClose();
           }}
           title="Save the API key now"
-          description="This is the only time you'll see the secret."
+          description="This is the only time the full key is shown. We store only a hash of it, so it cannot be shown again. If you lose it, rotate the key."
           secret={created.key}
         />
       )}
