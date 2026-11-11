@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { OAUTH_CONFIG } from './constants/oauth.constants';
 import type { AuthorizationRequest, ConsentChallenge } from '@app/shared-types';
+import { oauthError, OAUTH_ERROR } from './oauth-error.filter';
 import { resolveOAuthAccessTokenSecret, resolveOAuthConsentSecret, resolveOAuthIssuer } from './oauth-settings';
 
 /** The Prisma delegates token issuance writes through: the client itself, or a transaction. */
@@ -67,19 +68,19 @@ export class OAuthProviderService {
     });
 
     if (!client || !client.isActive) {
-      throw new BadRequestException('Invalid client_id');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'Invalid client_id');
     }
 
     // Exact-match redirect URI validation
     if (!client.redirectUris.includes(params.redirectUri)) {
-      throw new BadRequestException('Invalid redirect_uri');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'Invalid redirect_uri');
     }
 
     // Validate requested scopes are allowed for this client
     const requestedScopes = params.scope.split(' ').filter(Boolean);
     const invalidScopes = requestedScopes.filter((s) => !client.scopes.includes(s));
     if (invalidScopes.length > 0) {
-      throw new BadRequestException(`Invalid scopes: ${invalidScopes.join(', ')}`);
+      throw oauthError(OAUTH_ERROR.INVALID_SCOPE, `Invalid scopes: ${invalidScopes.join(', ')}`);
     }
 
     // Create consent challenge JWT
@@ -196,7 +197,7 @@ export class OAuthProviderService {
         this.logger.warn(`Auth code replay detected for client ${clientId}, revoking tokens`);
         await this.revokeAllTokensForUser(existing.userId, existing.clientId);
       }
-      throw new BadRequestException('Invalid or expired authorization code');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Invalid or expired authorization code');
     }
 
     // Now load the full code with relations for validation
@@ -206,7 +207,7 @@ export class OAuthProviderService {
     });
 
     if (!authCode) {
-      throw new BadRequestException('Invalid or expired authorization code');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Invalid or expired authorization code');
     }
 
     // Use a generic error message for all validation failures
@@ -214,38 +215,42 @@ export class OAuthProviderService {
     const invalidMsg = 'Invalid or expired authorization code';
 
     if (authCode.expiresAt < new Date()) {
-      throw new BadRequestException(invalidMsg);
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, invalidMsg);
     }
 
     if (authCode.client.clientId !== clientId) {
-      throw new BadRequestException(invalidMsg);
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, invalidMsg);
     }
 
     if (authCode.redirectUri !== redirectUri) {
-      throw new BadRequestException(invalidMsg);
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, invalidMsg);
     }
 
     // PKCE verification (S256)
     const expectedChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
     if (expectedChallenge !== authCode.codeChallenge) {
-      throw new BadRequestException(invalidMsg);
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, invalidMsg);
     }
 
     // Client secret verification for confidential clients
     if (authCode.client.clientType === 'confidential') {
       if (!clientSecret) {
-        throw new BadRequestException('client_secret required for confidential clients');
+        throw oauthError(
+          OAUTH_ERROR.INVALID_CLIENT,
+          'client_secret required for confidential clients',
+          HttpStatus.UNAUTHORIZED,
+        );
       }
       const valid = await bcrypt.compare(clientSecret, authCode.client.clientSecret);
       if (!valid) {
-        throw new UnauthorizedException('Invalid client credentials');
+        throw oauthError(OAUTH_ERROR.INVALID_CLIENT, 'Invalid client credentials', HttpStatus.UNAUTHORIZED);
       }
     }
 
     this.assertClientHasTenant(authCode.client);
     const grant = await this.resolveGrant(authCode.user, authCode.client);
     if (!grant) {
-      throw new BadRequestException(invalidMsg);
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, invalidMsg);
     }
 
     return this.prisma.$transaction((tx) =>
@@ -269,36 +274,40 @@ export class OAuthProviderService {
     });
 
     if (!storedToken) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Invalid refresh token');
     }
 
     // Replay detection: if token was already rotated, revoke entire chain
     if (storedToken.rotatedAt) {
       this.logger.warn(`Refresh token replay detected for client ${clientId}, user ${storedToken.userId}`);
       await this.revokeAllTokensForUser(storedToken.userId, storedToken.clientId);
-      throw new UnauthorizedException('Refresh token reuse detected — all tokens revoked');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Refresh token reuse detected — all tokens revoked');
     }
 
     if (storedToken.revokedAt) {
-      throw new UnauthorizedException('Refresh token revoked');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Refresh token revoked');
     }
 
     if (storedToken.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Refresh token expired');
     }
 
     if (storedToken.client.clientId !== clientId) {
-      throw new UnauthorizedException('Client mismatch');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Client mismatch');
     }
 
     // Verify client secret for confidential clients
     if (storedToken.client.clientType === 'confidential') {
       if (!clientSecret) {
-        throw new UnauthorizedException('client_secret required for confidential clients');
+        throw oauthError(
+          OAUTH_ERROR.INVALID_CLIENT,
+          'client_secret required for confidential clients',
+          HttpStatus.UNAUTHORIZED,
+        );
       }
       const valid = await bcrypt.compare(clientSecret, storedToken.client.clientSecret);
       if (!valid) {
-        throw new UnauthorizedException('Invalid client_secret');
+        throw oauthError(OAUTH_ERROR.INVALID_CLIENT, 'Invalid client credentials', HttpStatus.UNAUTHORIZED);
       }
     }
 
@@ -308,7 +317,7 @@ export class OAuthProviderService {
     // Not rotated and not revoked: if the membership comes back, the same token works again.
     const grant = await this.resolveGrant(storedToken.user, storedToken.client);
     if (!grant) {
-      throw new UnauthorizedException("The user no longer belongs to this app's workspace");
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, "The user no longer belongs to this app's workspace");
     }
 
     // The rotation claim and the new tokens commit together. Of two concurrent refreshes with the same token
@@ -333,7 +342,7 @@ export class OAuthProviderService {
     if (!tokens) {
       this.logger.warn(`Concurrent refresh token reuse for client ${clientId}, user ${storedToken.userId}`);
       await this.revokeAllTokensForUser(storedToken.userId, storedToken.clientId);
-      throw new UnauthorizedException('Refresh token reuse detected — all tokens revoked');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Refresh token reuse detected — all tokens revoked');
     }
     return tokens;
   }
@@ -418,7 +427,7 @@ export class OAuthProviderService {
       (Number(this.configService.get<string>('OAUTH_REFRESH_TOKEN_ABSOLUTE_TTL')) ||
         OAUTH_CONFIG.REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS) * 1000;
     if (Date.now() - originalIssuedAt.getTime() > absoluteTtlMs) {
-      throw new UnauthorizedException('Refresh token chain expired — user must re-consent');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'Refresh token chain expired — user must re-consent');
     }
   }
 
@@ -448,7 +457,7 @@ export class OAuthProviderService {
   /** No tokens for a client that belongs to no tenant: no admin could see it or revoke it. */
   private assertClientHasTenant(client: { tenantId: number | null }): void {
     if (client.tenantId === null) {
-      throw new BadRequestException('This app is not connected to a workspace. Connect it again.');
+      throw oauthError(OAUTH_ERROR.INVALID_GRANT, 'This app is not connected to a workspace. Connect it again.');
     }
   }
 

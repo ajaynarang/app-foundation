@@ -59,13 +59,27 @@ answer an error with exactly `{ "error": "...", "error_description": "..." }` (R
 section 3.2.2), with `Cache-Control: no-store`. Before, the two RFC keys rode on top of the app's error body, and
 only where the controller set them.
 
-- When the server gives no explicit RFC code, `error` follows the status: 400 `invalid_request`, 401
-  `invalid_client`, 403 `access_denied`, 429 and 503 `temporarily_unavailable`, 5xx `server_error`.
+- The token endpoint names the RFC code for each failure. A code that is invalid, expired, already used, or sent
+  with the wrong client, redirect URI or PKCE verifier is 400 `invalid_grant`. So is a refresh token that is
+  unknown, expired, revoked, reused, past the absolute cap, or issued to another client, and a grant whose user or
+  client no longer has a workspace. A missing or wrong `client_secret` is 401 `invalid_client`.
+- **Status changes at `POST /oauth/token`.** Refresh-token failures were **401** and are now **400**
+  `invalid_grant`. A confidential client that sends no `client_secret` on a code exchange was 400 and is now
+  **401** `invalid_client`.
+- `GET /oauth/authorize` answers a scope the client may not request with 400 `invalid_scope`.
+- Where the server names no RFC code, `error` follows the status: 400 `invalid_request`, 401 `invalid_client`,
+  403 `access_denied`, 429 and 503 `temporarily_unavailable`, 5xx `server_error`.
 - A bad redirect URI at registration is now `invalid_redirect_uri` (it was `invalid_client_metadata`).
 - `POST /oauth/authorize/consent` is the web app's own route and answers the standard envelope.
 
-**Who notices.** An OAuth client that read `detail`, `statusCode` or `message` from these four routes. A
-standards-following client reads `error` and `error_description` and needs no change.
+**Who notices.**
+
+- An OAuth client that read `detail`, `statusCode` or `message` from these four routes.
+- An OAuth client that treated a **401** from the token endpoint as "the refresh token is dead, authorize again".
+  That is now 400 `invalid_grant`; a 401 `invalid_client` means the client's own credentials are wrong.
+
+A standards-following client reads `error` and `error_description` and needs no change: `invalid_grant` tells it
+to authorize again.
 
 ## 3. Requests the API now refuses
 
