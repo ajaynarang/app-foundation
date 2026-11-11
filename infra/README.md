@@ -510,7 +510,7 @@ sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:URL_ENCODED_PASS
 cd apps/backend && pnpm run db:seed
 
 # Restore .env
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@localhost:5432/app|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5499/app?schema=public|' \
   apps/backend/.env
 ```
 
@@ -533,7 +533,7 @@ sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:URL_ENCODED_PASS
 cd apps/backend && pnpm run seed:knowledge
 
 # Restore .env
-sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://app_user:app_password@localhost:5432/app|' \
+sed -i '' 's|DATABASE_URL=.*|DATABASE_URL=postgresql://postgres:postgres@localhost:5499/app?schema=public|' \
   apps/backend/.env
 ```
 

@@ -19,7 +19,7 @@ import type { DomainEventService } from '@appshore/kernel/infrastructure/events/
  * pipeline is always on. Skipped when local Postgres is unreachable or no
  * tenant is seeded.
  */
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://app_user:app_password@localhost:5432/app';
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
 
 class TestRecordsReadTool {
   @RequiresScope('platform:read')
