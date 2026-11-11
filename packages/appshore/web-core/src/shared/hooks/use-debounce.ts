@@ -1,12 +1,2 @@
-import { useState, useEffect } from 'react';
-
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
+// The one debounce lives in @app/ui (the list kit's ListSearch needs it, and @app/ui cannot import web-core).
+export { useDebounce } from '@app/ui/hooks/use-debounce';
