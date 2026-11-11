@@ -1,0 +1,26 @@
+{
+  "PROVIDER_ROUTES": {
+    "apps/backend/src/domains/billing/controllers/webhook.controller.ts :: POST /webhooks/billing": "Stripe webhooks (docs.stripe.com/webhooks): 200 { received: true }; 400 on a missing or bad signature. Stripe reads only the status and retries on anything but 2xx",
+    "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-webhook.controller.ts :: GET /webhooks/whatsapp": "Meta webhook verification (developers.facebook.com, Graph API webhooks): 200 text/plain with hub.challenge echoed; 403 on a token mismatch. Meta names the hub.* query keys",
+    "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-webhook.controller.ts :: POST /webhooks/whatsapp": "WhatsApp Cloud API webhooks (Meta) and the Interakt webhook: 200 once the signature checks, always, so the vendor does not retry; 401 on a bad signature",
+    "apps/backend/src/domains/desk/core/inngest/inngest.controller.ts :: ALL /inngest": "Inngest serve handler (inngest.com/docs, serve): the SDK reads the request and writes the response",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: POST /": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: GET /": "MCP Streamable HTTP: a server without a server-sent stream answers the GET probe with 405",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: DELETE /": "MCP Streamable HTTP: session termination; this server is stateless and answers { status: 'ok' }",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: POST /mcp": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: POST /mcp/apikey": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: GET /mcp": "MCP Streamable HTTP: a server without a server-sent stream answers the GET probe with 405",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: DELETE /mcp": "MCP Streamable HTTP: session termination; this server is stateless and answers { status: 'ok' }",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: GET /oauth/authorize": "RFC 6749 section 4.1.1: the standard names the query keys (response_type, client_id, redirect_uri, code_challenge); errors are { error, error_description }",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/token": "RFC 6749 sections 4.1.3, 5.1 and 6: 200 with the token response; errors are { error, error_description } (section 5.2)",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/revoke": "RFC 7009: 200 whether or not the token was known",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/register": "RFC 7591 dynamic client registration: 201 with the client metadata the standard names (snake_case); errors per section 3.2.2",
+    "apps/backend/src/domains/integrations/oauth/oauth.controller.ts :: GET /integrations/oauth/callback": "OAuth 2.0 redirect from the vendor (RFC 6749 section 4.1.2): 302 to the web app either way; the vendor names the query keys (QuickBooks sends realmId)",
+    "apps/backend/src/platform-glue/sse/sse.controller.ts :: GET /sse/stream": "Server-sent events (WHATWG HTML, section 9.2): text/event-stream; frames, not JSON bodies",
+    "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/messages": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames",
+    "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/resume": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames"
+  },
+  "BOUNDED_LISTS": {},
+  "BOUNDED_READS": {},
+  "QUERY_KEY_ALLOWLIST": {}
+}
