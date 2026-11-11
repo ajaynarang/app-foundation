@@ -37,6 +37,8 @@ run() {
 }
 
 run "format check" pnpm format:check
+# Turbo only formats inside workspace packages; this covers the rest (root files, docs, skills, tools, workflows).
+run "format check (outside packages)" pnpm format:check:root
 run "lint" pnpm lint
 run "schema lint" pnpm lint:schema
 run "type-check" pnpm type-check

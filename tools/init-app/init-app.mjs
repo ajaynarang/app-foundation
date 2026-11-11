@@ -81,7 +81,10 @@ function fail(msg) {
 }
 
 function titleCase(kebab) {
-  return kebab.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return kebab
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -92,16 +95,23 @@ const rootPkgPath = path.join(ROOT, 'package.json');
 const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
 
 if (!flags.force && rootPkg.name !== TEMPLATE_NAME) {
-  fail(`This repo is already initialized (package name is "${rootPkg.name}", not "${TEMPLATE_NAME}"). Re-run with --force only if you know what you're doing.`);
+  fail(
+    `This repo is already initialized (package name is "${rootPkg.name}", not "${TEMPLATE_NAME}"). Re-run with --force only if you know what you're doing.`,
+  );
 }
 
 if (!flags.force && !flags['dry-run']) {
   try {
     const dirty = execSync('git status --porcelain', { cwd: ROOT, encoding: 'utf8' }).trim();
-    if (dirty) fail('Working tree is not clean. Commit or stash first (or pass --force). init-app rewrites many files — you want a clean diff.');
+    if (dirty)
+      fail(
+        'Working tree is not clean. Commit or stash first (or pass --force). init-app rewrites many files — you want a clean diff.',
+      );
   } catch (e) {
     if (e.message && e.message.includes('not a git repository')) {
-      console.warn('  ⚠ Not a git repository — skipping the clean-tree guard. Consider `git init` first so you can review the diff.');
+      console.warn(
+        '  ⚠ Not a git repository — skipping the clean-tree guard. Consider `git init` first so you can review the diff.',
+      );
     } else if (!e.message?.includes('Working tree')) {
       console.warn('  ⚠ Could not run git — skipping the clean-tree guard.');
     } else {
@@ -136,7 +146,9 @@ async function gatherConfig() {
     cfg.displayName = cfg.displayName || (await ask('Display name', titleCase(cfg.name || '')));
     cfg.scope = cfg.scope || (await ask('Package scope (keep @app unless you have a reason)', '@app'));
     cfg.db = cfg.db || (await ask('Postgres database name', (cfg.name || '').replace(/-/g, '_')));
-    cfg.tenancy = cfg.tenancy || (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
+    cfg.tenancy =
+      cfg.tenancy ||
+      (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
     cfg.mobile = cfg.mobile || (await ask('Include the Flutter mobile companion app? (yes/no)', 'yes'));
     rl.close();
   }
@@ -151,7 +163,8 @@ async function gatherConfig() {
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
   if (!VALID.scope.test(cfg.scope)) fail(`Invalid --scope "${cfg.scope}" — must match ${VALID.scope}`);
   if (!VALID.db.test(cfg.db)) fail(`Invalid --db "${cfg.db}" — must match ${VALID.db}`);
-  if (!['mt', 'st', 'personal'].includes(cfg.tenancy)) fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
+  if (!['mt', 'st', 'personal'].includes(cfg.tenancy))
+    fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
   if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
   return cfg;
 }
@@ -222,7 +235,10 @@ function buildRules(cfg) {
     {
       id: `web .env.example NEXT_PUBLIC_MULTI_TENANT=${mt}`,
       files: ['apps/web/.env.example'],
-      apply: (s) => s.replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`).replace(/^NEXT_PUBLIC_TENANCY_MODE=.*$/m, `NEXT_PUBLIC_TENANCY_MODE=${mode}`),
+      apply: (s) =>
+        s
+          .replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`)
+          .replace(/^NEXT_PUBLIC_TENANCY_MODE=.*$/m, `NEXT_PUBLIC_TENANCY_MODE=${mode}`),
     },
   ];
   if (cfg.mobile === 'yes') {
@@ -245,10 +261,43 @@ function buildRules(cfg) {
 // File walk
 // ---------------------------------------------------------------------------
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.turbo', '.next', 'dist', 'build', 'coverage', '.screenshots', '.dart_tool', 'ephemeral', '.gradle', 'generated']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.turbo',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.screenshots',
+  '.dart_tool',
+  'ephemeral',
+  '.gradle',
+  'generated',
+]);
 const SKIP_REL = ['docs/superpowers', 'tools/init-app'];
 const SKIP_FILES = new Set(['pnpm-lock.yaml']);
-const BINARY_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.gz', '.tar', '.mp4', '.mov', '.dump', '.jar']);
+const BINARY_EXT = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.ico',
+  '.webp',
+  '.svg',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.pdf',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.mp4',
+  '.mov',
+  '.dump',
+  '.jar',
+]);
 
 function* walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -285,7 +334,9 @@ const cfg = await gatherConfig();
 const rules = buildRules(cfg);
 const dryRun = flags['dry-run'];
 
-console.log(`\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy})\n`);
+console.log(
+  `\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy})\n`,
+);
 
 const stats = new Map(rules.map((r) => [r.id, { files: 0, lines: 0 }]));
 let touched = 0;
@@ -343,8 +394,12 @@ if (!dryRun) {
        Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend
     3. pnpm docker:up
     4. cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed
-    5. pnpm dev                           # web :3000, backend :8000${cfg.mobile === 'yes' ? `
-    5b. cd apps/mobile && flutter run     # mobile companion (needs a device/simulator)` : ''}
+    5. pnpm dev                           # web :3000, backend :8000${
+      cfg.mobile === 'yes'
+        ? `
+    5b. cd apps/mobile && flutter run     # mobile companion (needs a device/simulator)`
+        : ''
+    }
     6. Replace the landing page (apps/web/src/app/page.tsx) with your product's home,
        and update the Documentation link there to your repo.
     7. Review the diff, commit, and optionally delete tools/init-app/.
