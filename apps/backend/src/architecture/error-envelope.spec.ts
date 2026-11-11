@@ -16,6 +16,8 @@ import { APP_FILTER } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { ThrottlerException } from '@nestjs/throttler';
 import { IsString, MinLength } from 'class-validator';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import request from 'supertest';
 import { z } from 'zod';
 import { Prisma } from '@appshore/db';
@@ -177,6 +179,12 @@ describe('the error envelope', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/ECONNREFUSED|secret|10\.0\.0\.5/);
   });
 
+  it('a body over the parser limit is 413 PAYLOAD_TOO_LARGE, never a 500', async () => {
+    const res = await call('dto', 'post', { title: 'x'.repeat(300 * 1024) });
+    expect(res.status).toBe(413);
+    expect(res.body.code).toBe(ApiErrorCode.PAYLOAD_TOO_LARGE);
+  });
+
   it('a DTO failure is 400 VALIDATION_FAILED with fieldErrors', async () => {
     const res = await call('dto', 'post', { title: 'x', extra: 1 });
     expect(res.status).toBe(400);
@@ -233,5 +241,28 @@ describe('the error envelope', () => {
     } finally {
       process.env.NODE_ENV = previous;
     }
+  });
+});
+
+/**
+ * The spec above builds its own app, so it cannot see what `main.ts` registers. This reads the bootstrap file:
+ * the one global pipe is `AppValidationPipe`, and Nest's own `ValidationPipe` (whose failures carry no
+ * `fieldErrors`) is not used there.
+ */
+describe('main.ts registers the contract validation pipe', () => {
+  // Comment lines are dropped so a comment that names either pipe neither satisfies nor trips the rule.
+  const source = readFileSync(join(__dirname, '..', 'main.ts'), 'utf8')
+    .split('\n')
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+    .join('\n');
+
+  it('registers AppValidationPipe as the only global pipe', () => {
+    const registrations = source.match(/useGlobalPipes\(([\s\S]*?)\);/g) ?? [];
+    expect(registrations).toHaveLength(1);
+    expect(registrations[0].replace(/\s+/g, '')).toBe('useGlobalPipes(newAppValidationPipe());');
+  });
+
+  it('never constructs or imports the bare ValidationPipe', () => {
+    expect(source).not.toMatch(/(?<![A-Za-z])ValidationPipe\b/);
   });
 });
