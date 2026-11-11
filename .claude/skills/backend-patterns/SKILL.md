@@ -972,7 +972,7 @@ Service emits via DomainEventService → hot bus → DomainEventSseBridge → Ss
 
 **Global guard chain (AppModule, order matters):**
 
-1. `ThrottlerGuard` — rate limiting (counted in Redis; per signed-in user or OAuth client + user, otherwise per client IP; `THROTTLE_LIMIT` / `THROTTLE_TTL_MS`; see `apps/backend/src/bootstrap/edge-throttle.ts`)
+1. `ThrottlerGuard` — rate limiting (counted in Redis; per signed-in user or OAuth client + user, otherwise per client IP; a `@Public()` route is always per client IP unless `OAuthTokenGuard` protects it, where a verified OAuth token is per client + user; `THROTTLE_LIMIT` / `THROTTLE_TTL_MS`; see `apps/backend/src/bootstrap/edge-throttle.ts`)
 2. `JwtAuthGuard` — JWT validation
 3. `TenantGuard` — tenant context resolution (short-circuits to the implicit tenant when `MULTI_TENANT=false`)
 4. `RolesGuard` — role-based access

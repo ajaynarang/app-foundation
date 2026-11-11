@@ -46,6 +46,19 @@ describe('ThrottleTracker', () => {
     expect(tracker.resolve(req(`Bearer ${session}`), { isPublic: false })).toBe('user:u_42');
   });
 
+  it('on a public route that an OAuth guard protects, a verified OAuth token keeps its own bucket', () => {
+    const route = { isPublic: true, oauthGuarded: true };
+    const oauth = jwt.sign({ sub: '42', clientId: 'app_x' }, { secret: 'base-oauth', issuer: 'https://api.acme.io' });
+    const session = jwt.sign({ sub: 'u_42' }, { secret: 'session-secret' });
+    const forged = jwt.sign({ sub: '42', clientId: 'app_x' }, { secret: 'attacker', issuer: 'https://api.acme.io' });
+
+    expect(tracker.resolve(req(`Bearer ${oauth}`), route)).toBe('oauth:app_x:42');
+    // A session does not authenticate there, so it must not buy a bucket; neither does a forgery or no bearer.
+    expect(tracker.resolve(req(`Bearer ${session}`), route)).toBe('ip:203.0.113.7');
+    expect(tracker.resolve(req(`Bearer ${forged}`), route)).toBe('ip:203.0.113.7');
+    expect(tracker.resolve(req(undefined), route)).toBe('ip:203.0.113.7');
+  });
+
   it('falls back to the IP for a forged token (a fresh bucket per forgery would bypass the limit)', () => {
     const forged = jwt.sign({ sub: 'u_1' }, { secret: 'attacker' });
     expect(tracker.resolve(req(`Bearer ${forged}`))).toBe('ip:203.0.113.7');

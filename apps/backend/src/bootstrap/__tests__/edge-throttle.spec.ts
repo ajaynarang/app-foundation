@@ -1,4 +1,4 @@
-import { Controller, Get, Global, INestApplication, Module, Post } from '@nestjs/common';
+import { Controller, Get, Global, INestApplication, Module, Post, UseGuards } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -9,10 +9,14 @@ import { join } from 'path';
 import request from 'supertest';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { OAuthProviderService } from '@appshore/platform/domains/oauth-provider/oauth-provider.service';
+import { OAuthTokenGuard } from '@appshore/platform/domains/oauth-provider/oauth-token.guard';
 import { edgeThrottlerOptions } from '../edge-throttle';
 import { applyTrustProxy } from '../trust-proxy';
 
 const SESSION_SECRET = 'edge-throttle-spec-session-secret-0123456789';
+const SECRET_KEY = 'edge-throttle-spec-secret-key-0123456789';
+const ISSUER = 'https://api.acme.io';
 
 @Controller()
 class ProbeController {
@@ -33,7 +37,39 @@ class ProbeController {
   publicLogin() {
     return { ok: true };
   }
+
+  // Wired like POST /mcp: public to the session guard, authenticated by the OAuth guard.
+  @Public()
+  @Post('agent')
+  @UseGuards(OAuthTokenGuard)
+  agent() {
+    return { ok: true };
+  }
 }
+
+// The same, with the guard on the controller instead of the handler.
+@Public()
+@Controller('agent-class')
+@UseGuards(OAuthTokenGuard)
+class ClassGuardedController {
+  @Post()
+  agent() {
+    return { ok: true };
+  }
+}
+
+/** The real service checks the signature, the issuer and the stored grant; the signature and issuer are enough here. */
+const fakeOAuthService = {
+  validateAccessToken: (token: string) => {
+    try {
+      return Promise.resolve(
+        new JwtService().verify<Record<string, unknown>>(token, { secret: `${SECRET_KEY}-oauth`, issuer: ISSUER }),
+      );
+    } catch {
+      return Promise.resolve(null);
+    }
+  },
+};
 
 /** Stands in for Redis: the same counting the Lua script does, shared by whoever holds this object. */
 class FakeRedisCounts {
@@ -78,8 +114,12 @@ async function createApp(cache: FakeRedisCounts, settings: Record<string, unknow
         useFactory: edgeThrottlerOptions,
       }),
     ],
-    controllers: [ProbeController],
-    providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+    controllers: [ProbeController, ClassGuardedController],
+    providers: [
+      { provide: APP_GUARD, useClass: ThrottlerGuard },
+      { provide: OAuthProviderService, useValue: fakeOAuthService },
+      OAuthTokenGuard,
+    ],
   })
   class ProbeModule {}
 
@@ -95,9 +135,11 @@ describe('edge throttle (real ThrottlerGuard over HTTP)', () => {
     'edge.throttleLimit': 2,
     'edge.throttleTtlMs': 60_000,
     'jwt.accessSecret': SESSION_SECRET,
-    secretKey: 'edge-throttle-spec-secret-key-0123456789',
-    oauthIssuer: 'https://api.acme.io',
+    secretKey: SECRET_KEY,
+    oauthIssuer: ISSUER,
   };
+  const oauthFor = (clientId: string, sub: string) =>
+    `Bearer ${new JwtService().sign({ sub, clientId, tenantId: 1, role: 'MEMBER', scopes: [] }, { secret: `${SECRET_KEY}-oauth`, issuer: ISSUER })}`;
   const sessionFor = (sub: string) => `Bearer ${new JwtService().sign({ sub }, { secret: SESSION_SECRET })}`;
 
   let cache: FakeRedisCounts;
@@ -176,6 +218,41 @@ describe('edge throttle (real ThrottlerGuard over HTTP)', () => {
     expect((await post({ Authorization: sessionFor('user-alice') })).status).toBe(201);
     expect((await post({ Authorization: sessionFor('user-bob') })).status).toBe(429);
     expect((await post({})).status).toBe(429);
+  });
+
+  it.each([['/agent'], ['/agent-class']])(
+    'a @Public route behind the OAuth guard (%s) counts each OAuth client + user separately on one IP',
+    async (path) => {
+      const post = (headers: Record<string, string>) =>
+        request(app.getHttpServer())
+          .post(path)
+          .set({ 'X-Forwarded-For': '203.0.113.7', ...headers });
+      const alice = { Authorization: oauthFor('app_x', '1') };
+
+      expect((await post(alice)).status).toBe(201);
+      expect((await post(alice)).status).toBe(201);
+      expect((await post(alice)).status).toBe(429);
+
+      // Same IP: another user of the same client, and the same user through another client, have their own window.
+      expect((await post({ Authorization: oauthFor('app_x', '2') })).status).toBe(201);
+      expect((await post({ Authorization: oauthFor('app_y', '1') })).status).toBe(201);
+      // The OAuth calls did not use up the IP's window: a call with no bearer reaches the guard and gets its 401.
+      expect((await post({})).status).toBe(401);
+      // The principal follows the token, not the IP.
+      expect((await post({ ...alice, 'X-Forwarded-For': '198.51.100.20' })).status).toBe(429);
+    },
+  );
+
+  it('on that route a session or a forged bearer is still counted by IP', async () => {
+    const post = (authorization: string) =>
+      request(app.getHttpServer())
+        .post('/agent')
+        .set({ 'X-Forwarded-For': '203.0.113.7', Authorization: authorization });
+    const forged = new JwtService().sign({ sub: '1', clientId: 'app_x' }, { secret: 'attacker', issuer: ISSUER });
+
+    expect((await post(sessionFor('user-alice'))).status).toBe(401);
+    expect((await post(`Bearer ${forged}`)).status).toBe(401);
+    expect((await post(sessionFor('user-bob'))).status).toBe(429);
   });
 
   it('when Redis is down the limit still holds on this instance and no request errors', async () => {
