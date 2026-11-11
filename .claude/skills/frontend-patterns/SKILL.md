@@ -540,7 +540,32 @@ Every sheet's actions live in a **sticky bottom footer**, one row:
 
 ## 8.1 Pagination, Sorting, Filters
 
-Two pagination patterns. Pick by whether the state should be shareable.
+**A list that grows is a cursor list, and it is built from the list kit** (`@appshore/web-core/shared/list`, re-exported by `@/shared/components/page-chrome`). The backend answers `CursorList<T>` from `@app/shared-types`: `{ items, nextCursor, total, counts? }`. The cursor is opaque: pass it back, never build or parse it.
+
+```typescript
+// features/invoices/components/InvoiceList.tsx
+const params = useListParams(INVOICE_LIST_CONFIG); // module-level config; status, search, sort, filters and dates live in the URL
+const query = {
+  status: params.status,
+  q: params.q,
+  sort: params.sort,
+  from: params.dateRange.fromInstant,
+  to: params.dateRange.toInstant,
+};
+const list = useCursorList<Invoice>({
+  queryKey: queryKeys.invoices.list(query), // the key holds every filter: a changed filter is a new list
+  queryFn: (cursor) => invoicesApi.list({ ...query, cursor }),
+});
+// list.items · total · counts · isLoading · isRefreshing · isError · error · hasMore · loadMore · isLoadMoreError
+```
+
+Branch a list screen in this order, and it is right: `isLoading` → `PageLoadingSkeleton`; `isError` → `ListErrorState`; `items.length === 0` → `PageEmptyState`, worded by `listEmptyKind` (`first-run`, `no-match`, `empty-window`); otherwise the rows, then `ListFooter`. While the next filter loads, the previous rows stay on screen dimmed (`isRefreshing`); a failed "Load more" keeps the rows and `ListFooter` says so (`isLoadMoreError`). Never swap rows for a spinner.
+
+- `useListParams` owns the URL: one list per page URL. A list inside a sheet or a tab that does not own the URL uses `useLocalListParams`.
+- A picker over a growing list uses `usePickerSearch` (and `SearchSelect` for a form field): the first page until the user types, then a server search. Never filter a loaded page in the browser.
+- Several reads feeding one screen: `combineReads` so "unknown" is never shown as "none".
+
+The two offset patterns below are for the screens that have not moved to a cursor list yet. Do not start a new list on them.
 
 **Component-state pagination** (default — small lists, internal tools):
 
@@ -660,14 +685,23 @@ Children still own their own mutations and toasts. The page owns "what counts as
 **Status/label maps (per feature):**
 
 ```typescript
-// features/projects/constants.ts — use semantic theme tokens, never raw palette colors
-export const PRIORITY_VARIANTS: Record<TaskPriority, { label: string; className: string }> = {
-  CRITICAL: { label: 'Critical', className: 'bg-destructive/10 text-destructive' },
-  HIGH: { label: 'High', className: 'bg-amber-500/10 text-amber-500' },
-  MEDIUM: { label: 'Medium', className: 'bg-amber-500/10 text-amber-500' },
-  LOW: { label: 'Low', className: 'bg-muted text-muted-foreground' },
+// features/projects/constants.ts — a status maps to a TONE, never to a class string
+import type { StatusVariant } from '@app/ui';
+
+export const PROJECT_STATUS_VARIANTS: Record<ProjectStatus, StatusVariant> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  ACTIVE: { label: 'Active', tone: 'info' },
+  ON_HOLD: { label: 'On hold', tone: 'warning' },
+  DONE: { label: 'Done', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+  ARCHIVED: { label: 'Archived', tone: 'muted' },
 };
+// render: <StatusBadge tone={variant.tone}>{variant.label}</StatusBadge>
 ```
+
+**Status tones.** Six meanings, mapped once to theme tokens in `@app/ui` (`status-tone.ts`): `neutral` not started, `info` moving, `warning` waiting on a person, `success` done well, `danger` stopped, `muted` retired. A feature maps its Prisma enum to a tone and renders `StatusBadge`. It never writes a colour class for a status.
+
+**Tinted text wears the `-text` token.** `text-info-text`, `text-caution-text`, `text-success-text`, `text-critical-text` clear WCAG AA on their own 15% tint in both themes. The fill hues (`text-caution`, `text-success`) read 1.7 to 2.8:1 on that tint in light theme, so they are for fills and icons only. `--brand` and `--brand-text` in `packages/ui/src/styles/globals.css` are the one place a product sets its brand colour; `theme-tokens.test.ts` holds the contrast.
 
 **Select options** MUST be typed constants (in `constants.ts` or at file top), never inline arrays in JSX, with values from the shared enum:
 
@@ -737,7 +771,13 @@ Mobile-first. Test at 375px, 768px, 1440px in both themes.
 
 ## 15.4 Page Chrome (Layout & Control Patterns) — NON-NEGOTIABLE
 
-**Every sidebar page uses one canonical chrome.** Components live in `apps/web/src/shared/components/page-chrome/` (`PageHeader`, `PageToolbar`, `PageTabs`, `FilterBar`, `StatusPivot`, `SegmentedControl`, `ViewSwitcher`, `PageActionsMenu`, `PageEmptyState`, `PageLoadingSkeleton`). Four zones, top to bottom:
+**Every sidebar page uses one canonical chrome.** The components live in `@app/ui/components/page-chrome` and the list state in `@appshore/web-core/shared/list`; a page imports both from one place, `@/shared/components/page-chrome`, which re-exports them and adds `SearchSelect`. `@app/ui` imports no web-core, no router and no app code (held by `foundation-boundaries.spec.ts`): what the chrome needs from the app (timezone, formatters, the error reader, `next/link`) is passed once by `PageChromeBridge` in `app/providers.tsx`.
+
+- Page: `PageShell`, `PageHeader`, `PageToolbar`, `PageTabs`, `PageActionsMenu`, `ViewSwitcher`, `StatusPivot`, `SegmentedControl`, `PageSection`, `PageEmptyState`, `PageLoadingSkeleton`.
+- List: `ListFilterRow` (with `ListSearch`, `FilterSelect`, `FilterButton`, `FilterChips`, `SortButton`, `DateRangeFilter`), `ListRows` / `ListRow`, `ListCardGrid` / `ListCard`, `ListFooter`, `ListErrorState`. State: §8.1.
+- Grammar: `RowActions` (one visible primary, the rest behind ⋯, destructive last; the `actions` slots take its props, so a raw button there does not type-check), `Identifier` (a human key), `RelativeTime` ("5m ago", full timestamp on hover).
+
+Four zones, top to bottom:
 
 ```
 Zone 1 · Header        PageHeader: title (REQUIRED) + subtitle (REQUIRED) + optional ⚙ settings gear
@@ -876,7 +916,9 @@ ThemeProvider → QueryClientProvider → AuthProvider → TooltipProvider → {
 Shared monorepo UI package (`packages/ui/`) exports:
 
 - `cn()` — clsx + tailwind-merge
-- `showSuccess()`, `showSuccessWithLink()`, `showError()`, toast wrappers (Sonner)
+- `showSuccess()`, `showSuccessWithLink()`, `showSuccessWithAction()` (one action the person can take back, such as Undo), `showWarning()` (done, with something to know), `showError()`: toast wrappers (Sonner)
+- `Button` takes `asChild`: a navigating action is `<Button asChild><Link href="…">…</Link></Button>`, a real link with the button look
+- Page chrome and the list components (`@app/ui/components/page-chrome`, §15.4); `StatusBadge` and the status tones (§11)
 - The shadcn component set (accordion, alert, badge, button, card, dialog, sheet, table, tabs, etc.)
 - `FormSheet` — smart sheet wrapper
 - Tailwind preset with semantic color tokens, dark mode, animations
@@ -1011,7 +1053,9 @@ shows the backend's own `detail` when it gave one; Nest's bare defaults keep the
 
 ## 25. New Feature Checklist
 
-- [ ] Page chrome: `PageHeader` + `PageToolbar` + `FilterBar` from `shared/components/page-chrome` — title AND subtitle present; fixed right-cluster order; never hand-roll the header (§15.4)
+- [ ] Page chrome: `PageHeader` + `PageToolbar` + `ListFilterRow` from `@/shared/components/page-chrome` — title AND subtitle present; fixed right-cluster order; never hand-roll the header (§15.4)
+- [ ] A growing list: `useListParams` + `useCursorList`, branching loading, error, empty, rows; `ListErrorState` on failure; `ListFooter` under the rows (§8.1)
+- [ ] A status: enum → tone in `constants.ts`, rendered with `StatusBadge`; tinted text wears a `-text` token (§11)
 - [ ] Types: re-export from `@app/shared-types` (no local entity types)
 - [ ] API: object namespace pattern (`entityApi.method()`) over `apiClient`
 - [ ] Query keys: added to the centralized `query-keys.ts` (list/detail segments distinct)

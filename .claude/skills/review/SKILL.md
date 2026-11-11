@@ -158,7 +158,7 @@ Review every file against the frontend patterns skill. For each violation found,
 18. API layer: object namespace pattern (entityApi.method()), no direct fetch calls in components
 19. Query tier: QUERY_TIERS used instead of hardcoded staleTime/refetchInterval
 20. Error handling: extractErrorMessage usage, error boundaries per route segment; a raw fetch reads `detail` (never `message`) from an error body, and branches on `code` via extractErrorCode
-21. Page chrome: PageHeader + PageToolbar + FilterBar from shared/components/page-chrome; title AND subtitle present; no hand-rolled headers
+21. Page chrome: PageHeader + PageToolbar + ListFilterRow from @/shared/components/page-chrome; title AND subtitle present; no hand-rolled headers. A new growing list uses useListParams + useCursorList and renders ListErrorState and ListFooter. A status maps to a tone (StatusVariant) and renders StatusBadge, never a colour class; tinted text wears a `-text` token. Row actions go through RowActions. `@app/ui` imports no `@appshore/*`, `@/`, `next` or app code (foundation-boundaries.spec.ts)
 22. Button variants: correct variant for context (default/destructive/outline/ghost)
 23. Toasts imported from @app/ui, never raw toast()
 
