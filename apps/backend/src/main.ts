@@ -12,6 +12,7 @@ import helmet from 'helmet';
 import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
 import { OAUTH_SCOPES } from '@app/shared-types';
+import { resolveOAuthIssuer } from '@appshore/platform/domains/oauth-provider/oauth-settings';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
 import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
 
@@ -155,7 +156,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   // OAuth 2.1 server metadata (RFC 8414) — must be at well-known root, not under /api/v1
-  const oauthIssuer = process.env.OAUTH_ISSUER || `http://localhost:${process.env.PORT || '8000'}`;
+  // The issuer is the one the token service signs into every access token (config `oauthIssuer`).
+  const oauthIssuer = resolveOAuthIssuer(() => configService.get<string>('oauthIssuer'));
   app.use('/.well-known/oauth-authorization-server', (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');

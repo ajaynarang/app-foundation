@@ -37,7 +37,12 @@ export function findLocalCorsOrigins(corsOrigins: string): string[] {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
-    .filter((origin) => LOOPBACK_HOST.test(hostOf(origin)));
+    .filter(isLocalOrigin);
+}
+
+/** True when a URL (or bare host[:port]) points at this machine. */
+export function isLocalOrigin(origin: string): boolean {
+  return LOOPBACK_HOST.test(hostOf(origin));
 }
 
 function hostOf(origin: string): string {

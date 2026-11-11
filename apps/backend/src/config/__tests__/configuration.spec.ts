@@ -1,5 +1,6 @@
 import configuration, {
   DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT,
+  DEV_OAUTH_ISSUER_DEFAULT,
   DEV_VOICE_AGENT_SECRET_DEFAULT,
 } from '../configuration';
 
@@ -17,6 +18,7 @@ describe('configuration — production boot guard', () => {
   const SECRET_B = '0b2d4f6a8c1e3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3a5c7e9b1d3f5a7c9e0b2d';
   const SECRET_C = '9e7c5a3f1d0b8e6c4a2f0d9b7e5c3a1f8d6b4e2c0a9f7d5b3e1c8a6f4d2b0e9c';
   const SECRET_D = '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b';
+  const SECRET_E = '7d9e1ff3a91c0e5b7d48a2c6e0913f5d7b2a4c8e1f60935a7c4b2d9e0f1a3c5b';
   const CREDENTIALS_KEY = '4c8e1f60935a7c4b2d9e0f1a3c5b7d9e1ff3a91c0e5b7d48a2c6e0913f5d7b2a';
 
   /** Every variable this guard reads, so the developer's own shell cannot leak into a test. */
@@ -27,6 +29,9 @@ describe('configuration — production boot guard', () => {
     'JWT_ACCESS_SECRET',
     'JWT_REFRESH_SECRET',
     'OAUTH_JWT_SECRET',
+    'OAUTH_CONSENT_SECRET',
+    'OAUTH_ISSUER',
+    'PORT',
     'CREDENTIALS_ENCRYPTION_KEY',
     'VOICE_AGENT_SECRET',
     'LIVEKIT_URL',
@@ -43,6 +48,8 @@ describe('configuration — production boot guard', () => {
     JWT_ACCESS_SECRET: SECRET_B,
     JWT_REFRESH_SECRET: SECRET_C,
     OAUTH_JWT_SECRET: SECRET_D,
+    OAUTH_CONSENT_SECRET: SECRET_E,
+    OAUTH_ISSUER: 'https://api.acme.io',
     CREDENTIALS_ENCRYPTION_KEY: CREDENTIALS_KEY,
   });
 
@@ -77,6 +84,7 @@ describe('configuration — production boot guard', () => {
     ['JWT_ACCESS_SECRET'],
     ['JWT_REFRESH_SECRET'],
     ['OAUTH_JWT_SECRET'],
+    ['OAUTH_CONSENT_SECRET'],
     ['CREDENTIALS_ENCRYPTION_KEY'],
   ])('%s', (envVar) => {
     it('refuses production when unset', () => {
@@ -113,14 +121,17 @@ describe('configuration — production boot guard', () => {
     );
   });
 
-  it.each([['SECRET_KEY'], ['JWT_ACCESS_SECRET'], ['JWT_REFRESH_SECRET'], ['OAUTH_JWT_SECRET']])(
-    'refuses production when %s is shorter than 32 characters',
-    (envVar) => {
-      expect(() => load({ ...validProduction(), [envVar]: 'f3a91c0e5b7d48a2' })).toThrow(
-        new RegExp(`${envVar} must be at least 32 characters`),
-      );
-    },
-  );
+  it.each([
+    ['SECRET_KEY'],
+    ['JWT_ACCESS_SECRET'],
+    ['JWT_REFRESH_SECRET'],
+    ['OAUTH_JWT_SECRET'],
+    ['OAUTH_CONSENT_SECRET'],
+  ])('refuses production when %s is shorter than 32 characters', (envVar) => {
+    expect(() => load({ ...validProduction(), [envVar]: 'f3a91c0e5b7d48a2' })).toThrow(
+      new RegExp(`${envVar} must be at least 32 characters`),
+    );
+  });
 
   it('rejects a CREDENTIALS_ENCRYPTION_KEY that is not 64 hex characters, in any environment', () => {
     expect(() => load({ ...validProduction(), CREDENTIALS_ENCRYPTION_KEY: 'your-64-char-hex-key' })).toThrow(
@@ -143,6 +154,8 @@ describe('configuration — production boot guard', () => {
       'JWT_ACCESS_SECRET',
       'JWT_REFRESH_SECRET',
       'OAUTH_JWT_SECRET',
+      'OAUTH_CONSENT_SECRET',
+      'OAUTH_ISSUER',
       'CREDENTIALS_ENCRYPTION_KEY',
       'CORS_ORIGINS',
     ]) {
@@ -219,6 +232,52 @@ describe('configuration — production boot guard', () => {
     });
   });
 
+  describe('OAuth provider', () => {
+    it('refuses production when the consent secret is the access-token secret', () => {
+      expect(() => load({ ...validProduction(), OAUTH_CONSENT_SECRET: SECRET_D })).toThrow(
+        /OAUTH_CONSENT_SECRET must differ from OAUTH_JWT_SECRET/,
+      );
+    });
+
+    it.each([
+      ['unset, because the default is the development URL', undefined],
+      ['the development default', DEV_OAUTH_ISSUER_DEFAULT],
+      ['a local URL', 'https://localhost:8443'],
+      ['a loopback address', 'http://127.0.0.1:8000'],
+    ])('refuses production when OAUTH_ISSUER is %s', (_label, issuer) => {
+      expect(() => load({ ...validProduction(), OAUTH_ISSUER: issuer })).toThrow(
+        /OAUTH_ISSUER must be set to the public URL of this API in production/,
+      );
+    });
+
+    it('refuses production when OAUTH_ISSUER is not https', () => {
+      expect(() => load({ ...validProduction(), OAUTH_ISSUER: 'http://api.acme.io' })).toThrow(
+        /OAUTH_ISSUER must be an https URL in production/,
+      );
+    });
+
+    it('rejects an OAUTH_ISSUER that is not a URL, in any environment', () => {
+      expect(() =>
+        load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', OAUTH_ISSUER: 'api.acme.io' }),
+      ).toThrow(/OAUTH_ISSUER must be a URL/);
+    });
+
+    it('outside production an unset issuer follows PORT; production still refuses that', () => {
+      const dev = load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', PORT: '8010' });
+      expect(dev.oauthIssuer).toBe('http://localhost:8010');
+      expect(() => load({ ...validProduction(), OAUTH_ISSUER: undefined, PORT: '8010' })).toThrow(
+        /OAUTH_ISSUER must be set to the public URL of this API in production/,
+      );
+    });
+
+    it('exposes the issuer and both secrets to the provider', () => {
+      const config = load(validProduction());
+      expect(config.oauthIssuer).toBe('https://api.acme.io');
+      expect(config.oauthJwtSecret).toBe(SECRET_D);
+      expect(config.oauthConsentSecret).toBe(SECRET_E);
+    });
+  });
+
   describe('WEBHOOK_ALLOW_PRIVATE_TARGETS', () => {
     it('refuses production with the private-target escape hatch on', () => {
       expect(() => load({ ...validProduction(), WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true' })).toThrow(
@@ -246,6 +305,8 @@ describe('configuration — production boot guard', () => {
       expect(config.corsOrigins).toBe('http://localhost:3000');
       expect(config.credentialsEncryptionKey).toBe(DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT);
       expect(config.oauthJwtSecret).toBeUndefined();
+      expect(config.oauthConsentSecret).toBeUndefined();
+      expect(config.oauthIssuer).toBe(DEV_OAUTH_ISSUER_DEFAULT);
     });
 
     it('allows a local CORS origin, placeholders and Inngest dev mode', () => {

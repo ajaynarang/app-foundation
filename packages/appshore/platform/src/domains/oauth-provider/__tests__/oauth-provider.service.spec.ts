@@ -144,6 +144,7 @@ describe('OAuthProviderService', () => {
         id: 1,
         clientId: 'client-1',
         isActive: true,
+        tenantId: 7,
       });
       mockPrisma.oAuthAuthorizationCode.create.mockResolvedValue({});
 
@@ -323,6 +324,7 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthAccessToken.create.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.create.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.update.mockResolvedValue({});
+      mockPrisma.oAuthRefreshToken.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.refreshToken('valid-token', 'c-1', undefined);
 
@@ -330,13 +332,11 @@ describe('OAuthProviderService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(result.token_type).toBe('Bearer');
       expect(result.scope).toBe('platform:read');
+      expect(mockPrisma.oAuthRefreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { rotatedAt: expect.any(Date) } }),
+      );
       expect(mockPrisma.oAuthRefreshToken.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            rotatedAt: expect.any(Date),
-            replacedByHash: expect.any(String),
-          }),
-        }),
+        expect.objectContaining({ data: { replacedByHash: expect.any(String) } }),
       );
     });
   });

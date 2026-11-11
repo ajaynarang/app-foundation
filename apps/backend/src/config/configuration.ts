@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { findLocalCorsOrigins, isInngestDevMode, isPlaceholderSecret } from './production-guard';
+import { findLocalCorsOrigins, isInngestDevMode, isLocalOrigin, isPlaceholderSecret } from './production-guard';
 
 // Config ownership rule:
 // - App-owned config lives HERE, in the typed zod schema below — validated at
@@ -22,6 +22,9 @@ export const DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT = Buffer.from('dev-key-only-
 );
 // Shared with the forked voice agent, which authenticates to a public endpoint with it.
 export const DEV_VOICE_AGENT_SECRET_DEFAULT = 'app-voice-dev-secret-do-not-use-in-production';
+
+// The OAuth issuer a developer machine serves. Production must name its own public URL instead.
+export const DEV_OAUTH_ISSUER_DEFAULT = 'http://localhost:8000';
 
 const MIN_SECRET_LENGTH = 32;
 
@@ -92,9 +95,12 @@ const configSchema = z.object({
     })
     .default({}),
 
-  // OAuth Provider
+  // OAuth Provider. The two secrets sign different things (access tokens, consent challenges) and are never
+  // the same value; outside production each is derived from SECRET_KEY when unset.
   oauthJwtSecret: z.string().optional(),
-  oauthIssuer: z.string().default('http://localhost:8000'),
+  oauthConsentSecret: z.string().optional(),
+  // `iss` of every OAuth access token and the issuer in the RFC 8414 metadata: the public URL of this API.
+  oauthIssuer: z.string().url('OAUTH_ISSUER must be a URL, e.g. https://api.acme.io').default(DEV_OAUTH_ISSUER_DEFAULT),
 
   // S3 Storage Configuration
   s3: z.object({
@@ -152,13 +158,22 @@ const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
       hint: 'Generate one: openssl rand -hex 32',
     },
     {
-      // Signs OAuth access tokens and consent challenges. Unset, it is derived
-      // from SECRET_KEY, which ties two unrelated secrets together.
+      // Signs OAuth access tokens. Unset, it is derived from SECRET_KEY, which
+      // ties two unrelated secrets together.
       envVar: 'OAUTH_JWT_SECRET',
       value: config.oauthJwtSecret,
       required: true,
       minLength: MIN_SECRET_LENGTH,
       hint: 'Generate one: openssl rand -hex 32. To keep OAuth tokens issued before this check valid, set it to the value used so far: SECRET_KEY followed by "-oauth".',
+    },
+    {
+      // Signs OAuth consent challenges, which live ten minutes: a new value
+      // only makes a consent screen that is open right now ask again.
+      envVar: 'OAUTH_CONSENT_SECRET',
+      value: config.oauthConsentSecret,
+      required: true,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32',
     },
     {
       envVar: 'CREDENTIALS_ENCRYPTION_KEY',
@@ -203,6 +218,21 @@ const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
     } else if (value.length < minLength) {
       fail(`${envVar} must be at least ${minLength} characters in production. ${hint}`);
     }
+  }
+
+  // One secret for both would let a consent challenge verify as an access token's signature.
+  if (config.oauthConsentSecret !== undefined && config.oauthConsentSecret === config.oauthJwtSecret) {
+    fail('OAUTH_CONSENT_SECRET must differ from OAUTH_JWT_SECRET in production. Generate one: openssl rand -hex 32');
+  }
+
+  // OAuth clients verify tokens and discover endpoints against the issuer, so it must be this deployment's
+  // public URL. Unset, it defaults to the development URL.
+  if (config.oauthIssuer === DEV_OAUTH_ISSUER_DEFAULT || isLocalOrigin(config.oauthIssuer)) {
+    fail(
+      `OAUTH_ISSUER must be set to the public URL of this API in production (got ${config.oauthIssuer}), e.g. https://api.acme.io`,
+    );
+  } else if (!config.oauthIssuer.startsWith('https://')) {
+    fail(`OAUTH_ISSUER must be an https URL in production (got ${config.oauthIssuer}).`);
   }
 
   // The Inngest endpoint is public. In dev mode the SDK skips signature
@@ -268,6 +298,7 @@ export default (): Configuration => {
     },
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     oauthJwtSecret: env('OAUTH_JWT_SECRET'),
+    oauthConsentSecret: env('OAUTH_CONSENT_SECRET'),
     credentialsEncryptionKey: env('CREDENTIALS_ENCRYPTION_KEY'),
     voice: {
       livekitUrl: env('LIVEKIT_URL'),
@@ -280,7 +311,8 @@ export default (): Configuration => {
     webhooks: {
       allowPrivateTargets: env('WEBHOOK_ALLOW_PRIVATE_TARGETS') === 'true',
     },
-    oauthIssuer: process.env.OAUTH_ISSUER,
+    // Unset on a developer machine, the issuer follows the port the API listens on.
+    oauthIssuer: env('OAUTH_ISSUER') ?? (env('PORT') ? `http://localhost:${env('PORT')}` : undefined),
     s3: {
       bucket: process.env.S3_BUCKET,
       region: process.env.S3_REGION,
