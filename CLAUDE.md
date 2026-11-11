@@ -168,6 +168,16 @@ import the generated mirror in `packages/shared-types/src/generated/prisma-enums
 Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
 via the db package's `scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it.
 
+### API errors (one envelope)
+
+Every error body is `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing
+else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
+code). There is no `message` key. Throw a NestJS exception or a factory from
+`@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
+writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. New query
+strings are a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
+(`docs/adr/`), held by `apps/backend/src/architecture/error-envelope.spec.ts` and `field-errors.spec.ts`.
+
 ### UI standards
 
 shadcn/ui components only (no raw `<button>`/`<input>`). Dark-theme tokens (`bg-background`,
@@ -184,3 +194,15 @@ success + error toasts; every loading state shows a Skeleton.
   mocks, tenant/user factories) come from `@appshore/platform/test/*`.
 - **Mobile:** `cd apps/mobile && flutter analyze && flutter test`.
 - **E2E / smoke / RBAC:** `tests/` (`@app/qa`, Playwright). Run `pnpm test:qa`.
+
+### Gates (CI is manual-only, so these run locally)
+
+- **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
+  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`) and the
+  build, stops at the first failure, and ends with one line: `verify: PASS` or `verify: FAIL at "<step>"`. The
+  integration specs need Postgres and Redis (`docker compose up -d postgres redis`, or export `DATABASE_URL` and
+  `REDIS_URL`).
+- **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
+  architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
+  conventions, the error envelope). A new rule gets a spec in that folder, so the hook holds it.
+- **Pre-commit hook** — Prettier on staged files.

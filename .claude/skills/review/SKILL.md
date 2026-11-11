@@ -66,6 +66,8 @@ Review every file against the backend patterns skill. For each violation found, 
 1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and @Query('snake_case') decorator arguments)
 2. Event emission bypassing DomainEventService / the APP_EVENT_REGISTRY (raw EventEmitter2.emit or plain-object events)
 3. `throw new Error()` instead of NestJS exceptions in HTTP paths (BadRequestException, NotFoundException, etc.)
+3a. An error body written by hand (`res.status(4xx).json({ message })`) or an exception carrying keys beyond `code`, `detail`, `fieldErrors` — every error leaves through the one envelope (`writeErrorEnvelope`; held by architecture/error-envelope.spec.ts)
+3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/409 with a code); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
 4. Enums imported from '@prisma/client' instead of '@appshore/db', or hand-written enum literals/Zod enums duplicating a Prisma enum
 5. Raw AI SDK calls outside the sanctioned paths (Mastra runtime, StructuredOutputService, runStructuredLlmStep)
 6. Missing auth guard decorators (@Roles) on controller endpoints
@@ -77,6 +79,7 @@ Review every file against the backend patterns skill. For each violation found, 
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 12. DTO validation: class-validator decorators, @ApiProperty, @Transform for optional strings, cents for money
+12a. New query strings: one `@Query() query: XQueryDto` built from the kernel query-DTO kit (snake_case wire names, `q` for search, `containsText()` for LIKE); no new `@Query('x')` parameters and no hand parsing of numbers, booleans, dates or enums in a controller
 13. Cache patterns: correct TTL tier constant, buildKey usage, event-based invalidation registered
 14. Queue patterns: job names from *_JOB_NAMES constants, bullJobIdFromDbId for custom job IDs, correlationId forwarded
 15. Service structure: Logger injection, constructor pattern, tenantId as first param
@@ -149,7 +152,7 @@ Review every file against the frontend patterns skill. For each violation found,
 17. Responsive classes: mobile-first, 375/768/1440 breakpoints
 18. API layer: object namespace pattern (entityApi.method()), no direct fetch calls in components
 19. Query tier: QUERY_TIERS used instead of hardcoded staleTime/refetchInterval
-20. Error handling: extractErrorMessage usage, error boundaries per route segment
+20. Error handling: extractErrorMessage usage, error boundaries per route segment; a raw fetch reads `detail` (never `message`) from an error body, and branches on `code` via extractErrorCode
 21. Page chrome: PageHeader + PageToolbar + FilterBar from shared/components/page-chrome; title AND subtitle present; no hand-rolled headers
 22. Button variants: correct variant for context (default/destructive/outline/ghost)
 23. Toasts imported from @app/ui, never raw toast()

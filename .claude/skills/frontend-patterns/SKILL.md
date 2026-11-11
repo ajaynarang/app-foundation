@@ -952,13 +952,20 @@ Use `useNetworkStatus()` (`@appshore/web-core/shared/hooks/use-network-status.ts
 ```typescript
 {
   statusCode: 400,
+  code: "VALIDATION_FAILED",                // Machine code: branch on this, never on the copy
   detail: "User-friendly message",          // Always safe to show in a toast
-  fieldErrors?: { email: "Must be valid" }, // Only on validation errors
+  fieldErrors?: { email: "Must be valid" }, // Only on a 400
+  timestamp, path, method,
   debugDetail?: "Technical details...",     // Only in development
 }
 ```
 
-`extractErrorMessage()` reads `detail`. `extractFieldErrors()` reads `fieldErrors`.
+These keys and no others. There is no `message` key: a raw `fetch` that reads an error body reads `detail`.
+
+`extractErrorMessage()` reads `detail`, `extractFieldErrors()` reads `fieldErrors`, `extractErrorCode()` reads
+`code` (an `ApiErrorCode` from `@app/shared-types`, or a domain code such as `FEATURE_DISABLED`). A 403, 409 or 429
+shows the backend's own `detail` when it gave one; Nest's bare defaults keep the generic copy. Held by
+`apps/web/src/shared/lib/__tests__/error-utils.test.ts`.
 
 ---
 

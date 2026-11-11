@@ -394,6 +394,50 @@ export class CreateProjectDto implements CreateProjectInput {
 - Nested objects use `@ValidateNested({ each: true })` + `@Type(() => SubDto)`
 - All DTO fields are **camelCase** (NON-NEGOTIABLE — see CLAUDE.md)
 
+### 4.1 Query DTOs — a query string is a class, like a body
+
+New list and filter routes read their query string through one `@Query() query: XQueryDto`, built from the kit in
+`@appshore/kernel/shared/utils/query-dto`. Do not add `@Query('x')` parameters or parse numbers, booleans, dates or
+enums by hand in a controller.
+
+```typescript
+import { ListQueryDto, QueryEnumList, QuerySort, QueryString } from '@appshore/kernel/shared/utils/query-dto';
+
+export class TicketListQueryDto extends ListQueryDto {
+  // inherits limit, cursor, q
+  @QuerySort(TICKET_SORTS, 'newest') sort!: TicketSort;
+  @QueryEnumList(TICKET_STATUSES, { name: 'status' }) statuses?: TicketStatus[];
+  @QueryString({ name: 'assignee_id' }) assigneeId?: string;
+}
+
+@Get()
+list(@CurrentUser() user: any, @Query() query: TicketListQueryDto) { … }
+```
+
+| Decorator                          | Reads                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| `@QueryString`, `@QueryStringList` | one value as it is / several values, comma-joined or repeated                 |
+| `@QueryInt`, `@QueryLimit`         | a whole number / the page size, clamped to 1…100                              |
+| `@QueryBool`                       | `true` or `false` only                                                        |
+| `@QueryEnum`, `@QueryEnumList`     | one / several values from a whitelist                                         |
+| `@QuerySort(allowed, fallback)`    | a NAMED sort option (`newest`), never a column or a direction                 |
+| `@QueryDate('from' \| 'to')`       | an ISO instant or `YYYY-MM-DD` (a UTC day, both bounds inclusive)             |
+| `@QuerySearch`                     | `q`: one value, control characters removed, trimmed, capped at 200 characters |
+
+Base classes: `CursorQueryDto` (`limit`, `cursor`), `ListQueryDto` (+ `q`), `DatedListQueryDto` (+ `from`, `to`).
+
+**Rules:**
+
+- The wire name is **snake_case** (`{ name: 'assignee_id' }`), the property is camelCase. Free-text search is `q`.
+- An unknown param, a repeated single param or a value that does not parse (`?limit=abc`, `?flag=yes`) is a
+  **400 `VALIDATION_FAILED`** whose `fieldErrors` names the wire param. There is no silent fallback.
+- A text search goes into Prisma through `containsText(term)` from `list-query`, which escapes the LIKE wildcards.
+  Never hand-write `{ contains: term }` for user input.
+- A body whose wire shape a standard defines (RFC 7591 client registration) is a DTO marked `@ProtocolWireDto`
+  (`app-validation-pipe`): it may ignore unknown fields and adds the standard's error code.
+- Held by the kit's own specs (`query-dto.spec.ts`, `list-query.spec.ts`, `app-validation-pipe.spec.ts`) and
+  `apps/backend/src/architecture/field-errors.spec.ts`.
+
 ---
 
 ## 5. Shared Types (Zod in `packages/shared-types/`)
@@ -804,17 +848,37 @@ await this.queue.add(NOTIFICATIONS_JOB_NAMES.DIGEST, payload, {
 
 ### 10.1 Exception Rules (NON-NEGOTIABLE)
 
-**Always use NestJS exceptions in services and controllers:**
+**Always throw a NestJS exception, or one of the code-carrying factories, in services and controllers:**
 
 ```typescript
-throw new NotFoundException('Project not found'); // 404
-throw new BadRequestException('Invalid status transition'); // 400
-throw new ConflictException('Project number already exists'); // 409
-throw new ForbiddenException('Access denied'); // 403
-throw new InternalServerErrorException('Service unavailable'); // 500 (rare — infra failures)
+import { duplicate, fieldError, invalidState, stale } from '@appshore/kernel/shared/errors/api-errors';
+
+throw new NotFoundException('This project was not found'); // 404 NOT_FOUND
+throw new ForbiddenException('Only the owner can do this'); // 403 FORBIDDEN
+throw fieldError('email', 'Enter a valid email address'); // 400 VALIDATION_FAILED + fieldErrors.email
+throw invalidState('This invoice is already paid'); // 409 INVALID_STATE (illegal transition, closed, decided)
+throw duplicate('A project with this name already exists'); // 409 DUPLICATE
+throw stale('This was just changed by someone else. Refresh and try again'); // 409 STALE
 ```
 
-**NEVER `throw new Error('...')` in service/controller code.** Plain `Error` becomes a 500 with the raw message leaked to the frontend. NestJS exceptions are caught by the global filter (`HttpExceptionFilter`, `@appshore/platform`) and produce clean, user-friendly responses.
+**One meaning per status.** 400 = bad input, and it names the field in `fieldErrors`. 401 = not signed in.
+403 = signed in but not allowed. 404 = missing, **or in another tenant** (never confirm that a record exists across
+tenants). 409 = any state conflict: an illegal transition, a duplicate, a stale write. 429 = rate limited. 422 is not
+used. If no field is at fault, the answer is not a 400.
+
+**Every error carries a machine `code`.** A bare Nest exception gets the code its status implies (404 →
+`NOT_FOUND`, 409 → `INVALID_STATE`). Use a factory when the code is not the status default. The shared codes are
+`ApiErrorCode` in `@app/shared-types`: `VALIDATION_FAILED, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND,
+METHOD_NOT_ALLOWED, INVALID_STATE, STALE, DUPLICATE, PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL,
+UNAVAILABLE, INTERNAL`. A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
+(`FEATURE_DISABLED`, `PASSWORD_NOT_SET`); it passes through unchanged. Add a code to `ApiErrorCode` only when every
+domain shares it.
+
+**Parse a Zod schema at the boundary with `parseWithSchema(schema, input)`**, never `Schema.parse()`: it answers a
+400 with `fieldErrors`. (A `ZodError` that still reaches the filter is also mapped to a 400, never a 500.)
+
+**NEVER `throw new Error('...')` in service/controller code.** A plain `Error` becomes a generic 500 and its
+message is only logged.
 
 **Exception:** Infrastructure-internal code (cache utilities, env validation, health indicators) and queue/workflow workers that never reach HTTP responses may use plain `Error`.
 
@@ -855,32 +919,50 @@ try {
 throw new Error(`Vendor API error ${res.status}: ${await res.text()}`);
 ```
 
-### 10.4 Global Filter Response Format
+### 10.4 The Error Envelope (NON-NEGOTIABLE)
 
-The `HttpExceptionFilter` returns:
+Every error body is one shape, written in one place (`writeErrorEnvelope` in
+`@appshore/platform/shared/filters/error-envelope`). The global `HttpExceptionFilter` delegates to it.
 
 ```json
 {
-  "statusCode": 400,
+  "statusCode": 409,
+  "code": "INVALID_STATE",
+  "detail": "This invoice is already paid",
+  "fieldErrors": { "email": "Enter a valid email address" },
   "timestamp": "2026-07-06T...",
   "path": "/api/v1/...",
   "method": "POST",
-  "detail": "User-friendly message",
-  "fieldErrors": { "email": "Must be a valid email" },
   "debugDetail": "Technical details..."
 }
 ```
 
-`fieldErrors` is only present on validation errors. `debugDetail` is only included in development.
+- These eight keys and **no others**. `fieldErrors` only on a 400. `debugDetail` only in development. There is no
+  `message` and no `error` key. Anything else a thrower attaches is dropped, so do not invent a key: put the fact
+  in `code` or `detail`.
+- Prisma: P2002 → 409 `DUPLICATE`; P2025 → 404 `NOT_FOUND`; P2003 and P2014 → 409 `INVALID_STATE`; P2007 → 400.
+  An unknown error → generic 500 `INTERNAL`.
+- A route that writes its own response (`@Res()`, a stream) never reaches the filter. It answers a failure with
+  `writeErrorEnvelope(res, req, error)`, which returns `false` once headers are sent. Never hand-write
+  `res.status(…).json({ message })`.
+- Two exceptions, both set by a standard. The OAuth protocol routes answer `{ error, error_description }` through
+  `@UseFilters(OAuthErrorFilter)`; throw `oauthError(OAUTH_ERROR.INVALID_GRANT, '…')` there. A route that takes an
+  API key or an OAuth token adds `WWW-Authenticate` to its 401 with `@UseFilters(BearerChallengeFilter)`; the body
+  stays the envelope.
+- Held by `packages/appshore/platform/src/shared/filters/error-envelope.spec.ts` and
+  `apps/backend/src/architecture/error-envelope.spec.ts` (boots the real filter and pipe; a body with any other key
+  fails).
 
 **Logging:** 5xx → `error` with stack trace. 4xx → `warn`. Silent paths: `/sse/`, `/health/`.
 
 ### 10.5 Validation Errors
 
-Validation uses a custom `exceptionFactory` in `main.ts` that produces:
+The global `AppValidationPipe` (`@appshore/kernel/shared/utils/app-validation-pipe`) answers a DTO failure with:
 
-- `detail`: Human-readable summary (e.g., "3 fields have validation errors")
-- `fieldErrors`: Map of field name → validation message for frontend inline display
+- `code`: `VALIDATION_FAILED`
+- `detail`: the one message, or a summary ("3 fields have validation errors")
+- `fieldErrors`: field name → message, for inline display. Nested fields use dot paths (`items.0.title`); a query
+  DTO's field is its wire name (`assignee_id`).
 
 ### 10.6 Retry (External API Calls)
 
@@ -1120,14 +1202,13 @@ Don't `process.exit()` in shutdown paths — it kills the process before flush. 
 ## 19. Validation Pipe (Global)
 
 ```typescript
-app.useGlobalPipes(
-  new ValidationPipe({
-    whitelist: true, // Strip unknown properties
-    forbidNonWhitelisted: true, // Reject unknown properties with 400
-    transform: true, // Auto-transform to DTO class instances
-  }),
-);
+// main.ts
+app.useGlobalPipes(new AppValidationPipe());
 ```
+
+`AppValidationPipe` is Nest's `ValidationPipe` with `whitelist`, `forbidNonWhitelisted` and `transform` on, the
+`fieldErrors` exception factory (§10.5), and the query-DTO rules of §4.1. A test that boots a controller uses the
+same class, so it validates exactly as production does.
 
 ---
 
@@ -1198,7 +1279,9 @@ Guardrails: `schema-conventions.spec.ts`, `web-status-casing.spec.ts`, `status-c
 
 - NEVER `throw new Error('...')` in services — always use NestJS exceptions
 - NEVER `console.log` / `console.error` — always use `private readonly logger = new Logger(ClassName.name)`
-- NEVER let Prisma errors bubble unhandled — the global filter maps P2002/P2025/P2003/P2014, but services should still catch domain-specific cases
+- NEVER let Prisma errors bubble unhandled — the global filter maps P2002/P2025/P2003/P2014/P2007, but services should still catch domain-specific cases
+- NEVER write an error body by hand (`res.status(400).json({ message })`) or attach extra keys to an exception — the envelope is eight fixed keys (§10.4)
+- NEVER answer a 400 that names no field — it is a 401, 403 or 409 with a `code`, or it names the field with `fieldError()`
 - NEVER pass raw external API error messages to NestJS exceptions — log the details, throw a user-friendly message (§10.3)
 - NEVER include database field names, internal IDs, or Prisma error codes in exception messages — these leak to the frontend toast (§10.2)
 - NEVER `throw new InternalServerErrorException(error.message)` for caught external errors — the message may contain API keys, tokens, or internal details

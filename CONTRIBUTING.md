@@ -9,13 +9,13 @@ distributed under the same license.
 1. Create a feature branch from `main`.
 2. Make your changes following the project's code conventions (see [CLAUDE.md](CLAUDE.md)).
 3. Submit a pull request to `main` with a clear description of the changes.
-4. All contributions must pass CI before merging. CI is manual by default: run the `CI` workflow on your branch from the Actions tab (or `gh workflow run ci.yml --ref <branch>`).
+4. Run `pnpm verify` and paste its last line (`verify: PASS …`) into the pull request description. CI is manual by default, so this local gate is what a pull request must pass; the pre-push hook also runs the architecture specs on every push. You can still run the `CI` workflow on your branch from the Actions tab (or `gh workflow run ci.yml --ref <branch>`).
 
 ## Guidelines
 
 - Keep changes focused — one logical change per pull request.
 - Add or update tests for any behavior you change.
-- Run `pnpm lint`, `pnpm type-check`, and `pnpm test` locally before opening a PR.
+- `pnpm verify` runs the format check, lint, schema lint, type-check, unit tests and build in one go. It needs Postgres and Redis for the integration specs (`docker compose up -d postgres redis`).
 
 ## Questions
 
