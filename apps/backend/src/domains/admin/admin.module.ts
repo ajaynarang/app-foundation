@@ -5,7 +5,7 @@ import { AdminEventsModule } from './admin-events.module';
 import { AdminJobsModule } from './admin-jobs.module';
 
 /**
- * AdminModule aggregates the super-admin infra console surfaces:
+ * AdminModule aggregates the super-admin infra routes:
  * - AdminJobsModule: BullMQ job/queue/schedule/cache inspection + controls
  * - AdminEventsModule: domain-event log browsing
  * - AdminAiSpendModule: per-tenant AI spend reporting

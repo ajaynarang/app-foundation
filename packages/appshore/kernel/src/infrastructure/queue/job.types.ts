@@ -43,7 +43,7 @@ export const TENANT_VISIBLE_CATEGORIES = ALL_CATEGORIES.filter((c) => JOB_CATEGO
 
 // --- Type Display Names ---
 // Generic display names for the built-in job types. Add app-specific job
-// types here so the admin jobs console renders friendly labels.
+// types here so job listings (JobService) carry friendly labels.
 export const TYPE_DISPLAY_NAMES: Record<string, string> = {
   [NOTIFICATIONS_JOB_NAMES.CLEANUP]: 'Notification Cleanup',
   [NOTIFICATIONS_JOB_NAMES.DIGEST]: 'Notification Digest',

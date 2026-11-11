@@ -112,7 +112,7 @@ export class NotificationDispatcherService {
           if (!channels) continue;
 
           // Nothing to attempt, but the WHY still goes to the ledger: a recipient who
-          // opted out of everything shows up in the console as opted out, not as
+          // opted out of everything shows up in the ledger as opted out, not as
           // a notification that never existed.
           if (channels.primary.length === 0 && channels.fallback.length === 0) {
             ledgerRows.push({ userId: recipient.id, outcomes: suppressedOutcomes(channels) });

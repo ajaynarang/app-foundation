@@ -17,7 +17,7 @@ export interface DeveloperScopeEntry {
  * Not tenant-scoped — scope definitions are the same across the platform.
  * Authenticated (inherits the global JwtAuthGuard); any signed-in user
  * may read this list. Scopes in NEVER_EXTERNAL_SCOPES (e.g. platform:admin)
- * are filtered out so the developer portal never hints at internal-only grants.
+ * are filtered out so the scope picker's reference never hints at internal-only grants.
  */
 @ApiTags('Developer')
 @ApiBearerAuth()

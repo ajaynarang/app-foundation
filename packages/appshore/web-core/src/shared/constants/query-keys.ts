@@ -11,7 +11,7 @@
  *
  * This is the GENERIC platform set — preferences, feature flags, API keys,
  * OAuth clients, notifications, plans, organization, billing, AI/conversations,
- * onboarding, and the super-admin consoles. Add your own domain namespaces
+ * onboarding, and the super-admin screens. Add your own domain namespaces
  * alongside these as you build features.
  */
 
@@ -108,7 +108,7 @@ export const queryKeys = {
       ['login-activity', scope, 'summary', params] as const,
   },
 
-  // ─── Admin (super-admin consoles) ───────────────────────────────────────
+  // ─── Admin (super-admin screens) ────────────────────────────────────────
   admin: {
     addOnRequests: ['admin', 'add-on-requests'] as const,
     tenants: ['admin', 'tenants'] as const,
@@ -150,7 +150,7 @@ export const queryKeys = {
     messages: (id: string) => ['conversations', id, 'messages'] as const,
   },
 
-  // ─── Desk (agentic runtime — schedule console) ──────────────────────────
+  // ─── Desk (agentic runtime — schedule; no screen ships with the template) ─
   desk: {
     root: ['desk'] as const,
     schedule: () => ['desk', 'schedule'] as const,

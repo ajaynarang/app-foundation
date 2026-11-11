@@ -60,8 +60,8 @@ export interface AgentScopeDescription {
 
 /**
  * Single source of truth for human-readable scope copy.
- * - Phase D consumes this in the scope-diff preview on the Desk agent-management tabs.
- * - Phase E will consume the same map for the developer portal.
+ * - The web scope picker, scope chips and scope-diff preview read it directly.
+ * - GET /developer/scopes serves it, with live sample tools, as the scopes reference.
  * If a new scope is added to AgentScopeSchema, add its entry here too — the test in
  * agent-scopes-descriptions.spec.ts enforces full coverage.
  */

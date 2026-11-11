@@ -39,8 +39,8 @@ export const CACHE_TTL_FROZEN_24H = 86_400_000;
 // Cache namespaces for admin flush
 //
 // Generic platform namespaces. The `app:` prefix is the convention; add a
-// namespace here when a service introduces a new cache family so the admin
-// cache console can flush it.
+// namespace here when a service introduces a new cache family so the
+// super-admin cache routes (admin-cache.controller.ts) can list and flush it.
 // ---------------------------------------------------------------------------
 
 export const CACHE_NAMESPACES = [

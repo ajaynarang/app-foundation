@@ -35,7 +35,7 @@ export interface ResolvedChannels {
   primary: DeliveryChannel[];
   /** Attempt only if no primary channel reached the recipient. */
   fallback: DeliveryChannel[];
-  /** Why a channel is absent — a SKIPPED ledger row, so the console can explain the gap. */
+  /** Why a channel is absent — a SKIPPED ledger row, so the delivery ledger explains the gap. */
   suppressed: Partial<Record<DeliveryChannel, DeliverySkipReason>>;
   suppressedByQuietHours: boolean;
 }

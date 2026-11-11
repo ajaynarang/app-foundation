@@ -89,7 +89,7 @@ tests/         — Playwright QA suite (@app/qa)
 | `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                            |
 | `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                             |
 | `support/`       | Ticketing                                                                                          |
-| `admin/`         | Super-admin infra console (jobs, events, cache, schedules, AI spend)                               |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend)                                |
 | `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
 | `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
 | `desk/`          | Inngest durable workflow engine (**empty responsibility registry**)                                |
