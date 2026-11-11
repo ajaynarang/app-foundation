@@ -78,7 +78,7 @@ describe('McpToolService — pipeline routing', () => {
     const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('dispatcher', {
+    const tools = await svc.getToolsForPersona('member', {
       tenantId: 7,
       userId: '42',
       userDbId: 42,
@@ -105,7 +105,7 @@ describe('McpToolService — pipeline routing', () => {
     const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('dispatcher', {
+    const tools = await svc.getToolsForPersona('member', {
       tenantId: 7,
       userId: '42',
       userDbId: 42,

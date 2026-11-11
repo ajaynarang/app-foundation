@@ -54,7 +54,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      customer: null,
     });
 
     const result = await strategy.validate(basePayload);
@@ -76,7 +75,6 @@ describe('JwtStrategy', () => {
       userId: 'USR-001',
       isActive: false,
       tenant: null,
-      customer: null,
     });
 
     await expect(strategy.validate(basePayload)).rejects.toThrow(UnauthorizedException);
@@ -93,7 +91,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: false,
       },
-      customer: null,
     });
 
     await expect(strategy.validate(basePayload)).rejects.toThrow('Tenant is inactive');
@@ -107,7 +104,6 @@ describe('JwtStrategy', () => {
       role: 'SUPER_ADMIN',
       isActive: true,
       tenant: null,
-      customer: null,
     });
 
     const result = await strategy.validate({
@@ -132,7 +128,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      customer: null,
     });
 
     const result = await strategy.validate({

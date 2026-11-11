@@ -17,7 +17,7 @@ describe('McpServerController', () => {
       const oauthUser = {
         userId: 'user_1',
         tenantDbId: 1,
-        role: 'DISPATCHER',
+        role: 'MEMBER',
         scopes: ['platform:read'],
         clientId: 'client_1',
       };
