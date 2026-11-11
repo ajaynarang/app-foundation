@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import configuration, {
   DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT,
   DEV_OAUTH_ISSUER_DEFAULT,
@@ -24,6 +26,7 @@ describe('configuration — production boot guard', () => {
   /** Every variable this guard reads, so the developer's own shell cannot leak into a test. */
   const GUARDED_VARS = [
     'NODE_ENV',
+    'ENV_TYPE',
     'CORS_ORIGINS',
     'SECRET_KEY',
     'JWT_ACCESS_SECRET',
@@ -328,6 +331,36 @@ describe('configuration — production boot guard', () => {
       });
       expect(dev.webhooks.allowPrivateTargets).toBe(true);
     });
+  });
+
+  // The deployment label alone makes it production: the guard must not depend on NODE_ENV being remembered.
+  describe.each([
+    ['unset', undefined],
+    ['development', 'development'],
+    ['test', 'test'],
+  ])('ENV_TYPE=production with NODE_ENV %s', (_label, nodeEnv) => {
+    it('is production: refuses the development defaults', () => {
+      expect(() =>
+        load({ NODE_ENV: nodeEnv, ENV_TYPE: 'production', REDIS_URL: 'redis://cache.internal:6379' }),
+      ).toThrow(/SECRET_KEY must be set explicitly in production[\s\S]*CORS_ORIGINS must not include a local origin/);
+    });
+
+    it('is production: boots with every secret set and reports environment "production"', () => {
+      const config = load({ ...validProduction(), NODE_ENV: nodeEnv, ENV_TYPE: 'Production' });
+      expect(config.environment).toBe('production');
+    });
+  });
+
+  it('a non-production ENV_TYPE does not turn a NODE_ENV=production deploy into development', () => {
+    expect(() =>
+      load({ NODE_ENV: 'production', ENV_TYPE: 'sandbox', REDIS_URL: 'redis://cache.internal:6379' }),
+    ).toThrow(/SECRET_KEY must be set explicitly in production/);
+  });
+
+  it('the backend image declares NODE_ENV=production in its final stage', () => {
+    const dockerfile = readFileSync(join(__dirname, '..', '..', '..', 'Dockerfile'), 'utf8');
+    const finalStage = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
+    expect(finalStage).toMatch(/^ENV NODE_ENV=production$/m);
   });
 
   describe.each([['development'], ['test']])('outside production (%s)', (nodeEnv) => {

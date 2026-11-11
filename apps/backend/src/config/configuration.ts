@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { findLocalCorsOrigins, isInngestDevMode, isLocalOrigin, isPlaceholderSecret } from './production-guard';
+import {
+  findLocalCorsOrigins,
+  isInngestDevMode,
+  isLocalOrigin,
+  isPlaceholderSecret,
+  isProductionEnv,
+} from './production-guard';
 
 // Config ownership rule:
 // - App-owned config lives HERE, in the typed zod schema below — validated at
@@ -136,8 +142,9 @@ const configSchema = z.object({
 // goes for values copied from .env.example, and for a CORS origin or a
 // dev-mode switch that only makes sense on a developer machine.
 //
-// "Production" here is `environment === 'production'` (NODE_ENV). Nothing
-// below runs in development or test.
+// "Production" here is `environment === 'production'`, which the loader below
+// sets when NODE_ENV or ENV_TYPE says production (see isProductionEnv).
+// Nothing below runs in development or test.
 const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
   if (config.environment !== 'production') return;
 
@@ -298,7 +305,9 @@ function positiveIntEnv(name: string): number | undefined {
 
 export default (): Configuration => {
   const raw = {
-    environment: process.env.NODE_ENV,
+    // ENV_TYPE=production counts as production even when NODE_ENV is unset or says otherwise: everything
+    // that reads `environment` (this guard, the Secure cookie, trust proxy, the credentials cipher) fails closed.
+    environment: isProductionEnv(process.env) ? 'production' : process.env.NODE_ENV,
     databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public',
     redisUrl: process.env.REDIS_URL,
     corsOrigins: process.env.CORS_ORIGINS,

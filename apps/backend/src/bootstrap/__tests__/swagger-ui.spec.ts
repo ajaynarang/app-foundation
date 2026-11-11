@@ -23,6 +23,12 @@ describe('Swagger UI', () => {
     expect(setup).not.toHaveBeenCalled();
   });
 
+  it('is off when only ENV_TYPE says production (NODE_ENV unset or development)', () => {
+    expect(mountSwaggerUi(app, document, { ENV_TYPE: 'production' })).toBe(false);
+    expect(mountSwaggerUi(app, document, { NODE_ENV: 'development', ENV_TYPE: 'Production' })).toBe(false);
+    expect(setup).not.toHaveBeenCalled();
+  });
+
   it.each([[''], ['1'], ['yes'], ['TRUE ']])('stays off in production unless explicitly "true" (%j)', (value) => {
     const env = { NODE_ENV: 'production', SWAGGER_UI_ENABLED: value };
     expect(swaggerUiEnabled(env)).toBe(value.trim().toLowerCase() === 'true');

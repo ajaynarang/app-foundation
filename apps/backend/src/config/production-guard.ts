@@ -1,7 +1,17 @@
 /**
  * Pure helpers for the production boot guard in `configuration.ts`.
- * They decide nothing about the environment; the config schema does that.
  */
+
+/**
+ * True when this process is a production deployment: `NODE_ENV=production` (which the shipped image sets) or
+ * `ENV_TYPE=production` (the deployment label, required at boot). Either one is enough, so a deploy that
+ * forgets one of them still gets the boot guard, a Secure cookie, no Swagger UI and the load-balancer hop
+ * trusted. A sandbox that runs with NODE_ENV=production is held to the same rules.
+ */
+export function isProductionEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  const is = (value: string | undefined) => value?.trim().toLowerCase() === 'production';
+  return is(env.NODE_ENV) || is(env.ENV_TYPE);
+}
 
 /** Values that are documentation, not secrets: `.env.example` text and common stand-ins. */
 const PLACEHOLDER_PATTERNS: RegExp[] = [
