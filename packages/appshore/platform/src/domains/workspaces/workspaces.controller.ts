@@ -5,11 +5,7 @@ import { IsString, MinLength } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { WorkspacesService } from './workspaces.service';
-import {
-  REFRESH_TOKEN_COOKIE_NAME,
-  REFRESH_TOKEN_COOKIE_PATH,
-  REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-} from '../../constants/auth.constants';
+import { setRefreshTokenCookie } from '../../auth/refresh-token-cookie';
 
 class SwitchWorkspaceDto {
   @IsString()
@@ -41,15 +37,10 @@ export class WorkspacesController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.workspacesService.switch(user.dbId, dto.tenantId);
-    // Same cookie contract as login (auth.controller setRefreshTokenCookie)
-    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
-    response.cookie(REFRESH_TOKEN_COOKIE_NAME, result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: REFRESH_TOKEN_COOKIE_PATH,
-      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
+    // Same host-only cookie as login.
+    setRefreshTokenCookie(response, result.refreshToken, {
+      secure: this.configService.get<string>('environment') === 'production',
+      legacyDomain: this.configService.get<string>('COOKIE_DOMAIN') || undefined,
     });
     return { accessToken: result.accessToken, workspace: result.workspace };
   }
