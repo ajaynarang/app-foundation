@@ -195,11 +195,32 @@ export class ProjectsController extends BaseTenantController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Create project' })
   async create(@CurrentUser() user: any, @Body() dto: CreateProjectDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.projectsService.create(tenantDbId, dto);
+  }
+
+  @Post(':project_id/archive')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Archive a project' })
+  @ApiParam({ name: 'project_id' })
+  async archive(@Param('project_id') projectId: string, @CurrentUser() user: any) {
+    const tenantDbId = await this.getTenantDbId(user);
+    return this.projectsService.archive(projectId, tenantDbId); // the project as it is now
+  }
+
+  @Delete(':project_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Delete a project' })
+  @ApiParam({ name: 'project_id' })
+  async remove(@Param('project_id') projectId: string, @CurrentUser() user: any): Promise<void> {
+    const tenantDbId = await this.getTenantDbId(user);
+    await this.projectsService.remove(projectId, tenantDbId);
   }
 }
 ```
@@ -207,6 +228,7 @@ export class ProjectsController extends BaseTenantController {
 **Decorator checklist (every endpoint):**
 
 - `@Roles(...)` — RBAC (use the `UserRole` enum from `@appshore/db`: `OWNER`, `ADMIN`, `MEMBER`, `SUPER_ADMIN`)
+- `@HttpCode(...)` — on every POST and every DELETE (section 2.3)
 - `@ApiOperation({ summary: '...' })` — Swagger docs
 - `@ApiParam(...)` — on any `:param` endpoint
 - `@RequireFeature('feature_key')` — if behind a feature flag
@@ -215,9 +237,10 @@ export class ProjectsController extends BaseTenantController {
 
 - `getTenantDbId(user)` — resolves JWT tenant string to DB numeric ID
 - `getUserDbId(userId)` — resolves JWT user string to DB numeric ID
-- `validateTenantAccess(resourceTenantId, userTenantId)` — cross-tenant check
+- `validateTenantAccess(resourceTenantId, userTenantId)` — cross-tenant check (throws 404, see section 2.3)
 
-**URL param naming:** snake_case in URL (`:project_id`), camelCase in the TS variable.
+**URL param naming:** snake_case in URL (`:project_id`), camelCase in the TS variable. One name per collection:
+every route that addresses a project calls the param `:project_id`. `@Param('project_id')` must match the placeholder.
 
 **Self-service routes:** prefix with `/my-{entity}` and scope by the user id from the JWT.
 
@@ -238,6 +261,52 @@ Roles answer "is this user allowed to call this endpoint." They do NOT answer "i
 Apply `@RequireFeature(FEATURE_KEYS.X)` at the controller method (or class), AFTER `@Roles`. Order matters: roles fail fast (cheap), the feature flag check hits the feature-flags cache. Feature keys live in `packages/shared-types/src/platform/feature-keys.ts`.
 
 **Don't gate at the service layer.** Services are called by other domains (jobs, AI tools, internal triggers) that legitimately bypass tenant feature flags. Keep gating at the HTTP boundary.
+
+### 2.3 Status by Route Shape (NON-NEGOTIABLE)
+
+The success status says what happened. It follows the shape of the route (ADR "API contract", section 1).
+
+| Route                                                 | Status | Body                               | Decorator                          |
+| ----------------------------------------------------- | ------ | ---------------------------------- | ---------------------------------- |
+| `POST /things` (a new addressable record exists)      | 201    | the created resource               | `@HttpCode(HttpStatus.CREATED)`    |
+| `POST /things/:thing_id/verb` (an action on a record) | 200    | the resource as it is now          | `@HttpCode(HttpStatus.OK)`         |
+| Work was queued                                       | 202    | the record to poll (job, delivery) | `@HttpCode(HttpStatus.ACCEPTED)`   |
+| `DELETE`                                              | 204    | none: the handler returns `void`   | `@HttpCode(HttpStatus.NO_CONTENT)` |
+| A POST with nothing to return (logout, send a code)   | 204    | none                               | `@HttpCode(HttpStatus.NO_CONTENT)` |
+| GET, PATCH, PUT                                       | 200    | the resource                       | none needed                        |
+
+Rules:
+
+- **Every POST declares its status.** Nest answers 201 to any POST unless told otherwise, so a missing `@HttpCode`
+  is a wrong status waiting to happen.
+- **No acknowledgement bodies.** Never `return { success: true }`, `{ message: 'Done' }`, `{ deleted: true }`. Return
+  the resource as it is now, or answer 204. The web client and the mobile client both read a 204 and an empty 2xx
+  body as "no value".
+- **An action verb is the last segment after a param** (`/invitations/:invitation_id/resend`). It is never 201. The
+  verbs the ratchet knows are in `ACTION_VERBS` in `api-contract.spec.ts`; add yours there.
+- **An illegal state transition is 409**: `throw invalidState('Only failed jobs can be retried')`, never a 400 or a 403. A 400 is for a field of the request that is wrong.
+- **Another tenant's record is 404**, with the same text as a missing one. A 403 confirms that it exists.
+
+**Provider routes.** A route whose wire format a third party sets (a vendor webhook, the MCP transport, OAuth
+protocol routes, a vendor's OAuth redirect, an SSE stream) keeps the format the standard or vendor document fixes.
+List it in `PROVIDER_ROUTES` in `apps/backend/src/architecture/api-contract.allowlist.json`, with the document as
+the reason. An entry exempts the route from four rules only: acknowledgement bodies, query DTOs, snake_case query
+keys, and "a 400 names its field". It still declares its status, and it is either documented (`@ApiOperation`) or
+excluded on purpose (`@ApiExcludeEndpoint()`).
+
+**Edge.** `@SkipThrottle()` is for health and SSE routes only. A signed webhook, an MCP route or a dev lever gets
+`@Throttle(GENEROUS_THROTTLE)` (`@appshore/platform/shared/http/edge-throttle`): a ceiling, not an exemption. Never
+put `@SkipThrottle()` beside a `@Throttle(...)`: the skip wins and the limit is off. A route that takes an API key
+or an OAuth token (`ApiKeyAuthGuard`, `OAuthTokenGuard`) also carries `AgentRateLimitGuard` and sits on a controller
+with `@UseFilters(BearerChallengeFilter)`, so a 401 tells the client where to authenticate.
+
+**The ratchet.** `apps/backend/src/architecture/api-contract.spec.ts` holds these rules (`status/*`, `naming/*`,
+`edge/*`, `errors/transition-is-409`, `errors/cross-tenant-is-404`) and runs on every push. It also carries the
+rules the starter's own routes do not pass yet (`input/*`, `output/*`, `docs/*`, and some of `errors/*`): today's
+violations of those are frozen in `api-contract.baseline.json`, which can only shrink. New code may not add to it.
+After fixing a baselined violation run `UPDATE_API_BASELINE=1 pnpm --filter @app/backend exec jest
+src/architecture/api-contract`. Run `pnpm verify:api` before a pull request that changes the wire: it boots the
+backend and runs the Playwright `api` project against it.
 
 ---
 
@@ -311,7 +380,7 @@ Status changes are not free-form updates. Every status transition belongs in a d
 ```typescript
 async updateStatus(taskId: number, tenantId: number, next: TaskStatus, actor: EventActor) {
   const task = await this.findOne(taskId, tenantId);
-  this.assertTransition(task.status, next);   // throws BadRequestException on illegal transition
+  this.assertTransition(task.status, next);   // throws 409 INVALID_STATE on an illegal transition
   const updated = await this.prisma.task.update({ where: { id: task.id }, data: { status: next } });
   await this.events.emit(DOMAIN_EVENTS.TASK_STATUS_CHANGED, tenantId, { taskId, from: task.status, to: next }, actor);
   return updated;
@@ -326,7 +395,9 @@ private assertTransition(from: TaskStatus, to: TaskStatus) {
     CANCELLED:   [],
   };
   if (!allowed[from]?.includes(to)) {
-    throw new BadRequestException(`Cannot move from ${from} to ${to}`);
+    // 409, not 400: no field of the request is wrong, the record's state does not allow it. `stateLabel` keeps
+    // the raw enum name out of the copy.
+    throw invalidState(`A task that is ${stateLabel(from)} cannot become ${stateLabel(to)}`);
   }
 }
 ```
@@ -1069,7 +1140,7 @@ Guards and decorators live in `@appshore/platform` (`auth/guards/`, `auth/decora
 - `@CurrentUser()` — extract user from JWT
 - `@TenantDbId()` — extract numeric tenant DB id from request
 - `@Public()` — skip auth guards (webhooks, health)
-- `@SkipThrottle()` — exempt from rate limiting (health endpoints only)
+- `@SkipThrottle()` — exempt from rate limiting (health and SSE routes only; everything else that needs room gets `@Throttle(GENEROUS_THROTTLE)`, section 2.3)
 
 **NEVER** add `@UseGuards(ThrottlerGuard)` — it's already global.
 
@@ -1173,6 +1244,8 @@ Don't `process.exit()` in shutdown paths — it kills the process before flush. 
 - Raw body access via `req.rawBody` (configured in main.ts)
 - `@Public()` decorator (no auth required)
 - `@HttpCode(200)` — always return 200 to prevent vendor retries
+- `@Throttle(GENEROUS_THROTTLE)`, never `@SkipThrottle()`: a signed route still spends CPU on every forged request
+- An entry in `PROVIDER_ROUTES` (`api-contract.allowlist.json`) naming the vendor document that fixes the format
 
 **Outbound** (`apps/backend/src/platform-glue/webhooks/`):
 

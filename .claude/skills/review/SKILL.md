@@ -68,6 +68,10 @@ Review every file against the backend patterns skill. For each violation found, 
 3. `throw new Error()` instead of NestJS exceptions in HTTP paths (BadRequestException, NotFoundException, etc.)
 3a. An error body written by hand (`res.status(4xx).json({ message })`) or an exception carrying keys beyond `code`, `detail`, `fieldErrors` — every error leaves through the one envelope (`writeErrorEnvelope`; held by architecture/error-envelope.spec.ts)
 3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/409 with a code); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
+3c. Success status by route shape (held by architecture/api-contract.spec.ts, rules `status/*`): a POST without `@HttpCode`; a create that is not 201; an action POST (`/:id/verb`) answering 201; queued work not answering 202 with the record to poll; a DELETE that is not 204 or returns a body; an acknowledgement body (`{ success: true }`, `{ message }`, `{ deleted: true }`) from a controller or from the service it returns
+3d. Another tenant's record answered 403 instead of 404 (rule `errors/cross-tenant-is-404`); an illegal state transition answered 400 or 403 instead of `invalidState()` (rule `errors/transition-is-409`)
+3e. Edge (rules `edge/*`): `@SkipThrottle()` on anything but a health or SSE route (use `@Throttle(GENEROUS_THROTTLE)`), or beside a `@Throttle(...)`; a route behind `ApiKeyAuthGuard` or `OAuthTokenGuard` without `AgentRateLimitGuard` or without `@UseFilters(BearerChallengeFilter)` on its controller
+3f. A new entry in `api-contract.baseline.json` (it may only shrink), or an `api-contract.allowlist.json` entry with no reason, or a `PROVIDER_ROUTES` entry for a route whose format no third party sets
 4. Enums imported from '@prisma/client' instead of '@appshore/db', or hand-written enum literals/Zod enums duplicating a Prisma enum
 5. Raw AI SDK calls outside the sanctioned paths (Mastra runtime, StructuredOutputService, runStructuredLlmStep)
 6. Missing auth guard decorators (@Roles) on controller endpoints
@@ -86,7 +90,7 @@ Review every file against the backend patterns skill. For each violation found, 
 16. Error messages: user-friendly, no raw technical errors, Prisma codes, or internal IDs exposed
 17. Prisma queries: N+1 detection (findMany in loop), missing select/include optimization, find-then-create instead of upsert
 18. Domain event naming: app.<aggregate>.<past-tense-action> format, registered in APP_EVENT_REGISTRY
-19. Controller URL naming: kebab-case paths, snake_case URL params, RESTful conventions
+19. Controller URL naming: kebab-case paths, snake_case URL params (rule `naming/snake-case-url-params`), one param name per collection (`naming/one-param-name-per-collection`), every `@Param('x')` matching a `:x` in its route (`naming/param-matches-route`), RESTful conventions
 20. Module registration: proper imports/exports in the parent domain module
 21. BaseTenantController extension for tenant-scoped controllers
 22. State transitions: dedicated method with a whitelisted from→to map (no free-form status updates)

@@ -213,7 +213,9 @@ export const projectsApi = {
 - Object namespace pattern: `entityApi.method()` (not classes)
 - Use `URLSearchParams` for query strings
 - Type the return value: `apiClient<Entity[]>(...)`
-- For blob downloads (PDFs): use raw `fetch()` with auth headers, not `apiClient`
+- For blob downloads (PDFs, exports): use `apiFetchRaw` from the same module. It returns the raw `Response` with the same auth and one-shot refresh as `apiClient`. Never hand-build a bearer header on a raw `fetch()`
+- A 204, and a 200, 201 or 202 with an empty body, resolve to `undefined`. Type such a call `apiClient<void>(...)` and do not read its result
+- A mutation's response is the resource as it is now (the backend sends no `{ success: true }`). Type it as the resource, and prefer writing it into the query cache or invalidating over a second fetch
 - `credentials: 'include'` for cookie-based endpoints
 
 ---

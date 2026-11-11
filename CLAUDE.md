@@ -202,7 +202,17 @@ success + error toasts; every loading state shows a Skeleton.
   build, stops at the first failure, and ends with one line: `verify: PASS` or `verify: FAIL at "<step>"`. The
   integration specs need Postgres and Redis (`docker compose up -d postgres redis`, or export `DATABASE_URL` and
   `REDIS_URL`).
+- **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
+  or error body), and paste its last line too. It builds the backend, migrates, seeds, boots it and runs the
+  Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
+  third-party key. `API_QA_PORT` picks the port when 8000 is taken.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
-  conventions, the error envelope). A new rule gets a spec in that folder, so the hook holds it.
+  conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
+  holds it.
+- **The API contract ratchet** (`apps/backend/src/architecture/api-contract.spec.ts`) — one rule per line of the
+  ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. A violation that predates a
+  rule sits in `api-contract.baseline.json`, which can only shrink. A decision that is not debt (a route whose wire
+  format a vendor or a standard sets, a list the domain bounds) sits in `api-contract.allowlist.json` with its
+  reason.
 - **Pre-commit hook** — Prettier on staged files.

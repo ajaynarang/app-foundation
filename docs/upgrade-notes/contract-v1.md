@@ -91,3 +91,99 @@ ignore it.
 
 **Who notices.** Nobody yet: no route of the starter reads its query string through the kit in this change. Each
 route that moves to it is listed below when it moves.
+
+## 4. Success statuses, acknowledgement bodies and route params
+
+**What changed.** The success status now follows the shape of the route (ADR "API contract", section 1), and no
+route answers an acknowledgement (`{ success: true }`, `{ message: "…" }`). An action returns the resource as it
+is now, or 204 with no body.
+
+Statuses that moved. Nest answers 201 to a POST unless told otherwise, so most action POSTs moved from 201 to 200.
+
+| Route                                                                                                                             | Before                             | Now                                                |
+| --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------- |
+| `POST /dev/switch`, `POST /admin/cache/flush`, `POST /admin/cache/flush/:namespace`                                               | 201                                | 200                                                |
+| `POST /admin/jobs/:job_id/retry`                                                                                                  | 201                                | **202** `{ jobId, status }`                        |
+| `POST /admin/jobs/tenants/:tenant_id/pause-jobs`, `…/resume-jobs`                                                                 | 201                                | 200                                                |
+| `POST /admin/billing/tenants/:tenant_id/credit`, `pause`, `resume`, `cancel-immediately`, `extend-trial`, `suspend`, `reactivate` | 201 `{ success: true }`            | 200, the tenant's billing state                    |
+| `PATCH /admin/billing/tenants/:tenant_id/price`                                                                                   | 200 `{ success: true }`            | 200, the tenant's billing state                    |
+| `POST /admin/billing/tenants/:tenant_id/refund`, `change-plan`                                                                    | 201                                | 200 (same body)                                    |
+| `POST /billing/checkout`, `POST /billing/payment-methods/setup`                                                                   | 201                                | 200 (same body)                                    |
+| `POST /billing/upgrade`, `downgrade`, `cancel`, `reactivate`                                                                      | 201 `{ success: true }`            | 200, the billing overview                          |
+| `PATCH /billing/quantity`, `PATCH /billing/payment-methods/:id/default`                                                           | 200 `{ success: true }`            | 200, the billing overview                          |
+| `POST /billing/wallet/top-up`                                                                                                     | 201 `{ success: true }`            | 200, the wallet (`{ wallet, recentTransactions }`) |
+| `PATCH /billing/wallet/auto-reload`                                                                                               | 200 `{ success: true }`            | 200, the wallet                                    |
+| `DELETE /billing/payment-methods/:id`                                                                                             | 200 `{ success: true }`            | **204**                                            |
+| `DELETE /integrations/:integration_id`                                                                                            | 200 `{ success: true }`            | **204**                                            |
+| `POST /integrations/:integration_id/sync`                                                                                         | 201 `{ success, message, jobIds }` | **202** `{ jobId, status: "QUEUED" }`              |
+| `POST /integrations/:integration_id/test`                                                                                         | 201                                | 200 (same body)                                    |
+| `POST /integrations/oauth/:vendor/disconnect`                                                                                     | 201 `{ success, message }`         | **204**                                            |
+| `POST /webhooks/:id/test`                                                                                                         | 201 `{ message }`                  | **202**, the queued delivery log                   |
+| `POST /webhooks/:id/logs/:log_id/retry`                                                                                           | 201 `{ message }`                  | **202**, the delivery log, pending again           |
+| `POST /webhooks/:id/replay`                                                                                                       | 201 `{ message }`                  | **202** `{ queued, since }`                        |
+| `POST /auth/forgot-password`, `POST /auth/reset-password`                                                                         | 200 `{ success: true }`            | **204**                                            |
+| `POST /auth/logout`                                                                                                               | 201 `{ message }`                  | **204**                                            |
+| `POST /auth/phone/send-otp`, `set-pin`, `add-phone`                                                                               | 200 `{ message }`                  | **204**                                            |
+| `POST /auth/phone/verify-add-phone`                                                                                               | 200 `{ message }`                  | 200, the profile                                   |
+| `PATCH /auth/password`                                                                                                            | 200 `{ success, sessionsRevoked }` | 200 `{ sessionsRevoked }`                          |
+| `POST /auth/refresh`, `POST /auth/firebase/exchange`                                                                              | 201                                | 200 (same body)                                    |
+| `POST /notifications/:notification_id/read`, `unread`, `dismiss`, `POST /notifications/mark-all-read`, `dismiss-all-read`         | 201                                | 200 (same body)                                    |
+| `POST /notifications/devices`, `POST /push/subscribe`                                                                             | 201 `{ message }`                  | **204**                                            |
+| `DELETE /notifications/devices`, `DELETE /push/unsubscribe`                                                                       | 200 `{ message }`                  | **204**                                            |
+| `POST /users/:user_id/activate`, `deactivate`                                                                                     | 201 `{ message }`                  | 200, the user                                      |
+| `DELETE /users/:user_id`                                                                                                          | 200 `{ message }`                  | **204**                                            |
+| `DELETE /invitations/:invitation_id`                                                                                              | 200, the invitation row            | **204**                                            |
+| `POST /invitations/accept`, `POST /invitations/:invitation_id/resend`                                                             | 201                                | 200 (same body)                                    |
+| `POST /tenants/:tenant_id/approve`, `reject`, `suspend`, `reactivate`                                                             | 201                                | 200 (same body)                                    |
+| `POST /api-keys/:api_key_id/rotate`, `POST /oauth/clients/:client_id/rotate-secret`, `POST /webhooks/:id/rotate-secret`           | 201                                | 200 (same body)                                    |
+| `POST /api-keys/:api_key_id/pause`, `resume`, `revoke`                                                                            | 204                                | 200, the key                                       |
+| `POST /oauth/clients/:client_id/pause`, `resume`, `revoke`                                                                        | 204                                | 200, the client                                    |
+| `POST /oauth/authorize/consent`, `POST /settings/reset`, `POST /voice/token`, `POST /mcp/hitl/:token/step-up`                     | 201                                | 200 (same body)                                    |
+| `POST /admin/broadcasts/:id/publish`, `archive`; `POST /admin/feedback/:id/categorize`, `bulk-categorize`                         | 201                                | 200 (same body)                                    |
+| `GET /mcp`, `GET /` (the MCP stream probe)                                                                                        | 405 `{ error, message }`           | 405, the error envelope (`METHOD_NOT_ALLOWED`)     |
+
+Creates that already answered 201 still do (`POST /users`, `/invitations`, `/api-keys`, `/oauth/clients`,
+`/webhooks`, `/integrations`, `/support/tickets`, `/feedback`, `/conversations`, `/admin/broadcasts`,
+`/tenants/register`, `/admin/billing/tenants/:tenant_id/subscription`, `/desk/memories/playbook`, ticket messages).
+
+Errors that moved:
+
+| Case                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Before | Now                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------- |
+| A record of another tenant or user: a user, an OAuth client, an assistant or voice conversation                                                                                                                                                                                                                                                                                                                                                                               | 403    | 404 `NOT_FOUND`     |
+| An action the record's state does not allow: a revoked key or client, an invitation that is accepted, cancelled or expired, a tenant that is not pending, active or suspended as the action needs, a job or delivery that has not failed, a trial that cannot be extended, a subscription that is already active or already on that plan, removing the only payment method, a Desk episode that is not escalated, a responsibility that is coming soon, step-up without a PIN | 400    | 409 `INVALID_STATE` |
+
+The copy of those 409s changed too, and no longer carries a raw enum name.
+
+Route params are `:snake_case`, with one name per collection. A URL with a value in it is unchanged; only a client
+that builds URLs from the route template, or reads the OpenAPI path, notices.
+
+| Before                                                              | Now                                                                      |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `:tenantId` (tenants, plans, admin billing), `:id` under admin jobs | `:tenant_id`                                                             |
+| `:userId`, `:invitationId`, `:clientId`, `:integrationId`, `:jobId` | `:user_id`, `:invitation_id`, `:client_id`, `:integration_id`, `:job_id` |
+| `:conversationId`, `:logId`                                         | `:conversation_id`, `:log_id`                                            |
+| `DELETE /api-keys/:id`                                              | `DELETE /api-keys/:api_key_id`                                           |
+
+Edge changes:
+
+- `POST /oauth/register` is limited to 5 requests a minute per address. The limit was declared before and switched
+  off by a `@SkipThrottle()` beside it.
+- `GET /oauth/authorize`, the Stripe and WhatsApp webhooks, the MCP routes and `GET /dev/users` have a ceiling of
+  1000 requests a minute per address, where they had no throttle.
+- `POST /` and `DELETE /` (MCP at the domain root) and `DELETE /mcp` are now metered per agent, like `POST /mcp`.
+- A 401 from any MCP route carries `WWW-Authenticate: Bearer … resource_metadata="…"`.
+
+**Who notices.**
+
+- A client that checks for exactly 201 on an action, or exactly 200 on a delete.
+- A client that reads `success`, `message` or `jobIds` from a success body.
+- A client that parses the body of a route that now answers 204. `response.json()` on an empty body throws.
+- A client that treated 400 as "invalid input" for a state conflict, or 403 as "exists, not yours".
+- An MCP or OAuth client that sent more than the new limits allow.
+
+**What to do.** Treat any 2xx as success, and read the body only when the status is not 204. In the web app,
+`apiClient` returns `undefined` for a 204 and for an empty 200, 201 or 202; `apiFetchRaw` is there for binary
+downloads. In the mobile app, `ApiClient` returns an empty map for an empty body. Show `detail` on a 409, as
+`extractErrorMessage` does. A stored webhook, runbook or script that calls a moved route by its template needs the
+new param name only if it templates the URL itself.
