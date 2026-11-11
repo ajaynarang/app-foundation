@@ -1,12 +1,15 @@
-import { IsUrl, IsArray, IsString, IsOptional, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsString, IsOptional, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateWebhookSubscriptionDto {
   @ApiProperty({
     example: 'https://partner.com/hook',
-    description: 'HTTPS URL to deliver events to',
+    description:
+      'Public HTTPS URL to deliver events to. Private, loopback, link-local and cloud metadata addresses are refused.',
   })
-  @IsUrl({ protocols: ['https'], require_tld: true, require_protocol: true })
+  // The SSRF guard in the service is the one rule for what a webhook URL may be (it also resolves the host).
+  @IsString()
+  @MaxLength(2048)
   url: string;
 
   @ApiProperty({
