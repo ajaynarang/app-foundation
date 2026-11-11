@@ -5,7 +5,8 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
-import type { CreateOAuthClientInput, OAuthClientResponse, UpdateOAuthClientInput } from '@app/shared-types';
+import type { OAuthClientResponse } from '@app/shared-types';
+import { CreateOAuthClientDto, UpdateOAuthClientDto } from './dto/oauth-client.dto';
 
 @ApiTags('OAuth Clients')
 @Controller('oauth/clients')
@@ -23,10 +24,10 @@ export class OAuthClientsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new OAuth client' })
   @ApiResponse({ status: 201, description: 'Client created' })
-  async create(@Body() body: CreateOAuthClientInput, @Req() req: Request) {
+  async create(@Body() body: CreateOAuthClientDto, @Req() req: Request) {
     const user = (req as unknown as { user: { dbId: number } }).user;
     const tenantId = this.resolveTenantId(req);
-    return this.clientsService.create(body, user.dbId, tenantId);
+    return this.clientsService.create({ ...body, clientType: body.clientType ?? 'confidential' }, user.dbId, tenantId);
   }
 
   @Get()
@@ -43,7 +44,7 @@ export class OAuthClientsController {
 
   @Put(':client_id')
   @ApiOperation({ summary: 'Update OAuth client' })
-  async update(@Param('client_id') clientId: string, @Body() body: UpdateOAuthClientInput, @Req() req: Request) {
+  async update(@Param('client_id') clientId: string, @Body() body: UpdateOAuthClientDto, @Req() req: Request) {
     return this.clientsService.update(clientId, body, this.resolveTenantId(req));
   }
 

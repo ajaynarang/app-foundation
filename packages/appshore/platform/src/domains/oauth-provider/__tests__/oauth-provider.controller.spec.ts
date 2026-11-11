@@ -1,4 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { ApproveOAuthConsentDto, OAuthRevokeRequestDto, OAuthTokenRequestDto } from '../dto/oauth-protocol.dto';
+import { RegisterOAuthClientDto } from '../dto/register-oauth-client.dto';
 import { OAuthProviderController } from '../oauth-provider.controller';
 import { OAuthErrorFilter } from '../oauth-error.filter';
 import { GENEROUS_THROTTLE } from '../../../shared/http/edge-throttle';
@@ -80,97 +83,106 @@ describe('OAuthProviderController', () => {
   describe('approveConsent', () => {
     it('should approve consent with challenge and user', async () => {
       const req = { user: { dbId: 1, tenantDbId: 7 } } as any;
-      await controller.approveConsent('challenge_token', undefined, req);
+      await controller.approveConsent({ challenge: 'challenge_token' }, req);
       expect(oauthService.approveConsent).toHaveBeenCalledWith('challenge_token', 1, 7, undefined);
     });
 
     it('should forward selectedScopes when provided', async () => {
       const req = { user: { dbId: 1, tenantDbId: 7 } } as any;
-      await controller.approveConsent('challenge_token', ['platform:read', 'documents:read'], req);
+      await controller.approveConsent(
+        { challenge: 'challenge_token', selectedScopes: ['platform:read', 'documents:read'] },
+        req,
+      );
       expect(oauthService.approveConsent).toHaveBeenCalledWith('challenge_token', 1, 7, [
         'platform:read',
         'documents:read',
       ]);
     });
 
-    it('should throw if selectedScopes is not an array of strings', async () => {
-      const req = { user: { dbId: 1, tenantDbId: 7 } } as any;
-      await expect(controller.approveConsent('challenge_token', [1, 2] as any, req)).rejects.toThrow(
-        BadRequestException,
+    it('answers 400 naming selectedScopes when it is not an array of strings', async () => {
+      const fields = await fieldErrorsOf(
+        readBodyDto(ApproveOAuthConsentDto, { challenge: 'challenge_token', selectedScopes: [1, 2] }),
       );
+      expect(Object.keys(fields).some((field) => field.startsWith('selectedScopes'))).toBe(true);
+      expect(
+        await fieldErrorsOf(readBodyDto(ApproveOAuthConsentDto, { challenge: 'c', selectedScopes: 'a' })),
+      ).toHaveProperty('selectedScopes');
     });
 
-    it('should throw if challenge missing', async () => {
-      const req = { user: { dbId: 1, tenantDbId: 7 } } as any;
-      await expect(controller.approveConsent('', undefined, req)).rejects.toThrow(BadRequestException);
+    it('answers 400 naming challenge when it is missing or empty', async () => {
+      expect(await fieldErrorsOf(readBodyDto(ApproveOAuthConsentDto, {}))).toEqual({
+        challenge: 'Missing challenge token',
+      });
+      expect(await fieldErrorsOf(readBodyDto(ApproveOAuthConsentDto, { challenge: '' }))).toHaveProperty('challenge');
     });
   });
 
   describe('token', () => {
     it('should exchange authorization_code', async () => {
-      const result = await controller.token(
-        'authorization_code',
-        'code1',
-        'http://localhost',
-        'cid',
-        'secret',
-        'verifier',
-        undefined,
-      );
+      const result = await controller.token({
+        grant_type: 'authorization_code',
+        code: 'code1',
+        redirect_uri: 'http://localhost',
+        client_id: 'cid',
+        client_secret: 'secret',
+        code_verifier: 'verifier',
+      });
       expect(oauthService.exchangeCode).toHaveBeenCalledWith('code1', 'verifier', 'cid', 'secret', 'http://localhost');
       expect(result.access_token).toBe('at_123');
     });
 
     it('should throw if missing params for authorization_code', async () => {
       await expect(
-        controller.token('authorization_code', '', 'http://localhost', 'cid', 'secret', 'verifier', undefined as any),
+        controller.token({
+          grant_type: 'authorization_code',
+          code: '',
+          redirect_uri: 'http://localhost',
+          client_id: 'cid',
+          client_secret: 'secret',
+          code_verifier: 'verifier',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should refresh token', async () => {
-      const result = await controller.token(
-        'refresh_token',
-        undefined,
-        undefined,
-        'cid',
-        'secret',
-        undefined,
-        'rt_abc',
-      );
+      const result = await controller.token({
+        grant_type: 'refresh_token',
+        client_id: 'cid',
+        client_secret: 'secret',
+        refresh_token: 'rt_abc',
+      });
       expect(oauthService.refreshToken).toHaveBeenCalledWith('rt_abc', 'cid', 'secret');
       expect(result.access_token).toBe('at_456');
     });
 
     it('should throw if missing params for refresh_token', async () => {
       await expect(
-        controller.token('refresh_token', undefined as any, undefined as any, '', 'secret', undefined as any, 'rt_abc'),
+        controller.token({
+          grant_type: 'refresh_token',
+          client_id: '',
+          client_secret: 'secret',
+          refresh_token: 'rt_abc',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw on unsupported grant_type', async () => {
       await expect(
-        controller.token(
-          'client_credentials',
-          undefined as any,
-          undefined as any,
-          'cid',
-          'secret',
-          undefined as any,
-          undefined as any,
-        ),
+        controller.token({ grant_type: 'client_credentials', client_id: 'cid', client_secret: 'secret' }),
       ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('revoke', () => {
     it('should revoke a token', async () => {
-      const result = await controller.revoke('token_abc');
+      const result = await controller.revoke({ token: 'token_abc' });
       expect(oauthService.revokeToken).toHaveBeenCalledWith('token_abc');
       expect(result).toEqual({});
     });
 
     it('should throw if token missing', async () => {
-      await expect(controller.revoke('')).rejects.toThrow(BadRequestException);
+      await expect(controller.revoke({ token: '' })).rejects.toThrow(BadRequestException);
+      await expect(controller.revoke({})).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -218,26 +230,21 @@ describe('OAuthProviderController', () => {
     });
 
     it('should throw if client_name missing', async () => {
-      await expect(controller.register({ redirect_uris: ['http://localhost:3000'] }, mockReq)).rejects.toThrow(
+      await expect(readBodyDto(RegisterOAuthClientDto, { redirect_uris: ['http://localhost:3000'] })).rejects.toThrow(
         BadRequestException,
       );
     });
 
     it('should throw if redirect_uris missing or empty', async () => {
-      await expect(controller.register({ client_name: 'Test', redirect_uris: [] }, mockReq)).rejects.toThrow(
+      await expect(readBodyDto(RegisterOAuthClientDto, { client_name: 'Test', redirect_uris: [] })).rejects.toThrow(
         BadRequestException,
       );
+      await expect(readBodyDto(RegisterOAuthClientDto, { client_name: 'Test' })).rejects.toThrow(BadRequestException);
     });
 
     it('should throw for non-HTTPS non-localhost redirect_uri', async () => {
       await expect(
-        controller.register(
-          {
-            client_name: 'Test',
-            redirect_uris: ['http://evil.com/callback'],
-          },
-          mockReq,
-        ),
+        readBodyDto(RegisterOAuthClientDto, { client_name: 'Test', redirect_uris: ['http://evil.com/callback'] }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -268,14 +275,21 @@ describe('OAuthProviderController', () => {
 
     it('should throw for invalid redirect_uri format', async () => {
       await expect(
-        controller.register(
-          {
-            client_name: 'Test',
-            redirect_uris: ['not-a-url'],
-          },
-          mockReq,
-        ),
+        readBodyDto(RegisterOAuthClientDto, { client_name: 'Test', redirect_uris: ['not-a-url'] }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('drops metadata it does not use instead of refusing it (RFC 7591 section 2)', async () => {
+      const dto = await readBodyDto(RegisterOAuthClientDto, {
+        client_name: 'Claude',
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback', 'http://127.0.0.1:8123/cb'],
+        logo_uri: 'https://claude.ai/logo.png',
+        software_id: 'abc',
+      });
+      expect(dto).toEqual({
+        client_name: 'Claude',
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback', 'http://127.0.0.1:8123/cb'],
+      });
     });
   });
 
@@ -308,22 +322,35 @@ describe('OAuthProviderController', () => {
       expect(await errorOf(controller.authorize('token', 'c', 'r', 's', 'st', 'ch', 'S256', res))).toMatchObject({
         error: 'unsupported_response_type',
       });
-      expect(await errorOf(controller.token('password', '', '', '', '', '', ''))).toMatchObject({
+      expect(await errorOf(controller.token({ grant_type: 'password' }))).toMatchObject({
         error: 'unsupported_grant_type',
         error_description: 'Only authorization_code and refresh_token are supported',
       });
-      expect(await errorOf(controller.token('refresh_token', '', '', '', '', '', ''))).toMatchObject({
+      expect(await errorOf(controller.token({ grant_type: 'refresh_token' }))).toMatchObject({
         error: 'invalid_request',
       });
-      expect(await errorOf(controller.revoke(''))).toMatchObject({ error: 'invalid_request' });
+      expect(await errorOf(controller.revoke({}))).toMatchObject({ error: 'invalid_request' });
       expect(
-        await errorOf(controller.register({ redirect_uris: ['https://a.example.com/cb'] }, mockReq)),
+        await errorOf(readBodyDto(RegisterOAuthClientDto, { redirect_uris: ['https://a.example.com/cb'] })),
       ).toMatchObject({
         error: 'invalid_client_metadata',
       });
       expect(
-        await errorOf(controller.register({ client_name: 'T', redirect_uris: ['http://evil.com/cb'] }, mockReq)),
+        await errorOf(readBodyDto(RegisterOAuthClientDto, { client_name: 'T', redirect_uris: ['http://evil.com/cb'] })),
       ).toMatchObject({ error: 'invalid_redirect_uri' });
+    });
+
+    it('a token or revoke body of the wrong shape is invalid_request, and an unknown parameter is ignored', async () => {
+      // A repeated form key arrives as an array.
+      expect(await errorOf(readBodyDto(OAuthTokenRequestDto, { grant_type: ['a', 'b'] }))).toMatchObject({
+        error: 'invalid_request',
+      });
+      expect(await errorOf(readBodyDto(OAuthRevokeRequestDto, { token: { nested: true } }))).toMatchObject({
+        error: 'invalid_request',
+      });
+      expect(
+        await readBodyDto(OAuthTokenRequestDto, { grant_type: 'refresh_token', refresh_token: 'rt', resource: 'x' }),
+      ).toEqual({ grant_type: 'refresh_token', refresh_token: 'rt' });
     });
   });
 

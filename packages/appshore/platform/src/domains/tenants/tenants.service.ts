@@ -297,7 +297,7 @@ export class TenantsService {
   /**
    * Reject tenant
    */
-  async rejectTenant(tenantId: string, reason: string) {
+  async rejectTenant(tenantId: string, reason?: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { tenantId },
       include: {

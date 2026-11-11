@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, ForbiddenException } from '@nestjs/common';
 import { PlansService } from './plans.service';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -6,6 +6,7 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole, TenantPlan } from '@appshore/db';
 import { UpdatePlanConfigDto } from './dto/update-plan-config.dto';
 import { ToggleEntitlementDto } from './dto/toggle-entitlement.dto';
+import { AssignTenantPlanDto, UpdateProviderPriceDto } from './dto/assign-plan.dto';
 
 @Controller('plans')
 export class PlansController {
@@ -27,7 +28,9 @@ export class PlansController {
   @Get('my-plan')
   async getMyPlan(@CurrentUser() user: any) {
     if (!user?.tenantId) {
-      throw new BadRequestException('This endpoint requires a tenant context');
+      // No field of the request is at fault: the caller has no workspace (a super admin). 403 with the code
+      // the plan guard already answers for the same condition.
+      throw new ForbiddenException({ code: 'NO_TENANT', message: 'Open a workspace to see its plan' });
     }
     return this.plansService.getTenantPlanDetails(user.tenantId);
   }
@@ -46,11 +49,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch('tenant/:tenant_id')
-  async assignPlan(
-    @Param('tenant_id') tenantId: string,
-    @Body() body: { plan: TenantPlan; reason?: string },
-    @CurrentUser() user: any,
-  ) {
+  async assignPlan(@Param('tenant_id') tenantId: string, @Body() body: AssignTenantPlanDto, @CurrentUser() user: any) {
     return this.plansService.assignPlan(tenantId, body.plan, user.email ?? user.userId, body.reason);
   }
 
@@ -59,7 +58,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan/provider-price')
-  async updateProviderPrice(@Param('plan') plan: TenantPlan, @Body() body: { providerPriceId: string | null }) {
+  async updateProviderPrice(@Param('plan') plan: TenantPlan, @Body() body: UpdateProviderPriceDto) {
     return this.plansService.updateProviderPriceId(plan, body.providerPriceId);
   }
 

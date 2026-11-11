@@ -1,3 +1,7 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { CancelInvitationDto } from '../dto/cancel-invitation.dto';
+import { InvitationListQueryDto } from '../dto/invitation-list-query.dto';
 import { UserInvitationsController } from '../user-invitations.controller';
 
 describe('UserInvitationsController', () => {
@@ -33,8 +37,12 @@ describe('UserInvitationsController', () => {
   });
 
   it('getInvitations delegates to service', async () => {
-    await controller.getInvitations(currentUser, 'pending');
-    expect(invitationsService.getInvitations).toHaveBeenCalledWith('tenant_abc', 'pending');
+    await controller.getInvitations(currentUser, await readQueryDto(InvitationListQueryDto, { status: 'PENDING' }));
+    expect(invitationsService.getInvitations).toHaveBeenCalledWith('tenant_abc', 'PENDING');
+  });
+
+  it('getInvitations answers 400 naming status for an unknown one', async () => {
+    expect(await fieldErrorsOf(readQueryDto(InvitationListQueryDto, { status: 'pending' }))).toHaveProperty('status');
   });
 
   it('getInvitationByToken delegates to service', async () => {
@@ -51,7 +59,11 @@ describe('UserInvitationsController', () => {
   });
 
   it('cancelInvitation delegates to service', async () => {
-    await controller.cancelInvitation('inv_1', currentUser, 'No longer needed');
+    await controller.cancelInvitation(
+      'inv_1',
+      currentUser,
+      await readBodyDto(CancelInvitationDto, { reason: 'No longer needed' }),
+    );
     expect(invitationsService.cancelInvitation).toHaveBeenCalledWith('inv_1', 'tenant_abc', 'No longer needed');
   });
 

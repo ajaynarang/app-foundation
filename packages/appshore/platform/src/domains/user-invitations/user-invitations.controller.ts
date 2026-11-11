@@ -2,6 +2,8 @@ import { Controller, Post, Get, Delete, Body, Param, Query, HttpCode, HttpStatus
 import { UserInvitationsService } from './user-invitations.service';
 import { AuthService } from '../../auth/auth.service';
 import { InviteUserDto, AcceptInvitationDto, AcceptPhoneInvitationDto } from './dto/invite-user.dto';
+import { CancelInvitationDto } from './dto/cancel-invitation.dto';
+import { InvitationListQueryDto } from './dto/invitation-list-query.dto';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -31,8 +33,8 @@ export class UserInvitationsController {
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Get()
-  async getInvitations(@CurrentUser() currentUser: any, @Query('status') status?: string) {
-    return this.userInvitationsService.getInvitations(currentUser.tenantId, status);
+  async getInvitations(@CurrentUser() currentUser: any, @Query() query: InvitationListQueryDto) {
+    return this.userInvitationsService.getInvitations(currentUser.tenantId, query.status);
   }
 
   /**
@@ -63,9 +65,9 @@ export class UserInvitationsController {
   async cancelInvitation(
     @Param('invitation_id') invitationId: string,
     @CurrentUser() currentUser: any,
-    @Body('reason') reason?: string,
+    @Body() dto: CancelInvitationDto,
   ): Promise<void> {
-    await this.userInvitationsService.cancelInvitation(invitationId, currentUser.tenantId, reason);
+    await this.userInvitationsService.cancelInvitation(invitationId, currentUser.tenantId, dto?.reason);
   }
 
   /**

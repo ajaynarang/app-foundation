@@ -3,42 +3,15 @@
   "status/delete-204": [],
   "status/action-is-not-created": [],
   "status/no-ack-bodies": [],
-  "input/body-is-a-dto-class": [
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-clients.controller.ts :: POST /oauth/clients",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-clients.controller.ts :: PUT /oauth/clients/:client_id",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/authorize/consent",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/register",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/revoke",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/token",
-    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: PATCH /plans/:plan/provider-price",
-    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: PATCH /plans/tenant/:tenant_id",
-    "packages/appshore/platform/src/domains/settings/user-preferences.controller.ts :: POST /settings/reset",
-    "packages/appshore/platform/src/domains/tenants/tenants.controller.ts :: POST /tenants/:tenant_id/reject",
-    "packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts :: DELETE /invitations/:invitation_id",
-    "packages/appshore/platform/src/infrastructure/notifications/channels/push/push-subscription.controller.ts :: DELETE /push/unsubscribe",
-    "packages/appshore/platform/src/infrastructure/notifications/channels/push/push-subscription.controller.ts :: POST /push/subscribe"
-  ],
-  "input/query-is-a-dto": [
-    "packages/appshore/platform/src/domains/announcements/announcements.controller.ts :: GET /admin/broadcasts :: status",
-    "packages/appshore/platform/src/domains/tenants/tenants.controller.ts :: GET /tenants :: status",
-    "packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts :: GET /invitations :: status"
-  ],
+  "input/body-is-a-dto-class": [],
+  "input/query-is-a-dto": [],
   "input/no-number-parse-in-controllers": [],
   "input/no-schema-parse-in-controllers": [],
   "errors/no-hand-built-error-body": [],
   "errors/no-plain-error-in-controllers": [],
   "errors/transition-is-409": [],
-  "errors/controller-400-names-its-field": [
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: new BadRequestException('Missing challenge token');",
-    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: new BadRequestException('selectedScopes must be an array of strings when provided');",
-    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: new BadRequestException('This endpoint requires a tenant context');",
-    "packages/appshore/platform/src/domains/tenants/tenants.controller.ts :: new BadRequestException('Bot verification failed. Please try again.');",
-    "packages/appshore/platform/src/domains/tenants/tenants.controller.ts :: new BadRequestException('Bot verification required. Please try again.');",
-    "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-consent.controller.ts :: new BadRequestException('Nothing to change');"
-  ],
-  "errors/no-internals-in-messages": [
-    "packages/appshore/platform/src/infrastructure/storage/file-storage.service.ts :: Exception(`S3 object not found: ${s3Key}`);"
-  ],
+  "errors/controller-400-names-its-field": [],
+  "errors/no-internals-in-messages": [],
   "errors/cross-tenant-is-404": [],
   "output/no-raw-prisma-from-controllers": [
     "apps/backend/src/domains/admin/admin-jobs.controller.ts :: return this.prisma.tenant.update({"
@@ -120,18 +93,7 @@
   "naming/snake-case-url-params": [],
   "naming/one-param-name-per-collection": [],
   "naming/param-matches-route": [],
-  "naming/snake-case-query-keys": [
-    "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?excludeSuperAdmin)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?tenantId)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity (?userQuery)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity/summary (?excludeSuperAdmin)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity-admin.controller.ts :: GET /super-admin/login-activity/summary (?tenantId)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity.controller.ts :: GET /admin/login-activity (?excludeSuperAdmin)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity.controller.ts :: GET /admin/login-activity (?tenantId)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity.controller.ts :: GET /admin/login-activity (?userQuery)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity.controller.ts :: GET /admin/login-activity/summary (?excludeSuperAdmin)",
-    "packages/appshore/platform/src/domains/login-activity/login-activity.controller.ts :: GET /admin/login-activity/summary (?tenantId)"
-  ],
+  "naming/snake-case-query-keys": [],
   "docs/api-operation": [
     "apps/backend/src/domains/admin/admin-cache.controller.ts :: GET /admin/cache/health",
     "apps/backend/src/domains/admin/admin-cache.controller.ts :: GET /admin/cache/stats",

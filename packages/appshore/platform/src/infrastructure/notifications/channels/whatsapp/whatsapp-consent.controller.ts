@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Patch } from '@nestjs/common';
+import { fieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -23,7 +24,10 @@ export class WhatsAppConsentController {
   @ApiOperation({ summary: 'Say yes or no to WhatsApp updates' })
   async update(@CurrentUser() user: any, @Body() dto: UpdateWhatsAppConsentDto) {
     if (dto.optedIn === undefined && dto.marketingOptedIn === undefined) {
-      throw new BadRequestException('Nothing to change');
+      throw fieldErrors(
+        { optedIn: 'Send optedIn or marketingOptedIn', marketingOptedIn: 'Send optedIn or marketingOptedIn' },
+        'Nothing to change',
+      );
     }
     const source = dto.source === 'SIGNUP' ? WhatsAppConsentSource.SIGNUP : WhatsAppConsentSource.SETTINGS;
     return this.consent.update(user.dbId, { optedIn: dto.optedIn, marketingOptedIn: dto.marketingOptedIn }, source);

@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '../../../test/helpers/field-errors.helpers';
+import { BroadcastListQueryDto } from '../dto/broadcast-list-query.dto';
 import { NotFoundException } from '@nestjs/common';
 import { AnnouncementsController } from '../announcements.controller';
 
@@ -37,7 +40,7 @@ describe('AnnouncementsController', () => {
 
   describe('findAll', () => {
     it('returns the full list of announcements when no status filter', async () => {
-      const result = await controller.findAll();
+      const result = await controller.findAll(await readQueryDto(BroadcastListQueryDto, {}));
 
       expect(service.findAll).toHaveBeenCalledWith(undefined);
       expect(result).toHaveLength(1);
@@ -49,17 +52,23 @@ describe('AnnouncementsController', () => {
     it('passes status filter to service', async () => {
       service.findAll.mockResolvedValue([{ ...mockAnnouncement, status: 'PUBLISHED' }]);
 
-      const result = await controller.findAll('PUBLISHED');
+      const result = await controller.findAll(await readQueryDto(BroadcastListQueryDto, { status: 'PUBLISHED' }));
 
       expect(service.findAll).toHaveBeenCalledWith('PUBLISHED');
       expect(result).toHaveLength(1);
       expect(result[0].status).toBe('PUBLISHED');
     });
 
+    it('answers 400 naming status for an unknown one (it used to be ignored and list everything)', async () => {
+      expect(await fieldErrorsOf(readQueryDto(BroadcastListQueryDto, { status: 'published' }))).toHaveProperty(
+        'status',
+      );
+    });
+
     it('returns empty array when no announcements match', async () => {
       service.findAll.mockResolvedValue([]);
 
-      const result = await controller.findAll('ARCHIVED');
+      const result = await controller.findAll(await readQueryDto(BroadcastListQueryDto, { status: 'ARCHIVED' }));
 
       expect(result).toEqual([]);
       expect(result).toHaveLength(0);
@@ -68,7 +77,7 @@ describe('AnnouncementsController', () => {
     it('propagates service errors', async () => {
       service.findAll.mockRejectedValue(new Error('Database error'));
 
-      await expect(controller.findAll()).rejects.toThrow('Database error');
+      await expect(controller.findAll({})).rejects.toThrow('Database error');
     });
   });
 

@@ -2,6 +2,7 @@ import { Controller, Post, Delete, Get, Body, HttpCode, HttpStatus, Logger } fro
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { PushService } from './web-push.service';
+import { SubscribePushDto, UnsubscribePushDto } from './dto/push-subscription.dto';
 
 @ApiTags('Push Notifications')
 @Controller('push')
@@ -20,23 +21,14 @@ export class PushSubscriptionController {
   @Post('subscribe')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Register a push notification subscription' })
-  async subscribe(
-    @CurrentUser() user: any,
-    @Body()
-    body: {
-      subscription: {
-        endpoint: string;
-        keys: { p256dh: string; auth: string };
-      };
-    },
-  ): Promise<void> {
+  async subscribe(@CurrentUser() user: any, @Body() body: SubscribePushDto): Promise<void> {
     await this.pushService.saveSubscription(user.dbId, user.tenantDbId, body.subscription);
   }
 
   @Delete('unsubscribe')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a push notification subscription' })
-  async unsubscribe(@CurrentUser() user: any, @Body() body: { endpoint: string }): Promise<void> {
+  async unsubscribe(@CurrentUser() user: any, @Body() body: UnsubscribePushDto): Promise<void> {
     await this.pushService.removeSubscription(user.dbId, body.endpoint);
   }
 }

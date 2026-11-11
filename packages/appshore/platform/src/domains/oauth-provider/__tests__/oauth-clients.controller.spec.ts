@@ -1,4 +1,7 @@
 import { OAuthClientsController } from '../oauth-clients.controller';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { OAuthScopeSchema } from '@app/shared-types';
+import { CreateOAuthClientDto, UpdateOAuthClientDto } from '../dto/oauth-client.dto';
 
 describe('OAuthClientsController', () => {
   let controller: OAuthClientsController;
@@ -26,12 +29,12 @@ describe('OAuthClientsController', () => {
 
   it('create uses tenant for ADMIN', async () => {
     await controller.create({ name: 'Test' } as any, adminReq);
-    expect(clientsService.create).toHaveBeenCalledWith({ name: 'Test' }, 1, 10);
+    expect(clientsService.create).toHaveBeenCalledWith({ name: 'Test', clientType: 'confidential' }, 1, 10);
   });
 
   it('create uses null tenant for SUPER_ADMIN', async () => {
     await controller.create({ name: 'Test' } as any, superAdminReq);
-    expect(clientsService.create).toHaveBeenCalledWith({ name: 'Test' }, 2, null);
+    expect(clientsService.create).toHaveBeenCalledWith({ name: 'Test', clientType: 'confidential' }, 2, null);
   });
 
   it('findAll uses tenant for ADMIN', async () => {
@@ -77,5 +80,46 @@ describe('OAuthClientsController', () => {
       10,
       expect.objectContaining({ scopes: ['platform:read'] }),
     );
+  });
+
+  describe('request bodies', () => {
+    const valid = {
+      name: 'Release bot',
+      redirectUris: ['https://bot.example.com/oauth/callback'],
+      scopes: [OAuthScopeSchema.options[0]],
+    };
+
+    it('accepts a client the shared schema accepts', async () => {
+      expect(await readBodyDto(CreateOAuthClientDto, { ...valid, clientType: 'public' })).toEqual({
+        ...valid,
+        clientType: 'public',
+      });
+    });
+
+    it('answers 400 naming each bad field; the body was a type with no check before', async () => {
+      expect(await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, name: '' }))).toHaveProperty('name');
+      expect(await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, redirectUris: [] }))).toHaveProperty(
+        'redirectUris',
+      );
+      const badUri = await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, redirectUris: ['not a url'] }));
+      expect(Object.keys(badUri).some((field) => field.startsWith('redirectUris'))).toBe(true);
+      const badScope = await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, scopes: ['root:all'] }));
+      expect(Object.keys(badScope).some((field) => field.startsWith('scopes'))).toBe(true);
+      expect(await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, clientType: 'secret' }))).toHaveProperty(
+        'clientType',
+      );
+    });
+
+    it('refuses a field the client may not set', async () => {
+      expect(await fieldErrorsOf(readBodyDto(CreateOAuthClientDto, { ...valid, tenantId: 1 }))).toHaveProperty(
+        'tenantId',
+      );
+      expect(await fieldErrorsOf(readBodyDto(UpdateOAuthClientDto, { isActive: true }))).toHaveProperty('isActive');
+    });
+
+    it('an update may carry any subset, under the same rules', async () => {
+      expect(await readBodyDto(UpdateOAuthClientDto, { name: 'Updated' })).toEqual({ name: 'Updated' });
+      expect(await fieldErrorsOf(readBodyDto(UpdateOAuthClientDto, { scopes: [] }))).toHaveProperty('scopes');
+    });
   });
 });

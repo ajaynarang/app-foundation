@@ -1,16 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  Req,
-  Res,
-  HttpCode,
-  HttpStatus,
-  BadRequestException,
-  UseFilters,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Req, Res, HttpCode, HttpStatus, UseFilters } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
@@ -21,6 +9,8 @@ import { OAuthErrorFilter, oauthError, OAUTH_ERROR } from './oauth-error.filter'
 import { OAuthClientsService } from './oauth-clients.service';
 import { OAUTH_SCOPES } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { ApproveOAuthConsentDto, OAuthRevokeRequestDto, OAuthTokenRequestDto } from './dto/oauth-protocol.dto';
+import { RegisterOAuthClientDto } from './dto/register-oauth-client.dto';
 
 // The four protocol routes below (authorize, token, revoke, register) answer errors in the shape the standards
 // define, `{ error, error_description }`, through OAuthErrorFilter. The consent route is called by the web app
@@ -116,19 +106,8 @@ export class OAuthProviderController {
   @Post('authorize/consent')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve OAuth consent' })
-  async approveConsent(
-    @Body('challenge') challenge: string,
-    @Body('selectedScopes') selectedScopes: string[] | undefined,
-    @Req() req: Request,
-  ) {
-    if (!challenge) {
-      throw new BadRequestException('Missing challenge token');
-    }
-    if (selectedScopes !== undefined) {
-      if (!Array.isArray(selectedScopes) || !selectedScopes.every((s) => typeof s === 'string')) {
-        throw new BadRequestException('selectedScopes must be an array of strings when provided');
-      }
-    }
+  async approveConsent(@Body() body: ApproveOAuthConsentDto, @Req() req: Request) {
+    const { challenge, selectedScopes } = body;
     const user = (req as any).user;
     return this.oauthService.approveConsent(challenge, user.dbId, user.tenantDbId ?? null, selectedScopes);
   }
@@ -143,15 +122,16 @@ export class OAuthProviderController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token endpoint' })
-  async token(
-    @Body('grant_type') grantType: string,
-    @Body('code') code: string,
-    @Body('redirect_uri') redirectUri: string,
-    @Body('client_id') clientId: string,
-    @Body('client_secret') clientSecret: string,
-    @Body('code_verifier') codeVerifier: string,
-    @Body('refresh_token') refreshToken: string,
-  ) {
+  async token(@Body() body: OAuthTokenRequestDto) {
+    const {
+      grant_type: grantType,
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_secret: clientSecret,
+      code_verifier: codeVerifier,
+      refresh_token: refreshToken,
+    } = body;
     if (grantType === 'authorization_code') {
       if (!code || !clientId || !codeVerifier || !redirectUri) {
         throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'code, client_id, code_verifier and redirect_uri are required');
@@ -180,7 +160,8 @@ export class OAuthProviderController {
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token revocation' })
-  async revoke(@Body('token') token: string) {
+  async revoke(@Body() body: OAuthRevokeRequestDto) {
+    const { token } = body;
     if (!token) {
       throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'token is required');
     }
@@ -199,34 +180,11 @@ export class OAuthProviderController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'OAuth 2.1 Dynamic Client Registration (RFC 7591)' })
-  async register(@Body() body: Record<string, any>, @Req() req: Request) {
+  async register(@Body() body: RegisterOAuthClientDto, @Req() req: Request) {
+    // `RegisterOAuthClientDto` has checked the metadata: a name, and redirect URIs that are HTTPS or loopback
+    // (per the MCP authorization spec). A bad value never reaches here; it answers the RFC's error code.
     const clientName = body.client_name;
-    if (!clientName || typeof clientName !== 'string') {
-      throw oauthError(OAUTH_ERROR.INVALID_CLIENT_METADATA, 'client_name is required');
-    }
-
     const redirectUris = body.redirect_uris;
-    if (
-      !Array.isArray(redirectUris) ||
-      redirectUris.length === 0 ||
-      !redirectUris.every((u: unknown) => typeof u === 'string')
-    ) {
-      throw oauthError(OAUTH_ERROR.INVALID_CLIENT_METADATA, 'redirect_uris must be a non-empty array of strings');
-    }
-
-    // Validate redirect URIs: must be localhost or HTTPS (per MCP spec)
-    for (const uri of redirectUris) {
-      try {
-        const parsed = new URL(uri);
-        const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-        if (!isLocalhost && parsed.protocol !== 'https:') {
-          throw oauthError(OAUTH_ERROR.INVALID_REDIRECT_URI, 'redirect_uris must use HTTPS or be localhost URLs');
-        }
-      } catch (e) {
-        if (e instanceof BadRequestException) throw e;
-        throw oauthError(OAUTH_ERROR.INVALID_REDIRECT_URI, `Invalid redirect_uri: ${uri}`);
-      }
-    }
 
     // Requested scopes — default to all available scopes if not specified
     // MCP clients (Claude, ChatGPT) often omit scopes during DCR and rely on

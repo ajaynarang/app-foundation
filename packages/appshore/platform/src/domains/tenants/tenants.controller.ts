@@ -19,6 +19,9 @@ import { RegisterTenantDto } from './dto/register-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { SuspendTenantDto } from './dto/suspend-tenant.dto';
 import { UpdateOrganizationProfileDto } from './dto/update-organization-profile.dto';
+import { RejectTenantDto } from './dto/reject-tenant.dto';
+import { TenantListQueryDto } from './dto/tenant-list-query.dto';
+import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -74,7 +77,7 @@ export class TenantsController extends BaseTenantController {
     // Verify Turnstile token if configured
     if (process.env.TURNSTILE_SECRET_KEY) {
       if (!dto.turnstileToken) {
-        throw new BadRequestException('Bot verification required. Please try again.');
+        throw fieldError('turnstileToken', 'Bot verification required. Please try again.');
       }
       try {
         const verifyResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -87,7 +90,7 @@ export class TenantsController extends BaseTenantController {
         });
         const result = await verifyResponse.json();
         if (!result.success) {
-          throw new BadRequestException('Bot verification failed. Please try again.');
+          throw fieldError('turnstileToken', 'Bot verification failed. Please try again.');
         }
       } catch (error) {
         // If it's our own BadRequestException, re-throw it
@@ -120,8 +123,8 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Get()
-  async getAllTenants(@Query('status') status?: string) {
-    return this.tenantsService.getAllTenants(status);
+  async getAllTenants(@Query() query: TenantListQueryDto) {
+    return this.tenantsService.getAllTenants(query.status);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
@@ -134,8 +137,8 @@ export class TenantsController extends BaseTenantController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post(':tenant_id/reject')
   @HttpCode(HttpStatus.OK)
-  async rejectTenant(@Param('tenant_id') tenantId: string, @Body('reason') reason: string) {
-    return this.tenantsService.rejectTenant(tenantId, reason);
+  async rejectTenant(@Param('tenant_id') tenantId: string, @Body() dto: RejectTenantDto) {
+    return this.tenantsService.rejectTenant(tenantId, dto.reason);
   }
 
   @Roles(UserRole.SUPER_ADMIN)

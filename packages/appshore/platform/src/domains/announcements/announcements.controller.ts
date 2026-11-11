@@ -2,10 +2,11 @@ import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe, HttpCod
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { AnnouncementStatus, UserRole } from '@appshore/db';
+import { UserRole } from '@appshore/db';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
+import { BroadcastListQueryDto } from './dto/broadcast-list-query.dto';
 
 @ApiTags('Broadcasts (Admin)')
 @Controller('admin/broadcasts')
@@ -16,12 +17,8 @@ export class AnnouncementsController {
 
   @Get()
   @ApiOperation({ summary: 'List all broadcasts' })
-  findAll(@Query('status') status?: string) {
-    const typed =
-      status && (Object.values(AnnouncementStatus) as string[]).includes(status)
-        ? (status as AnnouncementStatus)
-        : undefined;
-    return this.service.findAll(typed);
+  findAll(@Query() query: BroadcastListQueryDto) {
+    return this.service.findAll(query.status);
   }
 
   @Get(':id')
