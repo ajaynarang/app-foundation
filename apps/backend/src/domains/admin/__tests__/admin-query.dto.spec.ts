@@ -9,7 +9,7 @@ import {
 
 describe('admin query DTOs', () => {
   describe('GET /admin/events', () => {
-    it('reads q, tenant, actor_type, since, until and pages with limit and offset', async () => {
+    it('reads q, tenant, actor_type, since, until and pages with limit and cursor', async () => {
       const query = await readQueryDto(AdminEventListQueryDto, {
         q: ' invoice ',
         tenant: 'demo-acme',
@@ -17,7 +17,7 @@ describe('admin query DTOs', () => {
         since: '2026-04-01',
         until: '2026-04-30T12:00:00Z',
         limit: '500',
-        offset: '20',
+        cursor: 'abc',
       });
       expect(query).toMatchObject({
         q: 'invoice',
@@ -26,12 +26,14 @@ describe('admin query DTOs', () => {
         since: '2026-04-01',
         until: '2026-04-30T12:00:00Z',
         limit: 100,
-        offset: 20,
+        cursor: 'abc',
       });
     });
 
-    it('defaults to the first 50', async () => {
-      expect(await readQueryDto(AdminEventListQueryDto, {})).toMatchObject({ limit: 50, offset: 0 });
+    it('leaves the page size to the service default (50) and starts at the first page', async () => {
+      const query = await readQueryDto(AdminEventListQueryDto, {});
+      expect(query.limit).toBeUndefined();
+      expect(query.cursor).toBeUndefined();
     });
 
     it('refuses the old keys: search and actorType', async () => {
@@ -43,7 +45,8 @@ describe('admin query DTOs', () => {
 
     it('answers 400 naming a bad number or date', async () => {
       expect(await fieldErrorsOf(readQueryDto(AdminEventListQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
-      expect(await fieldErrorsOf(readQueryDto(AdminEventListQueryDto, { offset: '-5' }))).toHaveProperty('offset');
+      // Offset paging is gone: the key is refused like any other the route does not declare.
+      expect(await fieldErrorsOf(readQueryDto(AdminEventListQueryDto, { offset: '20' }))).toHaveProperty('offset');
       expect(await fieldErrorsOf(readQueryDto(AdminEventListQueryDto, { since: 'soon' }))).toHaveProperty('since');
     });
   });

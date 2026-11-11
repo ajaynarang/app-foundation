@@ -15,7 +15,7 @@ export class AdminEventsController {
   constructor(private readonly adminEventsService: AdminEventsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List domain events across tenants' })
+  @ApiOperation({ summary: 'List domain events across tenants, newest first (cursor-paged)' })
   async listEvents(@Query() query: AdminEventListQueryDto) {
     return this.adminEventsService.listEvents({
       search: query.q,
@@ -24,7 +24,7 @@ export class AdminEventsController {
       since: query.since,
       until: query.until,
       limit: query.limit,
-      offset: query.offset,
+      cursor: query.cursor,
     });
   }
 

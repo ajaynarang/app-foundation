@@ -161,11 +161,7 @@ export class BillingController {
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('wallet/transactions')
   async getTransactions(@TenantDbId() tenantDbId: number, @Query() query: WalletTransactionsQueryDto) {
-    return this.walletService.getTransactions(tenantDbId, {
-      type: query.type,
-      limit: query.limit,
-      cursor: query.cursor,
-    });
+    return this.walletService.getTransactions(tenantDbId, query);
   }
 
   // ─── Invoices ────────────────────────────────────────────────────────────
@@ -176,10 +172,7 @@ export class BillingController {
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
   @Get('invoices')
   async listInvoices(@TenantDbId() tenantDbId: number, @Query() query: PaginationQueryDto) {
-    return this.invoiceService.listInvoices(tenantDbId, {
-      limit: query.limit,
-      cursor: query.cursor,
-    });
+    return this.invoiceService.listInvoices(tenantDbId, query);
   }
 
   /**

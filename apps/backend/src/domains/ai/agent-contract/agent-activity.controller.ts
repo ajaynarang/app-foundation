@@ -35,7 +35,7 @@ export class AgentActivityController extends BaseTenantController {
       principalKind: query.principalKind,
       principalId: query.principalId,
       filter: query.filter,
-      cursor: query.cursor ?? null,
+      cursor: query.cursor,
       limit: query.limit,
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null,

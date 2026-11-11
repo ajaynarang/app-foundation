@@ -1,3 +1,4 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -353,10 +354,10 @@ describe('Billing DTOs', () => {
       expect(dto.limit).toBe(25);
     });
 
-    it('should reject limit < 1', async () => {
-      const dto = plainToInstance(PaginationQueryDto, { limit: '0' });
-      const errors = await validate(dto);
-      expect(errors.some((e) => e.property === 'limit')).toBe(true);
+    it('clamps the page size into 1…100 like every cursor list, and answers 400 when it is not a number', async () => {
+      expect((await readQueryDto(PaginationQueryDto, { limit: '0' })).limit).toBe(1);
+      expect((await readQueryDto(PaginationQueryDto, { limit: '5000' })).limit).toBe(100);
+      await expect(readQueryDto(PaginationQueryDto, { limit: 'abc' })).rejects.toMatchObject({ status: 400 });
     });
   });
 });

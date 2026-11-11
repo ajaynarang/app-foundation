@@ -12,7 +12,7 @@ describe('AgentActivityController', () => {
 
   beforeEach(() => {
     service = {
-      list: jest.fn().mockResolvedValue({ rows: [], nextCursor: null }),
+      list: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
     };
     prisma = {
       tenant: {
@@ -62,12 +62,14 @@ describe('AgentActivityController', () => {
         principalKind: 'api_key',
         principalId: 'ak1',
         filter: 'all',
-        cursor: null,
-        limit: 50,
         dateFrom: null,
         dateTo: null,
       }),
     );
+    // No cursor and no limit: the first page, at the service's default size of 50.
+    const passed = service.list.mock.calls[0][0];
+    expect(passed.cursor).toBeUndefined();
+    expect(passed.limit).toBeUndefined();
   });
 
   it('passes cursor, limit and dates to service when provided', async () => {

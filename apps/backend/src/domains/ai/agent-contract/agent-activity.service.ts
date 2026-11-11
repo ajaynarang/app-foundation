@@ -1,4 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import type {
   AgentActivityFilter,
@@ -8,17 +15,16 @@ import type {
   AgentScope,
 } from '@app/shared-types';
 
-const MIN_LIMIT = 1;
-const MAX_LIMIT = 100;
-const DEFAULT_LIMIT = 50;
+/** Newest first; the row id is a UUID (never an Int key), so it is a safe tiebreak. */
+const ACTIVITY_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
 
 export interface AgentActivityListParams {
   tenantId: number;
   principalKind: AgentPrincipalKind;
   principalId: string;
   filter: AgentActivityFilter;
-  cursor: string | null;
-  limit: number;
+  cursor?: string | null;
+  limit?: number;
   /** Inclusive lower bound, YYYY-MM-DD in tenant local time. */
   dateFrom?: string | null;
   /** Inclusive upper bound, YYYY-MM-DD in tenant local time. */
@@ -37,9 +43,14 @@ export interface AgentActivityListParams {
 export class AgentActivityService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * One principal's invocations, newest first, as a cursor list. The cursor is the last row's
+   * (createdAt, id): a createdAt alone would drop every other row written in that millisecond.
+   */
   async list(params: AgentActivityListParams): Promise<AgentActivityPage> {
-    const requested = params.limit ?? DEFAULT_LIMIT;
-    const limit = Math.min(Math.max(requested, MIN_LIMIT), MAX_LIMIT);
+    const take = clampCursorLimit(params.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = params.cursor ? keysetWhere({ ...ACTIVITY_KEYSET, cursor: params.cursor }) : undefined;
 
     // The audit-log column stores `principal_id` with a kind-specific prefix
     // ("oauth:<clientId>", "apikey:<uuid>", "user:<userDbId>") so principals
@@ -47,7 +58,7 @@ export class AgentActivityService {
     // normalize here so the UI doesn't have to know about the prefix scheme.
     const principalIdQuery = this.canonicalPrincipalId(params.principalKind, params.principalId);
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.AgentInvocationLogWhereInput = {
       tenantId: params.tenantId,
       principalKind: params.principalKind,
       principalId: principalIdQuery,
@@ -58,36 +69,24 @@ export class AgentActivityService {
       where.confirmationTokenId = null;
     }
 
-    // Date range. `dateFrom` is inclusive at 00:00, `dateTo` is inclusive
-    // through 23:59:59.999 of that day. Cursor (if present) further narrows
-    // the upper bound to support pagination within a window.
-    const createdAt: Record<string, Date> = {};
-    if (params.dateFrom) createdAt.gte = new Date(`${params.dateFrom}T00:00:00.000Z`);
-    if (params.dateTo) createdAt.lte = new Date(`${params.dateTo}T23:59:59.999Z`);
-    if (params.cursor) {
-      const cursorDate = new Date(params.cursor);
-      // Cursor wins when narrower than dateTo
-      if (!createdAt.lt || cursorDate < createdAt.lt) createdAt.lt = cursorDate;
-      delete createdAt.lte;
-    }
-    if (Object.keys(createdAt).length > 0) {
-      where.createdAt = createdAt;
+    // Date range. `dateFrom` is inclusive at 00:00, `dateTo` is inclusive through 23:59:59.999 of that day.
+    if (params.dateFrom || params.dateTo) {
+      where.createdAt = {
+        ...(params.dateFrom ? { gte: new Date(`${params.dateFrom}T00:00:00.000Z`) } : {}),
+        ...(params.dateTo ? { lte: new Date(`${params.dateTo}T23:59:59.999Z`) } : {}),
+      };
     }
 
-    const rows = await this.prisma.agentInvocationLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1, // +1 to detect "has next page"
-    });
-
-    const hasMore = rows.length > limit;
-    const trimmed = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? trimmed[trimmed.length - 1].createdAt.toISOString() : null;
-
-    return {
-      rows: trimmed.map(this.project),
-      nextCursor,
-    };
+    const [rows, total] = await Promise.all([
+      this.prisma.agentInvocationLog.findMany({
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1, // the probe row says whether a next page exists
+      }),
+      this.prisma.agentInvocationLog.count({ where }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    return { items: page.items.map(this.project), nextCursor: page.nextCursor, total };
   }
 
   /**

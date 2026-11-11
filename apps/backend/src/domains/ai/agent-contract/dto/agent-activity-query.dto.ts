@@ -6,7 +6,7 @@ import {
 } from '@app/shared-types';
 import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 import { parseSingleValue } from '@appshore/kernel/shared/utils/list-query';
-import { QueryLimit, QueryParam, QueryString } from '@appshore/kernel/shared/utils/query-dto';
+import { CursorQueryDto, QueryParam } from '@appshore/kernel/shared/utils/query-dto';
 import { QueryCalendarDate } from '../../../../shared/dto/query-date-text';
 
 const PRINCIPAL_KINDS = AgentPrincipalKindSchema.options;
@@ -16,7 +16,7 @@ const FILTERS = AgentActivityFilterSchema.options;
  * `GET /agent-activity` — `principal_kind` + `principal_id` (required), `filter` (default `all`), `cursor`,
  * `limit` (1…100, default 50), `date_from` / `date_to` (YYYY-MM-DD, tenant-local).
  */
-export class AgentActivityQueryDto {
+export class AgentActivityQueryDto extends CursorQueryDto {
   @QueryParam(
     (raw, wire) => {
       const kind = parseSingleValue(raw, wire);
@@ -52,13 +52,6 @@ export class AgentActivityQueryDto {
     { type: String, enum: [...FILTERS], default: 'all' },
   )
   filter!: AgentActivityFilter;
-
-  /** `nextCursor` of the previous page (the last row's createdAt). */
-  @QueryString()
-  cursor?: string;
-
-  @QueryLimit({ default: 50 })
-  limit!: number;
 
   @QueryCalendarDate('date_from')
   dateFrom?: string;

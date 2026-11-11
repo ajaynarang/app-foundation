@@ -23,6 +23,7 @@ const mockAdapter = {
 };
 
 const mockPrisma = {
+  $queryRaw: jest.fn(),
   planConfig: { findUnique: jest.fn() },
   billingCustomer: { findUnique: jest.fn(), create: jest.fn() },
   billingSubscription: {
@@ -161,10 +162,8 @@ describe('BillingAdminService', () => {
 
   describe('getRevenueStats', () => {
     it('should calculate MRR, ARR, ARPU, and churn', async () => {
-      mockPrisma.billingSubscription.findMany.mockResolvedValue([
-        { unitPriceCents: 5000, quantity: 2 },
-        { unitPriceCents: 10000, quantity: 1 },
-      ]);
+      // Two active subscriptions, summed by the database: 5000*2 + 10000*1.
+      mockPrisma.$queryRaw.mockResolvedValue([{ mrr_cents: 20000n, active_count: 2n }]);
       mockPrisma.billingSubscription.count.mockResolvedValue(1); // 1 canceled this month
       mockPrisma.tenant.count.mockResolvedValue(10);
       mockPrisma.tenantAddOn.count.mockResolvedValue(3);
@@ -177,6 +176,23 @@ describe('BillingAdminService', () => {
       expect(result.activeSubscriptions).toBe(2);
       expect(result.canceledThisMonth).toBe(1);
       expect(result.totalTenants).toBe(10);
+      // No subscription row is loaded to add it up.
+      expect(mockPrisma.$queryRaw.mock.calls[0][0].join('?')).toContain('SUM(unit_price_cents::bigint * quantity)');
+    });
+
+    it('reports zeros, not NaN, when nothing is active', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ mrr_cents: 0n, active_count: 0n }]);
+      mockPrisma.billingSubscription.count.mockResolvedValue(0);
+      mockPrisma.tenant.count.mockResolvedValue(0);
+      mockPrisma.tenantAddOn.count.mockResolvedValue(0);
+
+      expect(await service.getRevenueStats()).toMatchObject({
+        mrrCents: 0,
+        arpuCents: 0,
+        activeSubscriptions: 0,
+        churnRate: 0,
+        addOnAdoptionRate: 0,
+      });
     });
   });
 

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PaymentMethodService } from '../payment-method.service';
+import { PAYMENT_METHOD_LIST_CAP, PaymentMethodService } from '../payment-method.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../../adapters/payment-provider.factory';
 
@@ -46,6 +46,21 @@ describe('PaymentMethodService', () => {
       ],
     }).compile();
     service = module.get<PaymentMethodService>(PaymentMethodService);
+  });
+
+  describe('listPaymentMethods', () => {
+    it('reads the mirrored cards with a ceiling, the default first', async () => {
+      mockPrisma.paymentMethod.findMany.mockResolvedValue([{ id: 'pm_1', isDefault: true }]);
+
+      const result = await service.listPaymentMethods(1);
+
+      expect(result).toEqual([{ id: 'pm_1', isDefault: true }]);
+      expect(mockPrisma.paymentMethod.findMany).toHaveBeenLastCalledWith({
+        where: { tenantId: 1 },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: PAYMENT_METHOD_LIST_CAP,
+      });
+    });
   });
 
   describe('addPaymentMethod', () => {

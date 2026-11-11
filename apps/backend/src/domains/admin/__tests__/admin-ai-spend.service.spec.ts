@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 
 import { AdminAiSpendService } from '../admin-ai-spend.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 
 describe('AdminAiSpendService', () => {
   let service: AdminAiSpendService;
@@ -12,6 +13,7 @@ describe('AdminAiSpendService', () => {
       $queryRaw: jest.fn().mockResolvedValue([]),
       aiInvocation: {
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       tenantAiBudget: {
         upsert: jest.fn().mockResolvedValue({
@@ -31,95 +33,127 @@ describe('AdminAiSpendService', () => {
     service = module.get(AdminAiSpendService);
   });
 
-  describe('listTenantSummaries', () => {
-    it('aggregates daily slices into per-tenant totals with a sparkline', async () => {
-      // First $queryRaw call = daily slices; second = last-activity.
+  describe('listTenants: a cursor list, highest spend first', () => {
+    const totalsRow = (id: number, slug: string, cost: string) => ({
+      tenant_id: id,
+      tenant_slug: slug,
+      company_name: `${slug} Inc`,
+      total_cost_usd: cost,
+      call_count: 15n,
+      error_count: 1n,
+    });
+    /** The text and the bound values of the nth `$queryRaw` call. */
+    const sqlOf = (call: number) => {
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[call];
+      const flatten = (part: any): { text: string; values: unknown[] } =>
+        part && typeof part === 'object' && Array.isArray(part.strings)
+          ? { text: part.strings.join('?'), values: part.values }
+          : { text: '?', values: [part] };
+      const parts = values.map(flatten);
+      return {
+        text: (strings as string[]).reduce((acc, str, i) => acc + str + (parts[i]?.text ?? ''), ''),
+        values: parts.flatMap((part) => part.values),
+      };
+    };
+
+    it('returns the page with totals, a sparkline and last activity read for its tenants only', async () => {
       prisma.$queryRaw
+        .mockResolvedValueOnce([totalsRow(1, 'acme', '3.750000')])
+        .mockResolvedValueOnce([{ total: 1n }])
         .mockResolvedValueOnce([
-          {
-            tenant_id: 1,
-            tenant_slug: 'acme',
-            company_name: 'Acme Inc',
-            day: new Date('2026-05-26T00:00:00Z'),
-            total_cost_usd: '1.500000',
-            call_count: 10n,
-            error_count: 1n,
-          },
-          {
-            tenant_id: 1,
-            tenant_slug: 'acme',
-            company_name: 'Acme Inc',
-            day: new Date('2026-05-27T00:00:00Z'),
-            total_cost_usd: '2.250000',
-            call_count: 5n,
-            error_count: 0n,
-          },
+          { tenant_id: 1, day: new Date('2026-05-26T00:00:00Z'), total_cost_usd: '1.500000' },
+          { tenant_id: 1, day: new Date('2026-05-27T00:00:00Z'), total_cost_usd: '2.250000' },
         ])
         .mockResolvedValueOnce([{ tenant_id: 1, last_at: new Date('2026-05-27T12:00:00Z') }]);
 
-      const result = await service.listTenantSummaries({ days: 7 });
+      const result = await service.listTenants({ days: 7 });
 
-      expect(result).toHaveLength(1);
-      const row = result[0];
-      expect(row.tenantId).toBe(1);
-      expect(row.tenantSlug).toBe('acme');
-      expect(row.companyName).toBe('Acme Inc');
-      expect(row.windowCostUsd).toBe('3.750000'); // 1.5 + 2.25
-      expect(row.windowCallCount).toBe(15);
-      expect(row.windowErrorCount).toBe(1);
-      expect(row.sparkline).toEqual([
-        { day: '2026-05-26', costUsd: '1.500000' },
-        { day: '2026-05-27', costUsd: '2.250000' },
+      expect(result.total).toBe(1);
+      expect(result.nextCursor).toBeNull();
+      expect(result.items).toEqual([
+        {
+          tenantId: 1,
+          tenantSlug: 'acme',
+          companyName: 'acme Inc',
+          windowCostUsd: '3.750000',
+          windowCallCount: 15,
+          windowErrorCount: 1,
+          sparkline: [
+            { day: '2026-05-26', costUsd: '1.500000' },
+            { day: '2026-05-27', costUsd: '2.250000' },
+          ],
+          lastActivityAt: '2026-05-27T12:00:00.000Z',
+        },
       ]);
-      expect(row.lastActivityAt).toBe('2026-05-27T12:00:00.000Z');
     });
 
-    it('sorts tenants by spend descending', async () => {
+    it('orders by spend then the tenant public id in SQL, and reads one probe row past the page', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0n }]);
+
+      await service.listTenants({ days: 7, limit: 2 });
+
+      const page = sqlOf(0);
+      expect(page.text).toContain('ORDER BY totals.cost DESC, t.tenant_id ASC');
+      expect(page.values[page.values.length - 1]).toBe(3);
+    });
+
+    it('hands out a cursor when a probe row came back, and the next page starts strictly after it', async () => {
       prisma.$queryRaw
         .mockResolvedValueOnce([
-          {
-            tenant_id: 1,
-            tenant_slug: 'small',
-            company_name: 'Small Co',
-            day: new Date('2026-05-27T00:00:00Z'),
-            total_cost_usd: '0.500000',
-            call_count: 1n,
-            error_count: 0n,
-          },
-          {
-            tenant_id: 2,
-            tenant_slug: 'big',
-            company_name: 'Big Co',
-            day: new Date('2026-05-27T00:00:00Z'),
-            total_cost_usd: '50.000000',
-            call_count: 100n,
-            error_count: 0n,
-          },
+          totalsRow(2, 'big', '50.000000'),
+          totalsRow(1, 'mid', '5.000000'),
+          totalsRow(3, 'mid-b', '5.000000'),
         ])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([{ total: 3n }])
+        .mockResolvedValue([]);
+      const first = await service.listTenants({ days: 7, limit: 2 });
 
-      const result = await service.listTenantSummaries({ days: 7 });
+      expect(first.items.map((row) => row.tenantSlug)).toEqual(['big', 'mid']);
+      expect(first.total).toBe(3);
+      expect(first.nextCursor).not.toBeNull();
 
-      expect(result.map((r) => r.tenantSlug)).toEqual(['big', 'small']);
+      prisma.$queryRaw.mockReset();
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 3n }]);
+      await service.listTenants({ days: 7, limit: 2, cursor: first.nextCursor! });
+
+      // Same cost, a larger public id: the tie is split by the tenant's public id, never its Int key.
+      const page = sqlOf(0);
+      expect(page.text).toContain('totals.cost < ?::numeric OR (totals.cost = ?::numeric AND t.tenant_id > ?)');
+      expect(page.values).toEqual(expect.arrayContaining(['5.000000', 'mid']));
+      // The total ignores the cursor.
+      expect(sqlOf(1).text).not.toContain('totals.cost <');
+    });
+
+    it('searches company name and tenant id with LIKE wildcards escaped', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0n }]);
+      await service.listTenants({ days: 7, q: '50%_off' });
+      expect(sqlOf(0).values).toEqual(expect.arrayContaining(['%50\\%\\_off%']));
+    });
+
+    it('answers 400 on a cursor from another window, or one it did not issue, before any query runs', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([totalsRow(2, 'big', '50.000000'), totalsRow(1, 'small', '5.000000')])
+        .mockResolvedValueOnce([{ total: 2n }])
+        .mockResolvedValue([]);
+      const sevenDay = await service.listTenants({ days: 7, limit: 1 });
+      prisma.$queryRaw.mockClear();
+
+      await expect(service.listTenants({ days: 30, cursor: sevenDay.nextCursor! })).rejects.toMatchObject({
+        status: 400,
+      });
+      await expect(service.listTenants({ days: 7, cursor: 'not-a-cursor' })).rejects.toMatchObject({ status: 400 });
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
 
     it('returns null lastActivityAt when no invocations exist for a tenant', async () => {
       prisma.$queryRaw
-        .mockResolvedValueOnce([
-          {
-            tenant_id: 9,
-            tenant_slug: 't9',
-            company_name: 'T9',
-            day: new Date('2026-05-27T00:00:00Z'),
-            total_cost_usd: '0.000000',
-            call_count: 0n,
-            error_count: 0n,
-          },
-        ])
+        .mockResolvedValueOnce([totalsRow(9, 't9', '0.000000')])
+        .mockResolvedValueOnce([{ total: 1n }])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]); // no last-activity rows
 
-      const result = await service.listTenantSummaries({ days: 7 });
-      expect(result[0].lastActivityAt).toBeNull();
+      const result = await service.listTenants({ days: 7 });
+      expect(result.items[0].lastActivityAt).toBeNull();
     });
   });
 
@@ -173,9 +207,11 @@ describe('AdminAiSpendService', () => {
 
     it('returns items and a null cursor when fewer than the limit', async () => {
       prisma.aiInvocation.findMany.mockResolvedValue([makeRow()]);
+      prisma.aiInvocation.count.mockResolvedValue(1);
 
       const result = await service.listInvocations({ tenantId: 1, limit: 50 });
 
+      expect(result.total).toBe(1);
       expect(result.items).toHaveLength(1);
       expect(result.items[0].costUsd).toBe('0.010500');
       expect(result.nextCursor).toBeNull();
@@ -205,8 +241,33 @@ describe('AdminAiSpendService', () => {
       await service.listInvocations({ tenantId: 1, limit: 1, cursor: first.nextCursor ?? undefined });
 
       const call = prisma.aiInvocation.findMany.mock.calls[0][0];
-      expect(call.where.OR).toBeDefined();
-      expect(call.where.OR[0]).toHaveProperty('createdAt');
+      const [scope, keyset] = call.where.AND;
+      expect(scope).toEqual({ tenantId: 1 });
+      expect(keyset.OR[0]).toHaveProperty('createdAt');
+      // The total is counted over the scope alone, never the cursor.
+      expect(prisma.aiInvocation.count).toHaveBeenLastCalledWith({ where: { tenantId: 1 } });
+    });
+
+    it('walks every invocation once across pages, same-millisecond rows included', async () => {
+      const stamps = tiedTimestamps(7);
+      const rows = stamps.map((createdAt, index) =>
+        makeRow({ id: `01900000-0000-7000-8000-00000000000${(index * 3) % 7}`, tenantId: 1, createdAt }),
+      );
+      Object.assign(prisma.aiInvocation, fixtureModel(rows));
+
+      const { pages, items } = await walkCursorList((cursor) =>
+        service.listInvocations({ tenantId: 1, limit: 2, cursor }),
+      );
+
+      expect(pages.map((page) => page.length)).toEqual([2, 2, 2, 1]);
+      expect(new Set(items.map((item) => item.id)).size).toBe(7);
+      const times = items.map((item) => Date.parse(item.createdAt));
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listInvocations({ tenantId: 1, cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+      expect(prisma.aiInvocation.findMany).not.toHaveBeenCalled();
     });
 
     it('applies the surface filter when provided', async () => {

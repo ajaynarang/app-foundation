@@ -7,6 +7,7 @@ import { AdminAiSpendService } from './admin-ai-spend.service';
 import { UpdateAiBudgetDto } from './dto/update-ai-budget.dto';
 import {
   AiSpendInvocationListQueryDto,
+  AiSpendTenantListQueryDto,
   AiSpendQuotaWindowQueryDto,
   AiSpendWindowQueryDto,
 } from './dto/ai-spend-query.dto';
@@ -15,8 +16,8 @@ import {
  * Super-admin AI Spend view. Reads from the `vw_ai_cost_*` views over
  * `ai_invocations`. Three endpoints:
  *
- *   GET /admin/ai-spend/tenants?days=7
- *      → per-tenant totals + sparkline, sorted by spend desc.
+ *   GET /admin/ai-spend/tenants?days=7&q=&limit=&cursor=
+ *      → cursor-paged per-tenant totals + sparkline, highest spend first.
  *
  *   GET /admin/ai-spend/tenants/:tenant_id/by-surface?days=7
  *      → per-surface breakdown for one tenant in the window.
@@ -38,9 +39,9 @@ export class AdminAiSpendController {
   constructor(private readonly service: AdminAiSpendService) {}
 
   @Get('tenants')
-  @ApiOperation({ summary: 'List tenants with their N-day AI spend' })
-  async listTenants(@Query() query: AiSpendWindowQueryDto) {
-    return this.service.listTenantSummaries({ days: query.days });
+  @ApiOperation({ summary: 'Tenants with their N-day AI spend: cursor-paged, highest spend first' })
+  async listTenants(@Query() query: AiSpendTenantListQueryDto) {
+    return this.service.listTenants(query);
   }
 
   @Get('tenants/:tenant_id/by-surface')
@@ -54,12 +55,7 @@ export class AdminAiSpendController {
   @ApiOperation({ summary: 'List AI invocations for one tenant (cursor-paginated)' })
   @ApiParam({ name: 'tenant_id' })
   async invocations(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendInvocationListQueryDto) {
-    return this.service.listInvocations({
-      tenantId,
-      surface: query.surface,
-      limit: query.limit ?? 50,
-      cursor: query.cursor,
-    });
+    return this.service.listInvocations({ tenantId, surface: query.surface, limit: query.limit, cursor: query.cursor });
   }
 
   @Get('tenants/:tenant_id/budget')

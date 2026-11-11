@@ -22,6 +22,7 @@ import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';
 import { PLAN_ORDER } from '../constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { PAYMENT_METHOD_LIST_CAP } from './payment-method.service';
 
 @Injectable()
 export class SubscriptionService {
@@ -445,7 +446,8 @@ export class SubscriptionService {
       }),
       this.prisma.paymentMethod.findMany({
         where: { tenantId: tenantDbId },
-        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: PAYMENT_METHOD_LIST_CAP,
       }),
       this.prisma.billingCustomer.findUnique({
         where: { tenantId: tenantDbId },

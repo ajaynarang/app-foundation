@@ -14,6 +14,7 @@ import { WalletService } from './wallet.service';
 import { PLAN_ORDER } from '../constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { PAYMENT_METHOD_LIST_CAP } from './payment-method.service';
 
 @Injectable()
 export class BillingAdminService {
@@ -194,7 +195,8 @@ export class BillingAdminService {
       }),
       this.prisma.paymentMethod.findMany({
         where: { tenantId: tenantDbId },
-        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: PAYMENT_METHOD_LIST_CAP,
       }),
       this.prisma.billingInvoice.findMany({
         where: { tenantId: tenantDbId },
@@ -623,11 +625,12 @@ export class BillingAdminService {
    * MRR, ARR, ARPU, churn rate, add-on adoption.
    */
   async getRevenueStats() {
-    const [activeSubscriptions, canceledThisMonth, totalTenants, activeAddOns] = await Promise.all([
-      this.prisma.billingSubscription.findMany({
-        where: { status: BillingSubscriptionStatus.ACTIVE },
-        select: { unitPriceCents: true, quantity: true },
-      }),
+    const [[active], canceledThisMonth, totalTenants, activeAddOns] = await Promise.all([
+      // Summed by the database: one row comes back, however many subscriptions are active.
+      this.prisma.$queryRaw<Array<{ mrr_cents: bigint | number | null; active_count: bigint | number }>>`
+        SELECT COALESCE(SUM(unit_price_cents::bigint * quantity), 0) AS mrr_cents, COUNT(*) AS active_count
+        FROM billing_subscriptions
+        WHERE status = ${BillingSubscriptionStatus.ACTIVE}::"BillingSubscriptionStatus"`,
       this.prisma.billingSubscription.count({
         where: {
           status: BillingSubscriptionStatus.CANCELED,
@@ -643,9 +646,9 @@ export class BillingAdminService {
     ]);
 
     // Calculate MRR (Monthly Recurring Revenue)
-    const mrr = activeSubscriptions.reduce((sum, sub) => sum + sub.unitPriceCents * sub.quantity, 0);
+    const mrr = Number(active?.mrr_cents ?? 0);
 
-    const activeCount = activeSubscriptions.length;
+    const activeCount = Number(active?.active_count ?? 0);
     const arpu = activeCount > 0 ? Math.round(mrr / activeCount) : 0;
 
     // Churn rate: canceled / (active + canceled) this month

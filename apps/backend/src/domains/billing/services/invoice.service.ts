@@ -6,10 +6,27 @@
  * Local DB is the source of truth for invoice history and display.
  */
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BillingInvoiceStatus } from '@appshore/db';
+import { BillingInvoiceStatus, type BillingInvoice, type Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import type { CursorList } from '@app/shared-types';
+
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';
+
+/** Newest first; the invoice id is a string id (never an Int key), so it is a safe tiebreak. */
+const INVOICE_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /billing/invoices`. */
+export interface InvoiceListQuery {
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class InvoiceService {
@@ -88,24 +105,23 @@ export class InvoiceService {
    * List invoices for a tenant from the local database.
    * Supports cursor-based pagination.
    */
-  async listInvoices(tenantDbId: number, opts?: { limit?: number; cursor?: string }) {
-    const take = opts?.limit ?? 20;
+  async listInvoices(tenantDbId: number, query: InvoiceListQuery = {}): Promise<CursorList<BillingInvoice>> {
+    const take = clampCursorLimit(query.limit);
+    const scope: Prisma.BillingInvoiceWhereInput = { tenantId: tenantDbId };
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const where: Prisma.BillingInvoiceWhereInput = query.cursor
+      ? { AND: [scope, keysetWhere({ ...INVOICE_KEYSET, cursor: query.cursor })] }
+      : scope;
 
-    const invoices = await this.prisma.billingInvoice.findMany({
-      where: { tenantId: tenantDbId },
-      orderBy: { createdAt: 'desc' },
-      take: take + 1,
-      ...(opts?.cursor && {
-        cursor: { id: opts.cursor },
-        skip: 1,
+    const [rows, total] = await Promise.all([
+      this.prisma.billingInvoice.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
       }),
-    });
-
-    const hasMore = invoices.length > take;
-    const items = hasMore ? invoices.slice(0, take) : invoices;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
-
-    return { items, nextCursor, hasMore };
+      this.prisma.billingInvoice.count({ where: scope }),
+    ]);
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id)), total };
   }
 
   /**

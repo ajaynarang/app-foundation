@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsInt, IsEnum, IsUrl, IsBoolean, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { TenantPlan } from '@appshore/db';
 
 export class CreateCheckoutDto {
@@ -117,14 +117,5 @@ export class AdminChangePlanDto {
   quantity?: number;
 }
 
-export class PaginationQueryDto {
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsInt()
-  @Min(1)
-  limit?: number;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
-}
+/** `GET /billing/invoices` — `limit` (1…100, default 50) and `cursor`. */
+export class PaginationQueryDto extends CursorQueryDto {}

@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { PaginationQueryDto } from '../../dto/billing.dto';
+import { WalletTransactionsQueryDto } from '../../dto/wallet.dto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BillingController } from '../billing.controller';
 import { SubscriptionService } from '../../services/subscription.service';
@@ -19,11 +22,11 @@ const mockWalletService = {
   getBalance: jest.fn().mockResolvedValue({ balanceCents: 10000 }),
   topUp: jest.fn().mockResolvedValue(undefined),
   updateAutoReload: jest.fn().mockResolvedValue(undefined),
-  getTransactions: jest.fn().mockResolvedValue({ items: [], cursor: null }),
+  getTransactions: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
 };
 
 const mockInvoiceService = {
-  listInvoices: jest.fn().mockResolvedValue({ items: [] }),
+  listInvoices: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
   getUpcomingInvoice: jest.fn().mockResolvedValue({ amountDueCents: 5000 }),
   downloadInvoice: jest.fn().mockResolvedValue({ url: 'https://pdf.com' }),
 };
@@ -178,14 +181,19 @@ describe('BillingController', () => {
 
   describe('getTransactions', () => {
     it('should return paginated transactions', async () => {
-      const query = { type: undefined, limit: 20, cursor: undefined } as any;
+      const query = await readQueryDto(WalletTransactionsQueryDto, { type: 'TOP_UP', limit: '20', cursor: 'abc' });
       const result = await controller.getTransactions(1, query);
-      expect(result).toEqual({ items: [], cursor: null });
-      expect(mockWalletService.getTransactions).toHaveBeenCalledWith(1, {
-        type: undefined,
-        limit: 20,
-        cursor: undefined,
-      });
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
+      expect(mockWalletService.getTransactions).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ type: 'TOP_UP', limit: 20, cursor: 'abc' }),
+      );
+    });
+
+    it('answers 400 on an unknown type, a limit that is not a number, or offset paging', async () => {
+      for (const raw of [{ type: 'bogus' }, { limit: 'abc' }, { offset: '10' }]) {
+        await expect(readQueryDto(WalletTransactionsQueryDto, raw)).rejects.toMatchObject({ status: 400 });
+      }
     });
   });
 
@@ -193,15 +201,15 @@ describe('BillingController', () => {
 
   describe('listInvoices', () => {
     it('should list invoices with pagination', async () => {
-      const result = await controller.listInvoices(1, {
-        limit: 10,
-        cursor: 'cur_1',
-      });
-      expect(result).toEqual({ items: [] });
-      expect(mockInvoiceService.listInvoices).toHaveBeenCalledWith(1, {
-        limit: 10,
-        cursor: 'cur_1',
-      });
+      const result = await controller.listInvoices(
+        1,
+        await readQueryDto(PaginationQueryDto, { limit: '10', cursor: 'cur_1' }),
+      );
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
+      expect(mockInvoiceService.listInvoices).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ limit: 10, cursor: 'cur_1' }),
+      );
     });
   });
 

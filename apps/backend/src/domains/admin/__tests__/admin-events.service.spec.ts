@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { AdminEventsService } from '../admin-events.service';
+import { AdminEventsService, MAX_WEBHOOK_HEALTH_TENANTS } from '../admin-events.service';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 describe('AdminEventsService', () => {
@@ -13,9 +14,7 @@ describe('AdminEventsService', () => {
         count: jest.fn().mockResolvedValue(0),
         groupBy: jest.fn().mockResolvedValue([]),
       },
-      webhookDeliveryLog: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     const module = await Test.createTestingModule({
@@ -26,7 +25,7 @@ describe('AdminEventsService', () => {
   });
 
   describe('listEvents', () => {
-    it('returns paginated events with no filters', async () => {
+    it('returns a cursor page of events with no filters', async () => {
       prisma.domainEventLog.findMany.mockResolvedValue([
         {
           id: 'evt-1',
@@ -45,20 +44,59 @@ describe('AdminEventsService', () => {
       ]);
       prisma.domainEventLog.count.mockResolvedValue(1);
 
-      const result = await service.listEvents({ limit: 50, offset: 0 });
+      const result = await service.listEvents({ limit: 50 });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].tenantId).toBe('t-1');
       expect(result.total).toBe(1);
-      expect(result.limit).toBe(50);
-      expect(result.offset).toBe(0);
+      expect(result.nextCursor).toBeNull();
+      expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 51 }),
+      );
+    });
+
+    it('walks every event once across pages, events of one millisecond included', async () => {
+      // An outbox flush writes several events in one millisecond.
+      const stamps = tiedTimestamps(8);
+      const rows = stamps.map((createdAt, index) => ({
+        id: `01900000-0000-7000-8000-00000000000${(index * 5) % 8}`,
+        event: index === 7 ? 'user.created' : 'tenant.updated',
+        aggregateType: 'tenant',
+        aggregateId: `agg-${index}`,
+        actorType: 'user',
+        actorLabel: null,
+        createdAt,
+        tenant: { tenantId: 't-1' },
+      }));
+      Object.assign(prisma.domainEventLog, fixtureModel(rows));
+
+      const totals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listEvents({ limit: 3, cursor });
+        totals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 3, 2]);
+      expect(new Set(items.map((item) => item.id)).size).toBe(8);
+      const times = items.map((item) => item.createdAt.getTime());
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+      expect(totals).toEqual([8, 8, 8]);
+
+      const searched = await service.listEvents({ search: 'user.' });
+      expect(searched.items.map((item) => item.event)).toEqual(['user.created']);
+      expect(searched.total).toBe(1);
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listEvents({ cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+      expect(prisma.domainEventLog.findMany).not.toHaveBeenCalled();
     });
 
     it('applies tenant filter via slug → relation', async () => {
       await service.listEvents({
         tenantId: 't-1',
         limit: 50,
-        offset: 0,
       });
 
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
@@ -72,7 +110,6 @@ describe('AdminEventsService', () => {
       await service.listEvents({
         search: 'app.load.created',
         limit: 50,
-        offset: 0,
       });
 
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
@@ -93,7 +130,6 @@ describe('AdminEventsService', () => {
         since: '2026-04-01T00:00:00Z',
         until: '2026-04-10T00:00:00Z',
         limit: 50,
-        offset: 0,
       });
 
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
@@ -115,7 +151,6 @@ describe('AdminEventsService', () => {
         actorType: 'user',
         since: '2026-04-01T00:00:00Z',
         limit: 10,
-        offset: 5,
       });
 
       expect(prisma.domainEventLog.findMany).toHaveBeenCalledWith(
@@ -129,8 +164,7 @@ describe('AdminEventsService', () => {
               }),
             ]),
           }),
-          take: 10,
-          skip: 5,
+          take: 11,
         }),
       );
     });
@@ -162,34 +196,33 @@ describe('AdminEventsService', () => {
     });
   });
 
-  describe('getWebhookHealth', () => {
-    it('aggregates delivery stats per tenant', async () => {
-      prisma.webhookDeliveryLog.findMany.mockResolvedValue([
-        {
-          id: '1',
-          deliveredAt: new Date(),
-          failedAt: null,
-          subscription: { tenant: { tenantId: 't-1' } },
-        },
-        {
-          id: '2',
-          deliveredAt: new Date(),
-          failedAt: null,
-          subscription: { tenant: { tenantId: 't-1' } },
-        },
-        {
-          id: '3',
-          deliveredAt: null,
-          failedAt: new Date(),
-          subscription: { tenant: { tenantId: 't-1' } },
-        },
-        {
-          id: '4',
-          deliveredAt: null,
-          failedAt: new Date(),
-          subscription: { tenant: { tenantId: 't-2' } },
-        },
+  describe('getVolume', () => {
+    it('counts per hour and event type in SQL and maps the buckets', async () => {
+      prisma.$queryRaw.mockResolvedValue([
+        { hour: new Date('2026-04-01T10:00:00.000Z'), event: 'user.created', count: 3n },
+        { hour: new Date('2026-04-01T11:00:00.000Z'), event: 'user.created', count: 1n },
       ]);
+
+      const result = await service.getVolume();
+
+      expect(result).toEqual([
+        { hour: '2026-04-01T10:00:00.000Z', event: 'user.created', count: 3 },
+        { hour: '2026-04-01T11:00:00.000Z', event: 'user.created', count: 1 },
+      ]);
+      // Grouped by the database: no event row is loaded, however many were written.
+      expect(prisma.domainEventLog.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw.mock.calls[0][0].join('?')).toContain("date_trunc('hour', created_at)");
+    });
+  });
+
+  describe('getWebhookHealth', () => {
+    it('maps the per-tenant counts (worst first, as the query orders them) and the overall summary', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { tenant_slug: 't-2', total: 1n, delivered: 0n, failed: 1n },
+          { tenant_slug: 't-1', total: 3n, delivered: 2n, failed: 1n },
+        ])
+        .mockResolvedValueOnce([{ total: 4n, delivered: 2n, failed: 2n }]);
 
       const result = await service.getWebhookHealth();
 
@@ -205,8 +238,18 @@ describe('AdminEventsService', () => {
       expect(result.summary.totalFailed).toBe(2);
     });
 
-    it('returns 100% success rate when no deliveries for a tenant', async () => {
-      prisma.webhookDeliveryLog.findMany.mockResolvedValue([]);
+    it('caps the per-tenant rows and orders worst first in SQL', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0n, delivered: 0n, failed: 0n }]);
+
+      await service.getWebhookHealth();
+
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0];
+      expect(strings.join('?')).toContain('ORDER BY (COUNT(l.delivered_at)::numeric / COUNT(*)) ASC');
+      expect(values[values.length - 1]).toBe(MAX_WEBHOOK_HEALTH_TENANTS);
+    });
+
+    it('returns no tenants and a zero summary when there were no deliveries', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 0n, delivered: 0n, failed: 0n }]);
 
       const result = await service.getWebhookHealth();
 
