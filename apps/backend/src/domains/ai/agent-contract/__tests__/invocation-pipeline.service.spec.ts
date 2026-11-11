@@ -49,7 +49,7 @@ describe('InvocationPipelineService', () => {
 
   it('returns scope_denied when tool scope is not granted', async () => {
     mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
-    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
+    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-records']));
     const p = fromOAuthUser({
       onBehalfOfUserDbId: Number('1'),
       tenantDbId: 1,
@@ -109,7 +109,7 @@ describe('InvocationPipelineService', () => {
 
   it('happy path: logs pending, executes, logs success, returns result', async () => {
     mockRegistry.scopeForTool.mockReturnValue('platform:read');
-    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
+    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-records']));
     mockHitl.resolveTier.mockReturnValue('none');
     mockLogger.writePending.mockResolvedValue('row-1');
     mockExecutor.execute.mockResolvedValue({
@@ -117,23 +117,23 @@ describe('InvocationPipelineService', () => {
     });
 
     const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
-    const res = await svc.run(p, 'query-loads', { status: 'active' });
+    const res = await svc.run(p, 'query-records', { status: 'active' });
 
     expect(mockLogger.writePending).toHaveBeenCalledWith(
       expect.objectContaining({
-        toolName: 'query-loads',
+        toolName: 'query-records',
         scopeRequired: 'platform:read',
         hitlTier: 'none',
       }),
     );
-    expect(mockExecutor.execute).toHaveBeenCalledWith('query-loads', { status: 'active' }, p);
+    expect(mockExecutor.execute).toHaveBeenCalledWith('query-records', { status: 'active' }, p);
     expect(mockLogger.completeSuccess).toHaveBeenCalledWith(expect.objectContaining({ rowId: 'row-1', tenantId: 7 }));
     expect(res.content[0].text).toBe('result');
   });
 
   it('executor error path: logs completeError, returns isError', async () => {
     mockRegistry.scopeForTool.mockReturnValue('platform:read');
-    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-loads']));
+    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['query-records']));
     mockHitl.resolveTier.mockReturnValue('none');
     mockLogger.writePending.mockResolvedValue('row-2');
     mockExecutor.execute.mockResolvedValue({
@@ -142,7 +142,7 @@ describe('InvocationPipelineService', () => {
     });
 
     const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
-    const res = await svc.run(p, 'query-loads', {});
+    const res = await svc.run(p, 'query-records', {});
 
     expect(mockLogger.completeError).toHaveBeenCalledWith(
       expect.objectContaining({ rowId: 'row-2', tenantId: 1, error: 'bad' }),

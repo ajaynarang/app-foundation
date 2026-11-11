@@ -41,8 +41,11 @@ jobs:
   # Backend CI
   # ─────────────────────────────────────────────────────────────
   backend:
-    name: Backend — Lint, Type-check, Test, Build
+    name: Backend and foundation packages — Lint, Type-check, Test, Build
     runs-on: ubuntu-latest # runs-on: self-hosted
+    env:
+      # ESLint and tsc over the whole backend can exceed Node's default heap on the runner.
+      NODE_OPTIONS: --max-old-space-size=6144
 
     steps:
       - name: Checkout
@@ -66,17 +69,32 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @appshore/db prisma:generate
 
+      # The backend consumes @appshore/{kernel,db,platform} through their built dist
+      # (each package's "types" points at ./dist). Without this build the typed lint
+      # and tsc see every foundation type as unresolved. pnpm builds them in
+      # dependency order.
+      - name: Build foundation packages
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
+
       - name: Lint
         run: pnpm --filter=backend lint
 
       - name: Schema lint (ID + naming convention)
-        run: pnpm --filter=backend lint:schema
+        run: pnpm --filter @appshore/db lint:schema
 
       - name: Type-check
-        run: pnpm --filter=backend exec tsc --noEmit
+        run: pnpm --filter=backend type-check
 
       - name: Unit tests
         run: pnpm --filter=backend test
+
+      # Most platform behaviour (auth, guards, notifications, cache, queues) lives in
+      # the foundation packages, and their specs are type-checked only here.
+      - name: Foundation packages — type-check
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform type-check
+
+      - name: Foundation packages — unit tests
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform test
 
       - name: RBAC gap audit
         run: npx tsx tests/scripts/audit-rbac-gaps.ts --ci
@@ -89,7 +107,7 @@ jobs:
   # Web CI
   # ─────────────────────────────────────────────────────────────
   web:
-    name: Web — Lint, Type-check, Build
+    name: Web — Lint, Type-check, Test, Build
     runs-on: ubuntu-latest # runs-on: self-hosted
 
     steps:
@@ -119,6 +137,9 @@ jobs:
 
       - name: Type-check
         run: pnpm --filter=@app/web type-check
+
+      - name: Unit tests
+        run: pnpm --filter=@app/web test
 
       - name: Build (verify compilation)
         run: pnpm --filter=@app/web build

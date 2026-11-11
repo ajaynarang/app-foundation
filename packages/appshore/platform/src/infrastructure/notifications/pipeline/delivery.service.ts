@@ -50,7 +50,7 @@ interface DeliveryParams {
   actionLabel?: string;
   iconType?: string;
   metadata?: Record<string, any>;
-  /** Same-type notifications inside one window collapse into one in-app row per scope (a tournament, say). */
+  /** Same-type notifications inside one window collapse into one in-app row per scope (a project, say). */
   groupScope?: string;
   channels: DeliveryChannelPlan;
   recipientEmail?: string;
@@ -60,10 +60,10 @@ interface DeliveryParams {
   showBrowserNotification?: boolean;
   /** The platform flag, resolved once per trigger. Absent = off. */
   whatsappEnabled?: boolean;
-  /** The club's plan includes WhatsApp, resolved once per trigger. Absent = no. */
+  /** The tenant's plan includes WhatsApp, resolved once per trigger. Absent = no. */
   whatsappEntitled?: boolean;
-  /** Closes every WhatsApp template — all clubs share the one the platform number. */
-  clubName?: string;
+  /** Closes every WhatsApp template — all tenants share the one platform number. */
+  tenantName?: string;
 }
 
 export interface PendingWhatsAppSend {
@@ -106,7 +106,7 @@ export class NotificationDeliveryService {
     const run: DeliveryRun = { params, results: {}, outcomes: [], pendingSends: [] };
     const { primary, fallback, suppressed } = params.channels;
 
-    // A test-marker string is dev/QA junk on an internal trigger (E57-5). Drop it across
+    // A test-marker string is dev/QA junk on an internal trigger. Drop it across
     // EVERY channel so no demo-facing surface ever carries it. Fire-and-forget, so log rather than throw.
     if (isTestMarker(params.title) || isTestMarker(params.message)) {
       this.logger.warn(`Dropped a ${params.type} delivery with a test-marker string`);
@@ -179,7 +179,7 @@ export class NotificationDeliveryService {
         groupScope: params.groupScope,
       });
 
-      // A null result means the in-app service DROPPED the notification (E57-5: a
+      // A null result means the in-app service DROPPED the notification (a
       // test-marker string). Nothing was persisted, so there is nothing to fan out.
       if (notification && params.recipientUserId) {
         // NOTIFICATION_SENT is what the SSE bridge fans out to the recipient.
@@ -257,7 +257,7 @@ export class NotificationDeliveryService {
           type: params.type,
           ...(params.actionUrl ? { actionUrl: params.actionUrl } : {}),
           // The STRING tenant id the mobile session identifies its workspace by;
-          // without it a push from a second club deep-links into a screen the
+          // without it a push from a second workspace deep-links into a screen the
           // session cannot load. Absent → the client routes it as it always did.
           ...(params.tenantSlug ? { tenantId: params.tenantSlug } : {}),
         },
@@ -327,7 +327,7 @@ export class NotificationDeliveryService {
       title: params.title,
       message: params.message,
       metadata: params.metadata,
-      clubName: params.clubName ?? '',
+      tenantName: params.tenantName ?? '',
     });
     if (!send) {
       run.outcomes.push(skipped(DeliveryChannel.WHATSAPP, DELIVERY_SKIP_REASONS.NO_TEMPLATE));

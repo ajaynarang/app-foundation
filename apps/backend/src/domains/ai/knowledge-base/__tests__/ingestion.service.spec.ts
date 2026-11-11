@@ -18,8 +18,8 @@ jest.mock('../content/content-loader', () => ({
       keywords: ['platform', 'overview'],
     },
     {
-      title: 'Route Planning Engine',
-      content: 'The route planning engine optimizes stop sequences using TSP/VRP.',
+      title: 'Audit Log',
+      content: 'The audit log records every change with its actor and timestamp.',
       documentType: 'feature',
       audience: 'all',
       category: 'getting-started',

@@ -3,13 +3,13 @@ import { SyncActionLog } from '../sync-action-log';
 describe('SyncActionLog', () => {
   it('should add actions with timestamp', () => {
     const log = new SyncActionLog();
-    log.add('tms_fetch', 'Fetched 5 drivers from PROJECT44_TMS');
+    log.add('vendor_fetch', 'Fetched 5 records from ACME_CRM');
 
     const actions = log.toArray();
     expect(actions).toHaveLength(1);
     expect(actions[0]).toEqual({
-      action: 'tms_fetch',
-      message: 'Fetched 5 drivers from PROJECT44_TMS',
+      action: 'vendor_fetch',
+      message: 'Fetched 5 records from ACME_CRM',
       timestamp: expect.any(String),
     });
     // Verify timestamp is a valid ISO string
@@ -18,12 +18,12 @@ describe('SyncActionLog', () => {
 
   it('should include meta when provided', () => {
     const log = new SyncActionLog();
-    log.add('driver_created', 'Created John Smith', {
-      driverId: 'TMS-D001',
+    log.add('record_created', 'Created John Smith', {
+      recordId: 'CRM-001',
     });
 
     const actions = log.toArray();
-    expect(actions[0].meta).toEqual({ driverId: 'TMS-D001' });
+    expect(actions[0].meta).toEqual({ recordId: 'CRM-001' });
   });
 
   it('should omit meta when not provided', () => {

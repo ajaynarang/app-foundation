@@ -50,9 +50,9 @@ describe('McpServerService — API-key principal path', () => {
       userId: 42,
       scopes: ['platform:read'],
     });
-    const res = await service.executeToolCallForPrincipal('query-loads', { status: 'active' }, principal);
+    const res = await service.executeToolCallForPrincipal('query-records', { status: 'active' }, principal);
 
-    expect(pipeline.run).toHaveBeenCalledWith(principal, 'query-loads', {
+    expect(pipeline.run).toHaveBeenCalledWith(principal, 'query-records', {
       status: 'active',
     });
     expect(res.content[0].text).toBe('ok');

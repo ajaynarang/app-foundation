@@ -2,14 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean } from 'class-validator';
 
 export class FeatureFlagDto {
-  @ApiProperty({ example: 'route_planning' })
+  @ApiProperty({ example: 'advanced_reports' })
   key: string;
 
-  @ApiProperty({ example: 'Route Planning' })
+  @ApiProperty({ example: 'Advanced Reports' })
   name: string;
 
   @ApiProperty({
-    example: 'Intelligent route planning with HOS compliance',
+    example: 'Scheduled and exportable reports',
     required: false,
   })
   description?: string;
@@ -17,7 +17,7 @@ export class FeatureFlagDto {
   @ApiProperty({ example: false })
   enabled: boolean;
 
-  @ApiProperty({ example: 'dispatcher' })
+  @ApiProperty({ example: 'reporting' })
   category: string;
 }
 

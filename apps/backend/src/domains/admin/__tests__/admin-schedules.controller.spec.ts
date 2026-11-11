@@ -30,7 +30,7 @@ describe('AdminSchedulesController', () => {
     it('should return all schedules', async () => {
       const mockSchedules = [
         { id: 1, name: 'job-cleanup', pattern: '0 3 * * *', isEnabled: true },
-        { id: 2, name: 'sync-fleet', intervalMs: 300000, isEnabled: false },
+        { id: 2, name: 'sync-records', intervalMs: 300000, isEnabled: false },
       ];
       scheduleManager.listSchedules.mockResolvedValue(mockSchedules);
 

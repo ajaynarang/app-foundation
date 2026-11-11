@@ -79,7 +79,7 @@ describe('AppCacheService (integration, real Redis)', () => {
   it('round-trips an object through get/set', async () => {
     if (!available) return;
 
-    const value = { driverId: 'D-1', miles: 123, nested: { ok: true } };
+    const value = { recordId: 'R-1', count: 123, nested: { ok: true } };
     await service.set(`${TEST_PREFIX}:roundtrip`, value, 60_000);
     const got = await service.get<typeof value>(`${TEST_PREFIX}:roundtrip`);
     expect(got).toEqual(value);

@@ -27,11 +27,11 @@ describe('NotificationDispatcherService', () => {
     { id: 1, userId: 'u1', firebaseUid: null, email: null, phone: null },
     { id: 2, userId: 'u2', firebaseUid: null, email: null, phone: null },
   ];
-  const message = { tenantId: 7, type: TYPE, title: 'Match', message: 'Court 1', recipients };
+  const message = { tenantId: 7, type: TYPE, title: 'Meeting', message: 'Room 1', recipients };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'demo', companyName: 'Smash Club' });
+    prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'demo', companyName: 'Acme Inc' });
     flags.isEnabled.mockResolvedValue(true);
     plans.getTenantPlan.mockResolvedValue('PROFESSIONAL');
     plans.isFeatureEnabled.mockResolvedValue(true);
@@ -70,7 +70,7 @@ describe('NotificationDispatcherService', () => {
     expect(delivery.deliver).toHaveBeenCalledTimes(2);
     expect(delivery.deliver.mock.calls[0][0]).toMatchObject({
       tenantSlug: 'demo',
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
       category: NotificationCategory.TEAM,
@@ -96,10 +96,13 @@ describe('NotificationDispatcherService', () => {
   it('prefers a recipient-level title and metadata over the message', async () => {
     await service.dispatch({
       ...message,
-      metadata: { tournamentId: 31 },
-      recipients: [{ ...recipients[0], title: 'Aarav · Match', metadata: { tournamentId: 31, subjectUserId: 9 } }],
+      metadata: { projectId: 31 },
+      recipients: [{ ...recipients[0], title: 'Aarav · Meeting', metadata: { projectId: 31, subjectUserId: 9 } }],
     });
-    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ title: 'Aarav · Match', metadata: { subjectUserId: 9 } });
+    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({
+      title: 'Aarav · Meeting',
+      metadata: { subjectUserId: 9 },
+    });
   });
 
   it('a recipient with nothing to attempt still gets ledger rows for the reasons', async () => {
@@ -127,6 +130,6 @@ describe('NotificationDispatcherService', () => {
     plans.getTenantPlan.mockRejectedValue(new Error('plans down'));
     prisma.tenant.findUnique.mockRejectedValue(new Error('db down'));
     await service.dispatch(message);
-    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEntitled: false, clubName: 'Your club' });
+    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEntitled: false, tenantName: 'Your workspace' });
   });
 });

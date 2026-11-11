@@ -7,9 +7,6 @@ import { Card, CardContent, CardFooter } from '@app/ui/components/ui/card';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Checkbox } from '@app/ui/components/ui/checkbox';
 import {
-  DollarSign,
-  Users,
-  ShieldCheck,
   Eye,
   Pencil,
   XCircle,
@@ -17,11 +14,11 @@ import {
   Lock,
   AlertTriangle,
   ChevronDown,
-  Package,
-  Bell,
   Plug,
   Send,
   Activity,
+  FileText,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/features/auth';
@@ -44,19 +41,13 @@ interface ScopeRow {
   id: string;
   label: string;
   tier: Tier;
-  /** Domain prefix (records, invoices, ...) — used for grouping inside the standard bucket. */
+  /** Domain prefix (platform, documents, ...) — used for grouping inside the standard bucket. */
   domain: string;
 }
 
 const DOMAIN_META: Record<string, { label: string; icon: LucideIcon }> = {
-  records: { label: 'Records', icon: Package },
-  invoices: { label: 'Invoices', icon: DollarSign },
-  settlements: { label: 'Settlements', icon: DollarSign },
-  billing: { label: 'Billing', icon: DollarSign },
-  customers: { label: 'Customers', icon: Users },
-  shield: { label: 'Compliance', icon: ShieldCheck },
-  documents: { label: 'Documents', icon: ShieldCheck },
-  alerts: { label: 'Alerts', icon: Bell },
+  platform: { label: 'Platform', icon: Settings },
+  documents: { label: 'Documents', icon: FileText },
   integrations: { label: 'Integrations', icon: Plug },
   comms: { label: 'Communications', icon: Send },
 };

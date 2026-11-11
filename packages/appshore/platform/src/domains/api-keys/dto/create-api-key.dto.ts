@@ -25,7 +25,7 @@ export class CreateApiKeyDto implements CreateApiKeyInput {
   name: string;
 
   @ApiProperty({
-    example: ['fleet:read', 'invoices:read'],
+    example: ['platform:read', 'documents:read'],
     description: 'Normalized agent scopes granted to this key',
   })
   @IsArray()

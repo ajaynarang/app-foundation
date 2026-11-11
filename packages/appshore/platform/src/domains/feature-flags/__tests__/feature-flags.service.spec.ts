@@ -11,9 +11,9 @@ describe('FeatureFlagsService', () => {
   let eventEmitter: any;
 
   const mockFlag = {
-    key: 'shield',
-    name: 'Shield Compliance',
-    description: 'Enable Shield',
+    key: 'reports',
+    name: 'Advanced Reports',
+    description: 'Enable reports',
     enabled: true,
     category: 'compliance',
   };
@@ -42,15 +42,15 @@ describe('FeatureFlagsService', () => {
     it('should return all flags', async () => {
       const result = await service.getAllFlags();
       expect(result).toHaveLength(1);
-      expect(result[0].key).toBe('shield');
+      expect(result[0].key).toBe('reports');
     });
   });
 
   describe('getFlagByKey', () => {
     it('should return a flag by key', async () => {
-      const result = await service.getFlagByKey('shield');
+      const result = await service.getFlagByKey('reports');
       expect(result).not.toBeNull();
-      expect(result.key).toBe('shield');
+      expect(result.key).toBe('reports');
     });
 
     it('should return null when flag not found', async () => {
@@ -62,7 +62,7 @@ describe('FeatureFlagsService', () => {
 
   describe('isEnabled', () => {
     it('should return true for enabled flag', async () => {
-      const result = await service.isEnabled('shield');
+      const result = await service.isEnabled('reports');
       expect(result).toBe(true);
     });
 
@@ -71,7 +71,7 @@ describe('FeatureFlagsService', () => {
         ...mockFlag,
         enabled: false,
       });
-      const result = await service.isEnabled('shield');
+      const result = await service.isEnabled('reports');
       expect(result).toBe(false);
     });
 
@@ -84,13 +84,13 @@ describe('FeatureFlagsService', () => {
 
   describe('toggleFlag', () => {
     it('should toggle flag and emit event', async () => {
-      const result = await service.toggleFlag('shield', false);
+      const result = await service.toggleFlag('reports', false);
       expect(prisma.featureFlag.update).toHaveBeenCalledWith({
-        where: { key: 'shield' },
+        where: { key: 'reports' },
         data: { enabled: false },
       });
       expect(eventEmitter.emit).toHaveBeenCalled();
-      expect(result.key).toBe('shield');
+      expect(result.key).toBe('reports');
     });
 
     it('should throw NotFoundException for P2025 error', async () => {
@@ -100,7 +100,7 @@ describe('FeatureFlagsService', () => {
 
     it('should re-throw non-P2025 errors', async () => {
       prisma.featureFlag.update.mockRejectedValue(new Error('DB error'));
-      await expect(service.toggleFlag('shield', true)).rejects.toThrow('DB error');
+      await expect(service.toggleFlag('reports', true)).rejects.toThrow('DB error');
     });
   });
 });

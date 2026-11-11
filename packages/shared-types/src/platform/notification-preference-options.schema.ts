@@ -13,7 +13,7 @@ export const NotificationPreferenceCategoryOptionsSchema = z.object({
   key: z.string(),
   category: NotificationCategorySchema,
   channels: z.record(NotificationPreferenceChannelSchema, NotificationChannelRuleSchema),
-  /** What each offered channel does for THIS caller with no stored preference — their role default under the rule. */
+  /** What each offered channel does with no stored preference: the default under the rule, the same for every caller. */
   defaults: z.record(NotificationPreferenceChannelSchema, z.boolean()),
 });
 export type NotificationPreferenceCategoryOptions = z.infer<typeof NotificationPreferenceCategoryOptionsSchema>;

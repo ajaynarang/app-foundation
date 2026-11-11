@@ -3,10 +3,9 @@
 /**
  * Self-contained notifications hooks for the header bell + sheet.
  *
- * The original trucking app had a full `features/operations/notifications`
- * slice; in the generic starter the in-app notification inbox is part of the
- * shared platform shell, so the minimal hooks needed by the header live here
- * against the generic `/notifications` API and `queryKeys.notifications`.
+ * The in-app notification inbox is part of the shared platform shell, so the
+ * minimal hooks needed by the header live here against the `/notifications`
+ * API and `queryKeys.notifications`.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

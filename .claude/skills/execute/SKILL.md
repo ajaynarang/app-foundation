@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, Skill
 
 You are implementing a change end-to-end: plan → code → tests → PR → review → coverage. This skill wraps `superpowers:executing-plans`, the repo's backend/frontend pattern skills, and the `review` skill.
 
-**Input:** $ARGUMENTS (typically a path to a plan under `docs/plans/` produced by the `plan` skill, or a concrete task description).
+**Input:** $ARGUMENTS (typically a path to a plan under `docs/superpowers/plans/` produced by the `plan` skill, or a concrete task description).
 
 ---
 

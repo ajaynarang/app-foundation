@@ -12,7 +12,7 @@ export class RecipientResolutionService {
   /**
    * Membership scoping is defense in depth: a caller bug passing a foreign user id
    * must not become a cross-tenant leak. A caller whose audience is legitimately
-   * built from non-members (followers, room-verified entrants) opts out.
+   * built from non-members (for example followers or invited guests) opts out.
    */
   resolveByUserIds(tenantId: number, userIds: number[], opts: { scopeToMembership: boolean }): Promise<Recipient[]> {
     if (userIds.length === 0) return Promise.resolve([]);

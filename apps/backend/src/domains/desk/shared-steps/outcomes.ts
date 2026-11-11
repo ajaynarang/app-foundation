@@ -39,8 +39,7 @@ export type DeskOutcome = (typeof DESK_OUTCOMES)[keyof typeof DESK_OUTCOMES];
  *
  * Kept intentionally identical to the original tight map: only the outcomes
  * that are unambiguously one terminal status across every responsibility
- * live here; per-responsibility outcomes (invoice_drafted, reminder_sent,
- * settlement_approved, …) pass their status explicitly or take the default.
+ * live here; per-responsibility outcomes (invoice_drafted, reminder_sent, …) pass their status explicitly or take the default.
  */
 export const TERMINAL_STATUS_BY_OUTCOME: Partial<Record<DeskOutcome, CloseInput['terminalStatus']>> = {
   [DESK_OUTCOMES.COMPLETED]: 'RESOLVED',

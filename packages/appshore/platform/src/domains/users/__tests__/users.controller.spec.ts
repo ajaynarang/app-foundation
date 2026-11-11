@@ -33,7 +33,7 @@ describe('UsersController', () => {
       email: 'a@b.com',
       firstName: 'A',
       lastName: 'B',
-      role: 'DISPATCHER',
+      role: 'MEMBER',
     };
     await controller.createUser(dto as any, currentUser);
     expect(service.createUser).toHaveBeenCalledWith(dto, 'tenant_abc');

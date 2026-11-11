@@ -37,12 +37,12 @@ describe('EmbeddingService', () => {
 
   describe('embedText', () => {
     it('should return a 1536-dimensional vector for a single text', async () => {
-      const result = await service.embedText('What is route planning?');
+      const result = await service.embedText('What is the audit log?');
       expect(result).toHaveLength(1536);
       expect(typeof result[0]).toBe('number');
       expect(mockEmbed).toHaveBeenCalledWith({
         model: 'mock-embedding-model',
-        value: 'What is route planning?',
+        value: 'What is the audit log?',
       });
     });
 
@@ -87,13 +87,13 @@ describe('EmbeddingService', () => {
 
   describe('embedBatch', () => {
     it('should return vectors for multiple texts', async () => {
-      const results = await service.embedBatch(['Route planning overview', 'HOS compliance features']);
+      const results = await service.embedBatch(['Audit log overview', 'Billing features']);
       expect(results).toHaveLength(2);
       expect(results[0]).toHaveLength(1536);
       expect(results[1]).toHaveLength(1536);
       expect(mockEmbedMany).toHaveBeenCalledWith({
         model: 'mock-embedding-model',
-        values: ['Route planning overview', 'HOS compliance features'],
+        values: ['Audit log overview', 'Billing features'],
       });
     });
 

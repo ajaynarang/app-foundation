@@ -33,8 +33,8 @@ export class DeliveryLedgerService {
 
   /**
    * One write for the whole audience of a trigger, after the fan-out — never
-   * per recipient inside the loop. A 200-entrant draw publish runs inside the
-   * organizer's request; 200 serial inserts there is the N+1 Phase 0 removed.
+   * per recipient inside the loop. A publish to 200 recipients runs inside the
+   * caller's request; 200 serial inserts there would be an N+1.
    */
   async recordOutcomes(params: {
     tenantId: number;

@@ -5,7 +5,7 @@ describe('escapeHtml', () => {
     expect(escapeHtml('<b>hi</b>')).toBe('&lt;b&gt;hi&lt;/b&gt;');
   });
 
-  it('defuses the image-beacon vector an organizer could type into free text', () => {
+  it('defuses the image-beacon vector an admin could type into free text', () => {
     const escaped = escapeHtml('<img src=x onerror="fetch(\'https://evil.example\')">');
     expect(escaped).not.toContain('<img');
     expect(escaped).toContain('&lt;img');
@@ -20,7 +20,7 @@ describe('escapeHtml', () => {
   });
 
   it('leaves ordinary copy untouched', () => {
-    expect(escapeHtml('Class cancelled — coach travelling')).toBe('Class cancelled — coach travelling');
+    expect(escapeHtml('Meeting cancelled — host travelling')).toBe('Meeting cancelled — host travelling');
   });
 
   it('accepts an absent value', () => {

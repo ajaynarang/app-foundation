@@ -26,9 +26,9 @@ import { Save, RotateCcw } from 'lucide-react';
 
 /** Copy per category. Which categories appear, and which channels, comes from the server's policy. */
 const CATEGORY_COPY: Record<string, { label: string; description: string }> = {
-  system: { label: 'System', description: 'Integrations, sync, shield audits' },
+  system: { label: 'System', description: 'Integrations and sync' },
   team: { label: 'Team', description: 'Invitations, role changes, activations' },
-  billing: { label: 'Billing', description: 'Invoices, payments, settlements' },
+  billing: { label: 'Billing', description: 'Invoices and payments' },
 };
 
 const CHANNEL_LABELS: Record<NotificationPreferenceChannel, string> = {

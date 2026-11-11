@@ -87,7 +87,7 @@ export type Configuration = z.infer<typeof configSchema>;
 export default (): Configuration => {
   const raw = {
     environment: process.env.NODE_ENV,
-    databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/app',
+    databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public',
     redisUrl: process.env.REDIS_URL,
     corsOrigins: process.env.CORS_ORIGINS,
     apiV1Prefix: process.env.API_V1_PREFIX,

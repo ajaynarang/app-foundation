@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when writing an implementation plan for this NestJS/Prisma + Next.js monorepo from a spec, design doc, or brainstorm output — before touching code. Wraps superpowers:writing-plans, applies the repo's pattern skills, and files plans under docs/plans/.
+description: Use when writing an implementation plan for this NestJS/Prisma + Next.js monorepo from a spec, design doc, or brainstorm output — before touching code. Wraps superpowers:writing-plans, applies the repo's pattern skills, and files plans under docs/superpowers/plans/.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, Skill
 ---
@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, Skill
 
 You are authoring an implementation plan for this codebase. This skill wraps `superpowers:writing-plans` and layers the repo's conventions on top so the executor can work without re-deriving decisions.
 
-**Input:** $ARGUMENTS — typically a path to a design/brainstorm doc (often `docs/plans/...-design.md`) or a concrete spec.
+**Input:** $ARGUMENTS — typically a path to a design/brainstorm doc (often `docs/superpowers/specs/...-design.md`) or a concrete spec.
 
 ---
 
@@ -55,7 +55,7 @@ Invoke `superpowers:writing-plans` with the spec/design as input. Follow its tas
 
 ### Step 3 — File the plan
 
-Write to `docs/plans/YYYY-MM-DD-<slug>-implementation.md` (or `-plan.md` for a phased rollout plan; create `docs/plans/` if missing). If the input design already lives in `docs/plans/`, keep the same slug family.
+Write to `docs/superpowers/plans/YYYY-MM-DD-<slug>-implementation.md` (or `-plan.md` for a phased rollout plan; create the folder if missing). `docs/superpowers/` is gitignored: plans are local working artifacts and are never committed. If the input design lives in `docs/superpowers/specs/`, keep the same slug family.
 
 ### Step 4 — Plan document structure
 

@@ -800,7 +800,7 @@ model NotificationDevice {
 
 /// The channels a trigger fans out to. Not the foundation `NotificationChannel`
 /// — that column is a label on the stored in-app row; this is what was attempted.
-/// A Postgres enum because adding a channel IS a schema event (E95 adds WHATSAPP).
+/// A Postgres enum because adding a channel IS a schema event.
 enum DeliveryChannel {
   IN_APP
   EMAIL
@@ -841,9 +841,9 @@ model NotificationDelivery {
   readAt      DateTime? @map("read_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  /// Support lookup by user, newest first — across every club they belong to.
+  /// Support lookup by user, newest first — across every workspace they belong to.
   @@index([userId, createdAt])
-  /// Support lookup by club, newest first.
+  /// Support lookup by tenant, newest first.
   @@index([tenantId, createdAt])
   /// Retention sweep and per-day status counts.
   @@index([createdAt])
@@ -858,7 +858,7 @@ enum WhatsAppConsentSource {
   INBOUND_STOP
 }
 
-/// Per PERSON, not per club: one user, one number, one yes. Meta requires the
+/// Per PERSON, not per tenant: one user, one number, one yes. Meta requires the
 /// business to hold the opt-in; this row is where it is held.
 model WhatsAppConsent {
   id     Int @id @default(autoincrement())
@@ -869,7 +869,7 @@ model WhatsAppConsent {
   /// Where the LAST change came from — an inbound STOP outranks nothing, it just records.
   source WhatsAppConsentSource
 
-  /// Marketing (E95-4) is a separate yes: Meta prices and caps it separately.
+  /// Marketing is a separate yes: Meta prices and caps it separately.
   marketingOptedInAt  DateTime? @map("marketing_opted_in_at") @db.Timestamptz
   marketingOptedOutAt DateTime? @map("marketing_opted_out_at") @db.Timestamptz
 

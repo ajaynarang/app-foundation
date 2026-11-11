@@ -10,7 +10,6 @@
     "type-check": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
-    "test:e2e": "playwright test",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "clean": "rm -rf .next .turbo node_modules"
@@ -79,7 +78,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.3",
-    "@playwright/test": "^1.49.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@types/canvas-confetti": "^1.9.0",

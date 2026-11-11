@@ -529,7 +529,7 @@ describe('resolveApprovalScope', () => {
     expect(resolveApprovalScope('mine', UserRole.OWNER)).toBe('mine');
   });
 
-  it('defaults DISPATCHER to mine', () => {
+  it('defaults MEMBER to mine', () => {
     expect(resolveApprovalScope(undefined, UserRole.MEMBER)).toBe('mine');
   });
 

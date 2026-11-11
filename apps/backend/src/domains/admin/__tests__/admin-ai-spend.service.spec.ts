@@ -39,7 +39,7 @@ describe('AdminAiSpendService', () => {
           {
             tenant_id: 1,
             tenant_slug: 'acme',
-            company_name: 'Acme Freight',
+            company_name: 'Acme Inc',
             day: new Date('2026-05-26T00:00:00Z'),
             total_cost_usd: '1.500000',
             call_count: 10n,
@@ -48,7 +48,7 @@ describe('AdminAiSpendService', () => {
           {
             tenant_id: 1,
             tenant_slug: 'acme',
-            company_name: 'Acme Freight',
+            company_name: 'Acme Inc',
             day: new Date('2026-05-27T00:00:00Z'),
             total_cost_usd: '2.250000',
             call_count: 5n,
@@ -63,7 +63,7 @@ describe('AdminAiSpendService', () => {
       const row = result[0];
       expect(row.tenantId).toBe(1);
       expect(row.tenantSlug).toBe('acme');
-      expect(row.companyName).toBe('Acme Freight');
+      expect(row.companyName).toBe('Acme Inc');
       expect(row.windowCostUsd).toBe('3.750000'); // 1.5 + 2.25
       expect(row.windowCallCount).toBe(15);
       expect(row.windowErrorCount).toBe(1);

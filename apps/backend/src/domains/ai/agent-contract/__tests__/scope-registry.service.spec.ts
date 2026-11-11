@@ -3,9 +3,9 @@ import { ScopeRegistryService } from '../scope-registry.service';
 import { RequiresScope } from '../requires-scope.decorator';
 import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 
-class FleetReadTool {
+class RecordsReadTool {
   @RequiresScope('platform:read')
-  queryLoads() {
+  queryRecords() {
     return 'ok';
   }
 }
@@ -27,9 +27,9 @@ const mockMcpRegistry = () => ({
   getMcpModuleIds: jest.fn().mockReturnValue(['m1']),
   getTools: jest.fn().mockReturnValue([
     {
-      metadata: { name: 'query-loads', description: 'q', parameters: null },
-      providerClass: FleetReadTool,
-      methodName: 'queryLoads',
+      metadata: { name: 'query-records', description: 'q', parameters: null },
+      providerClass: RecordsReadTool,
+      methodName: 'queryRecords',
     },
     {
       metadata: { name: 'send-invoice', description: 's', parameters: null },
@@ -47,9 +47,9 @@ describe('ScopeRegistryService', () => {
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await svc.onApplicationBootstrap();
-    expect(svc.toolsForScope('platform:read')).toEqual(['query-loads']);
+    expect(svc.toolsForScope('platform:read')).toEqual(['query-records']);
     expect(svc.toolsForScope('platform:write')).toEqual(['send-invoice']);
-    expect(svc.scopeForTool('query-loads')).toBe('platform:read');
+    expect(svc.scopeForTool('query-records')).toBe('platform:read');
   });
 
   it('resolveScopesForPrincipal expands tools allowed by granted scopes', async () => {
@@ -59,9 +59,9 @@ describe('ScopeRegistryService', () => {
     }).compile();
     const svc = mod.get(ScopeRegistryService);
     await svc.onApplicationBootstrap();
-    expect(svc.toolsAllowedByScopes(['platform:read'])).toEqual(new Set(['query-loads']));
+    expect(svc.toolsAllowedByScopes(['platform:read'])).toEqual(new Set(['query-records']));
     expect(svc.toolsAllowedByScopes(['platform:read', 'platform:write'])).toEqual(
-      new Set(['query-loads', 'send-invoice']),
+      new Set(['query-records', 'send-invoice']),
     );
   });
 
@@ -134,8 +134,8 @@ describe('ScopeRegistryService', () => {
       getTools: () => [
         {
           metadata: { name: 'cache-flush', description: '', parameters: null },
-          providerClass: FleetReadTool,
-          methodName: 'queryLoads',
+          providerClass: RecordsReadTool,
+          methodName: 'queryRecords',
         },
       ],
     };
@@ -201,13 +201,13 @@ describe('ScopeRegistryService', () => {
       const tools = svc.getAllTools();
       expect(tools).toHaveLength(2);
       const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-      expect(byName['query-loads']).toMatchObject({
-        name: 'query-loads',
+      expect(byName['query-records']).toMatchObject({
+        name: 'query-records',
         description: 'q',
       });
       // Schema always includes the `_confirmToken` hint so external agents
       // can replay HITL-required calls without hand-coded knowledge.
-      expect(byName['query-loads'].inputSchema).toMatchObject({
+      expect(byName['query-records'].inputSchema).toMatchObject({
         type: 'object',
         properties: {
           _confirmToken: expect.objectContaining({ type: 'string' }),
@@ -233,7 +233,7 @@ describe('ScopeRegistryService', () => {
         getTools: () => [
           {
             metadata: {
-              name: 'fleet-tool',
+              name: 'records-tool',
               description: 'schema-bearing tool',
               parameters: params,
             },
@@ -249,7 +249,7 @@ describe('ScopeRegistryService', () => {
       await svc.onApplicationBootstrap();
 
       const [tool] = svc.getAllTools();
-      expect(tool.name).toBe('fleet-tool');
+      expect(tool.name).toBe('records-tool');
       const props = (tool.inputSchema as { properties: Record<string, unknown> }).properties;
       expect(props).toHaveProperty('loadId');
       expect(props).not.toHaveProperty('_tenantId');

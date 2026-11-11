@@ -32,7 +32,7 @@ import { ApprovalEnrichmentService } from '../approval/approval-enrichment.servi
  * on one definition of "ended and needs no human." ESCALATED is deliberately
  * excluded — an escalation is unfinished business that lives on Needs-you
  * until a human resolves it (ESCALATED → RESOLVED via resolveEpisode), at
- * which point the RESOLVED episode lands here. Dispatchers still see failures
+ * which point the RESOLVED episode lands here. Operators still see failures
  * and cancellations on Handled — the unit-of-attention is "the episode ended,"
  * not "the episode ended HAPPILY."
  */

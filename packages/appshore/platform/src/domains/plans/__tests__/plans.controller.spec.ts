@@ -61,9 +61,9 @@ describe('PlansController', () => {
   });
 
   it('toggleEntitlement delegates to service', async () => {
-    await controller.toggleEntitlement('STARTER', 'shield', {
+    await controller.toggleEntitlement('STARTER', 'reports', {
       enabled: false,
     });
-    expect(service.toggleEntitlement).toHaveBeenCalledWith('STARTER', 'shield', false);
+    expect(service.toggleEntitlement).toHaveBeenCalledWith('STARTER', 'reports', false);
   });
 });

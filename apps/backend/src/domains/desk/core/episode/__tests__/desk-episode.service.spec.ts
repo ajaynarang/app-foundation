@@ -380,7 +380,7 @@ describe('DeskEpisodeService', () => {
             promptKey: 'hydrate.v1',
             aiInvocation: { promptTokens: 100, completionTokens: 50, costUsd: { toString: () => '0.0010' } },
             toolName: 'getInvoice',
-            toolScope: 'fleet:read',
+            toolScope: 'platform:read',
             toolTier: 'L0',
             toolArgs: { id: 'inv-1' },
             toolResult: { ok: true },
@@ -959,7 +959,7 @@ describe('DeskEpisodeService', () => {
       id: 'ep-esc',
       tenantId: 10,
       status: 'ESCALATED' as const,
-      outcomeNote: 'No driver response',
+      outcomeNote: 'No response',
       closedAt: new Date('2026-05-25T09:00:00Z'),
     };
 
@@ -977,7 +977,7 @@ describe('DeskEpisodeService', () => {
       const updateArgs = prisma.deskEpisode.update.mock.calls[0][0];
       expect(updateArgs.data.status).toBe('RESOLVED');
       expect(updateArgs.data.outcomeNote).toContain('Handled by phone');
-      expect(updateArgs.data.outcomeNote).toContain('No driver response');
+      expect(updateArgs.data.outcomeNote).toContain('No response');
       // closedAt is not overwritten on resolve (escalation already closed it).
       expect(updateArgs.data.closedAt).toBeUndefined();
       // Emits the change event with the tenant + episode + new status.
@@ -997,7 +997,7 @@ describe('DeskEpisodeService', () => {
 
       const updateArgs = prisma.deskEpisode.update.mock.calls[0][0];
       expect(updateArgs.data.status).toBe('RESOLVED');
-      expect(updateArgs.data.outcomeNote).toBe('No driver response');
+      expect(updateArgs.data.outcomeNote).toBe('No response');
     });
 
     it('throws NotFoundException when the episode is missing or cross-tenant', async () => {

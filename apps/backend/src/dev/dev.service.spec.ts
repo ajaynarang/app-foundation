@@ -43,7 +43,6 @@ describe('DevService', () => {
         userId: 'u_abc',
         tenantId: 7,
         tenant: { id: 7, tenantId: 't_demo' },
-        driver: null,
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       mockAuthService.generateTokensForUser.mockResolvedValue({
@@ -76,7 +75,6 @@ describe('DevService', () => {
         userId: 'u_abc',
         tenantId: 7,
         tenant: { id: 7, tenantId: 't_demo' },
-        driver: null,
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       mockAuthService.generateTokensForUser.mockResolvedValue({
@@ -105,7 +103,6 @@ describe('DevService', () => {
         userId: 'u_abc',
         tenantId: 7,
         tenant: { id: 7, tenantId: 't_demo' },
-        driver: null,
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       mockAuthService.generateTokensForUser.mockResolvedValue({
@@ -125,7 +122,7 @@ describe('DevService', () => {
     });
 
     it('does not throw if recording the login event fails', async () => {
-      const user = { id: 42, userId: 'u_abc', tenantId: 7, tenant: null, driver: null };
+      const user = { id: 42, userId: 'u_abc', tenantId: 7, tenant: null };
       mockPrisma.user.findUnique.mockResolvedValue(user);
       mockAuthService.generateTokensForUser.mockResolvedValue({
         accessToken: 'token',

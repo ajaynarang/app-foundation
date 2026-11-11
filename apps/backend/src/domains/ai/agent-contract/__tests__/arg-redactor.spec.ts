@@ -12,7 +12,7 @@ describe('redactArgs', () => {
   });
 
   it('redacts email-looking values', () => {
-    const out = redactArgs({ to: 'driver@acme.com', subject: 'hi' }) as any;
+    const out = redactArgs({ to: 'user@acme.com', subject: 'hi' }) as any;
     expect(out.to).toBe('[redacted-email]');
     expect(out.subject).toBe('hi');
   });
@@ -29,10 +29,10 @@ describe('redactArgs', () => {
 
   it('recurses into nested objects and arrays', () => {
     const out = redactArgs({
-      driver: { email: 'a@b.com', phones: ['555-1234567'] },
+      contact: { email: 'a@b.com', phones: ['555-1234567'] },
     }) as any;
-    expect(out.driver.email).toBe('[redacted-email]');
-    expect(out.driver.phones[0]).toBe('[redacted-phone]');
+    expect(out.contact.email).toBe('[redacted-email]');
+    expect(out.contact.phones[0]).toBe('[redacted-phone]');
   });
 });
 

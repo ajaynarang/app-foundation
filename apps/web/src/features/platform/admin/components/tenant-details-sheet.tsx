@@ -356,18 +356,6 @@ export function TenantDetailsSheet({
                     <p className="text-xs text-muted-foreground">Users</p>
                     <p className="text-lg font-semibold">{data.metrics.totalUsers}</p>
                   </div>
-                  <div className="rounded-md border border-border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Drivers</p>
-                    <p className="text-lg font-semibold">{data.metrics.totalDrivers}</p>
-                  </div>
-                  <div className="rounded-md border border-border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Vehicles</p>
-                    <p className="text-lg font-semibold">{data.metrics.totalVehicles}</p>
-                  </div>
-                  <div className="rounded-md border border-border px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Routes</p>
-                    <p className="text-lg font-semibold">{data.metrics.totalRoutePlans}</p>
-                  </div>
                 </div>
 
                 {/* Company Information */}

@@ -10,7 +10,7 @@ describe('SupportController', () => {
     tenantDbId: 1,
     dbId: 42,
     userId: 'u-1',
-    role: 'DISPATCHER',
+    role: 'MEMBER',
   };
 
   beforeEach(async () => {

@@ -36,7 +36,7 @@ export class NotificationDispatcherService {
   /**
    * The tenant's public string id (push payload) and its name (every WhatsApp
    * template closes with it). Never throws: a failed lookup ships the push
-   * without the club tag and the template with a neutral club name.
+   * without the tenant tag and the template with a neutral tenant name.
    */
   private async resolveTenant(tenantDbId: number): Promise<{ slug?: string; name: string }> {
     try {
@@ -44,14 +44,14 @@ export class NotificationDispatcherService {
         where: { id: tenantDbId },
         select: { tenantId: true, companyName: true },
       });
-      return { slug: tenant?.tenantId, name: tenant?.companyName || 'Your club' };
+      return { slug: tenant?.tenantId, name: tenant?.companyName || 'Your workspace' };
     } catch (err: any) {
       this.logger.warn(`Could not resolve tenant for delivery: ${err.message}`);
-      return { name: 'Your club' };
+      return { name: 'Your workspace' };
     }
   }
 
-  /** The club's plan, read once per trigger. No slug or a failed lookup is "no" — never fail open here. */
+  /** The tenant's plan, read once per trigger. No slug or a failed lookup is "no" — never fail open here. */
   private async isWhatsAppEntitled(tenantSlug: string | undefined): Promise<boolean> {
     if (!tenantSlug) return false;
     try {
@@ -79,9 +79,9 @@ export class NotificationDispatcherService {
     try {
       const { recipients } = params;
 
-      // Resolved ONCE per dispatch, not per recipient: a draw published to a
-      // 64-player category must not be a 64-query fan-out for values that cannot
-      // change between iterations. Both fail open — losing the club tag on a push
+      // Resolved ONCE per dispatch, not per recipient: a message to 64
+      // recipients must not be a 64-query fan-out for values that cannot
+      // change between iterations. Both fail open — losing the tenant tag on a push
       // is a far better outcome than losing the notification.
       const [tenant, whatsappEnabled] = await Promise.all([
         this.resolveTenant(params.tenantId),
@@ -94,7 +94,6 @@ export class NotificationDispatcherService {
       // claim-release rather than degrading to "nobody to notify".
       const channelsByUser = await this.channelResolution.resolveForAudience({
         userIds: recipients.map((r) => r.id),
-        tenantId: params.tenantId,
         type: params.type,
       });
       const context: DispatchContext = {
@@ -112,7 +111,7 @@ export class NotificationDispatcherService {
           const channels = channelsByUser.get(recipient.id);
           if (!channels) continue;
 
-          // Nothing to attempt, but the WHY still goes to the ledger: a player who
+          // Nothing to attempt, but the WHY still goes to the ledger: a recipient who
           // opted out of everything shows up in the console as opted out, not as
           // a notification that never existed.
           if (channels.primary.length === 0 && channels.fallback.length === 0) {
@@ -147,7 +146,7 @@ export class NotificationDispatcherService {
     // Reminder sweeps claim a sent-marker, call the dispatcher, and release the
     // claim in catch(). Swallowing a total outage consumes that claim, so the
     // reminder is lost rather than retried. A partial failure must NOT throw:
-    // one dead FCM token cannot fail a 200-player draw.
+    // one dead FCM token cannot fail a 200-recipient dispatch.
     if (attempted > 0 && failed === attempted) {
       throw new Error(`Notification ${params.type} failed for every recipient (${failed})`);
     }
@@ -174,7 +173,7 @@ export class NotificationDispatcherService {
       recipientDbId: recipient.id,
       tenantId: params.tenantId,
       tenantSlug: tenant.slug,
-      clubName: tenant.name,
+      tenantName: tenant.name,
       whatsappEnabled,
       whatsappEntitled,
       type: params.type,

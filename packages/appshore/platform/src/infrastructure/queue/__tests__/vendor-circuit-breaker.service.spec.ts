@@ -31,20 +31,20 @@ describe('VendorCircuitBreakerService', () => {
     it('opens after 5 failures within window', async () => {
       mockRedis.incr.mockResolvedValue(5);
 
-      await service.recordFailure('samsara');
+      await service.recordFailure('acme-vendor');
 
-      expect(mockRedis.set).toHaveBeenCalledWith('circuit:samsara:open', '1', 'EX', 300, 'NX');
+      expect(mockRedis.set).toHaveBeenCalledWith('circuit:acme-vendor:open', '1', 'EX', 300, 'NX');
     });
 
     it('sets expiry only on first failure', async () => {
       mockRedis.incr.mockResolvedValueOnce(1);
-      await service.recordFailure('samsara');
-      expect(mockRedis.expire).toHaveBeenCalledWith('circuit:samsara:failures', 60);
+      await service.recordFailure('acme-vendor');
+      expect(mockRedis.expire).toHaveBeenCalledWith('circuit:acme-vendor:failures', 60);
 
       mockRedis.expire.mockClear();
 
       mockRedis.incr.mockResolvedValueOnce(2);
-      await service.recordFailure('samsara');
+      await service.recordFailure('acme-vendor');
       expect(mockRedis.expire).not.toHaveBeenCalled();
     });
   });
@@ -52,19 +52,19 @@ describe('VendorCircuitBreakerService', () => {
   describe('isOpen', () => {
     it('reports open when circuit is set', async () => {
       mockRedis.get.mockResolvedValue('1');
-      await expect(service.isOpen('samsara')).resolves.toBe(true);
+      await expect(service.isOpen('acme-vendor')).resolves.toBe(true);
     });
 
     it('reports closed when circuit is not set', async () => {
       mockRedis.get.mockResolvedValue(null);
-      await expect(service.isOpen('samsara')).resolves.toBe(false);
+      await expect(service.isOpen('acme-vendor')).resolves.toBe(false);
     });
   });
 
   describe('recordSuccess', () => {
     it('resets failure counter on success', async () => {
-      await service.recordSuccess('samsara');
-      expect(mockRedis.del).toHaveBeenCalledWith('circuit:samsara:failures');
+      await service.recordSuccess('acme-vendor');
+      expect(mockRedis.del).toHaveBeenCalledWith('circuit:acme-vendor:failures');
     });
   });
 });

@@ -12,14 +12,14 @@ import { PipelineError } from '../../../agent-contract/invocation-pipeline.servi
  */
 describe('McpToolService — pipeline routing', () => {
   const healthSymbol = Symbol('HealthTool');
-  const fleetSymbol = Symbol('FleetQueryTool');
+  const recordsSymbol = Symbol('RecordsQueryTool');
   const mockHealthInstance = {
     healthCheck: jest.fn().mockResolvedValue({
       content: [{ type: 'text', text: '{"status":"ok"}' }],
     }),
   };
-  const mockFleetInstance = {
-    queryLoads: jest.fn().mockResolvedValue({
+  const mockRecordsInstance = {
+    queryRecords: jest.fn().mockResolvedValue({
       content: [{ type: 'text', text: '{"count":0}' }],
     }),
   };
@@ -41,12 +41,12 @@ describe('McpToolService — pipeline routing', () => {
         {
           type: 'tool',
           metadata: {
-            name: 'query-loads',
+            name: 'query-records',
             description: 'Query loads',
             parameters: z.object({}),
           },
-          providerClass: fleetSymbol,
-          methodName: 'queryLoads',
+          providerClass: recordsSymbol,
+          methodName: 'queryRecords',
         },
       ]),
     };
@@ -55,7 +55,7 @@ describe('McpToolService — pipeline routing', () => {
   const mockModuleRef = {
     get: jest.fn().mockImplementation((token: any) => {
       if (token === healthSymbol) return mockHealthInstance;
-      if (token === fleetSymbol) return mockFleetInstance;
+      if (token === recordsSymbol) return mockRecordsInstance;
       return null;
     }),
   };
@@ -78,21 +78,21 @@ describe('McpToolService — pipeline routing', () => {
     const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('dispatcher', {
+    const tools = await svc.getToolsForPersona('member', {
       tenantId: 7,
       userId: '42',
       userDbId: 42,
     });
-    const result = await (tools['query-loads'] as any).execute({
+    const result = await (tools['query-records'] as any).execute({
       status: 'active',
     });
 
     expect(pipeline.run).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'user', userId: 42, tenantId: 7 }),
-      'query-loads',
+      'query-records',
       { status: 'active' },
     );
-    expect(mockFleetInstance.queryLoads).not.toHaveBeenCalled();
+    expect(mockRecordsInstance.queryRecords).not.toHaveBeenCalled();
     expect(mockAiPrisma.executeWithRlsContext).not.toHaveBeenCalled();
     expect(result).toEqual({ count: 5 });
   });
@@ -105,15 +105,15 @@ describe('McpToolService — pipeline routing', () => {
     const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('dispatcher', {
+    const tools = await svc.getToolsForPersona('member', {
       tenantId: 7,
       userId: '42',
       userDbId: 42,
     });
-    await (tools['query-loads'] as any).execute({});
+    await (tools['query-records'] as any).execute({});
 
     expect(pipeline.run).toHaveBeenCalled();
-    expect(mockFleetInstance.queryLoads).toHaveBeenCalled();
+    expect(mockRecordsInstance.queryRecords).toHaveBeenCalled();
   });
 
   it('skips pipeline branch when no execution context is provided', async () => {
