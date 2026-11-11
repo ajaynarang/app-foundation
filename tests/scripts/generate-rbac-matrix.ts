@@ -82,9 +82,32 @@ function inferDomain(filePath: string): string {
 const HTTP_METHODS = ['Get', 'Post', 'Put', 'Patch', 'Delete'];
 const ROLE_REGEX = /UserRole\.(\w+)/g;
 
+/**
+ * Blank out comment lines so a decorator inside a JSDoc usage example (or a
+ * commented-out route) is not read as a real endpoint. Line-based on purpose:
+ * only a line that starts with a comment opens one, so a route string such as
+ * 'files/*' is left alone. Line numbers are preserved.
+ */
+function blankCommentLines(lines: string[]): string[] {
+  let inBlock = false;
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (inBlock) {
+      if (trimmed.includes('*/')) inBlock = false;
+      return '';
+    }
+    if (trimmed.startsWith('//')) return '';
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) inBlock = true;
+      return '';
+    }
+    return line;
+  });
+}
+
 function parseController(filePath: string): EndpointInfo[] {
   const content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.split('\n');
+  const lines = blankCommentLines(content.split('\n'));
   const endpoints: EndpointInfo[] = [];
   const domain = inferDomain(filePath);
   const relPath = path.relative(BACKEND_SRC, filePath);
@@ -287,6 +310,9 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
     if (ep.domain === 'dev') return false;
     // Skip SSE, webhook receivers, MCP, voice
     if (ep.path.includes('/sse') || ep.path.includes('/mcp') || ep.path.includes('/voice')) return false;
+    // Skip public vendor webhook receivers: they answer to a verify token or a
+    // signature, not a role, and refuse (403/401) a bare request by design.
+    if (ep.isPublic && ep.path.startsWith('/webhooks/')) return false;
     // Skip root path (MCP root controller, excluded from global prefix)
     if (ep.path === '/') return false;
     // Skip OAuth authorize/callback (needs query params: client_id, redirect_uri)
@@ -348,7 +374,7 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
  * Generated: ${new Date().toISOString()}
- * Source: ${Object.keys(byDomain).length} domains, ${testable.length} endpoints
+ * Source: ${byDomain.size} domains, ${uniqueTestable.length} endpoints
  * Controllers scanned: ${endpoints.length} total endpoints across all controllers
  *
  * Status codes:
