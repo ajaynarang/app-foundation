@@ -620,6 +620,7 @@ export const UserInvitationLinkSchema = z
 
 const ApiKeyBaseSchema = z.object({
   id: z.string().uuid(),
+  keyMasked: z.string().regex(/^sk_live_…[A-Za-z0-9_-]{4}$/),
   name: z.string(),
   scopes: z.array(AgentScopeSchema),
   ipAllowlist: z.array(z.string()),
