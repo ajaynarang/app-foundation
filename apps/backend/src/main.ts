@@ -13,6 +13,7 @@ import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
 import { OAUTH_SCOPES } from '@app/shared-types';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
+import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
 
 async function bootstrap() {
   // Initialize Firebase Admin SDK
@@ -192,7 +193,8 @@ async function bootstrap() {
     res.json(document);
   });
 
-  SwaggerModule.setup('api', app, document);
+  // Interactive Swagger UI: off in production unless SWAGGER_UI_ENABLED=true.
+  const swaggerUiMounted = mountSwaggerUi(app, document);
 
   const port = parseInt(process.env.PORT || '8000', 10);
 
@@ -217,7 +219,7 @@ async function bootstrap() {
   console.log('');
   console.log(`  ✅ App Backend ready on http://localhost:${port}`);
   console.log(`     API:     http://localhost:${port}/api/v1/`);
-  console.log(`     Swagger: http://localhost:${port}/api`);
+  if (swaggerUiMounted) console.log(`     Swagger: http://localhost:${port}/${SWAGGER_UI_PATH}`);
   console.log('');
 
   // Coordinate graceful shutdown: NestJS drains requests first, then we flush OTel spans.
