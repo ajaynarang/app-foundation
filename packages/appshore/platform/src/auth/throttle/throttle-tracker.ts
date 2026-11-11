@@ -20,6 +20,10 @@ interface TrackedRequest {
  *    that user
  * 3. anything else → `ip:<client ip>` (the real client, via `trust proxy`)
  *
+ * A route that is public by design (`@Public()`: login, OTP, password reset, token endpoints) is always counted by
+ * client IP, bearer or not. Those are the guessing targets, and a caller's own valid session must not buy a
+ * separate allowance there: with N accounts one machine would get N times the login budget.
+ *
  * Only cryptographic checks run here, no database. A forged, expired or random bearer never earns its own bucket;
  * it is counted against its IP. Otherwise anyone could pick a fresh bucket per request by changing the header, and
  * the limits on login and token endpoints would stop nothing. API keys need a database lookup to verify, so at the
@@ -37,8 +41,8 @@ export class ThrottleTracker {
     this.oauthIssuer = resolveOAuthIssuer(read);
   }
 
-  resolve(req: TrackedRequest): string {
-    const token = bearerOf(req.headers.authorization);
+  resolve(req: TrackedRequest, route: { isPublic?: boolean } = {}): string {
+    const token = route.isPublic ? null : bearerOf(req.headers.authorization);
     if (token) {
       const session = this.verify(token, { secret: this.sessionSecret });
       if (session?.sub !== undefined && session.clientId === undefined) return `user:${String(session.sub)}`;

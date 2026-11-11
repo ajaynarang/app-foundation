@@ -38,6 +38,14 @@ describe('ThrottleTracker', () => {
     expect(tracker.resolve(req(`Bearer ${token}`))).toBe('ip:203.0.113.7');
   });
 
+  it('counts a public route by IP even with a verified session or OAuth token attached', () => {
+    const session = jwt.sign({ sub: 'u_42' }, { secret: 'session-secret' });
+    const oauth = jwt.sign({ sub: '42', clientId: 'app_x' }, { secret: 'base-oauth', issuer: 'https://api.acme.io' });
+    expect(tracker.resolve(req(`Bearer ${session}`), { isPublic: true })).toBe('ip:203.0.113.7');
+    expect(tracker.resolve(req(`Bearer ${oauth}`), { isPublic: true })).toBe('ip:203.0.113.7');
+    expect(tracker.resolve(req(`Bearer ${session}`), { isPublic: false })).toBe('user:u_42');
+  });
+
   it('falls back to the IP for a forged token (a fresh bucket per forgery would bypass the limit)', () => {
     const forged = jwt.sign({ sub: 'u_1' }, { secret: 'attacker' });
     expect(tracker.resolve(req(`Bearer ${forged}`))).toBe('ip:203.0.113.7');

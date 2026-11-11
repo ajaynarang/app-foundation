@@ -4,7 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { Throttle, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import request from 'supertest';
+import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { edgeThrottlerOptions } from '../edge-throttle';
 import { applyTrustProxy } from '../trust-proxy';
@@ -21,6 +24,13 @@ class ProbeController {
   @Post('login')
   @Throttle({ default: { limit: 1, ttl: 60_000 } })
   login() {
+    return { ok: true };
+  }
+
+  @Public()
+  @Post('public-login')
+  @Throttle({ default: { limit: 1, ttl: 60_000 } })
+  publicLogin() {
     return { ok: true };
   }
 }
@@ -157,6 +167,17 @@ describe('edge throttle (real ThrottlerGuard over HTTP)', () => {
     expect((await post()).status).toBe(429);
   });
 
+  it('a @Public route is counted by IP whatever session is attached: more accounts do not buy more guesses', async () => {
+    const post = (headers: Record<string, string>) =>
+      request(app.getHttpServer())
+        .post('/public-login')
+        .set({ 'X-Forwarded-For': '203.0.113.7', ...headers });
+
+    expect((await post({ Authorization: sessionFor('user-alice') })).status).toBe(201);
+    expect((await post({ Authorization: sessionFor('user-bob') })).status).toBe(429);
+    expect((await post({})).status).toBe(429);
+  });
+
   it('when Redis is down the limit still holds on this instance and no request errors', async () => {
     cache.down = true;
     const from = { 'X-Forwarded-For': '203.0.113.7' };
@@ -166,5 +187,20 @@ describe('edge throttle (real ThrottlerGuard over HTTP)', () => {
 
     expect(statuses).toEqual([200, 200, 429, 429]);
     expect((await get({ 'X-Forwarded-For': '198.51.100.20' })).status).toBe(200);
+  });
+});
+
+describe('app.module.ts wiring', () => {
+  const appModule = readFileSync(join(__dirname, '..', '..', 'app.module.ts'), 'utf8');
+
+  it('registers the throttler through edgeThrottlerOptions (Redis count, per principal), not the in-memory default', () => {
+    expect(appModule).toMatch(
+      /ThrottlerModule\.forRootAsync\(\{\s*inject: \[ConfigService, AppCacheService\],\s*useFactory: edgeThrottlerOptions,\s*\}\)/,
+    );
+    expect(appModule).not.toMatch(/ThrottlerModule\.forRoot\(/);
+  });
+
+  it('keeps the ThrottlerGuard global', () => {
+    expect(appModule).toMatch(/provide: APP_GUARD,\s*useClass: ThrottlerGuard/);
   });
 });
