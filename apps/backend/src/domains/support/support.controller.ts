@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -19,6 +19,7 @@ import { SupportService } from './support.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { AdminTicketListQueryDto, TicketListQueryDto } from './dto/ticket-list-query.dto';
 
 @ApiTags('Support')
 @Controller('support')
@@ -39,19 +40,11 @@ export class SupportController {
 
   @Get('tickets')
   @ApiOperation({ summary: 'List my support tickets' })
-  @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'offset', required: false })
-  async listMyTickets(
-    @CurrentUser() user: any,
-    @Query('status') status?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
+  async listMyTickets(@CurrentUser() user: any, @Query() query: TicketListQueryDto) {
     return this.supportService.listTicketsForTenant(user.tenantDbId, {
-      status,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
+      status: query.status,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 
@@ -73,30 +66,15 @@ export class SupportController {
   @Get('admin/tickets')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all tickets across tenants (super admin)' })
-  @ApiQuery({ name: 'tenantId', required: false })
-  @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'priority', required: false })
-  @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'search', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'offset', required: false })
-  async listAllTickets(
-    @Query('tenantId') tenantId?: string,
-    @Query('status') status?: string,
-    @Query('priority') priority?: string,
-    @Query('category') category?: string,
-    @Query('search') search?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
+  async listAllTickets(@Query() query: AdminTicketListQueryDto) {
     return this.supportService.listAllTickets({
-      tenantId: tenantId ? parseInt(tenantId, 10) : undefined,
-      status,
-      priority,
-      category,
-      search,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
+      tenantId: query.tenantId,
+      status: query.status,
+      priority: query.priority,
+      category: query.category,
+      search: query.q,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 

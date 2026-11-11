@@ -9,7 +9,6 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -21,6 +20,8 @@ import { WebhookDispatcher } from './dispatcher.service';
 import { DOMAIN_EVENTS } from '../events/domain-events.constants';
 import { CreateWebhookSubscriptionDto, RotateWebhookSecretDto, UpdateWebhookSubscriptionDto } from './dto';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
+import { WebhookListQueryDto, WebhookLogListQueryDto } from './dto/webhook-list-query.dto';
+import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 
 @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
 @ApiTags('Webhooks')
@@ -50,11 +51,8 @@ export class SubscriptionController {
 
   @Get()
   @ApiOperation({ summary: 'List webhook subscriptions' })
-  async findAll(@CurrentUser() user: any, @Query('limit') limit = '20', @Query('offset') offset = '0') {
-    return this.subscriptionService.findAll(user.tenantDbId, {
-      limit: Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100),
-      offset: Math.max(parseInt(offset, 10) || 0, 0),
-    });
+  async findAll(@CurrentUser() user: any, @Query() query: WebhookListQueryDto) {
+    return this.subscriptionService.findAll(user.tenantDbId, { limit: query.limit, offset: query.offset });
   }
 
   @Get(':id')
@@ -90,26 +88,12 @@ export class SubscriptionController {
 
   @Get(':id/logs')
   @ApiOperation({ summary: 'Get delivery logs for a subscription' })
-  async getLogs(
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-    @Query('limit') limit = '20',
-    @Query('offset') offset = '0',
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-  ) {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (dateFrom && !dateRegex.test(dateFrom)) {
-      throw new BadRequestException('dateFrom must be in YYYY-MM-DD format');
-    }
-    if (dateTo && !dateRegex.test(dateTo)) {
-      throw new BadRequestException('dateTo must be in YYYY-MM-DD format');
-    }
+  async getLogs(@CurrentUser() user: any, @Param('id') id: string, @Query() query: WebhookLogListQueryDto) {
     return this.subscriptionService.findLogs(user.tenantDbId, id, {
-      limit: Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100),
-      offset: Math.max(parseInt(offset, 10) || 0, 0),
-      dateFrom: dateFrom ?? null,
-      dateTo: dateTo ?? null,
+      limit: query.limit,
+      offset: query.offset,
+      dateFrom: query.dateFrom ?? null,
+      dateTo: query.dateTo ?? null,
     });
   }
 
@@ -129,7 +113,7 @@ export class SubscriptionController {
     const since = new Date(dto.since);
     const maxRange = 7 * 24 * 60 * 60 * 1000; // 7 days
     if (Date.now() - since.getTime() > maxRange) {
-      throw new BadRequestException('Replay window cannot exceed 7 days');
+      throw fieldError('since', 'Pick a time within the last 7 days');
     }
     return this.subscriptionService.replayEvents(user.tenantDbId, id, dto);
   }

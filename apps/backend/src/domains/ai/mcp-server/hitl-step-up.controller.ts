@@ -1,15 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  BadRequestException,
-  NotFoundException,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, NotFoundException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
@@ -21,7 +10,7 @@ import { HitlChallengeService, parseHitlTokenOrNull } from '../agent-contract/hi
 import { PinService } from '@appshore/platform/auth/pin.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
-import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 @ApiTags('MCP HITL')
 @ApiBearerAuth()
@@ -63,24 +52,7 @@ export class HitlStepUpController {
     });
     const hasPinSet = !!record?.pinHash;
 
-    let callerLabel = challenge.principalId;
-    if (challenge.principalKind === 'api_key') {
-      const apiKeyIdStr = challenge.principalId.replace(/^apikey:/, '');
-      const apiKeyIdNum = parseInt(apiKeyIdStr, 10);
-      if (Number.isFinite(apiKeyIdNum) && apiKeyIdNum > 0) {
-        const apiKey = await this.prisma.apiKey.findUnique({
-          where: { id: apiKeyIdNum },
-          select: { name: true },
-        });
-        if (apiKey) callerLabel = apiKey.name;
-      }
-    } else if (challenge.principalKind === 'oauth_client') {
-      const client = await this.prisma.oAuthClient.findUnique({
-        where: { clientId: challenge.principalId.replace(/^oauth:/, '') },
-        select: { name: true },
-      });
-      if (client) callerLabel = client.name;
-    }
+    const callerLabel = await this.challenges.callerLabelOf(challenge);
 
     const now = Date.now();
     const expired = challenge.expiresAt.getTime() < now;
@@ -125,7 +97,7 @@ export class HitlStepUpController {
     }
 
     const ok = await this.pinService.verifyPin(dto.pin, record.pinHash);
-    if (!ok) throw new BadRequestException('Invalid PIN');
+    if (!ok) throw fieldError('pin', 'That PIN is not right');
 
     await this.challenges.markStepUpCompleted(token, user.dbId);
     return { status: 'step_up_verified' };

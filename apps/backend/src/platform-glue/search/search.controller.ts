@@ -1,12 +1,10 @@
 import { Controller, Get, Inject, Logger, Optional, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
+import { SearchQueryDto } from './dto/search-query.dto';
 import { SEARCH_PROVIDERS, SearchProvider, SearchResult } from './search.provider';
-
-const DEFAULT_LIMIT = 8;
-const MAX_LIMIT = 25;
 
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
 @ApiTags('Search')
@@ -23,14 +21,8 @@ export class SearchController {
 
   @Get()
   @ApiOperation({ summary: 'Tenant-scoped entity search (command palette / @-mentions)' })
-  @ApiQuery({ name: 'q', required: true, description: 'Search query (min 2 characters)' })
-  @ApiQuery({ name: 'limit', required: false, description: `Max results (default ${DEFAULT_LIMIT})` })
-  async search(
-    @CurrentUser() user: any,
-    @Query('q') q?: string,
-    @Query('limit') limit?: string,
-  ): Promise<{ results: SearchResult[] }> {
-    const query = q?.trim() ?? '';
+  async search(@CurrentUser() user: any, @Query() params: SearchQueryDto): Promise<{ results: SearchResult[] }> {
+    const query = params.q ?? '';
     if (query.length < 2) {
       return { results: [] };
     }
@@ -39,8 +31,6 @@ export class SearchController {
     if (providers.length === 0) {
       return { results: [] };
     }
-
-    const max = Math.min(Math.max(parseInt(limit ?? '', 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);
 
     const settled = await Promise.allSettled(providers.map((p) => p.search(user.tenantDbId, query)));
 
@@ -53,6 +43,6 @@ export class SearchController {
       }
     }
 
-    return { results: results.slice(0, max) };
+    return { results: results.slice(0, params.limit) };
   }
 }

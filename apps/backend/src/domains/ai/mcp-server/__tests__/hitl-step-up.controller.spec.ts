@@ -1,11 +1,12 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HitlStepUpController } from '../hitl-step-up.controller';
 import { HitlChallengeService } from '../../agent-contract/hitl-challenge.service';
 import { PinService } from '@appshore/platform/auth/pin.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
 
 describe('HitlStepUpController', () => {
   const prisma = createMockPrisma();
@@ -44,12 +45,10 @@ describe('HitlStepUpController', () => {
     expect(res).toEqual({ status: 'step_up_verified' });
   });
 
-  it('throws 400 when PIN is invalid', async () => {
+  it('answers 400 naming pin when the PIN is wrong', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 42, pinHash: '$2b$10$x' });
     pinService.verifyPin.mockResolvedValue(false);
-    await expect(ctrl.complete('tok-1', { pin: '9999' }, { dbId: 42 } as any)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    expect(await fieldErrorsOf(ctrl.complete('tok-1', { pin: '9999' }, { dbId: 42 } as any))).toHaveProperty('pin');
     expect(challenges.markStepUpCompleted).not.toHaveBeenCalled();
   });
 

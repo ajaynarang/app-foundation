@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { AdminTicketListQueryDto, TicketListQueryDto } from '../dto/ticket-list-query.dto';
 import { Test } from '@nestjs/testing';
 import { SupportController } from '../support.controller';
 import { SupportService } from '../support.service';
@@ -40,16 +43,19 @@ describe('SupportController', () => {
   });
 
   it('should list my tickets', async () => {
-    await controller.listMyTickets(mockUser, 'open', '10', '0');
+    await controller.listMyTickets(
+      mockUser,
+      await readQueryDto(TicketListQueryDto, { status: 'OPEN', limit: '10', offset: '0' }),
+    );
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
-      status: 'open',
+      status: 'OPEN',
       limit: 10,
       offset: 0,
     });
   });
 
   it('should list tickets with no params', async () => {
-    await controller.listMyTickets(mockUser);
+    await controller.listMyTickets(mockUser, await readQueryDto(TicketListQueryDto, {}));
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
       status: undefined,
       limit: undefined,
@@ -69,16 +75,36 @@ describe('SupportController', () => {
   });
 
   it('should list all tickets (super admin)', async () => {
-    await controller.listAllTickets('1', 'open', 'high', 'billing', 'test', '20', '0');
+    await controller.listAllTickets(
+      await readQueryDto(AdminTicketListQueryDto, {
+        tenant_id: '1',
+        status: 'OPEN',
+        priority: 'HIGH',
+        category: 'BILLING',
+        q: 'test',
+        limit: '20',
+        offset: '0',
+      }),
+    );
     expect(service.listAllTickets).toHaveBeenCalledWith({
       tenantId: 1,
-      status: 'open',
-      priority: 'high',
-      category: 'billing',
+      status: 'OPEN',
+      priority: 'HIGH',
+      category: 'BILLING',
       search: 'test',
       limit: 20,
       offset: 0,
     });
+  });
+
+  it('answers 400 naming the bad param, and refuses the old tenantId and search keys', async () => {
+    const read = (raw: Record<string, unknown>) => readQueryDto(AdminTicketListQueryDto, raw);
+    expect(await fieldErrorsOf(read({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
+    expect(await fieldErrorsOf(read({ status: 'open' }))).toHaveProperty('status');
+    expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
+    expect(await fieldErrorsOf(read({ offset: '-1' }))).toHaveProperty('offset');
+    expect(await fieldErrorsOf(read({ tenantId: '1' }))).toHaveProperty('tenantId');
+    expect(await fieldErrorsOf(read({ search: 'x' }))).toHaveProperty('search');
   });
 
   it('should get admin ticket', async () => {

@@ -134,6 +134,26 @@ export class HitlChallengeService {
     });
   }
 
+  /**
+   * The name to show for whoever asked: the API key's or OAuth client's name, else the principal id as stored.
+   */
+  async callerLabelOf(challenge: { principalKind: string; principalId: string }): Promise<string> {
+    if (challenge.principalKind === 'api_key') {
+      const apiKeyId = parseInt(challenge.principalId.replace(/^apikey:/, ''), 10);
+      if (Number.isFinite(apiKeyId) && apiKeyId > 0) {
+        const apiKey = await this.prisma.apiKey.findUnique({ where: { id: apiKeyId }, select: { name: true } });
+        if (apiKey) return apiKey.name;
+      }
+    } else if (challenge.principalKind === 'oauth_client') {
+      const client = await this.prisma.oAuthClient.findUnique({
+        where: { clientId: challenge.principalId.replace(/^oauth:/, '') },
+        select: { name: true },
+      });
+      if (client) return client.name;
+    }
+    return challenge.principalId;
+  }
+
   private resolveStepUpUserId(p: AgentPrincipal): number | null {
     switch (p.kind) {
       case 'oauth_client':

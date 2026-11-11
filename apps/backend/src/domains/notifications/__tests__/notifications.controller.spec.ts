@@ -1,3 +1,7 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf, readBodyDto } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { MarkAllReadDto } from '../dto/mark-all-read.dto';
+import { NotificationListQueryDto } from '../dto/notification-list-query.dto';
 import { Test } from '@nestjs/testing';
 import { NotificationsController } from '../notifications.controller';
 import { InAppNotificationService } from '../notifications.service';
@@ -28,23 +32,35 @@ describe('NotificationsController', () => {
   });
 
   it('should list notifications with filters', async () => {
-    await controller.list(mockUser, 'unread', 'alert', '1', '20');
+    await controller.list(
+      mockUser,
+      await readQueryDto(NotificationListQueryDto, { status: 'unread', category: 'BILLING', page: '1', limit: '20' }),
+    );
     expect(service.listForUser).toHaveBeenCalledWith(42, {
       status: 'unread',
-      category: 'alert',
+      category: 'BILLING',
       page: 1,
       limit: 20,
     });
   });
 
   it('should list notifications with defaults', async () => {
-    await controller.list(mockUser);
+    await controller.list(mockUser, await readQueryDto(NotificationListQueryDto, {}));
     expect(service.listForUser).toHaveBeenCalledWith(42, {
       status: undefined,
       category: undefined,
       page: undefined,
       limit: undefined,
     });
+  });
+
+  it('answers 400 naming an unknown status or category, or a page or limit that is not a number', async () => {
+    const read = (raw: Record<string, unknown>) => readQueryDto(NotificationListQueryDto, raw);
+    expect(await fieldErrorsOf(read({ status: 'seen' }))).toHaveProperty('status');
+    expect(await fieldErrorsOf(read({ category: 'alert' }))).toHaveProperty('category');
+    expect(await fieldErrorsOf(read({ page: 'abc' }))).toHaveProperty('page');
+    expect(await fieldErrorsOf(read({ page: '0' }))).toHaveProperty('page');
+    expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
   });
 
   it('should get unread count', async () => {
@@ -68,11 +84,14 @@ describe('NotificationsController', () => {
   });
 
   it('should mark all read', async () => {
-    const result = await controller.markAllRead(mockUser, {
-      category: 'alert',
-    });
+    const result = await controller.markAllRead(mockUser, await readBodyDto(MarkAllReadDto, { category: 'TEAM' }));
     expect(result).toEqual({ updated: 10 });
-    expect(service.markAllRead).toHaveBeenCalledWith(42, 'alert');
+    expect(service.markAllRead).toHaveBeenCalledWith(42, 'TEAM');
+  });
+
+  it('answers 400 naming category for an unknown one, and refuses an undeclared field', async () => {
+    expect(await fieldErrorsOf(readBodyDto(MarkAllReadDto, { category: 'alert' }))).toHaveProperty('category');
+    expect(await fieldErrorsOf(readBodyDto(MarkAllReadDto, { everything: true }))).toHaveProperty('everything');
   });
 
   it('should dismiss all read', async () => {

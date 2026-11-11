@@ -6,6 +6,7 @@ import { Throttle } from '@nestjs/throttler';
 import { GENEROUS_THROTTLE } from '@appshore/platform/shared/http/edge-throttle';
 import { DevService } from './dev.service';
 import { SwitchUserDto } from './dto/switch-user.dto';
+import { DevUsersQueryDto } from './dto/dev-users-query.dto';
 import { DevAuthGuard } from './guards/dev-auth.guard';
 
 // DevAuthGuard enforces DEV_AUTH_SECRET header presence and exactness with
@@ -25,8 +26,8 @@ export class DevController {
   @ApiOperation({
     summary: '[DEV ONLY] List all users grouped by tenant and role',
   })
-  async getUsers(@Query('tenantId') tenantId?: string) {
-    return this.devService.getUsers(tenantId);
+  async getUsers(@Query() query: DevUsersQueryDto) {
+    return this.devService.getUsers(query.tenantId);
   }
 
   @Public()

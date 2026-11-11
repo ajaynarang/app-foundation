@@ -28,7 +28,7 @@ describe('FeedbackAdminController', () => {
   });
 
   it('listAll delegates to service', async () => {
-    const query = { status: 'open', page: 1 };
+    const query = { status: 'NEW', page: 1 };
     await controller.listAll(query as any);
     expect(service.listAll).toHaveBeenCalledWith(query);
   });

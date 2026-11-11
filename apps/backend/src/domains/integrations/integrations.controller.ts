@@ -23,6 +23,7 @@ import { IntegrationsService } from './integrations.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
+import { IntegrationSyncHistoryQueryDto, SyncHistoryQueryDto } from './dto/sync-history-query.dto';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
@@ -67,20 +68,14 @@ export class IntegrationsController {
   }
 
   @Get('sync-history')
-  async getUnifiedSyncHistory(
-    @Request() req,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Query('syncType') syncType?: string,
-    @Query('status') status?: string,
-  ) {
+  async getUnifiedSyncHistory(@Request() req, @Query() query: SyncHistoryQueryDto) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getUnifiedSyncHistory(
       tenant.id,
-      parseInt(limit || '20'),
-      parseInt(offset || '0'),
-      syncType || undefined,
-      status || undefined,
+      query.limit,
+      query.offset,
+      query.syncType,
+      query.status,
     );
   }
 
@@ -173,16 +168,10 @@ export class IntegrationsController {
   async getSyncHistory(
     @Param('integration_id') integrationId: string,
     @Request() req,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query() query: IntegrationSyncHistoryQueryDto,
   ) {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.getSyncHistory(
-      integrationId,
-      tenant.id,
-      parseInt(limit || '50'),
-      parseInt(offset || '0'),
-    );
+    return this.integrationsService.getSyncHistory(integrationId, tenant.id, query.limit, query.offset);
   }
 
   @Get(':integration_id/sync-history/stats')

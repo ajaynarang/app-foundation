@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Param, Query, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { InAppNotificationService } from './notifications.service';
+import { NotificationListQueryDto } from './dto/notification-list-query.dto';
+import { MarkAllReadDto } from './dto/mark-all-read.dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -15,22 +17,12 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'List notifications for current user' })
-  @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  async list(
-    @CurrentUser() user: any,
-    @Query('status') status?: string,
-    @Query('category') category?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async list(@CurrentUser() user: any, @Query() query: NotificationListQueryDto) {
     return this.service.listForUser(user.dbId, {
-      status,
-      category,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
+      status: query.status,
+      category: query.category,
+      page: query.page,
+      limit: query.limit,
     });
   }
 
@@ -64,7 +56,7 @@ export class NotificationsController {
   @Post('mark-all-read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark all notifications as read' })
-  async markAllRead(@CurrentUser() user: any, @Body() body: { category?: string }) {
+  async markAllRead(@CurrentUser() user: any, @Body() body: MarkAllReadDto) {
     const result = await this.service.markAllRead(user.dbId, body.category);
     return { updated: result.count };
   }

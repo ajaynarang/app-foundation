@@ -1,17 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  Body,
-  Req,
-  Res,
-  ParseIntPipe,
-  DefaultValuePipe,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -21,6 +8,7 @@ import { AgentRegistry } from '../agents/agent.registry';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ResumeAgentDto } from './dto/resume-agent.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import type { Request, Response } from 'express';
 
 @ApiTags('AI Conversations')
@@ -67,11 +55,8 @@ export class AssistantAiController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'List conversations for the current user' })
-  async listConversations(
-    @CurrentUser() user: any,
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-  ) {
-    return this.service.listConversations(user.userId, user.tenantDbId, limit);
+  async listConversations(@CurrentUser() user: any, @Query() query: ListConversationsQueryDto) {
+    return this.service.listConversations(user.userId, user.tenantDbId, query.limit);
   }
 
   @Post(':conversation_id/resume')

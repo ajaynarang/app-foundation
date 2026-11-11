@@ -99,8 +99,8 @@ export async function getWebhookLogs(
   const qs = new URLSearchParams({
     limit: String(opts.limit ?? 20),
     offset: String(opts.offset ?? 0),
-    ...(opts.dateFrom ? { dateFrom: opts.dateFrom } : {}),
-    ...(opts.dateTo ? { dateTo: opts.dateTo } : {}),
+    ...(opts.dateFrom ? { date_from: opts.dateFrom } : {}),
+    ...(opts.dateTo ? { date_to: opts.dateTo } : {}),
   });
   return apiClient<WebhookLogsResponse>(`/webhooks/${id}/logs?${qs.toString()}`);
 }

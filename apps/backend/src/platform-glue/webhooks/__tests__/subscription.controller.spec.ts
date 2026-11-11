@@ -1,4 +1,7 @@
-import { BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { WebhookListQueryDto, WebhookLogListQueryDto } from '../dto/webhook-list-query.dto';
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { SubscriptionController } from '../subscription.controller';
 import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 
@@ -67,7 +70,7 @@ describe('SubscriptionController', () => {
     it('refuses a window longer than 7 days before anything is queued', async () => {
       const since = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
 
-      await expect(controller.replayEvents(user, 'sub-1', { since })).rejects.toThrow(BadRequestException);
+      expect(await fieldErrorsOf(controller.replayEvents(user, 'sub-1', { since }))).toHaveProperty('since');
 
       expect(service.replayEvents).not.toHaveBeenCalled();
     });
@@ -79,5 +82,31 @@ describe('SubscriptionController', () => {
 
       expect(service.softDelete).toHaveBeenCalledWith(1, 'sub-1');
     });
+  });
+});
+
+describe('webhook list query DTOs', () => {
+  it('pages with limit (1…100, default 20) and offset', async () => {
+    expect(await readQueryDto(WebhookListQueryDto, {})).toMatchObject({ limit: 20, offset: 0 });
+    expect(await readQueryDto(WebhookListQueryDto, { limit: '500', offset: '40' })).toMatchObject({
+      limit: 100,
+      offset: 40,
+    });
+  });
+
+  it('answers 400 naming limit or offset when it is not a whole number', async () => {
+    expect(await fieldErrorsOf(readQueryDto(WebhookListQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
+    expect(await fieldErrorsOf(readQueryDto(WebhookListQueryDto, { offset: '-1' }))).toHaveProperty('offset');
+  });
+
+  it('reads date_from and date_to as YYYY-MM-DD and refuses the old dateFrom and dateTo', async () => {
+    const read = (raw: Record<string, unknown>) => readQueryDto(WebhookLogListQueryDto, raw);
+    expect(await read({ date_from: '2026-04-01', date_to: '2026-04-30' })).toMatchObject({
+      dateFrom: '2026-04-01',
+      dateTo: '2026-04-30',
+    });
+    expect(await fieldErrorsOf(read({ date_from: '04/01/2026' }))).toHaveProperty('date_from');
+    expect(await fieldErrorsOf(read({ dateFrom: '2026-04-01' }))).toHaveProperty('dateFrom');
+    expect(await fieldErrorsOf(read({ dateTo: '2026-04-30' }))).toHaveProperty('dateTo');
   });
 });
