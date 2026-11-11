@@ -5,7 +5,7 @@ export interface WhatsAppTemplateContext {
   title: string;
   message: string;
   metadata?: Record<string, any>;
-  clubName: string;
+  tenantName: string;
 }
 
 export type WhatsAppConsentKind = 'utility' | 'marketing';

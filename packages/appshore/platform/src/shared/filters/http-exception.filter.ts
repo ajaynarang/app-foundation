@@ -25,7 +25,7 @@ import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter
  *
  * In controllers, just throw standard NestJS exceptions:
  * ```typescript
- * throw new NotFoundException('Driver not found');
+ * throw new NotFoundException('Project not found');
  * throw new ForbiddenException('Access denied');
  * throw new BadRequestException('Invalid input');
  * ```

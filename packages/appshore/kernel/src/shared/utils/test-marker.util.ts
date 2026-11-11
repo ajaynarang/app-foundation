@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 /**
- * Dev/QA junk that must never reach a demo-facing feed (E57-5). Multiword entries match
+ * Dev/QA junk that must never reach a demo-facing feed. Multiword entries match
  * as substrings anywhere; single words match only when they are the ENTIRE trimmed value,
  * so a real sentence ("COVID test at gate", "Say hello to…") is never a false positive.
  *

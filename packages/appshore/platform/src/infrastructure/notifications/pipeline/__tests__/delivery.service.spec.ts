@@ -24,14 +24,14 @@ const TEMPLATES: WhatsAppTemplateMap = {
     languageCode: 'en',
     category: 'UTILITY',
     body: 'The draw is out: {{1}} — {{2}} via the platform.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
   USER_INVITATION: {
     name: 'tx_match_scheduled_v1',
     languageCode: 'en',
     category: 'UTILITY',
     body: 'Your team: {{1}} — {{2}}.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
 };
 
@@ -77,7 +77,7 @@ describe('NotificationDeliveryService', () => {
   });
 
   describe('deliver', () => {
-    it('drops a test-marker delivery across EVERY channel (E57-5)', async () => {
+    it('drops a test-marker delivery across EVERY channel', async () => {
       const { results } = await service.deliver({
         recipientUserId: 'user-1',
         recipientDbId: 100,
@@ -227,9 +227,9 @@ describe('NotificationDeliveryService', () => {
     });
 
     it('includes the string tenantId in the FCM data payload', async () => {
-      // The app compares a push's club against the session's active workspace,
+      // The app compares a push's tenant against the session's active workspace,
       // and the session identifies its workspace by the STRING tenant id. A
-      // numeric db id would never match, so every push would look cross-club.
+      // numeric db id would never match, so every push would look cross-tenant.
       mockInApp.create.mockResolvedValue({ notificationId: 'ntf-3' });
       mockPush.sendPushToUser.mockResolvedValue(undefined);
       mockFcm.sendToUser.mockResolvedValue(undefined);
@@ -261,7 +261,7 @@ describe('NotificationDeliveryService', () => {
     it('still sends the push when no tenant slug was resolved', async () => {
       // Fail open: a push without a tenant routes exactly as it always did
       // (PushMessage.isForTenant treats an absent tenant as "mine"). Losing the
-      // notification entirely would be far worse than losing the club check.
+      // notification entirely would be far worse than losing the tenant check.
       mockInApp.create.mockResolvedValue({ notificationId: 'ntf-4' });
       mockPush.sendPushToUser.mockResolvedValue(undefined);
       mockFcm.sendToUser.mockResolvedValue(undefined);
@@ -605,7 +605,7 @@ describe('NotificationDeliveryService', () => {
       title: 'The draw is out',
       message: 'Men’s Singles',
       channels: plan(DeliveryChannel.WHATSAPP),
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
       recipientPhone: '+919876543210',
@@ -627,7 +627,7 @@ describe('NotificationDeliveryService', () => {
           send: {
             templateName: 'tx_draw_published_v1',
             languageCode: 'en',
-            bodyValues: ['Men’s Singles', 'Smash Club'],
+            bodyValues: ['Men’s Singles', 'Acme Inc'],
           },
         },
       ]);
@@ -638,7 +638,7 @@ describe('NotificationDeliveryService', () => {
     it.each([
       ['no phone', { recipientPhone: undefined }, 'NO_ADDRESS'],
       ['flag off', { whatsappEnabled: false }, 'FLAG_OFF'],
-      ['club not on Pro', { whatsappEntitled: false }, 'NOT_ENTITLED'],
+      ['tenant not on Pro', { whatsappEntitled: false }, 'NOT_ENTITLED'],
       [
         'flag off AND not on Pro — the flag is the reason',
         { whatsappEnabled: false, whatsappEntitled: false },
@@ -656,11 +656,11 @@ describe('NotificationDeliveryService', () => {
       expect(results.WHATSAPP).toBeUndefined();
     });
 
-    it('a missing club name cannot fill the template — SKIPPED/NO_TEMPLATE, never a half-filled send', async () => {
+    it('a missing tenant name cannot fill the template — SKIPPED/NO_TEMPLATE, never a half-filled send', async () => {
       const { outcomes, pendingSends } = await service.deliver({
         ...base,
         type: 'INTEGRATION_SYNC_COMPLETED',
-        clubName: undefined,
+        tenantName: undefined,
       });
       expect(outcomes[0]).toMatchObject({ status: 'SKIPPED', failureReason: 'NO_TEMPLATE' });
       expect(pendingSends).toEqual([]);
@@ -705,7 +705,7 @@ describe('NotificationDeliveryService', () => {
       title: 'Your match is scheduled',
       message: 'Court 1 at 10:00',
       recipientPhone: '+919876543210',
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
     };

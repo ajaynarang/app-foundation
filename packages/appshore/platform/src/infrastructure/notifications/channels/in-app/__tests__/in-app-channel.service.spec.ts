@@ -40,7 +40,7 @@ describe('InAppChannelService', () => {
   });
 
   describe('create with grouping', () => {
-    it('drops a notification whose title or message is a test marker instead of persisting it (E57-5)', async () => {
+    it('drops a notification whose title or message is a test marker instead of persisting it', async () => {
       const result = await service.create({
         recipientId: 1,
         tenantId: 1,
@@ -170,9 +170,9 @@ describe('InAppChannelService', () => {
    * ignored the groupKey it had just written, so ANY row of the type in the window
    * was a group to join. Two ENTRY_APPROVEDs for two tournaments merged into one row
    * that kept the FIRST tournament's metadata: the second approval was retitled and
-   * misattributed to a tournament the player was not approved into.
+   * misattributed to a tournament the user was not approved into.
    */
-  describe('grouping is scoped by groupScope — the app passes the tournament (E16-S7)', () => {
+  describe('grouping is scoped by groupScope — the app passes the tournament', () => {
     /**
      * A findFirst that behaves like the database: it honours EVERY predicate the
      * service puts in the where clause, whatever shape that predicate takes. A mock
@@ -232,7 +232,7 @@ describe('InAppChannelService', () => {
       await service.create(approval(44, 'Winter Open 2026'));
 
       // Two subjects, two rows. Merging here is the misattribution bug: the second
-      // player-visible approval would have inherited tournament 31's metadata.
+      // user-visible approval would have inherited tournament 31's metadata.
       expect(prisma.notification.create).toHaveBeenCalledTimes(2);
       expect(prisma.notification.update).not.toHaveBeenCalled();
       expect(rows).toHaveLength(2);

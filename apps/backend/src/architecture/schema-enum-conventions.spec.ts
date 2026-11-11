@@ -90,12 +90,9 @@ const ALLOWED_STRING_COLUMNS = new Map<string, string>([
   ],
   [
     'Job.category',
-    'extensible BullMQ job category list (eld | tms | compliance | accounting | documents | …); sibling to JobSchedule.category which is also open-set',
+    'extensible BullMQ job category list (cleanup | billing | documents | …); sibling to JobSchedule.category which is also open-set',
   ],
-  [
-    'Job.type',
-    'open-set BullMQ job type registry (gps | hos | loads | vehicles | drivers | audit | …); 12+ distinct values today, grows with each new background job',
-  ],
+  ['Job.type', 'open-set BullMQ job type registry (one value per background job); grows with each new background job'],
   [
     'PlanEntitlement.type',
     'classification registry (software | service | display | limit | …); tenant-billing owned and evolves with plan model',

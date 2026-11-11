@@ -305,8 +305,8 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
     if (ep.path.includes('/conversations')) return false;
     // Skip command-center briefing (has method-level @Roles override the auto-generator misses)
     if (ep.path.includes('/briefing')) return false;
-    // Skip user preferences driver/general (accessible by all authenticated users, no @Roles)
-    if (ep.path === '/settings/driver' || ep.path === '/settings/general') return false;
+    // Skip general user preferences (accessible by all authenticated users, no @Roles)
+    if (ep.path === '/settings/general') return false;
     // Skip admin tenant add-ons with path params (PATCH needs specific slug)
     if (ep.path.includes('/admin/tenants/:tenantId/add-ons/') && ep.method === 'PATCH') return false;
     // Include GET endpoints without params (list/summary endpoints)

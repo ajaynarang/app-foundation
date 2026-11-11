@@ -13,8 +13,7 @@ interface JobHealth {
 }
 
 /**
- * Background-job health is a super-admin concern. The trucking app had a
- * `system-activity` feature feeding this; the generic starter ships an inert
+ * Background-job health is a super-admin concern. The starter ships an inert
  * indicator (renders nothing) that the platform can wire to its own health
  * source by replacing this hook.
  */

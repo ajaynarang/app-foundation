@@ -16,7 +16,7 @@ import {
 
 /**
  * What rides the queue. No phone: the handler reads it from the DB at send
- * time. The rendered body values do ride along — a batch name, a day, a club —
+ * time. The rendered body values do ride along — a name, a day, a workspace —
  * the same class of text a push payload carries, and unlike a chat message
  * they exist nowhere else to re-derive from.
  */
@@ -55,7 +55,7 @@ export class WhatsAppDispatchService {
     try {
       await this.queue.addBulk(jobs);
     } catch (err: any) {
-      // The rows are already QUEUED in the ledger; a stale-QUEUED sweep (E95-5) picks them up.
+      // The rows are already QUEUED in the ledger; a stale-QUEUED sweep picks them up.
       this.logger.error(`Could not enqueue ${jobs.length} WhatsApp sends for ${meta.type}: ${err.message}`);
     }
   }

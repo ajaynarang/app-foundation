@@ -8,17 +8,17 @@ export const DELIVERY_SKIP_REASONS = {
   NO_ADDRESS: 'NO_ADDRESS',
   NOT_CONFIGURED: 'NOT_CONFIGURED',
   NO_DEVICE: 'NO_DEVICE',
-  /** No WhatsApp template maps this NotificationType (E95-2). */
+  /** No WhatsApp template maps this NotificationType. */
   NO_TEMPLATE: 'NO_TEMPLATE',
-  /** The platform kill switch is off (E95-2). */
+  /** The platform kill switch is off. */
   FLAG_OFF: 'FLAG_OFF',
-  /** The club's plan does not include WhatsApp (E95-3). */
+  /** The tenant's plan does not include WhatsApp. */
   NOT_ENTITLED: 'NOT_ENTITLED',
-  /** The platform's daily send ceiling was reached (E95-3). */
+  /** The platform's daily send ceiling was reached. */
   CEILING: 'CEILING',
-  /** Stranded QUEUED: the job never ran, or the provider never called back (E95-5 sweep). */
+  /** Stranded QUEUED: the job never ran, or the provider never called back (stale sweep). */
   QUEUE_LOST: 'QUEUE_LOST',
-  /** Meta's unpublished per-user marketing cap (error 131049) — never retried (E95-4). */
+  /** Meta's unpublished per-user marketing cap (error 131049) — never retried. */
   MARKETING_CAP: 'MARKETING_CAP',
   PROVIDER_ERROR: 'PROVIDER_ERROR',
   DROPPED_TEST_MARKER: 'DROPPED_TEST_MARKER',

@@ -39,7 +39,7 @@ interface Props {
 
 /**
  * Sticky footer action bar for the External-agent / API-key detail sheet.
- * Matches the Driver/Load detail-sheet pattern: an overflow DropdownMenu of
+ * Follows the detail-sheet pattern: an overflow DropdownMenu of
  * non-destructive ops on the left, a primary destructive action (Revoke) on
  * the right. Renders nothing for already-revoked entities.
  */
