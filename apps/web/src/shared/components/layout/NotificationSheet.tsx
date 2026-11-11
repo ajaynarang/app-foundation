@@ -19,14 +19,12 @@ import {
   type Notification,
 } from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
+import { resolveNotificationLink } from '@/shared/lib/notification-links';
 
 interface NotificationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-/** Prefix of action links written while a separate console app existed; see navigateToAction. */
-const RETIRED_APP_LINK_PREFIX = 'console:';
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
   SYSTEM: Settings,
@@ -73,8 +71,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   const notifications = notifData?.data ?? [];
 
   const navigateToAction = (url: string) => {
-    // Notices stored before the console app was removed carry a `console:` link; Settings is their home now.
-    router.push(url.startsWith(RETIRED_APP_LINK_PREFIX) ? '/settings' : url);
+    router.push(resolveNotificationLink(url));
     onOpenChange(false);
   };
 
