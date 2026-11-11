@@ -25,7 +25,13 @@ const mockTokenRefreshJob = {
 };
 
 const mockConfig = {
-  get: jest.fn().mockReturnValue('http://localhost:3002'),
+  get: jest.fn(
+    (key: string, fallback?: string) =>
+      ({
+        APP_URL: 'https://app.example.com/',
+        CONSOLE_URL: 'https://console.example.com',
+      })[key] ?? fallback,
+  ),
 };
 
 describe('OAuthController', () => {
@@ -89,6 +95,18 @@ describe('OAuthController', () => {
       expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('oauth=connected'));
     });
 
+    it('returns the browser to the web app (APP_URL), never the retired console, even if CONSOLE_URL is still set', async () => {
+      mockPrisma.integrationConfig.findFirst.mockResolvedValue(null);
+      mockAuthTokenService.handleCallback.mockResolvedValue({ vendor: 'QUICKBOOKS', tenantId: 5 });
+
+      const mockRes = { redirect: jest.fn() };
+      await controller.callback('c', 's', { query: { code: 'c', state: 's' } }, mockRes as any);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        'https://app.example.com/settings?oauth=connected&vendor=QUICKBOOKS',
+      );
+    });
+
     it('should register token refresh job after successful callback', async () => {
       mockPrisma.integrationConfig.findFirst.mockResolvedValue({
         integrationId: 'int-1',
@@ -134,6 +152,18 @@ describe('OAuthController', () => {
       await controller.callback('c', state, mockReq, mockRes as any);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('vendor=QUICKBOOKS'));
+    });
+
+    it('URL-encodes the vendor it reads back from an untrusted state on the error return', async () => {
+      mockAuthTokenService.handleCallback.mockRejectedValue(new Error('fail'));
+      const state = Buffer.from(JSON.stringify({ vendor: 'X&next=https://evil.example' })).toString('base64');
+
+      const mockRes = { redirect: jest.fn() };
+      await controller.callback('c', state, { query: { code: 'c', state } }, mockRes as any);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `https://app.example.com/settings?oauth=error&vendor=${encodeURIComponent('X&next=https://evil.example')}`,
+      );
     });
   });
 
