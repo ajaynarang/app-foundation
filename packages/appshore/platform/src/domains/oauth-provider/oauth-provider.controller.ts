@@ -14,8 +14,8 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
-import { SkipThrottle } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '../../shared/http/edge-throttle';
 import { OAuthProviderService } from './oauth-provider.service';
 import { OAuthErrorFilter, oauthError, OAUTH_ERROR } from './oauth-error.filter';
 import { OAuthClientsService } from './oauth-clients.service';
@@ -69,7 +69,7 @@ export class OAuthProviderController {
   @Get('authorize')
   @UseFilters(OAuthErrorFilter)
   @Public()
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @ApiOperation({ summary: 'OAuth 2.1 authorization endpoint' })
   async authorize(
     @Query('response_type') responseType: string,
@@ -114,6 +114,7 @@ export class OAuthProviderController {
    * Requires JWT auth (logged-in user).
    */
   @Post('authorize/consent')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve OAuth consent' })
   async approveConsent(
     @Body('challenge') challenge: string,
@@ -189,13 +190,12 @@ export class OAuthProviderController {
 
   /**
    * POST /oauth/register — Dynamic Client Registration (RFC 7591).
-   * Public endpoint, rate-limited. Allows MCP clients like Claude Desktop
+   * Public endpoint, rate-limited (5 a minute per address). Allows MCP clients like Claude Desktop
    * to self-register without manual setup.
    */
   @Post('register')
   @UseFilters(OAuthErrorFilter)
   @Public()
-  @SkipThrottle()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'OAuth 2.1 Dynamic Client Registration (RFC 7591)' })

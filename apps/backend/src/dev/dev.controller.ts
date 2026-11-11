@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Query, Logger, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Logger, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '@appshore/platform/shared/http/edge-throttle';
 import { DevService } from './dev.service';
 import { SwitchUserDto } from './dto/switch-user.dto';
 import { DevAuthGuard } from './guards/dev-auth.guard';
@@ -20,7 +21,7 @@ export class DevController {
 
   @Public()
   @Get('users')
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @ApiOperation({
     summary: '[DEV ONLY] List all users grouped by tenant and role',
   })
@@ -30,6 +31,7 @@ export class DevController {
 
   @Public()
   @Post('switch')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
     summary: '[DEV ONLY] Switch to any user — issues real JWT tokens',

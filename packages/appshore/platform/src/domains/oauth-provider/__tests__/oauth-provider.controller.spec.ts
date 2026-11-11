@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { OAuthProviderController } from '../oauth-provider.controller';
 import { OAuthErrorFilter } from '../oauth-error.filter';
+import { GENEROUS_THROTTLE } from '../../../shared/http/edge-throttle';
 
 describe('OAuthProviderController', () => {
   let controller: OAuthProviderController;
@@ -323,6 +324,22 @@ describe('OAuthProviderController', () => {
       expect(
         await errorOf(controller.register({ client_name: 'T', redirect_uris: ['http://evil.com/cb'] }, mockReq)),
       ).toMatchObject({ error: 'invalid_redirect_uri' });
+    });
+  });
+
+  describe('edge throttle', () => {
+    const throttle = (handler: (...args: any[]) => unknown) => ({
+      skipped: Reflect.getMetadata('THROTTLER:SKIPdefault', handler) === true,
+      limit: Reflect.getMetadata('THROTTLER:LIMITdefault', handler),
+      ttl: Reflect.getMetadata('THROTTLER:TTLdefault', handler),
+    });
+
+    it('client registration is limited to 5 a minute: a skip beside the limit used to switch it off', () => {
+      expect(throttle(controller.register)).toEqual({ skipped: false, limit: 5, ttl: 60000 });
+    });
+
+    it('the authorization endpoint has a ceiling instead of no throttle at all', () => {
+      expect(throttle(controller.authorize)).toEqual({ skipped: false, ...GENEROUS_THROTTLE.default });
     });
   });
 });
