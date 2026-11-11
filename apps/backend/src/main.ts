@@ -126,10 +126,8 @@ async function bootstrap() {
     credentials: true, // Allow cookies
   });
 
-  // Warn if localhost CORS origins are present in production
-  if (process.env.NODE_ENV === 'production' && corsOrigins.split(',').some((o) => o.trim().includes('localhost'))) {
-    console.warn('[Bootstrap] WARNING: CORS_ORIGINS includes localhost — this should not happen in production!');
-  }
+  // A local origin in production never gets this far: the config schema
+  // refuses to boot (config/configuration.ts).
 
   // Swagger/OpenAPI documentation
   const swaggerConfig = new DocumentBuilder()

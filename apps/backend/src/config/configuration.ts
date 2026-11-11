@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { findLocalCorsOrigins, isInngestDevMode, isPlaceholderSecret } from './production-guard';
 
 // Config ownership rule:
 // - App-owned config lives HERE, in the typed zod schema below — validated at
@@ -13,6 +14,16 @@ import { z } from 'zod';
 const DEV_SECRET_KEY_DEFAULT = 'app-development-secret-key-minimum-32-chars';
 const DEV_JWT_ACCESS_SECRET_DEFAULT = 'app-jwt-access-secret-change-in-production-min-32-chars';
 const DEV_JWT_REFRESH_SECRET_DEFAULT = 'app-jwt-refresh-secret-change-in-production-min-32-chars';
+// 32 bytes as 64 hex characters, the same form a real key takes. These are the
+// bytes earlier versions of the credentials cipher used when the key was
+// unset, so credentials stored by an existing local database stay readable.
+export const DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT = Buffer.from('dev-key-only-do-not-use-in-produ', 'utf8').toString(
+  'hex',
+);
+// Shared with the forked voice agent, which authenticates to a public endpoint with it.
+export const DEV_VOICE_AGENT_SECRET_DEFAULT = 'app-voice-dev-secret-do-not-use-in-production';
+
+const MIN_SECRET_LENGTH = 32;
 
 const configSchema = z.object({
   environment: z.enum(['development', 'production', 'test']).default('development'),
@@ -48,6 +59,31 @@ const configSchema = z.object({
 
   anthropicApiKey: z.string().optional(),
 
+  // Encrypts third-party integration credentials at rest (AES-256).
+  credentialsEncryptionKey: z
+    .string()
+    .trim()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'CREDENTIALS_ENCRYPTION_KEY must be 64 hex characters (32 bytes). Generate one: openssl rand -hex 32',
+    )
+    .default(DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT),
+
+  // Vendor-owned settings that the features read raw at their point of use.
+  // They are mirrored here only so the production guard below can see them.
+  voice: z
+    .object({
+      livekitUrl: z.string().optional(),
+      agentSecret: z.string().optional(),
+    })
+    .default({}),
+  inngest: z
+    .object({
+      dev: z.string().optional(),
+      signingKey: z.string().optional(),
+    })
+    .default({}),
+
   // OAuth Provider
   oauthJwtSecret: z.string().optional(),
   oauthIssuer: z.string().default('http://localhost:8000'),
@@ -59,30 +95,135 @@ const configSchema = z.object({
   }),
 });
 
-// Production fail-fast: refuse to boot with the published development
-// secrets (unset env vars fall back to the zod defaults above, so an
-// equality check catches both "unset" and "set to the template default").
-// Without this, anyone could mint valid access/refresh JWTs for any
-// user/tenant of a production deploy that forgot to set the secrets.
+// Production fail-fast. Every secret the backend signs or encrypts with must
+// be set explicitly: unset env vars fall back to the zod defaults above, which
+// are public (this is a template repo), so anyone could mint valid JWTs or
+// decrypt stored credentials of a production deploy that forgot one. The same
+// goes for values copied from .env.example, and for a CORS origin or a
+// dev-mode switch that only makes sense on a developer machine.
+//
+// "Production" here is `environment === 'production'` (NODE_ENV). Nothing
+// below runs in development or test.
 const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
   if (config.environment !== 'production') return;
 
-  const checks: Array<{ envVar: string; isDefault: boolean }> = [
-    { envVar: 'SECRET_KEY', isDefault: config.secretKey === DEV_SECRET_KEY_DEFAULT },
-    { envVar: 'JWT_ACCESS_SECRET', isDefault: config.jwt.accessSecret === DEV_JWT_ACCESS_SECRET_DEFAULT },
-    { envVar: 'JWT_REFRESH_SECRET', isDefault: config.jwt.refreshSecret === DEV_JWT_REFRESH_SECRET_DEFAULT },
+  const fail = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+
+  const voiceEnabled = !!config.voice.livekitUrl;
+
+  const secrets: Array<{
+    envVar: string;
+    value: string | undefined;
+    devDefault?: string;
+    required: boolean;
+    minLength: number;
+    hint: string;
+  }> = [
+    {
+      envVar: 'SECRET_KEY',
+      value: config.secretKey,
+      devDefault: DEV_SECRET_KEY_DEFAULT,
+      required: true,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32',
+    },
+    {
+      envVar: 'JWT_ACCESS_SECRET',
+      value: config.jwt.accessSecret,
+      devDefault: DEV_JWT_ACCESS_SECRET_DEFAULT,
+      required: true,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32',
+    },
+    {
+      envVar: 'JWT_REFRESH_SECRET',
+      value: config.jwt.refreshSecret,
+      devDefault: DEV_JWT_REFRESH_SECRET_DEFAULT,
+      required: true,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32',
+    },
+    {
+      // Signs OAuth access tokens and consent challenges. Unset, it is derived
+      // from SECRET_KEY, which ties two unrelated secrets together.
+      envVar: 'OAUTH_JWT_SECRET',
+      value: config.oauthJwtSecret,
+      required: true,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32. To keep OAuth tokens issued before this check valid, set it to the value used so far: SECRET_KEY followed by "-oauth".',
+    },
+    {
+      envVar: 'CREDENTIALS_ENCRYPTION_KEY',
+      value: config.credentialsEncryptionKey,
+      devDefault: DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT,
+      required: true,
+      minLength: 64,
+      hint: 'Generate one: openssl rand -hex 32',
+    },
+    {
+      // Authenticates the forked voice agent to a public endpoint. Only needed
+      // when voice is on (LIVEKIT_URL set); unset, that endpoint rejects every call.
+      envVar: 'VOICE_AGENT_SECRET',
+      value: config.voice.agentSecret,
+      devDefault: DEV_VOICE_AGENT_SECRET_DEFAULT,
+      required: voiceEnabled,
+      minLength: MIN_SECRET_LENGTH,
+      hint: 'Generate one: openssl rand -hex 32',
+    },
+    {
+      // Verifies that calls to the public Inngest endpoint come from Inngest.
+      // Optional: without it the endpoint rejects every call (see INNGEST_DEV below).
+      envVar: 'INNGEST_SIGNING_KEY',
+      value: config.inngest.signingKey,
+      required: false,
+      minLength: 8,
+      hint: 'Copy it from the Inngest dashboard.',
+    },
   ];
-  for (const { envVar, isDefault } of checks) {
-    if (isDefault) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `${envVar} must be set explicitly in production — the built-in development default is public in this template. Generate one: openssl rand -hex 32`,
-      });
+
+  for (const { envVar, value, devDefault, required, minLength, hint } of secrets) {
+    if (value === undefined) {
+      if (required) fail(`${envVar} must be set in production. ${hint}`);
+      continue;
     }
+    if (devDefault !== undefined && value === devDefault) {
+      fail(
+        `${envVar} must be set explicitly in production: the built-in development default is public in this template. ${hint}`,
+      );
+    } else if (isPlaceholderSecret(value)) {
+      fail(`${envVar} is still a placeholder value in production. ${hint}`);
+    } else if (value.length < minLength) {
+      fail(`${envVar} must be at least ${minLength} characters in production. ${hint}`);
+    }
+  }
+
+  // The Inngest endpoint is public. In dev mode the SDK skips signature
+  // verification, so anyone could trigger workflow runs.
+  if (isInngestDevMode(config.inngest.dev)) {
+    fail(
+      'INNGEST_DEV must not be set in production: it turns off signature verification on the public Inngest endpoint.',
+    );
+  }
+
+  const localOrigins = findLocalCorsOrigins(config.corsOrigins);
+  if (localOrigins.length > 0) {
+    fail(
+      `CORS_ORIGINS must not include a local origin in production (${localOrigins.join(', ')}): any page served from a developer machine could call this API with a signed-in user's cookies. Unset, CORS_ORIGINS defaults to http://localhost:3000, so set it to the deployed web origin.`,
+    );
   }
 });
 
 export type Configuration = z.infer<typeof configSchema>;
+
+/**
+ * An env var that is unset, empty or only whitespace counts as unset, so the
+ * schema default applies (and production refuses it). A set value is passed
+ * through unchanged.
+ */
+function env(name: string): string | undefined {
+  const value = process.env[name];
+  return value !== undefined && value.trim() !== '' ? value : undefined;
+}
 
 export default (): Configuration => {
   const raw = {
@@ -92,10 +233,10 @@ export default (): Configuration => {
     corsOrigins: process.env.CORS_ORIGINS,
     apiV1Prefix: process.env.API_V1_PREFIX,
     projectName: process.env.PROJECT_NAME,
-    secretKey: process.env.SECRET_KEY,
+    secretKey: env('SECRET_KEY'),
     jwt: {
-      accessSecret: process.env.JWT_ACCESS_SECRET,
-      refreshSecret: process.env.JWT_REFRESH_SECRET,
+      accessSecret: env('JWT_ACCESS_SECRET'),
+      refreshSecret: env('JWT_REFRESH_SECRET'),
       accessExpiry: process.env.JWT_ACCESS_EXPIRY,
       refreshExpiry: process.env.JWT_REFRESH_EXPIRY,
     },
@@ -111,7 +252,16 @@ export default (): Configuration => {
         (process.env.MULTI_TENANT === 'false' ? 'single' : 'multi'),
     },
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-    oauthJwtSecret: process.env.OAUTH_JWT_SECRET,
+    oauthJwtSecret: env('OAUTH_JWT_SECRET'),
+    credentialsEncryptionKey: env('CREDENTIALS_ENCRYPTION_KEY'),
+    voice: {
+      livekitUrl: env('LIVEKIT_URL'),
+      agentSecret: env('VOICE_AGENT_SECRET'),
+    },
+    inngest: {
+      dev: env('INNGEST_DEV'),
+      signingKey: env('INNGEST_SIGNING_KEY'),
+    },
     oauthIssuer: process.env.OAUTH_ISSUER,
     s3: {
       bucket: process.env.S3_BUCKET,

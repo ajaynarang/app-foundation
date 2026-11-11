@@ -1,0 +1,249 @@
+import configuration, {
+  DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT,
+  DEV_VOICE_AGENT_SECRET_DEFAULT,
+} from '../configuration';
+
+/**
+ * The production boot guard: the backend must refuse to start in production
+ * with a missing, default or placeholder signing/encryption secret, with a
+ * local CORS origin, or with Inngest signature verification turned off.
+ * Outside production the development defaults apply and nothing is refused.
+ */
+describe('configuration — production boot guard', () => {
+  const ORIGINAL_ENV = process.env;
+
+  // Generated-looking values; none is a default or a placeholder.
+  const SECRET_A = 'f3a91c0e5b7d48a2c6e0913f5d7b2a4c8e1f60935a7c4b2d9e0f1a3c5b7d9e1f';
+  const SECRET_B = '0b2d4f6a8c1e3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3a5c7e9b1d3f5a7c9e0b2d';
+  const SECRET_C = '9e7c5a3f1d0b8e6c4a2f0d9b7e5c3a1f8d6b4e2c0a9f7d5b3e1c8a6f4d2b0e9c';
+  const SECRET_D = '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b';
+  const CREDENTIALS_KEY = '4c8e1f60935a7c4b2d9e0f1a3c5b7d9e1ff3a91c0e5b7d48a2c6e0913f5d7b2a';
+
+  /** Every variable this guard reads, so the developer's own shell cannot leak into a test. */
+  const GUARDED_VARS = [
+    'NODE_ENV',
+    'CORS_ORIGINS',
+    'SECRET_KEY',
+    'JWT_ACCESS_SECRET',
+    'JWT_REFRESH_SECRET',
+    'OAUTH_JWT_SECRET',
+    'CREDENTIALS_ENCRYPTION_KEY',
+    'VOICE_AGENT_SECRET',
+    'LIVEKIT_URL',
+    'INNGEST_DEV',
+    'INNGEST_SIGNING_KEY',
+  ];
+
+  const validProduction = (): Record<string, string> => ({
+    NODE_ENV: 'production',
+    REDIS_URL: 'redis://cache.internal:6379',
+    CORS_ORIGINS: 'https://app.acme.io',
+    SECRET_KEY: SECRET_A,
+    JWT_ACCESS_SECRET: SECRET_B,
+    JWT_REFRESH_SECRET: SECRET_C,
+    OAUTH_JWT_SECRET: SECRET_D,
+    CREDENTIALS_ENCRYPTION_KEY: CREDENTIALS_KEY,
+  });
+
+  function load(overrides: Record<string, string | undefined>) {
+    const next: NodeJS.ProcessEnv = { ...ORIGINAL_ENV };
+    for (const name of GUARDED_VARS) delete next[name];
+    for (const [name, value] of Object.entries(overrides)) {
+      if (value === undefined) delete next[name];
+      else next[name] = value;
+    }
+    process.env = next;
+    return configuration();
+  }
+
+  beforeEach(() => {
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+    jest.restoreAllMocks();
+  });
+
+  it('boots production when every secret is set and CORS names a deployed origin', () => {
+    const config = load(validProduction());
+    expect(config.environment).toBe('production');
+    expect(config.credentialsEncryptionKey).toBe(CREDENTIALS_KEY);
+  });
+
+  describe.each([
+    ['SECRET_KEY'],
+    ['JWT_ACCESS_SECRET'],
+    ['JWT_REFRESH_SECRET'],
+    ['OAUTH_JWT_SECRET'],
+    ['CREDENTIALS_ENCRYPTION_KEY'],
+  ])('%s', (envVar) => {
+    it('refuses production when unset', () => {
+      expect(() => load({ ...validProduction(), [envVar]: undefined })).toThrow(new RegExp(`${envVar} must be set`));
+    });
+
+    it('refuses production when blank', () => {
+      expect(() => load({ ...validProduction(), [envVar]: '   ' })).toThrow(new RegExp(`${envVar} must be set`));
+    });
+  });
+
+  it.each([
+    ['SECRET_KEY', 'app-development-secret-key-minimum-32-chars'],
+    ['JWT_ACCESS_SECRET', 'app-jwt-access-secret-change-in-production-min-32-chars'],
+    ['JWT_REFRESH_SECRET', 'app-jwt-refresh-secret-change-in-production-min-32-chars'],
+    ['CREDENTIALS_ENCRYPTION_KEY', DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT],
+  ])('refuses production when %s is the built-in development default', (envVar, value) => {
+    expect(() => load({ ...validProduction(), [envVar]: value })).toThrow(
+      new RegExp(`${envVar} must be set explicitly in production`),
+    );
+  });
+
+  it.each([
+    // The values .env.example shows.
+    ['SECRET_KEY', 'local-dev-secret-key-minimum-32-chars-here-change-me'],
+    ['JWT_ACCESS_SECRET', 'local-jwt-access-secret-change-in-dev-min-32-chars'],
+    ['JWT_REFRESH_SECRET', 'local-jwt-refresh-secret-change-in-dev-min-32-chars'],
+    ['OAUTH_JWT_SECRET', 'your-oauth-jwt-secret-of-at-least-32-characters'],
+    ['SECRET_KEY', 'changeme-changeme-changeme-changeme'],
+    ['INNGEST_SIGNING_KEY', 'signkey-prod-...'],
+  ])('refuses production when %s is a placeholder (%s)', (envVar, value) => {
+    expect(() => load({ ...validProduction(), [envVar]: value })).toThrow(
+      new RegExp(`${envVar} is still a placeholder`),
+    );
+  });
+
+  it.each([['SECRET_KEY'], ['JWT_ACCESS_SECRET'], ['JWT_REFRESH_SECRET'], ['OAUTH_JWT_SECRET']])(
+    'refuses production when %s is shorter than 32 characters',
+    (envVar) => {
+      expect(() => load({ ...validProduction(), [envVar]: 'f3a91c0e5b7d48a2' })).toThrow(
+        new RegExp(`${envVar} must be at least 32 characters`),
+      );
+    },
+  );
+
+  it('rejects a CREDENTIALS_ENCRYPTION_KEY that is not 64 hex characters, in any environment', () => {
+    expect(() => load({ ...validProduction(), CREDENTIALS_ENCRYPTION_KEY: 'your-64-char-hex-key' })).toThrow(
+      /CREDENTIALS_ENCRYPTION_KEY must be 64 hex characters/,
+    );
+    expect(() =>
+      load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', CREDENTIALS_ENCRYPTION_KEY: 'abc123' }),
+    ).toThrow(/CREDENTIALS_ENCRYPTION_KEY must be 64 hex characters/);
+  });
+
+  it('reports every problem at once', () => {
+    let message = '';
+    try {
+      load({ NODE_ENV: 'production', REDIS_URL: 'redis://cache.internal:6379' });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    for (const envVar of [
+      'SECRET_KEY',
+      'JWT_ACCESS_SECRET',
+      'JWT_REFRESH_SECRET',
+      'OAUTH_JWT_SECRET',
+      'CREDENTIALS_ENCRYPTION_KEY',
+      'CORS_ORIGINS',
+    ]) {
+      expect(message).toContain(envVar);
+    }
+  });
+
+  describe('VOICE_AGENT_SECRET', () => {
+    const voiceOn = { LIVEKIT_URL: 'wss://voice.acme.io' };
+
+    it('is not required while voice is off', () => {
+      expect(() => load(validProduction())).not.toThrow();
+    });
+
+    it('is required once LIVEKIT_URL turns voice on', () => {
+      expect(() => load({ ...validProduction(), ...voiceOn })).toThrow(/VOICE_AGENT_SECRET must be set/);
+    });
+
+    it('may not be the development default, whether or not voice is on', () => {
+      expect(() =>
+        load({ ...validProduction(), ...voiceOn, VOICE_AGENT_SECRET: DEV_VOICE_AGENT_SECRET_DEFAULT }),
+      ).toThrow(/VOICE_AGENT_SECRET must be set explicitly/);
+      expect(() => load({ ...validProduction(), VOICE_AGENT_SECRET: DEV_VOICE_AGENT_SECRET_DEFAULT })).toThrow(
+        /VOICE_AGENT_SECRET must be set explicitly/,
+      );
+    });
+
+    it('accepts a real secret', () => {
+      expect(() => load({ ...validProduction(), ...voiceOn, VOICE_AGENT_SECRET: SECRET_A })).not.toThrow();
+    });
+  });
+
+  describe('Inngest', () => {
+    it.each([['1'], ['true'], ['http://localhost:8288']])('refuses production with INNGEST_DEV=%s', (value) => {
+      expect(() => load({ ...validProduction(), INNGEST_DEV: value })).toThrow(/INNGEST_DEV must not be set/);
+    });
+
+    it.each([['0'], ['false']])('allows INNGEST_DEV=%s', (value) => {
+      expect(() => load({ ...validProduction(), INNGEST_DEV: value })).not.toThrow();
+    });
+
+    it('does not require a signing key', () => {
+      expect(() => load(validProduction())).not.toThrow();
+    });
+  });
+
+  describe('CORS_ORIGINS', () => {
+    it.each([
+      ['http://localhost:3000'],
+      ['https://app.acme.io,http://localhost:3000'],
+      ['https://app.acme.io, http://127.0.0.1:3000'],
+      ['http://[::1]:3000'],
+      ['http://app.localhost:3000'],
+      ['localhost:3000'],
+    ])('refuses production with %s', (origins) => {
+      expect(() => load({ ...validProduction(), CORS_ORIGINS: origins })).toThrow(
+        /CORS_ORIGINS must not include a local origin/,
+      );
+    });
+
+    it('refuses production when unset, because the default is localhost', () => {
+      expect(() => load({ ...validProduction(), CORS_ORIGINS: undefined })).toThrow(
+        /CORS_ORIGINS must not include a local origin/,
+      );
+    });
+
+    it.each([
+      ['https://app.acme.io'],
+      ['https://app.acme.io,https://*.acme.io'],
+      ['https://localhost.acme.io'],
+      ['https://notlocalhost.io'],
+    ])('allows %s', (origins) => {
+      expect(() => load({ ...validProduction(), CORS_ORIGINS: origins })).not.toThrow();
+    });
+  });
+
+  describe.each([['development'], ['test']])('outside production (%s)', (nodeEnv) => {
+    it('boots with nothing set and uses the declared development defaults', () => {
+      const config = load({ NODE_ENV: nodeEnv, REDIS_URL: 'redis://localhost:6399' });
+      expect(config.corsOrigins).toBe('http://localhost:3000');
+      expect(config.credentialsEncryptionKey).toBe(DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT);
+      expect(config.oauthJwtSecret).toBeUndefined();
+    });
+
+    it('allows a local CORS origin, placeholders and Inngest dev mode', () => {
+      expect(() =>
+        load({
+          NODE_ENV: nodeEnv,
+          REDIS_URL: 'redis://localhost:6399',
+          CORS_ORIGINS: 'http://localhost:3000',
+          SECRET_KEY: 'local-dev-secret-key-minimum-32-chars-here-change-me',
+          INNGEST_DEV: '1',
+          LIVEKIT_URL: 'ws://localhost:7880',
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  it('the development credentials key is 32 bytes of hex, the bytes the cipher used before the key moved into config', () => {
+    expect(DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT).toMatch(/^[0-9a-f]{64}$/);
+    expect(Buffer.from(DEV_CREDENTIALS_ENCRYPTION_KEY_DEFAULT, 'hex').toString('utf8')).toBe(
+      'dev-key-only-do-not-use-in-produ',
+    );
+  });
+});
