@@ -8,7 +8,7 @@ import { CursorQueryDto, ListQueryDto, QueryEnum, QueryInt } from '@appshore/ker
  */
 const AiSpendDays = (fallback: number) => QueryInt({ min: 1, max: 90, clamp: true, default: fallback });
 
-/** `GET /admin/ai-spend/tenants/:tenant_id/by-surface` — `days` (1…90, default 7). */
+/** `GET /admin/ai-spend/summary` and `…/tenants/:tenant_id/by-surface` — `days` (1…90, default 7). */
 export class AiSpendWindowQueryDto {
   @AiSpendDays(7)
   days!: number;

@@ -39,11 +39,11 @@ describe('UserInvitationsController', () => {
   it('getInvitations delegates to service', async () => {
     const page = await controller.getInvitations(
       currentUser,
-      await readQueryDto(InvitationListQueryDto, { status: 'PENDING', limit: '10', cursor: 'abc' }),
+      await readQueryDto(InvitationListQueryDto, { status: 'PENDING,EXPIRED', limit: '10', cursor: 'abc' }),
     );
     expect(invitationsService.listInvitations).toHaveBeenCalledWith(
       'tenant_abc',
-      expect.objectContaining({ status: 'PENDING', limit: 10, cursor: 'abc' }),
+      expect.objectContaining({ statuses: ['PENDING', 'EXPIRED'], limit: 10, cursor: 'abc' }),
     );
     expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });

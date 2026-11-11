@@ -1,9 +1,12 @@
 import { InvitationStatus } from '@appshore/db';
-import { CursorQueryDto, QueryEnum } from '@appshore/kernel/shared/utils/query-dto';
+import { CursorQueryDto, QueryEnumList } from '@appshore/kernel/shared/utils/query-dto';
 import type { InvitationListQuery } from '../user-invitations.service';
 
-/** `GET /invitations` — `limit`, `cursor`, `status` (one invitation status; omitted: every invitation). */
+/**
+ * `GET /invitations` — `limit`, `cursor`, `status` (one invitation status, or several comma-joined; omitted:
+ * every invitation).
+ */
 export class InvitationListQueryDto extends CursorQueryDto implements InvitationListQuery {
-  @QueryEnum(Object.values(InvitationStatus))
-  status?: InvitationStatus;
+  @QueryEnumList(Object.values(InvitationStatus), { name: 'status' })
+  statuses?: InvitationStatus[];
 }

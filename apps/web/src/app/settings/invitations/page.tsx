@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { CursorList } from '@app/shared-types';
+import { useCursorList } from '@appshore/web-core/shared/list';
+import { ListFooter } from '@/shared/components/page-chrome';
 import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
@@ -98,16 +100,26 @@ function InvitationsSkeleton() {
   );
 }
 
+/** What this screen lists: invitations someone can still act on. */
+const ACTIONABLE_STATUSES = 'PENDING,EXPIRED';
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function InvitationsPage() {
   const queryClient = useQueryClient();
 
-  const { data: invitations, isLoading } = useQuery<Invitation[]>({
-    queryKey: ['invitations'],
-    queryFn: () => api.get('/invitations'),
+  // Only actionable invitations (pending or expired). The server filters: a paged list is never filtered in the
+  // browser. A cursor list, newest first; the key stays under ['invitations'] so mutations refresh it.
+  const invitations = useCursorList<Invitation>({
+    queryKey: ['invitations', 'list', ACTIONABLE_STATUSES],
+    queryFn: (cursor) => {
+      const search = new URLSearchParams({ status: ACTIONABLE_STATUSES });
+      if (cursor) search.set('cursor', cursor);
+      return api.get<CursorList<Invitation>>(`/invitations?${search.toString()}`);
+    },
   });
+  const { isLoading } = invitations;
 
   // Cancel invitation
   const cancelInvitation = useMutation({
@@ -135,15 +147,7 @@ export default function InvitationsPage() {
 
   const copyInviteLink = useCopyInviteLink();
 
-  // Only show actionable invitations (pending or expired)
-  const activeInvitations = useMemo(
-    () =>
-      invitations?.filter((inv) => {
-        const status = inv.status.toLowerCase();
-        return status === 'pending' || status === 'expired';
-      }) ?? [],
-    [invitations],
-  );
+  const activeInvitations = invitations.items;
 
   return (
     <div className="space-y-6">
@@ -233,6 +237,17 @@ export default function InvitationsPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {activeInvitations.length > 0 && (
+        <ListFooter
+          shown={activeInvitations.length}
+          total={invitations.total}
+          hasMore={invitations.hasMore}
+          onLoadMore={invitations.loadMore}
+          isLoadingMore={invitations.isLoadingMore}
+          loadMoreFailed={invitations.isLoadMoreError}
+        />
       )}
     </div>
   );

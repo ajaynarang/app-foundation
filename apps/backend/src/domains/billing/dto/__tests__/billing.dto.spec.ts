@@ -354,6 +354,13 @@ describe('Billing DTOs', () => {
       expect(dto.limit).toBe(25);
     });
 
+    it('reads the invoice status filter, and answers 400 naming it when it is not a status', async () => {
+      expect((await readQueryDto(PaginationQueryDto, { status: 'PAID' })).status).toBe('PAID');
+      await expect(readQueryDto(PaginationQueryDto, { status: 'paid' })).rejects.toMatchObject({
+        response: expect.objectContaining({ fieldErrors: expect.objectContaining({ status: expect.any(String) }) }),
+      });
+    });
+
     it('clamps the page size into 1…100 like every cursor list, and answers 400 when it is not a number', async () => {
       expect((await readQueryDto(PaginationQueryDto, { limit: '0' })).limit).toBe(1);
       expect((await readQueryDto(PaginationQueryDto, { limit: '5000' })).limit).toBe(100);

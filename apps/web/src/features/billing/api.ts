@@ -13,6 +13,7 @@ import type {
   TopUpRequest,
   AutoReloadSettings,
 } from './types';
+import type { CursorList } from '@app/shared-types';
 
 export const billingApi = {
   // ---------------------------------------------------------------------------
@@ -77,15 +78,13 @@ export const billingApi = {
     type?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<{ items: WalletTransaction[]; nextCursor?: string; hasMore: boolean }> => {
+  }): Promise<CursorList<WalletTransaction>> => {
     const searchParams = new URLSearchParams();
     if (params?.type) searchParams.set('type', params.type);
     if (params?.cursor) searchParams.set('cursor', params.cursor);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     const qs = searchParams.toString();
-    return apiClient<{ items: WalletTransaction[]; nextCursor?: string; hasMore: boolean }>(
-      `/billing/wallet/transactions${qs ? `?${qs}` : ''}`,
-    );
+    return apiClient<CursorList<WalletTransaction>>(`/billing/wallet/transactions${qs ? `?${qs}` : ''}`);
   },
 
   // ---------------------------------------------------------------------------
@@ -95,15 +94,13 @@ export const billingApi = {
     status?: string;
     cursor?: string;
     limit?: number;
-  }): Promise<{ items: BillingInvoice[]; nextCursor?: string; hasMore: boolean }> => {
+  }): Promise<CursorList<BillingInvoice>> => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set('status', params.status);
     if (params?.cursor) searchParams.set('cursor', params.cursor);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     const qs = searchParams.toString();
-    return apiClient<{ items: BillingInvoice[]; nextCursor?: string; hasMore: boolean }>(
-      `/billing/invoices${qs ? `?${qs}` : ''}`,
-    );
+    return apiClient<CursorList<BillingInvoice>>(`/billing/invoices${qs ? `?${qs}` : ''}`);
   },
 
   getUpcomingInvoice: async (): Promise<BillingInvoice> => apiClient<BillingInvoice>('/billing/invoices/upcoming'),

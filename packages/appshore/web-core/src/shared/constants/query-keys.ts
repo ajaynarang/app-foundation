@@ -125,6 +125,7 @@ export const queryKeys = {
   aiSpend: {
     root: ['ai-spend'] as const,
     tenants: (days: number) => ['ai-spend', 'tenants', days] as const,
+    summary: (days: number) => ['ai-spend', 'summary', days] as const,
     bySurface: (tenantId: number, days: number) => ['ai-spend', 'by-surface', tenantId, days] as const,
     invocations: (tenantId: number, surface: string | undefined) =>
       ['ai-spend', 'invocations', tenantId, surface ?? 'all'] as const,

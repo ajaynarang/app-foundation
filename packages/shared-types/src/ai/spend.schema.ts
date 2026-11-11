@@ -38,6 +38,13 @@ export type AiSpendTenantSummary = z.infer<typeof AiSpendTenantSummarySchema>;
 export const AiSpendTenantListSchema = cursorListSchema(AiSpendTenantSummarySchema);
 export type AiSpendTenantList = z.infer<typeof AiSpendTenantListSchema>;
 
+/** `GET /admin/ai-spend/summary`: the window across every tenant, so the header total never depends on the pages loaded. */
+export const AiSpendSummarySchema = z.object({
+  windowCostUsd: NumericString,
+  tenantCount: z.number().int().min(0),
+});
+export type AiSpendSummary = z.infer<typeof AiSpendSummarySchema>;
+
 /**
  * Drill-in: per-surface breakdown for one tenant within the chosen window.
  * The page sums these to get the tenant total, but exposes them as rows so

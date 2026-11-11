@@ -12,6 +12,7 @@ import { useTenantOAuthClients } from '../hooks/use-tenant-oauth-clients';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
 import { OAuthClientRegisterSheet } from './OAuthClientRegisterSheet';
 import { ExternalAgentsQuickstartModal } from './ExternalAgentsQuickstartModal';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 function summariseScopes(scopes: readonly string[]): string {
   if (scopes.length === 0) return 'None';
@@ -22,7 +23,8 @@ function summariseScopes(scopes: readonly string[]): string {
 export function ExternalAgentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data, isLoading } = useTenantOAuthClients();
+  const clients = useTenantOAuthClients();
+  const { data, isLoading } = clients;
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -134,6 +136,17 @@ export function ExternalAgentsPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {clients.items.length > 0 && (
+        <ListFooter
+          shown={clients.items.length}
+          total={clients.total}
+          hasMore={clients.hasMore}
+          onLoadMore={clients.loadMore}
+          isLoadingMore={clients.isLoadingMore}
+          loadMoreFailed={clients.isLoadMoreError}
+        />
       )}
 
       {selectedId && (

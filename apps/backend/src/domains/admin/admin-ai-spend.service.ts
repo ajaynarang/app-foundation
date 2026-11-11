@@ -11,6 +11,7 @@ import { escapeLike } from '@appshore/kernel/shared/utils/list-query';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import type {
+  AiSpendSummary,
   AiSpendTenantList,
   AiSpendTenantSummary,
   AiSpendSurfaceRow,
@@ -113,6 +114,19 @@ export class AdminAiSpendService {
     const page = buildCursorPage(rows, take, (row) => `${tag}${encodeCursor(row.total_cost_usd, row.tenant_slug)}`);
     const items = await this.withTrend(page.items, since);
     return { items, nextCursor: page.nextCursor, total: Number(counted[0]?.total ?? 0) };
+  }
+
+  /** The window in one figure: what every tenant together spent, and how many spent anything. */
+  async getSummary(opts: { days: number }): Promise<AiSpendSummary> {
+    const since = startOfDayUtcDaysAgo(opts.days);
+    const [row] = await this.prisma.$queryRaw<Array<{ total_cost_usd: string | null; tenant_count: bigint | number }>>`
+      SELECT SUM(total_cost_usd)::text AS total_cost_usd, COUNT(DISTINCT tenant_id) AS tenant_count
+      FROM vw_ai_cost_per_tenant
+      WHERE day >= ${since}::date`;
+    return {
+      windowCostUsd: row?.total_cost_usd ?? (0).toFixed(6),
+      tenantCount: Number(row?.tenant_count ?? 0),
+    };
   }
 
   /** Sparkline and last activity for the tenants on one page. */

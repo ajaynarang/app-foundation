@@ -4,11 +4,12 @@ import { ExternalLink } from 'lucide-react';
 
 import { AiInvocationStatus } from '@app/shared-types';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Button } from '@app/ui/components/ui/button';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 
 import { formatRelativeTime, formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
+
+import { ListFooter } from '@/shared/components/page-chrome';
 
 import { useAiSpendInvocations } from '../hooks';
 import { SURFACE_LABELS, getLangfuseTraceUrl, getLangfuseSessionUrl, buildLangfuseSessionId } from '../constants';
@@ -26,11 +27,8 @@ function formatInvocationCost(value: string | null): string {
 }
 
 export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationListProps) {
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useAiSpendInvocations(
-    tenantId,
-    surface,
-    true,
-  );
+  const list = useAiSpendInvocations(tenantId, surface, true);
+  const { items, isLoading } = list;
 
   if (isLoading) {
     return (
@@ -41,8 +39,6 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
       </div>
     );
   }
-
-  const items = data?.pages.flatMap((p) => p.items) ?? [];
 
   if (items.length === 0) {
     return <p className="text-muted-foreground text-sm py-6 text-center">No AI invocations in this window.</p>;
@@ -110,13 +106,14 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
         </TableBody>
       </Table>
 
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
-            Load more
-          </Button>
-        </div>
-      )}
+      <ListFooter
+        shown={items.length}
+        total={list.total}
+        hasMore={list.hasMore}
+        onLoadMore={list.loadMore}
+        isLoadingMore={list.isLoadingMore}
+        loadMoreFailed={list.isLoadMoreError}
+      />
     </div>
   );
 }

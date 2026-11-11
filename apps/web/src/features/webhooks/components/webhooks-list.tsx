@@ -7,6 +7,7 @@ import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { formatDistanceToNow } from 'date-fns';
 import { useWebhooks, type WebhookSubscription } from '../use-webhooks';
+import { ListFooter } from '@/shared/components/page-chrome';
 import { CreateWebhookSheet } from './create-webhook-sheet';
 import { WebhookDetailSheet } from './WebhookDetailSheet';
 
@@ -18,13 +19,14 @@ function summariseEvents(events: readonly string[]): string {
 }
 
 export function WebhooksList() {
-  const { data, isLoading } = useWebhooks();
+  const list = useWebhooks();
+  const { isLoading } = list;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<WebhookSubscription | null>(null);
 
-  const webhooks = data?.subscriptions ?? [];
+  const webhooks = list.items;
 
   const openDetail = (wh: WebhookSubscription) => {
     setSelected(wh);
@@ -103,6 +105,17 @@ export function WebhooksList() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {webhooks.length > 0 && (
+        <ListFooter
+          shown={webhooks.length}
+          total={list.total}
+          hasMore={list.hasMore}
+          onLoadMore={list.loadMore}
+          isLoadingMore={list.isLoadingMore}
+          loadMoreFailed={list.isLoadMoreError}
+        />
       )}
 
       <CreateWebhookSheet open={createOpen} onOpenChange={setCreateOpen} />

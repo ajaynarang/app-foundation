@@ -9,6 +9,7 @@ import { useTenantApiKeys } from '../hooks/use-tenant-api-keys';
 import type { TenantApiKeyListItem } from '../api';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
 import { ApiKeyMintSheet } from './ApiKeyMintSheet';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 function summariseScopes(scopes: readonly string[]): string {
   if (scopes.length === 0) return 'None';
@@ -23,7 +24,8 @@ function renderStatus(key: TenantApiKeyListItem) {
 }
 
 export function ApiKeysPage() {
-  const { data, isLoading } = useTenantApiKeys();
+  const keys = useTenantApiKeys();
+  const { data, isLoading } = keys;
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mintOpen, setMintOpen] = useState(false);
@@ -103,6 +105,17 @@ export function ApiKeysPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {keys.items.length > 0 && (
+        <ListFooter
+          shown={keys.items.length}
+          total={keys.total}
+          hasMore={keys.hasMore}
+          onLoadMore={keys.loadMore}
+          isLoadingMore={keys.isLoadingMore}
+          loadMoreFailed={keys.isLoadMoreError}
+        />
       )}
 
       {selectedId && (

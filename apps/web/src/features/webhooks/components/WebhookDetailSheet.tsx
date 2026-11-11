@@ -40,6 +40,7 @@ import {
 import { EventPicker } from './event-picker';
 import { RotateWebhookSecretDialog } from './rotate-webhook-secret-dialog';
 import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 interface Props {
   webhook: WebhookSubscription | null;
@@ -89,7 +90,6 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
   const [tab, setTab] = useState('overview');
 
   // Logs state
-  const [offset, setOffset] = useState(0);
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
   const [dateTo, setDateTo] = useState<string | undefined>(undefined);
 
@@ -113,19 +113,18 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
   useEffect(() => {
     if (webhook && open) {
       resetEditFromWebhook();
-      setOffset(0);
       setTab('overview');
       setIsEditing(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webhook?.id, open]);
 
-  const { data, isLoading } = useWebhookLogs(webhook?.id ?? '', {
+  const deliveries = useWebhookLogs(webhook?.id ?? '', {
     limit: PAGE_SIZE,
-    offset,
     dateFrom,
     dateTo,
   });
+  const { isLoading } = deliveries;
   const retryDelivery = useRetryDelivery();
 
   const isDirty = useMemo(() => {
@@ -166,10 +165,8 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
     });
   };
 
-  const total = data?.total ?? 0;
-  const logs = data?.logs ?? [];
-  const start = total > 0 ? offset + 1 : 0;
-  const end = Math.min(offset + PAGE_SIZE, total);
+  const total = deliveries.total;
+  const logs = deliveries.items;
 
   if (!webhook) return null;
 
@@ -328,7 +325,7 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
           <TabsContent value="logs" className="mt-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">
-                {total > 0 ? `${start}–${end} of ${total}` : 'No deliveries'}
+                {total > 0 ? `${total} ${total === 1 ? 'delivery' : 'deliveries'}` : 'No deliveries'}
               </p>
               <DateRangeFilter
                 dateFrom={dateFrom}
@@ -338,7 +335,6 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
                 onChange={(from, to) => {
                   setDateFrom(from);
                   setDateTo(to);
-                  setOffset(0);
                 }}
               />
             </div>
@@ -415,24 +411,14 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
                   </Table>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={offset === 0}
-                    onClick={() => setOffset((p) => Math.max(0, p - PAGE_SIZE))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={offset + PAGE_SIZE >= total}
-                    onClick={() => setOffset((p) => p + PAGE_SIZE)}
-                  >
-                    Next
-                  </Button>
-                </div>
+                <ListFooter
+                  shown={logs.length}
+                  total={total}
+                  hasMore={deliveries.hasMore}
+                  onLoadMore={deliveries.loadMore}
+                  isLoadingMore={deliveries.isLoadingMore}
+                  loadMoreFailed={deliveries.isLoadMoreError}
+                />
               </>
             )}
           </TabsContent>

@@ -104,7 +104,7 @@ describe('InvoiceService', () => {
       const rows = stamps.map((createdAt, index) => ({
         id: `inv_${(index * 3) % 7}`,
         tenantId: index === 6 ? 2 : 1,
-        status: 'PAID',
+        status: index === 0 ? 'OPEN' : 'PAID',
         createdAt,
       }));
 
@@ -124,6 +124,12 @@ describe('InvoiceService', () => {
         const times = items.map((invoice) => invoice.createdAt.getTime());
         expect(times).toEqual([...times].sort((a, b) => b - a));
         expect(totals).toEqual([6, 6]);
+      });
+
+      it('filters by status in the page and the total (the usage page sends it)', async () => {
+        const page = await service.listInvoices(1, { status: 'OPEN' as never });
+        expect(page.items.map((invoice) => invoice.status)).toEqual(['OPEN']);
+        expect(page.total).toBe(1);
       });
 
       it('answers 400 on a cursor it did not issue (the old row-id cursor included), before any query runs', async () => {

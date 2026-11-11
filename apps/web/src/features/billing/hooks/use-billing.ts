@@ -14,6 +14,7 @@ import type {
   CancelSubscriptionRequest,
 } from '../types';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { useCursorList } from '@appshore/web-core/shared/list';
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -33,10 +34,11 @@ export function useWalletBalance() {
   });
 }
 
-export function useBillingInvoices(params?: { status?: string; cursor?: string; limit?: number }) {
-  return useQuery({
-    queryKey: [...queryKeys.billing.invoices, params],
-    queryFn: () => billingApi.listInvoices(params),
+/** The workspace's invoices, newest first: a cursor list ("Load more" appends). A changed filter is a new list. */
+export function useBillingInvoices(params: { status?: string; limit?: number } = {}) {
+  return useCursorList({
+    queryKey: [...queryKeys.billing.invoices, 'list', params],
+    queryFn: (cursor) => billingApi.listInvoices({ ...params, cursor }),
   });
 }
 
@@ -54,10 +56,11 @@ export function usePaymentMethods() {
   });
 }
 
-export function useWalletTransactions(params?: { type?: string; cursor?: string; limit?: number }) {
-  return useQuery({
-    queryKey: [...queryKeys.billing.transactions, params],
-    queryFn: () => billingApi.getTransactions(params),
+/** The wallet ledger, newest first: a cursor list ("Load more" appends). A changed filter is a new list. */
+export function useWalletTransactions(params: { type?: string; limit?: number } = {}) {
+  return useCursorList({
+    queryKey: [...queryKeys.billing.transactions, 'list', params],
+    queryFn: (cursor) => billingApi.getTransactions({ ...params, cursor }),
   });
 }
 

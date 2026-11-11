@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsInt, IsEnum, IsUrl, IsBoolean, Min } from 'class-validator';
-import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
-import { TenantPlan } from '@appshore/db';
+import { CursorQueryDto, QueryEnum } from '@appshore/kernel/shared/utils/query-dto';
+import { BillingInvoiceStatus, TenantPlan } from '@appshore/db';
 
 export class CreateCheckoutDto {
   @IsEnum(TenantPlan)
@@ -117,5 +117,8 @@ export class AdminChangePlanDto {
   quantity?: number;
 }
 
-/** `GET /billing/invoices` — `limit` (1…100, default 50) and `cursor`. */
-export class PaginationQueryDto extends CursorQueryDto {}
+/** `GET /billing/invoices` — `status` (one invoice status), `limit` (1…100, default 50) and `cursor`. */
+export class PaginationQueryDto extends CursorQueryDto {
+  @QueryEnum(Object.values(BillingInvoiceStatus))
+  status?: BillingInvoiceStatus;
+}

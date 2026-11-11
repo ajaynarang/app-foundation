@@ -1,16 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCursorList } from '@appshore/web-core/shared/list';
 import type { AgentScope } from '@app/shared-types';
 import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@appshore/web-core/shared/constants';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { apiKeysApi, type TenantApiKeyListItem } from '../api';
 
-/** Tenant-wide list (admin view). */
+/**
+ * Tenant-wide list (admin view), newest first: a cursor list ("Load more" appends). `data` is every row loaded
+ * so far (undefined until the first page arrives), so a detail sheet opened from a row finds it here.
+ */
 export function useTenantApiKeys() {
-  return useQuery<TenantApiKeyListItem[]>({
+  const list = useCursorList<TenantApiKeyListItem>({
     queryKey: queryKeys.apiKeys.list(),
-    queryFn: apiKeysApi.listTenant,
+    queryFn: (cursor) => apiKeysApi.listTenant(cursor),
   });
+  return { ...list, data: list.isLoading ? undefined : list.items };
 }
 
 export function useRotateApiKey() {

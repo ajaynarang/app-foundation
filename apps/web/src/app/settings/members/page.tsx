@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { CursorList } from '@app/shared-types';
+import { useCursorList } from '@appshore/web-core/shared/list';
+import { ListFooter } from '@/shared/components/page-chrome';
 import { formatRelativeTime } from '@appshore/web-core/shared/lib/utils/formatters';
 import { Card, CardContent } from '@app/ui/components/ui/card';
 import { Button } from '@app/ui/components/ui/button';
@@ -231,10 +234,13 @@ export default function MembersPage() {
     name: string;
   } | null>(null);
 
-  const { data: users, isLoading } = useQuery<TeamMember[]>({
-    queryKey: ['users'],
-    queryFn: () => api.get('/users'),
+  // A cursor list, newest first: "Load more" appends. The key stays under ['users'] so mutations refresh it.
+  const members = useCursorList<TeamMember>({
+    queryKey: ['users', 'list'],
+    queryFn: (cursor) =>
+      api.get<CursorList<TeamMember>>(cursor ? `/users?cursor=${encodeURIComponent(cursor)}` : '/users'),
   });
+  const { items: users, isLoading } = members;
 
   // Deactivate user
   const { mutate: deactivateUser, isPending: deactivating } = useMutation({
@@ -257,7 +263,7 @@ export default function MembersPage() {
   });
 
   // All team members
-  const staffUsers = useMemo(() => users ?? [], [users]);
+  const staffUsers = users;
 
   const handleConfirmAction = () => {
     if (!confirmAction) return;
@@ -374,6 +380,17 @@ export default function MembersPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {members.items.length > 0 && (
+        <ListFooter
+          shown={members.items.length}
+          total={members.total}
+          hasMore={members.hasMore}
+          onLoadMore={members.loadMore}
+          isLoadingMore={members.isLoadingMore}
+          loadMoreFailed={members.isLoadMoreError}
+        />
       )}
 
       {/* Invite dialog */}

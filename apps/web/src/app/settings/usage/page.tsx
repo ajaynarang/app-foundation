@@ -23,6 +23,7 @@ import {
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { formatTimestampDate, DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { cn } from '@app/ui';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 // ---------------------------------------------------------------------------
 // Skeleton
@@ -45,25 +46,15 @@ function UsageSkeleton() {
 // ---------------------------------------------------------------------------
 export default function UsagePage() {
   const [invoiceStatus, setInvoiceStatus] = useState<string | undefined>();
-  const [invoiceCursor, setInvoiceCursor] = useState<string | undefined>();
   const [txType, setTxType] = useState<string | undefined>();
-  const [txCursor, setTxCursor] = useState<string | undefined>();
 
-  const { data: invoiceData, isLoading: invoicesLoading } = useBillingInvoices({
-    status: invoiceStatus,
-    cursor: invoiceCursor,
-    limit: 10,
-  });
-  const { data: txData, isLoading: txLoading } = useWalletTransactions({
-    type: txType,
-    cursor: txCursor,
-    limit: 10,
-  });
+  const invoices = useBillingInvoices({ status: invoiceStatus, limit: 10 });
+  const transactions = useWalletTransactions({ type: txType, limit: 10 });
   const { mutate: downloadInvoice, isPending: downloadPending } = useDownloadBillingInvoice();
 
   const { timezone } = useFormatters();
 
-  const isLoading = invoicesLoading || txLoading;
+  const isLoading = invoices.isLoading || transactions.isLoading;
 
   if (isLoading) {
     return <UsageSkeleton />;
@@ -86,7 +77,6 @@ export default function UsagePage() {
             value={invoiceStatus ?? 'all'}
             onValueChange={(v) => {
               setInvoiceStatus(v === 'all' ? undefined : v);
-              setInvoiceCursor(undefined);
             }}
           >
             <SelectTrigger className="w-[140px]">
@@ -115,7 +105,7 @@ export default function UsagePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!invoiceData?.items || invoiceData.items.length === 0 ? (
+                {invoices.items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
                       <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
@@ -123,7 +113,7 @@ export default function UsagePage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  invoiceData.items.map((inv) => (
+                  invoices.items.map((inv) => (
                     <TableRow key={inv.id}>
                       <TableCell className="text-sm text-muted-foreground tabular-nums">
                         {formatTimestampDate(inv.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
@@ -168,18 +158,15 @@ export default function UsagePage() {
           </CardContent>
         </Card>
 
-        {/* Pagination */}
-        {invoiceData && invoiceData.items.length > 0 && invoiceData.hasMore && (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!invoiceData.hasMore}
-              onClick={() => setInvoiceCursor(invoiceData.nextCursor)}
-            >
-              Load More
-            </Button>
-          </div>
+        {invoices.items.length > 0 && (
+          <ListFooter
+            shown={invoices.items.length}
+            total={invoices.total}
+            hasMore={invoices.hasMore}
+            onLoadMore={invoices.loadMore}
+            isLoadingMore={invoices.isLoadingMore}
+            loadMoreFailed={invoices.isLoadMoreError}
+          />
         )}
       </section>
 
@@ -193,7 +180,6 @@ export default function UsagePage() {
             value={txType ?? 'all'}
             onValueChange={(v) => {
               setTxType(v === 'all' ? undefined : v);
-              setTxCursor(undefined);
             }}
           >
             <SelectTrigger className="w-[140px]">
@@ -223,14 +209,14 @@ export default function UsagePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!txData?.items || txData.items.length === 0 ? (
+                {transactions.items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
                       No transactions found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  txData.items.map((tx) => (
+                  transactions.items.map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell className="text-sm text-muted-foreground tabular-nums">
                         {formatTimestampDate(tx.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
@@ -263,18 +249,15 @@ export default function UsagePage() {
           </CardContent>
         </Card>
 
-        {/* Pagination */}
-        {txData && txData.items.length > 0 && txData.hasMore && (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!txData.hasMore}
-              onClick={() => setTxCursor(txData.nextCursor)}
-            >
-              Load More
-            </Button>
-          </div>
+        {transactions.items.length > 0 && (
+          <ListFooter
+            shown={transactions.items.length}
+            total={transactions.total}
+            hasMore={transactions.hasMore}
+            onLoadMore={transactions.loadMore}
+            isLoadingMore={transactions.isLoadingMore}
+            loadMoreFailed={transactions.isLoadMoreError}
+          />
         )}
       </section>
     </div>

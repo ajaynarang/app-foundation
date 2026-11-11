@@ -11,6 +11,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@appshore/web-core/shared/lib/api';
 import { queryKeys } from '@appshore/web-core/shared/constants/query-keys';
+import { useCursorList } from '@appshore/web-core/shared/list';
+import type { CursorList } from '@app/shared-types';
 
 export interface Notification {
   notificationId: string;
@@ -26,10 +28,8 @@ export interface Notification {
   metadata?: Record<string, unknown> | null;
 }
 
-export interface NotificationListResponse {
-  data: Notification[];
-  total: number;
-}
+/** `GET /notifications`: a cursor list, newest first. */
+export type NotificationListResponse = CursorList<Notification>;
 
 export interface NotificationCount {
   total: number;
@@ -43,14 +43,16 @@ interface UseNotificationsParams {
   limit?: number;
 }
 
+/** The inbox, newest first: a cursor list ("Load more" appends). A changed category is a new list. */
 export function useNotifications(params: UseNotificationsParams = {}) {
   const { category, limit = 20 } = params;
-  return useQuery<NotificationListResponse>({
+  return useCursorList<Notification>({
     queryKey: [...queryKeys.notifications.root, 'list', category ?? 'ALL', limit],
-    queryFn: () => {
+    queryFn: (cursor) => {
       const search = new URLSearchParams();
       if (category) search.set('category', category);
       search.set('limit', String(limit));
+      if (cursor) search.set('cursor', cursor);
       return api.get<NotificationListResponse>(`/notifications?${search.toString()}`);
     },
   });

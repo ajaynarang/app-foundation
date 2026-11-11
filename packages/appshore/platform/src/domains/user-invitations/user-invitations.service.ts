@@ -34,7 +34,8 @@ const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: '
 
 /** `GET /invitations`. */
 export interface InvitationListQuery {
-  status?: InvitationStatus;
+  /** The statuses to show; omitted: every status. */
+  statuses?: InvitationStatus[];
   limit?: number;
   cursor?: string;
 }
@@ -219,7 +220,7 @@ export class UserInvitationsService {
 
     const scope: Prisma.UserInvitationWhereInput = {
       ...(tenantDbId !== undefined && { tenantId: tenantDbId }),
-      ...(query.status && { status: query.status }),
+      ...(query.statuses && { status: { in: query.statuses } }),
     };
     const [rows, total] = await Promise.all([
       this.prisma.userInvitation.findMany({

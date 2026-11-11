@@ -18,10 +18,9 @@ const get = api.get as jest.Mock;
 const post = api.post as jest.Mock;
 const writeText = jest.fn();
 
-// The list returns both ids. Every /invitations/:invitation_id route looks the
-// row up by the uuid; the numeric id finds nothing there.
+// The list names a row by its public id only (the numeric key never leaves the API). Every
+// /invitations/:invitation_id route looks the row up by that uuid.
 const PENDING = {
-  id: 41,
   invitationId: '5f0c1a52-6f0e-4c58-9d1b-0d6f6a1f7f11',
   email: 'pat@example.com',
   firstName: 'Pat',
@@ -31,7 +30,14 @@ const PENDING = {
   createdAt: '2026-01-05T10:00:00.000Z',
   expiresAt: '2026-01-12T10:00:00.000Z',
 };
-const EXPIRED = { ...PENDING, id: 42, invitationId: '9b0f4f3e-2a53-4f0c-8a39-2a0c1a4f9d22', status: 'EXPIRED' };
+const EXPIRED = { ...PENDING, invitationId: '9b0f4f3e-2a53-4f0c-8a39-2a0c1a4f9d22', status: 'EXPIRED' };
+
+/** One page of the cursor list `GET /invitations` answers. */
+const page = (items: unknown[], nextCursor: string | null = null, total = items.length) => ({
+  items,
+  nextCursor,
+  total,
+});
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -52,7 +58,7 @@ describe('Settings › Invitations', () => {
   });
 
   it("copies a pending invitation's link, asking for it by the invitation's public id", async () => {
-    get.mockResolvedValue([PENDING]);
+    get.mockResolvedValue(page([PENDING]));
     request.mockResolvedValue({ inviteLink: 'https://app.example.com/accept-invitation?token=t' });
     renderPage();
 
@@ -63,7 +69,7 @@ describe('Settings › Invitations', () => {
   });
 
   it('offers no link for an expired invitation: its token no longer works', async () => {
-    get.mockResolvedValue([EXPIRED]);
+    get.mockResolvedValue(page([EXPIRED]));
     renderPage();
 
     await screen.findByRole('button', { name: 'Resend' });
@@ -71,7 +77,7 @@ describe('Settings › Invitations', () => {
   });
 
   it('resends and cancels by the public id, not the numeric row id', async () => {
-    get.mockResolvedValue([PENDING]);
+    get.mockResolvedValue(page([PENDING]));
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Resend' }));
@@ -84,5 +90,20 @@ describe('Settings › Invitations', () => {
         expect.objectContaining({ method: 'DELETE' }),
       ),
     );
+  });
+
+  it('asks the server for actionable invitations only, and loads the next page with the cursor it was given', async () => {
+    get.mockResolvedValueOnce(page([PENDING], 'next-page', 2)).mockResolvedValueOnce(page([EXPIRED], null, 2));
+    renderPage();
+
+    // The server filters: nothing is filtered out of a loaded page in the browser.
+    await screen.findByText('Showing 1 of 2');
+    expect(get.mock.calls[0][0]).toBe('/invitations?status=PENDING%2CEXPIRED');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+    await screen.findByText('Showing 2 of 2');
+    expect(get.mock.calls[1][0]).toBe('/invitations?status=PENDING%2CEXPIRED&cursor=next-page');
+    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 });

@@ -157,6 +157,20 @@ describe('AdminAiSpendService', () => {
     });
   });
 
+  describe('getSummary', () => {
+    it('sums the window across every tenant in SQL, so the figure never depends on the pages loaded', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ total_cost_usd: '53.750000', tenant_count: 2n }]);
+
+      expect(await service.getSummary({ days: 7 })).toEqual({ windowCostUsd: '53.750000', tenantCount: 2 });
+      expect(prisma.$queryRaw.mock.calls[0][0].join('?')).toContain('COUNT(DISTINCT tenant_id)');
+    });
+
+    it('answers zero, not null, for a window with no spend', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ total_cost_usd: null, tenant_count: 0n }]);
+      expect(await service.getSummary({ days: 7 })).toEqual({ windowCostUsd: '0.000000', tenantCount: 0 });
+    });
+  });
+
   describe('listSurfaceBreakdown', () => {
     it('maps view rows to surface rows', async () => {
       prisma.$queryRaw.mockResolvedValueOnce([

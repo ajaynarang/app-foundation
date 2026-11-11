@@ -1,4 +1,5 @@
 import { apiClient } from '@appshore/web-core/shared/lib/api';
+import type { CursorList } from '@app/shared-types';
 
 // --- Types ---
 
@@ -9,7 +10,6 @@ export interface WebhookEventCategory {
 
 export interface WebhookSubscription {
   id: string;
-  tenantId: string;
   url: string;
   events: string[];
   active: boolean;
@@ -25,10 +25,8 @@ export interface WebhookCreatedResponse extends WebhookSubscription {
   signingSecret: string;
 }
 
-export interface WebhookListResponse {
-  subscriptions: WebhookSubscription[];
-  total: number;
-}
+/** `GET /webhooks`: a cursor list, newest first. */
+export type WebhookListResponse = CursorList<WebhookSubscription>;
 
 export interface WebhookDeliveryLog {
   id: string;
@@ -43,10 +41,8 @@ export interface WebhookDeliveryLog {
   createdAt: string;
 }
 
-export interface WebhookLogsResponse {
-  logs: WebhookDeliveryLog[];
-  total: number;
-}
+/** `GET /webhooks/:id/logs`: a cursor list, newest first. */
+export type WebhookLogsResponse = CursorList<WebhookDeliveryLog>;
 
 export interface CreateWebhookRequest {
   url: string;
@@ -63,8 +59,12 @@ export interface UpdateWebhookRequest {
 
 // --- API Functions ---
 
-export async function listWebhooks(limit = 20, offset = 0): Promise<WebhookListResponse> {
-  return apiClient<WebhookListResponse>(`/webhooks?limit=${limit}&offset=${offset}`);
+export async function listWebhooks(opts: { limit?: number; cursor?: string } = {}): Promise<WebhookListResponse> {
+  const qs = new URLSearchParams({
+    ...(opts.limit ? { limit: String(opts.limit) } : {}),
+    ...(opts.cursor ? { cursor: opts.cursor } : {}),
+  }).toString();
+  return apiClient<WebhookListResponse>(`/webhooks${qs ? `?${qs}` : ''}`);
 }
 
 export async function createWebhook(data: CreateWebhookRequest): Promise<WebhookCreatedResponse> {
@@ -91,14 +91,14 @@ export async function getWebhookLogs(
   id: string,
   opts: {
     limit?: number;
-    offset?: number;
+    cursor?: string;
     dateFrom?: string;
     dateTo?: string;
   } = {},
 ): Promise<WebhookLogsResponse> {
   const qs = new URLSearchParams({
     limit: String(opts.limit ?? 20),
-    offset: String(opts.offset ?? 0),
+    ...(opts.cursor ? { cursor: opts.cursor } : {}),
     ...(opts.dateFrom ? { date_from: opts.dateFrom } : {}),
     ...(opts.dateTo ? { date_to: opts.dateTo } : {}),
   });

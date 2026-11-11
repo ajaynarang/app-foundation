@@ -24,6 +24,7 @@ const INVOICE_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direct
 
 /** `GET /billing/invoices`. */
 export interface InvoiceListQuery {
+  status?: BillingInvoiceStatus;
   limit?: number;
   cursor?: string;
 }
@@ -108,6 +109,7 @@ export class InvoiceService {
   async listInvoices(tenantDbId: number, query: InvoiceListQuery = {}): Promise<CursorList<BillingInvoice>> {
     const take = clampCursorLimit(query.limit);
     const scope: Prisma.BillingInvoiceWhereInput = { tenantId: tenantDbId };
+    if (query.status) scope.status = query.status;
     // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
     const where: Prisma.BillingInvoiceWhereInput = query.cursor
       ? { AND: [scope, keysetWhere({ ...INVOICE_KEYSET, cursor: query.cursor })] }

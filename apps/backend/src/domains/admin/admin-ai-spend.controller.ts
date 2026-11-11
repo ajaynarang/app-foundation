@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -42,6 +42,20 @@ export class AdminAiSpendController {
   @ApiOperation({ summary: 'Tenants with their N-day AI spend: cursor-paged, highest spend first' })
   async listTenants(@Query() query: AiSpendTenantListQueryDto) {
     return this.service.listTenants(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'The N-day AI spend across every tenant, in one figure' })
+  @ApiOkResponse({
+    description: 'The window total and how many tenants spent anything',
+    schema: {
+      type: 'object',
+      required: ['windowCostUsd', 'tenantCount'],
+      properties: { windowCostUsd: { type: 'string' }, tenantCount: { type: 'integer', minimum: 0 } },
+    },
+  })
+  async summary(@Query() query: AiSpendWindowQueryDto) {
+    return this.service.getSummary({ days: query.days });
   }
 
   @Get('tenants/:tenant_id/by-surface')

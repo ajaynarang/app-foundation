@@ -20,6 +20,7 @@ import {
 } from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
 import { resolveNotificationLink } from '@/shared/lib/notification-links';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 interface NotificationSheetProps {
   open: boolean;
@@ -56,7 +57,8 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const category = activeTab === 'ALL' ? undefined : activeTab;
-  const { data: notifData, isLoading, refetch } = useNotifications({ category, limit: 20 });
+  const inbox = useNotifications({ category, limit: 20 });
+  const { isLoading, refetch } = inbox;
 
   // Refetch when sheet opens to ensure fresh data
   useEffect(() => {
@@ -68,7 +70,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   const dismiss = useDismissNotification();
   const markAllRead = useMarkAllRead();
 
-  const notifications = notifData?.data ?? [];
+  const notifications = inbox.items;
 
   const navigateToAction = (url: string) => {
     router.push(resolveNotificationLink(url));
@@ -273,6 +275,17 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                     </div>
                   );
                 })}
+              {notifications.length > 0 && (
+                <ListFooter
+                  className="px-4 py-3"
+                  shown={notifications.length}
+                  total={inbox.total}
+                  hasMore={inbox.hasMore}
+                  onLoadMore={inbox.loadMore}
+                  isLoadingMore={inbox.isLoadingMore}
+                  loadMoreFailed={inbox.isLoadMoreError}
+                />
+              )}
             </div>
           </ScrollArea>
         </Tabs>

@@ -1,5 +1,5 @@
 import { apiClient } from '@appshore/web-core/shared/lib/api';
-import type { ApiKeyResponse, AgentScope } from '@app/shared-types';
+import type { ApiKeyResponse, AgentScope, CursorList } from '@app/shared-types';
 
 /**
  * Tenant-level admin view row. Adds a few housekeeping fields not present
@@ -17,7 +17,11 @@ export interface RotateApiKeyResponse {
 }
 
 export const apiKeysApi = {
-  listTenant: (): Promise<TenantApiKeyListItem[]> => apiClient<TenantApiKeyListItem[]>('/api-keys/admin/tenant'),
+  /** A cursor list, newest first: pass `cursor` from the previous page's `nextCursor`. */
+  listTenant: (cursor?: string): Promise<CursorList<TenantApiKeyListItem>> =>
+    apiClient<CursorList<TenantApiKeyListItem>>(
+      `/api-keys/admin/tenant${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
 
   rotate: (id: number): Promise<RotateApiKeyResponse> =>
     apiClient<RotateApiKeyResponse>(`/api-keys/${id}/rotate`, {

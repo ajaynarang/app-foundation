@@ -265,9 +265,12 @@ describe('UserInvitationsService', () => {
     });
 
     it('filters by status in the page and the total', async () => {
-      const page = await service.listInvitations('tenant_abc', { status: 'ACCEPTED' as never });
+      const page = await service.listInvitations('tenant_abc', { statuses: ['ACCEPTED'] as never });
       expect(page).toMatchObject({ total: 1, nextCursor: null });
       expect(page.items[0].status).toBe('ACCEPTED');
+      // Several statuses at once: what the invitations screen asks for (pending or expired).
+      const open = await service.listInvitations('tenant_abc', { statuses: ['PENDING', 'EXPIRED'] as never });
+      expect(open.total).toBe(5);
     });
 
     it('answers 404 for an unknown tenant and 400 for a cursor it did not issue', async () => {
@@ -693,11 +696,11 @@ describe('UserInvitationsService', () => {
       mockPrismaService.userInvitation.findMany.mockResolvedValue([]);
       mockPrismaService.userInvitation.count.mockResolvedValue(0);
 
-      await service.listInvitations('tenant_abc', { status: 'PENDING' as never });
+      await service.listInvitations('tenant_abc', { statuses: ['PENDING'] as never });
 
       expect(mockPrismaService.userInvitation.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ status: 'PENDING' }),
+          where: expect.objectContaining({ status: { in: ['PENDING'] } }),
         }),
       );
     });

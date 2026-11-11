@@ -9,6 +9,7 @@ import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '
 import { useAgentActivity } from '@/features/ai/agent-activity';
 import { ScopeChip } from '@/features/ai/agent-scope-ui';
 import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
+import { ListFooter } from '@/shared/components/page-chrome';
 
 interface ActivityTabProps {
   principalKind: AgentPrincipalKind;
@@ -46,15 +47,15 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
   const [filter, setFilter] = useState<AgentActivityFilter>('all');
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
   const [dateTo, setDateTo] = useState<string | undefined>(undefined);
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useAgentActivity({
+  const activity = useAgentActivity({
     principalKind,
     principalId,
     filter,
     dateFrom,
     dateTo,
   });
-
-  const rows: AgentActivityRow[] = data?.pages.flatMap((p) => p.rows) ?? [];
+  const { isLoading } = activity;
+  const rows: AgentActivityRow[] = activity.items;
 
   return (
     <div className="space-y-3">
@@ -137,12 +138,15 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
         </div>
       )}
 
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="ghost" onClick={() => fetchNextPage()} loading={isFetchingNextPage}>
-            Load more
-          </Button>
-        </div>
+      {rows.length > 0 && (
+        <ListFooter
+          shown={rows.length}
+          total={activity.total}
+          hasMore={activity.hasMore}
+          onLoadMore={activity.loadMore}
+          isLoadingMore={activity.isLoadingMore}
+          loadMoreFailed={activity.isLoadMoreError}
+        />
       )}
     </div>
   );

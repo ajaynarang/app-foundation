@@ -4,6 +4,7 @@ import type {
   OAuthClientCreatedResponse,
   CreateOAuthClientInput,
   AgentScope,
+  CursorList,
 } from '@app/shared-types';
 
 export type { OAuthClientResponse, OAuthClientCreatedResponse };
@@ -17,7 +18,11 @@ export async function createOAuthClient(input: CreateOAuthClientInput): Promise<
 
 /** Tenant-admin operations. */
 export const oauthClientsApi = {
-  list: (): Promise<OAuthClientResponse[]> => apiClient<OAuthClientResponse[]>('/oauth/clients'),
+  /** A cursor list, newest first: pass `cursor` from the previous page's `nextCursor`. */
+  list: (cursor?: string): Promise<CursorList<OAuthClientResponse>> =>
+    apiClient<CursorList<OAuthClientResponse>>(
+      `/oauth/clients${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
 
   detail: (clientId: string): Promise<OAuthClientResponse> =>
     apiClient<OAuthClientResponse>(`/oauth/clients/${clientId}`),
