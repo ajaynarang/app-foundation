@@ -1,0 +1,105 @@
+{
+  "DTOS": {
+    "apps/backend/src/domains/admin/dto/admin-jobs-query.dto.ts": {
+      "count": 2,
+      "reason": "The super-admin jobs filter takes the numeric tenant id (?tenant_id=). Super-admin ids stay numeric until they are converted together"
+    },
+    "apps/backend/src/domains/ai/voice/dto/voice-respond.dto.ts": {
+      "count": 1,
+      "reason": "An internal callback from the voice worker carries the tenant key it was handed; it is not a client-facing body. Follow-up with the AI domain"
+    },
+    "apps/backend/src/domains/desk/core/agent/dto/update-agent.dto.ts": {
+      "count": 1,
+      "reason": "supervisorUserId is the numeric user id the eligible-supervisors picker returns. Move both to the public userId together"
+    },
+    "apps/backend/src/domains/feedback/dto/list-feedback-query.dto.ts": {
+      "count": 1,
+      "reason": "The super-admin feedback filter takes the numeric tenant id the tenant picker returns (?tenant_id=). Super-admin ids stay numeric until they are converted together"
+    },
+    "apps/backend/src/domains/support/dto/create-ticket.dto.ts": {
+      "count": 1,
+      "reason": "conversationId links a ticket to an assistant conversation by its numeric id. Move it when conversations take a public id"
+    },
+    "apps/backend/src/domains/support/dto/ticket-list-query.dto.ts": {
+      "count": 1,
+      "reason": "The super-admin ticket filter takes the numeric tenant id the tenant picker returns (?tenant_id=). Super-admin ids stay numeric until they are converted together"
+    },
+    "packages/appshore/platform/src/domains/api-keys/dto/api-key.dto.ts": {
+      "count": 1,
+      "reason": "An API key is addressed by its numeric id (/api-keys/:api_key_id). API keys stay numeric and listed: the table has no public id of its own"
+    },
+    "packages/appshore/platform/src/domains/api-keys/dto/list-api-keys.dto.ts": {
+      "count": 2,
+      "reason": "The tenant key list shows the key's numeric id (its address) and its owner's numeric user id. API keys stay numeric and listed"
+    },
+    "packages/appshore/platform/src/domains/login-activity/dto/list-login-activity.query.dto.ts": {
+      "count": 1,
+      "reason": "The super-admin login-activity filter takes the numeric tenant id (?tenant_id=). Super-admin ids stay numeric until they are converted together"
+    },
+    "packages/appshore/platform/src/domains/login-activity/dto/login-activity-summary.query.dto.ts": {
+      "count": 1,
+      "reason": "The super-admin login-activity summary takes the numeric tenant id (?tenant_id=). Super-admin ids stay numeric until they are converted together"
+    },
+    "packages/appshore/platform/src/domains/user-invitations/dto/invite-user.dto.ts": {
+      "count": 1,
+      "reason": "A super admin inviting into a workspace names it by numeric tenant id. Super-admin ids stay numeric until they are converted together"
+    }
+  },
+  "ROUTE_PARAMS": {
+    "apps/backend/src/domains/admin/admin-ai-spend.controller.ts": {
+      "count": 5,
+      "reason": "Super-admin console route. The numeric tenant id stays, as in the product this was ported from; converting the super-admin ids is its own piece of work"
+    },
+    "apps/backend/src/domains/admin/admin-jobs.controller.ts": {
+      "count": 4,
+      "reason": "Super-admin console routes: a job and a tenant are addressed by numeric id. The job list pages by its public id; the address moves when the super-admin ids are converted"
+    },
+    "apps/backend/src/domains/admin/admin-schedules.controller.ts": {
+      "count": 1,
+      "reason": "Super-admin console route: a schedule is addressed by numeric id. It stays until the super-admin ids are converted"
+    },
+    "apps/backend/src/domains/billing/controllers/billing-admin.controller.ts": {
+      "count": 12,
+      "reason": "Super-admin console route. The numeric tenant id stays, as in the product this was ported from; converting the super-admin ids is its own piece of work"
+    },
+    "apps/backend/src/domains/support/support.controller.ts": {
+      "count": 5,
+      "reason": "A ticket is addressed by its numeric id in the URL. Its public id is ticketNumber, which the lists already page by: move the ticket routes to it as a follow-up"
+    },
+    "packages/appshore/platform/src/domains/api-keys/api-keys.controller.ts": {
+      "count": 6,
+      "reason": "An API key is addressed by its numeric id. API keys stay numeric and listed: the table has no public id of its own, and the key hash is a secret"
+    }
+  },
+  "MCP_TOOLS": {},
+  "SHARED_TYPES": {
+    "packages/shared-types/src/ai/spend.schema.ts": {
+      "count": 1,
+      "reason": "The super-admin AI spend rows carry the numeric tenant id that addresses /admin/ai-spend/tenants/:tenant_id (beside the public tenantSlug)"
+    },
+    "packages/shared-types/src/ai/telemetry.schema.ts": {
+      "count": 3,
+      "reason": "AiCallContext and AiInvocationRecord are in-process shapes passed between services and the telemetry writer, not API bodies. They hold foreign keys by design"
+    },
+    "packages/shared-types/src/infrastructure/webhook.schema.ts": {
+      "count": 3,
+      "reason": "JobSchema is the super-admin job row: numeric job and tenant ids address the console routes. It also carries publicId, which the list pages by"
+    },
+    "packages/shared-types/src/platform/api-key.schema.ts": {
+      "count": 1,
+      "reason": "An API key is addressed by its numeric id. API keys stay numeric and listed: the table has no public id of its own"
+    },
+    "packages/shared-types/src/platform/login-activity.schema.ts": {
+      "count": 7,
+      "reason": "Login activity is an admin audit view: rows and the Notable panel carry numeric event, user and tenant ids, and the super-admin filter takes one. Rows also carry publicId, which the list pages by"
+    },
+    "packages/shared-types/src/platform/plans.schema.ts": {
+      "count": 1,
+      "reason": "PlanConfig carries its numeric row id; a plan is identified by its TenantPlan value. Drop the id when the plan admin screens are next touched"
+    },
+    "packages/shared-types/src/platform/preferences.schema.ts": {
+      "count": 2,
+      "reason": "UserPreferences returns its row id and the owner's numeric user id to the user themselves. Serialize them out when preferences are next touched"
+    }
+  }
+}

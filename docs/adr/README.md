@@ -20,3 +20,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | #                            | Decision                                                                                     | Status  |
 | ---------------------------- | -------------------------------------------------------------------------------------------- | ------- |
 | [0001](0001-api-contract.md) | API contract: one contract for people and agents (status, errors, inputs, lists, versioning) | Adopted |
+| [0002](0002-id-boundary.md)  | ID boundary: an Int primary key never crosses the API; the public id is a sixth id role      | Adopted |

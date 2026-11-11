@@ -7,6 +7,7 @@ import {
   NotificationType,
   NotificationTypeSchema,
 } from '../generated/prisma-enums';
+import { cursorListSchema } from './cursor-list';
 
 // ─── Notifications ───
 
@@ -24,8 +25,8 @@ export { NotificationCategory, NotificationCategorySchema, NotificationType, Not
 export const NotificationInboxStatusSchema = z.enum(['UNREAD', 'READ', 'DISMISSED']);
 export type NotificationInboxStatus = z.infer<typeof NotificationInboxStatusSchema>;
 
+/** An in-app notification as the API shows it: named by its public id, never the row's Int key. */
 export const NotificationSchema = z.object({
-  id: z.number(),
   notificationId: z.string(),
   type: z.string(),
   category: NotificationCategorySchema.nullable(),
@@ -34,14 +35,14 @@ export const NotificationSchema = z.object({
   actionUrl: z.string().nullable(),
   actionLabel: z.string().nullable(),
   iconType: z.string().nullable(),
-  status: z.string(),
   readAt: z.string().nullable(),
-  dismissedAt: z.string().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
-  groupKey: z.string().nullable().optional(),
   groupCount: z.number().default(1).optional(),
   createdAt: z.string(),
 });
+
+/** `GET /notifications`: a cursor list, newest first. */
+export const NotificationListSchema = cursorListSchema(NotificationSchema);
 
 export const NotificationCountSchema = z.object({
   total: z.number(),
@@ -53,8 +54,8 @@ export const NotificationCountSchema = z.object({
 export const ListNotificationsParamsSchema = z.object({
   status: z.string().optional(),
   category: z.string().optional(),
-  page: z.number().optional(),
   limit: z.number().optional(),
+  cursor: z.string().optional(),
 });
 
 // ─── System Activity / Jobs ───
@@ -66,6 +67,8 @@ export const JobSchema = z.object({
   // Numeric PK — the `jobs` table migrated from a CUID string PK to an Int PK
   // (PR #734/735). Consumers must treat `id` as a number, not a string.
   id: z.number(),
+  /** Public id (uuid): the list cursor tiebreak, and the id a sync-history row is named by. */
+  publicId: z.string(),
   tenantId: z.number(),
   submittedBy: z.number().nullable(),
   category: z.string(),
@@ -116,17 +119,14 @@ export const JobMetricsSchema = z.object({
   avgDurationMs: z.number(),
 });
 
-export const PaginatedJobsSchema = z.object({
-  items: z.array(JobSchema),
-  total: z.number(),
-  limit: z.number(),
-  offset: z.number(),
-});
+/** `GET /admin/jobs`: a cursor list, newest first. */
+export const PaginatedJobsSchema = cursorListSchema(JobSchema);
 
 // Inferred types — `NotificationCategory`, `NotificationType`, `JobStatus`
 // already come from the generated mirror via the re-export above.
 // `NotificationInboxStatus` is exported next to its Schema declaration.
 export type Notification = z.infer<typeof NotificationSchema>;
+export type NotificationList = z.infer<typeof NotificationListSchema>;
 export type NotificationCount = z.infer<typeof NotificationCountSchema>;
 export type ListNotificationsParams = z.infer<typeof ListNotificationsParamsSchema>;
 export type HealthStatus = z.infer<typeof HealthStatusSchema>;
