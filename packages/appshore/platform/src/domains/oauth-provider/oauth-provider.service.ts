@@ -12,6 +12,12 @@ import { resolveOAuthAccessTokenSecret, resolveOAuthConsentSecret, resolveOAuthI
 /** The Prisma delegates token issuance writes through: the client itself, or a transaction. */
 type TokenStore = Pick<PrismaService, 'oAuthAccessToken' | 'oAuthRefreshToken'>;
 
+/** The tenant and role an access token is issued for. */
+interface TokenGrant {
+  tenantId: number;
+  role: string;
+}
+
 /** RFC 6749 Section 5.1 token response (snake_case per spec). */
 export interface OAuthTokenResponse {
   access_token: string;
@@ -237,8 +243,14 @@ export class OAuthProviderService {
     }
 
     this.assertClientHasTenant(authCode.client);
+    const grant = await this.resolveGrant(authCode.user, authCode.client);
+    if (!grant) {
+      throw new BadRequestException(invalidMsg);
+    }
 
-    return this.prisma.$transaction((tx) => this.issueTokens(tx, authCode.user, authCode.client, authCode.scopes));
+    return this.prisma.$transaction((tx) =>
+      this.issueTokens(tx, authCode.user, authCode.client, grant, authCode.scopes),
+    );
   }
 
   /**
@@ -293,6 +305,11 @@ export class OAuthProviderService {
     // 90-day absolute cap from the first token in the chain; past it the client must re-consent.
     this.assertWithinAbsoluteTtl(storedToken.originalIssuedAt);
     this.assertClientHasTenant(storedToken.client);
+    // Not rotated and not revoked: if the membership comes back, the same token works again.
+    const grant = await this.resolveGrant(storedToken.user, storedToken.client);
+    if (!grant) {
+      throw new UnauthorizedException("The user no longer belongs to this app's workspace");
+    }
 
     // The rotation claim and the new tokens commit together. Of two concurrent refreshes with the same token
     // exactly one claims it (the other is reuse and revokes the chain), and a failure while issuing rolls the
@@ -303,7 +320,7 @@ export class OAuthProviderService {
         data: { rotatedAt: new Date() },
       });
       if (claimed.count === 0) return null;
-      const issued = await this.issueTokens(tx, storedToken.user, storedToken.client, storedToken.scopes, {
+      const issued = await this.issueTokens(tx, storedToken.user, storedToken.client, grant, storedToken.scopes, {
         originalIssuedAt: storedToken.originalIssuedAt,
       });
       await tx.oAuthRefreshToken.update({
@@ -435,11 +452,46 @@ export class OAuthProviderService {
     }
   }
 
+  /**
+   * What a token for this user through this client may carry: the client's tenant, never the tenant the user
+   * row currently points at (that follows every workspace switch, so a client connected in one workspace would
+   * otherwise get tokens for whichever workspace the user opened last, where no admin can see or revoke it), and
+   * the user's role in that tenant. Null when the user is not a member of the client's tenant: no tokens then.
+   */
+  private async resolveGrant(
+    user: { id: number; tenantId: number | null; role: string },
+    client: { tenantId: number | null },
+  ): Promise<TokenGrant | null> {
+    const tenantId = client.tenantId;
+    if (tenantId === null) return null;
+
+    const membership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_tenantId: { userId: user.id, tenantId } },
+      select: { role: true },
+    });
+    if (membership) return { tenantId, role: membership.role };
+
+    // No membership row. The user row still names the user's own workspace and role there (accounts created
+    // before memberships existed), and in single-tenant mode everyone belongs to the one implicit tenant.
+    if (user.tenantId === tenantId) return { tenantId, role: user.role };
+    const multiTenancy = this.configService.get<{ enabled: boolean; implicitTenantId: number }>('multiTenancy');
+    if (
+      multiTenancy?.enabled === false &&
+      user.tenantId === null &&
+      user.role !== 'SUPER_ADMIN' &&
+      tenantId === multiTenancy.implicitTenantId
+    ) {
+      return { tenantId, role: user.role };
+    }
+    return null;
+  }
+
   /** Signs and stores an access + refresh pair through `store`, so a caller's transaction covers both rows. */
   private async issueTokens(
     store: TokenStore,
-    user: any,
-    client: any,
+    user: { id: number },
+    client: { id: number; clientId: string },
+    grant: TokenGrant,
     scopes: string[],
     chainContext: { originalIssuedAt?: Date } = {},
   ): Promise<OAuthTokenResponse> {
@@ -453,8 +505,8 @@ export class OAuthProviderService {
     const accessToken = this.jwtService.sign(
       {
         sub: String(user.id),
-        tenantId: user.tenantId,
-        role: user.role,
+        tenantId: grant.tenantId,
+        role: grant.role,
         scopes,
         clientId: client.clientId,
         jti,

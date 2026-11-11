@@ -54,6 +54,7 @@ describe('OAuthProviderService security', () => {
   beforeEach(() => {
     prisma = {
       oAuthClient: { findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
+      workspaceMember: { findUnique: jest.fn().mockResolvedValue({ role: 'ADMIN' }) },
       oAuthAuthorizationCode: { create: jest.fn().mockResolvedValue({}), findUnique: jest.fn(), updateMany: jest.fn() },
       oAuthAccessToken: {
         create: jest.fn().mockResolvedValue({}),
@@ -299,6 +300,104 @@ describe('OAuthProviderService security', () => {
         'This app is connected to a different workspace',
       );
       expect(prisma.oAuthAuthorizationCode.create).not.toHaveBeenCalled();
+    });
+
+    describe("tokens are for the client's tenant, not the workspace the user has open", () => {
+      const verifier = 'verifier-123';
+      // The client belongs to tenant 7; the user row points at tenant 3 (they switched workspace) as OWNER.
+      const elsewhere = { id: 42, tenantId: 3, role: 'OWNER' };
+      const code = () => ({
+        expiresAt: new Date(Date.now() + 60_000),
+        redirectUri: authorizeParams.redirectUri,
+        codeChallenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
+        scopes: ['platform:read'],
+        client: client({ tenantId: 7 }),
+        user: elsewhere,
+      });
+      const refresh = () => ({
+        rotatedAt: null,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+        originalIssuedAt: new Date(),
+        scopes: ['platform:read'],
+        userId: 42,
+        clientId: 10,
+        client: client({ tenantId: 7 }),
+        user: elsewhere,
+      });
+      const exchange = () => service.exchangeCode('code', verifier, 'client-1', undefined, authorizeParams.redirectUri);
+
+      beforeEach(() => {
+        prisma.oAuthAuthorizationCode.updateMany.mockResolvedValue({ count: 1 });
+        prisma.oAuthAuthorizationCode.findUnique.mockResolvedValue(code());
+        prisma.oAuthRefreshToken.findUnique.mockResolvedValue(refresh());
+      });
+
+      it("code exchange signs the client's tenant and the user's role there", async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+
+        const tokens = await exchange();
+
+        expect(prisma.workspaceMember.findUnique).toHaveBeenCalledWith({
+          where: { userId_tenantId: { userId: 42, tenantId: 7 } },
+          select: { role: true },
+        });
+        expect(jwt.decode(tokens.access_token)).toMatchObject({ sub: '42', tenantId: 7, role: 'MEMBER' });
+      });
+
+      it("refresh signs the client's tenant and the user's role there", async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+
+        const tokens = await service.refreshToken('old-refresh', 'client-1', undefined);
+
+        expect(jwt.decode(tokens.access_token)).toMatchObject({ sub: '42', tenantId: 7, role: 'MEMBER' });
+      });
+
+      it("code exchange issues nothing when the user is not a member of the client's tenant", async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue(null);
+
+        await expect(exchange()).rejects.toThrow(BadRequestException);
+        expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
+        expect(prisma.oAuthRefreshToken.create).not.toHaveBeenCalled();
+      });
+
+      it("refresh issues nothing, and leaves the token unrotated, when the user is not a member of the client's tenant", async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue(null);
+
+        await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toThrow(UnauthorizedException);
+        expect(prisma.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
+      });
+
+      it("without a membership row, a user whose own workspace is the client's tenant keeps the role on the user row", async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue(null);
+        prisma.oAuthAuthorizationCode.findUnique.mockResolvedValue({
+          ...code(),
+          user: { id: 42, tenantId: 7, role: 'ADMIN' },
+        });
+
+        expect(jwt.decode((await exchange()).access_token)).toMatchObject({ tenantId: 7, role: 'ADMIN' });
+      });
+
+      it('in single-tenant mode a user with no tenant on the row gets the implicit tenant, and only that one', async () => {
+        prisma.workspaceMember.findUnique.mockResolvedValue(null);
+        const single = {
+          get: (key: string) => (key === 'multiTenancy' ? { enabled: false, implicitTenantId: 7 } : settings[key]),
+        };
+        service = new OAuthProviderService(prisma, jwt, single as never);
+        prisma.oAuthAuthorizationCode.findUnique.mockResolvedValue({
+          ...code(),
+          user: { id: 42, tenantId: null, role: 'MEMBER' },
+        });
+        expect(jwt.decode((await exchange()).access_token)).toMatchObject({ tenantId: 7, role: 'MEMBER' });
+
+        prisma.oAuthAuthorizationCode.findUnique.mockResolvedValue({
+          ...code(),
+          client: client({ tenantId: 8 }),
+          user: { id: 42, tenantId: null, role: 'MEMBER' },
+        });
+        await expect(exchange()).rejects.toThrow(BadRequestException);
+      });
     });
 
     it('issues no tokens on code exchange for a client that belongs to no tenant', async () => {

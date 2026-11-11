@@ -14,6 +14,8 @@ jest.mock('bcrypt', () => ({
 
 const mockPrisma = {
   oAuthClient: { findUnique: jest.fn() },
+  // No membership row: the user row's own tenant and role apply (see resolveGrant).
+  workspaceMember: { findUnique: jest.fn().mockResolvedValue(null) },
   oAuthAuthorizationCode: {
     create: jest.fn(),
     findUnique: jest.fn(),
@@ -315,6 +317,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c-1',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         scopes: ['platform:read'],
@@ -548,6 +551,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c-1',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
@@ -609,6 +613,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'MEMBER', tenant: { id: 1 } },
         scopes: ['platform:read'],
