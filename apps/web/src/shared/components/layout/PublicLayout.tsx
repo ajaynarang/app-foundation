@@ -23,10 +23,7 @@ import { isMultiTenant } from '@appshore/web-core/shared/lib/tenant-url';
 import { Footer } from '@/shared/components/footer';
 import { getInitials } from '@/shared/utils/initials';
 
-const navItems = [
-  { label: 'Home', href: '/', external: false },
-  { label: 'Docs', href: `${process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002'}/docs`, external: true },
-];
+const navItems: { label: string; href: string; external: boolean }[] = [{ label: 'Home', href: '/', external: false }];
 
 interface PublicLayoutProps {
   children: React.ReactNode;

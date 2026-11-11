@@ -268,6 +268,6 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Register this store as the session source for @appshore/web-core (api
-// client, SSE provider, console-url). Runs at module load — any consumer of
+// client, SSE provider). Runs at module load — any consumer of
 // the auth feature wires the bridge automatically.
 registerSessionStore(useAuthStore as unknown as SessionStoreHook);

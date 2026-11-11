@@ -1,47 +1,61 @@
 'use client';
 
+import Link from 'next/link';
 import { Button } from '@app/ui/components/ui/button';
-import { BookOpen, ExternalLink, Mail, MessageSquare, CreditCard, Plug, Settings, Users } from 'lucide-react';
+import { Mail, MessageSquare, CreditCard, Settings, Users, type LucideIcon } from 'lucide-react';
+import { USER_ROLES, type UserRoleValue } from '@app/shared-types';
 
-import { CONSOLE_URL } from '@appshore/web-core/shared/lib/navigation';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
+import { useAuthStore } from '@/features/auth';
 
 // ─── Help Center topics ───
 
-const HELP_TOPICS = [
+interface HelpTopic {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  /** The Settings screen where the topic is handled. */
+  href: string;
+  /** Screens only these roles can open; omitted means everyone. */
+  roles?: ReadonlyArray<UserRoleValue>;
+}
+
+const ADMIN_ROLES: ReadonlyArray<UserRoleValue> = [USER_ROLES.OWNER, USER_ROLES.ADMIN];
+
+const HELP_TOPICS: HelpTopic[] = [
   {
     icon: MessageSquare,
     title: 'Getting Started',
     desc: 'Set up your workspace, invite teammates, and explore the basics',
-    href: '/docs/manual/getting-started/welcome',
+    href: '/onboarding',
   },
   {
     icon: CreditCard,
     title: 'Billing & Subscription',
     desc: 'Manage your plan, payment methods, and invoices',
-    href: '/docs/manual/web-app/admin/tenant-settings',
-  },
-  {
-    icon: Plug,
-    title: 'Integrations',
-    desc: 'Connect external services to your workspace',
-    href: '/docs/manual/web-app/admin/tenant-settings',
+    href: '/settings/subscription',
+    roles: ADMIN_ROLES,
   },
   {
     icon: Settings,
     title: 'Developer Tools',
-    desc: 'API keys, webhooks, OAuth clients, and the public API',
-    href: '/docs/manual/web-app/admin/tenant-settings',
+    desc: 'API keys, webhooks, OAuth clients, and AI assistants',
+    href: '/settings/api-keys',
+    roles: ADMIN_ROLES,
   },
   {
     icon: Users,
     title: 'Account & Team',
     desc: 'Manage users, roles, invitations, and organization settings',
-    href: '/docs/manual/web-app/admin/tenant-settings',
+    href: '/settings/members',
+    roles: ADMIN_ROLES,
   },
 ];
 
 export default function SupportPage() {
+  const role = useAuthStore((s) => s.user?.role) as UserRoleValue | undefined;
+  const topics = HELP_TOPICS.filter((topic) => !topic.roles || (!!role && topic.roles.includes(role)));
+
   return (
     <div className="space-y-6">
       <div>
@@ -67,40 +81,22 @@ export default function SupportPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Help Center</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {HELP_TOPICS.map((topic) => {
+          {topics.map((topic) => {
             const Icon = topic.icon;
             return (
-              <a
+              <Link
                 key={topic.title}
-                href={`${CONSOLE_URL}${topic.href}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-border bg-card p-4 hover:border-muted-foreground/30 transition-colors group"
+                href={topic.href}
+                className="rounded-lg border border-border bg-card p-4 hover:border-muted-foreground/30 transition-colors"
               >
                 <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center mb-3">
                   <Icon className="h-4 w-4 text-foreground" />
                 </div>
-                <div className="flex items-center gap-1 mb-1">
-                  <h3 className="text-sm font-medium text-foreground">{topic.title}</h3>
-                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
+                <h3 className="text-sm font-medium text-foreground mb-1">{topic.title}</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">{topic.desc}</p>
-              </a>
+              </Link>
             );
           })}
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between max-w-lg">
-          <div>
-            <h3 className="text-sm font-medium text-foreground">Can&apos;t find what you&apos;re looking for?</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Browse the full documentation</p>
-          </div>
-          <a href={`${CONSOLE_URL}/docs`} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" />
-              Browse Docs
-            </Button>
-          </a>
         </div>
       </section>
     </div>
