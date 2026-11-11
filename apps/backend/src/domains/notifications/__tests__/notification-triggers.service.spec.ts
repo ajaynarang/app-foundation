@@ -60,7 +60,7 @@ describe('NotificationTriggersService', () => {
   ] as const)('%s links staff to a web-app route, not the retired console', async (method, type, titleTail) => {
     await (service as any)[method](7, 'HubSpot', 'details');
     expect(dispatcher.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: '/settings' }),
+      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: '/settings/general' }),
     );
   });
 

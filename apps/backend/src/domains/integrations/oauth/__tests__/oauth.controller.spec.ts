@@ -99,7 +99,7 @@ describe('OAuthController', () => {
       await controller.callback('c', 's', { query: { code: 'c', state: 's' } }, mockRes as any);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        'https://app.example.com/settings?oauth=connected&vendor=QUICKBOOKS',
+        'https://app.example.com/settings/general?oauth=connected&vendor=QUICKBOOKS',
       );
     });
 
@@ -158,7 +158,7 @@ describe('OAuthController', () => {
       await controller.callback('c', state, { query: { code: 'c', state } }, mockRes as any);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        `https://app.example.com/settings?oauth=error&vendor=${encodeURIComponent('X&next=https://evil.example')}`,
+        `https://app.example.com/settings/general?oauth=error&vendor=${encodeURIComponent('X&next=https://evil.example')}`,
       );
     });
   });
