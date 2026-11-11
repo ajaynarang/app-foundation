@@ -3,11 +3,12 @@ import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.help
 import { IntegrationSyncHistoryQueryDto, SyncHistoryQueryDto } from '../dto/sync-history-query.dto';
 
 describe('sync history query DTOs', () => {
-  it('pages the unified history with limit (default 20) and offset, and reads sync_type and status', async () => {
-    expect(await readQueryDto(SyncHistoryQueryDto, {})).toMatchObject({ limit: 20, offset: 0 });
+  it('pages the unified history with limit and cursor, and reads sync_type and status', async () => {
+    // No limit: the service applies the cursor-list default of 50 (this list used to default to 20).
+    expect((await readQueryDto(SyncHistoryQueryDto, {})).limit).toBeUndefined();
     expect(
-      await readQueryDto(SyncHistoryQueryDto, { limit: '5', offset: '10', sync_type: 'Vendor', status: 'failed' }),
-    ).toMatchObject({ limit: 5, offset: 10, syncType: 'Vendor', status: 'failed' });
+      await readQueryDto(SyncHistoryQueryDto, { limit: '5', cursor: 'abc', sync_type: 'Vendor', status: 'failed' }),
+    ).toMatchObject({ limit: 5, cursor: 'abc', syncType: 'Vendor', status: 'failed' });
   });
 
   it('refuses the old syncType key and an unknown status', async () => {
@@ -15,14 +16,18 @@ describe('sync history query DTOs', () => {
     expect(await fieldErrorsOf(readQueryDto(SyncHistoryQueryDto, { status: 'done' }))).toHaveProperty('status');
   });
 
-  it('answers 400 naming limit or offset when it is not a whole number', async () => {
+  it('answers 400 naming limit when it is not a whole number, and refuses offset paging on both routes', async () => {
     expect(await fieldErrorsOf(readQueryDto(SyncHistoryQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
-    expect(await fieldErrorsOf(readQueryDto(IntegrationSyncHistoryQueryDto, { offset: '1.5' }))).toHaveProperty(
+    expect(await fieldErrorsOf(readQueryDto(SyncHistoryQueryDto, { offset: '10' }))).toHaveProperty('offset');
+    expect(await fieldErrorsOf(readQueryDto(IntegrationSyncHistoryQueryDto, { offset: '10' }))).toHaveProperty(
       'offset',
     );
   });
 
-  it('pages one integration with limit (default 50) and offset', async () => {
-    expect(await readQueryDto(IntegrationSyncHistoryQueryDto, {})).toMatchObject({ limit: 50, offset: 0 });
+  it('pages one integration with limit (clamped to 100) and cursor', async () => {
+    expect(await readQueryDto(IntegrationSyncHistoryQueryDto, { limit: '500', cursor: 'abc' })).toMatchObject({
+      limit: 100,
+      cursor: 'abc',
+    });
   });
 });

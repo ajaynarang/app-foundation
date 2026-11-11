@@ -39,38 +39,38 @@ export class FeedbackAdminController {
     return this.feedbackService.bulkCategorize();
   }
 
-  @Get(':feedback_id')
+  @Get(':id')
   @ApiOperation({ summary: 'Get feedback detail' })
-  async getDetail(@Param('feedback_id', ParseUUIDPipe) feedbackId: string) {
+  async getDetail(@Param('id', ParseUUIDPipe) feedbackId: string) {
     return this.feedbackService.getDetail(feedbackId);
   }
 
-  @Patch(':feedback_id/resolve')
+  @Patch(':id/resolve')
   @ApiOperation({ summary: 'Resolve feedback with note' })
   async resolve(
-    @Param('feedback_id', ParseUUIDPipe) feedbackId: string,
+    @Param('id', ParseUUIDPipe) feedbackId: string,
     @Body() dto: ResolveFeedbackDto,
     @CurrentUser() user: any,
   ) {
     return this.feedbackService.resolve(feedbackId, user.dbId, dto);
   }
 
-  @Patch(':feedback_id/status')
+  @Patch(':id/status')
   @ApiOperation({ summary: 'Update feedback status' })
-  async updateStatus(@Param('feedback_id', ParseUUIDPipe) feedbackId: string, @Body() dto: UpdateStatusDto) {
+  async updateStatus(@Param('id', ParseUUIDPipe) feedbackId: string, @Body() dto: UpdateStatusDto) {
     return this.feedbackService.updateStatus(feedbackId, dto);
   }
 
-  @Post(':feedback_id/categorize')
+  @Post(':id/categorize')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'AI-categorize feedback (on-demand)' })
-  async categorize(@Param('feedback_id', ParseUUIDPipe) feedbackId: string) {
+  async categorize(@Param('id', ParseUUIDPipe) feedbackId: string) {
     return this.feedbackService.categorizeWithAi(feedbackId);
   }
 
-  @Patch(':feedback_id/category')
+  @Patch(':id/category')
   @ApiOperation({ summary: 'Manually set feedback category' })
-  async updateCategory(@Param('feedback_id', ParseUUIDPipe) feedbackId: string, @Body() dto: UpdateCategoryDto) {
+  async updateCategory(@Param('id', ParseUUIDPipe) feedbackId: string, @Body() dto: UpdateCategoryDto) {
     return this.feedbackService.updateCategory(feedbackId, dto);
   }
 }

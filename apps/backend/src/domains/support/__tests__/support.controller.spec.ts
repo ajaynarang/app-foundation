@@ -19,13 +19,13 @@ describe('SupportController', () => {
   beforeEach(async () => {
     service = {
       createTicket: jest.fn().mockResolvedValue({ id: 1 }),
-      listTicketsForTenant: jest.fn().mockResolvedValue({ tickets: [], total: 0 }),
+      listTicketsForTenant: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getTicket: jest.fn().mockResolvedValue({ id: 1 }),
       addMessage: jest.fn().mockResolvedValue({ id: 1 }),
-      listAllTickets: jest.fn().mockResolvedValue({ tickets: [] }),
+      listAllTickets: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       updateTicket: jest.fn().mockResolvedValue({ id: 1 }),
       getStats: jest.fn().mockResolvedValue({ open: 5 }),
-      getTenants: jest.fn().mockResolvedValue([]),
+      getTenants: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
     };
 
     const module = await Test.createTestingModule({
@@ -45,12 +45,12 @@ describe('SupportController', () => {
   it('should list my tickets', async () => {
     await controller.listMyTickets(
       mockUser,
-      await readQueryDto(TicketListQueryDto, { status: 'OPEN', limit: '10', offset: '0' }),
+      await readQueryDto(TicketListQueryDto, { status: 'OPEN', limit: '10', cursor: 'abc' }),
     );
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
       status: 'OPEN',
       limit: 10,
-      offset: 0,
+      cursor: 'abc',
     });
   });
 
@@ -59,7 +59,7 @@ describe('SupportController', () => {
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
       status: undefined,
       limit: undefined,
-      offset: undefined,
+      cursor: undefined,
     });
   });
 
@@ -83,7 +83,7 @@ describe('SupportController', () => {
         category: 'BILLING',
         q: 'test',
         limit: '20',
-        offset: '0',
+        cursor: 'abc',
       }),
     );
     expect(service.listAllTickets).toHaveBeenCalledWith({
@@ -93,7 +93,7 @@ describe('SupportController', () => {
       category: 'BILLING',
       search: 'test',
       limit: 20,
-      offset: 0,
+      cursor: 'abc',
     });
   });
 
@@ -102,7 +102,8 @@ describe('SupportController', () => {
     expect(await fieldErrorsOf(read({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
     expect(await fieldErrorsOf(read({ status: 'open' }))).toHaveProperty('status');
     expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
-    expect(await fieldErrorsOf(read({ offset: '-1' }))).toHaveProperty('offset');
+    // Offset paging is gone: the key is refused like any other the route does not declare.
+    expect(await fieldErrorsOf(read({ offset: '10' }))).toHaveProperty('offset');
     expect(await fieldErrorsOf(read({ tenantId: '1' }))).toHaveProperty('tenantId');
     expect(await fieldErrorsOf(read({ search: 'x' }))).toHaveProperty('search');
   });
@@ -130,7 +131,8 @@ describe('SupportController', () => {
   });
 
   it('should get tenants', async () => {
-    await controller.getTenants();
-    expect(service.getTenants).toHaveBeenCalled();
+    const page = await controller.getTenants({ q: 'acme' });
+    expect(service.getTenants).toHaveBeenCalledWith({ q: 'acme' });
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });
 });

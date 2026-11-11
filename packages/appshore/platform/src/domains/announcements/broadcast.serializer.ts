@@ -1,7 +1,7 @@
 import type { Announcement, AnnouncementPriority, AnnouncementStatus } from '@appshore/db';
 
 /**
- * Broadcasts out of the API, named by their public id (`publicId` — the `/admin/broadcasts/:broadcast_id`
+ * Broadcasts out of the API, named by their public id (`publicId` — the `/admin/broadcasts/:id`
  * id and the list cursor tiebreak). The Int PK never leaves; the author is named by their public `userId`,
  * never the User PK (`createdById` stays inside).
  */

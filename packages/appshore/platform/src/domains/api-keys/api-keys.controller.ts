@@ -13,7 +13,15 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiExtraModels,
+  ApiOkResponse,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -58,6 +66,19 @@ export class ApiKeysController extends BaseTenantController {
   @Get()
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: "List the current user's API keys, newest first (cursor-paged)" })
+  @ApiExtraModels(ApiKeyDto)
+  @ApiOkResponse({
+    description: 'One page of API keys',
+    schema: {
+      type: 'object',
+      required: ['items', 'nextCursor', 'total'],
+      properties: {
+        items: { type: 'array', items: { $ref: getSchemaPath(ApiKeyDto) } },
+        nextCursor: { type: 'string', nullable: true },
+        total: { type: 'integer', minimum: 0 },
+      },
+    },
+  })
   async findAll(@Request() req, @Query() query: CursorQueryDto): Promise<CursorList<ApiKeyDto>> {
     return this.apiKeysService.findAll(req.user.dbId, query);
   }

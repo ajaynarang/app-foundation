@@ -583,10 +583,21 @@ describe('API contract (ratchet)', () => {
     expect(route('mcp-root.controller.ts :: POST /')).toBeDefined();
   });
 
-  it('the list scanner reads handler types (sanity: an array list is seen, a single record is not)', () => {
+  it('the list scanner reads handler types (sanity: an array is seen; a cursor list and a single record are not)', () => {
     const lists = LIST_SCAN().lists.map(routeOf);
-    expect(lists).toContain('packages/appshore/platform/src/domains/api-keys/api-keys.controller.ts :: GET /api-keys');
+    // The plan catalog is a bare array (a BOUNDED_LISTS entry): the scanner still sees it.
+    expect(lists).toContain('packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans');
+    // A CursorList { items, nextCursor, total } is the contract, so it is not a finding.
+    expect(lists.some((k) => k.endsWith('api-keys.controller.ts :: GET /api-keys'))).toBe(false);
     expect(lists.some((k) => k.endsWith('GET /auth/me'))).toBe(false);
+  });
+
+  it('the bounded-read scanner sees a findMany without take (sanity: the flag catalog; a paged list is clean)', () => {
+    const reads = LIST_SCAN().unboundedReads;
+    expect(reads).toContain(
+      'packages/appshore/platform/src/domains/feature-flags/feature-flags.controller.ts :: GET /feature-flags -> FeatureFlagsService.getAllFlags',
+    );
+    expect(reads.some((k) => k.includes('GET /users ->'))).toBe(false);
   });
 
   it('the scanner sees class-level decorators (a class @Throttle / @UseFilters applies to every route)', () => {

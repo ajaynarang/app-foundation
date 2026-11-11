@@ -13,10 +13,10 @@ import { FeedbackAdminController } from '../feedback-admin.controller';
 const FEEDBACK_ID = '0190f1c2-0000-7000-8000-000000000001';
 
 describe('FeedbackAdminController', () => {
-  it('addresses a feedback row by its public id: the param is :feedback_id, parsed as a uuid', () => {
+  it('addresses a feedback row by its public id: every :id is parsed as a uuid, never an Int', () => {
     const source = readFileSync(join(__dirname, '../feedback-admin.controller.ts'), 'utf8');
     expect(source).not.toMatch(/ParseIntPipe/);
-    expect(source.match(/@Param\('feedback_id', ParseUUIDPipe\)/g)).toHaveLength(5);
+    expect(source.match(/@Param\('id', ParseUUIDPipe\)/g)).toHaveLength(5);
   });
 
   let controller: FeedbackAdminController;

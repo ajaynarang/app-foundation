@@ -8,7 +8,7 @@ import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { BroadcastListQueryDto } from './dto/broadcast-list-query.dto';
 
-const BROADCAST_ID_PARAM = { name: 'broadcast_id', description: 'The broadcast public id (uuid)' };
+const BROADCAST_ID_PARAM = { name: 'id', description: 'The broadcast public id (uuid)' };
 
 @ApiTags('Broadcasts (Admin)')
 @Controller('admin/broadcasts')
@@ -26,10 +26,10 @@ export class AnnouncementsController {
     return this.service.findAll(query);
   }
 
-  @Get(':broadcast_id')
+  @Get(':id')
   @ApiOperation({ summary: 'Get broadcast by its public id' })
   @ApiParam(BROADCAST_ID_PARAM)
-  findOne(@Param('broadcast_id', ParseUUIDPipe) broadcastId: string) {
+  findOne(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.findOne(broadcastId);
   }
 
@@ -40,26 +40,26 @@ export class AnnouncementsController {
     return this.service.create(dto, user.dbId);
   }
 
-  @Patch(':broadcast_id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
-  update(@Param('broadcast_id', ParseUUIDPipe) broadcastId: string, @Body() dto: UpdateAnnouncementDto) {
+  update(@Param('id', ParseUUIDPipe) broadcastId: string, @Body() dto: UpdateAnnouncementDto) {
     return this.service.update(broadcastId, dto);
   }
 
-  @Post(':broadcast_id/publish')
+  @Post(':id/publish')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Publish a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
-  publish(@Param('broadcast_id', ParseUUIDPipe) broadcastId: string) {
+  publish(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.publish(broadcastId);
   }
 
-  @Post(':broadcast_id/archive')
+  @Post(':id/archive')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
-  archive(@Param('broadcast_id', ParseUUIDPipe) broadcastId: string) {
+  archive(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.archive(broadcastId);
   }
 }

@@ -20,7 +20,31 @@
     "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/messages": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames",
     "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/resume": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames"
   },
-  "BOUNDED_LISTS": {},
-  "BOUNDED_READS": {},
+  "BOUNDED_LISTS": {
+    "apps/backend/src/domains/admin/admin-ai-spend.controller.ts :: GET /admin/ai-spend/tenants/:tenant_id/by-surface": "One row per AI surface: the query groups by the AiSurface enum",
+    "apps/backend/src/domains/admin/admin-events.controller.ts :: GET /admin/events/volume": "One bucket per hour and event type over a fixed 24 hours, counted in SQL: at most 24 rows per event in the registry",
+    "apps/backend/src/domains/admin/admin-jobs.controller.ts :: GET /admin/jobs/categories/summary": "One row per job category in the JOB_CATEGORIES registry (code-defined)",
+    "apps/backend/src/domains/admin/admin-schedules.controller.ts :: GET /admin/schedules": "One row per registered repeatable schedule: job_schedules is unique on (category, job_type) and both are code-defined",
+    "apps/backend/src/domains/ai/agent-contract/developer-scopes.controller.ts :: GET /developer/scopes": "The static agent scope catalog (code-defined)",
+    "apps/backend/src/domains/billing/controllers/billing.controller.ts :: GET /billing/payment-methods": "A mirror of the provider customer's payment methods, read with take PAYMENT_METHOD_LIST_CAP (100)",
+    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: GET /desk/agents": "One row per Desk agent of the workspace: desk_agents is unique on (tenant_id, key) and agents are seeded from the code registry",
+    "apps/backend/src/domains/desk/core/responsibility/responsibility.controller.ts :: GET /desk/responsibilities": "One row per entry in RESPONSIBILITY_REGISTRY (code-defined): the handler maps the registry, not the table",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations": "One config per (integration type, vendor) for the workspace: a unique key, bounded by VENDOR_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/vendors": "The static VENDOR_REGISTRY (code-defined)",
+    "packages/appshore/platform/src/domains/announcements/broadcasts-public.controller.ts :: GET /broadcasts/active": "The broadcasts live right now for the banner: read with take ACTIVE_BROADCAST_SCAN_CAP and cut to ACTIVE_BROADCAST_CAP (20)",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans": "The plan catalog: one row per value of the TenantPlan enum"
+  },
+  "BOUNDED_READS": {
+    "apps/backend/src/domains/admin/admin-schedules.controller.ts :: GET /admin/schedules -> ScheduleManagerService.listSchedules": "job_schedules is unique on (category, job_type); both come from the code-defined job registry",
+    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: GET /desk/agents -> DeskAgentService.listForTenant": "desk_agents is unique on (tenant_id, key); a workspace holds one row per agent in the code registry",
+    "apps/backend/src/domains/desk/core/responsibility/responsibility.controller.ts :: GET /desk/responsibilities -> DeskResponsibilityService.listForTenant": "desk_responsibilities is unique on (tenant_id, key); a workspace holds one row per entry in RESPONSIBILITY_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations -> IntegrationsService.listIntegrations": "integration_configs is unique on (tenant_id, integration_type, vendor); bounded by VENDOR_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/health -> IntegrationsService.getHealthSummary": "The integration_configs read is bounded by its unique key (tenant_id, integration_type, vendor); the jobs read in the same method has take MAX_ACTIVE_SYNCS_SHOWN",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/vendors -> IntegrationsService.getVendorRegistry": "vendor_configs is unique on vendor_id: one row per vendor in VENDOR_REGISTRY",
+    "packages/appshore/platform/src/domains/feature-flags/feature-flags.controller.ts :: GET /feature-flags -> FeatureFlagsService.getAllFlags": "feature_flags is unique on key: one row per feature key the code declares",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans -> PlansService.getAllPlanConfigs": "plan_configs is unique on plan (the TenantPlan enum); plan_entitlements is unique on (plan, feature)",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans/my-plan -> PlansService.getTenantPlanDetails": "The entitlements of one plan: plan_entitlements is unique on (plan, feature), one row per feature key; the plan-event read has take 10",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans/tenant/:tenant_id -> PlansService.getTenantPlanDetails": "The entitlements of one plan: plan_entitlements is unique on (plan, feature), one row per feature key; the plan-event read has take 10"
+  },
   "QUERY_KEY_ALLOWLIST": {}
 }

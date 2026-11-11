@@ -1276,7 +1276,7 @@ model WebhookDeliveryLog {
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, createdAt])
-  @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:subscription_id/logs
+  @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:id/logs
   @@map("webhook_delivery_logs")
 }
 

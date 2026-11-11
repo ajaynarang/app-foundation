@@ -16,13 +16,13 @@ export class NotificationsController {
   constructor(private readonly service: InAppNotificationService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List notifications for current user' })
+  @ApiOperation({ summary: 'List notifications for current user, newest first (cursor-paged)' })
   async list(@CurrentUser() user: any, @Query() query: NotificationListQueryDto) {
     return this.service.listForUser(user.dbId, {
       status: query.status,
       category: query.category,
-      page: query.page,
       limit: query.limit,
+      cursor: query.cursor,
     });
   }
 

@@ -70,13 +70,7 @@ export class IntegrationsController {
   @Get('sync-history')
   async getUnifiedSyncHistory(@Request() req, @Query() query: SyncHistoryQueryDto) {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.getUnifiedSyncHistory(
-      tenant.id,
-      query.limit,
-      query.offset,
-      query.syncType,
-      query.status,
-    );
+    return this.integrationsService.getUnifiedSyncHistory(tenant.id, query);
   }
 
   // ---- Parameterized routes (must come AFTER static routes) ----
@@ -171,7 +165,7 @@ export class IntegrationsController {
     @Query() query: IntegrationSyncHistoryQueryDto,
   ) {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.getSyncHistory(integrationId, tenant.id, query.limit, query.offset);
+    return this.integrationsService.getSyncHistory(integrationId, tenant.id, query);
   }
 
   @Get(':integration_id/sync-history/stats')

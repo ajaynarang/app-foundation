@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import * as dns from 'node:dns';
@@ -202,7 +203,7 @@ describe('WebhookSubscriptionService', () => {
       prisma.webhookSubscription.findMany.mockResolvedValue([]);
       prisma.webhookSubscription.count.mockResolvedValue(0);
 
-      await service.findAll(tenantId, { limit: 20, offset: 0 });
+      await service.findAll(tenantId, { limit: 20 });
       await service.findOne(tenantId, 'sub-1');
 
       for (const select of [
@@ -213,6 +214,61 @@ describe('WebhookSubscriptionService', () => {
         expect(select).not.toHaveProperty('previousSecret');
         expect(select.previousSecretExpiresAt).toBe(true);
       }
+    });
+  });
+
+  describe('lists page by cursor, newest first', () => {
+    const tenantId = 1;
+    // A replay writes several delivery rows in one millisecond; one row is another subscription's.
+    const stamps = tiedTimestamps(8);
+    const logs = stamps.map((createdAt, index) => ({
+      id: `0190f1c2-0000-7000-8000-00000000000${(index * 5) % 8}`,
+      subscriptionId: index === 7 ? 'sub-2' : 'sub-1',
+      event: 'user.created',
+      createdAt,
+    }));
+    const subscriptions = stamps.map((createdAt, index) => ({
+      id: `sub_${(index * 3) % 8}`,
+      tenantId: index === 7 ? 2 : tenantId,
+      active: index !== 6,
+      url: `https://example.com/hook/${index}`,
+      createdAt,
+    }));
+
+    it('walks every delivery of the subscription once, same-millisecond rows included', async () => {
+      prisma.webhookSubscription.findFirst.mockResolvedValue({ id: 'sub-1', tenantId });
+      Object.assign(prisma.webhookDeliveryLog, fixtureModel(logs));
+
+      const totals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.findLogs(tenantId, 'sub-1', { limit: 3, cursor });
+        totals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+      expect(new Set(items.map((log) => log.id)).size).toBe(7);
+      const times = items.map((log) => log.createdAt.getTime());
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+      expect(totals).toEqual([7, 7, 7]);
+    });
+
+    it("walks the workspace's active subscriptions once, and never another workspace's or a deleted one", async () => {
+      Object.assign(prisma.webhookSubscription, fixtureModel(subscriptions));
+
+      const { pages, items } = await walkCursorList((cursor) => service.findAll(tenantId, { limit: 4, cursor }));
+
+      expect(pages.map((page) => page.length)).toEqual([4, 2]);
+      expect(new Set(items.map((subscription) => subscription.id)).size).toBe(6);
+      expect((await service.findAll(tenantId, { limit: 1 })).total).toBe(6);
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.findAll(tenantId, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+      await expect(service.findLogs(tenantId, 'sub-1', { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+      expect(prisma.webhookSubscription.findMany).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.findFirst).not.toHaveBeenCalled();
+      expect(prisma.webhookDeliveryLog.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -238,7 +294,7 @@ describe('WebhookSubscriptionService', () => {
       const calls: Array<() => Promise<unknown>> = [
         () => service.update(otherTenantId, 'sub-1', { active: false }),
         () => service.softDelete(otherTenantId, 'sub-1'),
-        () => service.findLogs(otherTenantId, 'sub-1', { limit: 20, offset: 0 }),
+        () => service.findLogs(otherTenantId, 'sub-1', { limit: 20 }),
         () => service.retryDelivery(otherTenantId, 'sub-1', 'log-1'),
         () => service.replayEvents(otherTenantId, 'sub-1', { since: '2026-04-01T00:00:00Z' }),
       ];

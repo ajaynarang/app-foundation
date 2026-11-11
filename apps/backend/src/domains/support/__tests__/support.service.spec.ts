@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { NotFoundException } from '@nestjs/common';
 import { SupportService } from '../support.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
@@ -125,25 +126,76 @@ describe('SupportService', () => {
 
       const result = await service.listTicketsForTenant(1, {
         limit: 10,
-        offset: 0,
       });
 
-      expect(result.tickets).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
+      expect(result.nextCursor).toBeNull();
       expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { tenantId: 1 },
-          take: 10,
-          skip: 0,
+          orderBy: [{ createdAt: 'desc' }, { ticketNumber: 'desc' }],
+          take: 11,
         }),
       );
+      expect(prisma.supportTicket.findMany.mock.calls[0][0].skip).toBeUndefined();
+    });
+
+    describe('walking pages over a fixture', () => {
+      // Tickets imported together share a timestamp. One is another tenant's, one is closed.
+      const stamps = tiedTimestamps(9);
+      const rows = stamps.map((createdAt, index) => ({
+        ...mockTicket,
+        id: index + 1,
+        ticketNumber: `ST-${1000 + ((index * 5) % 9)}`,
+        tenantId: index === 8 ? 2 : 1,
+        status: index === 0 ? 'CLOSED' : 'OPEN',
+        subject: index === 3 ? 'Refund 100% of invoice' : `Ticket ${index}`,
+        createdAt,
+      }));
+
+      beforeEach(() => Object.assign(prisma.supportTicket, fixtureModel(rows)));
+
+      it("returns every ticket of the tenant once, ties included, and none of another tenant's", async () => {
+        const totals: number[] = [];
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listTicketsForTenant(1, { limit: 3, cursor });
+          totals.push(page.total);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([3, 3, 2]);
+        expect(new Set(items.map((ticket) => ticket.ticketNumber)).size).toBe(8);
+        const times = items.map((ticket) => new Date(ticket.createdAt).getTime());
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+        expect(totals).toEqual([8, 8, 8]);
+      });
+
+      it('pages the super-admin list across tenants, filtered and searched, with the matching total', async () => {
+        const all = await walkCursorList((cursor) => service.listAllTickets({ limit: 4, cursor }));
+        expect(all.items).toHaveLength(9);
+
+        const open = await service.listAllTickets({ tenantId: 1, status: 'OPEN' as never, limit: 2 });
+        expect(open.total).toBe(7);
+        expect(open.nextCursor).not.toBeNull();
+
+        // "%" is matched literally: it finds the one subject that holds it, not every ticket.
+        const searched = await service.listAllTickets({ search: '100%' });
+        expect(searched.items.map((ticket) => ticket.subject)).toEqual(['Refund 100% of invoice']);
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(service.listTicketsForTenant(1, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        await expect(service.listAllTickets({ cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        expect(prisma.supportTicket.findMany).not.toHaveBeenCalled();
+      });
     });
 
     it('should filter by status', async () => {
       prisma.supportTicket.findMany.mockResolvedValue([]);
       prisma.supportTicket.count.mockResolvedValue(0);
 
-      await service.listTicketsForTenant(1, { status: 'OPEN' });
+      await service.listTicketsForTenant(1, { status: 'OPEN' as never });
 
       expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -469,15 +521,33 @@ describe('SupportService', () => {
       );
     });
 
+    it('lists the tenants behind the admin filter as a picker: only tenants with a ticket, searched on the server', async () => {
+      prisma.tenant = {
+        findMany: jest.fn().mockResolvedValue([{ id: 1, tenantId: 'acme', companyName: 'Acme' }]),
+        count: jest.fn().mockResolvedValue(1),
+      };
+
+      const result = await service.getTenants({ q: 'ac' });
+
+      expect(result).toEqual({
+        items: [{ id: 1, tenantId: 'acme', companyName: 'Acme' }],
+        nextCursor: null,
+        total: 1,
+      });
+      expect(prisma.tenant.findMany.mock.calls[0][0].where.AND[0]).toEqual({ supportTickets: { some: {} } });
+      // No ticket row is read to find its tenant.
+      expect(prisma.supportTicket.findMany).not.toHaveBeenCalled();
+    });
+
     it('should filter by multiple criteria', async () => {
       prisma.supportTicket.findMany.mockResolvedValue([]);
       prisma.supportTicket.count.mockResolvedValue(0);
 
       await service.listAllTickets({
         tenantId: 1,
-        status: 'OPEN',
-        priority: 'HIGH',
-        category: 'TECHNICAL',
+        status: 'OPEN' as never,
+        priority: 'HIGH' as never,
+        category: 'TECHNICAL' as never,
       });
 
       expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(

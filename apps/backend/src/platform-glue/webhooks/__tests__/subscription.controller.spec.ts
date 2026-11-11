@@ -86,17 +86,18 @@ describe('SubscriptionController', () => {
 });
 
 describe('webhook list query DTOs', () => {
-  it('pages with limit (1…100, default 20) and offset', async () => {
-    expect(await readQueryDto(WebhookListQueryDto, {})).toMatchObject({ limit: 20, offset: 0 });
-    expect(await readQueryDto(WebhookListQueryDto, { limit: '500', offset: '40' })).toMatchObject({
+  it('pages with limit (1…100; the service defaults to 50) and cursor', async () => {
+    expect((await readQueryDto(WebhookListQueryDto, {})).limit).toBeUndefined();
+    expect(await readQueryDto(WebhookListQueryDto, { limit: '500', cursor: 'abc' })).toMatchObject({
       limit: 100,
-      offset: 40,
+      cursor: 'abc',
     });
   });
 
-  it('answers 400 naming limit or offset when it is not a whole number', async () => {
+  it('answers 400 naming limit when it is not a whole number, and refuses offset paging', async () => {
     expect(await fieldErrorsOf(readQueryDto(WebhookListQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
-    expect(await fieldErrorsOf(readQueryDto(WebhookListQueryDto, { offset: '-1' }))).toHaveProperty('offset');
+    expect(await fieldErrorsOf(readQueryDto(WebhookListQueryDto, { offset: '40' }))).toHaveProperty('offset');
+    expect(await fieldErrorsOf(readQueryDto(WebhookLogListQueryDto, { offset: '40' }))).toHaveProperty('offset');
   });
 
   it('reads date_from and date_to as YYYY-MM-DD and refuses the old dateFrom and dateTo', async () => {

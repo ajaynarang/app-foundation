@@ -20,6 +20,7 @@ import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { AdminTicketListQueryDto, TicketListQueryDto } from './dto/ticket-list-query.dto';
+import { ListQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 
 @ApiTags('Support')
 @Controller('support')
@@ -44,7 +45,7 @@ export class SupportController {
     return this.supportService.listTicketsForTenant(user.tenantDbId, {
       status: query.status,
       limit: query.limit,
-      offset: query.offset,
+      cursor: query.cursor,
     });
   }
 
@@ -74,7 +75,7 @@ export class SupportController {
       category: query.category,
       search: query.q,
       limit: query.limit,
-      offset: query.offset,
+      cursor: query.cursor,
     });
   }
 
@@ -115,8 +116,8 @@ export class SupportController {
 
   @Get('admin/tenants')
   @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'List tenants that have submitted support tickets' })
-  async getTenants() {
-    return this.supportService.getTenants();
+  @ApiOperation({ summary: 'Tenants that have opened a ticket, by name (a picker: cursor list with q)' })
+  async getTenants(@Query() query: ListQueryDto) {
+    return this.supportService.getTenants(query);
   }
 }

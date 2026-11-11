@@ -52,7 +52,7 @@ export class SubscriptionController {
   @Get()
   @ApiOperation({ summary: 'List webhook subscriptions' })
   async findAll(@CurrentUser() user: any, @Query() query: WebhookListQueryDto) {
-    return this.subscriptionService.findAll(user.tenantDbId, { limit: query.limit, offset: query.offset });
+    return this.subscriptionService.findAll(user.tenantDbId, { limit: query.limit, cursor: query.cursor });
   }
 
   @Get(':id')
@@ -91,7 +91,7 @@ export class SubscriptionController {
   async getLogs(@CurrentUser() user: any, @Param('id') id: string, @Query() query: WebhookLogListQueryDto) {
     return this.subscriptionService.findLogs(user.tenantDbId, id, {
       limit: query.limit,
-      offset: query.offset,
+      cursor: query.cursor,
       dateFrom: query.dateFrom ?? null,
       dateTo: query.dateTo ?? null,
     });

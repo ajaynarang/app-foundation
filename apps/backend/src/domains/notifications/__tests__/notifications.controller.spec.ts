@@ -34,13 +34,18 @@ describe('NotificationsController', () => {
   it('should list notifications with filters', async () => {
     await controller.list(
       mockUser,
-      await readQueryDto(NotificationListQueryDto, { status: 'unread', category: 'BILLING', page: '1', limit: '20' }),
+      await readQueryDto(NotificationListQueryDto, {
+        status: 'unread',
+        category: 'BILLING',
+        cursor: 'abc',
+        limit: '20',
+      }),
     );
     expect(service.listForUser).toHaveBeenCalledWith(42, {
       status: 'unread',
       category: 'BILLING',
-      page: 1,
       limit: 20,
+      cursor: 'abc',
     });
   });
 
@@ -49,17 +54,17 @@ describe('NotificationsController', () => {
     expect(service.listForUser).toHaveBeenCalledWith(42, {
       status: undefined,
       category: undefined,
-      page: undefined,
       limit: undefined,
+      cursor: undefined,
     });
   });
 
-  it('answers 400 naming an unknown status or category, or a page or limit that is not a number', async () => {
+  it('answers 400 naming an unknown status or category, a limit that is not a number, or page paging', async () => {
     const read = (raw: Record<string, unknown>) => readQueryDto(NotificationListQueryDto, raw);
     expect(await fieldErrorsOf(read({ status: 'seen' }))).toHaveProperty('status');
     expect(await fieldErrorsOf(read({ category: 'alert' }))).toHaveProperty('category');
-    expect(await fieldErrorsOf(read({ page: 'abc' }))).toHaveProperty('page');
-    expect(await fieldErrorsOf(read({ page: '0' }))).toHaveProperty('page');
+    // The inbox is a cursor list: `page` is refused like any key the route does not declare.
+    expect(await fieldErrorsOf(read({ page: '2' }))).toHaveProperty('page');
     expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
   });
 
