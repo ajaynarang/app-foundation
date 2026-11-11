@@ -145,7 +145,7 @@ apps/web/src/
     platform/             # settings, plans, feature-flags, api-keys, workspaces, onboarding, …
     <your-feature>/       # api.ts, hooks/, components/, index.ts
   shared/                 # App-level shared code
-    components/           # page-chrome/, layout/, common/, ui/, command-palette/
+    components/           # page-chrome/, layout/, common/, command-palette/ (no ui/: components come from @app/ui)
     config/  hooks/  providers/  utils/
   middleware.ts           # Route protection + tenant resolution
 
@@ -920,10 +920,12 @@ Shared monorepo UI package (`packages/ui/`) exports:
 - `Button` takes `asChild`: a navigating action is `<Button asChild><Link href="…">…</Link></Button>`, a real link with the button look
 - Page chrome and the list components (`@app/ui/components/page-chrome`, §15.4); `StatusBadge` and the status tones (§11)
 - The shadcn component set (accordion, alert, badge, button, card, dialog, sheet, table, tabs, etc.)
-- `FormSheet` — smart sheet wrapper
+- `FormSheet` — smart sheet wrapper; `SheetSizeControls`, `DateRangeFilter`, `SortButton`
 - Tailwind preset with semantic color tokens, dark mode, animations
 
 Use `@app/ui` components only — no raw `<button>`/`<input>`/`<select>`/`<table>`.
+
+**One component set.** A shadcn component is imported from `@app/ui/components/ui/<name>` and from nowhere else. `apps/web/src/shared/components/ui/` is gone: a file there may only re-export from `@app/ui`, and nothing imports through `@/shared/components/ui/` (held by `apps/web/src/shared/components/__tests__/single-component-set.test.ts`, which the pre-push hook runs). A component that is missing, or needs a new behaviour, is added or changed in `packages/ui/src/components/ui/`, never copied into the app. There is one `FormSheet` and one `Sheet`: `FormSheet` takes `size` (`sm` or `md`) for a fixed width, or `entityType` to show the size controls (`SheetSizeControls`) and remember the chosen width per entity; `titleNode` puts rich content in the title and `headerActions` puts buttons before pin and close.
 
 ---
 

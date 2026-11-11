@@ -181,7 +181,8 @@ string is a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decisi
 
 ### UI standards
 
-shadcn/ui components only (no raw `<button>`/`<input>`). Dark-theme tokens (`bg-background`,
+shadcn/ui components only (no raw `<button>`/`<input>`). They come from `@app/ui/components/ui/*`, the one
+component set; the web app keeps no copy. Dark-theme tokens (`bg-background`,
 `text-foreground`, `border-border`) — never standalone light-only colors. Sheet for 4+ field
 forms, Dialog for quick actions, AlertDialog for destructive confirmations. Every mutation shows
 success + error toasts; every loading state shows a Skeleton.
@@ -210,7 +211,8 @@ success + error toasts; every loading state shows a Skeleton.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
-  holds it.
+  holds it. It then runs the web guard `single-component-set.test.ts`: the shadcn components live in `@app/ui`
+  and `apps/web/src/shared/components/ui/` holds no copy.
 - **The API contract ratchet** (`apps/backend/src/architecture/api-contract.spec.ts`) — one rule per line of the
   ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. A violation that predates a
   rule sits in `api-contract.baseline.json`, which can only shrink. A decision that is not debt (a route whose wire

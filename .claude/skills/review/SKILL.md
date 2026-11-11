@@ -136,7 +136,7 @@ Review every file against the frontend patterns skill. For each violation found,
 - The fix (for CONVENTION: provide exact replacement code)
 
 ## CRITICAL violations (always check, all files):
-1. Plain HTML elements instead of @app/ui shadcn components: <button>, <input>, <select>, <table>, <label>, <textarea>
+1. Plain HTML elements instead of @app/ui shadcn components: <button>, <input>, <select>, <table>, <label>, <textarea>. A shadcn component is imported from `@app/ui/components/ui/*` only: no copy under `apps/web/src/shared/components/ui/` and no import through `@/shared/components/ui/` (single-component-set.test.ts)
 2. Standalone light-only colors without dark variant or semantic token: bg-white, bg-gray-50, text-gray-900, text-gray-600, border-gray-200, hover:bg-gray-100
 3. Missing mutation toasts: every useMutation must have both showSuccess() and showError() (or a verified global fallback)
 4. Loading states using Loader2/spinner/null instead of <Skeleton>
