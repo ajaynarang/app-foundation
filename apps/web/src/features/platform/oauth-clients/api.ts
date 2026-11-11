@@ -25,11 +25,14 @@ export const oauthClientsApi = {
   rotateSecret: (clientId: string): Promise<{ clientSecret: string }> =>
     apiClient<{ clientSecret: string }>(`/oauth/clients/${clientId}/rotate-secret`, { method: 'POST' }),
 
-  pause: (clientId: string): Promise<void> => apiClient<void>(`/oauth/clients/${clientId}/pause`, { method: 'POST' }),
+  pause: (clientId: string): Promise<OAuthClientResponse> =>
+    apiClient<OAuthClientResponse>(`/oauth/clients/${clientId}/pause`, { method: 'POST' }),
 
-  resume: (clientId: string): Promise<void> => apiClient<void>(`/oauth/clients/${clientId}/resume`, { method: 'POST' }),
+  resume: (clientId: string): Promise<OAuthClientResponse> =>
+    apiClient<OAuthClientResponse>(`/oauth/clients/${clientId}/resume`, { method: 'POST' }),
 
-  revoke: (clientId: string): Promise<void> => apiClient<void>(`/oauth/clients/${clientId}/revoke`, { method: 'POST' }),
+  revoke: (clientId: string): Promise<OAuthClientResponse> =>
+    apiClient<OAuthClientResponse>(`/oauth/clients/${clientId}/revoke`, { method: 'POST' }),
 
   updateScopes: (clientId: string, scopes: AgentScope[]): Promise<OAuthClientResponse> =>
     apiClient<OAuthClientResponse>(`/oauth/clients/${clientId}/scopes`, {

@@ -40,7 +40,7 @@ export const adminBillingApi = {
   },
 
   /** Add wallet credits as a gift */
-  addCredit(tenantId: number, data: { amountCents: number; reason: string }): Promise<{ success: boolean }> {
+  addCredit(tenantId: number, data: { amountCents: number; reason: string }): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/credit`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -48,7 +48,7 @@ export const adminBillingApi = {
   },
 
   /** Override unit price for custom pricing */
-  overridePrice(tenantId: number, unitPriceCents: number): Promise<{ success: boolean }> {
+  overridePrice(tenantId: number, unitPriceCents: number): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/price`, {
       method: 'PATCH',
       body: JSON.stringify({ unitPriceCents }),
@@ -67,26 +67,26 @@ export const adminBillingApi = {
   },
 
   /** Immediately cancel subscription (not at period end) */
-  cancelImmediately(tenantId: number): Promise<{ success: boolean }> {
+  cancelImmediately(tenantId: number): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/cancel-immediately`, { method: 'POST' });
   },
 
   /** Pause billing (cancel at period end) */
-  pauseBilling(tenantId: number): Promise<{ success: boolean }> {
+  pauseBilling(tenantId: number): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/pause`, {
       method: 'POST',
     });
   },
 
   /** Resume paused billing */
-  resumeBilling(tenantId: number): Promise<{ success: boolean }> {
+  resumeBilling(tenantId: number): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/resume`, {
       method: 'POST',
     });
   },
 
   /** Extend trial by N days */
-  extendTrial(tenantId: number, days: number): Promise<{ success: boolean }> {
+  extendTrial(tenantId: number, days: number): Promise<TenantBillingState> {
     return apiClient(`/admin/billing/tenants/${tenantId}/extend-trial`, {
       method: 'POST',
       body: JSON.stringify({ days }),

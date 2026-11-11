@@ -1,10 +1,8 @@
 import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type {
   BillingOverview,
-  BillingSubscription,
   BillingInvoice,
   PaymentMethod,
-  Wallet,
   WalletTransaction,
   WalletBalanceResponse,
   CreateCheckoutSessionRequest,
@@ -31,46 +29,46 @@ export const billingApi = {
       body: JSON.stringify(data),
     }),
 
-  upgradePlan: async (data: UpgradePlanRequest): Promise<BillingSubscription> =>
-    apiClient<BillingSubscription>('/billing/upgrade', {
+  upgradePlan: async (data: UpgradePlanRequest): Promise<BillingOverview> =>
+    apiClient<BillingOverview>('/billing/upgrade', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  downgradePlan: async (data: DowngradePlanRequest): Promise<BillingSubscription> =>
-    apiClient<BillingSubscription>('/billing/downgrade', {
+  downgradePlan: async (data: DowngradePlanRequest): Promise<BillingOverview> =>
+    apiClient<BillingOverview>('/billing/downgrade', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateQuantity: async (data: UpdateQuantityRequest): Promise<BillingSubscription> =>
-    apiClient<BillingSubscription>('/billing/quantity', {
+  updateQuantity: async (data: UpdateQuantityRequest): Promise<BillingOverview> =>
+    apiClient<BillingOverview>('/billing/quantity', {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  cancelSubscription: async (data?: CancelSubscriptionRequest): Promise<void> =>
-    apiClient('/billing/cancel', {
+  cancelSubscription: async (data?: CancelSubscriptionRequest): Promise<BillingOverview> =>
+    apiClient<BillingOverview>('/billing/cancel', {
       method: 'POST',
       body: JSON.stringify(data ?? {}),
     }),
 
-  reactivateSubscription: async (): Promise<BillingSubscription> =>
-    apiClient<BillingSubscription>('/billing/reactivate', { method: 'POST' }),
+  reactivateSubscription: async (): Promise<BillingOverview> =>
+    apiClient<BillingOverview>('/billing/reactivate', { method: 'POST' }),
 
   // ---------------------------------------------------------------------------
   // Wallet
   // ---------------------------------------------------------------------------
   getWalletBalance: async (): Promise<WalletBalanceResponse> => apiClient<WalletBalanceResponse>('/billing/wallet'),
 
-  topUp: async (data: TopUpRequest): Promise<WalletTransaction> =>
-    apiClient<WalletTransaction>('/billing/wallet/top-up', {
+  topUp: async (data: TopUpRequest): Promise<WalletBalanceResponse> =>
+    apiClient<WalletBalanceResponse>('/billing/wallet/top-up', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateAutoReload: async (data: AutoReloadSettings): Promise<Wallet> =>
-    apiClient<Wallet>('/billing/wallet/auto-reload', {
+  updateAutoReload: async (data: AutoReloadSettings): Promise<WalletBalanceResponse> =>
+    apiClient<WalletBalanceResponse>('/billing/wallet/auto-reload', {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
@@ -124,9 +122,9 @@ export const billingApi = {
 
   listPaymentMethods: async (): Promise<PaymentMethod[]> => apiClient<PaymentMethod[]>('/billing/payment-methods'),
 
-  setDefaultPaymentMethod: async (id: string): Promise<void> =>
-    apiClient(`/billing/payment-methods/${id}/default`, { method: 'PATCH' }),
+  setDefaultPaymentMethod: async (id: string): Promise<BillingOverview> =>
+    apiClient<BillingOverview>(`/billing/payment-methods/${id}/default`, { method: 'PATCH' }),
 
   removePaymentMethod: async (id: string): Promise<void> =>
-    apiClient(`/billing/payment-methods/${id}`, { method: 'DELETE' }),
+    apiClient<void>(`/billing/payment-methods/${id}`, { method: 'DELETE' }),
 };

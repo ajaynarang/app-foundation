@@ -105,8 +105,9 @@ export async function getWebhookLogs(
   return apiClient<WebhookLogsResponse>(`/webhooks/${id}/logs?${qs.toString()}`);
 }
 
-export async function testWebhook(id: string): Promise<{ message: string }> {
-  return apiClient<{ message: string }>(`/webhooks/${id}/test`, {
+/** 202: the queued test delivery, to follow in the log. */
+export async function testWebhook(id: string): Promise<WebhookDeliveryLog> {
+  return apiClient<WebhookDeliveryLog>(`/webhooks/${id}/test`, {
     method: 'POST',
   });
 }
@@ -125,8 +126,9 @@ export async function fetchEventCatalog(): Promise<{
   return apiClient<{ categories: WebhookEventCategory[] }>('/webhooks/events');
 }
 
-export async function retryDelivery(subscriptionId: string, logId: string): Promise<void> {
-  return apiClient<void>(`/webhooks/${subscriptionId}/logs/${logId}/retry`, {
+/** 202: the delivery as it is now, pending again. */
+export async function retryDelivery(subscriptionId: string, logId: string): Promise<WebhookDeliveryLog> {
+  return apiClient<WebhookDeliveryLog>(`/webhooks/${subscriptionId}/logs/${logId}/retry`, {
     method: 'POST',
   });
 }

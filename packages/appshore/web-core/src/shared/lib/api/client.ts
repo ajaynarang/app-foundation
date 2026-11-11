@@ -122,7 +122,41 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
     return undefined as T;
   }
 
-  return response.json();
+  // A 200, 201 or 202 may carry no body either: that is undefined, not a JSON parse error.
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text);
+}
+
+/**
+ * Authenticated fetch that returns the RAW Response, for binary downloads (files, exports) where the caller needs
+ * the headers and the blob, not parsed JSON. Same auth and one-shot 401 refresh as `apiClient`. It sets no
+ * `Content-Type`, and it does not throw on a failed status: the caller reads `response.ok`.
+ */
+export async function apiFetchRaw(url: string, options: ApiClientOptions = {}): Promise<Response> {
+  const { _isRetry, ...fetchOptions } = options;
+  const accessToken = getSessionStore().getState().accessToken;
+
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...fetchOptions,
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...fetchOptions.headers,
+    },
+    credentials: 'include',
+  });
+
+  if (response.status === 401 && !_isRetry) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      return apiFetchRaw(url, { ...options, _isRetry: true });
+    }
+    throw new ApiError(401, 'Session expired. Please login again.');
+  }
+
+  return response;
 }
 
 // Convenience methods

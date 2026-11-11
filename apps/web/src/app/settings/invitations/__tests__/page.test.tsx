@@ -18,7 +18,7 @@ const get = api.get as jest.Mock;
 const post = api.post as jest.Mock;
 const writeText = jest.fn();
 
-// The list returns both ids. Every /invitations/:invitationId route looks the
+// The list returns both ids. Every /invitations/:invitation_id route looks the
 // row up by the uuid; the numeric id finds nothing there.
 const PENDING = {
   id: 41,

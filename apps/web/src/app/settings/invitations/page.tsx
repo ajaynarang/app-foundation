@@ -15,7 +15,7 @@ import { useCopyInviteLink } from '@/features/platform/settings/hooks/use-copy-i
 // Types
 // ---------------------------------------------------------------------------
 interface Invitation {
-  /** Public id (uuid): the one every /invitations/:invitationId route takes. */
+  /** Public id (uuid): the one every /invitations/:invitation_id route takes. */
   invitationId: string;
   email: string | null;
   firstName: string;

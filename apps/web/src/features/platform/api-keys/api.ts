@@ -24,11 +24,14 @@ export const apiKeysApi = {
       method: 'POST',
     }),
 
-  pause: (id: number): Promise<void> => apiClient<void>(`/api-keys/${id}/pause`, { method: 'POST' }),
+  pause: (id: number): Promise<ApiKeyResponse> =>
+    apiClient<ApiKeyResponse>(`/api-keys/${id}/pause`, { method: 'POST' }),
 
-  resume: (id: number): Promise<void> => apiClient<void>(`/api-keys/${id}/resume`, { method: 'POST' }),
+  resume: (id: number): Promise<ApiKeyResponse> =>
+    apiClient<ApiKeyResponse>(`/api-keys/${id}/resume`, { method: 'POST' }),
 
-  revoke: (id: number): Promise<void> => apiClient<void>(`/api-keys/${id}/revoke`, { method: 'POST' }),
+  revoke: (id: number): Promise<ApiKeyResponse> =>
+    apiClient<ApiKeyResponse>(`/api-keys/${id}/revoke`, { method: 'POST' }),
 
   updateScopes: (
     id: number,
