@@ -89,8 +89,7 @@ before. The difference is in query strings read through the new query DTO kit: a
 param, or a value that does not parse (`?limit=abc`) is a 400 that names the param, where hand parsing used to
 ignore it.
 
-**Who notices.** Nobody yet: no route of the starter reads its query string through the kit in this change. Each
-route that moves to it is listed below when it moves.
+**Who notices.** Nobody from that change alone. Every route of the starter moved to the kit later: see section 5.
 
 ## 4. Success statuses, acknowledgement bodies and route params
 
@@ -188,3 +187,87 @@ Edge changes:
 downloads. In the mobile app, `ApiClient` returns an empty map for an empty body. Show `detail` on a 409, as
 `extractErrorMessage` does. A stored webhook, runbook or script that calls a moved route by its template needs the
 new param name only if it templates the URL itself.
+
+## 5. Query keys, request bodies and 400s that name their field
+
+**What changed.** Every query string and every request body of the starter is now a DTO class, so the global pipe
+checks all of them. Three things follow.
+
+**Query keys are snake_case, and free-text search is `q`.** The old key is not read any more: it is an unknown
+param, and answers 400.
+
+| Route                                                             | Before                                                                | Now                                                                          |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /admin/feedback`                                             | `tenantId`, `sentimentMin`, `sentimentMax`                            | `tenant_id`, `sentiment_min`, `sentiment_max`                                |
+| `GET /admin/login-activity`, `GET /super-admin/login-activity`    | `tenantId`, `userQuery`, `excludeSuperAdmin`                          | `tenant_id`, `user_query`, `exclude_super_admin`                             |
+| `GET /admin/login-activity/summary`, `GET /super-admin/…/summary` | `tenantId`, `excludeSuperAdmin`                                       | `tenant_id`, `exclude_super_admin`                                           |
+| `GET /admin/jobs`                                                 | `tenantId`, `dateFrom`, `dateTo`                                      | `tenant_id`, `date_from`, `date_to`                                          |
+| `GET /admin/jobs/metrics`, `GET /admin/jobs/categories/summary`   | `tenantId`                                                            | `tenant_id`                                                                  |
+| `GET /admin/events`                                               | `search`, `actorType`                                                 | `q`, `actor_type`                                                            |
+| `GET /support/admin/tickets`                                      | `tenantId`, `search`                                                  | `tenant_id`, `q`                                                             |
+| `GET /agent-activity`                                             | `principalKind`, `principalId`, `dateFrom`, `dateTo`                  | `principal_kind`, `principal_id`, `date_from`, `date_to`                     |
+| `GET /webhooks/:id/logs`                                          | `dateFrom`, `dateTo`                                                  | `date_from`, `date_to`                                                       |
+| `GET /integrations/sync-history`                                  | `syncType`                                                            | `sync_type`                                                                  |
+| `GET /desk/memories`                                              | `agentKey`, `authoredByOperatorOnly`, `sourceEpisodeId`, `activeOnly` | `agent_key`, `authored_by_operator_only`, `source_episode_id`, `active_only` |
+| `GET /dev/users`                                                  | `tenantId`                                                            | `tenant_id`                                                                  |
+
+**A value that does not parse is a 400 that names the param.** Hand parsing used to replace it or pass it on.
+
+| Case                                                                                                                                                                                                            | Before                                              | Now                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------- |
+| A number that is not one (`?limit=abc`, `?offset=x`, `?days=abc`, `?page=abc`, `?tenant_id=abc`), a negative `offset`, a `page` below 1                                                                         | the default was used, or `NaN` reached the database | 400 `VALIDATION_FAILED`      |
+| A page size out of range (`?limit=999`, `?limit=0`)                                                                                                                                                             | varied by route                                     | clamped to the route's 1…max |
+| An unknown enum value: `status` on admin jobs, broadcasts, tenants, invitations, notifications, support tickets and sync history; `category` and `priority` on support and notifications; `surface` on AI spend | ignored, or a 500 from the database                 | 400 `VALIDATION_FAILED`      |
+| A date that is not a date (`since`, `until`, `date_from`, `date_to`, `from`, `to`)                                                                                                                              | an invalid date reached the query                   | 400 `VALIDATION_FAILED`      |
+| A bad Desk filter (`GET /desk/episodes`, `/desk/episodes/handled`, `/desk/memories`)                                                                                                                            | an uncaught `ZodError`                              | 400 with `fieldErrors`       |
+| A Desk boolean (`active_only`, `authored_by_operator_only`)                                                                                                                                                     | `1`, `yes`, `on` and friends were accepted          | `true` or `false` only       |
+| An undeclared query param on any of these routes                                                                                                                                                                | ignored                                             | 400 that names it            |
+
+`status` on `GET /support/tickets`, `GET /support/admin/tickets` and `GET /notifications` takes the stored values
+(`OPEN`, `BILLING`, `unread`); a value in another case never matched a row before and is now refused.
+
+**Bodies that were unchecked types are checked.** These routes took an inline type, an interface or `@Body('x')`,
+which the pipe cannot see. Each now refuses a missing or wrong-typed field, and a field it does not declare.
+
+| Route                                                  | Body                                                                                         |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `POST /oauth/clients`, `PUT /oauth/clients/:client_id` | `name`, `description`, `redirectUris` (absolute URLs), `scopes` (known scopes), `clientType` |
+| `POST /oauth/authorize/consent`                        | `challenge`, `selectedScopes`                                                                |
+| `PATCH /plans/tenant/:tenant_id`                       | `plan` (a plan that exists), `reason`                                                        |
+| `PATCH /plans/:plan/provider-price`                    | `providerPriceId` (text or `null`)                                                           |
+| `POST /tenants/:tenant_id/reject`                      | `reason`                                                                                     |
+| `DELETE /invitations/:invitation_id`                   | `reason`                                                                                     |
+| `POST /settings/reset`                                 | `scope` (`user`)                                                                             |
+| `POST /push/subscribe`, `DELETE /push/unsubscribe`     | the browser's `PushSubscription.toJSON()` under `subscription`; `endpoint`                   |
+| `POST /notifications/mark-all-read`                    | `category` (a notification category)                                                         |
+| `POST /admin/cache/flush`                              | `confirm`                                                                                    |
+
+The OAuth protocol bodies (`POST /oauth/token`, `/oauth/revoke`, `/oauth/register`) are DTOs too, in the standards'
+own field names. A parameter the server does not use is still ignored, as RFC 6749 and RFC 7591 require. A value of
+the wrong shape (a repeated form key, a nested object) answers 400 `invalid_request`, or `invalid_client_metadata`
+or `invalid_redirect_uri` on registration, where it used to reach the handler.
+
+**A 400 names its field; if no field is at fault it is not a 400.**
+
+| Case                                                                                              | Before                     | Now                                                      |
+| ------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------- |
+| `GET /plans/my-plan` with no workspace (a super admin)                                            | 400                        | 403 `NO_TENANT`                                          |
+| `POST /desk/memories/playbook` when the session carries no user id                                | 400                        | 401 `UNAUTHENTICATED`                                    |
+| `POST /tenants/register` with a missing or failed bot check                                       | 400, no field              | 400 with `fieldErrors.turnstileToken`                    |
+| `GET /integrations/oauth/:vendor/connect`, `POST …/:vendor/disconnect` for a vendor without OAuth | 400                        | 404 `NOT_FOUND`                                          |
+| A wrong PIN on `POST /mcp/hitl/:token/step-up`                                                    | 400, no field              | 400 with `fieldErrors.pin`                               |
+| `POST /webhooks/:id/replay` further back than 7 days                                              | 400, no field              | 400 with `fieldErrors.since`                             |
+| `POST /admin/cache/flush` without `confirm`, or an unknown namespace                              | 400, no field              | 400 with `fieldErrors.confirm` / `fieldErrors.namespace` |
+| `PATCH /notifications/whatsapp-consent` with nothing to change                                    | 400, no field              | 400 with `fieldErrors.optedIn` and `marketingOptedIn`    |
+| `POST /desk/approvals/:id/claim` when someone else holds it                                       | 409 naming their user id   | 409 `INVALID_STATE`, no id in the copy                   |
+| A file missing from storage                                                                       | 404 naming the storage key | 404 `This file was not found`                            |
+
+**Who notices.**
+
+- A client, script or saved link that sends one of the old query keys, or relies on a bad value being ignored.
+- A client that sent extra fields in one of the bodies above.
+- A client that read the 400 on `GET /plans/my-plan` or on an OAuth-less vendor as "bad input".
+
+**What to do.** Rename the keys. Send only declared fields. Read `fieldErrors` to place a message on the right
+input: its keys are the wire names (`tenant_id`, `subscription.keys.auth`). The web app's own callers
+(`agentActivityApi`, `getWebhookLogs`, the dev user switcher) moved in the same change.

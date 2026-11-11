@@ -157,8 +157,9 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 ### camelCase (NON-NEGOTIABLE)
 
 All API responses, request bodies, DTOs, service params, and frontend types use **camelCase**.
-Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, and
-the `@Query('snake_case')` decorator argument (the TS variable is still camelCase).
+Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, URL params
+(`:tenant_id`), and query keys on the wire: a query DTO declares `@QueryString({ name: 'tenant_id' }) tenantId`,
+so the property is still camelCase.
 
 ### Enums = Prisma (single source of truth)
 
@@ -174,8 +175,8 @@ Every error body is `statusCode, code, detail, fieldErrors?, timestamp, path, me
 else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
 code). There is no `message` key. Throw a NestJS exception or a factory from
 `@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
-writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. New query
-strings are a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
+writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. Every query
+string is a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
 (`docs/adr/`), held by `apps/backend/src/architecture/error-envelope.spec.ts` and `field-errors.spec.ts`.
 
 ### UI standards

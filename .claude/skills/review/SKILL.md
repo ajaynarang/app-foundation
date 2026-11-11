@@ -63,11 +63,11 @@ Review every file against the backend patterns skill. For each violation found, 
 - The fix (for CONVENTION: provide exact replacement code)
 
 ## CRITICAL violations (always check, all files):
-1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and @Query('snake_case') decorator arguments)
+1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and the wire `name` of a query DTO param, which is snake_case: rule `naming/snake-case-query-keys`)
 2. Event emission bypassing DomainEventService / the APP_EVENT_REGISTRY (raw EventEmitter2.emit or plain-object events)
 3. `throw new Error()` instead of NestJS exceptions in HTTP paths (BadRequestException, NotFoundException, etc.)
 3a. An error body written by hand (`res.status(4xx).json({ message })`) or an exception carrying keys beyond `code`, `detail`, `fieldErrors` — every error leaves through the one envelope (`writeErrorEnvelope`; held by architecture/error-envelope.spec.ts)
-3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/409 with a code); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
+3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/404/409 with a code; rule `errors/controller-400-names-its-field`); error copy that carries an internal id, a storage key or raw exception text (rule `errors/no-internals-in-messages`); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
 3c. Success status by route shape (held by architecture/api-contract.spec.ts, rules `status/*`): a POST without `@HttpCode`; a create that is not 201; an action POST (`/:id/verb`) answering 201; queued work not answering 202 with the record to poll; a DELETE that is not 204 or returns a body; an acknowledgement body (`{ success: true }`, `{ message }`, `{ deleted: true }`) from a controller or from the service it returns
 3d. Another tenant's record answered 403 instead of 404 (rule `errors/cross-tenant-is-404`); an illegal state transition answered 400 or 403 instead of `invalidState()` (rule `errors/transition-is-409`)
 3e. Edge (rules `edge/*`): `@SkipThrottle()` on anything but a health or SSE route (use `@Throttle(GENEROUS_THROTTLE)`), or beside a `@Throttle(...)`; a route behind `ApiKeyAuthGuard` or `OAuthTokenGuard` without `AgentRateLimitGuard` or without `@UseFilters(BearerChallengeFilter)` on its controller
@@ -83,7 +83,8 @@ Review every file against the backend patterns skill. For each violation found, 
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 12. DTO validation: class-validator decorators, @ApiProperty, @Transform for optional strings, cents for money
-12a. New query strings: one `@Query() query: XQueryDto` built from the kernel query-DTO kit (snake_case wire names, `q` for search, `containsText()` for LIKE); no new `@Query('x')` parameters and no hand parsing of numbers, booleans, dates or enums in a controller
+12a. Query strings: one `@Query() query: XQueryDto` built from the kernel query-DTO kit (snake_case wire names, `q` for search, `containsText()` for LIKE); no `@Query('x')` parameter (rule `input/query-is-a-dto`) and no `parseInt`/`parseFloat`/`Number()` or `Schema.parse()` in a controller (rules `input/no-number-parse-in-controllers`, `input/no-schema-parse-in-controllers`)
+12b. Bodies: `@Body() dto: XDto`, a class imported as a value; never `@Body('x')`, an inline type, an interface, `Record<…>`, an array or an `import type` class (rule `input/body-is-a-dto-class`). A body a standard defines is a `@ProtocolWireDto`
 13. Cache patterns: correct TTL tier constant, buildKey usage, event-based invalidation registered
 14. Queue patterns: job names from *_JOB_NAMES constants, bullJobIdFromDbId for custom job IDs, correlationId forwarded
 15. Service structure: Logger injection, constructor pattern, tenantId as first param

@@ -129,8 +129,7 @@ export function buildSuperAdminPreferences(overrides: Record<string, unknown> = 
 //   - `RegisterTenantDto` — public POST /tenants/register (Turnstile-gated).
 //   - `UpdateTenantDto`   — SUPER_ADMIN PATCH /tenants/:tenant_id.
 //   - `SuspendTenantDto`  — SUPER_ADMIN POST /tenants/:tenant_id/suspend.
-//   - `/reject` takes a raw `{ reason: string }` body (no DTO class); factory
-//     returns the same shape so the rubric's "no inline JSON" rule holds.
+//   - `RejectTenantDto`   — SUPER_ADMIN POST /tenants/:tenant_id/reject (`reason`, optional, at most 1000).
 //
 // The `register` factory emits clearly test-marked values (prefix
 // `qa-test-`, timestamp-suffixed) so a real tenant isn't created by
@@ -192,10 +191,8 @@ export function buildTenantSuspend(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * POST /tenants/:tenant_id/reject body. Controller reads `reason` via
- * `@Body('reason')` — it's a plain string field with no DTO class (no
- * length validation server-side). Factory emits a non-empty string so the
- * rejection reason is recorded meaningfully.
+ * POST /tenants/:tenant_id/reject body — `RejectTenantDto` (`reason`, optional text, at most 1000
+ * characters). Factory emits a non-empty string so the rejection reason is recorded meaningfully.
  */
 export function buildTenantReject(overrides: Record<string, unknown> = {}) {
   return {
@@ -271,9 +268,8 @@ export function buildInvitationAccept(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * DELETE /invitations/:invitation_id body — controller reads `reason` via
- * `@Body('reason')`, optional on the service side (stored as
- * `cancellationReason` on the row). Factory emits a non-empty string so
+ * DELETE /invitations/:invitation_id body — `CancelInvitationDto` (`reason`, optional text, at most 500
+ * characters; stored as `cancellationReason` on the row). Factory emits a non-empty string so
  * the cancellation is recorded meaningfully on the row.
  */
 export function buildInvitationCancel(overrides: Record<string, unknown> = {}) {

@@ -180,9 +180,9 @@ export class ProjectsController extends BaseTenantController {
   @Get()
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'List projects' })
-  async list(@CurrentUser() user: any, @Query('status') status?: string) {
+  async list(@CurrentUser() user: any, @Query() query: ProjectListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    return this.projectsService.findAll(tenantDbId, { status });
+    return this.projectsService.findAll(tenantDbId, { status: query.status });
   }
 
   @Get(':project_id')
@@ -303,9 +303,9 @@ or an OAuth token (`ApiKeyAuthGuard`, `OAuthTokenGuard`) also carries `AgentRate
 with `@UseFilters(BearerChallengeFilter)`, so a 401 tells the client where to authenticate.
 
 **The ratchet.** `apps/backend/src/architecture/api-contract.spec.ts` holds these rules (`status/*`, `naming/*`,
-`edge/*`, `errors/transition-is-409`, `errors/cross-tenant-is-404`) and runs on every push. It also carries the
-rules the starter's own routes do not pass yet (`input/*`, `output/*`, `docs/*`, and some of `errors/*`): today's
-violations of those are frozen in `api-contract.baseline.json`, which can only shrink. New code may not add to it.
+`edge/*`, `input/*`, `errors/*`) and runs on every push: the starter's own routes pass all of them, so any
+violation is new and fails. It also carries the rules the starter's routes do not pass yet (`output/*`, `docs/*`):
+today's violations of those are frozen in `api-contract.baseline.json`, which can only shrink. New code may not add to it.
 After fixing a baselined violation run `UPDATE_API_BASELINE=1 pnpm --filter @app/backend exec jest
 src/architecture/api-contract`. Run `pnpm verify:api` before a pull request that changes the wire: it boots the
 backend and runs the Playwright `api` project against it.
@@ -469,9 +469,9 @@ export class CreateProjectDto implements CreateProjectInput {
 
 ### 4.1 Query DTOs — a query string is a class, like a body
 
-New list and filter routes read their query string through one `@Query() query: XQueryDto`, built from the kit in
-`@appshore/kernel/shared/utils/query-dto`. Do not add `@Query('x')` parameters or parse numbers, booleans, dates or
-enums by hand in a controller.
+Every route reads its query string through one `@Query() query: XQueryDto`, built from the kit in
+`@appshore/kernel/shared/utils/query-dto`. There is no `@Query('x')` parameter in the starter, and a controller
+never parses a number, boolean, date or enum by hand.
 
 ```typescript
 import { ListQueryDto, QueryEnumList, QuerySort, QueryString } from '@appshore/kernel/shared/utils/query-dto';
@@ -508,8 +508,20 @@ Base classes: `CursorQueryDto` (`limit`, `cursor`), `ListQueryDto` (+ `q`), `Dat
   Never hand-write `{ contains: term }` for user input.
 - A body whose wire shape a standard defines (RFC 7591 client registration) is a DTO marked `@ProtocolWireDto`
   (`app-validation-pipe`): it may ignore unknown fields and adds the standard's error code.
-- Held by the kit's own specs (`query-dto.spec.ts`, `list-query.spec.ts`, `app-validation-pipe.spec.ts`) and
-  `apps/backend/src/architecture/field-errors.spec.ts`.
+- A date a service reads as text keeps its text: `QueryCalendarDate('date_from')` (a `YYYY-MM-DD` day in the
+  tenant's timezone) and `QueryDateText()` (a date or an instant) in `apps/backend/src/shared/dto/query-date-text.ts`.
+  Use `@QueryDate` when the service wants a `Date`.
+- A param the kit has no decorator for is a `QueryParam((raw, wire) => …)` that throws `fieldError(wire, …)`.
+  A required param is one of these (see `AgentActivityQueryDto`): the kit's decorators are all optional.
+- Every body is a class too: never `@Body('x')`, an inline type, an interface, `Record<…>` or a class imported
+  with `import type`. The pipe cannot see any of those, so nothing is checked and nothing is refused.
+- Controllers do not call `parseInt`, `parseFloat`, `Number()` or `Schema.parse()`. The DTO parses.
+- Test a DTO the way a request reaches it: `readQueryDto(Dto, raw)` (kernel) or `readBodyDto(Dto, raw)` and
+  `fieldErrorsOf(promise)` from `@appshore/platform/test/helpers/field-errors.helpers`.
+- Held by the kit's own specs (`query-dto.spec.ts`, `list-query.spec.ts`, `app-validation-pipe.spec.ts`),
+  `apps/backend/src/architecture/field-errors.spec.ts`, and the ratchet rules `input/body-is-a-dto-class`,
+  `input/query-is-a-dto`, `input/no-number-parse-in-controllers`, `input/no-schema-parse-in-controllers` and
+  `naming/snake-case-query-keys` in `api-contract.spec.ts`. The starter's routes pass all five.
 
 ---
 
@@ -937,7 +949,11 @@ throw stale('This was just changed by someone else. Refresh and try again'); // 
 **One meaning per status.** 400 = bad input, and it names the field in `fieldErrors`. 401 = not signed in.
 403 = signed in but not allowed. 404 = missing, **or in another tenant** (never confirm that a record exists across
 tenants). 409 = any state conflict: an illegal transition, a duplicate, a stale write. 429 = rate limited. 422 is not
-used. If no field is at fault, the answer is not a 400.
+used. If no field is at fault, the answer is not a 400: a caller with no workspace is a 403 with a code
+(`NO_TENANT`), a session that cannot be identified is a 401, a thing that is not there is a 404. A path param can
+be the field (`fieldError('namespace', …)`). The rule `errors/controller-400-names-its-field` fails on a
+`new BadRequestException('…')` in a controller. Error copy carries no internal id, storage key or raw exception
+text (`errors/no-internals-in-messages`): log it, and say what happened in plain words.
 
 **Every error carries a machine `code`.** A bare Nest exception gets the code its status implies (404 →
 `NOT_FOUND`, 409 → `INVALID_STATE`). Use a factory when the code is not the status default. The shared codes are
