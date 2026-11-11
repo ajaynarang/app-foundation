@@ -79,7 +79,7 @@ describe('DeskAgentService', () => {
         {
           id: 1,
           key: 'assistant',
-          name: 'Dispatch',
+          name: 'Assistant',
           description: null,
           supervisor: null,
           responsibilities: [{ id: 20, lifecycle: 'AVAILABLE', enabled: false, lastRunAt: null }],
@@ -124,11 +124,11 @@ describe('DeskAgentService', () => {
       prisma.deskAgent.findUnique.mockResolvedValue({
         id: 1,
         key: 'assistant',
-        name: 'Dispatch',
-        description: 'Picks the best driver for new loads and watches late ETAs before they become problems.',
+        name: 'Assistant',
+        description: 'Answers product questions and drafts follow-ups before they become problems.',
         supervisor: { id: 3, firstName: 'Jane', lastName: 'Doe', role: UserRole.ADMIN },
         responsibilities: [
-          { key: 'driver_assignment', lifecycle: 'COMING_SOON', enabled: false, trustLevel: 'SUPERVISED' },
+          { key: 'follow_up_drafting', lifecycle: 'COMING_SOON', enabled: false, trustLevel: 'SUPERVISED' },
         ],
       });
 
@@ -303,7 +303,7 @@ describe('DeskAgentService', () => {
   // ─── listEligibleSupervisors ──────────────────────────────────────
 
   describe('listEligibleSupervisors', () => {
-    it('returns non-driver/customer active users sorted by last name', async () => {
+    it('returns active users sorted by last name', async () => {
       prisma.user.findMany.mockResolvedValue([
         { id: 1, firstName: 'Ada', lastName: 'Aardvark', role: UserRole.OWNER },
         { id: 2, firstName: 'Bob', lastName: 'Builder', role: UserRole.ADMIN },

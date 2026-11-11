@@ -21,9 +21,9 @@ import type { DomainEventService } from '@appshore/kernel/infrastructure/events/
  */
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://app_user:app_password@localhost:5432/app';
 
-class TestFleetReadTool {
+class TestRecordsReadTool {
   @RequiresScope('platform:read')
-  async queryLoads(_args: Record<string, unknown>) {
+  async queryRecords(_args: Record<string, unknown>) {
     return {
       content: [{ type: 'text' as const, text: JSON.stringify({ count: 0 }) }],
     };
@@ -56,21 +56,21 @@ describe('Phase A pipeline integration', () => {
       return;
     }
 
-    const toolInstance = new TestFleetReadTool();
+    const toolInstance = new TestRecordsReadTool();
 
     const registry = {
       getMcpModuleIds: () => ['m1'],
       getTools: () => [
         {
-          metadata: { name: 'query-loads', description: 'q', parameters: null },
-          providerClass: TestFleetReadTool,
-          methodName: 'queryLoads',
+          metadata: { name: 'query-records', description: 'q', parameters: null },
+          providerClass: TestRecordsReadTool,
+          methodName: 'queryRecords',
         },
       ],
     } as unknown as McpRegistryDiscoveryService;
 
     const moduleRef = {
-      get: (token: unknown) => (token === TestFleetReadTool ? toolInstance : null),
+      get: (token: unknown) => (token === TestRecordsReadTool ? toolInstance : null),
     } as unknown as ModuleRef;
 
     const aiPrisma = {
@@ -116,13 +116,13 @@ describe('Phase A pipeline integration', () => {
       role: 'MEMBER',
       scopes: ['platform:read'],
     });
-    const result = await pipeline.run(principal, 'query-loads', {});
+    const result = await pipeline.run(principal, 'query-records', {});
     expect(result.isError).toBeFalsy();
 
     const row = await prisma.agentInvocationLog.findFirst({
       where: {
         tenantId: testTenantId,
-        toolName: 'query-loads',
+        toolName: 'query-records',
         principalKind: 'user',
         createdAt: { gte: before },
       },

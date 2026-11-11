@@ -29,9 +29,9 @@ describe('TenantJobRunService', () => {
 
     it('keys the lookup by tenantId + jobKey', async () => {
       prisma.tenantJobRun.findUnique.mockResolvedValue(null);
-      await svc.hasRunOn(7, 'shield-audit', '2026-05-29');
+      await svc.hasRunOn(7, 'daily-digest', '2026-05-29');
       expect(prisma.tenantJobRun.findUnique).toHaveBeenCalledWith({
-        where: { tenantId_jobKey: { tenantId: 7, jobKey: 'shield-audit' } },
+        where: { tenantId_jobKey: { tenantId: 7, jobKey: 'daily-digest' } },
         select: { lastRunDate: true },
       });
     });
@@ -40,11 +40,11 @@ describe('TenantJobRunService', () => {
   describe('markRanOn', () => {
     it('upserts the local date as a UTC-midnight stamp keyed by (tenant, job)', async () => {
       prisma.tenantJobRun.upsert.mockResolvedValue({});
-      await svc.markRanOn(7, 'shield-audit', '2026-05-29');
+      await svc.markRanOn(7, 'daily-digest', '2026-05-29');
       const expectedDate = new Date('2026-05-29T00:00:00.000Z');
       expect(prisma.tenantJobRun.upsert).toHaveBeenCalledWith({
-        where: { tenantId_jobKey: { tenantId: 7, jobKey: 'shield-audit' } },
-        create: { tenantId: 7, jobKey: 'shield-audit', lastRunDate: expectedDate },
+        where: { tenantId_jobKey: { tenantId: 7, jobKey: 'daily-digest' } },
+        create: { tenantId: 7, jobKey: 'daily-digest', lastRunDate: expectedDate },
         update: { lastRunDate: expectedDate },
       });
     });

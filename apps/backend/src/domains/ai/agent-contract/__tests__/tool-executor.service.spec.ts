@@ -51,9 +51,9 @@ describe('ToolExecutorService', () => {
     mockModuleRef.get.mockReturnValue(instance);
 
     const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
-    const result = await svc.execute('query-loads', { status: 'active' }, principal);
+    const result = await svc.execute('query-records', { status: 'active' }, principal);
 
-    // RLS uses the numeric DB id (required for role='driver' bindings)
+    // RLS uses the numeric DB id (row-level policies bind on it)
     expect(mockAiPrisma.executeWithRlsContext).toHaveBeenCalledWith(7, 42, 'MEMBER', expect.any(Function));
     // Tools receive the wire-format string userId (what `User.userId`
     // column stores and what VARCHAR audit columns expect), plus the

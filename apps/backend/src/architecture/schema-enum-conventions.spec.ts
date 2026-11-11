@@ -70,7 +70,7 @@ const ALLOWED_STRING_COLUMNS = new Map<string, string>([
   ],
   [
     'ConversationMessage.role',
-    'lowercase by design — matches LLM provider conventions (assistant | user | system | dispatcher | driver | …); changing it would break wire compatibility with stored conversation history',
+    'lowercase by design — matches LLM provider conventions (assistant | user | system | …); changing it would break wire compatibility with stored conversation history',
   ],
   [
     'Feedback.category',

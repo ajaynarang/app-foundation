@@ -23,8 +23,8 @@ describe('PlansService', () => {
 
   const mockEntitlement = {
     plan: 'STARTER',
-    feature: 'shield',
-    displayName: 'Shield Compliance',
+    feature: 'reports',
+    displayName: 'Advanced Reports',
     enabled: true,
   };
 
@@ -106,7 +106,7 @@ describe('PlansService', () => {
     });
 
     it('should check entitlement for regular plans', async () => {
-      const result = await service.isFeatureEnabled('STARTER', 'shield');
+      const result = await service.isFeatureEnabled('STARTER', 'reports');
       expect(result).toBe(true);
     });
 
@@ -153,9 +153,9 @@ describe('PlansService', () => {
 
   describe('toggleEntitlement', () => {
     it('should toggle and invalidate cache', async () => {
-      await service.toggleEntitlement('STARTER', 'shield', false);
+      await service.toggleEntitlement('STARTER', 'reports', false);
       expect(prisma.planEntitlement.update).toHaveBeenCalledWith({
-        where: { plan_feature: { plan: 'STARTER', feature: 'shield' } },
+        where: { plan_feature: { plan: 'STARTER', feature: 'reports' } },
         data: { enabled: false },
       });
       expect(cache.del).toHaveBeenCalled();

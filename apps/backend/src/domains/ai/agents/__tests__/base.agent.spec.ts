@@ -134,7 +134,7 @@ describe('AbstractBaseAgent', () => {
 
       // Simulate card capture during tool execution
       mockMcpToolService.getToolsetsForPersona.mockImplementation((_mode: string, _ctx: any, accumulator: any) => {
-        if (accumulator) accumulator.capture({ type: 'fleet', data: {} });
+        if (accumulator) accumulator.capture({ type: 'records', data: {} });
         return { 'app-tools': {} };
       });
 

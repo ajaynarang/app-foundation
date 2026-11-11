@@ -89,7 +89,6 @@ describe('AuthService - Phone Auth', () => {
       pinHash: 'hashed-pin',
       isActive: true,
       tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
-      driver: null,
     };
 
     it('should return tokens when phone and PIN are valid', async () => {
@@ -162,7 +161,6 @@ describe('AuthService - Phone Auth', () => {
       pinHash: 'hashed-pin',
       isActive: true,
       tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
-      driver: null,
     };
 
     it('should return tokens with requiresPinSetup=false when PIN is set', async () => {
@@ -336,7 +334,6 @@ describe('AuthService - Phone Auth', () => {
         role: 'ADMIN',
         isActive: true,
         tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
-        driver: null,
         createdAt: new Date(),
         lastLoginAt: new Date(),
       };
@@ -386,7 +383,6 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: true,
         pinHash: 'hashed',
         tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: 'acme', status: 'ACTIVE', isActive: true },
-        driver: null,
         createdAt: new Date(),
         lastLoginAt: new Date(),
       };
@@ -419,7 +415,6 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: false,
         pinHash: null,
         tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
-        driver: null,
         createdAt: new Date(),
         lastLoginAt: null,
       };
@@ -444,7 +439,6 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: false,
         pinHash: null,
         tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
-        driver: null,
         createdAt: new Date(),
         lastLoginAt: null,
       };
@@ -522,7 +516,6 @@ describe('AuthService - Phone Auth', () => {
           status: 'ACTIVE',
           isActive: true,
         },
-        driver: null,
       };
       mockFirebaseAuthService.findOrCreateUserByFirebaseUid.mockResolvedValue(user);
       mockPrismaService.user.update.mockResolvedValue(user);
@@ -596,7 +589,6 @@ describe('AuthService - Phone Auth', () => {
         pinHash: null,
         isActive: true,
         tenant: { isActive: true, status: 'ACTIVE', tenantId: 'TNT-001', companyName: 'ACME' },
-        driver: null,
       };
       mockTwilioVerifyService.checkVerification.mockResolvedValue(true);
       mockPrismaService.user.findFirst.mockResolvedValue(user);
@@ -639,7 +631,6 @@ describe('AuthService - Phone Auth', () => {
         pinHash: null,
         isActive: true,
         tenant: { isActive: true, status: 'ACTIVE' },
-        driver: null,
       });
 
       await expect(service.loginWithPhone({ phone: '+12025551234', pin: '1234' })).rejects.toThrow(
@@ -663,7 +654,6 @@ describe('AuthService - Phone Auth', () => {
         phoneVerified: false,
         pinHash: null,
         tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
-        driver: null,
         createdAt: new Date(),
         lastLoginAt: null,
       };

@@ -22,7 +22,6 @@ describe('UsersService', () => {
     createdAt: new Date('2026-01-01'),
     lastLoginAt: new Date('2026-03-01'),
     tenant: { tenantId: 'tenant_abc', companyName: 'TestCo' },
-    driver: null,
   };
 
   beforeEach(async () => {

@@ -80,7 +80,7 @@ describe('PushService', () => {
     it('takes the endpoint away from whoever held it before', async () => {
       // An endpoint identifies a BROWSER, not a person. If user A signs out and
       // user B signs in on the same machine, A's row still points at B's browser
-      // — and A's draws and match times would buzz on B's screen.
+      // — and A's notifications would buzz on B's screen.
       mockPrisma.pushSubscription.upsert.mockResolvedValue({ id: 2, ...sub });
 
       await service.saveSubscription(2, 1, sub);

@@ -54,7 +54,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      driver: null,
       customer: null,
     });
 
@@ -77,7 +76,6 @@ describe('JwtStrategy', () => {
       userId: 'USR-001',
       isActive: false,
       tenant: null,
-      driver: null,
       customer: null,
     });
 
@@ -95,7 +93,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: false,
       },
-      driver: null,
       customer: null,
     });
 
@@ -110,7 +107,6 @@ describe('JwtStrategy', () => {
       role: 'SUPER_ADMIN',
       isActive: true,
       tenant: null,
-      driver: null,
       customer: null,
     });
 
@@ -136,7 +132,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      driver: null,
       customer: null,
     });
 

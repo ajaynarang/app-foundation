@@ -7,9 +7,9 @@ describe('MetaCloudWhatsAppAdapter', () => {
   let fetchMock: jest.Mock;
   const send: WhatsAppTemplateSend = {
     to: '+919876543210',
-    templateName: 'tx_draw_published_v1',
+    templateName: 'sync_completed_v1',
     languageCode: 'en',
-    bodyValues: ['Monsoon Open', 'Men’s singles'],
+    bodyValues: ['Website Relaunch', 'Contacts import'],
     callbackData: '01a0-ledger',
   };
   const accepted = (id = 'wamid.HBgL') => ({
@@ -49,14 +49,14 @@ describe('MetaCloudWhatsAppAdapter', () => {
         to: '919876543210',
         type: 'template',
         template: {
-          name: 'tx_draw_published_v1',
+          name: 'sync_completed_v1',
           language: { code: 'en' },
           components: [
             {
               type: 'body',
               parameters: [
-                { type: 'text', text: 'Monsoon Open' },
-                { type: 'text', text: 'Men’s singles' },
+                { type: 'text', text: 'Website Relaunch' },
+                { type: 'text', text: 'Contacts import' },
               ],
             },
           ],
@@ -69,7 +69,7 @@ describe('MetaCloudWhatsAppAdapter', () => {
       fetchMock.mockResolvedValue(accepted());
       await adapter.sendTemplate({ ...send, bodyValues: [], callbackData: undefined });
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-      expect(body.template).toEqual({ name: 'tx_draw_published_v1', language: { code: 'en' } });
+      expect(body.template).toEqual({ name: 'sync_completed_v1', language: { code: 'en' } });
       expect(body).not.toHaveProperty('biz_opaque_callback_data');
     });
 

@@ -17,7 +17,7 @@ describe('InAppChannelService', () => {
       NOTIFICATION_URGENCIES.TIMELY,
       {
         sms: CHANNEL_RULES.FALLBACK,
-        groupLabel: 'entries approved',
+        groupLabel: 'requests approved',
       },
     ),
   };
@@ -164,15 +164,15 @@ describe('InAppChannelService', () => {
 
   /**
    * Grouping collapses same-type notifications inside a 10-minute window into one
-   * row. The window is the right unit for "you were approved into two categories of
-   * the SAME tournament"; it is exactly the wrong unit across tournaments, and the
+   * row. The window is the right unit for "you were approved into two teams of
+   * the SAME project"; it is exactly the wrong unit across projects, and the
    * old lookup could not tell the two apart — it matched on type + user + tenant and
    * ignored the groupKey it had just written, so ANY row of the type in the window
-   * was a group to join. Two ENTRY_APPROVEDs for two tournaments merged into one row
-   * that kept the FIRST tournament's metadata: the second approval was retitled and
-   * misattributed to a tournament the user was not approved into.
+   * was a group to join. Two approvals for two projects merged into one row
+   * that kept the FIRST project's metadata: the second approval was retitled and
+   * misattributed to a project the user was not approved into.
    */
-  describe('grouping is scoped by groupScope — the app passes the tournament', () => {
+  describe('grouping is scoped by groupScope — the app passes the project', () => {
     /**
      * A findFirst that behaves like the database: it honours EVERY predicate the
      * service puts in the where clause, whatever shape that predicate takes. A mock
@@ -214,69 +214,69 @@ describe('InAppChannelService', () => {
       return rows;
     }
 
-    const approval = (tournamentId: number, tournamentName: string) => ({
+    const approval = (projectId: number, projectName: string) => ({
       recipientId: 1,
       tenantId: 7,
       type: 'TENANT_REGISTRATION_CONFIRMATION' as const,
       category: 'TEAM',
-      title: 'Entry approved',
-      message: `You're in! Your entry for Men's Singles was approved.`,
-      metadata: { tournamentId, tournamentName, categoryId: tournamentId * 10 },
-      groupScope: String(tournamentId),
+      title: 'Request approved',
+      message: `Your request to join Design was approved.`,
+      metadata: { projectId, projectName, teamId: projectId * 10 },
+      groupScope: String(projectId),
     });
 
-    it('does NOT merge two same-type notifications for DIFFERENT tournaments inside the window', async () => {
+    it('does NOT merge two same-type notifications for DIFFERENT projects inside the window', async () => {
       const rows = withStore([]);
 
-      await service.create(approval(31, 'Monsoon Smash 2026'));
-      await service.create(approval(44, 'Winter Open 2026'));
+      await service.create(approval(31, 'Website Relaunch'));
+      await service.create(approval(44, 'Mobile App'));
 
       // Two subjects, two rows. Merging here is the misattribution bug: the second
-      // user-visible approval would have inherited tournament 31's metadata.
+      // user-visible approval would have inherited project 31's metadata.
       expect(prisma.notification.create).toHaveBeenCalledTimes(2);
       expect(prisma.notification.update).not.toHaveBeenCalled();
       expect(rows).toHaveLength(2);
-      expect(rows.map((row) => row.metadata.tournamentId)).toEqual([31, 44]);
+      expect(rows.map((row) => row.metadata.projectId)).toEqual([31, 44]);
       expect(rows.map((row) => row.groupCount)).toEqual([1, 1]);
-      // The tournament is what makes the two keys differ — nothing else does.
+      // The project is what makes the two keys differ — nothing else does.
       expect(rows[0].groupKey).not.toBe(rows[1].groupKey);
     });
 
-    it('still merges two same-type notifications for the SAME tournament — grouping is not broken, only scoped', async () => {
+    it('still merges two same-type notifications for the SAME project — grouping is not broken, only scoped', async () => {
       const rows = withStore([]);
 
-      await service.create(approval(31, 'Monsoon Smash 2026'));
+      await service.create(approval(31, 'Website Relaunch'));
       await service.create({
-        ...approval(31, 'Monsoon Smash 2026'),
-        title: 'Entry approved',
-        message: `You're in! Your entry for Men's Doubles was approved.`,
+        ...approval(31, 'Website Relaunch'),
+        title: 'Request approved',
+        message: `Your request to join Engineering was approved.`,
       });
 
       expect(prisma.notification.create).toHaveBeenCalledTimes(1);
       expect(prisma.notification.update).toHaveBeenCalledTimes(1);
       expect(rows).toHaveLength(1);
       expect(rows[0].groupCount).toBe(2);
-      expect(rows[0].message).toBe('2 entries approved');
+      expect(rows[0].message).toBe('2 requests approved');
     });
 
-    it('persists tournamentId + tournamentName on the row the inbox reads back', async () => {
+    it('persists projectId + projectName on the row the inbox reads back', async () => {
       // listForUser does a bare findMany and returns metadata verbatim, so what is
-      // written here IS what the mobile inbox renders as the tournament overline
+      // written here IS what the mobile inbox renders as the project overline
       // and filters on.
       const rows = withStore([]);
 
-      await service.create(approval(31, 'Monsoon Smash 2026'));
+      await service.create(approval(31, 'Website Relaunch'));
 
       const { data } = prisma.notification.create.mock.calls[0][0];
       expect(data.metadata).toEqual(
-        expect.objectContaining({ tournamentId: 31, tournamentName: 'Monsoon Smash 2026', categoryId: 310 }),
+        expect.objectContaining({ projectId: 31, projectName: 'Website Relaunch', teamId: 310 }),
       );
       expect(data.metadata.items).toHaveLength(1);
       expect(data.groupKey).toContain('31');
-      expect(rows[0].metadata.tournamentName).toBe('Monsoon Smash 2026');
+      expect(rows[0].metadata.projectName).toBe('Website Relaunch');
     });
 
-    it('a notification with no tournament degrades to the shared slot and groups exactly as before', async () => {
+    it('a notification with no project degrades to the shared slot and groups exactly as before', async () => {
       const rows = withStore([]);
       const joined = {
         recipientId: 1,

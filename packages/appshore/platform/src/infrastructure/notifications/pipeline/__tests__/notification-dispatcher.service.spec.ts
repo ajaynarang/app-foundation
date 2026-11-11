@@ -27,7 +27,7 @@ describe('NotificationDispatcherService', () => {
     { id: 1, userId: 'u1', firebaseUid: null, email: null, phone: null },
     { id: 2, userId: 'u2', firebaseUid: null, email: null, phone: null },
   ];
-  const message = { tenantId: 7, type: TYPE, title: 'Match', message: 'Court 1', recipients };
+  const message = { tenantId: 7, type: TYPE, title: 'Meeting', message: 'Room 1', recipients };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -96,10 +96,13 @@ describe('NotificationDispatcherService', () => {
   it('prefers a recipient-level title and metadata over the message', async () => {
     await service.dispatch({
       ...message,
-      metadata: { tournamentId: 31 },
-      recipients: [{ ...recipients[0], title: 'Aarav · Match', metadata: { tournamentId: 31, subjectUserId: 9 } }],
+      metadata: { projectId: 31 },
+      recipients: [{ ...recipients[0], title: 'Aarav · Meeting', metadata: { projectId: 31, subjectUserId: 9 } }],
     });
-    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ title: 'Aarav · Match', metadata: { subjectUserId: 9 } });
+    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({
+      title: 'Aarav · Meeting',
+      metadata: { subjectUserId: 9 },
+    });
   });
 
   it('a recipient with nothing to attempt still gets ledger rows for the reasons', async () => {

@@ -21,7 +21,7 @@ describe('OAuthClientsService', () => {
     name: 'Test Client',
     description: 'A test client',
     redirectUris: ['http://localhost:3000/callback'],
-    scopes: ['read:fleet'],
+    scopes: ['platform:read'],
     clientType: 'confidential',
     isActive: true,
     tenantId: 1,
@@ -57,7 +57,7 @@ describe('OAuthClientsService', () => {
         {
           name: 'Test',
           redirectUris: ['http://localhost:3000'],
-          scopes: ['read:fleet'] as any,
+          scopes: ['platform:read'] as any,
           clientType: 'confidential' as const,
         },
         1,
