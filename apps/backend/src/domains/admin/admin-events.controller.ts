@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { AdminEventsService } from './admin-events.service';
+import { AdminEventListQueryDto } from './dto/admin-events-query.dto';
 
 @Controller('admin/events')
 @Roles(UserRole.SUPER_ADMIN)
@@ -15,26 +16,15 @@ export class AdminEventsController {
 
   @Get()
   @ApiOperation({ summary: 'List domain events across tenants' })
-  async listEvents(
-    @Query('search') search?: string,
-    @Query('tenant') tenant?: string,
-    @Query('actorType') actorType?: string,
-    @Query('since') since?: string,
-    @Query('until') until?: string,
-    @Query('limit') limit = '50',
-    @Query('offset') offset = '0',
-  ) {
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
-
+  async listEvents(@Query() query: AdminEventListQueryDto) {
     return this.adminEventsService.listEvents({
-      search,
-      tenantId: tenant,
-      actorType,
-      since,
-      until,
-      limit: Math.min(isNaN(parsedLimit) ? 50 : parsedLimit, 100),
-      offset: isNaN(parsedOffset) ? 0 : parsedOffset,
+      search: query.q,
+      tenantId: query.tenantId,
+      actorType: query.actorType,
+      since: query.since,
+      until: query.until,
+      limit: query.limit,
+      offset: query.offset,
     });
   }
 

@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AdminJobsController } from '../admin-jobs.controller';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from '../dto/admin-jobs-query.dto';
 
 describe('AdminJobsController', () => {
   let controller: AdminJobsController;
@@ -73,9 +76,13 @@ describe('AdminJobsController', () => {
 
   // ─── listJobs ────────────────────────────────────────────────────────────
 
+  /** The query as the global pipe hands it to the handler. */
+  const listQuery = (raw: Record<string, unknown> = {}) => readQueryDto(AdminJobListQueryDto, raw);
+  const tenantQuery = (raw: Record<string, unknown> = {}) => readQueryDto(AdminJobsTenantQueryDto, raw);
+
   describe('listJobs', () => {
     it('should list jobs with default pagination', async () => {
-      await controller.listJobs();
+      await controller.listJobs(await listQuery());
 
       expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
         tenantId: undefined,
@@ -91,14 +98,16 @@ describe('AdminJobsController', () => {
 
     it('should parse query parameters correctly', async () => {
       await controller.listJobs(
-        '5',
-        'documents',
-        'ratecon',
-        'COMPLETED,FAILED',
-        '50',
-        '10',
-        '2026-01-01',
-        '2026-01-31',
+        await listQuery({
+          tenant_id: '5',
+          category: 'documents',
+          type: 'ratecon',
+          status: 'COMPLETED,FAILED',
+          limit: '50',
+          offset: '10',
+          date_from: '2026-01-01',
+          date_to: '2026-01-31',
+        }),
       );
 
       expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
@@ -113,35 +122,39 @@ describe('AdminJobsController', () => {
       });
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.listJobs('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(listQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
+    });
+
+    it('refuses the camelCase keys the route used to read (tenantId, dateFrom, dateTo)', async () => {
+      expect(await fieldErrorsOf(listQuery({ tenantId: '5' }))).toHaveProperty('tenantId');
+      expect(await fieldErrorsOf(listQuery({ dateFrom: '2026-01-01' }))).toHaveProperty('dateFrom');
+      expect(await fieldErrorsOf(listQuery({ dateTo: '2026-01-31' }))).toHaveProperty('dateTo');
     });
 
     it('should cap limit at 100', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, '999');
+      await controller.listJobs(await listQuery({ limit: '999' }));
 
       expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
     });
 
-    it('should default NaN limit to 20', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, 'bad');
-
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 20 }));
+    it('answers 400 naming limit or offset when it is not a whole number', async () => {
+      expect(await fieldErrorsOf(listQuery({ limit: 'bad' }))).toHaveProperty('limit');
+      expect(await fieldErrorsOf(listQuery({ offset: 'bad' }))).toHaveProperty('offset');
+      expect(await fieldErrorsOf(listQuery({ offset: '-1' }))).toHaveProperty('offset');
     });
 
-    it('should default NaN offset to 0', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, undefined, 'bad');
-
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
+    it('answers 400 naming a date that is not a date', async () => {
+      expect(await fieldErrorsOf(listQuery({ date_from: 'yesterday' }))).toHaveProperty('date_from');
     });
 
-    it('should split comma-separated status string and reject unknown values', async () => {
-      // 'pending' and 'active' are not valid JobStatus values; controller filters them out.
-      await controller.listJobs(undefined, undefined, undefined, 'QUEUED,PROCESSING,bogus');
-
+    it('splits a comma-joined status and answers 400 on an unknown value', async () => {
+      await controller.listJobs(await listQuery({ status: 'QUEUED,PROCESSING' }));
       expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(
         expect.objectContaining({ status: ['QUEUED', 'PROCESSING'] }),
       );
+
+      expect(await fieldErrorsOf(listQuery({ status: 'QUEUED,bogus' }))).toHaveProperty('status');
     });
   });
 
@@ -149,35 +162,36 @@ describe('AdminJobsController', () => {
 
   describe('getMetrics', () => {
     it('should return metrics without tenantId', async () => {
-      await controller.getMetrics();
+      await controller.getMetrics(await tenantQuery());
 
       expect(jobService.getMetrics).toHaveBeenCalledWith(undefined);
     });
 
     it('should return metrics with parsed tenantId', async () => {
-      await controller.getMetrics('42');
+      await controller.getMetrics(await tenantQuery({ tenant_id: '42' }));
 
       expect(jobService.getMetrics).toHaveBeenCalledWith(42);
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.getMetrics('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(tenantQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
     });
   });
 
   // ─── getCategorySummary ──────────────────────────────────────────────────
 
   describe('getCategorySummary', () => {
-    it('should throw BadRequestException when tenantId is missing', async () => {
-      await expect(controller.getCategorySummary()).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is missing', async () => {
+      const fields = await fieldErrorsOf(tenantQuery().then((query) => controller.getCategorySummary(query)));
+      expect(fields).toHaveProperty('tenant_id');
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.getCategorySummary('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(tenantQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
     });
 
     it('should call getCategorySummary with correct params', async () => {
-      await controller.getCategorySummary('10');
+      await controller.getCategorySummary(await tenantQuery({ tenant_id: '10' }));
 
       expect(jobService.getCategorySummary).toHaveBeenCalledWith(
         10,

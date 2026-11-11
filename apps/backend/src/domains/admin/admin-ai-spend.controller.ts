@@ -5,6 +5,11 @@ import { UserRole } from '@appshore/db';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { AdminAiSpendService } from './admin-ai-spend.service';
 import { UpdateAiBudgetDto } from './dto/update-ai-budget.dto';
+import {
+  AiSpendInvocationListQueryDto,
+  AiSpendQuotaWindowQueryDto,
+  AiSpendWindowQueryDto,
+} from './dto/ai-spend-query.dto';
 
 /**
  * Super-admin AI Spend view. Reads from the `vw_ai_cost_*` views over
@@ -34,34 +39,26 @@ export class AdminAiSpendController {
 
   @Get('tenants')
   @ApiOperation({ summary: 'List tenants with their N-day AI spend' })
-  async listTenants(@Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 7);
-    return this.service.listTenantSummaries({ days });
+  async listTenants(@Query() query: AiSpendWindowQueryDto) {
+    return this.service.listTenantSummaries({ days: query.days });
   }
 
   @Get('tenants/:tenant_id/by-surface')
   @ApiOperation({ summary: 'Per-surface AI spend breakdown for one tenant' })
   @ApiParam({ name: 'tenant_id' })
-  async surfaceBreakdown(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 7);
-    return this.service.listSurfaceBreakdown({ tenantId, days });
+  async surfaceBreakdown(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendWindowQueryDto) {
+    return this.service.listSurfaceBreakdown({ tenantId, days: query.days });
   }
 
   @Get('tenants/:tenant_id/invocations')
   @ApiOperation({ summary: 'List AI invocations for one tenant (cursor-paginated)' })
   @ApiParam({ name: 'tenant_id' })
-  async invocations(
-    @Param('tenant_id', ParseIntPipe) tenantId: number,
-    @Query('surface') surface?: string,
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-  ) {
-    const parsedLimit = parseInt(limit ?? '50', 10);
+  async invocations(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendInvocationListQueryDto) {
     return this.service.listInvocations({
       tenantId,
-      surface,
-      limit: Number.isFinite(parsedLimit) ? parsedLimit : 50,
-      cursor,
+      surface: query.surface,
+      limit: query.limit ?? 50,
+      cursor: query.cursor,
     });
   }
 
@@ -82,19 +79,7 @@ export class AdminAiSpendController {
   @Get('tenants/:tenant_id/cost-vs-quota')
   @ApiOperation({ summary: 'Cost (USD) vs quota (feature counts) for one tenant, side by side' })
   @ApiParam({ name: 'tenant_id' })
-  async costVsQuota(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 30);
-    return this.service.getCostVsQuota({ tenantId, days });
+  async costVsQuota(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendQuotaWindowQueryDto) {
+    return this.service.getCostVsQuota({ tenantId, days: query.days });
   }
-}
-
-/**
- * Clamp the `?days=` query param to [1, 90]. Pre-validated default keeps
- * the home view fast and stops a runaway 365-day scan from a malicious or
- * fat-fingered request.
- */
-function clampDays(raw: string | undefined, fallback: number): number {
-  const parsed = parseInt(raw ?? '', 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(Math.max(parsed, 1), 90);
 }

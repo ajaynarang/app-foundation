@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Param, Body, BadRequestException, Logger, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { CACHE_NAMESPACES, CacheNamespace } from '@appshore/kernel/constants/cache.constants';
+import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
+import { FlushCacheDto } from './dto/flush-cache.dto';
 
 @Controller('admin/cache')
 @Roles(UserRole.SUPER_ADMIN)
@@ -54,9 +56,9 @@ export class AdminCacheController {
 
   @Post('flush')
   @HttpCode(HttpStatus.OK)
-  async flushAll(@Body() body: { confirm?: boolean }) {
+  async flushAll(@Body() body: FlushCacheDto) {
     if (!body?.confirm) {
-      throw new BadRequestException('Body must include { "confirm": true } to flush all caches');
+      throw fieldError('confirm', 'Send { "confirm": true } to flush all caches');
     }
 
     this.logger.warn('Flushing ALL app:* cache keys');
@@ -68,7 +70,7 @@ export class AdminCacheController {
   @HttpCode(HttpStatus.OK)
   async flushNamespace(@Param('namespace') namespace: string) {
     if (!CACHE_NAMESPACES.includes(namespace as CacheNamespace)) {
-      throw new BadRequestException(`Invalid namespace "${namespace}". Valid: ${CACHE_NAMESPACES.join(', ')}`);
+      throw fieldError('namespace', `Pick one of: ${CACHE_NAMESPACES.join(', ')}`);
     }
 
     this.logger.warn(`Flushing cache namespace: ${namespace}`);

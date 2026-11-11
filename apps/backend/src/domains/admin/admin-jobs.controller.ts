@@ -4,7 +4,6 @@ import {
   Post,
   Param,
   Query,
-  BadRequestException,
   NotFoundException,
   ParseIntPipe,
   HttpCode,
@@ -12,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
-import { JobStatus, UserRole } from '@appshore/db';
+import { UserRole } from '@appshore/db';
 import { JobStatusSchema } from '@app/shared-types';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { ALL_CATEGORIES, JOB_CATEGORIES } from '@appshore/kernel/infrastructure/queue/job.types';
@@ -22,7 +21,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES, bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
-import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from './dto/admin-jobs-query.dto';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -59,58 +59,30 @@ export class AdminJobsController {
   }
 
   @Get()
-  async listJobs(
-    @Query('tenantId') tenantId?: string,
-    @Query('category') category?: string,
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-  ) {
-    const statusArray = status
-      ? (status.split(',').filter((s) => (Object.values(JobStatus) as string[]).includes(s)) as JobStatus[])
-      : undefined;
-    const parsedLimit = limit ? parseInt(limit, 10) : 20;
-    const parsedOffset = offset ? parseInt(offset, 10) : 0;
-    const parsedTenantId = tenantId ? parseInt(tenantId, 10) : undefined;
-
-    if (parsedTenantId !== undefined && isNaN(parsedTenantId)) {
-      throw new BadRequestException('tenantId must be a number');
-    }
-
+  async listJobs(@Query() query: AdminJobListQueryDto) {
     return this.jobService.listAllJobsPaginated({
-      tenantId: parsedTenantId,
-      category,
-      type,
-      status: statusArray,
-      limit: Math.min(isNaN(parsedLimit) ? 20 : parsedLimit, 100),
-      offset: isNaN(parsedOffset) ? 0 : parsedOffset,
-      dateFrom,
-      dateTo,
+      tenantId: query.tenantId,
+      category: query.category,
+      type: query.type,
+      status: query.statuses,
+      limit: query.limit,
+      offset: query.offset,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
     });
   }
 
   @Get('metrics')
-  async getMetrics(@Query('tenantId') tenantId?: string) {
-    const parsedTenantId = tenantId ? parseInt(tenantId, 10) : undefined;
-    if (parsedTenantId !== undefined && isNaN(parsedTenantId)) {
-      throw new BadRequestException('tenantId must be a number');
-    }
-    return this.jobService.getMetrics(parsedTenantId);
+  async getMetrics(@Query() query: AdminJobsTenantQueryDto) {
+    return this.jobService.getMetrics(query.tenantId);
   }
 
   @Get('categories/summary')
-  async getCategorySummary(@Query('tenantId') tenantId?: string) {
-    if (!tenantId) {
-      throw new BadRequestException('tenantId required for category summary');
+  async getCategorySummary(@Query() query: AdminJobsTenantQueryDto) {
+    if (query.tenantId === undefined) {
+      throw fieldError('tenant_id', 'tenant_id is required for the category summary');
     }
-    const parsedTenantId = parseInt(tenantId, 10);
-    if (isNaN(parsedTenantId)) {
-      throw new BadRequestException('tenantId must be a number');
-    }
-    return this.jobService.getCategorySummary(parsedTenantId, ALL_CATEGORIES, {
+    return this.jobService.getCategorySummary(query.tenantId, ALL_CATEGORIES, {
       [QUEUE_NAMES.EVENTS]: this.eventsQueue,
       [QUEUE_NAMES.NOTIFICATIONS]: this.notificationsQueue,
       [QUEUE_NAMES.WEBHOOKS]: this.webhooksQueue,
