@@ -18,7 +18,8 @@ A full-stack monorepo extracted from a production platform with all business-dom
 removed. Everything cross-cutting remains and works:
 
 - **Auth** — first-party email+password (primary, zero external services), phone PIN/OTP,
-  optional Firebase exchange, JWT + rotating refresh, login-event tracking, OAuth 2.1 provider.
+  optional Firebase exchange, JWT + refresh token (revocable; NOT rotated on use), login-event
+  tracking, OAuth 2.1 provider.
   Seeds print dev credentials (owner@example.com / admin@example.com / Password123!).
 - **Multi-tenancy** — tenant-scoped data + a global guard chain. Toggle with `MULTI_TENANT`
   (see below) to run single-tenant from the same code.
@@ -32,7 +33,7 @@ removed. Everything cross-cutting remains and works:
 
 ## Tenancy models (config toggle)
 
-The same codebase runs four ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
+The same codebase runs three ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
 kept for compat). Workspace-based membership (one user ↔ many workspaces, per-workspace role,
 live switcher) is built in: `WorkspaceMember` is the source of truth and the JWT carries the
 session's ACTIVE workspace — so two tabs can live in two workspaces. Personal mode auto-creates
@@ -130,6 +131,8 @@ pnpm --filter @app/shared-types build         # build shared types (dependents n
 cp apps/web/.env.example apps/web/.env.local   # web env (NEXT_PUBLIC_API_URL etc.)
 cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL, ANTHROPIC_API_KEY, ...)
 pnpm prisma:generate                           # Prisma client + shared-enum codegen
+pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
+                                               # foundation packages (the backend consumes their dist)
 pnpm prisma:migrate:deploy && pnpm db:seed     # apply migration + seed platform data
 cd ../.. && pnpm dev                           # backend + web + console
 ```
