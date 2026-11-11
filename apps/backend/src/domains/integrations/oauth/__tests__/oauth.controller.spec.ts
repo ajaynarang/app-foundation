@@ -25,13 +25,9 @@ const mockTokenRefreshJob = {
 };
 
 const mockConfig = {
-  get: jest.fn(
-    (key: string, fallback?: string) =>
-      ({
-        APP_URL: 'https://app.example.com/',
-        CONSOLE_URL: 'https://console.example.com',
-      })[key] ?? fallback,
-  ),
+  // Any URL setting other than APP_URL answers with another origin, so a
+  // callback that read one (as it once read the console app's) fails the specs.
+  get: jest.fn((key: string) => (key === 'APP_URL' ? 'https://app.example.com/' : 'https://other.example.com')),
 };
 
 describe('OAuthController', () => {
@@ -95,7 +91,7 @@ describe('OAuthController', () => {
       expect(mockRes.redirect).toHaveBeenCalledWith(expect.stringContaining('oauth=connected'));
     });
 
-    it('returns the browser to the web app (APP_URL), never the retired console, even if CONSOLE_URL is still set', async () => {
+    it('returns the browser to the web app at APP_URL, whatever other URL settings exist', async () => {
       mockPrisma.integrationConfig.findFirst.mockResolvedValue(null);
       mockAuthTokenService.handleCallback.mockResolvedValue({ vendor: 'QUICKBOOKS', tenantId: 5 });
 

@@ -25,8 +25,8 @@ interface NotificationSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Action links written while a separate console app existed; see navigateToAction. */
-const LEGACY_CONSOLE_PREFIX = 'console:';
+/** Prefix of action links written while a separate console app existed; see navigateToAction. */
+const RETIRED_APP_LINK_PREFIX = 'console:';
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
   SYSTEM: Settings,
@@ -74,7 +74,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
 
   const navigateToAction = (url: string) => {
     // Notices stored before the console app was removed carry a `console:` link; Settings is their home now.
-    router.push(url.startsWith(LEGACY_CONSOLE_PREFIX) ? '/settings' : url);
+    router.push(url.startsWith(RETIRED_APP_LINK_PREFIX) ? '/settings' : url);
     onOpenChange(false);
   };
 
