@@ -11,13 +11,13 @@ export class CreateFeedbackDto {
   @Max(5)
   sentiment: number;
 
-  @ApiProperty({ example: 'The map route is not loading properly' })
+  @ApiProperty({ example: 'The projects list is not loading properly' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(5000)
   message: string;
 
-  @ApiPropertyOptional({ example: '/projects/route-planning' })
+  @ApiPropertyOptional({ example: '/projects' })
   @IsOptional()
   @IsString()
   @MaxLength(500)

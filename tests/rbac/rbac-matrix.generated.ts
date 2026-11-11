@@ -5,7 +5,7 @@
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
  * Generated: 2026-07-03T16:43:04.084Z
- * Source: 0 domains, 87 endpoints
+ * Source: 0 domains, 86 endpoints
  * Controllers scanned: 262 total endpoints across all controllers
  *
  * Status codes:
@@ -438,13 +438,6 @@ export const RBAC_MATRIX: RbacEntry[] = [
   // ═══════════════════════════════════════════════════════
   // OTHER
   // ═══════════════════════════════════════════════════════
-  {
-    method: 'GET', path: '/drivers',
-    description: 'DriversController: GET /drivers',
-    domain: 'other',
-    featureGate: null,
-    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
-  },
   {
     method: 'GET', path: '/push/vapid-key',
     description: 'PushSubscriptionController: GET /push/vapid-key',

@@ -55,7 +55,7 @@ export function RejectTenantDialog({
             id="reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g., Invalid DOT number, duplicate registration..."
+            placeholder="e.g., Invalid company details, duplicate registration..."
             rows={4}
             className="bg-background"
           />

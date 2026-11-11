@@ -303,7 +303,7 @@ function generateMatrixFile(endpoints: EndpointInfo[]): string {
       return false;
     // Skip conversations (AI — has custom role logic beyond @Roles)
     if (ep.path.includes('/conversations')) return false;
-    // Skip command-center briefing (has method-level @Roles override the auto-generator misses)
+    // Skip briefing endpoints (has method-level @Roles override the auto-generator misses)
     if (ep.path.includes('/briefing')) return false;
     // Skip general user preferences (accessible by all authenticated users, no @Roles)
     if (ep.path === '/settings/general') return false;
