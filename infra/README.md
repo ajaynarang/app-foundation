@@ -291,7 +291,7 @@ aws logs tail /app/staging/api --follow
 
 ### `terraform/doppler.tf` — Runtime Secrets via Doppler
 
-All app environment variables (`DATABASE_URL`, `REDIS_URL`, JWT secrets, API keys, `FRONTEND_URL`, `CONSOLE_URL`, `CORS_ORIGINS`, optional LiveKit/voice settings, etc.) live in **Doppler** — not in Terraform and not in AWS Secrets Manager. See `docs/doppler.md` for setting up your Doppler project.
+All app environment variables (`DATABASE_URL`, `REDIS_URL`, JWT secrets, API keys, `FRONTEND_URL`, `CORS_ORIGINS`, optional LiveKit/voice settings, etc.) live in **Doppler** — not in Terraform and not in AWS Secrets Manager. See `docs/doppler.md` for setting up your Doppler project.
 
 Terraform's only job here is storing the Doppler **service token** in SSM Parameter Store as a SecureString (`/<project>-<env>/doppler-token`). The ECS task definitions inject that one token via the `secrets` block, and the container entrypoint runs the app under `doppler run`, which fetches everything else at startup.
 

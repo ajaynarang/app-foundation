@@ -34,11 +34,11 @@ pnpm init-app --name acme-crm --yes --dry-run
 | Pattern                                         | Becomes          | Where                                                                           |
 | ----------------------------------------------- | ---------------- | ------------------------------------------------------------------------------- |
 | `app-foundation`                                | `<name>`         | package names, README, CLAUDE.md, landing page                                  |
-| `app-backend` / `app-frontend` / `app-console`  | `<name>-*`       | Doppler projects (`doppler.yaml`, scripts), OTel/Grafana service names, compose |
+| `app-backend` / `app-frontend`                  | `<name>-*`       | Doppler projects (`doppler.yaml`, scripts), OTel/Grafana service names, compose |
 | `app-postgres` … `app-inngest`                  | `<name>-*`       | docker container names                                                          |
 | `__PROJECT__` + terraform `var.project` default | `<name>`         | `infra/`                                                                        |
 | postgres db `app`                               | `<db>`           | `DATABASE_URL`, `POSTGRES_DB`                                                   |
-| branding `Platform`                             | `<display-name>` | web/console layout metadata, login, landing page (targeted files only)          |
+| branding `Platform`                             | `<display-name>` | web layout metadata, login, landing page (targeted files only)                  |
 | `MULTI_TENANT` / `NEXT_PUBLIC_MULTI_TENANT`     | per `--tenancy`  | `.env.example` files                                                            |
 | `@app/`                                         | `<scope>/`       | only when `--scope` differs from `@app`                                         |
 | flutter `app_mobile`                            | `<name>_mobile`  | `apps/mobile` (pubspec, bundle ids, imports) — only with `--mobile yes`         |

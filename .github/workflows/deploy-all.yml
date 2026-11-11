@@ -10,7 +10,6 @@ name: Deploy All
 #   AWS_REGION, AWS_ACCOUNT_ID, STAGING_OIDC_ROLE_ARN, PRODUCTION_OIDC_ROLE_ARN, DOMAIN
 #   DOPPLER_TOKEN_STG, DOPPLER_TOKEN_PRD
 #   VERCEL_WEB_DEPLOY_HOOK_STAGING, VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
-#   VERCEL_CONSOLE_DEPLOY_HOOK_STAGING, VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION
 #
 # Required GitHub Environments: staging, production (with Required Reviewers)
 
@@ -654,36 +653,32 @@ jobs:
           exit 1
 
   # ─────────────────────────────────────────────────────────────
-  # 4. Deploy Frontends to Vercel (after backend succeeds)
-  #    Fires the web and console deploy hooks (fire-and-forget;
-  #    check the Vercel dashboard for build status).
+  # 4. Deploy the web app to Vercel (after backend succeeds)
+  #    Fires the web deploy hook (fire-and-forget; check the
+  #    Vercel dashboard for build status).
   # ─────────────────────────────────────────────────────────────
   deploy-frontend-staging:
-    name: Deploy Web + Console to Staging (Vercel)
+    name: Deploy Web to Staging (Vercel)
     needs: migrate-staging
     if: github.event.inputs.environment == 'staging'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Vercel staging deployments
+      - name: Trigger Vercel staging deployment
         run: |
           echo "Triggering web deployment..."
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_STAGING }}" > /dev/null
-          echo "Triggering console deployment..."
-          curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_STAGING }}" > /dev/null
-          echo "✓ Vercel staging deployments triggered"
+          echo "✓ Vercel staging deployment triggered"
 
   deploy-frontend-production:
-    name: Deploy Web + Console to Production (Vercel)
+    name: Deploy Web to Production (Vercel)
     needs: migrate-production
     if: github.event.inputs.environment == 'production'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Vercel production deployments
+      - name: Trigger Vercel production deployment
         run: |
           echo "Triggering web deployment..."
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
-          echo "Triggering console deployment..."
-          curl -s -X POST "${{ secrets.VERCEL_CONSOLE_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
-          echo "✓ Vercel production deployments triggered"
+          echo "✓ Vercel production deployment triggered"
