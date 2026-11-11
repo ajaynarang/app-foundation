@@ -1,8 +1,23 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { BadRequestException } from '@nestjs/common';
+import * as dns from 'node:dns';
 import { getQueueToken } from '@nestjs/bullmq';
 import { WebhookSubscriptionService } from '../subscription.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+
+jest.mock('node:dns', () => ({ ...jest.requireActual('node:dns'), lookup: jest.fn() }));
+
+/** Makes every host resolve to these addresses, as `dns.lookup(host, { all: true })` would report them. */
+const resolveTo = (...addresses: string[]) =>
+  (dns.lookup as unknown as jest.Mock).mockImplementation(
+    (_host: string, _options: unknown, callback: (err: Error | null, addresses: unknown) => void) =>
+      callback(
+        null,
+        addresses.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })),
+      ),
+  );
 
 describe('WebhookSubscriptionService', () => {
   let service: WebhookSubscriptionService;
@@ -10,6 +25,7 @@ describe('WebhookSubscriptionService', () => {
   let queue: any;
 
   beforeEach(async () => {
+    (dns.lookup as unknown as jest.Mock).mockReset();
     prisma = {
       webhookSubscription: {
         findUnique: jest.fn(),
@@ -42,10 +58,66 @@ describe('WebhookSubscriptionService', () => {
         WebhookSubscriptionService,
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(QUEUE_NAMES.WEBHOOKS), useValue: queue },
+        { provide: ConfigService, useValue: { get: () => false } },
       ],
     }).compile();
 
     service = module.get(WebhookSubscriptionService);
+  });
+
+  describe('SSRF guard at registration', () => {
+    const tenantId = 1;
+    const input = (url: string) => ({ url, events: ['*'] });
+
+    beforeEach(() => {
+      prisma.webhookSubscription.create.mockImplementation(({ data }: any) => ({ id: 'sub-new', ...data }));
+      prisma.webhookSubscription.findUnique.mockResolvedValue({ id: 'sub-1', tenantId, active: true });
+      prisma.webhookSubscription.update.mockResolvedValue({ id: 'sub-1' });
+    });
+
+    it('saves a subscription whose host resolves only to public addresses', async () => {
+      resolveTo('93.184.216.34', '2606:2800:220:1::1');
+
+      await service.create(tenantId, input('https://hooks.partner-site.com/in'));
+
+      expect(prisma.webhookSubscription.create).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a private address', '10.0.0.5'],
+      ['loopback', '127.0.0.1'],
+      ['the metadata address', '169.254.169.254'],
+      ['CGNAT', '100.64.0.9'],
+      ['an IPv6-mapped private address', '::ffff:10.0.0.5'],
+    ])('refuses a public-looking host that resolves to %s, on create and on update', async (_label, address) => {
+      resolveTo('93.184.216.34', address);
+
+      await expect(service.create(tenantId, input('https://hooks.partner-site.com/in'))).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.update(tenantId, 'sub-1', { url: 'https://hooks.partner-site.com/in' })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+    });
+
+    it.each([['https://169.254.169.254/latest/meta-data/'], ['https://localhost/hook'], ['http://partner.com/hook']])(
+      'refuses %s before resolving anything',
+      async (url) => {
+        await expect(service.create(tenantId, input(url))).rejects.toThrow(BadRequestException);
+        expect(dns.lookup).not.toHaveBeenCalled();
+        expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not check the URL when an update leaves it unchanged', async () => {
+      await service.update(tenantId, 'sub-1', { active: false });
+
+      expect(dns.lookup).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).toHaveBeenCalled();
+    });
   });
 
   describe('getEventCatalog', () => {

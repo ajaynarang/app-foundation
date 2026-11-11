@@ -84,6 +84,14 @@ const configSchema = z.object({
     })
     .default({}),
 
+  // Outbound webhooks. Development escape hatch: with this on, a subscription may use http and point at
+  // localhost or a private address, so a receiver on a laptop works. Production refuses to boot with it.
+  webhooks: z
+    .object({
+      allowPrivateTargets: z.boolean().default(false),
+    })
+    .default({}),
+
   // OAuth Provider
   oauthJwtSecret: z.string().optional(),
   oauthIssuer: z.string().default('http://localhost:8000'),
@@ -205,6 +213,13 @@ const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
     );
   }
 
+  // The webhook worker would then deliver to addresses inside the deployment's own network (SSRF).
+  if (config.webhooks.allowPrivateTargets) {
+    fail(
+      'WEBHOOK_ALLOW_PRIVATE_TARGETS must not be true in production: it lets a tenant point outbound webhooks at private and loopback addresses.',
+    );
+  }
+
   const localOrigins = findLocalCorsOrigins(config.corsOrigins);
   if (localOrigins.length > 0) {
     fail(
@@ -261,6 +276,9 @@ export default (): Configuration => {
     inngest: {
       dev: env('INNGEST_DEV'),
       signingKey: env('INNGEST_SIGNING_KEY'),
+    },
+    webhooks: {
+      allowPrivateTargets: env('WEBHOOK_ALLOW_PRIVATE_TARGETS') === 'true',
     },
     oauthIssuer: process.env.OAUTH_ISSUER,
     s3: {

@@ -32,6 +32,7 @@ describe('configuration — production boot guard', () => {
     'LIVEKIT_URL',
     'INNGEST_DEV',
     'INNGEST_SIGNING_KEY',
+    'WEBHOOK_ALLOW_PRIVATE_TARGETS',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -215,6 +216,27 @@ describe('configuration — production boot guard', () => {
       ['https://notlocalhost.io'],
     ])('allows %s', (origins) => {
       expect(() => load({ ...validProduction(), CORS_ORIGINS: origins })).not.toThrow();
+    });
+  });
+
+  describe('WEBHOOK_ALLOW_PRIVATE_TARGETS', () => {
+    it('refuses production with the private-target escape hatch on', () => {
+      expect(() => load({ ...validProduction(), WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true' })).toThrow(
+        /WEBHOOK_ALLOW_PRIVATE_TARGETS must not be true in production/,
+      );
+    });
+
+    it('is off unless set to true, and may be on outside production', () => {
+      expect(load(validProduction()).webhooks.allowPrivateTargets).toBe(false);
+      expect(load({ ...validProduction(), WEBHOOK_ALLOW_PRIVATE_TARGETS: 'false' }).webhooks.allowPrivateTargets).toBe(
+        false,
+      );
+      const dev = load({
+        NODE_ENV: 'development',
+        REDIS_URL: 'redis://localhost:6399',
+        WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true',
+      });
+      expect(dev.webhooks.allowPrivateTargets).toBe(true);
     });
   });
 

@@ -1,9 +1,15 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import { Job, UnrecoverableError } from 'bullmq';
 import { createHmac } from 'crypto';
 import axios from 'axios';
 import type { JobEnvelope } from '@app/shared-types';
+import {
+  assertDeliverableWebhookUrl,
+  createSafeWebhookAgents,
+  isUnsafeWebhookTargetError,
+} from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
@@ -41,15 +47,24 @@ class WebhookHttpError extends Error {
   }
 }
 
+const DELIVERY_TIMEOUT_MS = 10_000;
+
 @Processor(QUEUE_NAMES.WEBHOOKS, { concurrency: 5 })
 export class WebhookDeliveryProcessor extends WorkerHost {
   private readonly logger = new Logger(WebhookDeliveryProcessor.name);
 
+  private readonly allowPrivate: boolean;
+  /** Every connection resolves through the SSRF guard: a host that resolves to a private address is refused. */
+  private readonly agents: ReturnType<typeof createSafeWebhookAgents>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly deadLetter: DeadLetterService,
+    config: ConfigService,
   ) {
     super();
+    this.allowPrivate = config.get<boolean>('webhooks.allowPrivateTargets') === true;
+    this.agents = createSafeWebhookAgents({ allowPrivate: this.allowPrivate });
   }
 
   computeSignature(secret: string, body: string): string {
@@ -97,71 +112,75 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     const body = JSON.stringify(payload);
     const signature = this.computeSignature(subscription.secret, body);
 
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': signature,
+      'X-Webhook-Event': payload.event,
+      'X-Webhook-Delivery': logId,
+      'X-Webhook-Event-Version': String(payload.version ?? 1),
+    };
+
+    let response: { status: number; data: unknown };
     try {
-      const response = await axios.post(subscription.url, body, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Signature': signature,
-          'X-Webhook-Event': payload.event,
-          'X-Webhook-Delivery': logId,
-          'X-Webhook-Event-Version': String(payload.version ?? 1),
-        },
-        timeout: 10_000,
-        validateStatus: () => true, // handle all statuses manually below
-      });
-
-      const isSuccess = response.status >= 200 && response.status < 300;
-      const responseBody =
-        typeof response.data === 'object'
-          ? JSON.stringify(response.data).slice(0, 1000)
-          : String(response.data).slice(0, 1000);
-
-      if (isSuccess) {
-        await this.prisma.webhookDeliveryLog.update({
-          where: { id: logId },
-          data: {
-            responseStatus: response.status,
-            responseBody,
-            attempts: { increment: 1 },
-            deliveredAt: new Date(),
-          },
-        });
-        this.logger.log(`Delivered ${payload.event} to ${subscription.url} → ${response.status}`);
-      } else {
-        // Non-2xx: log the failure and throw to trigger BullMQ retry
-        this.logger.warn(`Delivery got ${response.status} for ${logId}`);
-        await this.prisma.webhookDeliveryLog.update({
-          where: { id: logId },
-          data: {
-            attempts: { increment: 1 },
-            responseStatus: response.status,
-            responseBody,
-            ...(isFinalAttempt ? { failedAt: new Date() } : {}),
-          },
-        });
-        throw new WebhookHttpError(response.status);
-      }
+      response = await this.send(subscription.url, body, headers);
     } catch (error) {
-      // Only network errors reach here (axios never throws for HTTP errors when validateStatus: () => true)
-      // But re-thrown WebhookHttpError from our non-2xx block above also passes through here.
-      // Avoid double-logging/double-updating for those.
-      if (error instanceof WebhookHttpError) {
-        throw error;
-      }
-
+      if (isUnsafeWebhookTargetError(error)) return this.refuse(logId, subscription.url, error);
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Network error for ${logId}: ${message}`);
-      await this.prisma.webhookDeliveryLog.update({
-        where: { id: logId },
-        data: {
-          attempts: { increment: 1 },
-          responseStatus: null,
-          responseBody: message.slice(0, 1000),
-          ...(isFinalAttempt ? { failedAt: new Date() } : {}),
-        },
-      });
+      await this.recordAttempt(logId, { responseStatus: null, responseBody: message.slice(0, 1000) }, isFinalAttempt);
       throw error;
     }
+
+    const responseBody = (
+      typeof response.data === 'object' ? JSON.stringify(response.data) : String(response.data)
+    ).slice(0, 1000);
+    if (response.status >= 200 && response.status < 300) {
+      await this.prisma.webhookDeliveryLog.update({
+        where: { id: logId },
+        data: { responseStatus: response.status, responseBody, attempts: { increment: 1 }, deliveredAt: new Date() },
+      });
+      this.logger.log(`Delivered ${payload.event} to ${subscription.url} → ${response.status}`);
+      return;
+    }
+    // Non-2xx, a 3xx included (redirects are never followed): record it and throw so BullMQ retries.
+    this.logger.warn(`Delivery got ${response.status} for ${logId}`);
+    await this.recordAttempt(logId, { responseStatus: response.status, responseBody }, isFinalAttempt);
+    throw new WebhookHttpError(response.status);
+  }
+
+  /** One POST through the SSRF guard: literal hosts are checked here, resolved addresses by the safe agents. */
+  private send(url: string, body: string, headers: Record<string, string>) {
+    assertDeliverableWebhookUrl(url, { allowPrivate: this.allowPrivate });
+    return axios.post(url, body, {
+      headers,
+      timeout: DELIVERY_TIMEOUT_MS,
+      // Never follow a redirect: a 3xx is a failed delivery, not a way into another host.
+      maxRedirects: 0,
+      // No environment proxy: the safe agents must make the connection themselves.
+      proxy: false,
+      httpAgent: this.agents.httpAgent,
+      httpsAgent: this.agents.httpsAgent,
+      validateStatus: () => true, // every status is handled by the caller
+    });
+  }
+
+  private async recordAttempt(
+    logId: string,
+    result: { responseStatus: number | null; responseBody: string },
+    isFinalAttempt: boolean,
+  ): Promise<void> {
+    await this.prisma.webhookDeliveryLog.update({
+      where: { id: logId },
+      data: { attempts: { increment: 1 }, ...result, ...(isFinalAttempt ? { failedAt: new Date() } : {}) },
+    });
+  }
+
+  /** The target is not (or is no longer) a public address. Retrying cannot help, so fail it now, visibly. */
+  private async refuse(logId: string, url: string, error: unknown): Promise<never> {
+    const reason = `Refused: ${error instanceof Error ? error.message : 'the webhook URL is not a public address'}`;
+    this.logger.warn(`Refused delivery ${logId} to ${url}: ${reason}`);
+    await this.recordAttempt(logId, { responseStatus: null, responseBody: reason.slice(0, 1000) }, true);
+    throw new UnrecoverableError(reason);
   }
 
   /**
@@ -173,7 +192,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   async onFailed(job: Job<JobEnvelope<WebhookDeliveryPayload>>, err: Error): Promise<void> {
     const maxAttempts = job.opts?.attempts ?? 3;
-    if (job.attemptsMade >= maxAttempts) {
+    if (job.attemptsMade >= maxAttempts || err instanceof UnrecoverableError) {
       await this.deadLetter.recordPermanentFailure(job, err);
     }
   }

@@ -1,10 +1,11 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { randomBytes } from 'crypto';
-import { assertSafeWebhookUrl } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
+import { assertSafeWebhookTarget } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
 import { getExternalEventsByCategory } from '../events/event-registry';
 import { QUEUE_NAMES, WEBHOOKS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
@@ -20,7 +21,15 @@ export class WebhookSubscriptionService {
     private readonly prisma: PrismaService,
     @InjectQueue(QUEUE_NAMES.WEBHOOKS)
     private readonly deliveryQueue: Queue,
+    private readonly config: ConfigService,
   ) {}
+
+  /** The URL and every address its host resolves to must be public (the delivery worker checks again on send). */
+  private assertSafeTarget(url: string): Promise<void> {
+    return assertSafeWebhookTarget(url, {
+      allowPrivate: this.config.get<boolean>('webhooks.allowPrivateTargets') === true,
+    });
+  }
 
   async create(
     tenantId: number,
@@ -30,7 +39,7 @@ export class WebhookSubscriptionService {
       description?: string;
     },
   ) {
-    assertSafeWebhookUrl(data.url);
+    await this.assertSafeTarget(data.url);
 
     const secret = randomBytes(32).toString('hex');
 
@@ -115,7 +124,7 @@ export class WebhookSubscriptionService {
     },
   ) {
     await this.findOne(tenantId, id);
-    if (data.url) assertSafeWebhookUrl(data.url);
+    if (data.url) await this.assertSafeTarget(data.url);
     return this.prisma.webhookSubscription.update({
       where: { id },
       data,
