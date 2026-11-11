@@ -6,7 +6,7 @@ import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
 import { TwilioVerifyService } from '../../../infrastructure/sms/twilio-verify.service';
 import { PinService } from '../../../auth/pin.service';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('UserInvitationsService', () => {
   let service: UserInvitationsService;
@@ -194,14 +194,17 @@ describe('UserInvitationsService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw error if invitation expired', async () => {
+    it('answers 409 INVALID_STATE if the invitation expired', async () => {
       mockPrismaService.userInvitation.findUnique.mockResolvedValue({
         id: 1,
         status: 'PENDING',
         expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
 
-      await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toThrow(BadRequestException);
+      await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 
@@ -248,7 +251,7 @@ describe('UserInvitationsService', () => {
       expect(result.status).toBe('CANCELLED');
     });
 
-    it('should throw error if invitation already accepted', async () => {
+    it('answers 409 INVALID_STATE if the invitation was already accepted', async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -259,7 +262,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.cancelInvitation('inv_abc', 'tenant_abc', 'reason')).rejects.toThrow(BadRequestException);
+      await expect(service.cancelInvitation('inv_abc', 'tenant_abc', 'reason')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 
@@ -302,7 +308,7 @@ describe('UserInvitationsService', () => {
       );
     });
 
-    it('should throw error if invitation is not PENDING', async () => {
+    it('answers 409 INVALID_STATE if the invitation is not PENDING', async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -314,7 +320,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toThrow(BadRequestException);
+      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should throw error if invitation not found', async () => {
@@ -461,7 +470,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toThrow('Cannot get link');
+      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE', detail: 'An invitation that is accepted has no link to share' },
+      });
     });
   });
 
@@ -692,7 +704,7 @@ describe('UserInvitationsService', () => {
       expect(mockPinService.hashPin).toHaveBeenCalledWith('1234');
     });
 
-    it('should throw for invalid or expired invitation', async () => {
+    it('answers 409 INVALID_STATE for an invalid or expired invitation', async () => {
       mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -702,7 +714,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when invitation status is not PENDING', async () => {
@@ -719,7 +731,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when invitation has expired', async () => {
@@ -736,7 +748,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when phone number does not match invitation', async () => {

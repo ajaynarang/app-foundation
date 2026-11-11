@@ -5,7 +5,7 @@ import type { AgentScope } from '@app/shared-types';
 const CIDR_REGEX = /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/;
 
 /**
- * Payload for PATCH /api-keys/:id/scopes. Tenant admins edit the scope
+ * Payload for PATCH /api-keys/:api_key_id/scopes. Tenant admins edit the scope
  * set, IP allowlist, and rate-limit on an existing key. Issuing a new
  * plaintext key requires the rotate endpoint — this endpoint never
  * exposes the secret.

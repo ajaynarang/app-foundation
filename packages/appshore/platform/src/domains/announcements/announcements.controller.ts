@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -31,6 +31,7 @@ export class AnnouncementsController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a broadcast' })
   create(@Body() dto: CreateAnnouncementDto, @CurrentUser() user: any) {
     return this.service.create(dto, user.dbId);
@@ -43,12 +44,14 @@ export class AnnouncementsController {
   }
 
   @Post(':id/publish')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Publish a broadcast' })
   publish(@Param('id', ParseIntPipe) id: number) {
     return this.service.publish(id);
   }
 
   @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive a broadcast' })
   archive(@Param('id', ParseIntPipe) id: number) {
     return this.service.archive(id);

@@ -40,6 +40,7 @@ export class ApiKeysController extends BaseTenantController {
   // RolesGuard treats missing @Roles metadata as allow-any-authenticated-role;
   // self-service endpoints must declare @Roles explicitly. (security audit SEC-21)
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Generate a new API key' })
   @ApiResponse({
@@ -63,13 +64,13 @@ export class ApiKeysController extends BaseTenantController {
     return this.apiKeysService.findAll(req.user.dbId);
   }
 
-  @Delete(':id')
+  @Delete(':api_key_id')
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke an API key (owner self-service)' })
   @ApiResponse({ status: 204, description: 'API key revoked successfully' })
-  async revoke(@Request() req, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.apiKeysService.revoke(id, req.user.dbId);
+  async revoke(@Request() req, @Param('api_key_id', ParseIntPipe) id: number): Promise<void> {
+    await this.apiKeysService.revoke(id, req.user.dbId);
   }
 
   // ─── Tenant-admin endpoints (Phase D) ────────────────────────────
@@ -85,6 +86,7 @@ export class ApiKeysController extends BaseTenantController {
   }
 
   @Post(':api_key_id/rotate')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Rotate a key: revoke the old row and mint a new one with the same scopes',
@@ -98,30 +100,33 @@ export class ApiKeysController extends BaseTenantController {
   }
 
   @Post(':api_key_id/pause')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Pause an API key (isActive=false); reversible via resume',
   })
-  async pause(@CurrentUser() user: { tenantId: string }, @Param('api_key_id', ParseIntPipe) id: number): Promise<void> {
+  async pause(
+    @CurrentUser() user: { tenantId: string },
+    @Param('api_key_id', ParseIntPipe) id: number,
+  ): Promise<ApiKeyDto> {
     const tenantId = await this.getTenantDbId(user);
     return this.apiKeysService.pause(id, tenantId);
   }
 
   @Post(':api_key_id/resume')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Resume a paused API key' })
   async resume(
     @CurrentUser() user: { tenantId: string },
     @Param('api_key_id', ParseIntPipe) id: number,
-  ): Promise<void> {
+  ): Promise<ApiKeyDto> {
     const tenantId = await this.getTenantDbId(user);
     return this.apiKeysService.resume(id, tenantId);
   }
 
   @Post(':api_key_id/revoke')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Revoke an API key (tenant admin; sets revokedAt, irreversible)',
@@ -129,7 +134,7 @@ export class ApiKeysController extends BaseTenantController {
   async revokeForTenant(
     @CurrentUser() user: { tenantId: string },
     @Param('api_key_id', ParseIntPipe) id: number,
-  ): Promise<void> {
+  ): Promise<ApiKeyDto> {
     const tenantId = await this.getTenantDbId(user);
     return this.apiKeysService.revokeForTenant(id, tenantId);
   }

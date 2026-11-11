@@ -17,6 +17,7 @@ import { InviteUserDto, AcceptPhoneInvitationDto } from './dto/invite-user.dto';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
+import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
 
@@ -229,11 +230,11 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Invitation is no longer valid');
+      throw invalidState('This invitation is no longer valid');
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invitation has expired');
+      throw invalidState('This invitation has expired — ask for a new one');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -296,7 +297,7 @@ export class UserInvitationsService {
     });
 
     if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invalid or expired invitation');
+      throw invalidState('This invitation is invalid or has expired — ask for a new one');
     }
 
     // Validate that the phone number matches what the invitation was sent to
@@ -376,11 +377,11 @@ export class UserInvitationsService {
     }
 
     if (invitation.status === 'ACCEPTED') {
-      throw new BadRequestException('Cannot cancel accepted invitation');
+      throw invalidState('An accepted invitation cannot be cancelled');
     }
 
     if (invitation.status === 'CANCELLED') {
-      throw new BadRequestException('Invitation is already cancelled');
+      throw invalidState('This invitation is already cancelled');
     }
 
     return this.prisma.userInvitation.update({
@@ -422,7 +423,7 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(`Cannot resend invitation with status ${invitation.status}`);
+      throw invalidState(`An invitation that is ${stateLabel(invitation.status)} cannot be resent`);
     }
 
     const newToken = nanoid();
@@ -482,7 +483,7 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(`Cannot get link for invitation with status ${invitation.status}`);
+      throw invalidState(`An invitation that is ${stateLabel(invitation.status)} has no link to share`);
     }
 
     const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
@@ -520,11 +521,11 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Invitation is no longer valid');
+      throw invalidState('This invitation is no longer valid');
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invitation has expired');
+      throw invalidState('This invitation has expired — ask for a new one');
     }
 
     return invitation;

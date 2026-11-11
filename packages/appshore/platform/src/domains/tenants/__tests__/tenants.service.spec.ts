@@ -191,7 +191,7 @@ describe('TenantsService', () => {
       await expect(service.approveTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw if tenant is not PENDING_APPROVAL', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not PENDING_APPROVAL', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'TNT-001',
@@ -199,7 +199,10 @@ describe('TenantsService', () => {
         users: [],
       });
 
-      await expect(service.approveTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
+      await expect(service.approveTenant('TNT-001', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should approve tenant and activate users', async () => {
@@ -253,16 +256,17 @@ describe('TenantsService', () => {
   });
 
   describe('suspendTenant', () => {
-    it('should throw if tenant is not ACTIVE', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not ACTIVE', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         status: 'PENDING_APPROVAL',
         users: [],
       });
 
-      await expect(service.suspendTenant('TNT-001', 'Violation of TOS - repeated', 'admin')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.suspendTenant('TNT-001', 'Violation of TOS - repeated', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should require reason of at least 10 characters', async () => {
@@ -297,14 +301,17 @@ describe('TenantsService', () => {
   });
 
   describe('reactivateTenant', () => {
-    it('should throw if tenant is not SUSPENDED', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not SUSPENDED', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         status: 'ACTIVE',
         users: [],
       });
 
-      await expect(service.reactivateTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
+      await expect(service.reactivateTenant('TNT-001', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should reactivate and re-enable users', async () => {

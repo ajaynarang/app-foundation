@@ -20,6 +20,7 @@ export class UserInvitationsController {
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async inviteUser(@Body() dto: InviteUserDto, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.inviteUser(dto, currentUser);
   }
@@ -48,6 +49,7 @@ export class UserInvitationsController {
    */
   @Public()
   @Post('accept')
+  @HttpCode(HttpStatus.OK)
   async acceptInvitation(@Body() dto: AcceptInvitationDto) {
     return this.userInvitationsService.acceptInvitation(dto.token, dto.firebaseUid);
   }
@@ -56,21 +58,22 @@ export class UserInvitationsController {
    * Cancel invitation (OWNER and ADMIN)
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Delete(':invitationId')
+  @Delete(':invitation_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   async cancelInvitation(
-    @Param('invitationId') invitationId: string,
+    @Param('invitation_id') invitationId: string,
     @CurrentUser() currentUser: any,
     @Body('reason') reason?: string,
-  ) {
-    return this.userInvitationsService.cancelInvitation(invitationId, currentUser.tenantId, reason);
+  ): Promise<void> {
+    await this.userInvitationsService.cancelInvitation(invitationId, currentUser.tenantId, reason);
   }
 
   /**
    * Get invite link for an existing pending invitation (OWNER, ADMIN, MEMBER)
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
-  @Get(':invitationId/link')
-  async getInvitationLink(@Param('invitationId') invitationId: string, @CurrentUser() currentUser: any) {
+  @Get(':invitation_id/link')
+  async getInvitationLink(@Param('invitation_id') invitationId: string, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.getInvitationLink(invitationId, currentUser.tenantId);
   }
 
@@ -78,8 +81,9 @@ export class UserInvitationsController {
    * Resend invitation with new token (OWNER and ADMIN)
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Post(':invitationId/resend')
-  async resendInvitation(@Param('invitationId') invitationId: string, @CurrentUser() currentUser: any) {
+  @Post(':invitation_id/resend')
+  @HttpCode(HttpStatus.OK)
+  async resendInvitation(@Param('invitation_id') invitationId: string, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.resendInvitation(invitationId, currentUser.tenantId);
   }
 

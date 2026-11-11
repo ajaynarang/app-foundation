@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Post, Body } from '@nestjs/common';
+import { Controller, Get, Put, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { UserPreferencesService } from './user-preferences.service';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -21,6 +21,7 @@ export class UserPreferencesController {
   }
 
   @Post('reset')
+  @HttpCode(HttpStatus.OK)
   async resetToDefaults(@CurrentUser() user: any, @Body() body: { scope: 'user' }) {
     return this.userPreferencesService.resetToDefaults(user.userId, body.scope);
   }

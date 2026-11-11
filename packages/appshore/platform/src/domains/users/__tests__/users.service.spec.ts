@@ -101,13 +101,13 @@ describe('UsersService', () => {
       await expect(service.getUser('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException if user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other_tenant', companyName: 'OtherCo' },
       });
 
-      await expect(service.getUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.getUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -195,14 +195,14 @@ describe('UsersService', () => {
       await expect(service.updateUser('nonexistent', { firstName: 'Jane' })).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException if user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
       await expect(service.updateUser('user_1234abcd', { firstName: 'Jane' }, 'tenant_abc')).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
       );
     });
 
@@ -256,9 +256,9 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.user.update.mockResolvedValue({ ...mockUser, isActive: false });
 
-      const result = await service.deleteUser('user_1234abcd');
+      // DELETE answers 204: the service returns nothing.
+      await expect(service.deleteUser('user_1234abcd')).resolves.toBeUndefined();
 
-      expect(result.message).toBe('User deactivated successfully');
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { userId: 'user_1234abcd' },
         data: { isActive: false },
@@ -285,13 +285,13 @@ describe('UsersService', () => {
       );
     });
 
-    it('should throw ForbiddenException when user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
-      await expect(service.deleteUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.deleteUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -302,7 +302,10 @@ describe('UsersService', () => {
 
       const result = await service.toggleUserStatus('user_1234abcd', true);
 
-      expect(result.message).toBe('User activated successfully');
+      // The action answers the user as they are now, not an acknowledgement.
+      expect(result).toMatchObject({ userId: 'user_1234abcd' });
+      expect(result).not.toHaveProperty('message');
+      expect(prisma.user.update).toHaveBeenCalledWith({ where: { userId: 'user_1234abcd' }, data: { isActive: true } });
     });
 
     it('should deactivate a user', async () => {
@@ -311,7 +314,11 @@ describe('UsersService', () => {
 
       const result = await service.toggleUserStatus('user_1234abcd', false);
 
-      expect(result.message).toBe('User deactivated successfully');
+      expect(result).toMatchObject({ userId: 'user_1234abcd' });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 'user_1234abcd' },
+        data: { isActive: false },
+      });
     });
 
     it('should throw NotFoundException if user not found', async () => {
@@ -336,13 +343,13 @@ describe('UsersService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should throw ForbiddenException when user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
-      await expect(service.toggleUserStatus('user_1234abcd', false, 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.toggleUserStatus('user_1234abcd', false, 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 });

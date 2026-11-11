@@ -24,6 +24,7 @@ import {
 } from '@app/shared-types';
 import { NotificationService } from '../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /** Prisma select for the editable organization-profile field set. */
 const ORGANIZATION_PROFILE_SELECT = {
@@ -231,7 +232,7 @@ export class TenantsService {
     }
 
     if (tenant.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Tenant is not pending approval');
+      throw invalidState('This workspace is not pending approval');
     }
 
     // Update tenant and activate admin user
@@ -350,7 +351,7 @@ export class TenantsService {
     }
 
     if (tenant.status !== 'ACTIVE') {
-      throw new BadRequestException('Can only suspend ACTIVE tenants');
+      throw invalidState('Only an active workspace can be suspended');
     }
 
     if (!reason || reason.trim().length < 10) {
@@ -410,7 +411,7 @@ export class TenantsService {
     }
 
     if (tenant.status !== 'SUSPENDED') {
-      throw new BadRequestException('Can only reactivate SUSPENDED tenants');
+      throw invalidState('Only a suspended workspace can be reactivated');
     }
 
     // Update tenant and reactivate all users in transaction

@@ -36,8 +36,8 @@ export class PlansController {
    * Get a specific tenant's plan details (SUPER_ADMIN only)
    */
   @Roles(UserRole.SUPER_ADMIN)
-  @Get('tenant/:tenantId')
-  async getTenantPlan(@Param('tenantId') tenantId: string) {
+  @Get('tenant/:tenant_id')
+  async getTenantPlan(@Param('tenant_id') tenantId: string) {
     return this.plansService.getTenantPlanDetails(tenantId);
   }
 
@@ -45,9 +45,9 @@ export class PlansController {
    * Assign a plan to a tenant (SUPER_ADMIN only)
    */
   @Roles(UserRole.SUPER_ADMIN)
-  @Patch('tenant/:tenantId')
+  @Patch('tenant/:tenant_id')
   async assignPlan(
-    @Param('tenantId') tenantId: string,
+    @Param('tenant_id') tenantId: string,
     @Body() body: { plan: TenantPlan; reason?: string },
     @CurrentUser() user: any,
   ) {

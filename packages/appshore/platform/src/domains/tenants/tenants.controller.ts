@@ -9,6 +9,8 @@ import {
   Query,
   BadRequestException,
   NotFoundException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -66,6 +68,7 @@ export class TenantsController extends BaseTenantController {
 
   @Public()
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterTenantDto) {
     this.assertMultiTenant();
     // Verify Turnstile token if configured
@@ -122,38 +125,42 @@ export class TenantsController extends BaseTenantController {
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Post(':tenantId/approve')
-  async approveTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+  @Post(':tenant_id/approve')
+  @HttpCode(HttpStatus.OK)
+  async approveTenant(@Param('tenant_id') tenantId: string, @CurrentUser() user: any) {
     return this.tenantsService.approveTenant(tenantId, user.email);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Post(':tenantId/reject')
-  async rejectTenant(@Param('tenantId') tenantId: string, @Body('reason') reason: string) {
+  @Post(':tenant_id/reject')
+  @HttpCode(HttpStatus.OK)
+  async rejectTenant(@Param('tenant_id') tenantId: string, @Body('reason') reason: string) {
     return this.tenantsService.rejectTenant(tenantId, reason);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Post(':tenantId/suspend')
-  async suspendTenant(@Param('tenantId') tenantId: string, @Body() dto: SuspendTenantDto, @CurrentUser() user: any) {
+  @Post(':tenant_id/suspend')
+  @HttpCode(HttpStatus.OK)
+  async suspendTenant(@Param('tenant_id') tenantId: string, @Body() dto: SuspendTenantDto, @CurrentUser() user: any) {
     return this.tenantsService.suspendTenant(tenantId, dto.reason, user.email);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Post(':tenantId/reactivate')
-  async reactivateTenant(@Param('tenantId') tenantId: string, @CurrentUser() user: any) {
+  @Post(':tenant_id/reactivate')
+  @HttpCode(HttpStatus.OK)
+  async reactivateTenant(@Param('tenant_id') tenantId: string, @CurrentUser() user: any) {
     return this.tenantsService.reactivateTenant(tenantId, user.email);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Patch(':tenantId')
-  async updateTenant(@Param('tenantId') tenantId: string, @Body() dto: UpdateTenantDto) {
+  @Patch(':tenant_id')
+  async updateTenant(@Param('tenant_id') tenantId: string, @Body() dto: UpdateTenantDto) {
     return this.tenantsService.updateTenant(tenantId, dto);
   }
 
   @Roles(UserRole.SUPER_ADMIN)
-  @Get(':tenantId/details')
-  async getTenantDetails(@Param('tenantId') tenantId: string) {
+  @Get(':tenant_id/details')
+  async getTenantDetails(@Param('tenant_id') tenantId: string) {
     return this.tenantsService.getTenantDetails(tenantId);
   }
 }

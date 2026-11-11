@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Patch, HttpCode, HttpStatus } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -17,38 +17,42 @@ export class UsersController {
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Get(':userId')
-  async getUser(@Param('userId') userId: string, @CurrentUser() currentUser: any) {
+  @Get(':user_id')
+  async getUser(@Param('user_id') userId: string, @CurrentUser() currentUser: any) {
     return this.usersService.getUser(userId, currentUser.tenantId);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async createUser(@Body() dto: CreateUserDto, @CurrentUser() currentUser: any) {
     return this.usersService.createUser(dto, currentUser.tenantId);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Patch(':userId')
-  async updateUser(@Param('userId') userId: string, @Body() dto: UpdateUserDto, @CurrentUser() currentUser: any) {
+  @Patch(':user_id')
+  async updateUser(@Param('user_id') userId: string, @Body() dto: UpdateUserDto, @CurrentUser() currentUser: any) {
     return this.usersService.updateUser(userId, dto, currentUser.tenantId, currentUser);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Delete(':userId')
-  async deleteUser(@Param('userId') userId: string, @CurrentUser() currentUser: any) {
-    return this.usersService.deleteUser(userId, currentUser.tenantId, currentUser);
+  @Delete(':user_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteUser(@Param('user_id') userId: string, @CurrentUser() currentUser: any): Promise<void> {
+    await this.usersService.deleteUser(userId, currentUser.tenantId, currentUser);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Post(':userId/deactivate')
-  async deactivateUser(@Param('userId') userId: string, @CurrentUser() currentUser: any) {
+  @Post(':user_id/deactivate')
+  @HttpCode(HttpStatus.OK)
+  async deactivateUser(@Param('user_id') userId: string, @CurrentUser() currentUser: any) {
     return this.usersService.toggleUserStatus(userId, false, currentUser.tenantId, currentUser);
   }
 
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @Post(':userId/activate')
-  async activateUser(@Param('userId') userId: string, @CurrentUser() currentUser: any) {
+  @Post(':user_id/activate')
+  @HttpCode(HttpStatus.OK)
+  async activateUser(@Param('user_id') userId: string, @CurrentUser() currentUser: any) {
     return this.usersService.toggleUserStatus(userId, true, currentUser.tenantId, currentUser);
   }
 }

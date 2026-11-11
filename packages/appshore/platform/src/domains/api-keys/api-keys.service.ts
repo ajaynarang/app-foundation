@@ -9,6 +9,7 @@ import { ApiKeyDto } from './dto/api-key.dto';
 import { TenantApiKeyListItemDto } from './dto/list-api-keys.dto';
 import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
 import { AgentScope, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /**
  * IPv4 CIDR containment check. Returns true when `ip` is inside `cidr`.
@@ -162,9 +163,9 @@ export class ApiKeysService {
   }
 
   /** Tenant-scoped revoke — used by tenant-admin flows (Desk). */
-  async revokeForTenant(id: number, tenantId: number): Promise<void> {
+  async revokeForTenant(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
-    await this.prisma.apiKey.update({
+    const updated = await this.prisma.apiKey.update({
       where: { id: apiKey.id },
       data: { revokedAt: new Date(), isActive: false },
     });
@@ -172,15 +173,16 @@ export class ApiKeysService {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
+    return this.toDto(updated);
   }
 
   /** Toggle isActive=false. No secret change. Reversible via resume(). */
-  async pause(id: number, tenantId: number): Promise<void> {
+  async pause(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
     if (apiKey.revokedAt) {
-      throw new BadRequestException('Cannot pause a revoked key');
+      throw invalidState('A revoked key cannot be paused');
     }
-    await this.prisma.apiKey.update({
+    const updated = await this.prisma.apiKey.update({
       where: { id: apiKey.id },
       data: { isActive: false },
     });
@@ -188,14 +190,15 @@ export class ApiKeysService {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
+    return this.toDto(updated);
   }
 
-  async resume(id: number, tenantId: number): Promise<void> {
+  async resume(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
     if (apiKey.revokedAt) {
-      throw new BadRequestException('Cannot resume a revoked key');
+      throw invalidState('A revoked key cannot be resumed');
     }
-    await this.prisma.apiKey.update({
+    const updated = await this.prisma.apiKey.update({
       where: { id: apiKey.id },
       data: { isActive: true },
     });
@@ -203,6 +206,7 @@ export class ApiKeysService {
       apiKeyId: apiKey.id,
       name: apiKey.name,
     });
+    return this.toDto(updated);
   }
 
   /**
@@ -213,7 +217,7 @@ export class ApiKeysService {
   async rotate(id: number, tenantId: number): Promise<{ apiKey: ApiKeyDto; plaintextKey: string }> {
     const existing = await this.findTenantKeyOrThrow(id, tenantId);
     if (existing.revokedAt) {
-      throw new BadRequestException('Cannot rotate a revoked key');
+      throw invalidState('A revoked key cannot be rotated');
     }
     const { plaintext: plaintextKey, ...stored } = mintKey();
 
@@ -257,7 +261,7 @@ export class ApiKeysService {
   async updateScopes(id: number, tenantId: number, dto: UpdateApiKeyScopesDto): Promise<ApiKeyDto> {
     const existing = await this.findTenantKeyOrThrow(id, tenantId);
     if (existing.revokedAt) {
-      throw new BadRequestException('Cannot update scopes on a revoked key');
+      throw invalidState('A revoked key cannot change its scopes');
     }
 
     this.assertScopesAreGrantable(dto.scopes);

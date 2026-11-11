@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Get, Body, Logger } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { PushService } from './web-push.service';
@@ -16,7 +16,9 @@ export class PushSubscriptionController {
     return { publicKey: this.pushService.getPublicKey() || '' };
   }
 
+  // 204: the subscription is keyed by the endpoint the browser already holds, so there is nothing to send back.
   @Post('subscribe')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Register a push notification subscription' })
   async subscribe(
     @CurrentUser() user: any,
@@ -27,15 +29,14 @@ export class PushSubscriptionController {
         keys: { p256dh: string; auth: string };
       };
     },
-  ) {
+  ): Promise<void> {
     await this.pushService.saveSubscription(user.dbId, user.tenantDbId, body.subscription);
-    return { message: 'Push subscription registered' };
   }
 
   @Delete('unsubscribe')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove a push notification subscription' })
-  async unsubscribe(@CurrentUser() user: any, @Body() body: { endpoint: string }) {
+  async unsubscribe(@CurrentUser() user: any, @Body() body: { endpoint: string }): Promise<void> {
     await this.pushService.removeSubscription(user.dbId, body.endpoint);
-    return { message: 'Push subscription removed' };
   }
 }

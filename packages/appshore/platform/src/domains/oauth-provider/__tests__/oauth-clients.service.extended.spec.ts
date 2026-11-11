@@ -102,12 +102,15 @@ describe('OAuthClientsService — Phase D admin surface', () => {
       expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.OAUTH_CLIENT_RESUMED, '7', expect.any(Object));
     });
 
-    it('pause is a BadRequest when already paused', async () => {
+    it('pause is 409 INVALID_STATE when already paused', async () => {
       prisma.oAuthClient.findUnique.mockResolvedValue({
         ...mockClient,
         isActive: false,
       });
-      await expect(service.pause('app_abc123', 7)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.pause('app_abc123', 7)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 

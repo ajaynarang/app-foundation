@@ -1,4 +1,4 @@
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { OAuthClientsService } from '../oauth-clients.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
@@ -95,12 +95,12 @@ describe('OAuthClientsService', () => {
       await expect(service.findByClientId('bad', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when tenant mismatch', async () => {
+    it("answers 404 for another workspace's client: a 403 would confirm it exists", async () => {
       prisma.oAuthClient.findUnique.mockResolvedValue({
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.findByClientId('app_abc123', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.findByClientId('app_abc123', 1)).rejects.toThrow(NotFoundException);
     });
 
     it('should allow null tenantId (global access)', async () => {
@@ -122,12 +122,12 @@ describe('OAuthClientsService', () => {
       await expect(service.update('bad', { name: 'X' }, 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when tenant mismatch', async () => {
+    it("answers 404 for another workspace's client: a 403 would confirm it exists", async () => {
       prisma.oAuthClient.findUnique.mockResolvedValue({
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.update('app_abc123', { name: 'X' }, 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.update('app_abc123', { name: 'X' }, 1)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -143,12 +143,12 @@ describe('OAuthClientsService', () => {
       await expect(service.revoke('bad', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when tenant mismatch', async () => {
+    it("answers 404 for another workspace's client: a 403 would confirm it exists", async () => {
       prisma.oAuthClient.findUnique.mockResolvedValue({
         ...mockClient,
         tenantId: 2,
       });
-      await expect(service.revoke('app_abc123', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.revoke('app_abc123', 1)).rejects.toThrow(NotFoundException);
     });
   });
 });

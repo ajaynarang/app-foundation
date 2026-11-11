@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
@@ -17,6 +17,7 @@ import type {
   OAuthClientCreatedResponse,
 } from '@app/shared-types';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 @Injectable()
 export class OAuthClientsService {
@@ -173,7 +174,7 @@ export class OAuthClientsService {
     const client = await this.loadClientOrThrow(clientId, tenantId);
     await this.assertNotRevoked(client);
     if (!client.isActive) {
-      throw new BadRequestException('Client is already paused');
+      throw invalidState('This app is already paused');
     }
     await this.prisma.oAuthClient.update({
       where: { clientId },
@@ -190,7 +191,7 @@ export class OAuthClientsService {
     const client = await this.loadClientOrThrow(clientId, tenantId);
     await this.assertNotRevoked(client);
     if (client.isActive) {
-      throw new BadRequestException('Client is already active');
+      throw invalidState('This app is already active');
     }
     await this.prisma.oAuthClient.update({
       where: { clientId },
@@ -285,7 +286,8 @@ export class OAuthClientsService {
       throw new NotFoundException('OAuth client not found');
     }
     if (tenantId !== null && client.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Another workspace's client answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('OAuth client not found');
     }
     return client;
   }
@@ -304,7 +306,7 @@ export class OAuthClientsService {
       where: { clientId: client.id, revokedAt: { not: null } },
     });
     if (revokedTokenCount > 0) {
-      throw new BadRequestException('Cannot modify a revoked OAuth client. Register a new one.');
+      throw invalidState('This app has been revoked and can no longer be changed. Register it again.');
     }
   }
 

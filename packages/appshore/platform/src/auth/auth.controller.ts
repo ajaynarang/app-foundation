@@ -13,7 +13,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Response, Request as ExpressRequest } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiNoContentResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginResponseDto, UserProfileDto } from './dto/login.dto';
@@ -110,13 +110,12 @@ export class AuthController {
     default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
   })
   @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request a password reset link (always 200 — no account enumeration)' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Request a password reset link (always 204, so an account cannot be probed)' })
   @ApiBody({ type: ForgotPasswordDto })
-  @ApiResponse({ status: 200 })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+  @ApiNoContentResponse()
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {
     await this.authService.forgotPassword(dto);
-    return { success: true };
   }
 
   @Public()
@@ -124,18 +123,18 @@ export class AuthController {
     default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
   })
   @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Complete a password reset with a one-time token' })
   @ApiBody({ type: ResetPasswordDto })
-  @ApiResponse({ status: 200 })
+  @ApiNoContentResponse()
   @ApiResponse({ status: 401 })
-  async resetPassword(@Body() dto: ResetPasswordDto) {
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto);
-    return { success: true };
   }
 
   @Public()
   @Post('firebase/exchange')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Exchange Firebase token for app JWT' })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 401 })
@@ -155,6 +154,7 @@ export class AuthController {
   @Public()
   @UseGuards(RefreshJwtAuthGuard)
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
   @ApiResponse({ status: 200, type: LoginResponseDto })
   @ApiResponse({ status: 401 })
@@ -165,12 +165,12 @@ export class AuthController {
 
   @ApiBearerAuth()
   @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Logout and revoke refresh token' })
-  @ApiResponse({ status: 200 })
-  async logout(@CurrentUser() user: any, @Res({ passthrough: true }) response: Response) {
+  @ApiNoContentResponse()
+  async logout(@CurrentUser() user: any, @Res({ passthrough: true }) response: Response): Promise<void> {
     if (user.tokenId) await this.authService.logout(user.tokenId, user.dbId, user.tenantDbId ?? null);
     clearRefreshTokenCookie(response, this.refreshCookieContext);
-    return { message: 'Logout successful' };
   }
 
   @ApiBearerAuth()
@@ -207,7 +207,7 @@ export class AuthController {
       revokeOtherSessions,
       { currentPassword: dto.currentPassword, newPassword: dto.newPassword },
     );
-    return { success: true, sessionsRevoked };
+    return { sessionsRevoked };
   }
 
   @Public()
@@ -215,14 +215,11 @@ export class AuthController {
     default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_OTP_SEND },
   })
   @Post('phone/send-otp')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send OTP to phone number' })
-  @ApiResponse({ status: 200 })
-  async sendPhoneOtp(@Body() dto: SendOtpDto): Promise<{ message: string }> {
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Send OTP to phone number (always 204, so a number cannot be probed)' })
+  @ApiNoContentResponse()
+  async sendPhoneOtp(@Body() dto: SendOtpDto): Promise<void> {
     await this.authService.sendPhoneOtp(dto.phone);
-    return {
-      message: 'If this phone number is registered, a code has been sent.',
-    };
   }
 
   @Public()
@@ -258,26 +255,24 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('phone/set-pin')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Set or update 4-digit PIN' })
-  @ApiResponse({ status: 200 })
-  async setPin(@CurrentUser() user: any, @Body() dto: SetPinDto): Promise<{ message: string }> {
+  @ApiNoContentResponse()
+  async setPin(@CurrentUser() user: any, @Body() dto: SetPinDto): Promise<void> {
     await this.authService.setPin(user.userId, dto.pin);
-    return { message: 'PIN set successfully' };
   }
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('phone/add-phone')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Add phone number to existing account and send OTP',
   })
-  @ApiResponse({ status: 200 })
+  @ApiNoContentResponse()
   @ApiResponse({ status: 409 })
-  async addPhone(@CurrentUser() user: any, @Body() dto: AddPhoneDto): Promise<{ message: string }> {
+  async addPhone(@CurrentUser() user: any, @Body() dto: AddPhoneDto): Promise<void> {
     await this.authService.addPhone(user.userId, dto.phone);
-    return { message: 'Verification code sent to your phone' };
   }
 
   @ApiBearerAuth()
@@ -287,10 +282,11 @@ export class AuthController {
   @ApiOperation({
     summary: 'Verify OTP to confirm phone number on existing account',
   })
-  @ApiResponse({ status: 200 })
+  @ApiResponse({ status: 200, type: UserProfileDto })
   @ApiResponse({ status: 401 })
-  async verifyAddPhone(@CurrentUser() user: any, @Body() dto: VerifyOtpDto): Promise<{ message: string }> {
+  async verifyAddPhone(@CurrentUser() user: any, @Body() dto: VerifyOtpDto): Promise<UserProfileDto> {
     await this.authService.verifyAndAddPhone(user.userId, dto.phone, dto.code);
-    return { message: 'Phone number verified and added to your account' };
+    // The resource as it is now: the profile, with the phone on it.
+    return this.authService.getProfile(user.userId);
   }
 }

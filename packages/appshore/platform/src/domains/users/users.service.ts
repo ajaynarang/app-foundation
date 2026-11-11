@@ -103,7 +103,8 @@ export class UsersService {
 
     // ADMIN can only access users in their tenant
     if (tenantIdString && user.tenant?.tenantId !== tenantIdString) {
-      throw new ForbiddenException('Cannot access user from different tenant');
+      // Another workspace's user answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('User not found');
     }
 
     return {
@@ -188,7 +189,8 @@ export class UsersService {
 
     // ADMIN can only update users in their tenant
     if (tenantIdString && user.tenant?.tenantId !== tenantIdString) {
-      throw new ForbiddenException('Cannot update user from different tenant');
+      // Another workspace's user answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('User not found');
     }
 
     // Cannot modify OWNER role
@@ -270,7 +272,8 @@ export class UsersService {
 
     // ADMIN can only delete users in their tenant
     if (tenantIdString && user.tenant?.tenantId !== tenantIdString) {
-      throw new ForbiddenException('Cannot delete user from different tenant');
+      // Another workspace's user answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('User not found');
     }
 
     // Cannot delete OWNER
@@ -288,8 +291,6 @@ export class UsersService {
       where: { userId },
       data: { isActive: false },
     });
-
-    return { message: 'User deactivated successfully' };
   }
 
   async toggleUserStatus(userId: string, isActive: boolean, tenantIdString?: string, currentUser?: any) {
@@ -304,7 +305,8 @@ export class UsersService {
 
     // ADMIN can only toggle users in their tenant
     if (tenantIdString && user.tenant?.tenantId !== tenantIdString) {
-      throw new ForbiddenException('Cannot modify user from different tenant');
+      // Another workspace's user answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('User not found');
     }
 
     // Cannot deactivate OWNER
@@ -322,8 +324,7 @@ export class UsersService {
       data: { isActive },
     });
 
-    return {
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-    };
+    // An action answers the resource as it is now: the user, with the new status.
+    return this.getUser(userId, tenantIdString);
   }
 }

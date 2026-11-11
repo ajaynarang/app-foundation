@@ -98,20 +98,22 @@ describe('ApiKeysService — Phase D admin surface', () => {
       await expect(svc.rotate(999, 7)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('throws BadRequest when the key is already revoked', async () => {
+    it('answers 409 INVALID_STATE when the key is already revoked', async () => {
       prisma.apiKey.findFirst.mockResolvedValue({
         ...baseRow,
         revokedAt: new Date(),
       });
-      await expect(svc.rotate(501, 7)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.rotate(501, 7)).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
   });
 
   describe('pause / resume', () => {
     it('pause flips isActive=false and emits PAUSED', async () => {
       prisma.apiKey.findFirst.mockResolvedValue(baseRow);
-      prisma.apiKey.update.mockResolvedValue({});
-      await svc.pause(501, 7);
+      prisma.apiKey.update.mockResolvedValue({ ...baseRow, isActive: false });
+      const paused = await svc.pause(501, 7);
+      // The action answers the key as it is now, not an empty acknowledgement.
+      expect(paused).toMatchObject({ id: 501, isActive: false });
       expect(prisma.apiKey.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 501 },
@@ -127,25 +129,27 @@ describe('ApiKeysService — Phase D admin surface', () => {
 
     it('resume flips isActive=true and emits RESUMED', async () => {
       prisma.apiKey.findFirst.mockResolvedValue(baseRow);
-      prisma.apiKey.update.mockResolvedValue({});
-      await svc.resume(501, 7);
+      prisma.apiKey.update.mockResolvedValue({ ...baseRow, isActive: true });
+      const resumed = await svc.resume(501, 7);
+      expect(resumed).toMatchObject({ id: 501, isActive: true });
       expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.API_KEY_RESUMED, '7', expect.any(Object));
     });
 
-    it('pause on a revoked key is a BadRequest', async () => {
+    it('pause on a revoked key is 409 INVALID_STATE', async () => {
       prisma.apiKey.findFirst.mockResolvedValue({
         ...baseRow,
         revokedAt: new Date(),
       });
-      await expect(svc.pause(501, 7)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.pause(501, 7)).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
   });
 
   describe('revokeForTenant', () => {
     it('sets revokedAt + isActive=false and emits REVOKED', async () => {
       prisma.apiKey.findFirst.mockResolvedValue(baseRow);
-      prisma.apiKey.update.mockResolvedValue({});
-      await svc.revokeForTenant(501, 7);
+      prisma.apiKey.update.mockResolvedValue({ ...baseRow, isActive: false, revokedAt: new Date() });
+      const revoked = await svc.revokeForTenant(501, 7);
+      expect(revoked).toMatchObject({ id: 501, isActive: false });
       const call = prisma.apiKey.update.mock.calls[0][0];
       expect(call.data.isActive).toBe(false);
       expect(call.data.revokedAt).toBeInstanceOf(Date);
@@ -252,12 +256,15 @@ describe('ApiKeysService — Phase D admin surface', () => {
       );
     });
 
-    it('refuses to update a revoked key', async () => {
+    it('refuses to update a revoked key with 409 INVALID_STATE', async () => {
       prisma.apiKey.findFirst.mockResolvedValue({
         ...baseRow,
         revokedAt: new Date(),
       });
-      await expect(svc.updateScopes(501, 7, { scopes: ['platform:read'] })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.updateScopes(501, 7, { scopes: ['platform:read'] })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 });
