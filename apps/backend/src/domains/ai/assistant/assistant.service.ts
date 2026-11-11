@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { writeErrorEnvelope } from '@appshore/platform/shared/filters/error-envelope';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
@@ -76,11 +70,12 @@ export class AssistantAiService {
       });
 
       if (!found) {
-        throw new NotFoundException(`Conversation ${conversationId} not found`);
+        throw new NotFoundException('Conversation not found');
       }
 
       if (found.userId !== userDbId || found.tenantId !== tenantId) {
-        throw new ForbiddenException('Access denied');
+        // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+        throw new NotFoundException('Conversation not found');
       }
 
       return found;
@@ -160,10 +155,11 @@ export class AssistantAiService {
     });
 
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${conversationId} not found`);
+      throw new NotFoundException('Conversation not found');
     }
     if (conversation.userId !== userDbId || conversation.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Conversation not found');
     }
 
     // 2. Store user message
@@ -534,11 +530,12 @@ export class AssistantAiService {
     });
 
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${conversationId} not found`);
+      throw new NotFoundException('Conversation not found');
     }
 
     if (conversation.userId !== userDbId || conversation.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Conversation not found');
     }
 
     return {

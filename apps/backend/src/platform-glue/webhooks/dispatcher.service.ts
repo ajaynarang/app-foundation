@@ -133,13 +133,13 @@ export class WebhookDispatcher {
     }
   }
 
-  async deliverToSubscription(subscriptionId: string, eventName: string, data: unknown): Promise<void> {
+  async deliverToSubscription(subscriptionId: string, eventName: string, data: unknown): Promise<string | null> {
     try {
       const sub = await this.prisma.webhookSubscription.findUnique({
         where: { id: subscriptionId },
         include: { tenant: { select: { tenantId: true } } },
       });
-      if (!sub || !sub.active) return;
+      if (!sub || !sub.active) return null;
 
       // Outbound payloads ship the public tenant slug, not the internal Int PK.
       const payload = {
@@ -165,9 +165,11 @@ export class WebhookDispatcher {
           backoff: { type: 'exponential', delay: 30_000 },
         },
       );
+      return log.id;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`deliverToSubscription failed for subscription ${subscriptionId} event ${eventName}: ${msg}`);
+      return null;
     }
   }
 }

@@ -128,6 +128,7 @@ export class DeskMemoryController extends BaseTenantController {
   }
 
   @Post('playbook')
+  @HttpCode(HttpStatus.CREATED)
   @UseGuards(DeskAgentEditGuard)
   @ApiOperation({ summary: 'Add an operator-authored playbook rule (Rules tab "Add a rule")' })
   async addPlaybookRule(@CurrentUser() user: any, @Body() body: AddPlaybookRuleDto) {

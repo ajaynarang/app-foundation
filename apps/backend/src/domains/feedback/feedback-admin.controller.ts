@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -32,6 +32,7 @@ export class FeedbackAdminController {
   }
 
   @Post('bulk-categorize')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'AI-categorize all uncategorized feedback' })
   async bulkCategorize() {
     return this.feedbackService.bulkCategorize();
@@ -56,6 +57,7 @@ export class FeedbackAdminController {
   }
 
   @Post(':id/categorize')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'AI-categorize feedback (on-demand)' })
   async categorize(@Param('id', ParseIntPipe) id: number) {
     return this.feedbackService.categorizeWithAi(id);

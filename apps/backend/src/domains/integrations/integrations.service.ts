@@ -398,14 +398,12 @@ export class IntegrationsService {
   /**
    * Delete integration (tenant-scoped)
    */
-  async deleteIntegration(integrationId: string, tenantId: number) {
+  async deleteIntegration(integrationId: string, tenantId: number): Promise<void> {
     await this.assertIntegrationInTenant(integrationId, tenantId);
 
     await this.prisma.integrationConfig.delete({
       where: { integrationId },
     });
-
-    return { success: true };
   }
 
   /**

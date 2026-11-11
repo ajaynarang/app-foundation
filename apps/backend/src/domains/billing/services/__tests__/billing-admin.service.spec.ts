@@ -76,13 +76,16 @@ describe('BillingAdminService', () => {
   });
 
   describe('extendTrial', () => {
-    it('should throw if tenant not on TRIAL or TRIAL_EXPIRED', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not on TRIAL or TRIAL_EXPIRED', async () => {
       mockPrisma.tenant.findUniqueOrThrow.mockResolvedValue({
         tenantId: 'TNT-1',
         plan: 'STARTER',
         trialEndsAt: new Date(),
       });
-      await expect(service.extendTrial(1, 30)).rejects.toThrow(BadRequestException);
+      await expect(service.extendTrial(1, 30)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should extend trial and restore TRIAL_EXPIRED to TRIAL', async () => {
@@ -125,12 +128,12 @@ describe('BillingAdminService', () => {
   });
 
   describe('reactivate', () => {
-    it('should throw if tenant not suspended', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not suspended', async () => {
       mockPrisma.tenant.findUniqueOrThrow.mockResolvedValue({
         tenantId: 'TNT-1',
         plan: 'ACTIVE',
       });
-      await expect(service.reactivate(1)).rejects.toThrow(BadRequestException);
+      await expect(service.reactivate(1)).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should restore to last subscription plan', async () => {
@@ -530,7 +533,7 @@ describe('BillingAdminService', () => {
       expect(result).toEqual({ action: 'created' });
     });
 
-    it('should throw if already on the same plan', async () => {
+    it('answers 409 INVALID_STATE if already on the same plan', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
         pricePerUnitCents: 5000,
@@ -545,7 +548,10 @@ describe('BillingAdminService', () => {
         tenantId: 'TNT-1',
       });
 
-      await expect(service.changeSubscriptionPlan(1, 'PROFESSIONAL' as any)).rejects.toThrow(BadRequestException);
+      await expect(service.changeSubscriptionPlan(1, 'PROFESSIONAL' as any)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should upgrade with proration', async () => {

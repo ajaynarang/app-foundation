@@ -11,6 +11,8 @@ import {
   Request,
   Logger,
   NotFoundException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -24,6 +26,7 @@ import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
+import { JobStatusSchema } from '@app/shared-types';
 
 /** BullMQ job name for a manually-triggered integration sync. */
 const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';
@@ -86,20 +89,21 @@ export class IntegrationsController {
   // the service, which scopes the lookup with where: { integrationId, tenantId }.
   // Cross-tenant ids get the same 404 as nonexistent ids (no information leak).
 
-  @Get(':integrationId')
-  async getIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+  @Get(':integration_id')
+  async getIntegration(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getIntegration(integrationId, tenant.id);
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async createIntegration(@Body() dto: CreateIntegrationDto, @Request() req) {
     return this.integrationsService.createIntegration(req.user.tenantId, dto);
   }
 
-  @Patch(':integrationId')
+  @Patch(':integration_id')
   async updateIntegration(
-    @Param('integrationId') integrationId: string,
+    @Param('integration_id') integrationId: string,
     @Body() dto: UpdateIntegrationDto,
     @Request() req,
   ) {
@@ -107,27 +111,29 @@ export class IntegrationsController {
     return this.integrationsService.updateIntegration(integrationId, tenant.id, dto);
   }
 
-  @Delete(':integrationId')
-  async deleteIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+  @Delete(':integration_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteIntegration(@Param('integration_id') integrationId: string, @Request() req): Promise<void> {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.deleteIntegration(integrationId, tenant.id);
+    await this.integrationsService.deleteIntegration(integrationId, tenant.id);
   }
 
-  @Post(':integrationId/test')
-  async testConnection(@Param('integrationId') integrationId: string, @Request() req) {
+  @Post(':integration_id/test')
+  @HttpCode(HttpStatus.OK)
+  async testConnection(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.testConnection(integrationId, tenant.id);
   }
 
-  @Post(':integrationId/sync')
-  async triggerSync(@Param('integrationId') integrationId: string, @Request() req) {
+  @Post(':integration_id/sync')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerSync(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     const integration = await this.prisma.integrationConfig.findFirst({
       where: { integrationId, tenantId: tenant.id },
       select: {
         id: true,
         tenantId: true,
-        displayName: true,
         integrationType: true,
       },
     });
@@ -159,16 +165,13 @@ export class IntegrationsController {
       ),
     );
 
-    return {
-      success: true,
-      message: `Sync started for ${integration.displayName}.`,
-      jobIds: [job.id],
-    };
+    // 202 with the record to poll: the sync runs on the queue. Follow the job or the sync history.
+    return { jobId: job.id, status: JobStatusSchema.enum.QUEUED };
   }
 
-  @Get(':integrationId/sync-history')
+  @Get(':integration_id/sync-history')
   async getSyncHistory(
-    @Param('integrationId') integrationId: string,
+    @Param('integration_id') integrationId: string,
     @Request() req,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
@@ -182,8 +185,8 @@ export class IntegrationsController {
     );
   }
 
-  @Get(':integrationId/sync-history/stats')
-  async getSyncStats(@Param('integrationId') integrationId: string, @Request() req) {
+  @Get(':integration_id/sync-history/stats')
+  async getSyncStats(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getSyncStats(integrationId, tenant.id);
   }

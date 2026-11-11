@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
@@ -32,6 +33,7 @@ export class SubscriptionController {
   ) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Register a webhook subscription' })
   async create(@CurrentUser() user: any, @Body() body: CreateWebhookSubscriptionDto) {
@@ -77,6 +79,7 @@ export class SubscriptionController {
   }
 
   @Post(':id/rotate-secret')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Rotate the signing secret. The new secret is shown once; the old one keeps signing for the overlap',
@@ -110,14 +113,16 @@ export class SubscriptionController {
     });
   }
 
-  @Post(':id/logs/:logId/retry')
+  @Post(':id/logs/:log_id/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Retry a failed webhook delivery' })
-  async retryDelivery(@CurrentUser() user: any, @Param('id') id: string, @Param('logId') logId: string) {
+  async retryDelivery(@CurrentUser() user: any, @Param('id') id: string, @Param('log_id') logId: string) {
     return this.subscriptionService.retryDelivery(user.tenantDbId, id, logId);
   }
 
   @Post(':id/replay')
+  @HttpCode(HttpStatus.ACCEPTED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Replay events from event log to a subscription' })
   async replayEvents(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: ReplayWebhookDto) {
@@ -130,16 +135,19 @@ export class SubscriptionController {
   }
 
   @Post(':id/test')
+  @HttpCode(HttpStatus.ACCEPTED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Send a test event through the real delivery pipeline',
   })
   async test(@CurrentUser() user: any, @Param('id') id: string) {
     await this.subscriptionService.findOne(user.tenantDbId, id);
-    await this.dispatcher.deliverToSubscription(id, DOMAIN_EVENTS.NOTIFICATION_CREATED, {
+    const logId = await this.dispatcher.deliverToSubscription(id, DOMAIN_EVENTS.NOTIFICATION_CREATED, {
       test: true,
       message: 'This is a test webhook delivery',
     });
-    return { message: 'Test event queued for delivery' };
+    if (!logId) throw new ServiceUnavailableException('The test event could not be queued. Please try again.');
+    // 202 with the record to poll: the queued delivery, to follow in the log.
+    return this.subscriptionService.getDeliveryLog(user.tenantDbId, id, logId);
   }
 }

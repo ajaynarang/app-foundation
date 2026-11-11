@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Param, Query, Body, Req, Res, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Body,
+  Req,
+  Res,
+  ParseIntPipe,
+  DefaultValuePipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -19,18 +32,19 @@ export class AssistantAiController {
   ) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Create a new assistant conversation' })
   async createConversation(@CurrentUser() user: any, @Body() dto: CreateConversationDto) {
     return this.service.createConversation(user.userId, user.tenantDbId, dto.userMode);
   }
 
-  @Post(':conversationId/messages')
+  @Post(':conversation_id/messages')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Send a message and stream assistant response' })
   async sendMessage(
     @CurrentUser() user: any,
-    @Param('conversationId') conversationId: string,
+    @Param('conversation_id') conversationId: string,
     @Body() dto: SendMessageDto,
     @Req() req: Request,
     @Res() res: Response,
@@ -60,14 +74,14 @@ export class AssistantAiController {
     return this.service.listConversations(user.userId, user.tenantDbId, limit);
   }
 
-  @Post(':conversationId/resume')
+  @Post(':conversation_id/resume')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Resume a suspended assistant agent (HITL confirmation)',
   })
   async resumeAgent(
     @CurrentUser() user: any,
-    @Param('conversationId') conversationId: string,
+    @Param('conversation_id') conversationId: string,
     @Body() dto: ResumeAgentDto,
     @Req() req: Request,
     @Res() res: Response,
@@ -84,12 +98,12 @@ export class AssistantAiController {
     );
   }
 
-  @Get(':conversationId/messages')
+  @Get(':conversation_id/messages')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Get messages for a conversation (view-only history)',
   })
-  async getMessages(@CurrentUser() user: any, @Param('conversationId') conversationId: string) {
+  async getMessages(@CurrentUser() user: any, @Param('conversation_id') conversationId: string) {
     return this.service.getMessages(conversationId, user.userId, user.tenantDbId);
   }
 

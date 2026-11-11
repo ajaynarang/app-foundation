@@ -219,10 +219,13 @@ describe('AdminJobsController', () => {
       await expect(controller.retryJob(999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException when job is not failed', async () => {
+    it('answers 409 INVALID_STATE when the job has not failed', async () => {
       jobService.getJob.mockResolvedValue({ id: 101, status: 'COMPLETED' });
 
-      await expect(controller.retryJob(101)).rejects.toThrow(BadRequestException);
+      await expect(controller.retryJob(101)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should retry a failed maintenance job (routes to bulk-ops queue)', async () => {
@@ -281,7 +284,7 @@ describe('AdminJobsController', () => {
       expect(result).toEqual({ jobId: 102, status: 'QUEUED' });
     });
 
-    it('should throw BadRequestException for unsupported category', async () => {
+    it('answers 409 INVALID_STATE for a category that cannot be retried', async () => {
       jobService.getJob.mockResolvedValue({
         id: 104,
         status: 'FAILED',
@@ -289,7 +292,10 @@ describe('AdminJobsController', () => {
         inputData: {},
       });
 
-      await expect(controller.retryJob(104)).rejects.toThrow(BadRequestException);
+      await expect(controller.retryJob(104)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should handle null inputData', async () => {

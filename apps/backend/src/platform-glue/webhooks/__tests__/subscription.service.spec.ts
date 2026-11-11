@@ -252,7 +252,8 @@ describe('WebhookSubscriptionService', () => {
         failedAt: new Date(),
         payload: { event: 'app.load.created', data: {} },
       });
-      prisma.webhookDeliveryLog.update.mockResolvedValue({});
+      const pending = { id: logId, subscriptionId: subId, failedAt: null, deliveredAt: null };
+      prisma.webhookDeliveryLog.update.mockResolvedValue(pending);
 
       const result = await service.retryDelivery(tenantId, subId, logId);
 
@@ -265,7 +266,8 @@ describe('WebhookSubscriptionService', () => {
         }),
         expect.any(Object),
       );
-      expect(result.message).toContain('retry');
+      // 202 answers the record to poll (the delivery, pending again), not an acknowledgement.
+      expect(result).toBe(pending);
     });
 
     it('throws NotFoundException for missing log', async () => {
@@ -274,7 +276,7 @@ describe('WebhookSubscriptionService', () => {
       await expect(service.retryDelivery(tenantId, subId, logId)).rejects.toThrow('Delivery log not found');
     });
 
-    it('throws BadRequestException for non-failed delivery', async () => {
+    it('answers 409 INVALID_STATE for a delivery that has not failed', async () => {
       prisma.webhookDeliveryLog.findUnique.mockResolvedValue({
         id: logId,
         subscriptionId: subId,
@@ -282,9 +284,12 @@ describe('WebhookSubscriptionService', () => {
         payload: {},
       });
 
-      await expect(service.retryDelivery(tenantId, subId, logId)).rejects.toThrow(
-        'Only failed deliveries can be retried',
-      );
+      const error = await service.retryDelivery(tenantId, subId, logId).catch((e) => e);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect(error.getResponse()).toMatchObject({
+        code: 'INVALID_STATE',
+        detail: 'Only failed deliveries can be retried',
+      });
     });
 
     it('throws NotFoundException for log belonging to different subscription', async () => {
@@ -346,7 +351,8 @@ describe('WebhookSubscriptionService', () => {
         limit: 1000,
       });
 
-      expect(result.message).toContain('2 events queued');
+      // 202 answers how many deliveries were queued, not a sentence.
+      expect(result).toEqual({ queued: 2, since: '2026-04-01T00:00:00.000Z' });
       expect(queue.add).toHaveBeenCalledTimes(2);
       expect(prisma.webhookDeliveryLog.create).toHaveBeenCalledTimes(2);
       // External payload identifies the tenant by slug, not Int DB id.
@@ -378,7 +384,7 @@ describe('WebhookSubscriptionService', () => {
         since: '2026-04-01T00:00:00Z',
       });
 
-      expect(result.message).toContain('0 events queued');
+      expect(result).toEqual({ queued: 0, since: '2026-04-01T00:00:00.000Z' });
     });
 
     it('filters replay by subscription event list', async () => {

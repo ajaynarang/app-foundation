@@ -7,6 +7,8 @@ import {
   BadRequestException,
   NotFoundException,
   ParseIntPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -20,6 +22,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES, bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -116,19 +119,20 @@ export class AdminJobsController {
     });
   }
 
-  @Get(':jobId')
-  async getJob(@Param('jobId', ParseIntPipe) jobId: number) {
+  @Get(':job_id')
+  async getJob(@Param('job_id', ParseIntPipe) jobId: number) {
     const job = await this.jobService.getJob(jobId);
     if (!job) throw new NotFoundException('Job not found');
     return job;
   }
 
-  @Post(':jobId/retry')
-  async retryJob(@Param('jobId', ParseIntPipe) jobId: number) {
+  @Post(':job_id/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async retryJob(@Param('job_id', ParseIntPipe) jobId: number) {
     const job = await this.jobService.getJob(jobId);
     if (!job) throw new NotFoundException('Job not found');
     if (job.status !== JOB_STATUS.FAILED) {
-      throw new BadRequestException('Only failed jobs can be retried');
+      throw invalidState('Only failed jobs can be retried');
     }
 
     await this.jobService.resetForRetry(jobId);
@@ -137,7 +141,7 @@ export class AdminJobsController {
 
     const targetQueue = this.queueForCategory(job.category);
     if (!targetQueue) {
-      throw new BadRequestException(`Retry not supported for category: ${job.category}`);
+      throw invalidState('Jobs of this kind cannot be retried from here');
     }
 
     await targetQueue.add(
@@ -158,8 +162,9 @@ export class AdminJobsController {
     return { jobId: job.id, status: JOB_STATUS.QUEUED };
   }
 
-  @Post('tenants/:id/pause-jobs')
-  async pauseJobs(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  @Post('tenants/:tenant_id/pause-jobs')
+  @HttpCode(HttpStatus.OK)
+  async pauseJobs(@Param('tenant_id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
@@ -179,8 +184,9 @@ export class AdminJobsController {
     });
   }
 
-  @Post('tenants/:id/resume-jobs')
-  async resumeJobs(@Param('id', ParseIntPipe) id: number) {
+  @Post('tenants/:tenant_id/resume-jobs')
+  @HttpCode(HttpStatus.OK)
+  async resumeJobs(@Param('tenant_id', ParseIntPipe) id: number) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 

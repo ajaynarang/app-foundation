@@ -4,7 +4,7 @@
  * Tenant-facing billing endpoints for subscription management,
  * wallet operations, invoices, and payment methods.
  */
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -49,6 +49,7 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('checkout')
+  @HttpCode(HttpStatus.OK)
   async createCheckout(@CurrentUser() user: any, @TenantDbId() tenantDbId: number, @Body() dto: CreateCheckoutDto) {
     return this.subscriptionService.createSubscription(
       user.tenantId,
@@ -65,9 +66,10 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('upgrade')
+  @HttpCode(HttpStatus.OK)
   async upgradePlan(@CurrentUser() user: any, @TenantDbId() tenantDbId: number, @Body() dto: UpgradePlanDto) {
     await this.subscriptionService.upgradePlan(user.tenantId, tenantDbId, dto.newPlan, dto.newQuantity);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   /**
@@ -75,9 +77,10 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('downgrade')
+  @HttpCode(HttpStatus.OK)
   async downgradePlan(@CurrentUser() user: any, @TenantDbId() tenantDbId: number, @Body() dto: DowngradePlanDto) {
     await this.subscriptionService.downgradePlan(user.tenantId, tenantDbId, dto.newPlan);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   /**
@@ -87,7 +90,7 @@ export class BillingController {
   @Patch('quantity')
   async updateQuantity(@CurrentUser() user: any, @TenantDbId() tenantDbId: number, @Body() dto: UpdateQuantityDto) {
     await this.subscriptionService.updateQuantity(user.tenantId, tenantDbId, dto.quantity);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   /**
@@ -95,13 +98,14 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('cancel')
+  @HttpCode(HttpStatus.OK)
   async cancelSubscription(
     @CurrentUser() user: any,
     @TenantDbId() tenantDbId: number,
     @Body() dto: CancelSubscriptionDto,
   ) {
     await this.subscriptionService.cancelSubscription(user.tenantId, tenantDbId, dto.reason);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   /**
@@ -109,9 +113,10 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('reactivate')
+  @HttpCode(HttpStatus.OK)
   async reactivateSubscription(@CurrentUser() user: any, @TenantDbId() tenantDbId: number) {
     await this.subscriptionService.reactivateSubscription(user.tenantId, tenantDbId);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   // ─── Wallet ──────────────────────────────────────────────────────────────
@@ -130,9 +135,10 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('wallet/top-up')
+  @HttpCode(HttpStatus.OK)
   async topUpWallet(@TenantDbId() tenantDbId: number, @Body() dto: TopUpWalletDto) {
     await this.walletService.topUp(tenantDbId, dto.amountCents);
-    return { success: true };
+    return this.walletService.getBalance(tenantDbId);
   }
 
   /**
@@ -146,7 +152,7 @@ export class BillingController {
       thresholdCents: dto.thresholdCents,
       reloadAmountCents: dto.reloadAmountCents,
     });
-    return { success: true };
+    return this.walletService.getBalance(tenantDbId);
   }
 
   /**
@@ -201,6 +207,7 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Post('payment-methods/setup')
+  @HttpCode(HttpStatus.OK)
   async setupPaymentMethod(@TenantDbId() tenantDbId: number, @Body() dto: SetupPaymentMethodDto) {
     return this.paymentMethodService.addPaymentMethod(tenantDbId, dto.returnUrl);
   }
@@ -221,7 +228,7 @@ export class BillingController {
   @Patch('payment-methods/:id/default')
   async setDefaultPaymentMethod(@TenantDbId() tenantDbId: number, @Param('id') paymentMethodId: string) {
     await this.paymentMethodService.setDefault(tenantDbId, paymentMethodId);
-    return { success: true };
+    return this.subscriptionService.getBillingOverview(tenantDbId);
   }
 
   /**
@@ -229,8 +236,8 @@ export class BillingController {
    */
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @Delete('payment-methods/:id')
-  async removePaymentMethod(@TenantDbId() tenantDbId: number, @Param('id') paymentMethodId: string) {
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removePaymentMethod(@TenantDbId() tenantDbId: number, @Param('id') paymentMethodId: string): Promise<void> {
     await this.paymentMethodService.removePaymentMethod(tenantDbId, paymentMethodId);
-    return { success: true };
   }
 }

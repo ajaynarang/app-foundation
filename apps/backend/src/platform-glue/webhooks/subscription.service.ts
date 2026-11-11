@@ -1,11 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -21,6 +14,7 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 import { RotateWebhookSecretDto } from './dto/rotate-webhook-secret.dto';
 import { generateWebhookSecret } from './standard-webhooks';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -246,8 +240,14 @@ export class WebhookSubscriptionService {
       throw new NotFoundException('Delivery log not found');
     }
     if (!log.failedAt) {
-      throw new BadRequestException('Only failed deliveries can be retried');
+      throw invalidState('Only failed deliveries can be retried');
     }
+
+    // Reset the failure first: a worker that fails it again (a refused target, say) must not be overwritten.
+    const pending = await this.prisma.webhookDeliveryLog.update({
+      where: { id: logId },
+      data: { failedAt: null },
+    });
 
     const innerPayload = log.payload as WebhookDeliveryPayload['payload'];
     const jobPayload: WebhookDeliveryPayload = {
@@ -270,13 +270,17 @@ export class WebhookSubscriptionService {
       },
     );
 
-    // Reset failure state for retry
-    await this.prisma.webhookDeliveryLog.update({
-      where: { id: logId },
-      data: { failedAt: null },
-    });
+    // 202 with the record to poll: the delivery as it is now, pending again.
+    return pending;
+  }
 
-    return { message: 'Delivery queued for retry' };
+  /** One delivery of a subscription: the 202 body of queued work (`POST …/test`). */
+  async getDeliveryLog(tenantId: number, subscriptionId: string, logId: string) {
+    const log = await this.prisma.webhookDeliveryLog.findFirst({
+      where: { id: logId, subscriptionId, subscription: { tenantId } },
+    });
+    if (!log) throw new NotFoundException('Delivery log not found');
+    return log;
   }
 
   async replayEvents(tenantId: number, subscriptionId: string, dto: ReplayWebhookDto) {
@@ -366,6 +370,7 @@ export class WebhookSubscriptionService {
       queued++;
     }
 
-    return { message: `${queued} events queued for replay` };
+    // 202: how many deliveries were queued, to follow in the log.
+    return { queued, since: since.toISOString() };
   }
 }

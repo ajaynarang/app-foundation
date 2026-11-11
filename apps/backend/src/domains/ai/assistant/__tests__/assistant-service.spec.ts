@@ -22,7 +22,7 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { AssistantAiService } from '../assistant.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { McpToolService } from '../../mcp/mcp-tool.service';
@@ -170,7 +170,7 @@ describe('AssistantAiService', () => {
       await expect(gen.next()).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong tenant', async () => {
+    it('answers 404 for a conversation of another tenant: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         id: 1,
         conversationId: 'conv_test',
@@ -180,7 +180,7 @@ describe('AssistantAiService', () => {
         title: null,
       });
       const gen = service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1);
-      await expect(gen.next()).rejects.toThrow(ForbiddenException);
+      await expect(gen.next()).rejects.toThrow(NotFoundException);
     });
 
     it('yields blocked when moderation flags input', async () => {
@@ -542,7 +542,7 @@ describe('AssistantAiService', () => {
       await expect(service.getMessages('conv_unknown', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong user', async () => {
+    it('answers 404 for a conversation of another user: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         conversationId: 'conv_1',
         userId: 999,
@@ -550,7 +550,7 @@ describe('AssistantAiService', () => {
         userMode: 'member',
         messages: [],
       });
-      await expect(service.getMessages('conv_1', 'user_1', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.getMessages('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
   });
 

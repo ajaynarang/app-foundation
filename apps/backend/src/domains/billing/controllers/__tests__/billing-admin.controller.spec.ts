@@ -55,7 +55,9 @@ describe('BillingAdminController', () => {
     it('should add wallet credit', async () => {
       const user = { userId: 'admin-1', email: 'admin@test.com' };
       const result = await controller.addCredit(1, { amountCents: 5000, reason: 'Bonus' }, user);
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.addWalletCredit).toHaveBeenCalledWith(1, 5000, 'Bonus', 'admin-1');
     });
 
@@ -84,7 +86,9 @@ describe('BillingAdminController', () => {
       const result = await controller.overrideUnitPrice(1, {
         unitPriceCents: 3500,
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.overrideUnitPrice).toHaveBeenCalledWith(1, 3500);
     });
   });
@@ -92,7 +96,9 @@ describe('BillingAdminController', () => {
   describe('pauseBilling', () => {
     it('should pause billing', async () => {
       const result = await controller.pauseBilling(1);
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.pauseBilling).toHaveBeenCalledWith(1);
     });
   });
@@ -100,7 +106,9 @@ describe('BillingAdminController', () => {
   describe('resumeBilling', () => {
     it('should resume billing', async () => {
       const result = await controller.resumeBilling(1);
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.resumeBilling).toHaveBeenCalledWith(1);
     });
   });
@@ -119,7 +127,9 @@ describe('BillingAdminController', () => {
   describe('cancelImmediately', () => {
     it('should cancel subscription immediately', async () => {
       const result = await controller.cancelImmediately(1);
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.cancelSubscriptionImmediately).toHaveBeenCalledWith(1);
     });
   });
@@ -127,7 +137,9 @@ describe('BillingAdminController', () => {
   describe('extendTrial', () => {
     it('should extend trial', async () => {
       const result = await controller.extendTrial(1, { days: 14 });
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.extendTrial).toHaveBeenCalledWith(1, 14);
     });
   });
@@ -135,7 +147,9 @@ describe('BillingAdminController', () => {
   describe('forceSuspend', () => {
     it('should force suspend', async () => {
       const result = await controller.forceSuspend(1, { reason: 'Fraud' });
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.forceSuspend).toHaveBeenCalledWith(1, 'Fraud');
     });
   });
@@ -143,7 +157,9 @@ describe('BillingAdminController', () => {
   describe('reactivate', () => {
     it('should reactivate tenant', async () => {
       const result = await controller.reactivate(1);
-      expect(result).toEqual({ success: true });
+      // The action answers the tenant's billing state as it is now, not an acknowledgement.
+      expect(result).toEqual({ tenant: {}, subscription: {} });
+      expect(mockBillingAdminService.getTenantBilling).toHaveBeenCalledWith(1);
       expect(mockBillingAdminService.reactivate).toHaveBeenCalledWith(1);
     });
   });

@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Param, Query, Body, Logger, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Query,
+  Body,
+  Logger,
+  ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -19,6 +31,7 @@ export class SupportController {
   // ─── Tenant endpoints ───
 
   @Post('tickets')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a support ticket' })
   async createTicket(@CurrentUser() user: any, @Body() dto: CreateTicketDto) {
     return this.supportService.createTicket(user.tenantDbId, user.dbId, dto);
@@ -49,6 +62,7 @@ export class SupportController {
   }
 
   @Post('tickets/:id/messages')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Reply to a ticket' })
   async addMessage(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any, @Body() dto: CreateMessageDto) {
     return this.supportService.addMessage(id, user.dbId, 'user', dto, user.tenantDbId);
@@ -101,6 +115,7 @@ export class SupportController {
   }
 
   @Post('admin/tickets/:id/messages')
+  @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Reply to ticket or add internal note (super admin)',

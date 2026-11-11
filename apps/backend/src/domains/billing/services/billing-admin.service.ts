@@ -13,6 +13,7 @@ import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { WalletService } from './wallet.service';
 import { PLAN_ORDER } from '../constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 @Injectable()
 export class BillingAdminService {
@@ -403,7 +404,7 @@ export class BillingAdminService {
     });
 
     if (tenant.plan !== TenantPlan.TRIAL && tenant.plan !== TenantPlan.TRIAL_EXPIRED) {
-      throw new BadRequestException('Trial extension is only available for tenants on TRIAL or TRIAL_EXPIRED plans');
+      throw invalidState('A trial can only be extended for a workspace on a trial or an expired trial');
     }
 
     const currentEnd = tenant.trialEndsAt ?? new Date();
@@ -478,7 +479,7 @@ export class BillingAdminService {
     });
 
     if (tenant.plan !== TenantPlan.SUSPENDED) {
-      throw new BadRequestException('Tenant is not currently suspended');
+      throw invalidState('This workspace is not currently suspended');
     }
 
     // Find the most recent subscription to determine what plan to restore
@@ -551,7 +552,7 @@ export class BillingAdminService {
 
     // Same plan — nothing to do
     if (subscription.plan === newPlan) {
-      throw new BadRequestException(`Subscription is already on the ${newPlan} plan`);
+      throw invalidState('The subscription is already on that plan');
     }
 
     const currentOrder = PLAN_ORDER[subscription.plan] ?? 0;

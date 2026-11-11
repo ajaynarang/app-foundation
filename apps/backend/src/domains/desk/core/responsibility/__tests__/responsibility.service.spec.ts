@@ -67,12 +67,15 @@ describe('DeskResponsibilityService — autonomy switch', () => {
       expect(prisma.deskResponsibility.findUnique).not.toHaveBeenCalled();
     });
 
-    it('refuses to arm a COMING_SOON responsibility', async () => {
+    it('refuses to arm a COMING_SOON responsibility with 409 INVALID_STATE', async () => {
       const prisma = createMockPrisma();
       prisma.deskResponsibility.findUnique.mockResolvedValue({ id: 101, lifecycle: 'COMING_SOON' });
       const svc = new DeskResponsibilityService(prisma);
 
-      await expect(svc.setAutonomyEnabled(7, AVAILABLE_KEY, true)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.setAutonomyEnabled(7, AVAILABLE_KEY, true)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
       expect(prisma.deskResponsibility.update).not.toHaveBeenCalled();
     });
   });

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, BadRequestException, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
@@ -53,6 +53,7 @@ export class AdminCacheController {
   }
 
   @Post('flush')
+  @HttpCode(HttpStatus.OK)
   async flushAll(@Body() body: { confirm?: boolean }) {
     if (!body?.confirm) {
       throw new BadRequestException('Body must include { "confirm": true } to flush all caches');
@@ -64,6 +65,7 @@ export class AdminCacheController {
   }
 
   @Post('flush/:namespace')
+  @HttpCode(HttpStatus.OK)
   async flushNamespace(@Param('namespace') namespace: string) {
     if (!CACHE_NAMESPACES.includes(namespace as CacheNamespace)) {
       throw new BadRequestException(`Invalid namespace "${namespace}". Valid: ${CACHE_NAMESPACES.join(', ')}`);

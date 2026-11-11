@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Body, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, Logger, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -41,24 +41,28 @@ export class NotificationsController {
   }
 
   @Post(':notification_id/read')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a notification as read' })
   async markAsRead(@Param('notification_id') notificationId: string, @CurrentUser() user: any) {
     return this.service.markAsRead(notificationId, user.dbId);
   }
 
   @Post(':notification_id/dismiss')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Dismiss a notification' })
   async dismiss(@Param('notification_id') notificationId: string, @CurrentUser() user: any) {
     return this.service.dismiss(notificationId, user.dbId);
   }
 
   @Post(':notification_id/unread')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a notification as unread' })
   async markAsUnread(@Param('notification_id') notificationId: string, @CurrentUser() user: any) {
     return this.service.markAsUnread(notificationId, user.dbId);
   }
 
   @Post('mark-all-read')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllRead(@CurrentUser() user: any, @Body() body: { category?: string }) {
     const result = await this.service.markAllRead(user.dbId, body.category);
@@ -66,6 +70,7 @@ export class NotificationsController {
   }
 
   @Post('dismiss-all-read')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Dismiss all read notifications' })
   async dismissAllRead(@CurrentUser() user: any) {
     const result = await this.service.dismissAllRead(user.dbId);

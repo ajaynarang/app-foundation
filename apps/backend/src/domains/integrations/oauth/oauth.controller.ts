@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Param, Query, Req, Res, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Req,
+  Res,
+  Logger,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -11,6 +23,7 @@ import { AuthTokenService } from './auth-token.service';
 import { OAuthTokenRefreshJob } from './oauth-token-refresh.job';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
 import { INTEGRATIONS_WEB_PATH } from '../../../shared/web-routes';
+import { ApiExcludeEndpoint } from '@nestjs/swagger';
 
 @Controller('integrations/oauth')
 export class OAuthController extends BaseTenantController {
@@ -48,6 +61,8 @@ export class OAuthController extends BaseTenantController {
    * Public because the user's browser is redirected here from the vendor.
    */
   @Get('callback')
+  // A browser redirect whose query the vendor writes: not part of the published contract.
+  @ApiExcludeEndpoint()
   @Public()
   async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: any, @Res() res: Response) {
     // The browser returns to the web app: APP_URL is the origin every other web link uses.
@@ -109,8 +124,9 @@ export class OAuthController extends BaseTenantController {
    * Revokes OAuth tokens and clears credentials.
    */
   @Post(':vendor/disconnect')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any) {
+  async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any): Promise<void> {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     if (!vendorMeta || !getVendorOAuth(vendorMeta)) {
       throw new BadRequestException(`Vendor ${vendor} does not support OAuth`);
@@ -119,6 +135,5 @@ export class OAuthController extends BaseTenantController {
     const tenantDbId = await this.getTenantDbId(user);
     await this.authTokenService.disconnect(vendor, tenantDbId);
     await this.tokenRefreshJob.removeForIntegration(vendor, tenantDbId);
-    return { success: true, message: `${vendor} disconnected` };
   }
 }

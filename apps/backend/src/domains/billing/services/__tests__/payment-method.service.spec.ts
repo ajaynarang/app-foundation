@@ -92,7 +92,7 @@ describe('PaymentMethodService', () => {
       await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw if removing only default method with active subscription', async () => {
+    it('answers 409 INVALID_STATE when removing the only method of an active subscription', async () => {
       mockPrisma.paymentMethod.findFirst.mockResolvedValue({
         id: 'pm-1',
         isDefault: true,
@@ -103,7 +103,10 @@ describe('PaymentMethodService', () => {
       });
       mockPrisma.paymentMethod.count.mockResolvedValue(1);
 
-      await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toThrow(BadRequestException);
+      await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should allow removing non-default method', async () => {

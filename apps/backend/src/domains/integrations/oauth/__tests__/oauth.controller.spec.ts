@@ -173,7 +173,8 @@ describe('OAuthController', () => {
         tenantId: 'tenant-abc',
       });
 
-      expect(result.success).toBe(true);
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockAuthTokenService.disconnect).toHaveBeenCalledWith('QUICKBOOKS', 5);
       expect(mockTokenRefreshJob.removeForIntegration).toHaveBeenCalledWith('QUICKBOOKS', 5);
     });

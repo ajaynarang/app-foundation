@@ -11,6 +11,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { fieldErrors, zodFieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { findResponsibilityDefinition, RESPONSIBILITY_REGISTRY } from '../../responsibilities';
 import type { ResponsibilityDefinition } from '../../responsibilities/definition.types';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /**
  * Reads + updates per-tenant DeskResponsibility rows, enriched with
@@ -181,7 +182,7 @@ export class DeskResponsibilityService {
       throw new NotFoundException(`Responsibility ${key} not seeded for this tenant`);
     }
     if (row.lifecycle === 'COMING_SOON') {
-      throw new BadRequestException(`Responsibility ${key} is COMING_SOON — settings are read-only`);
+      throw invalidState('This responsibility is coming soon — its settings are read-only');
     }
 
     // Validate conditions JSON against the registry schema so garbage
@@ -232,7 +233,7 @@ export class DeskResponsibilityService {
       throw new NotFoundException(`Responsibility ${key} not seeded for this tenant`);
     }
     if (row.lifecycle === 'COMING_SOON') {
-      throw new BadRequestException(`Responsibility ${key} is COMING_SOON — it can't run automatically yet`);
+      throw invalidState('This responsibility is coming soon — it cannot run automatically yet');
     }
 
     await this.prisma.deskResponsibility.update({

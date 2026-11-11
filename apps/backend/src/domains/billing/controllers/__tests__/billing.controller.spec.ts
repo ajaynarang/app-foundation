@@ -89,32 +89,35 @@ describe('BillingController', () => {
   });
 
   describe('upgradePlan', () => {
-    it('should upgrade plan and return success', async () => {
+    it('should upgrade plan and answer the overview', async () => {
       const result = await controller.upgradePlan({ tenantId: 'TNT-1' }, 1, {
         newPlan: 'ENTERPRISE',
         newQuantity: 5,
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.upgradePlan).toHaveBeenCalledWith('TNT-1', 1, 'ENTERPRISE', 5);
     });
   });
 
   describe('downgradePlan', () => {
-    it('should downgrade plan and return success', async () => {
+    it('should downgrade plan and answer the overview', async () => {
       const result = await controller.downgradePlan({ tenantId: 'TNT-1' }, 1, {
         newPlan: 'STARTER',
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.downgradePlan).toHaveBeenCalledWith('TNT-1', 1, 'STARTER');
     });
   });
 
   describe('updateQuantity', () => {
-    it('should update quantity and return success', async () => {
+    it('should update quantity and answer the overview', async () => {
       const result = await controller.updateQuantity({ tenantId: 'TNT-1' }, 1, {
         quantity: 10,
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.updateQuantity).toHaveBeenCalledWith('TNT-1', 1, 10);
     });
   });
@@ -122,7 +125,8 @@ describe('BillingController', () => {
   describe('cancelSubscription', () => {
     it('should cancel subscription with reason', async () => {
       const result = await controller.cancelSubscription({ tenantId: 'TNT-1' }, 1, { reason: 'Too expensive' });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.cancelSubscription).toHaveBeenCalledWith('TNT-1', 1, 'Too expensive');
     });
   });
@@ -130,7 +134,8 @@ describe('BillingController', () => {
   describe('reactivateSubscription', () => {
     it('should reactivate subscription', async () => {
       const result = await controller.reactivateSubscription({ tenantId: 'TNT-1' }, 1);
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.reactivateSubscription).toHaveBeenCalledWith('TNT-1', 1);
     });
   });
@@ -147,7 +152,8 @@ describe('BillingController', () => {
   describe('topUpWallet', () => {
     it('should top up wallet', async () => {
       const result = await controller.topUpWallet(1, { amountCents: 5000 });
-      expect(result).toEqual({ success: true });
+      // The action answers the wallet as it is now, not an acknowledgement.
+      expect(result).toEqual({ balanceCents: 10000 });
       expect(mockWalletService.topUp).toHaveBeenCalledWith(1, 5000);
     });
   });
@@ -160,7 +166,8 @@ describe('BillingController', () => {
         reloadAmountCents: 5000,
       };
       const result = await controller.updateAutoReload(1, dto);
-      expect(result).toEqual({ success: true });
+      // The action answers the wallet as it is now, not an acknowledgement.
+      expect(result).toEqual({ balanceCents: 10000 });
       expect(mockWalletService.updateAutoReload).toHaveBeenCalledWith(1, {
         enabled: true,
         thresholdCents: 1000,
@@ -235,7 +242,8 @@ describe('BillingController', () => {
   describe('setDefaultPaymentMethod', () => {
     it('should set default payment method', async () => {
       const result = await controller.setDefaultPaymentMethod(1, 'pm_123');
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockPaymentMethodService.setDefault).toHaveBeenCalledWith(1, 'pm_123');
     });
   });
@@ -243,7 +251,8 @@ describe('BillingController', () => {
   describe('removePaymentMethod', () => {
     it('should remove payment method', async () => {
       const result = await controller.removePaymentMethod(1, 'pm_123');
-      expect(result).toEqual({ success: true });
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockPaymentMethodService.removePaymentMethod).toHaveBeenCalledWith(1, 'pm_123');
     });
   });

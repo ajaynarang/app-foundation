@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DeskEpisodeStatus, Prisma } from '@appshore/db';
 import {
   HANDLED_EPISODE_STATUSES,
@@ -25,6 +25,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { ApprovalEnrichmentService } from '../approval/approval-enrichment.service';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /**
  * Statuses shown on the Handled tab. Sourced from the shared view set so the
@@ -85,7 +86,7 @@ export class DeskEpisodeService {
     });
     if (!episode) throw new NotFoundException('Episode not found');
     if (episode.status !== EPISODE_STATUS.ESCALATED) {
-      throw new BadRequestException('Only an escalated episode can be resolved');
+      throw invalidState('Only an escalated episode can be resolved');
     }
 
     const trimmedNote = note?.trim();

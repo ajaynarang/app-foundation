@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HitlStepUpController } from '../hitl-step-up.controller';
 import { HitlChallengeService } from '../../agent-contract/hitl-challenge.service';
@@ -53,11 +53,11 @@ describe('HitlStepUpController', () => {
     expect(challenges.markStepUpCompleted).not.toHaveBeenCalled();
   });
 
-  it('throws 400 when user has no PIN set', async () => {
+  it('answers 409 INVALID_STATE when the user has no PIN set (no field of the request is at fault)', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 42, pinHash: null });
-    await expect(ctrl.complete('tok-1', { pin: '1234' }, { dbId: 42 } as any)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    const error = await ctrl.complete('tok-1', { pin: '1234' }, { dbId: 42 } as any).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({ code: 'INVALID_STATE' });
     expect(pinService.verifyPin).not.toHaveBeenCalled();
   });
 

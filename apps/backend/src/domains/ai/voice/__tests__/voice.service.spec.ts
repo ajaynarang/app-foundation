@@ -32,7 +32,7 @@ jest.mock('livekit-server-sdk', () => ({
   RoomConfiguration: jest.fn(),
 }));
 
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { VoiceService } from '../voice.service';
 
 describe('VoiceService', () => {
@@ -139,24 +139,24 @@ describe('VoiceService', () => {
       await expect(service.generateToken('conv_x', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong tenant', async () => {
+    it('answers 404 for a conversation of another tenant: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         id: 1,
         conversationId: 'conv_1',
         userId: 1,
         tenantId: 99,
       });
-      await expect(service.generateToken('conv_1', 'user_1', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.generateToken('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong user', async () => {
+    it('answers 404 for a conversation of another user: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         id: 1,
         conversationId: 'conv_1',
         userId: 999,
         tenantId: 1,
       });
-      await expect(service.generateToken('conv_1', 'user_1', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.generateToken('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
   });
 

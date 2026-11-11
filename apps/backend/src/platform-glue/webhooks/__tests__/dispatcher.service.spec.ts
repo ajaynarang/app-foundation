@@ -163,9 +163,12 @@ describe('WebhookDispatcher', () => {
         id: 'log-test',
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {
+      const logId = await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {
         test: true,
       });
+
+      // The caller (the test route) answers 202 with this delivery, so the id must come back.
+      expect(logId).toBe('log-test');
 
       expect(mockPrisma.webhookSubscription.findUnique).toHaveBeenCalledWith({
         where: { id: 'sub-1' },
@@ -191,8 +194,9 @@ describe('WebhookDispatcher', () => {
         active: false,
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
+      const logId = await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
 
+      expect(logId).toBeNull();
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
 

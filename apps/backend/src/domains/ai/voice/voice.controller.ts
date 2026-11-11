@@ -8,6 +8,8 @@ import {
   ServiceUnavailableException,
   ForbiddenException,
   Logger,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Throttle } from '@nestjs/throttler';
@@ -36,6 +38,7 @@ export class VoiceController {
   }
 
   @Post('token')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async getToken(@CurrentUser() user: any, @Body() dto: VoiceTokenDto) {

@@ -8,6 +8,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PaymentMethodType } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 @Injectable()
 export class PaymentMethodService {
@@ -118,7 +119,7 @@ export class PaymentMethodService {
           where: { tenantId: tenantDbId },
         });
         if (methodCount <= 1) {
-          throw new BadRequestException('Cannot remove the only payment method while an active subscription exists');
+          throw invalidState('Cannot remove the only payment method while an active subscription exists');
         }
       }
     }

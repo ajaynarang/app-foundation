@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
@@ -1007,16 +1007,22 @@ describe('DeskEpisodeService', () => {
       expect(events.emit).not.toHaveBeenCalled();
     });
 
-    it('rejects (BadRequest) resolving an episode that is not ESCALATED — only ESCALATED → RESOLVED allowed', async () => {
+    it('rejects (409 INVALID_STATE) resolving an episode that is not ESCALATED — only ESCALATED → RESOLVED allowed', async () => {
       prisma.deskEpisode.findFirst.mockResolvedValue({ ...escalated, status: 'RESOLVED' });
-      await expect(service.resolveEpisode(10, 'ep-esc', 7)).rejects.toThrow(BadRequestException);
+      await expect(service.resolveEpisode(10, 'ep-esc', 7)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
       expect(prisma.deskEpisode.update).not.toHaveBeenCalled();
       expect(events.emit).not.toHaveBeenCalled();
     });
 
-    it('rejects (BadRequest) resolving a RUNNING episode', async () => {
+    it('rejects (409 INVALID_STATE) resolving a RUNNING episode', async () => {
       prisma.deskEpisode.findFirst.mockResolvedValue({ ...escalated, status: 'RUNNING' });
-      await expect(service.resolveEpisode(10, 'ep-esc', 7)).rejects.toThrow(BadRequestException);
+      await expect(service.resolveEpisode(10, 'ep-esc', 7)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 
