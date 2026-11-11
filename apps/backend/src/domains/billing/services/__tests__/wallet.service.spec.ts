@@ -63,6 +63,23 @@ describe('WalletService', () => {
         data: { tenantId: 1 },
       });
     });
+
+    it('reads the row another request created first: two first reads of a wallet race, and the loser must not fail', async () => {
+      const winner = { id: 'w-1', tenantId: 1, balanceCents: 0 };
+      mockPrisma.wallet.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(winner);
+      mockPrisma.wallet.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      await expect(service.getOrCreateWallet(1)).resolves.toEqual(winner);
+    });
+
+    it('still fails when the create fails for any other reason', async () => {
+      mockPrisma.wallet.findUnique.mockResolvedValue(null);
+      mockPrisma.wallet.create.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.getOrCreateWallet(1)).rejects.toThrow('connection lost');
+    });
   });
 
   describe('getBalance', () => {

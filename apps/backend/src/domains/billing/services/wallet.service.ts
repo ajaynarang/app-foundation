@@ -32,10 +32,18 @@ export class WalletService {
     });
 
     if (!wallet) {
-      wallet = await this.prisma.wallet.create({
-        data: { tenantId: tenantDbId },
-      });
-      this.logger.log(`Wallet created for tenant ${tenantDbId}`);
+      try {
+        wallet = await this.prisma.wallet.create({
+          data: { tenantId: tenantDbId },
+        });
+        this.logger.log(`Wallet created for tenant ${tenantDbId}`);
+      } catch (error) {
+        // Two first reads race (a page loads the overview and the wallet together): the loser's create hits the
+        // unique tenant index. The row is there now, so read it.
+        if ((error as { code?: string }).code !== 'P2002') throw error;
+        wallet = await this.prisma.wallet.findUnique({ where: { tenantId: tenantDbId } });
+        if (!wallet) throw error;
+      }
     }
 
     return wallet;
