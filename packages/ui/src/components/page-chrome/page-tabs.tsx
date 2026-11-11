@@ -8,7 +8,7 @@ import { cn } from '../../lib/utils';
 /**
  * PageTabs — underline-styled content tabs for Zone 2 (Control bar) of the page chrome.
  *
- * The base @/shared/components/ui/tabs is the pill/segmented style (used inside cards,
+ * The base `../ui/tabs` is the pill/segmented style (used inside cards,
  * for view toggles). Page-level content tabs use the underline treatment so they read
  * as navigation, distinct from the segmented view/group switchers in the right cluster.
  *
@@ -18,7 +18,7 @@ import { cn } from '../../lib/utils';
  *     <TabsContent value="a">…</TabsContent>
  *   </PageTabs>
  *
- * Re-export TabsContent from @/shared/components/ui/tabs for the panels.
+ * `TabsContent` for the panels comes from the same index as PageTabs.
  */
 export { Tabs as PageTabs };
 
