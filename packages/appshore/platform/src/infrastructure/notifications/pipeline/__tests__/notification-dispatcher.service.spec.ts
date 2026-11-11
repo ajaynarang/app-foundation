@@ -31,7 +31,7 @@ describe('NotificationDispatcherService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'demo', companyName: 'Smash Club' });
+    prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'demo', companyName: 'Acme Inc' });
     flags.isEnabled.mockResolvedValue(true);
     plans.getTenantPlan.mockResolvedValue('PROFESSIONAL');
     plans.isFeatureEnabled.mockResolvedValue(true);
@@ -70,7 +70,7 @@ describe('NotificationDispatcherService', () => {
     expect(delivery.deliver).toHaveBeenCalledTimes(2);
     expect(delivery.deliver.mock.calls[0][0]).toMatchObject({
       tenantSlug: 'demo',
-      clubName: 'Smash Club',
+      tenantName: 'Acme Inc',
       whatsappEnabled: true,
       whatsappEntitled: true,
       category: NotificationCategory.TEAM,
@@ -127,6 +127,6 @@ describe('NotificationDispatcherService', () => {
     plans.getTenantPlan.mockRejectedValue(new Error('plans down'));
     prisma.tenant.findUnique.mockRejectedValue(new Error('db down'));
     await service.dispatch(message);
-    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEntitled: false, clubName: 'Your club' });
+    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEntitled: false, tenantName: 'Your workspace' });
   });
 });

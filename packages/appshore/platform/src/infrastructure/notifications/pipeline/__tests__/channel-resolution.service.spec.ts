@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { DeliveryChannel, NotificationType } from '@appshore/db';
-import { ChannelResolutionService } from '../channel-resolution.service';
+import { CHANNEL_DEFAULTS, ChannelResolutionService } from '../channel-resolution.service';
 import { WhatsAppConsentService } from '../../channels/whatsapp/whatsapp-consent.service';
 import { PrismaService } from '../../../database/prisma.service';
 import { NotificationPolicyRegistry } from '../../notification-policy.registry';
@@ -37,7 +37,7 @@ const APP_TEMPLATES: WhatsAppTemplateMap = {
     languageCode: 'en',
     category: 'UTILITY',
     body: 'Match: {{1}} — {{2}}.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
   [NotificationType.TENANT_REJECTED]: {
     name: 'announce_v1',
@@ -62,29 +62,17 @@ const { IN_APP, EMAIL, PUSH, SMS, WHATSAPP } = DeliveryChannel;
 describe('ChannelResolutionService', () => {
   let service: ChannelResolutionService;
   const consent = { consentedUserIds: jest.fn() };
-  let prisma: {
-    userPreferences: { findUnique: jest.Mock; findMany: jest.Mock };
-    workspaceMember: { findUnique: jest.Mock; findMany: jest.Mock };
-  };
+  let prisma: { userPreferences: { findUnique: jest.Mock; findMany: jest.Mock } };
 
-  const asStaff = () => prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'ADMIN' });
-  const asPlayer = () => prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
   const storedPrefs = (notificationPreferences: Record<string, Record<string, boolean>> | null) =>
     prisma.userPreferences.findUnique.mockResolvedValue({ notificationPreferences });
-  const resolve = (
-    type: NotificationType,
-    tenantId = 1,
-  ): ReturnType<ChannelResolutionService['resolveForNotification']> =>
-    service.resolveForNotification({ userId: 1, tenantId, type });
+  const resolve = (type: NotificationType): ReturnType<ChannelResolutionService['resolveForNotification']> =>
+    service.resolveForNotification({ userId: 1, type });
 
   beforeEach(async () => {
     consent.consentedUserIds.mockReset().mockResolvedValue(new Set<number>());
     prisma = {
       userPreferences: { findUnique: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
-      workspaceMember: {
-        findUnique: jest.fn().mockResolvedValue({ role: 'ADMIN' }),
-        findMany: jest.fn().mockResolvedValue([]),
-      },
     };
     const module = await Test.createTestingModule({
       providers: [
@@ -102,7 +90,7 @@ describe('ChannelResolutionService', () => {
   });
 
   describe('policy rules', () => {
-    it('staff with no preferences get the policy defaults: in-app, push, email now; SMS as fallback', async () => {
+    it('a user with no preferences gets the policy defaults: in-app, push, email now; SMS as fallback', async () => {
       const result = await resolve(NotificationType.TENANT_APPROVED);
 
       expect(result.primary).toEqual([IN_APP, EMAIL, PUSH]);
@@ -151,7 +139,7 @@ describe('ChannelResolutionService', () => {
     });
 
     it('reads the preference under the policy category, whatever the caller thinks the category is', async () => {
-      storedPrefs({ team: { push: false }, team: { push: false } });
+      storedPrefs({ billing: { push: true }, team: { push: false } });
 
       const result = await resolve(NotificationType.USER_INVITATION);
 
@@ -315,11 +303,13 @@ describe('ChannelResolutionService', () => {
     });
   });
 
-  // Players live in the mobile app and cannot reach the web settings page, so the
-  // default is the only channel choice they will ever have. It sits UNDER the policy.
-  describe('role-aware defaults', () => {
-    it('a MEMBER gets in-app + push; email off and no SMS fallback', async () => {
-      asPlayer();
+  describe('defaults', () => {
+    it('every channel defaults on, so the policy alone decides what an undecided user gets', () => {
+      expect(CHANNEL_DEFAULTS).toEqual({ inApp: true, push: true, email: true, sms: true, whatsapp: true });
+    });
+
+    it('a stored opt-in still wins where the policy asks for one', async () => {
+      storedPrefs({ billing: { email: false, sms: false } });
 
       const result = await resolve(NotificationType.TENANT_APPROVED);
 
@@ -328,55 +318,11 @@ describe('ChannelResolutionService', () => {
       expect(result.suppressed[EMAIL]).toBe('USER_OPT_OUT');
       expect(result.suppressed[SMS]).toBe('USER_OPT_OUT');
     });
-
-    it('staff keep email on and SMS as the fallback', async () => {
-      asStaff();
-
-      const result = await resolve(NotificationType.TENANT_APPROVED);
-
-      expect(result.primary).toContain(EMAIL);
-      expect(result.fallback).toEqual([SMS]);
-    });
-
-    it('honours a MEMBER opting INTO email over the lean default', async () => {
-      asPlayer();
-      storedPrefs({ billing: { email: true } });
-
-      const result = await resolve(NotificationType.TENANT_APPROVED);
-
-      expect(result.primary).toContain(EMAIL);
-      expect(result.suppressed[SMS]).toBe('USER_OPT_OUT');
-    });
-
-    it('resolves the role per workspace, not per user', async () => {
-      // Staff in their own club, a player in someone else's: no SMS for a tournament they entered elsewhere.
-      prisma.workspaceMember.findUnique.mockImplementation(({ where }: any) =>
-        Promise.resolve({ role: where.userId_tenantId.tenantId === 1 ? 'OWNER' : 'MEMBER' }),
-      );
-
-      expect((await resolve(NotificationType.TENANT_APPROVED, 1)).fallback).toEqual([SMS]);
-      expect((await resolve(NotificationType.TENANT_APPROVED, 2)).fallback).toEqual([]);
-    });
-
-    it('falls open to staff defaults when the membership lookup fails', async () => {
-      prisma.workspaceMember.findUnique.mockRejectedValue(new Error('db down'));
-
-      const result = await resolve(NotificationType.TENANT_APPROVED);
-
-      expect(result.primary).toContain(EMAIL);
-      expect(result.fallback).toEqual([SMS]);
-    });
-
-    it('falls open to staff defaults when no membership row exists', async () => {
-      prisma.workspaceMember.findUnique.mockResolvedValue(null);
-
-      expect((await resolve(NotificationType.TENANT_APPROVED)).fallback).toEqual([SMS]);
-    });
   });
 
   describe('resolveForAudience', () => {
     const audience = (userIds: number[], type: NotificationType = NotificationType.USER_INVITATION) =>
-      service.resolveForAudience({ userIds, tenantId: 1, type });
+      service.resolveForAudience({ userIds, type });
 
     it('asks consent for the whole audience once, with the kind the type needs', async () => {
       consent.consentedUserIds.mockResolvedValue(new Set([2]));
@@ -398,45 +344,26 @@ describe('ChannelResolutionService', () => {
       await audience(Array.from({ length: 200 }, (_, i) => i + 1));
 
       expect(prisma.userPreferences.findMany).toHaveBeenCalledTimes(1);
-      expect(prisma.workspaceMember.findMany).toHaveBeenCalledTimes(1);
+      expect(consent.consentedUserIds).toHaveBeenCalledTimes(1);
       expect(prisma.userPreferences.findUnique).not.toHaveBeenCalled();
     });
 
-    it('gives each recipient the defaults for their own role', async () => {
-      prisma.workspaceMember.findMany.mockResolvedValue([
-        { userId: 1, role: 'MEMBER' },
-        { userId: 2, role: 'ADMIN' },
+    it('gives a recipient with no stored preferences the defaults', async () => {
+      const resolved = await audience([9], NotificationType.TENANT_APPROVED);
+
+      expect(resolved.get(9).primary).toContain(EMAIL);
+      expect(resolved.get(9).fallback).toEqual([SMS]);
+    });
+
+    it('honours a stored per-channel preference over the default', async () => {
+      prisma.userPreferences.findMany.mockResolvedValue([
+        { userId: 1, notificationPreferences: { team: { sms: false } } },
       ]);
 
       const resolved = await audience([1, 2]);
 
       expect(resolved.get(1).fallback).toEqual([]);
       expect(resolved.get(2).fallback).toEqual([SMS]);
-    });
-
-    it('falls open to staff defaults for a recipient with no membership row', async () => {
-      const resolved = await audience([9], NotificationType.TENANT_APPROVED);
-      expect(resolved.get(9).primary).toContain(EMAIL);
-    });
-
-    it('honours a stored per-channel preference over the role default', async () => {
-      prisma.userPreferences.findMany.mockResolvedValue([
-        { userId: 1, notificationPreferences: { team: { sms: true } } },
-      ]);
-      prisma.workspaceMember.findMany.mockResolvedValue([{ userId: 1, role: 'MEMBER' }]);
-
-      const resolved = await audience([1]);
-
-      expect(resolved.get(1).fallback).toEqual([SMS]);
-    });
-
-    it('falls open to staff defaults for everyone when the role lookup fails', async () => {
-      prisma.workspaceMember.findMany.mockRejectedValue(new Error('db down'));
-
-      const resolved = await audience([1, 2], NotificationType.TENANT_APPROVED);
-
-      expect(resolved.get(1).fallback).toEqual([SMS]);
-      expect(resolved.get(2).primary).toContain(EMAIL);
     });
 
     it('never beats a stored yes on the bulk path too', async () => {

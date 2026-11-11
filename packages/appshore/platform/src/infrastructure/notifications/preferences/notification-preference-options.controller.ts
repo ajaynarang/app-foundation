@@ -1,7 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { NotificationPreferenceOptionsService } from './notification-preference-options.service';
 
@@ -16,7 +15,7 @@ export class NotificationPreferenceOptionsController {
   @ApiOperation({
     summary: 'Which categories and channels a user may set preferences for, per the notification policy',
   })
-  list(@CurrentUser() user: { role?: UserRole }) {
-    return this.options.list(user?.role);
+  list() {
+    return this.options.list();
   }
 }
