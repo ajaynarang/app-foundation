@@ -57,6 +57,26 @@ export function expectPaginatedContract<T>(itemSchema: ZodSchema<T>, data: unkno
   return expectContract(paginatedSchema, data, context);
 }
 
+/**
+ * The schema of a cursor list of `item`: `{ items, nextCursor, total, counts? }`, the one envelope every list
+ * that can grow answers. `nextCursor` is opaque: pass it back as `?cursor=`; null on the last page.
+ */
+export function cursorListOf<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .object({
+      items: z.array(item),
+      nextCursor: z.string().nullable(),
+      total: z.number().int().nonnegative(),
+      counts: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    })
+    .strict();
+}
+
+/** Assert a cursor-list response and return its typed page. */
+export function expectCursorListContract<T extends z.ZodTypeAny>(itemSchema: T, data: unknown, context?: string) {
+  return expectContract(cursorListOf(itemSchema), data, context);
+}
+
 function formatZodErrors(error: ZodError): string {
   return error.issues
     .map((issue) => {

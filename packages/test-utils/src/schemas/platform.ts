@@ -47,7 +47,7 @@ import {
   OnboardingStatusResponseSchema as SharedOnboardingStatusResponseSchema,
   AgentScopeSchema,
 } from '@app/shared-types';
-import { apiErrorEnvelope, dbId, stringId, isoDateString } from './helpers.js';
+import { apiErrorEnvelope, dbId, stringId, isoDateString, cursorListOf } from './helpers.js';
 
 // Note: `SuperAdminPreferencesSchema` is NOT exported from shared-types —
 // hand-written below.
@@ -688,70 +688,49 @@ export const SuperAdminPreferencesSchema = z.object({
 
 /** Enums (matches shared-types, duplicated locally for `.strict()` composition). */
 const FeedbackCategoryEnum = z.enum(['bug', 'idea', 'general']);
-const FeedbackStatusEnum = z.enum(['new', 'reviewed', 'resolved']);
+const FeedbackStatusEnum = z.enum(['NEW', 'REVIEWED', 'RESOLVED']);
 
-/** Core projection common to all four row variants. */
-const FeedbackCoreProjection = {
-  id: dbId,
+/**
+ * A feedback row as the API shows it: named by its public id (`feedbackId`, a uuid). No numeric key crosses
+ * the API. POST /feedback, GET /feedback and every admin route answer this shape; the admin routes add the
+ * `user`, `tenant` and `resolver` references, each named by its public id.
+ */
+export const FeedbackRowSchema = z.object({
+  feedbackId: z.string().uuid(),
   category: FeedbackCategoryEnum.nullable(),
   sentiment: z.number().int().min(1).max(5),
   message: z.string(),
   page: z.string().nullable(),
   status: FeedbackStatusEnum,
-  createdAt: isoDateString,
-};
-
-/** Full Prisma row — POST /feedback and all admin PATCH transitions return this shape. */
-export const FeedbackRowSchema = z.object({
-  ...FeedbackCoreProjection,
-  tenantId: dbId,
-  userId: dbId,
   note: z.string().nullable(),
-  resolvedBy: dbId.nullable(),
   resolvedAt: isoDateString.nullable(),
+  createdAt: isoDateString,
   updatedAt: isoDateString,
 });
 
-/** Trimmed user-facing row — GET /feedback (listOwn) drops tenant/user/resolve metadata. */
-export const FeedbackOwnRowSchema = z.object({
-  ...FeedbackCoreProjection,
-});
+/** GET /feedback (listOwn) rows: the same serialized row, without references. */
+export const FeedbackOwnRowSchema = FeedbackRowSchema;
 
-/** Admin row — Prisma row + nested relations (user/tenant/resolver). */
+/** Admin row: the serialized row plus its references, by public id. */
 export const FeedbackAdminRowSchema = FeedbackRowSchema.extend({
   user: z
     .object({
-      id: dbId,
-      firstName: z.string(),
-      lastName: z.string(),
-      email: z.string(),
-      phone: z.string().nullable(),
+      userId: z.string(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+      email: z.string().nullable(),
       role: z.string(),
     })
     .strict(),
-  tenant: z
-    .object({
-      id: dbId,
-      companyName: z.string(),
-    })
-    .strict(),
+  tenant: z.object({ tenantId: z.string(), companyName: z.string().nullable() }).strict(),
   resolver: z
-    .object({
-      id: dbId,
-      firstName: z.string(),
-      lastName: z.string(),
-    })
+    .object({ userId: z.string(), firstName: z.string().nullable(), lastName: z.string().nullable() })
     .strict()
     .nullable(),
 });
 
-/** Pagination envelope around admin rows — GET /admin/feedback. */
-export const FeedbackListEnvelopeSchema = z.object({
-  data: z.array(FeedbackAdminRowSchema),
-  total: z.number().int().nonnegative(),
-  page: z.number().int().positive(),
-  limit: z.number().int().positive(),
-});
+/** GET /admin/feedback: a cursor list, newest first; `counts` holds every status for the filters. */
+export const FeedbackListEnvelopeSchema = cursorListOf(FeedbackAdminRowSchema);
 
 /** GET /admin/feedback/stats envelope. */
 export const FeedbackStatsSchema = z.object({

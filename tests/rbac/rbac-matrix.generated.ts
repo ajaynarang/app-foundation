@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-11T12:53:06.779Z
- * Source: 22 domains, 91 endpoints
- * Controllers scanned: 269 total endpoints across all controllers
+ * Generated: 2026-11-11T21:49:56.401Z
+ * Source: 22 domains, 92 endpoints
+ * Controllers scanned: 270 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -28,6 +28,13 @@ export const RBAC_MATRIX: RbacEntry[] = [
   // ═══════════════════════════════════════════════════════
   // SUPER-ADMIN
   // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/admin/ai-spend/summary',
+    description: 'AdminAiSpendController: GET /admin/ai-spend/summary',
+    domain: 'super-admin',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
   {
     method: 'GET', path: '/admin/ai-spend/tenants',
     description: 'AdminAiSpendController: GET /admin/ai-spend/tenants',

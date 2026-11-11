@@ -23,7 +23,7 @@
  * promote the stable ones to shared-types once admin UI stabilises.
  */
 import { z } from 'zod';
-import { apiErrorEnvelope, isoDateString } from './helpers.js';
+import { apiErrorEnvelope, isoDateString, cursorListOf } from './helpers.js';
 
 // ── admin/cache ──────────────────────────────────────────────────────
 
@@ -140,21 +140,8 @@ export const AdminEventRowSchema = z
   })
   .strict();
 
-/**
- * `GET /admin/events` — admin-events.controller.ts:16-39.
- *
- * Pagination envelope: `{ items, total, limit, offset }`. `limit` is
- * clamped 1..100 (default 50). `total` is the unfiltered count after
- * any query filters but before pagination.
- */
-export const AdminEventListSchema = z
-  .object({
-    items: z.array(AdminEventRowSchema),
-    total: z.number().int().nonnegative(),
-    limit: z.number().int().positive(),
-    offset: z.number().int().nonnegative(),
-  })
-  .strict();
+/** `GET /admin/events`: a cursor list, newest first. `total` counts what matches the filters. */
+export const AdminEventListSchema = cursorListOf(AdminEventRowSchema);
 
 /**
  * `GET /admin/events/stats` — admin-events.controller.ts:41-45.

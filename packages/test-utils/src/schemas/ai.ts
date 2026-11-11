@@ -41,7 +41,7 @@
  * the raw line). A strict discriminated union over the 4 known kinds.
  */
 import { z } from 'zod';
-import { apiErrorEnvelope, isoDateString, stringId } from './helpers.js';
+import { apiErrorEnvelope, isoDateString, stringId, cursorListOf } from './helpers.js';
 
 // ── CONVERSATION ROW (POST /conversations) ───────────────────────────
 
@@ -290,19 +290,10 @@ export const AgentActivityRowSchema = z
   .strict();
 
 /**
- * `GET /agent-activity` response — `agent-activity.service.ts:87-90`:
- *   { rows: AgentActivityRow[], nextCursor: string | null }
- *
- * NOTE: the plan §6 line 210 sketched `items[]` but live shape is `rows`.
- * `nextCursor` is the createdAt ISO string of the last row (cursor-based;
- * pass back as `?cursor=...` to fetch the next page).
+ * `GET /agent-activity` response: a cursor list, newest first. `nextCursor` is opaque (pass it back as
+ * `?cursor=`); `total` counts every row for the principal and filters.
  */
-export const AgentActivityListSchema = z
-  .object({
-    rows: z.array(AgentActivityRowSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .strict();
+export const AgentActivityListSchema = cursorListOf(AgentActivityRowSchema);
 
 /**
  * Single scope row from `developer-scopes.controller.ts::list` (lines 36-49).

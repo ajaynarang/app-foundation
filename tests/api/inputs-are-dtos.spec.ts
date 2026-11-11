@@ -36,7 +36,8 @@ test.describe('Inputs are DTOs @api', () => {
 
   test('a number that is not one is a 400 naming the param, and a page size is clamped', async ({ asMember }) => {
     expect(await fieldErrorsOf(await asMember.get('/notifications?limit=abc'))).toHaveProperty('limit');
-    expect(await fieldErrorsOf(await asMember.get('/support/tickets?offset=-1'))).toHaveProperty('offset');
+    // Lists page by cursor: `offset` is refused like any key a route does not declare.
+    expect(await fieldErrorsOf(await asMember.get('/support/tickets?offset=10'))).toHaveProperty('offset');
     expect((await asMember.get('/notifications?limit=999')).status()).toBe(200);
   });
 
