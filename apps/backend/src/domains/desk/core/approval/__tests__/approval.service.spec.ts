@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { UserRole } from '@appshore/db';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
@@ -18,6 +19,7 @@ describe('ApprovalService', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     prisma.deskApproval.findMany.mockResolvedValue([]);
+    prisma.deskApproval.count.mockResolvedValue(0);
     const enrichment = new ApprovalEnrichmentService();
     service = new ApprovalService(prisma, new FakeInngest() as any, enrichment);
   });
@@ -52,7 +54,53 @@ describe('ApprovalService', () => {
 
     it('scope=mine with no currentUserId returns empty without hitting Prisma', async () => {
       const res = await service.listPending(7, { scope: 'mine' });
-      expect(res).toEqual([]);
+      expect(res).toEqual({ items: [], nextCursor: null, total: 0 });
+      expect(prisma.deskApproval.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listPending: a cursor list, oldest request first', () => {
+    // A sweep asks for several approvals in one millisecond; one is decided, one is another tenant's.
+    const stamps = tiedTimestamps(9).reverse();
+    const rows = stamps.map((requestedAt, index) => ({
+      id: `app-${(index * 5) % 9}`,
+      episodeId: `ep-${index}`,
+      decision: index === 7 ? 'APPROVED' : null,
+      requestedAt,
+      expiresAt: new Date('2026-04-01T00:00:00.000Z'),
+      episode: {
+        id: `ep-${index}`,
+        tenantId: index === 8 ? 99 : 7,
+        entityType: 'invoice',
+        entityId: `inv-${index}`,
+        entityLabel: `Invoice ${index}`,
+        priority: 'NORMAL',
+        status: 'WAITING_APPROVAL',
+        openedAt: requestedAt,
+        responsibility: { key: 'welcome', title: 'Welcome' },
+        ownerAgent: { key: 'autumn', name: 'Autumn' },
+      },
+    }));
+
+    beforeEach(() => Object.assign(prisma.deskApproval, fixtureModel(rows)));
+
+    it('walks every pending approval of the tenant once, same-millisecond requests included', async () => {
+      const totals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listPending(7, { limit: 3, cursor });
+        totals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+      expect(new Set(items.map((approval) => approval.id)).size).toBe(7);
+      const times = items.map((approval) => Date.parse(String(approval.requestedAt)));
+      expect(times).toEqual([...times].sort((a, b) => a - b));
+      expect(totals).toEqual([7, 7, 7]);
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listPending(7, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
       expect(prisma.deskApproval.findMany).not.toHaveBeenCalled();
     });
   });
@@ -471,8 +519,10 @@ describe('ApprovalService', () => {
       const enrichment = { enrich: jest.fn() } as any;
       const svc = new ApprovalService(localPrisma, new FakeInngest() as any, enrichment);
 
-      const rows = await svc.listPending(10, { limit: 10, scope: 'all' });
+      const { items: rows, nextCursor, total } = await svc.listPending(10, { limit: 10, scope: 'all' });
       expect(rows).toHaveLength(1);
+      expect(nextCursor).toBeNull();
+      expect(total).toBe(1);
       const row = rows[0] as any;
 
       // list-only fields present
@@ -528,6 +578,7 @@ function makePrismaWithOneApproval() {
       },
     },
   ]);
+  prisma.deskApproval.count.mockResolvedValue(1);
   return prisma;
 }
 

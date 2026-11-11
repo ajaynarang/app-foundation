@@ -1,5 +1,5 @@
 import { FeedbackStatusEnum, type FeedbackStatus } from '@app/shared-types';
-import { QueryEnum, QueryInt, QueryLimit } from '@appshore/kernel/shared/utils/query-dto';
+import { CursorQueryDto, QueryEnum, QueryInt } from '@appshore/kernel/shared/utils/query-dto';
 import { QueryDateText } from '../../../shared/dto/query-date-text';
 
 export const FEEDBACK_LIST_CATEGORIES = ['bug', 'idea', 'general', 'uncategorized'] as const;
@@ -9,9 +9,9 @@ const SENTIMENT_RANGE = { min: 1, max: 5 } as const;
 
 /**
  * `GET /admin/feedback` — `status`, `category`, `tenant_id` (numeric), `sentiment_min`, `sentiment_max` (1…5),
- * `from`, `to`, `page` (from 1), `limit` (1…100, default 20).
+ * `from`, `to`, `limit` (1…100, default 50), `cursor`.
  */
-export class ListFeedbackQueryDto {
+export class ListFeedbackQueryDto extends CursorQueryDto {
   // The canonical uppercase enum: it goes straight to the Prisma `status` filter.
   @QueryEnum(FeedbackStatusEnum.options)
   status?: FeedbackStatus;
@@ -34,10 +34,4 @@ export class ListFeedbackQueryDto {
 
   @QueryDateText()
   to?: string;
-
-  @QueryInt({ min: 1 })
-  page?: number;
-
-  @QueryLimit()
-  limit?: number;
 }

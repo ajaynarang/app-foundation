@@ -45,13 +45,14 @@ export class ApprovalController extends BaseTenantController {
 
   @Get()
   @ApiOperation({
-    summary: 'List pending Desk approvals for the tenant (queue view)',
+    summary: 'List pending Desk approvals for the tenant, oldest first (queue view, cursor-paged)',
   })
   async listPending(@CurrentUser() user: any, @Query() query: ApprovalListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const resolvedScope = resolveApprovalScope(query.scope, user.role);
     return this.approvals.listPending(tenantDbId, {
       limit: query.limit,
+      cursor: query.cursor,
       scope: resolvedScope,
       currentUserId: user.dbId,
     });

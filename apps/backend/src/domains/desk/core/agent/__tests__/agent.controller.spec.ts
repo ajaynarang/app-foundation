@@ -10,7 +10,7 @@ class FakeAgentService {
   listForTenant = jest.fn().mockResolvedValue([{ key: 'assistant' }]);
   getDetailForTenant = jest.fn().mockResolvedValue({ key: 'assistant' });
   getActivity = jest.fn().mockResolvedValue({ episodeCount: 1 });
-  listEligibleSupervisors = jest.fn().mockResolvedValue([{ id: 42 }]);
+  listEligibleSupervisors = jest.fn().mockResolvedValue({ items: [{ id: 42 }], nextCursor: null, total: 1 });
   updateAgent = jest.fn().mockResolvedValue({ updatedResponsibilityCount: 1, supervisorUpdated: true });
 }
 
@@ -41,8 +41,9 @@ describe('DeskAgentController', () => {
   });
 
   it('listEligibleSupervisors delegates to service', async () => {
-    await controller.listEligibleSupervisors({ role: UserRole.OWNER });
-    expect(agents.listEligibleSupervisors).toHaveBeenCalledWith(7);
+    const page = await controller.listEligibleSupervisors({ role: UserRole.OWNER }, { q: 'ada', limit: 10 });
+    expect(agents.listEligibleSupervisors).toHaveBeenCalledWith(7, { q: 'ada', limit: 10 });
+    expect(page).toEqual({ items: [{ id: 42 }], nextCursor: null, total: 1 });
   });
 
   describe('activity', () => {

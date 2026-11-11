@@ -36,11 +36,15 @@ describe('ListFeedbackQueryDto', () => {
         tenant_id: '7',
         sentiment_min: '2',
         sentiment_max: '5',
-        page: '3',
+        cursor: 'abc',
         limit: '500',
         from: '2026-04-01',
       }),
-    ).toMatchObject({ tenantId: 7, sentimentMin: 2, sentimentMax: 5, page: 3, limit: 100, from: '2026-04-01' });
+    ).toMatchObject({ tenantId: 7, sentimentMin: 2, sentimentMax: 5, cursor: 'abc', limit: 100, from: '2026-04-01' });
+  });
+
+  it('refuses page paging: the list is a cursor list', async () => {
+    expect(await fieldErrorsOf(read({ page: '2' }))).toHaveProperty('page');
   });
 
   it('refuses the camelCase keys the route used to read', async () => {

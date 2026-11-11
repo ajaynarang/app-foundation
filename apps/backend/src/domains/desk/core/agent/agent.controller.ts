@@ -7,6 +7,8 @@ import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
+import { ListQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+
 import { DeskAgentService } from './agent.service';
 import { DeskAgentEditGuard } from './desk-agent-edit.guard';
 import { UpdateAgentDto } from './dto/update-agent.dto';
@@ -44,10 +46,10 @@ export class DeskAgentController extends BaseTenantController {
   // Must precede `:key` routes so Nest doesn't match the literal as a key.
   @Get('eligible-supervisors')
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'List tenant users eligible to supervise an agent' })
-  async listEligibleSupervisors(@CurrentUser() user: any) {
+  @ApiOperation({ summary: 'Tenant users eligible to supervise an agent, by last name (a picker: cursor list with q)' })
+  async listEligibleSupervisors(@CurrentUser() user: any, @Query() query: ListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    return this.agents.listEligibleSupervisors(tenantDbId);
+    return this.agents.listEligibleSupervisors(tenantDbId, query);
   }
 
   @Get(':key')

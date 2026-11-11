@@ -53,7 +53,9 @@ describe('DeskEpisodeController', () => {
   describe('query DTOs', () => {
     it('answers 400 with fieldErrors for a bad status, scope or limit (it was an uncaught ZodError)', async () => {
       const read = (raw: Record<string, unknown>) => readQueryDto(DeskEpisodeListQueryDto, raw);
-      expect((await read({})).limit).toBe(25);
+      // No limit: the service applies the cursor-list default of 50 (this list used to default to 25).
+      expect((await read({})).limit).toBeUndefined();
+      expect((await read({ limit: '500' })).limit).toBe(100);
       expect(await fieldErrorsOf(read({ status: 'nope' }))).toHaveProperty('status');
       expect(await fieldErrorsOf(read({ scope: 'theirs' }))).toHaveProperty('scope');
       expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
@@ -68,7 +70,6 @@ describe('DeskEpisodeController', () => {
         from: '2026-04-01T00:00:00.000Z',
         to: '2026-04-30T00:00:00.000Z',
         q: 'x',
-        limit: 50,
       });
       expect(await fieldErrorsOf(read({ from: '2026-04-01' }))).toHaveProperty('from');
       expect(await fieldErrorsOf(read({ window: 'forever' }))).toHaveProperty('window');

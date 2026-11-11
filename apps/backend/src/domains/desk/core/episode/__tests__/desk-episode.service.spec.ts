@@ -4,6 +4,8 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
+import { encodeCursor } from '@appshore/kernel/shared/utils/cursor-pagination';
 
 import { ApprovalEnrichmentService } from '../../approval/approval-enrichment.service';
 import { DeskEpisodeService, pickMostRecentDecidedApproval } from '../desk-episode.service';
@@ -180,7 +182,7 @@ describe('DeskEpisodeService', () => {
         { ...baseEpisode, id: 'ep-b' },
       ]);
       const result = await service.listForTenant(10, { limit: 25 });
-      expect(result.rows).toHaveLength(2);
+      expect(result.items).toHaveLength(2);
       expect(result.nextCursor).toBeNull();
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
       expect(call.where.tenantId).toBe(10);
@@ -227,23 +229,53 @@ describe('DeskEpisodeService', () => {
       const rows = Array.from({ length: 3 }, (_, i) => ({ ...baseEpisode, id: `ep-${i}` }));
       prisma.deskEpisode.findMany.mockResolvedValue(rows);
       const result = await service.listForTenant(10, { limit: 2 });
-      expect(result.rows).toHaveLength(2);
-      expect(result.nextCursor).toContain('|ep-1');
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe(encodeCursor(baseEpisode.openedAt, 'ep-1'));
     });
 
-    it('cursor parses and forwards into where', async () => {
+    it('cursor parses and forwards into where, joined to the scope with AND', async () => {
       prisma.deskEpisode.findMany.mockResolvedValue([]);
-      const cur = `${new Date('2026-04-24T09:00:00Z').toISOString()}|ep-last`;
+      const cur = encodeCursor(new Date('2026-04-24T09:00:00Z'), 'ep-last');
       await service.listForTenant(10, { limit: 25, cursor: cur });
       const call = prisma.deskEpisode.findMany.mock.calls[0][0];
-      expect(call.where.OR).toBeDefined();
+      const [scope, keyset] = call.where.AND;
+      expect(scope).toMatchObject({ tenantId: 10 });
+      expect(keyset.OR).toBeDefined();
+      // The total counts the scope alone, never the cursor.
+      expect(prisma.deskEpisode.count).toHaveBeenCalledWith({ where: scope });
     });
 
-    it('malformed cursor is ignored', async () => {
-      prisma.deskEpisode.findMany.mockResolvedValue([]);
-      await service.listForTenant(10, { limit: 25, cursor: 'garbage' });
-      const call = prisma.deskEpisode.findMany.mock.calls[0][0];
-      expect(call.where.OR).toBeUndefined();
+    it('malformed cursor is a 400 before any query runs (it used to be ignored and restart the list)', async () => {
+      for (const cursor of ['garbage', `${new Date('2026-04-24T09:00:00Z').toISOString()}|ep-last`]) {
+        await expect(service.listForTenant(10, { limit: 25, cursor })).rejects.toMatchObject({ status: 400 });
+      }
+      expect(prisma.deskEpisode.findMany).not.toHaveBeenCalled();
+    });
+
+    it('walks every open episode once across pages, episodes opened in one millisecond included', async () => {
+      // A nightly sweep opens several episodes in one millisecond; one row is another tenant's.
+      const stamps = tiedTimestamps(8);
+      const rows = stamps.map((openedAt, index) => ({
+        ...baseEpisode,
+        id: `ep-${(index * 5) % 8}`,
+        tenantId: index === 7 ? 99 : 10,
+        status: 'WAITING_APPROVAL',
+        openedAt,
+      }));
+      Object.assign(prisma.deskEpisode, fixtureModel(rows));
+
+      const totals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listForTenant(10, { limit: 3, cursor });
+        totals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+      expect(new Set(items.map((episode) => episode.id)).size).toBe(7);
+      const times = items.map((episode) => Date.parse(episode.openedAt));
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+      expect(totals).toEqual([7, 7, 7]);
     });
   });
 
@@ -463,8 +495,8 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: 'today', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'America/Chicago' },
       );
-      expect(result.rows).toHaveLength(2);
-      for (const row of result.rows) {
+      expect(result.items).toHaveLength(2);
+      for (const row of result.items) {
         expect(row).toHaveProperty('closedAt');
         expect(row).toHaveProperty('outcome');
         expect(row).toHaveProperty('humanDecision');
@@ -525,7 +557,7 @@ describe('DeskEpisodeService', () => {
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
       expect(result.summary.total).toBe(3);
-      expect(result.rows.every((r) => r.status !== 'ESCALATED')).toBe(true);
+      expect(result.items.every((r) => r.status !== 'ESCALATED')).toBe(true);
     });
 
     it('mine scope empty when currentUserId missing', async () => {
@@ -537,7 +569,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'mine', window: 'today', limit: 50 },
         { currentUserId: undefined, tenantTimezone: 'UTC' },
       );
-      expect(result.rows).toEqual([]);
+      expect(result.items).toEqual([]);
       expect(localPrisma.deskEpisode.findMany).not.toHaveBeenCalled();
     });
 
@@ -561,9 +593,9 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].humanDecision).toBe('EDITED');
-      expect(result.rows[0].decidedByUserId).toBe(42);
-      expect(result.rows[0].decidedByName).toBe('Ada Lovelace');
+      expect(result.items[0].humanDecision).toBe('EDITED');
+      expect(result.items[0].decidedByUserId).toBe(42);
+      expect(result.items[0].decidedByName).toBe('Ada Lovelace');
     });
 
     it('activeSuppression is populated when an unexpired, unsuppressed row is joined', async () => {
@@ -574,7 +606,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '30d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].activeSuppression).toMatchObject({
+      expect(result.items[0].activeSuppression).toMatchObject({
         id: '11111111-1111-1111-1111-111111111111',
         suppressUntil: '2099-05-24T00:00:00.000Z',
       });
@@ -588,7 +620,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '30d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].activeSuppression).toEqual({
+      expect(result.items[0].activeSuppression).toEqual({
         id: '22222222-2222-2222-2222-222222222222',
         suppressUntil: null,
       });
@@ -613,7 +645,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '30d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].activeSuppression).toBeNull();
+      expect(result.items[0].activeSuppression).toBeNull();
 
       // Confirm the Prisma join wires the unexpired + unsuppressed filters.
       const call = localPrisma.deskEpisode.findMany.mock.calls[0][0];
@@ -775,22 +807,70 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 2 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows).toHaveLength(2);
-      expect(result.nextCursor).toContain('|ep-1');
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe(encodeCursor(new Date(closedToday), 'ep-1'));
     });
 
-    it('cursor parses and feeds OR clause', async () => {
+    it('a search and a cursor both apply: the cursor is joined with AND and never replaces the search', async () => {
       const localPrisma = makePrismaForHandled(closedToday);
       const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
-      const cur = `${new Date('2026-04-20T00:00:00Z').toISOString()}|ep-prev`;
+      const cur = encodeCursor(new Date('2026-04-20T00:00:00Z'), 'ep-prev');
       await svc.listHandled(
         10,
-        { scope: 'all', window: '7d', cursor: cur, limit: 50 },
+        { scope: 'all', window: '7d', cursor: cur, q: 'invoice', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
       const call = localPrisma.deskEpisode.findMany.mock.calls[0][0];
-      // cursor OR is merged into where — either as `OR` top-level or spread
-      expect(call.where.OR).toBeDefined();
+      const [scope, keyset] = call.where.AND;
+      expect(scope.OR).toEqual([
+        { entityLabel: { contains: 'invoice', mode: 'insensitive' } },
+        { responsibility: { key: { contains: 'invoice', mode: 'insensitive' } } },
+      ]);
+      expect(keyset.OR[0]).toHaveProperty('closedAt');
+    });
+
+    it('walks every handled episode of a search once, episodes closed in one millisecond included', async () => {
+      // Seven matching episodes, closed in groups of three within the last hour; one does not match the search.
+      const stamps = tiedTimestamps(8, 3, Date.now() - 60_000);
+      const rows = stamps.map((closedAt, index) => ({
+        ...baseEpisode,
+        id: `ep-${(index * 5) % 8}`,
+        entityLabel: index === 7 ? 'Shipment 9' : `Invoice ${index}`,
+        closedAt,
+        approvals: [],
+        entitySuppressions: [],
+      }));
+      const localPrisma = createMockPrisma();
+      Object.assign(localPrisma.deskEpisode, fixtureModel(rows));
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
+
+      const totals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await svc.listHandled(
+          10,
+          { scope: 'all', window: '7d', q: 'invoice', limit: 3, cursor },
+          { currentUserId: 1, tenantTimezone: 'UTC' },
+        );
+        totals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+      expect(new Set(items.map((episode) => episode.id)).size).toBe(7);
+      expect(totals).toEqual([7, 7, 7]);
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      const localPrisma = makePrismaForHandled(closedToday);
+      const svc = new DeskEpisodeService(localPrisma, { enrich: jest.fn() }, makeEvents());
+      await expect(
+        svc.listHandled(
+          10,
+          { scope: 'all', window: '7d', cursor: 'garbage' },
+          { currentUserId: 1, tenantTimezone: 'UTC' },
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(localPrisma.deskEpisode.findMany).not.toHaveBeenCalled();
     });
 
     it('escalation row: escalationReason populated from outcomeNote', async () => {
@@ -812,7 +892,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].escalationReason).toBe('No customer response after 3 attempts');
+      expect(result.items[0].escalationReason).toBe('No customer response after 3 attempts');
     });
 
     it('fallback: null outcome becomes "unknown"; null entityLabel uses responsibility title', async () => {
@@ -834,10 +914,10 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].outcome).toBe('unknown');
-      expect(result.rows[0].decisionTitle).toBe(baseEpisode.responsibility.title);
+      expect(result.items[0].outcome).toBe('unknown');
+      expect(result.items[0].decisionTitle).toBe(baseEpisode.responsibility.title);
       // closedAt maps from updatedAt when episode.closedAt is null
-      expect(result.rows[0].closedAt).toBe(baseEpisode.updatedAt.toISOString());
+      expect(result.items[0].closedAt).toBe(baseEpisode.updatedAt.toISOString());
     });
 
     it('approval with decidedBy but no names yields null decidedByName', async () => {
@@ -857,7 +937,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].decidedByName).toBeNull();
+      expect(result.items[0].decidedByName).toBeNull();
     });
 
     it('approval with decidedBy=null falls through to null name + null userId', async () => {
@@ -877,9 +957,9 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].decidedByName).toBeNull();
-      expect(result.rows[0].decidedByUserId).toBeNull();
-      expect(result.rows[0].humanDecision).toBe('REJECTED');
+      expect(result.items[0].decidedByName).toBeNull();
+      expect(result.items[0].decidedByUserId).toBeNull();
+      expect(result.items[0].humanDecision).toBe('REJECTED');
     });
 
     it('only last name present still builds a trimmed decidedByName', async () => {
@@ -899,7 +979,7 @@ describe('DeskEpisodeService', () => {
         { scope: 'all', window: '7d', limit: 50 },
         { currentUserId: 1, tenantTimezone: 'UTC' },
       );
-      expect(result.rows[0].decidedByName).toBe('Turing');
+      expect(result.items[0].decidedByName).toBe('Turing');
     });
 
     it('window=custom without from/to falls back to start-of-day → now', async () => {

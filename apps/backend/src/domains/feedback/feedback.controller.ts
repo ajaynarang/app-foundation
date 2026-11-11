@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { FeedbackService } from './feedback.service';
 import { CreateFeedbackDto } from './dto';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -21,8 +22,8 @@ export class FeedbackController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List own feedback' })
-  async listOwn(@CurrentUser() user: any) {
-    return this.feedbackService.listOwn(user.dbId, user.tenantDbId);
+  @ApiOperation({ summary: 'List own feedback, newest first (cursor-paged)' })
+  async listOwn(@CurrentUser() user: any, @Query() query: CursorQueryDto) {
+    return this.feedbackService.listOwn(user.dbId, user.tenantDbId, query);
   }
 }

@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 import { parseSingleValue } from '@appshore/kernel/shared/utils/list-query';
-import { QueryEnum, QueryLimit, QueryParam, QuerySearch, QueryString } from '@appshore/kernel/shared/utils/query-dto';
+import {
+  CursorQueryDto,
+  QueryEnum,
+  QueryParam,
+  QuerySearch,
+  QueryString,
+} from '@appshore/kernel/shared/utils/query-dto';
 import {
   APPROVAL_SCOPES,
   EPISODE_STATUSES,
@@ -27,26 +33,20 @@ const QueryInstant = () =>
     return value;
   });
 
-/** `GET /desk/episodes` — `status`, `scope` (mine | all; default by role), `limit` (1…100, default 25), `cursor`. */
-export class DeskEpisodeListQueryDto implements ListDeskEpisodesQuery {
+/** `GET /desk/episodes` — `status`, `scope` (mine | all; default by role), `limit` (1…100, default 50), `cursor`. */
+export class DeskEpisodeListQueryDto extends CursorQueryDto implements ListDeskEpisodesQuery {
   @QueryEnum(EPISODE_STATUSES)
   status?: EpisodeStatus;
 
   @QueryEnum(APPROVAL_SCOPES)
   scope?: ApprovalScope;
-
-  @QueryLimit({ default: 25 })
-  limit!: number;
-
-  @QueryString()
-  cursor?: string;
 }
 
 /**
  * `GET /desk/episodes/handled` — `scope`, `window` (today | 7d | 30d | this_month | custom), `from` / `to`
  * (ISO instants, for `custom`), `agent`, `outcome`, `q`, `limit` (1…100, default 50), `cursor`.
  */
-export class HandledEpisodeListQueryDto implements ListHandledEpisodesQuery {
+export class HandledEpisodeListQueryDto extends CursorQueryDto implements ListHandledEpisodesQuery {
   @QueryEnum(APPROVAL_SCOPES)
   scope?: ApprovalScope;
 
@@ -68,10 +68,4 @@ export class HandledEpisodeListQueryDto implements ListHandledEpisodesQuery {
 
   @QuerySearch()
   q?: string;
-
-  @QueryLimit({ default: 50 })
-  limit!: number;
-
-  @QueryString()
-  cursor?: string;
 }

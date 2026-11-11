@@ -30,8 +30,10 @@ describe('ApprovalController.listPending', () => {
 
   it('member default → scope=mine with currentUserId', async () => {
     await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, await query());
+    // No limit and no cursor: the first page, at the service's default size of 50.
     expect(approvals.listPending).toHaveBeenCalledWith(7, {
-      limit: 50,
+      limit: undefined,
+      cursor: undefined,
       scope: 'mine',
       currentUserId: 42,
     });
@@ -53,6 +55,12 @@ describe('ApprovalController.listPending', () => {
 
   it('answers 400 naming limit when it is not a number', async () => {
     expect(await fieldErrorsOf(query({ limit: 'abc' }))).toHaveProperty('limit');
+  });
+
+  it('passes the cursor through and refuses offset paging', async () => {
+    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, await query({ cursor: 'abc', limit: '10' }));
+    expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ cursor: 'abc', limit: 10 }));
+    expect(await fieldErrorsOf(query({ offset: '10' }))).toHaveProperty('offset');
   });
 
   it('clamps limit to 1..100', async () => {
