@@ -2,7 +2,7 @@
 #
 # One-command database migration for local or AWS staging.
 #
-# Local:   Runs against localhost:5432 directly (no tunnel).
+# Local:   Runs against the docker-compose Postgres on localhost:5499 (no tunnel).
 # Staging: Opens an SSM tunnel to the staging RDS, runs migrations, tears down.
 #
 # Usage:
@@ -18,6 +18,8 @@
 # Staging credentials:
 #   The staging DATABASE_URL is read from apps/backend/.env.aws.staging.
 #   That file is gitignored. Never hardcode credentials in this script.
+#   The RDS host and port are taken from that URL (RDS_HOST / RDS_PORT in the
+#   environment override them), so nothing here names a real instance.
 
 set -euo pipefail
 
@@ -25,15 +27,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CLUSTER="app-staging-ecs-cluster"
-RDS_HOST="app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
-RDS_PORT="5432"
+RDS_HOST="${RDS_HOST:-}"
+RDS_PORT="${RDS_PORT:-}"
 TUNNEL_PORT="5433"
 PREFERRED_CONTAINER="worker"
 BACKEND_DIR="$(cd "$TOOLS_DIR/../apps/backend" && pwd)"
 DB_PKG_DIR="$(cd "$TOOLS_DIR/../packages/appshore/db" && pwd)"
 
-# Local DB config (from apps/backend/.env)
-LOCAL_DB_URL="postgresql://app_user:app_password@localhost:5432/app"
+# Local DB config (the docker-compose defaults, as in apps/backend/.env.example)
+LOCAL_DB_PORT="5499"
+LOCAL_DB_URL="postgresql://postgres:postgres@localhost:${LOCAL_DB_PORT}/app?schema=public"
 
 # --- State ---
 TUNNEL_PID=""
@@ -69,7 +72,7 @@ while [[ $# -gt 0 ]]; do
       echo "One-command database migration for local or AWS staging."
       echo ""
       echo "Required:"
-      echo "  --env local      Target local PostgreSQL (localhost:5432)"
+      echo "  --env local      Target local PostgreSQL (localhost:5499)"
       echo "  --env staging    Target AWS staging RDS (via SSM tunnel)"
       echo ""
       echo "Options:"
@@ -129,6 +132,17 @@ else
     echo "ERROR: DATABASE_URL not found in $STAGING_ENV_FILE"
     exit 1
   fi
+  # The RDS endpoint comes from the URL itself, so a new or replaced instance needs no edit here.
+  url_part() {
+    DB_URL="$DB_URL" python3 -c "import os, sys, urllib.parse as u; print(getattr(u.urlsplit(os.environ['DB_URL'].strip('\"')), sys.argv[1]) or '')" "$1"
+  }
+  RDS_HOST="${RDS_HOST:-$(url_part hostname)}"
+  RDS_PORT="${RDS_PORT:-$(url_part port)}"
+  RDS_PORT="${RDS_PORT:-5432}"
+  if [[ -z "$RDS_HOST" ]]; then
+    echo "ERROR: Could not read the database host from DATABASE_URL in $STAGING_ENV_FILE (or set RDS_HOST)."
+    exit 1
+  fi
 fi
 
 # --- cd into backend once (all commands run from here) ---
@@ -167,7 +181,7 @@ header() {
     echo "  RDS:         ${RDS_HOST}"
     echo "  Tunnel:      localhost:${TUNNEL_PORT}"
   else
-    echo "  Database:    localhost:5432/app"
+    echo "  Database:    localhost:${LOCAL_DB_PORT}/app"
   fi
   echo "=========================================="
   echo ""
@@ -185,8 +199,8 @@ check_aws_session() {
 
 check_local_db() {
   echo "Checking local database..."
-  if ! port_ready 127.0.0.1 5432; then
-    echo "ERROR: Local PostgreSQL is not running on port 5432."
+  if ! port_ready 127.0.0.1 "$LOCAL_DB_PORT"; then
+    echo "ERROR: Local PostgreSQL is not running on port ${LOCAL_DB_PORT}."
     echo "Start it with: docker compose up -d postgres"
     exit 1
   fi

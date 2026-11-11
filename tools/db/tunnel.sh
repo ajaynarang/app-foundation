@@ -14,13 +14,17 @@
 #   ./db-tunnel.sh              # Uses first available container (worker preferred)
 #   ./db-tunnel.sh --container api   # Use the api container specifically
 #   ./db-tunnel.sh --local-port 5434 # Use a different local port
+#
+# The RDS host comes from RDS_HOST in the environment, or else from the
+# DATABASE_URL in apps/backend/.env.aws.staging (gitignored).
 
 set -euo pipefail
 
 # --- Configuration (change these if infra changes) ---
 CLUSTER="app-staging-ecs-cluster"
-RDS_HOST="app-staging-rds-postgres.cb4sy4ym62k1.us-east-1.rds.amazonaws.com"
-RDS_PORT="5432"
+RDS_HOST="${RDS_HOST:-}"
+RDS_PORT="${RDS_PORT:-5432}"
+STAGING_ENV_FILE="$(cd "$(dirname "$0")/../../apps/backend" && pwd)/.env.aws.staging"
 LOCAL_PORT="5433"
 PREFERRED_CONTAINER="worker"  # worker or api — either works as a jump host
 
@@ -48,6 +52,16 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# --- Resolve the RDS host ---
+if [[ -z "$RDS_HOST" && -f "$STAGING_ENV_FILE" ]]; then
+  STAGING_DB_URL=$(grep -E '^DATABASE_URL=' "$STAGING_ENV_FILE" | head -1 | cut -d= -f2-)
+  RDS_HOST=$(DB_URL="$STAGING_DB_URL" python3 -c "import os, urllib.parse as u; print(u.urlsplit(os.environ['DB_URL'].strip('\"')).hostname or '')")
+fi
+if [[ -z "$RDS_HOST" ]]; then
+  echo "ERROR: RDS host unknown. Set RDS_HOST, or put DATABASE_URL in $STAGING_ENV_FILE."
+  exit 1
+fi
 
 # --- Fetch running tasks ---
 echo "Finding running ECS tasks in ${CLUSTER}..."
