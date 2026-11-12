@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CursorList } from '@app/shared-types';
 import { api } from '@appshore/web-core/shared/lib/api';
 import { useCursorList } from '@appshore/web-core/shared/list';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@app/ui/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +16,8 @@ import {
   AlertDialogTitle,
 } from '@app/ui/components/ui/alert-dialog';
 import { showSuccess, showError } from '@app/ui';
-import { ListFooter } from '@/shared/components/page-chrome';
+import { ListFilterRow, StatusPivot, type StatusPivotSegment } from '@/shared/components/page-chrome';
+import { TENANT_STATUS_VARIANTS } from '../constants';
 import { TenantTable } from './tenant-table';
 import { RejectTenantDialog } from './reject-tenant-dialog';
 import { SuspendTenantDialog } from './suspend-tenant-dialog';
@@ -63,27 +63,15 @@ function useTenantsByStatus(status: TenantStatusTab) {
   });
 }
 
-/** The server's total for the tab, once the first page is in. */
-const tabCount = (list: ReturnType<typeof useTenantsByStatus>) => (list.isLoading ? '' : `(${list.total})`);
-
-function TenantListFooter({ list }: { list: ReturnType<typeof useTenantsByStatus> }) {
-  if (list.items.length === 0) return null;
-  return (
-    <ListFooter
-      shown={list.items.length}
-      total={list.total}
-      hasMore={list.hasMore}
-      onLoadMore={list.loadMore}
-      isLoadingMore={list.isLoadingMore}
-      loadMoreFailed={list.isLoadMoreError}
-    />
-  );
-}
+/** The four lifecycle states, each a server-filtered list; the pivot shows each one's server total. */
+const STATUS_SEGMENTS: StatusPivotSegment<TenantStatusTab>[] = (
+  ['PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'REJECTED'] as const
+).map((value) => ({ value, label: TENANT_STATUS_VARIANTS[value].label }));
 
 export function TenantManagementTabs() {
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState<TenantStatusTab>('PENDING_APPROVAL');
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; tenant?: Tenant }>({
     open: false,
   });
@@ -103,6 +91,11 @@ export function TenantManagementTabs() {
   const active = useTenantsByStatus('ACTIVE');
   const suspended = useTenantsByStatus('SUSPENDED');
   const rejected = useTenantsByStatus('REJECTED');
+  const lists = { PENDING_APPROVAL: pending, ACTIVE: active, SUSPENDED: suspended, REJECTED: rejected };
+  const counts: Partial<Record<TenantStatusTab, number>> = {};
+  for (const [status, list] of Object.entries(lists) as [TenantStatusTab, typeof pending][]) {
+    if (!list.isLoading) counts[status] = list.total;
+  }
 
   const approveMutation = useMutation({
     mutationFn: (tenantId: string) => api.post(`/tenants/${tenantId}/approve`),
@@ -175,58 +168,28 @@ export function TenantManagementTabs() {
 
   return (
     <>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="pending">Pending {tabCount(pending)}</TabsTrigger>
-          <TabsTrigger value="active">Active {tabCount(active)}</TabsTrigger>
-          <TabsTrigger value="suspended">Suspended {tabCount(suspended)}</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected {tabCount(rejected)}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="pending">
-          <TenantTable
-            tenants={pending.items}
-            status="PENDING_APPROVAL"
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onViewDetails={handleViewDetails}
-            isLoading={pending.isLoading}
-          />
-          <TenantListFooter list={pending} />
-        </TabsContent>
-
-        <TabsContent value="active">
-          <TenantTable
-            tenants={active.items}
-            status="ACTIVE"
-            onSuspend={handleSuspend}
-            onViewDetails={handleViewDetails}
-            isLoading={active.isLoading}
-          />
-          <TenantListFooter list={active} />
-        </TabsContent>
-
-        <TabsContent value="suspended">
-          <TenantTable
-            tenants={suspended.items}
-            status="SUSPENDED"
-            onReactivate={handleReactivate}
-            onViewDetails={handleViewDetails}
-            isLoading={suspended.isLoading}
-          />
-          <TenantListFooter list={suspended} />
-        </TabsContent>
-
-        <TabsContent value="rejected">
-          <TenantTable
-            tenants={rejected.items}
-            status="REJECTED"
-            onViewDetails={handleViewDetails}
-            isLoading={rejected.isLoading}
-          />
-          <TenantListFooter list={rejected} />
-        </TabsContent>
-      </Tabs>
+      <div className="space-y-4">
+        <ListFilterRow
+          pivot={
+            <StatusPivot
+              label="Tenant status"
+              segments={STATUS_SEGMENTS}
+              value={activeTab}
+              onChange={setActiveTab}
+              counts={counts}
+            />
+          }
+        />
+        <TenantTable
+          list={lists[activeTab]}
+          status={activeTab}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onSuspend={handleSuspend}
+          onReactivate={handleReactivate}
+          onViewDetails={handleViewDetails}
+        />
+      </div>
 
       {/* Dialogs */}
       {rejectDialog.tenant && (

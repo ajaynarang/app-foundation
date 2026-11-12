@@ -10,7 +10,7 @@ jest.mock('@appshore/web-core/shared/lib/api', () => ({
   apiClient: jest.fn(),
   api: { get: jest.fn(), post: jest.fn() },
 }));
-jest.mock('@app/ui', () => ({ showSuccess: jest.fn(), showError: jest.fn() }));
+jest.mock('@app/ui', () => ({ ...jest.requireActual('@app/ui'), showSuccess: jest.fn(), showError: jest.fn() }));
 jest.mock('@/shared/providers/PreferencesProvider', () => ({
   useFormatters: () => ({ formatDateTime: (value: string) => value }),
 }));
@@ -61,9 +61,9 @@ describe('Admin › Tenants', () => {
     renderTabs();
 
     expect(await screen.findByText('Acme')).toBeTruthy();
-    // The count is the server's total, not the rows loaded so far.
-    expect(screen.getByRole('tab', { name: 'Pending (3)' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Active (7)' })).toBeTruthy();
+    // The status pivot counts each status by the server's total, not the rows loaded so far.
+    expect(screen.getByRole('tab', { name: /^Pending approval\s*3$/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: /^Active\s*7$/ })).toBeTruthy();
     expect(screen.getByText('Showing 1 of 3')).toBeTruthy();
   });
 
@@ -84,5 +84,18 @@ describe('Admin › Tenants', () => {
     expect(screen.getByText('Acme')).toBeTruthy();
     expect(screen.getByText('Showing 2 of 2')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+  });
+
+  it('a failed fetch reads as an error with Retry, never as an empty tab', async () => {
+    get.mockImplementation((path: string) =>
+      path.startsWith('/tenants?status=PENDING_APPROVAL')
+        ? Promise.reject(new Error('boom'))
+        : Promise.resolve(page([])),
+    );
+    renderTabs();
+
+    expect(await screen.findByText("Couldn't load pending approval tenants.")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByText('No pending approval tenants')).toBeNull();
   });
 });

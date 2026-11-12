@@ -1,6 +1,7 @@
 'use client';
 
 import { TenantManagementTabs } from '@/features/platform/admin';
+import { PageHeader } from '@/shared/components/page-chrome';
 
 /**
  * Super-admin tenant management — registrations, lifecycle, billing, and
@@ -9,10 +10,7 @@ import { TenantManagementTabs } from '@/features/platform/admin';
 export default function SuperAdminTenantsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Tenant Management</h1>
-        <p className="text-muted-foreground mt-1">Manage tenant registrations and lifecycle across all statuses</p>
-      </div>
+      <PageHeader title="Tenants" subtitle="Every account, sign-ups waiting on you first" />
       <TenantManagementTabs />
     </div>
   );
