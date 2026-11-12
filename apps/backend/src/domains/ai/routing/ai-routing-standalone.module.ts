@@ -6,6 +6,7 @@ import { CacheModule } from '../../../platform-glue/cache/cache.module';
 
 import { AiRouteResolver } from './ai-route-resolver.service';
 import { CredentialCryptoService } from './credential-crypto.service';
+import { TenantSubKeyReader } from './provisioning/tenant-sub-key.reader';
 
 /** The event bus of a command-line process; see `AiRoutingStandaloneModule`. */
 export const COMMAND_EVENT_BUS = {
@@ -33,7 +34,12 @@ export const COMMAND_EVENT_BUS = {
  */
 @Module({
   imports: [PrismaModule, CacheModule],
-  providers: [AiRouteResolver, CredentialCryptoService, { provide: DomainEventService, useValue: COMMAND_EVENT_BUS }],
+  providers: [
+    AiRouteResolver,
+    CredentialCryptoService,
+    TenantSubKeyReader,
+    { provide: DomainEventService, useValue: COMMAND_EVENT_BUS },
+  ],
   exports: [AiRouteResolver, DomainEventService],
 })
 export class AiRoutingStandaloneModule {}

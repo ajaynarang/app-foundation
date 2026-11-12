@@ -10,6 +10,7 @@ import { InAppNotificationsModule } from '../../notifications/notifications.modu
 import { AI_CREDIT_REFUSAL_SINK, AiRouteResolver } from './ai-route-resolver.service';
 import { AiCredentialRefusalRecorder } from './ai-credential-refusal.recorder';
 import { CredentialCryptoService } from './credential-crypto.service';
+import { TenantSubKeyReader } from './provisioning/tenant-sub-key.reader';
 
 /**
  * AI routing: the route resolver. Everything that talks to a model imports this module; there is no other way to
@@ -28,6 +29,7 @@ import { CredentialCryptoService } from './credential-crypto.service';
   providers: [
     AiRouteResolver,
     CredentialCryptoService,
+    TenantSubKeyReader,
     AiCredentialRefusalRecorder,
     { provide: AI_CREDIT_REFUSAL_SINK, useExisting: AiCredentialRefusalRecorder },
   ],

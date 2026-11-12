@@ -7,6 +7,7 @@ import { DomainEventService } from '@appshore/kernel/infrastructure/events/domai
 import { AiRouteResolver } from '../ai-route-resolver.service';
 import { AiRoutingModule } from '../ai-routing.module';
 import { CredentialCryptoService } from '../credential-crypto.service';
+import { TenantSubKeyReader } from '../provisioning/tenant-sub-key.reader';
 import { TEST_CREDENTIALS_KEY } from './resolver-fixtures';
 
 describe('AiRoutingModule', () => {
@@ -36,6 +37,7 @@ describe('AiRoutingModule', () => {
       providers: [
         AiRouteResolver,
         CredentialCryptoService,
+        TenantSubKeyReader,
         { provide: PrismaService, useValue: {} },
         { provide: AppCacheService, useValue: {} },
         { provide: DomainEventService, useValue: {} },

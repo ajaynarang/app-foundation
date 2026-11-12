@@ -1,3 +1,4 @@
+import { TenantSubKeyReader } from '../../provisioning/tenant-sub-key.reader';
 import {
   BadRequestException,
   ConflictException,
@@ -116,7 +117,14 @@ function makeHarness(opts: HarnessOptions = {}) {
   });
   const crypto = new CredentialCryptoService(config);
   const events = { emit: jest.fn().mockResolvedValue(undefined) };
-  const resolver = new AiRouteResolver(prisma, cache, events as never, config, crypto);
+  const resolver = new AiRouteResolver(
+    prisma,
+    cache,
+    events as never,
+    config,
+    crypto,
+    new TenantSubKeyReader(prisma, crypto),
+  );
   jest.spyOn(resolver, 'evictCredential');
 
   const service = new AiCredentialConnectService(

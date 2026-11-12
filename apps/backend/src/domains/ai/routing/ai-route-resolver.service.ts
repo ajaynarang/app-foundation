@@ -15,6 +15,7 @@ import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.const
 import { AiNotConfigured } from './ai-not-configured.error';
 import { AiCredentialFailing } from './ai-credential-failing.error';
 import { CredentialCryptoService } from './credential-crypto.service';
+import { TenantSubKeyReader, type TenantSubKey } from './provisioning/tenant-sub-key.reader';
 import { ZeroRetentionUnavailable } from '../infrastructure/redaction/zero-retention-unavailable.error';
 import { MODEL_CATALOG } from './model-catalog';
 import { tunedLanguageModel } from './model-tuning.middleware';
@@ -104,6 +105,11 @@ function isProductionEnvType(): boolean {
  * `platform-bedrock` (both needs, zero retention) once the operator sets its region. A credential the retention
  * policy rules out is inert, treated as absent. So a zero-retention workspace is served by its own Bedrock role, else
  * its attested Anthropic key (language only), else `platform-bedrock`, else refused.
+ *
+ * On `platform-openrouter` a workspace with a provisioned OpenRouter sub-key (`TenantSubKeyReader`) is called with that
+ * key instead of the master one: same route id, same payer (the platform), but OpenRouter enforces the workspace's
+ * monthly cap at its edge. Such a workspace gets its own cached bundle. No sub-key, or one that cannot be read, means
+ * the master key; that never fails a resolve.
  */
 @Injectable()
 export class AiRouteResolver {
@@ -120,6 +126,7 @@ export class AiRouteResolver {
     private readonly events: DomainEventService,
     private readonly config: ConfigService,
     private readonly credentialCrypto: CredentialCryptoService,
+    private readonly subKeyReader: TenantSubKeyReader,
     @Optional() @Inject(AI_CREDIT_REFUSAL_SINK) private readonly refusalSink?: CreditRefusalSink,
   ) {}
 
@@ -161,9 +168,14 @@ export class AiRouteResolver {
     const config = this.platformConfig();
     const platformServing = PLATFORM_ROUTES.filter((r) => r.serves.includes(need) && r.isConfigured(config));
     const platformCompatible = platformServing.filter((r) => policy === 'STANDARD' || r.retention === 'ZDR');
+    // `platform-openrouter` rides the workspace's own sub-key when one is provisioned. Read only when that route is in
+    // the pool, so an embedding call or a zero-retention workspace never touches the table.
+    const subKey = platformCompatible.some((r) => r.routeId === 'platform-openrouter')
+      ? await this.subKeyReader.getSubKey(tenantId)
+      : null;
     return {
       payer: 'PLATFORM',
-      candidates: platformCompatible.map((r) => this.platformCandidate(r, config)),
+      candidates: platformCompatible.map((r) => this.platformCandidate(r, config, tenantId, subKey)),
       hadRetentionInert: servingNeed.length > compatible.length || platformServing.length > platformCompatible.length,
     };
   }
@@ -290,7 +302,26 @@ export class AiRouteResolver {
     }
   }
 
-  private platformCandidate(route: PlatformRoute, config: PlatformRouteConfig): Candidate {
+  private platformCandidate(
+    route: PlatformRoute,
+    config: PlatformRouteConfig,
+    tenantId?: number,
+    subKey?: TenantSubKey | null,
+  ): Candidate {
+    if (route.routeId === 'platform-openrouter' && tenantId !== undefined && subKey) {
+      return {
+        routeId: route.routeId,
+        credentialType: route.credentialType,
+        payer: 'PLATFORM',
+        retention: route.retention,
+        promptCache: route.promptCache,
+        // A bundle per workspace: the key is the workspace's. The row's `updatedAt` keys a replaced key to a miss, and
+        // the prefix evicts the superseded bundle so the old key does not stay in memory.
+        cacheKey: `platform:${route.routeId}:${tenantId}:${subKey.updatedAtMs}`,
+        evictPrefix: `platform:${route.routeId}:${tenantId}:`,
+        build: () => route.buildProvider({ ...config, openRouterApiKey: subKey.apiKey }),
+      };
+    }
     return {
       routeId: route.routeId,
       credentialType: route.credentialType,

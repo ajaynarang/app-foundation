@@ -3,6 +3,7 @@ import { AiCredentialStatus, AiCredentialType } from '@appshore/db';
 import { AiRouteResolver, type CreditRefusalSink } from '../ai-route-resolver.service';
 import { CredentialCryptoService } from '../credential-crypto.service';
 import type { PlatformRouteConfig } from '../route-registry';
+import { SUB_KEY_BINDING_ID, TenantSubKeyReader } from '../provisioning/tenant-sub-key.reader';
 
 export const TENANT = 7;
 /** A valid `AI_CREDENTIALS_KEY` (64 hex characters). */
@@ -15,11 +16,17 @@ export interface ResolverFixtureOptions {
   /** The workspace's credential rows, as Postgres returns them (already ordered by priority). */
   credentials?: Record<string, unknown>[];
   refusalSink?: CreditRefusalSink;
+  /** The workspace's OpenRouter sub-key row, as Postgres returns it (`subKeyRow()` builds a real envelope). */
+  subKeyRow?: Record<string, unknown> | null;
 }
 
 export interface ResolverFixture {
   resolver: AiRouteResolver;
-  prisma: { tenant: { findUnique: jest.Mock }; aiCredential: { findMany: jest.Mock } };
+  prisma: {
+    tenant: { findUnique: jest.Mock };
+    aiCredential: { findMany: jest.Mock };
+    tenantAiSubKey: { findUnique: jest.Mock };
+  };
   cache: { getOrSet: jest.Mock };
   events: { emit: jest.Mock };
 }
@@ -29,16 +36,19 @@ export function makeResolver(opts: ResolverFixtureOptions = {}): ResolverFixture
   const prisma = {
     tenant: { findUnique: jest.fn().mockResolvedValue({ aiZeroRetention: opts.aiZeroRetention ?? false }) },
     aiCredential: { findMany: jest.fn().mockResolvedValue(opts.credentials ?? []) },
+    tenantAiSubKey: { findUnique: jest.fn().mockResolvedValue(opts.subKeyRow ?? null) },
   };
   const cache = { getOrSet: jest.fn((_key: string, fn: () => unknown) => fn()) };
   const events = { emit: jest.fn().mockResolvedValue(undefined) };
   const config = new ConfigService({ ...(opts.config ?? {}) });
+  const crypto = new CredentialCryptoService(config);
   const resolver = new AiRouteResolver(
     prisma as never,
     cache as never,
     events as never,
     config,
-    new CredentialCryptoService(config),
+    crypto,
+    new TenantSubKeyReader(prisma as never, crypto),
     opts.refusalSink,
   );
   return { resolver, prisma, cache, events };
@@ -71,4 +81,14 @@ export function credentialRow(overrides: Record<string, unknown> = {}): Record<s
     ...rest,
     publicId,
   };
+}
+
+/**
+ * A sub-key row whose key is genuinely GCM-encrypted for (tenantId, `subkey_openrouter`) under `TEST_CREDENTIALS_KEY`,
+ * so the reader's decrypt runs the real crypto.
+ */
+export function subKeyRow(apiKey: string, updatedAt = new Date('2026-11-12T00:00:00Z'), tenantId = TENANT) {
+  const crypto = new CredentialCryptoService(new ConfigService({ aiCredentialsKey: TEST_CREDENTIALS_KEY }));
+  const { ciphertext, keyVersion } = crypto.encrypt(apiKey, { tenantId, credentialPublicId: SUB_KEY_BINDING_ID });
+  return { tenantId, encryptedKey: ciphertext, keyVersion, keyHash: 'orhash-test', limitUsd: '200', updatedAt };
 }
