@@ -583,7 +583,7 @@ model IntegrationConfig {
 
   // Plaintext QB realm ID for fast webhook routing (not sensitive)
   /// Vendor account / workspace identifier (e.g. a QuickBooks realm, a Xero org).
-  realmId String? @map("realm_id") @db.VarChar(30)
+  realmId String? @map("realm_id") @db.VarChar(100)
 
   // Sync settings
   syncIntervalSeconds Int? @map("sync_interval_seconds")
