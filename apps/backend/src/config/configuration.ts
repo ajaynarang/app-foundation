@@ -34,6 +34,9 @@ export const DEV_OAUTH_ISSUER_DEFAULT = 'http://localhost:8000';
 
 const MIN_SECRET_LENGTH = 32;
 
+/** AI variables the route resolver replaced. Still set, each earns a boot warning; never read. */
+export const RETIRED_AI_ENV_VARS = ['AI_PROVIDER', 'AI_GATEWAY_API_KEY', 'ANTHROPIC_API_KEY'] as const;
+
 const configSchema = z.object({
   environment: z.enum(['development', 'production', 'test']).default('development'),
   databaseUrl: z.string(),
@@ -66,8 +69,6 @@ const configSchema = z.object({
     bcryptRounds: z.number().default(10),
   }),
 
-  anthropicApiKey: z.string().optional(),
-
   // Platform AI routes (`domains/ai/routing/route-registry.ts`). Each is optional: a route is off until its key is
   // set, and a keyless machine boots with AI answering "not configured".
   /** Enables `platform-openrouter`, the platform's default language route. */
@@ -76,6 +77,12 @@ const configSchema = z.object({
   cohereApiKey: z.string().optional(),
   /** External moderation only (OpenAI `omni-moderation-latest`); never a language or embedding route. */
   openaiApiKey: z.string().optional(),
+  /**
+   * Names (never values) of retired AI variables that are still set: `AI_PROVIDER`, `AI_GATEWAY_API_KEY`, and
+   * `ANTHROPIC_API_KEY`, which is no longer a platform route (a developer connects it in Settings as a workspace
+   * credential). Nothing reads them; the routing module logs one boot warning per name so an operator removes them.
+   */
+  retiredAiEnvVars: z.array(z.string()).default([]),
 
   // Encrypts third-party integration credentials at rest (AES-256).
   credentialsEncryptionKey: z
@@ -340,7 +347,7 @@ export default (): Configuration => {
         (process.env.TENANCY_MODE as 'multi' | 'single' | 'personal') ||
         (process.env.MULTI_TENANT === 'false' ? 'single' : 'multi'),
     },
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    retiredAiEnvVars: RETIRED_AI_ENV_VARS.filter((name) => env(name) !== undefined),
     openRouterApiKey: env('OPENROUTER_API_KEY'),
     cohereApiKey: env('COHERE_API_KEY'),
     openaiApiKey: env('OPENAI_API_KEY'),

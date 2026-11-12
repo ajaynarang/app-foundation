@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
@@ -29,7 +29,26 @@ describe('AiRoutingModule', () => {
   it('logs the platform routes once at boot', () => {
     const resolver = { logPlatformRoutes: jest.fn() } as unknown as AiRouteResolver;
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
-    new AiRoutingModule(resolver).onApplicationBootstrap();
+    new AiRoutingModule(resolver, new ConfigService({})).onApplicationBootstrap();
     expect(resolver.logPlatformRoutes).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns once at boot for each retired AI variable still set, naming it and never its value', () => {
+    const resolver = { logPlatformRoutes: jest.fn() } as unknown as AiRouteResolver;
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const config = new ConfigService({ retiredAiEnvVars: ['AI_PROVIDER', 'ANTHROPIC_API_KEY'] });
+
+    new AiRoutingModule(resolver, config).onApplicationBootstrap();
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0][0]).toContain('AI_PROVIDER');
+    expect(warn.mock.calls[1][0]).toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('warns about nothing when no retired variable is set', () => {
+    const resolver = { logPlatformRoutes: jest.fn() } as unknown as AiRouteResolver;
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    new AiRoutingModule(resolver, new ConfigService({ retiredAiEnvVars: [] })).onApplicationBootstrap();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

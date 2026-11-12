@@ -412,6 +412,23 @@ describe('configuration — production boot guard', () => {
       expect(config.cohereApiKey).toBe('co-test');
       expect(config.openaiApiKey).toBe('sk-openai-test');
     });
+
+    it('names the retired AI variables still set, and carries none of their values', () => {
+      const config = load({
+        ...dev,
+        AI_PROVIDER: 'anthropic',
+        AI_GATEWAY_API_KEY: 'vck-test',
+        ANTHROPIC_API_KEY: 'sk-ant-test',
+      });
+      expect(config.retiredAiEnvVars).toEqual(['AI_PROVIDER', 'AI_GATEWAY_API_KEY', 'ANTHROPIC_API_KEY']);
+      expect(JSON.stringify(config)).not.toMatch(/vck-test|sk-ant-test/);
+      expect(config).not.toHaveProperty('anthropicApiKey');
+    });
+
+    it('lists no retired variable when none is set (a blank one counts as unset)', () => {
+      const config = load({ ...dev, AI_PROVIDER: undefined, AI_GATEWAY_API_KEY: '', ANTHROPIC_API_KEY: undefined });
+      expect(config.retiredAiEnvVars).toEqual([]);
+    });
   });
 
   it('the development credentials key is 32 bytes of hex, the bytes the cipher used before the key moved into config', () => {
