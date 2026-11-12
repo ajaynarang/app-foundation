@@ -8,6 +8,7 @@ import type { UserRole } from '@appshore/web-core/shared/lib/navigation';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { useAuthStore } from '@/features/auth';
 import { helpTopicsFor } from '@/features/platform/support/help-topics';
+import { PageHeader, PageSection } from '@/shared/components/page-chrome';
 
 export default function SupportPage() {
   const role = useAuthStore((s) => s.user?.role) as UserRole | undefined;
@@ -15,15 +16,12 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Support</h1>
-        <p className="text-sm text-muted-foreground mt-1">We&apos;re here when you need us</p>
-      </div>
+      <PageHeader title="Support" subtitle="We're here when you need us" />
 
       {/* Contact support */}
       <div className="rounded-lg border border-border bg-card p-5 flex items-center justify-between max-w-lg">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Need a hand?</h2>
+          <h3 className="text-sm font-semibold text-foreground">Need a hand?</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Email our support team and we&apos;ll get back to you.</p>
         </div>
         <a href={mailto('support', 'Support request')}>
@@ -36,8 +34,7 @@ export default function SupportPage() {
 
       {/* Help Center — only tiles this role can open; hidden when there are none */}
       {topics.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-foreground">Help Center</h2>
+        <PageSection title="Help Center">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {topics.map((topic) => {
               const Icon = topic.icon;
@@ -56,7 +53,7 @@ export default function SupportPage() {
               );
             })}
           </div>
-        </section>
+        </PageSection>
       )}
     </div>
   );

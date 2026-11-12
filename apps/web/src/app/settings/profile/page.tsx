@@ -18,21 +18,8 @@ import { showSuccess, showError } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
-
-function formatRelativeTime(
-  isoString: string,
-  formatTimestamp: (isoString: string | null | undefined, fmt?: string) => string,
-): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return formatTimestamp(isoString, DISPLAY_FORMATS.FRIENDLY);
-}
+import { PageHeader, RelativeTime } from '@/shared/components/page-chrome';
+import { roleLabel } from '@/features/platform/settings/constants';
 
 function IdentityCard() {
   const { user, setUser } = useAuthStore();
@@ -112,7 +99,7 @@ function EmailCard() {
                   </>
                 ) : (
                   <>
-                    <AlertCircle className="h-3 w-3 mr-1 text-caution" />
+                    <AlertCircle className="h-3 w-3 mr-1 text-caution-text" />
                     Unverified
                   </>
                 )}
@@ -234,7 +221,7 @@ function PhoneCard() {
                       </>
                     ) : (
                       <>
-                        <AlertCircle className="h-3 w-3 mr-1 text-caution" />
+                        <AlertCircle className="h-3 w-3 mr-1 text-caution-text" />
                         Unverified
                       </>
                     )}
@@ -340,13 +327,6 @@ function AccountCard() {
   if (user?.email) loginMethods.push('Email');
   if (user?.phone && user?.phoneVerified) loginMethods.push('Phone');
 
-  const roleLabel: Record<string, string> = {
-    OWNER: 'Owner',
-    ADMIN: 'Admin',
-    MEMBER: 'Member',
-    SUPER_ADMIN: 'Super Admin',
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -358,7 +338,7 @@ function AccountCard() {
           <div className="flex items-center justify-between">
             <dt className="text-muted-foreground">Role</dt>
             <dd>
-              <Badge variant="muted">{roleLabel[user?.role ?? ''] ?? user?.role}</Badge>
+              <Badge variant="outline">{roleLabel(user?.role)}</Badge>
             </dd>
           </div>
           {user?.tenantName && (
@@ -383,7 +363,9 @@ function AccountCard() {
           {user?.lastLoginAt && (
             <div className="flex items-center justify-between">
               <dt className="text-muted-foreground">Last login</dt>
-              <dd className="text-foreground">{formatRelativeTime(user.lastLoginAt, formatTimestamp)}</dd>
+              <dd className="text-foreground">
+                <RelativeTime iso={user.lastLoginAt} />
+              </dd>
             </div>
           )}
         </dl>
@@ -395,10 +377,7 @@ function AccountCard() {
 export default function ProfileSettingsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Profile</h2>
-        <p className="text-sm text-muted-foreground mt-1">Your identity and login methods</p>
-      </div>
+      <PageHeader title="Profile" subtitle="Your identity and login methods" />
       <IdentityCard />
       <EmailCard />
       <PhoneCard />

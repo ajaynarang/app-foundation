@@ -11,7 +11,10 @@ jest.mock('@appshore/web-core/shared/lib/api', () => ({
   api: { get: jest.fn(), post: jest.fn() },
 }));
 jest.mock('@appshore/web-core/shared/lib/toast', () => ({ showSuccess: jest.fn(), showError: jest.fn() }));
-jest.mock('@app/ui', () => ({ showSuccess: jest.fn(), showError: jest.fn() }));
+jest.mock('@app/ui', () => ({ ...jest.requireActual('@app/ui'), showSuccess: jest.fn(), showError: jest.fn() }));
+jest.mock('@/shared/providers/PreferencesProvider', () => ({
+  useFormatters: () => ({ formatDate: (value: string) => value }),
+}));
 
 const request = apiClient as jest.Mock;
 const get = api.get as jest.Mock;
@@ -39,6 +42,11 @@ const page = (items: unknown[], nextCursor: string | null = null, total = items.
   total,
 });
 
+/** Opens a row's ⋯ menu: the row's secondary actions live there (RowActions). */
+function openRowMenu() {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'More actions' }), { key: 'ArrowDown' });
+}
+
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
@@ -62,7 +70,9 @@ describe('Settings › Invitations', () => {
     request.mockResolvedValue({ inviteLink: 'https://app.example.com/accept-invitation?token=t' });
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }));
+    await screen.findByRole('button', { name: /^Resend/ });
+    openRowMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Copy the invitation link/ }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://app.example.com/accept-invitation?token=t'));
     expect(request).toHaveBeenCalledWith(`/invitations/${PENDING.invitationId}/link`);
@@ -72,18 +82,24 @@ describe('Settings › Invitations', () => {
     get.mockResolvedValue(page([EXPIRED]));
     renderPage();
 
-    await screen.findByRole('button', { name: 'Resend' });
-    expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
+    await screen.findByRole('button', { name: /^Resend/ });
+    // An expired row has Resend only: no ⋯ menu, so no Copy link and no Cancel.
+    expect(screen.queryByRole('button', { name: 'More actions' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Copy the invitation link/ })).toBeNull();
   });
 
-  it('resends and cancels by the public id, not the numeric row id', async () => {
+  it('resends and cancels by the public id, not the numeric row id; cancelling asks first', async () => {
     get.mockResolvedValue(page([PENDING]));
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Resend' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Resend/ }));
     await waitFor(() => expect(post).toHaveBeenCalledWith(`/invitations/${PENDING.invitationId}/resend`));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    openRowMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Cancel the invitation/ }));
+    // Nothing is cancelled until the confirm dialog says so.
+    expect(request).not.toHaveBeenCalledWith(`/invitations/${PENDING.invitationId}`, expect.anything());
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel invitation' }));
     await waitFor(() =>
       expect(request).toHaveBeenCalledWith(
         `/invitations/${PENDING.invitationId}`,
@@ -105,5 +121,14 @@ describe('Settings › Invitations', () => {
     await screen.findByText('Showing 2 of 2');
     expect(get.mock.calls[1][0]).toBe('/invitations?status=PENDING%2CEXPIRED&cursor=next-page');
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+  });
+
+  it('a failed fetch reads as an error with Retry, never as "no pending invitations"', async () => {
+    get.mockRejectedValue(new Error('boom'));
+    renderPage();
+
+    expect(await screen.findByText("Couldn't load your invitations.")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    expect(screen.queryByText('No pending invitations')).toBeNull();
   });
 });
