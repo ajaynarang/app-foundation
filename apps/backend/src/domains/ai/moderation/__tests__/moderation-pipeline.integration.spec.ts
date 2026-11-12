@@ -25,6 +25,7 @@ jest.mock('redact-pii', () => ({
 import { ModerationService } from '../moderation.service';
 import { ContentModerationService } from '../content-moderation.service';
 import { GuardrailsService } from '../guardrails.service';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
 
 /**
  * Moderation Pipeline Integration Tests
@@ -57,7 +58,7 @@ describe('Moderation Pipeline Integration', () => {
     jest.spyOn(guardrails, 'checkLeakage').mockResolvedValue({ flagged: false });
     // redactPii uses the mocked SyncRedactor from module-level mock
 
-    service = new ModerationService(contentModeration, guardrails);
+    service = new ModerationService(contentModeration, guardrails, makeResolver().resolver);
   });
 
   describe('clean input', () => {

@@ -6,6 +6,7 @@ jest.mock('@mastra/memory', () => ({ Memory: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   jsonSchema: jest.fn(),
   customProvider: jest.fn(),
   createGateway: jest.fn(),
@@ -19,7 +20,35 @@ jest.mock('@rekog/mcp-nest', () => ({
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
 import { AbstractBaseAgent, CHAT_STEP_MAX_OUTPUT_TOKENS } from '../base.agent';
-import { AgentDefinition } from '../agent.types';
+import { AgentContext, AgentDefinition } from '../agent.types';
+import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
+import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
+const CTX: AgentContext = {
+  userMode: 'member',
+  tenantId: 1,
+  userId: 'user_1',
+  userDbId: 1,
+  conversationId: 'conv_1',
+  inputMode: 'text',
+};
+
+/** A Mastra agent whose stream yields `parts` and reports `usage` once drained. */
+function streamingAgent(parts: string[], usage: Record<string, number> = {}) {
+  const read = jest.fn();
+  for (const value of parts) read.mockResolvedValueOnce({ done: false, value });
+  read.mockResolvedValueOnce({ done: true, value: undefined });
+  return {
+    getInstructions: jest.fn().mockResolvedValue('Base instructions'),
+    stream: jest.fn().mockResolvedValue({
+      textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+      suspendPayload: undefined,
+      usage: Promise.resolve(usage),
+    }),
+  };
+}
 
 class TestAgent extends AbstractBaseAgent {
   readonly definition: AgentDefinition = {
@@ -56,7 +85,75 @@ describe('AbstractBaseAgent', () => {
       record: jest.fn().mockResolvedValue({ id: 'inv-chat' }),
     };
 
-    agent = new TestAgent(mockSkillLoader, mockMcpToolService, mockMastraProvider, mockAiTelemetry);
+    agent = new TestAgent(
+      mockSkillLoader,
+      mockMcpToolService,
+      mockMastraProvider,
+      mockAiTelemetry,
+      makeResolver({ config: OPENROUTER }).resolver,
+    );
+  });
+
+  describe('routing', () => {
+    it("hands the agent the tenant's resolved model for its alias through the request context", async () => {
+      const mockAgent = streamingAgent(['hi']);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+
+      const requestContext = mockAgent.stream.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
+
+    it('records the turn against the route that served it', async () => {
+      const mockAgent = streamingAgent(['hi'], { inputTokens: 12, outputTokens: 3 });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockAiTelemetry.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openrouter',
+          model: 'anthropic/claude-sonnet-5.5',
+          routeId: 'platform-openrouter',
+          credentialType: 'PLATFORM_OPENROUTER',
+          promptTokens: 12,
+          completionTokens: 3,
+        }),
+        expect.objectContaining({ tenantId: 1, surface: 'CHAT' }),
+      );
+    });
+
+    it('refuses a zero-retention tenant before anything streams: the message never reaches a retaining route', async () => {
+      agent = new TestAgent(
+        mockSkillLoader,
+        mockMcpToolService,
+        mockMastraProvider,
+        mockAiTelemetry,
+        makeResolver({ aiZeroRetention: true, config: OPENROUTER }).resolver,
+      );
+      const mockAgent = streamingAgent(['hi']);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      await expect(agent.chat('Private message', CTX).next()).rejects.toThrow(ZeroRetentionUnavailable);
+      expect(mockAgent.stream).not.toHaveBeenCalled();
+      expect(mockAiTelemetry.record).not.toHaveBeenCalled();
+    });
+
+    it("hands a delegated execute the tenant's resolved model too", async () => {
+      const mockAgent = { generate: jest.fn().mockResolvedValue({ text: 'ok' }) };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      await agent.execute('summarize', {}, CTX);
+
+      const requestContext = mockAgent.generate.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
   });
 
   it('exposes definition properties', () => {

@@ -8,6 +8,7 @@ jest.mock('@mastra/core/agent', () => ({
   Agent: jest.fn().mockImplementation((config: any) => ({
     id: config.id,
     name: config.name,
+    model: config.model,
   })),
 }));
 jest.mock('@mastra/pg', () => ({
@@ -24,11 +25,12 @@ jest.mock('@mastra/observability', () => ({
 jest.mock('@mastra/langfuse', () => ({
   LangfuseExporter: jest.fn().mockImplementation(() => ({})),
 }));
-jest.mock('../../../infrastructure/providers/ai-provider', () => ({
-  ai: jest.fn().mockReturnValue('mock-model'),
-}));
 
+import { InternalServerErrorException } from '@nestjs/common';
+import { RequestContext } from '@mastra/core/request-context';
+import { Agent } from '@mastra/core/agent';
 import { MastraProvider } from '../mastra.provider';
+import { REQUEST_MODEL_KEY } from '../../../routing/request-model-key';
 
 describe('MastraProvider', () => {
   let provider: MastraProvider;
@@ -79,6 +81,33 @@ describe('MastraProvider', () => {
       const providerWithLF = new MastraProvider();
       await providerWithLF.onModuleInit();
       expect(providerWithLF.getMastra()).toBeDefined();
+    });
+  });
+
+  describe('per-request model', () => {
+    /** The `model` each registered agent was constructed with. */
+    function registeredModels(): Array<(arg: { requestContext: RequestContext }) => unknown> {
+      return (Agent as unknown as jest.Mock).mock.calls.map(([config]) => config.model);
+    }
+
+    beforeEach(() => (Agent as unknown as jest.Mock).mockClear());
+
+    it('gives every agent the model the call site resolved for the tenant, never a default provider', async () => {
+      await provider.onModuleInit();
+      const resolved = { modelId: 'resolved-model' };
+      const models = registeredModels();
+      expect(models.length).toBeGreaterThan(0);
+      for (const model of models) {
+        expect(typeof model).toBe('function');
+        expect(model({ requestContext: new RequestContext([[REQUEST_MODEL_KEY, resolved]] as never) })).toBe(resolved);
+      }
+    });
+
+    it('fails loud when an agent is invoked without a resolved model', async () => {
+      await provider.onModuleInit();
+      for (const model of registeredModels()) {
+        expect(() => model({ requestContext: new RequestContext() })).toThrow(InternalServerErrorException);
+      }
     });
   });
 });

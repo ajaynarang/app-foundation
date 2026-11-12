@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import { ContentModerationService } from './content-moderation.service';
 import { GuardrailsService } from './guardrails.service';
 import { ModerationService } from './moderation.service';
+import { AiRoutingModule } from '../routing/ai-routing.module';
 
 /** The external moderation client, or null when `OPENAI_API_KEY` (zod `openaiApiKey`) is unset: moderation is off. */
 export function openAiModerationClient(config: ConfigService): OpenAI | null {
@@ -24,6 +25,7 @@ const ContentModerationProvider = {
 };
 
 @Module({
+  imports: [AiRoutingModule],
   providers: [OpenAIProvider, ContentModerationProvider, GuardrailsService, ModerationService],
   exports: [ModerationService],
 })

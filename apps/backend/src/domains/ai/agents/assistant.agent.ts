@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
+import { AiRouteResolver } from '../routing/ai-route-resolver.service';
 import { PromptingService } from '../../prompting';
 import { AgentDefinition } from './agent.types';
 import { AbstractBaseAgent } from './base.agent';
@@ -31,7 +32,8 @@ export class AssistantAgent extends AbstractBaseAgent {
     mcpToolService: McpToolService,
     mastraProvider: MastraProvider,
     aiTelemetry: AiTelemetryService,
+    aiRouteResolver: AiRouteResolver,
   ) {
-    super(skillLoader, mcpToolService, mastraProvider, aiTelemetry);
+    super(skillLoader, mcpToolService, mastraProvider, aiTelemetry, aiRouteResolver);
   }
 }

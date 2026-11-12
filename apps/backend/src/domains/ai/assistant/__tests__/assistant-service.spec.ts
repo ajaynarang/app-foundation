@@ -9,6 +9,7 @@ jest.mock('@mastra/core/tools', () => ({ createTool: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   jsonSchema: jest.fn(),
   customProvider: jest.fn(),
   createGateway: jest.fn(),
@@ -32,6 +33,12 @@ import { PromptingService } from '../../../prompting';
 import { AssistantRouterService } from '../../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../../agents/agent.registry';
 import { AiTelemetryService } from '../../infrastructure/telemetry/ai-telemetry.service';
+import { AiRouteResolver } from '../../routing/ai-route-resolver.service';
+import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 
 describe('AssistantAiService', () => {
   let service: AssistantAiService;
@@ -42,6 +49,20 @@ describe('AssistantAiService', () => {
   let mockPromptService: any;
   let mockAssistantRouter: any;
   let mockAgentRegistry: any;
+  let mockTelemetry: { assertBudget: jest.Mock };
+
+  const buildService = (resolver: AiRouteResolver) =>
+    new AssistantAiService(
+      mockPrisma,
+      mockMcpTools,
+      mockMastra,
+      mockModeration,
+      mockPromptService,
+      mockAssistantRouter,
+      mockAgentRegistry,
+      mockTelemetry as unknown as AiTelemetryService,
+      resolver,
+    );
 
   beforeEach(() => {
     mockPrisma = {
@@ -116,16 +137,8 @@ describe('AssistantAiService', () => {
       getAll: jest.fn().mockReturnValue([]),
     };
 
-    service = new AssistantAiService(
-      mockPrisma,
-      mockMcpTools,
-      mockMastra,
-      mockModeration,
-      mockPromptService,
-      mockAssistantRouter,
-      mockAgentRegistry,
-      { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
-    );
+    mockTelemetry = { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) };
+    service = buildService(makeResolver({ config: OPENROUTER }).resolver);
   });
 
   describe('createConversation', () => {
@@ -246,6 +259,45 @@ describe('AssistantAiService', () => {
       expect(mockAgentRegistry.get).toHaveBeenCalledWith('assistant');
       expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
       expect(chunks.some((c) => c.type === 'complete')).toBe(true);
+    });
+
+    it('refuses a zero-retention tenant before the agent runs or the budget is read', async () => {
+      service = buildService(makeResolver({ aiZeroRetention: true, config: OPENROUTER }).resolver);
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+      });
+
+      await expect(async () => {
+        for await (const _chunk of service.generateResponse('conv_test', 'Private', 'text', 'user_1', 1)) {
+          // drain
+        }
+      }).rejects.toThrow(ZeroRetentionUnavailable);
+
+      expect(mockAgentRegistry.get).not.toHaveBeenCalled();
+      expect(mockTelemetry.assertBudget).not.toHaveBeenCalled();
+    });
+
+    it('skips external moderation for a zero-retention tenant (tells the moderator the tenant)', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+      });
+      mockModeration.moderate.mockResolvedValue({ blocked: true, events: [] });
+
+      for await (const _chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1)) {
+        // drain
+      }
+
+      expect(mockModeration.moderate).toHaveBeenCalledWith('hello', 'input', 'member', 1);
     });
 
     it('yields followups when agent response contains them', async () => {
@@ -472,6 +524,36 @@ describe('AssistantAiService', () => {
     });
   });
 
+  describe('streamMessage — routing errors before the first byte', () => {
+    it('answers a routing refusal with its own status and code, not a 500', async () => {
+      service = buildService(makeResolver().resolver); // no platform key: nothing serves language
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+      });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
+      const mockRes = {
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(503);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
+  });
+
   describe('listConversations', () => {
     it('returns formatted conversation list', async () => {
       mockPrisma.conversation.findMany.mockResolvedValue([
@@ -573,6 +655,36 @@ describe('AssistantAiService', () => {
       expect(mockRes.status).toHaveBeenCalled();
     });
 
+    it("resumes on the tenant's resolved model, passed through the request context", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Test',
+      });
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      const resumeStream = jest.fn().mockRejectedValue(new Error('stop here'));
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' } as any;
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
+
+      const requestContext = resumeStream.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
+
     it('handles resume error gracefully', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
       mockPrisma.conversation.findUnique.mockResolvedValue({
@@ -584,6 +696,7 @@ describe('AssistantAiService', () => {
         title: 'Test',
       });
 
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
       mockMastra.getMastra.mockReturnValue({
         getAgent: jest.fn().mockReturnValue({
           resumeStream: jest.fn().mockRejectedValue(new Error('Resume failed')),

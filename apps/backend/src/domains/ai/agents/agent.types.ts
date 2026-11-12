@@ -51,6 +51,8 @@ export interface AssistantAgentContract {
   readonly id: AgentId;
   readonly displayName: string;
   readonly mastraAgentId: string;
+  /** The alias the agent runs on; its model comes from the tenant's route per request. */
+  readonly modelAlias: AgentDefinition['modelAlias'];
   readonly domainSkills: string[];
   readonly taskSkills: string[];
   readonly personas: UserMode[];

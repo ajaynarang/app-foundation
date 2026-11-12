@@ -115,6 +115,7 @@ describe('AssistantAiService', () => {
       mockAssistantRouter,
       mockAgentRegistry,
       { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
+      { resolve: jest.fn() } as never,
     );
   });
 

@@ -1,4 +1,5 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { RequestContext } from '@mastra/core/request-context';
 import { writeErrorEnvelope } from '@appshore/platform/shared/filters/error-envelope';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
@@ -11,6 +12,8 @@ import { AgentRegistry } from '../agents/agent.registry';
 import { CHAT_STEP_MAX_OUTPUT_TOKENS } from '../agents/base.agent';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
+import { AiRouteResolver } from '../routing/ai-route-resolver.service';
+import { REQUEST_MODEL_KEY } from '../routing/request-model-key';
 import { UserMode } from '../agents/agent.types';
 import type { Request, Response } from 'express';
 import { pipeAgentResponse } from './utils/pipe-agent-response';
@@ -34,7 +37,16 @@ export class AssistantAiService {
     private readonly assistantRouter: AssistantRouterService,
     private readonly agentRegistry: AgentRegistry,
     private readonly aiTelemetry: AiTelemetryService,
+    private readonly aiRouteResolver: AiRouteResolver,
   ) {}
+
+  /**
+   * A typed refusal (a routing error such as `AiNotConfigured` or `ZeroRetentionUnavailable`, a 404) keeps its own
+   * status and body; anything else is answered with `fallback`, so no internal message leaves.
+   */
+  private static asHttpError(error: unknown, fallback: string): HttpException {
+    return error instanceof HttpException ? error : new InternalServerErrorException(fallback);
+  }
 
   private async getUserDbId(userId: string): Promise<number> {
     const user = await this.prisma.user.findUnique({
@@ -191,7 +203,7 @@ export class AssistantAiService {
     // never applied as migrations, so it was silently throwing on every
     // call. Deleted in favour of Langfuse as the single LLM audit surface.
     try {
-      const inputResult = await this.moderationService.moderate(content, 'input', conversation.userMode);
+      const inputResult = await this.moderationService.moderate(content, 'input', conversation.userMode, tenantId);
 
       if (inputResult.blocked) {
         const blockedText = "I'm not able to help with that. Could you rephrase your question?";
@@ -211,7 +223,12 @@ export class AssistantAiService {
       this.logger.warn('Input moderation failed — allowing message through (fail-open)', moderationError);
     }
 
-    // 4b. AI cost budget — block chat if the tenant is over its hard cap.
+    // 4b. Resolve the tenant's language route before anything streams. Retention and configuration refusals
+    // (ZeroRetentionUnavailable, AiNotConfigured) surface here as clean typed errors, which the HTTP route answers
+    // as an error envelope; nothing reaches a provider.
+    await this.aiRouteResolver.resolve(tenantId, 'language');
+
+    // 4c. AI cost budget — block chat if the tenant is over its hard cap.
     // assertBudget fails open (allows on its own infra error), so this only
     // throws on a genuine hard breach. We answer assistant-style rather than
     // surfacing a raw 402 mid-stream, and persist it like the moderation
@@ -406,8 +423,9 @@ export class AssistantAiService {
       }
     } catch (error) {
       this.logger.error(`AI streaming error for conversation ${conversationId}`, error);
-      // Before the first chunk the answer is the error envelope. After it the headers are out and nothing is written.
-      writeErrorEnvelope(res, req, new InternalServerErrorException('AI streaming failed'));
+      // Before the first chunk the answer is the error envelope (a routing refusal keeps its own status and code).
+      // After it the headers are out and nothing is written.
+      writeErrorEnvelope(res, req, AssistantAiService.asHttpError(error, 'AI streaming failed'));
     }
 
     res.end();
@@ -439,6 +457,10 @@ export class AssistantAiService {
     const agent = this.mastra.getMastra().getAgent(agentId);
 
     try {
+      // Agents take their model per request: the resumed turn runs on the tenant's route like the original did.
+      const route = await this.aiRouteResolver.resolve(tenantId, 'language');
+      const modelAlias = this.agentRegistry.get(agentId).modelAlias;
+      const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageModel(modelAlias)]]);
       const response = await agent.resumeStream(
         { confirmed },
         {
@@ -450,6 +472,7 @@ export class AssistantAiService {
           ...(toolCallId && { toolCallId }),
           ...(runId && { runId }),
           modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
+          requestContext,
         },
       );
 
@@ -465,7 +488,7 @@ export class AssistantAiService {
       });
     } catch (error) {
       this.logger.error(`Resume error for conversation ${conversationId}`, error);
-      writeErrorEnvelope(res, req, new InternalServerErrorException('Resume failed'));
+      writeErrorEnvelope(res, req, AssistantAiService.asHttpError(error, 'Resume failed'));
     }
   }
 

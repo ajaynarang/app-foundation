@@ -1,11 +1,13 @@
 import { Logger } from '@nestjs/common';
 import { AiInvocationStatus, AiSurface } from '@appshore/db';
+import { RequestContext } from '@mastra/core/request-context';
 
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
-import { LANGUAGE_PROVIDER_LABEL } from '../infrastructure/providers/ai-provider';
-import { ledgerModelIdFor } from '../routing/model-catalog';
+import { AiRouteResolver } from '../routing/ai-route-resolver.service';
+import { REQUEST_MODEL_KEY } from '../routing/request-model-key';
+import type { ResolvedRoute } from '../routing/routing.types';
 import { OUTPUT_CEILINGS } from '../routing/output-ceilings';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
@@ -40,6 +42,9 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
   get mastraAgentId() {
     return this.definition.mastraAgentId;
   }
+  get modelAlias() {
+    return this.definition.modelAlias;
+  }
   get domainSkills() {
     return this.definition.domainSkills;
   }
@@ -55,8 +60,19 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     protected readonly mcpToolService: McpToolService,
     protected readonly mastraProvider: MastraProvider,
     protected readonly aiTelemetry: AiTelemetryService,
+    protected readonly aiRouteResolver: AiRouteResolver,
   ) {
     this.logger = new Logger(this.constructor.name);
+  }
+
+  /**
+   * The tenant's route and the request context that hands its model to the Mastra agent. Resolved before anything
+   * streams, so a retention or configuration refusal is a clean typed error, never a mid-stream failure.
+   */
+  private async resolveModel(tenantId: number) {
+    const route = await this.aiRouteResolver.resolve(tenantId, 'language');
+    const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageModel(this.definition.modelAlias)]]);
+    return { route, requestContext };
   }
 
   /**
@@ -70,6 +86,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
    * losing the cost entirely. Recording never throws into the chat path.
    */
   async *chat(message: string, ctx: AgentContext): AsyncGenerator<ChatChunk> {
+    const { route, requestContext } = await this.resolveModel(ctx.tenantId);
     const agent = this.mastraProvider.getMastra().getAgent(this.mastraAgentId);
     const cardAccumulator = new CardAccumulator();
     const toolsets = await this.mcpToolService.getToolsetsForPersona(
@@ -105,6 +122,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
       },
       maxSteps: this.definition.maxToolSteps,
       modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
+      requestContext,
       tracingOptions: { metadata: { sessionId, userId }, tags },
     });
 
@@ -118,7 +136,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
       // Record cost telemetry whether the stream finished or the client
       // disconnected mid-way. Fire-and-forget; never blocks or throws into
       // the chat path.
-      void this.recordChatUsage(response, ctx, Date.now() - startedAt, streamErrored);
+      void this.recordChatUsage(response, ctx, Date.now() - startedAt, streamErrored, route);
     }
 
     if (cardAccumulator.card) {
@@ -186,8 +204,8 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
 
   /**
    * Record one AiInvocation for a chat turn from the drained stream's usage.
-   * The chat agents are registered with their definition.modelAlias in
-   * MastraProvider, so we attribute cost to that tier. Usage is read
+   * The turn ran on `route` with the agent's `definition.modelAlias`, so cost
+   * is attributed to that route and that alias's id on it. Usage is read
    * defensively (await the promise, tolerate missing keys / mid-stream
    * disconnect). Never throws into the chat path.
    */
@@ -196,6 +214,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     ctx: AgentContext,
     latencyMs: number,
     streamErrored: boolean,
+    route: ResolvedRoute,
   ): Promise<void> {
     try {
       const usage = (await Promise.resolve(response?.usage).catch(() => undefined)) as
@@ -210,8 +229,10 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
       const alias = this.definition.modelAlias;
       await this.aiTelemetry.record(
         {
-          provider: LANGUAGE_PROVIDER_LABEL,
-          model: ledgerModelIdFor(alias, undefined),
+          provider: route.providerLabel,
+          model: route.ledgerModelIdFor(alias),
+          routeId: route.routeId,
+          credentialType: route.credentialType,
           promptTokens,
           completionTokens,
           totalTokens: promptTokens + completionTokens,
@@ -239,6 +260,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
    * Returns structured result, not a stream.
    */
   async execute(action: string, params: Record<string, unknown>, ctx: AgentContext): Promise<AgentResult> {
+    const { requestContext } = await this.resolveModel(ctx.tenantId);
     const agent = this.mastraProvider.getMastra().getAgent(this.mastraAgentId);
 
     const skillContent = await this.skillLoader.getSkill(action);
@@ -270,6 +292,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
         toolsets,
         maxSteps: 3,
         modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
+        requestContext,
         tracingOptions: { metadata: { sessionId, userId }, tags },
       },
     );
