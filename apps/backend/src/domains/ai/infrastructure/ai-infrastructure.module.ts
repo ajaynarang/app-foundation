@@ -16,9 +16,9 @@ import { AiRoutingModule } from '../routing/ai-routing.module';
  * workflow-shaped (non-agent) structured extraction — document parsing, desk
  * memory extract, and similar non-chat surfaces.
  *
- * EmbeddingService wraps AI SDK `embed` + `embedMany` for 1536-dim vectors
- * via the AI gateway. Shared by knowledge-base RAG and desk-memory semantic
- * retrieval.
+ * EmbeddingService wraps AI SDK `embed` + `embedMany` for 1536-dim vectors on
+ * the tenant's resolved embedding route (Cohere Embed v4). Shared by
+ * knowledge-base RAG and desk-memory semantic retrieval.
  *
  * AiTelemetryModule provides `AiTelemetryService`, the single write path
  * for the `ai_invocations` cost ledger. PR 2-4 of the AI Cost Telemetry
