@@ -12,9 +12,12 @@ import { toOutboxRow } from '@appshore/platform/infrastructure/events/outbox-row
  * this one holds the parts only a database can — a rollback really leaves no row, and the relay's raw claim
  * (`FOR UPDATE SKIP LOCKED` with a lease) and purge SQL run against the migrated table.
  *
- * Skipped only when there is no usable database (unreachable, login refused, no such database, not migrated).
+ * Skipped when DATABASE_URL is unset or names no usable database (unreachable, login refused, no such database, not
+ * migrated).
  */
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
+// No default: the purge case deletes every published row past retention in the database it is given, so it runs
+// only against a database someone named.
+const DATABASE_URL = process.env.DATABASE_URL;
 
 const NO_DATABASE_CODES = new Set([
   'ECONNREFUSED',
@@ -47,6 +50,10 @@ describe('outbox on a real database', () => {
   } as unknown as DomainEventService;
 
   beforeAll(async () => {
+    if (!DATABASE_URL) {
+      console.warn('outbox.integration: DATABASE_URL is unset — skipping');
+      return;
+    }
     try {
       pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 });
       prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
