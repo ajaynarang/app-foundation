@@ -23,7 +23,7 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AssistantAiService } from '../assistant.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { McpToolService } from '../../mcp/mcp-tool.service';
@@ -86,6 +86,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_test',
           userMode: 'member',
           title: null,
+          isActive: true,
           createdAt: new Date('2026-01-01'),
           messages: [
             {
@@ -193,6 +194,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
     });
 
@@ -210,6 +212,7 @@ describe('AssistantAiService', () => {
         tenantId: 99,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
       const gen = service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1);
       await expect(gen.next()).rejects.toThrow(NotFoundException);
@@ -289,6 +292,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing',
+        isActive: true,
       });
 
       await expect(async () => {
@@ -393,6 +397,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing',
+        isActive: true,
       });
       mockModeration.moderate.mockResolvedValue({ blocked: true, events: [] });
 
@@ -533,6 +538,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing Title',
+        isActive: true,
       });
 
       mockModeration.moderate.mockResolvedValue({
@@ -580,6 +586,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
 
       // Block at moderation to keep it simple
@@ -637,6 +644,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing',
+        isActive: true,
       });
       const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
@@ -665,6 +673,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing',
+        isActive: true,
       });
       const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
@@ -708,6 +717,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_1',
           userMode: 'member',
           title: 'Test Chat',
+          isActive: true,
           _count: { messages: 5 },
           messages: [{ createdAt: new Date('2026-01-01') }],
           createdAt: new Date('2026-01-01'),
@@ -726,6 +736,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_empty',
           userMode: 'member',
           title: null,
+          isActive: true,
           _count: { messages: 0 },
           messages: [],
           createdAt: new Date('2026-02-15'),
@@ -746,6 +757,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
         messages: [
           {
             messageId: 'msg_1',
@@ -811,6 +823,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
       });
       mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
       const resumeStream = jest.fn().mockRejectedValue(new Error('stop here'));
@@ -841,6 +854,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
       });
       mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
       const textStream = new ReadableStream<string>({
@@ -882,6 +896,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
       });
 
       mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
@@ -964,6 +979,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
       mockPrisma.tenant = {
         findUnique: jest.fn().mockResolvedValue({ companyName: 'Acme Inc' }),
@@ -1236,6 +1252,47 @@ describe('AssistantAiService', () => {
 
         await expect(service.archiveConversation('conv_test', 'user_1', 1)).resolves.toBeUndefined();
         expect(mockOutbox.transaction).not.toHaveBeenCalled();
+      });
+
+      it('refuses a message into an archived conversation with a 409, storing nothing', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+
+        const error = await service
+          .generateResponse('conv_test', 'hi', 'text', 'user_1', 1)
+          .next()
+          .then(
+            () => undefined,
+            (e: unknown) => e,
+          );
+
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as ConflictException).getResponse()).toMatchObject({ code: 'INVALID_STATE' });
+        expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+        expect(mockPrisma.conversation.update).not.toHaveBeenCalled();
+      });
+
+      it('the streaming route answers that refusal as the 409 envelope', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+        const res = streamingRes();
+
+        await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, code: 'INVALID_STATE' }));
+        expect(res.write).not.toHaveBeenCalled();
+      });
+
+      it('refuses to resume a confirmation in an archived conversation with a 409, before the agent runs', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+        const getAgent = jest.fn();
+        mockMastra.getMastra.mockReturnValue({ getAgent });
+        const res = streamingRes();
+
+        await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, streamReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'INVALID_STATE' }));
+        expect(getAgent).not.toHaveBeenCalled();
       });
     });
 

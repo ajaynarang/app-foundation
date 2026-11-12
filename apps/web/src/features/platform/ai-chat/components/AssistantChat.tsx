@@ -152,7 +152,15 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden space-y-1"
                     >
-                      <AssistantHistory onOpen={(id) => void viewConversation(id)} activeId={sessionId} />
+                      <AssistantHistory
+                        onOpen={(id) => void viewConversation(id)}
+                        activeId={sessionId}
+                        // The open conversation was archived: it takes no new turn, so start a fresh one.
+                        onActiveRemoved={() => {
+                          clearSession();
+                          expandStrip();
+                        }}
+                      />
                     </motion.div>
                   )}
                 </AnimatePresence>

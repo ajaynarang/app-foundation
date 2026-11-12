@@ -8,6 +8,7 @@ import {
   type Citation,
 } from '@app/shared-types';
 import { writeErrorEnvelope } from '@appshore/platform/shared/filters/error-envelope';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
@@ -94,7 +95,7 @@ export class AssistantAiService {
   }
 
   /**
-   * Validate that the conversation exists and belongs to the given user/tenant.
+   * Validate that the conversation exists, belongs to the given user/tenant and is not archived.
    * Returns the conversation record or sends an error JSON response.
    */
   private async validateConversationOwnership(
@@ -112,10 +113,8 @@ export class AssistantAiService {
     try {
       const userDbId = await this.getUserDbId(userId);
 
-      return ownedConversation(
-        await this.prisma.conversation.findUnique({ where: { conversationId } }),
-        userDbId,
-        tenantId,
+      return activeConversation(
+        ownedConversation(await this.prisma.conversation.findUnique({ where: { conversationId } }), userDbId, tenantId),
       );
     } catch (error) {
       // This route writes its own response, so the global filter never sees the throw: answer with the same
@@ -213,12 +212,10 @@ export class AssistantAiService {
     userId: string,
     tenantId: number,
   ): AsyncGenerator<ChatChunk> {
-    // 1. Validate conversation ownership (throws on failure)
+    // 1. Validate conversation ownership, and that it is not archived (throws on failure)
     const userDbId = await this.getUserDbId(userId);
-    const conversation = ownedConversation(
-      await this.prisma.conversation.findUnique({ where: { conversationId } }),
-      userDbId,
-      tenantId,
+    const conversation = activeConversation(
+      ownedConversation(await this.prisma.conversation.findUnique({ where: { conversationId } }), userDbId, tenantId),
     );
 
     // 2. Store user message
@@ -694,6 +691,18 @@ export function ownedConversation<T extends { userId: number | null; tenantId: n
 ): T {
   if (!conversation || conversation.userId !== userDbId || conversation.tenantId !== tenantId) {
     throw new NotFoundException('This conversation was not found');
+  }
+  return conversation;
+}
+
+/**
+ * The conversation, if it is still active. An archived one (removed from history by its owner, or by the rolling cap)
+ * takes no new turn: a send or a resume answers a 409 `INVALID_STATE`, so the turn never lands in a conversation the
+ * person can no longer see. The web starts a new conversation when the open one is removed.
+ */
+export function activeConversation<T extends { isActive: boolean }>(conversation: T): T {
+  if (!conversation.isActive) {
+    throw invalidState('This conversation was removed from your history. Start a new conversation to keep chatting.');
   }
   return conversation;
 }

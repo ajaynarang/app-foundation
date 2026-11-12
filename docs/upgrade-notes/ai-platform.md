@@ -522,7 +522,9 @@ follows the Bedrock sheet), tests one again or removes one. An admin sees it all
   the stream now ends with one `x:` frame carrying the same `code` and `detail` the envelope would, and the web
   shows the partial answer and then the reason. Before this change a failure after the first byte wrote nothing,
   and a provider error in the middle of an answer was logged and the turn ended as if complete: it now raises and
-  ends with `x:`, and the partial answer is not stored as a message.
+  ends with `x:`, and the partial answer is not stored as a message. That holds on resume too, including a
+  provider error Mastra records on `response.error` instead of throwing, and a credit refusal there keeps
+  `AI_BUDGET_EXCEEDED`.
 - AI refusal codes. `AiNotConfigured`, `AiCredentialFailing`, `ZeroRetentionUnavailable` and the budget errors
   (including a provider credit refusal) now carry their own `code` on the envelope and the `x:` frame:
   `AI_NOT_CONFIGURED`, `AI_CREDENTIAL_FAILING`, `ZERO_RETENTION_UNAVAILABLE`, `AI_BUDGET_EXCEEDED` (constants in
@@ -542,7 +544,9 @@ href? }`; knowledge-base documents have no page in the web app, so theirs carry 
   creating another. After a new conversation is created, every active one past the newest 30 is archived. A missing
   conversation, another person's and another workspace's all answer the same 404 (`This conversation was not
 found`). A new event, `CONVERSATION_ARCHIVED` (`app.conversation.archived`, internal), records each archive with
-  the reason `user` or `cap`.
+  the reason `user` or `cap`. An archived conversation takes no new turn: a message or a resume into it answers 409
+  `INVALID_STATE` (re-activating it on send was rejected: it would silently undo the archive and the cap). Reading its
+  messages still works. The web starts a new conversation when the open one is removed.
 - The web shows a "Reading …" line while a source is read, a Sources list under an answer that named any, and a
   searchable history (grouped by recency, each conversation removable after a confirmation) in place of the five
   "Recent" rows.
@@ -554,6 +558,8 @@ found`). A new event, `CONVERSATION_ARCHIVED` (`app.conversation.archived`, inte
 
 - Anyone with more than 30 active conversations: the oldest are archived on their next new chat. They leave history;
   nothing is deleted.
+- A client that keeps an archived conversation open (a second tab, after the cap archived it) gets a 409 on its next
+  message and starts a new conversation.
 - A client that branched on the envelope `code` of an AI refusal sees the new AI codes. A client that read only
   `detail` (the web app does) sees no change.
 - An older web build against this backend shows the partial answer without the reason (it ignores `x:`, `c:` and
