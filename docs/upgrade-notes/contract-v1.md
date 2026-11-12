@@ -321,3 +321,28 @@ row.
 **What to do.** Read `items` and pass `nextCursor` back as `?cursor=` until it is `null`. Show `total` rather than
 counting loaded rows. Address broadcasts and feedback by the id the list now returns. The web app's own callers
 moved in the same change (`useCursorList` and `ListFooter`).
+
+## 7. The published OpenAPI document
+
+**What changed.** The OpenAPI document is generated from the code and committed: `apps/backend/openapi.json` (every
+route) and `apps/backend/public-openapi.json` (what an outside developer can call). Every route now documents its
+success body, at the status it really answers.
+
+| Route or body                                                  | Before                                                                                                                                    | Now                                                                                                                                            |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/openapi.json` in production                          | the full document, admin routes included, to anyone                                                                                       | the public subset: the MCP and OAuth protocol routes and the OAuth discovery documents (and any route a product opens to API keys)             |
+| `GET /api/openapi.json` on a local run                         | the full document                                                                                                                         | the full document, the same as the committed `openapi.json` apart from `servers`                                                               |
+| `/dev/*` routes                                                | listed in the document                                                                                                                    | left out (`@ApiExcludeController`); the routes themselves are unchanged                                                                        |
+| `POST /invitations`, `POST /invitations/:invitation_id/resend` | the stored invitation row: its acceptance `token`, its Int `id`, `tenantId`, `invitedBy`, and on create the whole tenant and inviter rows | the public invitation, as `GET /invitations` lists it (`invitationId`, `invitedBy: { userId, email, firstName, lastName }`), plus `inviteLink` |
+| `POST /integrations/:integration_id/sync` (202)                | `jobId` was the job's Int primary key                                                                                                     | `jobId` is the job's public id (a uuid), the same id the sync-history rows carry                                                               |
+
+`Deprecation`, `Sunset` and `Link` are now exposed through CORS. No route sends them yet: they appear on a v1 route
+once a v2 successor ships (`@DeprecatedRoute`).
+
+**Who notices.** A tool that read the admin routes from a deployed `/api/openapi.json`; a client that read `token`,
+`id` or `tenant` from an invitation create or resend; a client that polled a sync job by the number `jobId` held.
+
+**What to do.** Read the full contract from the committed `apps/backend/openapi.json` (or from a local run). Take the
+acceptance link from `inviteLink`; address an invitation by `invitationId`. Treat a sync `jobId` as an opaque string.
+After changing a route in your product, run `pnpm --filter @app/backend openapi:generate` and commit both files:
+`swagger-completeness.spec.ts` fails on any drift and names that command.

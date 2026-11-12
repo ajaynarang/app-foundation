@@ -166,6 +166,8 @@ export class ProjectsModule {}
 ## 2. Controller Patterns
 
 ```typescript
+const PROJECT_ID_PARAM = { name: 'project_id', description: 'Project public id (prj_…)' } as const;
+
 @ApiTags('Projects')
 @ApiBearerAuth()
 @Controller('projects')
@@ -180,6 +182,7 @@ export class ProjectsController extends BaseTenantController {
   @Get()
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'List projects' })
+  @ApiResult(ProjectListResponse)
   async list(@CurrentUser() user: any, @Query() query: ProjectListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.projectsService.findAll(tenantDbId, { status: query.status });
@@ -188,7 +191,8 @@ export class ProjectsController extends BaseTenantController {
   @Get(':project_id')
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Get project by ID' })
-  @ApiParam({ name: 'project_id' })
+  @ApiParam(PROJECT_ID_PARAM)
+  @ApiResult(ProjectResponse)
   async getOne(@Param('project_id') projectId: string, @CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.projectsService.findOne(projectId, tenantDbId);
@@ -198,6 +202,7 @@ export class ProjectsController extends BaseTenantController {
   @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Create project' })
+  @ApiResult(ProjectResponse, HttpStatus.CREATED)
   async create(@CurrentUser() user: any, @Body() dto: CreateProjectDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.projectsService.create(tenantDbId, dto);
@@ -207,7 +212,8 @@ export class ProjectsController extends BaseTenantController {
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Archive a project' })
-  @ApiParam({ name: 'project_id' })
+  @ApiParam(PROJECT_ID_PARAM)
+  @ApiResult(ProjectResponse)
   async archive(@Param('project_id') projectId: string, @CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.projectsService.archive(projectId, tenantDbId); // the project as it is now
@@ -217,7 +223,8 @@ export class ProjectsController extends BaseTenantController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Delete a project' })
-  @ApiParam({ name: 'project_id' })
+  @ApiParam(PROJECT_ID_PARAM)
+  @ApiNoContentResponse({ description: 'Deleted' })
   async remove(@Param('project_id') projectId: string, @CurrentUser() user: any): Promise<void> {
     const tenantDbId = await this.getTenantDbId(user);
     await this.projectsService.remove(projectId, tenantDbId);
@@ -229,8 +236,9 @@ export class ProjectsController extends BaseTenantController {
 
 - `@Roles(...)` — RBAC (use the `UserRole` enum from `@appshore/db`: `OWNER`, `ADMIN`, `MEMBER`, `SUPER_ADMIN`)
 - `@HttpCode(...)` — on every POST and every DELETE (section 2.3)
-- `@ApiOperation({ summary: '...' })` — Swagger docs
-- `@ApiParam(...)` — on any `:param` endpoint
+- `@ApiOperation({ summary: '...' })`: what the route does, in one line (section 2.4)
+- `@ApiParam({ name, description })`: on any `:param` endpoint, with a description
+- `@ApiResult(<response schema>, <status>)` or `@ApiNoContentResponse()`: the success body (section 2.4)
 - `@RequireFeature('feature_key')` — if behind a feature flag
 
 **`BaseTenantController` utilities** (`@appshore/platform`, `shared/base/base-tenant.controller.ts`):
@@ -303,12 +311,69 @@ or an OAuth token (`ApiKeyAuthGuard`, `OAuthTokenGuard`) also carries `AgentRate
 with `@UseFilters(BearerChallengeFilter)`, so a 401 tells the client where to authenticate.
 
 **The ratchet.** `apps/backend/src/architecture/api-contract.spec.ts` holds these rules (`status/*`, `naming/*`,
-`edge/*`, `input/*`, `errors/*`) and runs on every push: the starter's own routes pass all of them, so any
-violation is new and fails. It also carries the rules the starter's routes do not pass yet (`output/*`, `docs/*`):
-today's violations of those are frozen in `api-contract.baseline.json`, which can only shrink. New code may not add to it.
-After fixing a baselined violation run `UPDATE_API_BASELINE=1 pnpm --filter @app/backend exec jest
-src/architecture/api-contract`. Run `pnpm verify:api` before a pull request that changes the wire: it boots the
-backend and runs the Playwright `api` project against it.
+`edge/*`, `input/*`, `errors/*`, `output/*`, `docs/*`) and runs on every push. The starter's own routes pass all of
+them: `api-contract.baseline.json` ships as `{}`, and a test holds it empty, so any violation is new and fails. Fix
+the route; never add a baseline entry. (A product that adopts a rule before its code follows it removes the
+empty-baseline test in a reviewed diff; its baseline then only shrinks, through `UPDATE_API_BASELINE=1 pnpm --filter
+@app/backend exec jest src/architecture/api-contract`.) Run `pnpm verify:api` before a pull request that changes the
+wire: it boots the backend and runs the Playwright `api` project against it, the contract spec included.
+
+### 2.4 The Published Contract: OpenAPI (NON-NEGOTIABLE)
+
+The OpenAPI document is generated from the code, committed, and held to it (ADR "API contract", section 4). A
+contract change is a reviewed diff of `apps/backend/openapi.json`.
+
+- **One builder.** `apps/backend/src/bootstrap/openapi.ts` builds the document the API serves at
+  `/api/openapi.json` and the one `pnpm --filter @app/backend openapi:generate` writes. The generator boots the module
+  graph in Nest's preview mode (no port, no database, no Redis), pins the environment and sorts keys, so the file
+  changes only when the contract does. After any change to a route, a DTO or a response schema, run it and commit both
+  files (`openapi.json`, `public-openapi.json`).
+- **It refuses an incomplete document.** Every operation needs a summary (`@ApiOperation`), a described path param
+  (`@ApiParam({ name, description })`), body properties (`@ApiProperty` / `@ApiPropertyOptional` on each DTO field;
+  `PartialType` from `@nestjs/swagger`, not `@nestjs/mapped-types`), and exactly one success response at the status
+  the route answers. A route that writes its own response (`@Res()`) or is `@Public()` may skip the response schema.
+- **Response schemas are the `@app/shared-types` Zod schemas**, named once in an `openapi.responses.ts` beside the
+  controller group and referenced by name:
+
+  ```typescript
+  // openapi.responses.ts
+  export const ProjectResponse = defineResponseSchema('Project', ProjectSchema);
+  export const ProjectListResponse = defineCursorListSchema('ProjectList', ProjectListItemSchema);
+
+  // controller
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiResult(ProjectResponse, HttpStatus.CREATED)
+  ```
+
+  `ApiResult` and `defineResponseSchema` come from `@appshore/platform/shared/openapi/api-result`,
+  `defineCursorListSchema` from `common-responses`. The schema describes what the route really sends: dates as ISO
+  strings, nullable columns `.nullable()`, a numeric id only where `id-boundary.allowlist.json` lists it. A bare array
+  (`@ApiResult([X])`) is only for a reasoned `BOUNDED_LISTS` entry; every other list is a cursor list. Where no Zod
+  schema exists, a response class with `@ApiProperty` on each field works too.
+
+- **Errors are documented for you.** The builder puts the error envelope on every operation (`default`, and any 4xx
+  a route names); the OAuth protocol routes get RFC 6749's `{ error, error_description }` instead.
+- **What is served.** In production (`isProductionEnv()`, so every deployed task of the shipped image, staging
+  included) `/api/openapi.json` serves the public subset; a local run serves the full document. Never read
+  `NODE_ENV` or `ENV_TYPE` for this: call `isProductionEnv()`.
+- **The public subset is derived, never listed.** `apps/backend/src/bootstrap/public-openapi.ts` publishes a route
+  when it is `@Public()` and takes an outside credential (`ApiKeyAuthGuard`, `OAuthTokenGuard`), is metered as an
+  agent (`AgentRateLimitGuard`), or speaks an agent protocol (`BearerChallengeFilter`, `OAuthErrorFilter`). To open a
+  route to API keys, put those guards and the filter on it; it is published on the next generate. A new credential
+  guard goes in `AGENT_AUTH_GUARDS` (with its scheme) or `NON_CREDENTIAL_GUARDS` (with the reason it is not one): the
+  generator stops on a guard it cannot classify, and on a credential route without the bearer challenge.
+- **A QA or dev lever is not part of the contract**: `@ApiExcludeController()`.
+- **Retiring a v1 route.** A breaking change ships as v2 beside v1; mark the v1 route
+  `@DeprecatedRoute({ since, sunset, successor? })` (`@appshore/platform/shared/http/deprecation`). It writes
+  `Deprecation`, `Sunset` and `Link` on every response and marks the operation deprecated in the document. A sunset
+  less than 182 days after `since` throws at boot.
+
+Held by `apps/backend/src/architecture/swagger-completeness.spec.ts` (runs the generator; fails on an incomplete
+document, an unclassified route, or drift from the committed files, and names the regenerate command), the ratchet
+rules `docs/api-operation` and `docs/response-documented`, and `tests/api/contract/openapi.spec.ts` under
+`pnpm verify:api` (the served document equals the committed one, and every parameterless GET body matches its
+published schema).
 
 ---
 

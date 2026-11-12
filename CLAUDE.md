@@ -217,8 +217,13 @@ success + error toasts; every loading state shows a Skeleton.
   admin page, `ListErrorState` on every list). Dates go through `useFormatters()`: lint bans `toLocaleDateString`
   and `toLocaleTimeString`.
 - **The API contract ratchet** (`apps/backend/src/architecture/api-contract.spec.ts`) — one rule per line of the
-  ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. A violation that predates a
-  rule sits in `api-contract.baseline.json`, which can only shrink. A decision that is not debt (a route whose wire
-  format a vendor or a standard sets, a list the domain bounds) sits in `api-contract.allowlist.json` with its
+  ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. The starter passes every
+  rule: `api-contract.baseline.json` is `{}` and a test keeps it empty. A decision that is not debt (a route whose
+  wire format a vendor or a standard sets, a list the domain bounds) sits in `api-contract.allowlist.json` with its
   reason.
+- **The committed OpenAPI document** (`apps/backend/openapi.json`, `public-openapi.json`) — generated from the code
+  by `pnpm --filter @app/backend openapi:generate` and held to it by `swagger-completeness.spec.ts`, which also
+  refuses a route without a summary, a described path param or a documented success body (`@ApiResult` with a
+  response schema named in the controller group's `openapi.responses.ts`). Regenerate and commit both files with any
+  change to a route, a DTO or a response. Production serves the public subset at `/api/openapi.json`.
 - **Pre-commit hook** — Prettier on staged files.
