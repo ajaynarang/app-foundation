@@ -37,9 +37,13 @@ describe('optional features', () => {
   const kept = keptFeatures(REPO_ROOT);
   const files = textFiles(REPO_ROOT);
 
-  it('finds the Desk manifest and the template keeps Desk', () => {
+  it('finds the Desk manifest, and the template itself keeps Desk', () => {
     expect(manifests.map((m) => m.name)).toContain('desk');
-    expect(kept).toContain('desk');
+    // Split so init-app's rename leaves it alone: a scaffolded product may have said no.
+    const templateName = ['app', 'foundation'].join('-');
+    const rootName = (JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as { name: string })
+      .name;
+    if (rootName === templateName) expect(kept).toContain('desk');
   });
 
   it('every kept feature has a manifest, and every seam file is listed in index.ts', () => {
