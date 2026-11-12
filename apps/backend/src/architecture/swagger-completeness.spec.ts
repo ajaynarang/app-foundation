@@ -151,7 +151,50 @@ describe('Published OpenAPI contract', () => {
       }
     }
   });
+
+  it('a response that shows a secret once is never stored for Idempotency-Key replay', () => {
+    type Schema = { properties?: Record<string, unknown> };
+    const doc: {
+      paths: Record<string, Record<string, { parameters?: Array<{ name: string }>; responses: object }>>;
+      components: { schemas: Record<string, Schema> };
+    } = JSON.parse(readFileSync(COMMITTED, 'utf8'));
+    const secretBearing = Object.entries(doc.components.schemas)
+      .filter(([, schema]) => Object.keys(schema.properties ?? {}).some((field) => SECRET_FIELDS.includes(field)))
+      .map(([name]) => name);
+    // The detector still sees the starter's own secret-bearing bodies: a renamed field would otherwise blind it.
+    expect(secretBearing).toEqual(expect.arrayContaining(KNOWN_SECRET_BEARING_SCHEMAS));
+    const replayable = Object.entries(doc.paths).flatMap(([path, item]) =>
+      Object.entries(item)
+        .filter(([, op]) => op.parameters?.some((p) => p.name === 'Idempotency-Key'))
+        .filter(([, op]) => secretBearing.some((name) => JSON.stringify(op.responses).includes(`/${name}"`)))
+        .map(([method]) => `${method.toUpperCase()} ${path}`),
+    );
+    expect(replayable).toEqual([]); // mark each route @SkipIdempotency()
+  });
 });
+
+/** A response property that carries a secret shown once: a key, a client or signing secret, a token, a token link. */
+const SECRET_FIELDS = [
+  'key',
+  'apiKey',
+  'secret',
+  'clientSecret',
+  'signingSecret',
+  'token',
+  'accessToken',
+  'inviteLink',
+];
+
+/** The starter's bodies that show a secret once; each must still be found through {@link SECRET_FIELDS}. */
+const KNOWN_SECRET_BEARING_SCHEMAS = [
+  'ApiKeyDto',
+  'OAuthClientCreated',
+  'OAuthClientSecretRotated',
+  'WebhookSubscriptionCreated',
+  'WebhookSubscriptionWithSecret',
+  'InvitationIssued',
+  'VoiceToken',
+];
 
 /**
  * What `/api/openapi.json` serves, by environment (owner decision 6). The builder decides through

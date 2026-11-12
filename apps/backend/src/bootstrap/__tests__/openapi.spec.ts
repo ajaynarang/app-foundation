@@ -3,6 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { ApiBearerAuth, ApiNotFoundResponse, ApiOperation, ApiParam, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
+import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
+import { SkipIdempotency } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
+import { UserRole } from '@appshore/db';
 import { ApiResult, defineResponseSchema } from '@appshore/platform/shared/openapi/api-result';
 import { applyGlobalPrefix, buildOpenApiDocument, sortKeys } from '../openapi';
 
@@ -36,6 +39,23 @@ class WidgetsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'A public create' })
   open() {}
+
+  @Post('secret')
+  @HttpCode(HttpStatus.CREATED)
+  @SkipIdempotency()
+  @ApiOperation({ summary: 'Mint a secret shown once' })
+  mint() {}
+
+  @Post('platform')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'A super-admin create, outside any tenant' })
+  platformCreate() {}
+
+  @Post('queued')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Queue a widget' })
+  queue() {}
 
   @Get()
   @ApiOperation({ summary: 'List' })
@@ -77,6 +97,20 @@ describe('buildOpenApiDocument', () => {
     expect(polish.responses.default.content['application/json'].schema).toEqual(envelope);
     expect(polish.responses['404'].content['application/json'].schema).toEqual(envelope);
     expect(doc.components.schemas.ApiErrorEnvelope.properties).toHaveProperty('code');
+  });
+
+  it('documents Idempotency-Key on exactly the creates the interceptor honours', () => {
+    const header = (op: Record<string, any>) =>
+      (op.parameters ?? []).some(
+        (p: { name: string; in: string }) => p.name === 'Idempotency-Key' && p.in === 'header',
+      );
+    expect(header(doc.paths['/api/v1/widgets'].post)).toBe(true);
+    expect(header(doc.paths['/api/v1/widgets/queued'].post)).toBe(true);
+    expect(header(doc.paths['/api/v1/widgets/{widget_id}/polish'].post)).toBe(false);
+    expect(header(doc.paths['/api/v1/widgets/public'].post)).toBe(false);
+    expect(header(doc.paths['/api/v1/widgets/secret'].post)).toBe(false);
+    expect(header(doc.paths['/api/v1/widgets/platform'].post)).toBe(false);
+    expect(header(doc.paths['/api/v1/widgets'].get)).toBe(false);
   });
 
   it('names a configured server', async () => {

@@ -1,12 +1,20 @@
 import { type INestApplication, RequestMethod } from '@nestjs/common';
-import { EXCEPTION_FILTERS_METADATA } from '@nestjs/common/constants';
+import { EXCEPTION_FILTERS_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import { ApiExcludeController, DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { zodV3ToOpenAPI } from 'nestjs-zod';
 import { componentRef, responseSchemas } from '@appshore/platform/shared/openapi/api-result';
 import { ApiErrorEnvelopeResponse } from '@appshore/platform/shared/openapi/common-responses';
+import { IS_PUBLIC_KEY } from '@appshore/platform/auth/decorators/public.decorator';
+import { ROLES_KEY } from '@appshore/platform/auth/decorators/roles.decorator';
+import { idempotentCreateStatus } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENT_REPLAYED_HEADER,
+} from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 import { OAuthErrorFilter } from '@appshore/platform/domains/oauth-provider/oauth-error.filter';
 import { OAuthErrorResponse } from '@appshore/platform/domains/oauth-provider/openapi.responses';
+import { UserRole } from '@appshore/db';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { isProductionEnv } from '../config/production-guard';
@@ -53,6 +61,7 @@ const DESCRIPTION = [
   '- **Auth:** a session JWT, a personal API key (`Authorization: Bearer sk_…`) or an OAuth 2.1 access token.',
   '- **Errors:** every error is the `ApiErrorEnvelope` with a machine `code` (`VALIDATION_FAILED`, `INVALID_STATE`, `DUPLICATE`, …).',
   '- **Lists:** cursor-paged (`limit`, `cursor` → `{ items, nextCursor, total }`).',
+  `- **Retries:** a create accepts an optional \`${IDEMPOTENCY_KEY_HEADER}\`; a retry with the same key replays the first response for 24 hours (\`${IDEMPOTENT_REPLAYED_HEADER}: true\`).`,
   '- **Versioning:** additive changes ship in v1; a breaking change ships as v2 beside v1, which then carries `Deprecation` and `Sunset` headers for at least six months.',
 ].join('\n');
 
@@ -86,6 +95,7 @@ export function buildOpenApiDocument(app: INestApplication, options: OpenApiOpti
   const document = SwaggerModule.createDocument(app, config);
   addResponseSchemas(document);
   addErrorEnvelope(document, oauthProtocolOperationIds(app));
+  addIdempotencyKey(document, idempotentOperationIds(app));
   return sortKeys(document);
 }
 
@@ -176,4 +186,40 @@ function oauthProtocolOperationIds(app: INestApplication): Set<string> {
       .filter(({ controller, handler }) => [...filtersOf(controller), ...filtersOf(handler)].includes(OAuthErrorFilter))
       .map(({ operationId }) => operationId),
   );
+}
+
+/**
+ * The operation ids of every create the idempotency interceptor honours (`idempotentCreateStatus`): a POST answering
+ * 201 or 202 that is not `@Public()`, not `@SkipIdempotency()`, does not write its own response, and is not for super
+ * admins alone (they act outside any tenant, and the key is scoped per tenant).
+ */
+function idempotentOperationIds(app: INestApplication): Set<string> {
+  const ids = new Set<string>();
+  for (const { controller, handler, operationId } of documentedRoutes(app)) {
+    if (Reflect.getMetadata(IS_PUBLIC_KEY, handler) || Reflect.getMetadata(IS_PUBLIC_KEY, controller)) continue;
+    const roles: string[] | undefined =
+      Reflect.getMetadata(ROLES_KEY, handler) ?? Reflect.getMetadata(ROLES_KEY, controller);
+    if (roles?.length && roles.every((role) => role === UserRole.SUPER_ADMIN)) continue;
+    const method = RequestMethod[Reflect.getMetadata(METHOD_METADATA, handler) as number];
+    if (method && idempotentCreateStatus(method, controller, handler) !== null) ids.add(operationId);
+  }
+  return ids;
+}
+
+/** Document the optional header on exactly the operations that honour it (ADR "API contract", section 5). */
+function addIdempotencyKey(document: OpenAPIObject, ids: Set<string>): void {
+  for (const [, method, op] of operations(document)) {
+    if (method !== 'post' || !ids.has(op.operationId)) continue;
+    op.parameters = [
+      ...(op.parameters ?? []),
+      {
+        name: IDEMPOTENCY_KEY_HEADER,
+        in: 'header',
+        required: false,
+        description:
+          'Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.',
+        schema: { type: 'string', maxLength: 255 },
+      },
+    ];
+  }
 }

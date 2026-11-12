@@ -28,6 +28,7 @@ import { ApiKeyDto } from './dto/api-key.dto';
 import { TenantApiKeyListItemDto } from './dto/list-api-keys.dto';
 import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
+import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
 import { ApiKeyList, ApiKeyRotation, TenantApiKeyList } from './openapi.responses';
 
 const API_KEY_ID_PARAM = {
@@ -51,6 +52,7 @@ export class ApiKeysController extends BaseTenantController {
   // self-service endpoints must declare @Roles explicitly. (security audit SEC-21)
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @SkipIdempotency() // the plaintext key is shown once: never stored for replay
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Generate a new API key' })
   @ApiResult(ApiKeyDto, HttpStatus.CREATED, 'The new key; `key` holds the plaintext, shown only on this response')

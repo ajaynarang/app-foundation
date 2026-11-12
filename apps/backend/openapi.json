@@ -14296,7 +14296,7 @@
   },
   "info": {
     "contact": {},
-    "description": "The App API: one contract for the web app, the mobile app and agents (ADR \"API contract\").\n\n- **Auth:** a session JWT, a personal API key (`Authorization: Bearer sk_…`) or an OAuth 2.1 access token.\n- **Errors:** every error is the `ApiErrorEnvelope` with a machine `code` (`VALIDATION_FAILED`, `INVALID_STATE`, `DUPLICATE`, …).\n- **Lists:** cursor-paged (`limit`, `cursor` → `{ items, nextCursor, total }`).\n- **Versioning:** additive changes ship in v1; a breaking change ships as v2 beside v1, which then carries `Deprecation` and `Sunset` headers for at least six months.",
+    "description": "The App API: one contract for the web app, the mobile app and agents (ADR \"API contract\").\n\n- **Auth:** a session JWT, a personal API key (`Authorization: Bearer sk_…`) or an OAuth 2.1 access token.\n- **Errors:** every error is the `ApiErrorEnvelope` with a machine `code` (`VALIDATION_FAILED`, `INVALID_STATE`, `DUPLICATE`, …).\n- **Lists:** cursor-paged (`limit`, `cursor` → `{ items, nextCursor, total }`).\n- **Retries:** a create accepts an optional `Idempotency-Key`; a retry with the same key replays the first response for 24 hours (`Idempotent-Replayed: true`).\n- **Versioning:** additive changes ship in v1; a breaking change ships as v2 beside v1, which then carries `Deprecation` and `Sunset` headers for at least six months.",
     "title": "App API",
     "version": "0.1.0"
   },
@@ -19400,7 +19400,18 @@
       },
       "post": {
         "operationId": "AssistantAiController_createConversation",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -20600,7 +20611,18 @@
     "/api/v1/desk/memories/playbook": {
       "post": {
         "operationId": "DeskMemoryController_addPlaybookRule",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -21008,6 +21030,16 @@
             "name": "key",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
               "type": "string"
             }
           }
@@ -21505,7 +21537,18 @@
       },
       "post": {
         "operationId": "FeedbackController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -21948,7 +21991,18 @@
       },
       "post": {
         "operationId": "IntegrationsController_createIntegration",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -22385,6 +22439,16 @@
             "name": "integration_id",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
               "type": "string"
             }
           }
@@ -25760,7 +25824,18 @@
       },
       "post": {
         "operationId": "SupportController_createTicket",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -25852,6 +25927,16 @@
             "required": true,
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
             }
           }
         ],
@@ -26576,7 +26661,18 @@
       },
       "post": {
         "operationId": "UsersController_createUser",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -27416,6 +27512,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -27461,6 +27567,16 @@
             "name": "id",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
               "type": "string"
             }
           }
@@ -27575,6 +27691,16 @@
             "name": "id",
             "required": true,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
               "type": "string"
             }
           }

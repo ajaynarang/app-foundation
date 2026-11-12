@@ -22,6 +22,7 @@ import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto
 import type { OAuthClientResponse } from '@app/shared-types';
 import { CreateOAuthClientDto, UpdateOAuthClientDto } from './dto/oauth-client.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
+import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
 import {
   OAuthClientCreatedResponse,
   OAuthClientListResponse,
@@ -45,6 +46,7 @@ export class OAuthClientsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @SkipIdempotency() // the client secret is shown once: never stored for replay
   @ApiOperation({ summary: 'Register a new OAuth client' })
   @ApiResult(OAuthClientCreatedResponse, HttpStatus.CREATED)
   async create(@Body() body: CreateOAuthClientDto, @Req() req: Request) {

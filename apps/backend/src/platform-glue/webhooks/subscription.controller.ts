@@ -23,6 +23,7 @@ import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 import { WebhookListQueryDto, WebhookLogListQueryDto } from './dto/webhook-list-query.dto';
 import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { SkipIdempotency } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
 import {
   WebhookDeliveryLogListResponse,
   WebhookDeliveryLogResponse,
@@ -50,6 +51,7 @@ export class SubscriptionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @SkipIdempotency() // the signing secret is shown once: never stored for replay
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: 'Register a webhook subscription; the signing secret is shown on this response only' })
   @ApiResult(WebhookSubscriptionCreatedResponse, HttpStatus.CREATED)

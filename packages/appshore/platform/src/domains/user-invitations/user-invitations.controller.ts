@@ -10,6 +10,7 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
 import { ApiNoContentResponse, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { ApiResult } from '../../shared/openapi/api-result';
+import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
 import { InvitationIssued, InvitationLink, InvitationList } from './openapi.responses';
 
 const INVITATION_ID_PARAM = { name: 'invitation_id', description: 'Invitation public id (inv_…)' };
@@ -28,6 +29,7 @@ export class UserInvitationsController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @SkipIdempotency() // the invite link carries the acceptance token: never stored for replay
   @ApiOperation({ summary: 'Invite a person to the workspace by email or SMS; answers the invitation and its link' })
   @ApiResult(InvitationIssued, HttpStatus.CREATED)
   async inviteUser(@Body() dto: InviteUserDto, @CurrentUser() currentUser: any) {
