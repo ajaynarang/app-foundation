@@ -4,14 +4,13 @@ import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { AgentScope } from '@app/shared-types';
 import { cn } from '@app/ui';
-import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@app/ui/components/ui/collapsible';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
-import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import type { ScopeReferenceEntry } from '../api';
 import { useScopeReference } from '../hooks/use-scope-reference';
+import { ListErrorState } from '@/shared/components/page-chrome';
 import { groupScopesByDomain } from '../utils/scope-copy';
 import { ScopeChip } from './ScopeChip';
 
@@ -83,7 +82,8 @@ function ScopeReferenceList({ entries }: { entries: ScopeReferenceEntry[] }) {
  */
 export function ScopesReference() {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: entries, isLoading, isError, error } = useScopeReference({ enabled: isOpen });
+  const reference = useScopeReference({ enabled: isOpen });
+  const { data: entries, isLoading, isError, error } = reference;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -102,9 +102,13 @@ export function ScopesReference() {
           </div>
         )}
         {isError && (
-          <Alert variant="destructive" className="border-0">
-            <AlertDescription>{extractErrorMessage(error)}</AlertDescription>
-          </Alert>
+          <ListErrorState
+            className="border-0"
+            title="Couldn't load the scope reference."
+            error={error}
+            onRetry={() => void reference.refetch()}
+            isRetrying={reference.isRefetching}
+          />
         )}
         {entries && <ScopeReferenceList entries={entries} />}
       </CollapsibleContent>

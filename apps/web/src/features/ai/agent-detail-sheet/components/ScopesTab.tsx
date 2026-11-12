@@ -115,7 +115,7 @@ export function ScopesTab({
           <ScopeMultiSelect value={nextScopes} onChange={setNextScopes} disabled={isPending} />
           <ScopeDiffPreview current={currentScopes} next={nextScopes} />
           {needsIpAllowlist && (
-            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+            <p className="text-sm text-caution-text">
               Write-scope keys need an explicit IP policy. Add at least one CIDR from the Profile tab before confirming
               — use <code>0.0.0.0/0</code> if you need to accept any IP.
             </p>

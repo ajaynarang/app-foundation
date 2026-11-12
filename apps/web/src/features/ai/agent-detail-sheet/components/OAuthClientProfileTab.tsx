@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@app/ui/components/ui/button';
-import { Badge } from '@app/ui/components/ui/badge';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
+import { credentialStatus } from '@/features/ai/agent-scope-ui';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { showSuccess } from '@app/ui';
 import { Copy } from 'lucide-react';
@@ -72,7 +73,7 @@ export function OAuthClientProfileTab({ clientId }: OAuthClientProfileTabProps) 
 
       <div className="space-y-1">
         <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-        <Badge variant={data.isActive ? 'info' : 'muted'}>{data.isActive ? 'Active' : 'Paused'}</Badge>
+        <StatusBadge tone={credentialStatus(data).tone}>{credentialStatus(data).label}</StatusBadge>
       </div>
     </div>
   );

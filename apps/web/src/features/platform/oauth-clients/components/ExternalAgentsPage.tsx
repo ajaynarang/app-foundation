@@ -3,16 +3,24 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@app/ui/components/ui/button';
-import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import type { OAuthClientResponse } from '@app/shared-types';
 import { STORAGE_KEYS } from '@appshore/web-core/shared/constants/storage-keys';
 import { useTenantOAuthClients } from '../hooks/use-tenant-oauth-clients';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
+import { credentialStatus } from '@/features/ai/agent-scope-ui';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { OAuthClientRegisterSheet } from './OAuthClientRegisterSheet';
 import { ExternalAgentsQuickstartModal } from './ExternalAgentsQuickstartModal';
-import { ListFooter } from '@/shared/components/page-chrome';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  PageSection,
+  RowActions,
+} from '@/shared/components/page-chrome';
 
 function summariseScopes(scopes: readonly string[]): string {
   if (scopes.length === 0) return 'None';
@@ -24,6 +32,7 @@ export function ExternalAgentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clients = useTenantOAuthClients();
+  const { formatDateTime } = useFormatters();
   const { data, isLoading } = clients;
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,31 +74,26 @@ export function ExternalAgentsPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">External agents</h2>
-          <p className="text-sm text-muted-foreground">
-            ChatGPT, Claude, and other third-party AI clients connected to your tenant.
-          </p>
-        </div>
-        <Button onClick={() => setRegisterOpen(true)}>Register an agent</Button>
-      </div>
-
+    <PageSection
+      title="External agents"
+      description="ChatGPT, Claude, and other third-party AI clients connected to your tenant."
+      action={<Button onClick={() => setRegisterOpen(true)}>Register an agent</Button>}
+    >
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
+        <PageLoadingSkeleton variant="table" rows={4} />
+      ) : clients.isError ? (
+        <ListErrorState
+          title="Couldn't load your external agents."
+          error={clients.error}
+          onRetry={() => void clients.refetch()}
+          isRetrying={clients.isRefetching}
+        />
       ) : !data || data.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <p className="text-sm text-muted-foreground">No external agents yet.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Connect ChatGPT, Claude, or your own agent to start.</p>
-          <Button className="mt-4" onClick={() => setRegisterOpen(true)}>
-            Register an agent
-          </Button>
-        </div>
+        <PageEmptyState
+          title="No external agents yet"
+          description="Connect ChatGPT, Claude, or your own agent to start."
+          action={<Button onClick={() => setRegisterOpen(true)}>Register an agent</Button>}
+        />
       ) : (
         <div className="rounded-md border border-border overflow-x-auto">
           <Table>
@@ -99,7 +103,9 @@ export function ExternalAgentsPage() {
                 <TableHead>Scopes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-0" />
+                <TableHead className="w-[1%]">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -108,28 +114,15 @@ export function ExternalAgentsPage() {
                   <TableCell className="font-medium text-foreground">{c.name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{summariseScopes(c.scopes)}</TableCell>
                   <TableCell>
-                    <Badge variant={c.isActive ? 'info' : 'muted'}>{c.isActive ? 'Active' : 'Paused'}</Badge>
+                    <StatusBadge tone={credentialStatus(c).tone}>{credentialStatus(c).label}</StatusBadge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {new Date(c.createdAt).toLocaleString(undefined, {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                    {formatDateTime(c.createdAt)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDetail(c);
-                      }}
-                    >
-                      Open
-                    </Button>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <RowActions
+                      primary={{ label: 'Open', ariaLabel: `Open ${c.name}`, onClick: () => openDetail(c) }}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -168,6 +161,6 @@ export function ExternalAgentsPage() {
         onOpenChange={setQuickstartOpen}
         onRegisterClick={() => setRegisterOpen(true)}
       />
-    </div>
+    </PageSection>
   );
 }

@@ -1,15 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '@app/shared-types';
 import { useAgentActivity } from '@/features/ai/agent-activity';
-import { ScopeChip } from '@/features/ai/agent-scope-ui';
+import { HITL_TIER_VARIANTS, ScopeChip } from '@/features/ai/agent-scope-ui';
 import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
-import { ListFooter, RelativeTime } from '@/shared/components/page-chrome';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  RelativeTime,
+  SegmentedControl,
+} from '@/shared/components/page-chrome';
 
 interface ActivityTabProps {
   principalKind: AgentPrincipalKind;
@@ -26,12 +32,6 @@ const FILTERS: Array<{ value: AgentActivityFilter; label: string }> = [
   { value: 'tool_calls', label: 'Tool calls' },
   { value: 'approvals', label: 'Approvals' },
 ];
-
-function tierBadgeVariant(tier: 'none' | 'standard' | 'sensitive'): 'muted' | 'info' | 'caution' {
-  if (tier === 'sensitive') return 'caution';
-  if (tier === 'standard') return 'info';
-  return 'muted';
-}
 
 export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
   const [filter, setFilter] = useState<AgentActivityFilter>('all');
@@ -50,18 +50,7 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1" role="tablist" aria-label="Activity filter">
-          {FILTERS.map((f) => (
-            <Button
-              key={f.value}
-              size="sm"
-              variant={filter === f.value ? 'default' : 'outline'}
-              onClick={() => setFilter(f.value)}
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl label="Activity filter" options={FILTERS} value={filter} onChange={setFilter} />
         <DateRangeFilter
           dateFrom={dateFrom}
           dateTo={dateTo}
@@ -75,19 +64,23 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
-        </div>
+        <PageLoadingSkeleton variant="table" rows={6} />
+      ) : activity.isError ? (
+        <ListErrorState
+          title="Couldn't load this agent's activity."
+          error={activity.error}
+          onRetry={() => void activity.refetch()}
+          isRetrying={activity.isRefetching}
+        />
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            {dateFrom || dateTo
-              ? 'No activity in this date range. Try widening the window.'
-              : 'No activity yet. Invocations will appear here once this agent starts making calls.'}
-          </p>
-        </div>
+        <PageEmptyState
+          title={dateFrom || dateTo ? 'No activity in this date range' : 'No activity yet'}
+          description={
+            dateFrom || dateTo
+              ? 'Try widening the window.'
+              : 'Invocations will appear here once this agent starts making calls.'
+          }
+        />
       ) : (
         <div className="rounded-md border border-border overflow-x-auto">
           <Table>
@@ -111,13 +104,19 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
                     <ScopeChip scope={r.scopeRequired} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={tierBadgeVariant(r.hitlTier)}>{r.hitlTier}</Badge>
+                    <StatusBadge tone={HITL_TIER_VARIANTS[r.hitlTier].tone}>
+                      {HITL_TIER_VARIANTS[r.hitlTier].label}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell>
-                    {r.success ? <Badge variant="info">ok</Badge> : <Badge variant="critical">failed</Badge>}
+                    {r.success ? (
+                      <StatusBadge tone="success">Succeeded</StatusBadge>
+                    ) : (
+                      <StatusBadge tone="danger">Failed</StatusBadge>
+                    )}
                     {r.confirmationTokenId && (
-                      <Badge variant="muted" className="ml-1">
-                        approval
+                      <Badge variant="outline" className="ml-1">
+                        Approved by a person
                       </Badge>
                     )}
                   </TableCell>
