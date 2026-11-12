@@ -2163,6 +2163,64 @@
         ],
         "type": "object"
       },
+      "BedrockBegin": {
+        "properties": {
+          "cfnQuickCreateUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "permissionsPolicy": {
+            "type": "string"
+          },
+          "platformRoleArns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roleName": {
+            "type": "string"
+          },
+          "terraformSnippet": {
+            "type": "string"
+          },
+          "trustPolicy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalId",
+          "platformRoleArns",
+          "roleName",
+          "trustPolicy",
+          "permissionsPolicy",
+          "terraformSnippet",
+          "cfnQuickCreateUrl"
+        ],
+        "type": "object"
+      },
+      "BedrockCompleteDto": {
+        "properties": {
+          "awsRegion": {
+            "description": "The AWS region the role calls Bedrock in",
+            "example": "us-east-1",
+            "type": "string"
+          },
+          "roleArn": {
+            "description": "The role created in the workspace AWS account from the begin step",
+            "example": "arn:aws:iam::123456789012:role/app-bedrock-access",
+            "type": "string"
+          }
+        },
+        "required": [
+          "roleArn",
+          "awsRegion"
+        ],
+        "type": "object"
+      },
       "BillingAdminPlanChange": {
         "properties": {
           "action": {
@@ -18221,6 +18279,101 @@
           }
         ],
         "summary": "Connect a provider key: it is tested with one small call, then stored encrypted",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/bedrock/begin": {
+      "post": {
+        "operationId": "AiCredentialController_beginBedrock",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedrockBegin"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start connecting an AWS Bedrock role: the external id, trust policy and IaC to create it (nothing stored)",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/bedrock/complete": {
+      "post": {
+        "operationId": "AiCredentialController_completeBedrock",
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BedrockCompleteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "Created: the new resource"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Connect an AWS Bedrock role: checked with and without the external id and one model call, then stored",
         "tags": [
           "AI Settings"
         ]

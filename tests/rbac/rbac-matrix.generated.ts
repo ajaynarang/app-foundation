@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-12T13:49:18.481Z
- * Source: 22 domains, 98 endpoints
- * Controllers scanned: 279 total endpoints across all controllers
+ * Generated: 2026-11-12T16:47:31.150Z
+ * Source: 22 domains, 100 endpoints
+ * Controllers scanned: 281 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -133,6 +133,20 @@ export const RBAC_MATRIX: RbacEntry[] = [
   {
     method: 'POST', path: '/ai-settings/credentials',
     description: 'AiCredentialController: POST /ai-settings/credentials',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/ai-settings/credentials/bedrock/begin',
+    description: 'AiCredentialController: POST /ai-settings/credentials/bedrock/begin',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/ai-settings/credentials/bedrock/complete',
+    description: 'AiCredentialController: POST /ai-settings/credentials/bedrock/complete',
     domain: 'ai',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
