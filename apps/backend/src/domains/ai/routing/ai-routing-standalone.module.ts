@@ -5,6 +5,7 @@ import { DomainEventService } from '@appshore/kernel/infrastructure/events/domai
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 
 import { AiRouteResolver } from './ai-route-resolver.service';
+import { CredentialCryptoService } from './credential-crypto.service';
 
 /** The event bus of a command-line process; see `AiRoutingStandaloneModule`. */
 export const COMMAND_EVENT_BUS = {
@@ -24,12 +25,15 @@ export const COMMAND_EVENT_BUS = {
  * - `publish` refuses, so an event a command stages in the outbox (a ledger row's `AI_INVOCATION_RECORDED`) stays
  *   unpublished and the app's outbox relay publishes it. Nothing is lost; it is only late.
  *
+ * A workspace credential's credit refusal is not recorded here (no notification pipeline in a command); the command's
+ * call still fails with the refusal.
+ *
  * It needs the configuration factory loaded globally (`ConfigModule.forRoot({ load: [configuration] })`) by the
  * command's root module, plus `DATABASE_URL` and `REDIS_URL`.
  */
 @Module({
   imports: [PrismaModule, CacheModule],
-  providers: [AiRouteResolver, { provide: DomainEventService, useValue: COMMAND_EVENT_BUS }],
+  providers: [AiRouteResolver, CredentialCryptoService, { provide: DomainEventService, useValue: COMMAND_EVENT_BUS }],
   exports: [AiRouteResolver, DomainEventService],
 })
 export class AiRoutingStandaloneModule {}

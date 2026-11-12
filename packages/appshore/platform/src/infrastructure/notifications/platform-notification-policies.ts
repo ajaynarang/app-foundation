@@ -36,6 +36,10 @@ export const PLATFORM_NOTIFICATION_POLICIES: Record<PlatformNotificationType, No
     email: DEFAULT,
     groupLabel: 'AI budget alerts',
   }),
+  [PlatformNotificationType.AI_CREDENTIAL_FAILING]: policy(NotificationCategory.SYSTEM, TIMELY, {
+    email: DEFAULT,
+    groupLabel: 'AI key alerts',
+  }),
   [PlatformNotificationType.USER_JOINED]: policy(NotificationCategory.TEAM, INFORMATIONAL, {
     email: OPT_IN,
     groupLabel: 'users joined',

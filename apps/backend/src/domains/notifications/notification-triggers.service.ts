@@ -4,7 +4,7 @@ import { PlatformNotificationType, type NotificationType } from '@app/shared-typ
 import { NotificationDispatcherService } from '@appshore/platform/infrastructure/notifications/pipeline/notification-dispatcher.service';
 import { RecipientResolutionService } from '@appshore/platform/infrastructure/notifications/pipeline/recipient-resolution.service';
 import type { DispatchRecipient } from '@appshore/platform/infrastructure/notifications/pipeline/dispatch.types';
-import { INTEGRATIONS_WEB_PATH } from '../../shared/web-routes';
+import { AI_SETTINGS_WEB_PATH, INTEGRATIONS_WEB_PATH } from '../../shared/web-routes';
 
 interface TriggerParams {
   tenantId: number;
@@ -20,6 +20,14 @@ interface TriggerParams {
 }
 
 const STAFF: UserRole[] = [UserRole.OWNER, UserRole.ADMIN];
+
+/** How a workspace AI credential type reads in a notification. */
+const AI_CREDENTIAL_TYPE_LABELS: Record<string, string> = {
+  ANTHROPIC_KEY: 'Anthropic',
+  OPENROUTER_KEY: 'OpenRouter',
+  VERCEL_GATEWAY_KEY: 'Vercel AI Gateway',
+  BEDROCK_ROLE: 'AWS Bedrock',
+};
 
 /**
  * This app's notification vocabulary: one named method per thing that happens.
@@ -90,6 +98,35 @@ export class NotificationTriggersService {
       title: 'AI usage limit reached',
       message:
         'This workspace reached its AI usage limit, so AI features are paused until the limit resets. An administrator can raise it.',
+      iconType: 'ai',
+      recipientRoles: STAFF,
+    });
+  }
+
+  /**
+   * A workspace's own AI key needs attention. `failed-test`: it failed its test (on connect, "Test again" or the daily
+   * sweep), is now FAILING, and the AI calls it served are blocked until it passes again or is removed. `credit-refused`:
+   * the provider refused a call for credit; the key stays ACTIVE and the owner tops it up. Sent to owners and admins;
+   * the credit case at most once a day per key. Never names more of the key than its last four characters.
+   */
+  async aiCredentialFailing(
+    tenantId: number,
+    credential: { type: string; lastFour: string | null },
+    cause: 'failed-test' | 'credit-refused',
+  ) {
+    const which = `${AI_CREDENTIAL_TYPE_LABELS[credential.type] ?? credential.type} key${
+      credential.lastFour ? ` ending ${credential.lastFour}` : ''
+    }`;
+    return this.trigger({
+      tenantId,
+      type: PlatformNotificationType.AI_CREDENTIAL_FAILING,
+      title: cause === 'failed-test' ? 'AI key is failing' : 'AI key is out of credit',
+      message:
+        cause === 'failed-test'
+          ? `The workspace's ${which} failed its check, so the AI features it pays for are paused. Test it again or replace it in AI settings.`
+          : `The provider refused a call on the workspace's ${which} because its credit can't cover it. Add credit or raise the key's limit.`,
+      actionUrl: AI_SETTINGS_WEB_PATH,
+      actionLabel: 'Open AI settings',
       iconType: 'ai',
       recipientRoles: STAFF,
     });

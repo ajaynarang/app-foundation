@@ -1,4 +1,5 @@
-import { PLATFORM_CREDENTIAL_TYPES, PLATFORM_ROUTES } from '../route-registry';
+import { AiCredentialType } from '@appshore/db';
+import { PLATFORM_CREDENTIAL_TYPES, PLATFORM_ROUTES, TENANT_CREDENTIAL_CAPABILITIES } from '../route-registry';
 import { AI_NEEDS } from '../routing.types';
 import { PLATFORM_CREDENTIAL_TYPE_PREFIX } from '../../infrastructure/telemetry/platform-paid';
 import { PROMPT_CACHE_STRATEGIES } from '../prompt-cache';
@@ -69,5 +70,56 @@ describe('route registry parity', () => {
     for (const need of AI_NEEDS) {
       expect(PLATFORM_ROUTES.some((r) => r.serves.includes(need))).toBe(true);
     }
+  });
+});
+
+/**
+ * Workspace credential types (bring-your-own-key). `BEDROCK_ROLE` is in the enum so the AWS role flow needs no
+ * migration, but its route arrives with that flow: until then it serves nothing, and the one assertion that every type
+ * serves a need skips it by name. The AWS role change removes the skip.
+ */
+describe('route registry parity: workspace credential types', () => {
+  const NOT_YET_SERVING: readonly AiCredentialType[] = [AiCredentialType.BEDROCK_ROLE];
+
+  it('every AiCredentialType has a registry entry, and nothing else does', () => {
+    expect(Object.keys(TENANT_CREDENTIAL_CAPABILITIES).sort()).toEqual(Object.values(AiCredentialType).sort());
+  });
+
+  it('every type declares serves, a retention rule and a prompt-cache strategy', () => {
+    for (const [type, capability] of Object.entries(TENANT_CREDENTIAL_CAPABILITIES)) {
+      for (const need of capability.serves) expect(AI_NEEDS).toContain(need);
+      expect(['ZDR', 'STANDARD']).toContain(capability.retention({ zdrAttested: false }));
+      expect(PROMPT_CACHE_STRATEGIES).toContain(capability.promptCache);
+      expect(typeof capability.buildProvider).toBe('function');
+      if (!NOT_YET_SERVING.includes(type as AiCredentialType)) expect(capability.serves.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('BEDROCK_ROLE serves nothing yet, so no resolve can pick it', () => {
+    expect(TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.serves).toEqual([]);
+  });
+
+  it('the paste-key types serve language at the retention the design gives them', () => {
+    const { ANTHROPIC_KEY, OPENROUTER_KEY, VERCEL_GATEWAY_KEY } = TENANT_CREDENTIAL_CAPABILITIES;
+    expect(ANTHROPIC_KEY.serves).toEqual(['language']);
+    expect(ANTHROPIC_KEY.retention({ zdrAttested: false })).toBe('STANDARD');
+    expect(ANTHROPIC_KEY.retention({ zdrAttested: true })).toBe('ZDR');
+    for (const capability of [OPENROUTER_KEY, VERCEL_GATEWAY_KEY]) {
+      expect(capability.serves).toEqual(['language']);
+      // No attestation makes these zero-retention: the flag is the Anthropic key's alone.
+      expect(capability.retention({ zdrAttested: true })).toBe('STANDARD');
+    }
+  });
+
+  it('the exact prompt-cache map of the workspace credential types', () => {
+    expect(
+      Object.fromEntries(Object.entries(TENANT_CREDENTIAL_CAPABILITIES).map(([type, c]) => [type, c.promptCache])),
+    ).toEqual({
+      ANTHROPIC_KEY: 'anthropic',
+      OPENROUTER_KEY: 'openrouter',
+      // Until someone verifies the gateway forwards Anthropic cache control.
+      VERCEL_GATEWAY_KEY: 'none',
+      BEDROCK_ROLE: 'bedrock',
+    });
   });
 });

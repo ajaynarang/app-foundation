@@ -19,9 +19,9 @@ export type { AiPayer } from '@app/shared-types';
  * `zdrCapable` is refused here, not at the call site) and refuse an alias the route has no id for.
  */
 export interface ResolvedRoute {
-  /** `platform-openrouter`, `platform-cohere`, or (with bring-your-own-key) a credential's public id. */
+  /** `platform-openrouter`, `platform-cohere`, or a workspace credential's public id (`aicred_…`). */
   routeId: string;
-  /** `PLATFORM_OPENROUTER`, `PLATFORM_COHERE`, or (with bring-your-own-key) the credential type. A ledger string. */
+  /** `PLATFORM_OPENROUTER`, `PLATFORM_COHERE`, or a workspace credential's `AiCredentialType`. A ledger string. */
   credentialType: string;
   payer: AiPayer;
   retention: RetentionClass;
@@ -45,6 +45,11 @@ export interface ResolvedRoute {
   ledgerModelIdFor(alias: ModelAlias, answeredByModelId?: string): string;
   embeddingModel(): EmbeddingModel;
   embeddingModelId(): string;
+  /**
+   * Set on a workspace credential only: record that the provider refused a call for credit (the credential's
+   * `lastError`, the owner told at most once a day). The status stays ACTIVE. Fire and forget; never throws.
+   */
+  reportCreditRefusal?: (detail: string) => void;
 }
 
 /** What a registry entry builds: a language leg, an embedding leg, or both. */

@@ -66,15 +66,26 @@ export function logPlatformCreditRefusal(route: { payer: AiPayer; routeId: strin
 }
 
 /**
- * For a catch block: the typed refusal for a credit error (logged once through `logPlatformCreditRefusal`), else the
- * error unchanged, to rethrow.
+ * For a catch block: the typed refusal for a credit error, else the error unchanged, to rethrow. A platform-paid
+ * refusal is logged once (`logPlatformCreditRefusal`); one on a workspace's own key is handed to the route's
+ * `reportCreditRefusal`, which records it on the credential and tells the owner (status stays ACTIVE).
  */
 export function mapProviderRefusal(
   error: unknown,
   tenantId: number,
-  route: { payer: AiPayer; routeId: string },
+  route: { payer: AiPayer; routeId: string; reportCreditRefusal?: (detail: string) => void },
 ): unknown {
   if (!isProviderCreditRefusal(error)) return error;
   logPlatformCreditRefusal(route, tenantId);
+  if (route.payer === 'TENANT') route.reportCreditRefusal?.(refusalText(error));
   return new AiProviderCreditRefused(tenantId);
+}
+
+/** The provider's own words for a refusal, from the first layer that has any; the recorder redacts it. */
+function refusalText(error: unknown): string {
+  for (const layer of layersOf(error)) {
+    const message = (layer as Record<string, unknown>).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return 'the provider refused the call for credit';
 }

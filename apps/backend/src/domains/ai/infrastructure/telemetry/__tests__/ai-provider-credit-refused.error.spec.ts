@@ -91,6 +91,21 @@ describe('provider credit refusals', () => {
       expect(log).not.toHaveBeenCalled();
     });
 
+    it("hands a refusal on the workspace's own key to the route's recorder, with the provider's reason", () => {
+      const reportCreditRefusal = jest.fn();
+      const refusal = { statusCode: 402, message: 'Your credit balance is too low' };
+      mapProviderRefusal(refusal, 7, { ...TENANT, reportCreditRefusal });
+      expect(reportCreditRefusal).toHaveBeenCalledWith('Your credit balance is too low');
+    });
+
+    it('records nothing for an error that is not a credit refusal, or on a platform route', () => {
+      const reportCreditRefusal = jest.fn();
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      mapProviderRefusal(new Error('boom'), 7, { ...TENANT, reportCreditRefusal });
+      mapProviderRefusal({ statusCode: 402 }, 7, { ...PLATFORM, reportCreditRefusal });
+      expect(reportCreditRefusal).not.toHaveBeenCalled();
+    });
+
     it('passes any other error through unchanged, and logs nothing', () => {
       const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       const error = new Error('boom');

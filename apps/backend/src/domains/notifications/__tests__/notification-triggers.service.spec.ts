@@ -47,6 +47,25 @@ describe('NotificationTriggersService', () => {
     );
   });
 
+  it.each([
+    ['failed-test', 'AI key is failing'],
+    ['credit-refused', 'AI key is out of credit'],
+  ] as const)(
+    'aiCredentialFailing (%s) reaches owners and admins, links to AI settings, names only the last four',
+    async (cause, title) => {
+      await service.aiCredentialFailing(7, { type: 'ANTHROPIC_KEY', lastFour: 'wxyz' }, cause);
+      expect(recipients.resolveByRoles).toHaveBeenCalledWith(7, [UserRole.OWNER, UserRole.ADMIN]);
+      const sent = dispatcher.dispatch.mock.calls[0][0];
+      expect(sent).toMatchObject({
+        tenantId: 7,
+        type: PlatformNotificationType.AI_CREDENTIAL_FAILING,
+        title,
+        actionUrl: '/settings/ai',
+      });
+      expect(sent.message).toContain('Anthropic key ending wxyz');
+    },
+  );
+
   it('userRoleChanged notifies the person and every admin, once each', async () => {
     await service.userRoleChanged(7, 2, 'Arun', 'MEMBER', 'ADMIN');
     expect(recipients.resolveByUserIds).toHaveBeenCalledWith(7, [2, 1], { scopeToMembership: true });
