@@ -144,7 +144,8 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 | ----------------- | ------------------------------------------ | ---------------------------------- |
 | Real SMS / OTP    | `TWILIO_*`                                 | mock OTP `123456` (non-prod only)  |
 | Email delivery    | `SMTP_*` or `RESEND_API_KEY`               | emails logged to server console    |
-| AI assistant      | `ANTHROPIC_API_KEY`                        | chat UI loads, replies unavailable |
+| AI assistant      | `OPENROUTER_API_KEY`                       | chat UI loads, replies unavailable |
+| KB vector search  | `COHERE_API_KEY`                           | knowledge-base search is full-text |
 | Firebase login    | `FIREBASE_*` (backend + web)               | email/password + phone still work  |
 | Stripe billing    | `STRIPE_*`                                 | plans/entitlements still enforced  |
 | File uploads      | `AWS_*` / S3 bucket                        | uploads unavailable                |

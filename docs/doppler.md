@@ -95,10 +95,10 @@ Notes:
 
 ```bash
 # Set (creates or updates)
-doppler secrets set ANTHROPIC_API_KEY=sk-ant-... --project app-backend --config dev
+doppler secrets set OPENROUTER_API_KEY=sk-or-v1-... --project app-backend --config dev
 
 # Read one value
-doppler secrets get ANTHROPIC_API_KEY --project app-backend --config dev --plain
+doppler secrets get OPENROUTER_API_KEY --project app-backend --config dev --plain
 
 # Inspect a whole config without writing a file
 doppler secrets download --no-file --format env --project app-backend --config dev
@@ -122,7 +122,7 @@ When you add a brand-new variable, update all three places:
 
 "Required to boot?" reflects the backend's Zod validation
 (`apps/backend/src/config/configuration.ts`) and code fallbacks — the template is designed to
-boot with **minimal** config (Postgres + Redis). Firebase, Anthropic, Stripe, Twilio, voice
+boot with **minimal** config (Postgres + Redis). Firebase, the AI routes, Stripe, Twilio, voice
 and Desk workflow keys are all optional at boot; the related feature simply stays disabled
 until configured.
 
@@ -177,11 +177,9 @@ public https URL of the API, `CORS_ORIGINS` lists no local origin, `INNGEST_DEV`
 | `S3_REGION`                         | No (default `us-east-1`)                                                                             | No      | Bucket region                                                                                                                                             | —                                                                                                            |
 | `AWS_ACCESS_KEY_ID`                 | No (uploads fail without; ECS uses task role instead)                                                | Yes     | S3 credentials for local dev                                                                                                                              | AWS IAM → user with S3 access                                                                                |
 | `AWS_SECRET_ACCESS_KEY`             | No                                                                                                   | Yes     | S3 credentials for local dev                                                                                                                              | AWS IAM                                                                                                      |
-| `AI_PROVIDER`                       | No (default `anthropic`)                                                                             | No      | AI routing: `anthropic` (direct) or `gateway` (Vercel AI Gateway)                                                                                         | —                                                                                                            |
-| `ANTHROPIC_API_KEY`                 | No (AI assistant disabled without it)                                                                | Yes     | Claude API access                                                                                                                                         | Anthropic console (console.anthropic.com) → API Keys                                                         |
-| `AI_GATEWAY_API_KEY`                | No (needed for embeddings / gateway mode)                                                            | Yes     | Vercel AI Gateway key                                                                                                                                     | Vercel dashboard → AI Gateway                                                                                |
+| `ANTHROPIC_API_KEY`                 | No (not a platform route; nothing in the app reads it)                                               | Yes     | Dev and test key only: `ai:live-check` reads it; a workspace connects it in Settings as its own credential                                                | Anthropic console (console.anthropic.com) → API Keys                                                         |
 | `OPENAI_API_KEY`                    | No (content moderation disabled without it)                                                          | Yes     | Moderation API                                                                                                                                            | platform.openai.com → API Keys                                                                               |
-| `OPENROUTER_API_KEY`                | No (the platform language route is off without it)                                                   | Yes     | Platform default language route (`platform-openrouter`); chat moves onto it with the route resolver                                                       | openrouter.ai → Keys                                                                                         |
+| `OPENROUTER_API_KEY`                | No (the platform language route is off without it)                                                   | Yes     | Platform default language route (`platform-openrouter`): chat, structured output, classifier, feedback                                                    | openrouter.ai → Keys                                                                                         |
 | `COHERE_API_KEY`                    | No (the platform embedding route is off without it)                                                  | Yes     | Platform embedding route (`platform-cohere`, Embed v4 at 1536 dimensions)                                                                                 | dashboard.cohere.com → API Keys                                                                              |
 | `LANGFUSE_SECRET_KEY`               | No (tracing disabled without it)                                                                     | Yes     | LLM observability                                                                                                                                         | Langfuse → Project settings → API Keys                                                                       |
 | `LANGFUSE_PUBLIC_KEY`               | No                                                                                                   | No      | Langfuse public key                                                                                                                                       | Langfuse → Project settings → API Keys                                                                       |

@@ -169,7 +169,8 @@ docker compose up -d postgres redis          # Postgres (pgvector) on :5499, Red
 pnpm install
 pnpm --filter @app/shared-types build         # build shared types (dependents need its dist)
 cp apps/web/.env.example apps/web/.env.local   # web env (NEXT_PUBLIC_API_URL etc.)
-cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL, ANTHROPIC_API_KEY, ...)
+cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL; OPENROUTER_API_KEY for chat,
+                                               # COHERE_API_KEY for knowledge-base vector search)
 pnpm prisma:generate                           # Prisma client + shared-enum codegen
 pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
                                                # foundation packages (the backend consumes their dist)
