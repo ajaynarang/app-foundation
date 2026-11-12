@@ -121,7 +121,7 @@ describe('deadlines on a real database', () => {
     await prisma.$transaction((tx) => service.schedule(tx as never, input({ dedupeKey: 'committed' })));
     await expect(
       prisma.$transaction(async (tx) => {
-        await service.schedule(tx as never, input({ dedupeKey: 'rolled-back' }));
+        await service.schedule(tx, input({ dedupeKey: 'rolled-back' }));
         throw new Error('roll back');
       }),
     ).rejects.toThrow('roll back');
@@ -209,7 +209,7 @@ describe('deadlines on a real database', () => {
     let [row] = await sweep();
     expect(row).toMatchObject({ id: deadline.id, firedAt: null, cancelledAt: null, attempts: 1 });
     expect(row.lastError).toBe('downstream unavailable');
-    expect(row.lockedUntilAt!.getTime()).toBeGreaterThanOrEqual(before + 30_000 - 1_000);
+    expect(row.lockedUntilAt.getTime()).toBeGreaterThanOrEqual(before + 30_000 - 1_000);
 
     // Inside the backoff it is not claimed again.
     [row] = await sweep();
