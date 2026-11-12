@@ -4,7 +4,6 @@ import { AssistantAiModule } from './assistant/assistant.module';
 import { McpToolsModule } from './mcp/mcp-tools.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { ModerationModule } from './moderation/moderation.module';
-import { RlsModule } from './rls/rls.module';
 import { McpExternalServerModule } from './mcp-server/mcp-server.module';
 import { VoiceModule } from './voice/voice.module';
 import { AgentContractModule } from './agent-contract/agent-contract.module';
@@ -28,7 +27,6 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     McpExternalServerModule,
     KnowledgeBaseModule,
     ModerationModule,
-    RlsModule,
     VoiceModule,
     AgentContractModule,
   ],
@@ -38,7 +36,6 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     McpExternalServerModule,
     KnowledgeBaseModule,
     ModerationModule,
-    RlsModule,
     AgentContractModule,
   ],
 })

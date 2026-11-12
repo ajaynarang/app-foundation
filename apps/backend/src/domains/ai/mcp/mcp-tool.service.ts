@@ -3,7 +3,6 @@ import { ModuleRef } from '@nestjs/core';
 import { jsonSchema, type ToolSet } from 'ai';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
-import { AiPrismaService } from '../rls/ai-prisma.service';
 import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
@@ -18,8 +17,8 @@ import { scopesForRole } from '../agent-contract/role-scopes';
  *
  * - `userId` is the wire-format user id (e.g. JWT `sub` — `"user_demo_owner"`),
  *   injected into tool args as `_userId` for downstream lookups.
- * - `userDbId` is the numeric DB id (`User.id`), used for RLS session setup
- *   and AgentPrincipal construction. Callers resolve it from `userId` via
+ * - `userDbId` is the numeric DB id (`User.id`), used for AgentPrincipal
+ *   construction. Callers resolve it from `userId` via
  *   `BaseTenantController.getUserDbId` (or an equivalent helper) before
  *   reaching this service, so the resolution happens once per request.
  */
@@ -58,7 +57,6 @@ export class McpToolService implements OnModuleInit {
   constructor(
     private readonly registry: McpRegistryDiscoveryService,
     private readonly moduleRef: ModuleRef,
-    private readonly aiPrisma: AiPrismaService,
     @Optional() private readonly pipeline?: InvocationPipelineService,
   ) {}
 
@@ -108,12 +106,8 @@ export class McpToolService implements OnModuleInit {
    * When `context` is provided, `_tenantId` and `_userId` are injected into
    * every tool call's arguments, ensuring tenant isolation at the service boundary.
    * The AI never controls these values — they come from the authenticated session.
-   *
-   * RLS enforcement: When context is provided, each tool call is wrapped in
-   * `AiPrismaService.executeWithRlsContext()`, setting PostgreSQL session
-   * variables (app.current_tenant_id, app.current_user_role, app.current_user_id)
-   * within a transaction. This provides database-level tenant isolation as a
-   * defense-in-depth layer on top of application-level WHERE clause filtering.
+   * Tenant isolation is each tool's own `_tenantId` filter; no transaction or
+   * role switch is opened around a tool call.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Promise<ToolSet> is part of the public API contract
   async getToolsForPersona(
@@ -132,7 +126,6 @@ export class McpToolService implements OnModuleInit {
       if (!registeredTool) continue;
 
       const { providerClass, methodName, metadata } = registeredTool;
-      const aiPrisma = this.aiPrisma;
 
       let rawSchema: Record<string, unknown>;
       if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
@@ -188,13 +181,6 @@ export class McpToolService implements OnModuleInit {
 
             return result;
           };
-
-          // Wrap with RLS context when tenant context is available.
-          // This sets PostgreSQL session variables within a transaction,
-          // providing database-level isolation as defense-in-depth.
-          if (context) {
-            return aiPrisma.executeWithRlsContext(context.tenantId, context.userDbId, userMode, async () => callTool());
-          }
 
           return callTool();
         },
@@ -266,10 +252,9 @@ export class McpToolService implements OnModuleInit {
       userId: string;
       // `userDbId` is only meaningful when the trigger is a real user
       // (e.g. `triggeredBy = 'user:42'`). For scheduler/event triggers the
-      // caller passes null; the starter's RLS policies only key on the
-      // tenant id (never app.current_user_id), so null is safe today. When Desk
-      // joins the pipeline (Phase F) the principal factory will reject
-      // null and the caller will need to resolve or pass a system user.
+      // caller passes null. When Desk joins the pipeline (Phase F) the
+      // principal factory will reject null and the caller will need to
+      // resolve or pass a system user.
       userDbId: number | null;
       conversationId?: string;
       invocationSource?: 'desk' | 'chat';
@@ -281,14 +266,12 @@ export class McpToolService implements OnModuleInit {
     }
 
     const tools: ToolSet = {};
-    const userMode = 'desk'; // RLS context label for desk invocations
 
     for (const toolName of toolNames) {
       const registeredTool = this.allTools.get(toolName);
       if (!registeredTool) continue;
 
       const { providerClass, methodName, metadata } = registeredTool;
-      const aiPrisma = this.aiPrisma;
 
       let rawSchema: Record<string, unknown>;
       if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
@@ -335,17 +318,6 @@ export class McpToolService implements OnModuleInit {
 
             return result;
           };
-
-          if (context) {
-            // No starter RLS policy reads app.current_user_id. Desk runs as
-            // role='desk', so userDbId may be null (scheduler/event
-            // triggers without a user attribution). Fall back to 0 so the
-            // SQL set_config call still has a value to bind; the value is
-            // never read in that code path.
-            return aiPrisma.executeWithRlsContext(context.tenantId, context.userDbId ?? 0, userMode, async () =>
-              callTool(),
-            );
-          }
 
           return callTool();
         },

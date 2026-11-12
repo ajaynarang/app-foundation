@@ -5,13 +5,12 @@ import { McpToolService } from '../../mcp-tool.service';
  * McpToolService unit tests.
  *
  * The service uses McpRegistryService to discover tools and ModuleRef to
- * resolve provider instances. We mock the registry, moduleRef, and AiPrismaService
- * to test tool exposure, context injection, and RLS wrapping in isolation.
+ * resolve provider instances. We mock the registry and moduleRef to test tool
+ * exposure and context injection in isolation.
  */
 describe('McpToolService', () => {
   let mockRegistry: any;
   let mockModuleRef: any;
-  let mockAiPrisma: any;
   let mockHealthInstance: any;
   let mockKbInstance: any;
   let mockItemsInstance: any;
@@ -67,14 +66,10 @@ describe('McpToolService', () => {
         return null;
       }),
     };
-
-    mockAiPrisma = {
-      executeWithRlsContext: jest.fn((tenantId, userId, role, fn) => fn()),
-    };
   });
 
   function createService(): McpToolService {
-    const service = new McpToolService(mockRegistry, mockModuleRef, mockAiPrisma);
+    const service = new McpToolService(mockRegistry, mockModuleRef);
     return service;
   }
 
@@ -132,7 +127,7 @@ describe('McpToolService', () => {
       });
     });
 
-    it('should wrap tool execution with RLS context when context is provided', async () => {
+    it('calls the provider directly when context is provided, with no wrapper around the call', async () => {
       const service = createService();
       await service.onModuleInit();
       const tools = await service.getToolsForPersona('admin', {
@@ -141,24 +136,10 @@ describe('McpToolService', () => {
         userDbId: 10,
       });
 
-      await (tools['health-check'] as any).execute({});
+      const result = await (tools['health-check'] as any).execute({});
 
-      expect(mockAiPrisma.executeWithRlsContext).toHaveBeenCalledWith(
-        1, // tenantId
-        10, // userDbId
-        'admin', // role = userMode
-        expect.any(Function),
-      );
-    });
-
-    it('should NOT wrap with RLS when no context is provided', async () => {
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('member');
-
-      await (tools['health-check'] as any).execute({});
-
-      expect(mockAiPrisma.executeWithRlsContext).not.toHaveBeenCalled();
+      expect(mockHealthInstance.check).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ status: 'ok' });
     });
 
     it('should unwrap MCP content format from tool results', async () => {

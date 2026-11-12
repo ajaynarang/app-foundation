@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
-import { RlsModule } from '../rls/rls.module';
 import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/feature-flags.module';
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { ScopeRegistryService } from './scope-registry.service';
@@ -15,7 +14,7 @@ import { AgentActivityController } from './agent-activity.controller';
 import { DeveloperScopesController } from './developer-scopes.controller';
 
 @Module({
-  imports: [forwardRef(() => McpToolsModule), RlsModule, FeatureFlagsModule, CacheModule],
+  imports: [forwardRef(() => McpToolsModule), FeatureFlagsModule, CacheModule],
   controllers: [AgentActivityController, DeveloperScopesController],
   providers: [
     ScopeRegistryService,

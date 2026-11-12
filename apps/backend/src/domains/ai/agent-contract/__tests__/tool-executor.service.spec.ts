@@ -1,16 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { ToolExecutorService } from '../tool-executor.service';
 import { ScopeRegistryService } from '../scope-registry.service';
-import { AiPrismaService } from '../../rls/ai-prisma.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ModuleRef } from '@nestjs/core';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 
 const mockScopeRegistry = {
   resolveProvider: jest.fn(),
-};
-const mockAiPrisma = {
-  executeWithRlsContext: jest.fn((_t, _u, _r, fn) => fn()),
 };
 const mockModuleRef = {
   get: jest.fn(),
@@ -19,6 +15,8 @@ const mockPrisma = {
   user: {
     findUnique: jest.fn(),
   },
+  $transaction: jest.fn(),
+  $executeRaw: jest.fn(),
 };
 
 describe('ToolExecutorService', () => {
@@ -31,7 +29,6 @@ describe('ToolExecutorService', () => {
       providers: [
         ToolExecutorService,
         { provide: ScopeRegistryService, useValue: mockScopeRegistry },
-        { provide: AiPrismaService, useValue: mockAiPrisma },
         { provide: ModuleRef, useValue: mockModuleRef },
         { provide: PrismaService, useValue: mockPrisma },
       ],
@@ -39,7 +36,7 @@ describe('ToolExecutorService', () => {
     svc = mod.get(ToolExecutorService);
   });
 
-  it('wraps the tool call in RLS context and injects _tenantId/_userId (string)/_userDbId (number)', async () => {
+  it('calls the tool directly and injects _tenantId/_userId (string)/_userDbId (number)', async () => {
     const ToolClass = class {};
     mockScopeRegistry.resolveProvider.mockReturnValue({
       providerClass: ToolClass,
@@ -53,8 +50,6 @@ describe('ToolExecutorService', () => {
     const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
     const result = await svc.execute('query-records', { status: 'active' }, principal);
 
-    // RLS uses the numeric DB id (row-level policies bind on it)
-    expect(mockAiPrisma.executeWithRlsContext).toHaveBeenCalledWith(7, 42, 'MEMBER', expect.any(Function));
     // Tools receive the wire-format string userId (what `User.userId`
     // column stores and what VARCHAR audit columns expect), plus the
     // numeric DB id as `_userDbId` for FK joins.
@@ -118,12 +113,29 @@ describe('ToolExecutorService', () => {
     expect(result.content[0].text).toMatch(/boom/);
   });
 
-  it('returns isError when the tool is unknown and does not touch aiPrisma', async () => {
+  it('opens no transaction and switches no role around a tool call', async () => {
+    const ToolClass = class {};
+    mockScopeRegistry.resolveProvider.mockReturnValue({
+      providerClass: ToolClass,
+      methodName: 'run',
+    });
+    const instance = { run: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] }) };
+    mockModuleRef.get.mockReturnValue(instance);
+    const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
+
+    await svc.execute('query-records', {}, principal);
+
+    expect(instance.run).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('returns isError when the tool is unknown and never resolves a provider', async () => {
     mockScopeRegistry.resolveProvider.mockReturnValue(undefined);
     const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
     const result = await svc.execute('unknown', {}, principal);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/Unknown tool/);
-    expect(mockAiPrisma.executeWithRlsContext).not.toHaveBeenCalled();
+    expect(mockModuleRef.get).not.toHaveBeenCalled();
   });
 });

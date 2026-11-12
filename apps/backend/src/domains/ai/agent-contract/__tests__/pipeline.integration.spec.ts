@@ -10,14 +10,13 @@ import { AgentInvocationLoggerService } from '../agent-invocation-logger.service
 import { InvocationPipelineService } from '../invocation-pipeline.service';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { RequiresScope } from '../requires-scope.decorator';
-import type { AiPrismaService } from '../../rls/ai-prisma.service';
 import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row
- * into agent_invocation_logs, with mocked registry/moduleRef/aiPrisma. The
+ * into agent_invocation_logs, with mocked registry/moduleRef. The
  * pipeline is always on. Skipped when DATABASE_URL is unset or names no usable
  * database: Postgres is unreachable, refuses the login, has no such database, is
  * not migrated, or holds no seeded tenant. Any other failure in setup fails the spec.
@@ -105,10 +104,6 @@ describe('Phase A pipeline integration', () => {
       get: (token: unknown) => (token === TestRecordsReadTool ? toolInstance : null),
     } as unknown as ModuleRef;
 
-    const aiPrisma = {
-      executeWithRlsContext: (_t: number, _u: number, _r: string, fn: () => Promise<unknown>) => fn(),
-    } as unknown as AiPrismaService;
-
     // The real outbox on the real database; publishing is a no-op, so the staged rows are simply marked published.
     const events = {
       publish: async () => undefined,
@@ -119,7 +114,7 @@ describe('Phase A pipeline integration', () => {
     await scopeRegistry.onApplicationBootstrap();
 
     const hitl = new HitlPolicyService();
-    const executor = new ToolExecutorService(scopeRegistry, aiPrisma, moduleRef, prisma as any);
+    const executor = new ToolExecutorService(scopeRegistry, moduleRef, prisma as any);
     const logger = new AgentInvocationLoggerService(prisma as any, outbox);
     const challenges = {
       issue: async () => ({

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ScopeRegistryService } from './scope-registry.service';
-import { AiPrismaService } from '../rls/ai-prisma.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
 export interface ToolResult {
@@ -17,7 +16,6 @@ export class ToolExecutorService {
 
   constructor(
     private readonly registry: ScopeRegistryService,
-    private readonly aiPrisma: AiPrismaService,
     private readonly moduleRef: ModuleRef,
     private readonly prisma: PrismaService,
   ) {}
@@ -32,14 +30,12 @@ export class ToolExecutorService {
     }
 
     const userDbId = this.resolveUserDbId(principal);
-    const role = this.resolveRole(principal);
 
     // Tools expect `_userId` to be the *wire-format* string user id (what
     // `User.userId` column stores — e.g. "user_demo_owner"), because they
     // write it into VARCHAR audit columns (Alert.acknowledgedBy,
     // Invoice.voidedBy, etc.) or use it to look up by `firebaseUid`.
-    // Inject the string form here; RLS session uses the numeric DB id
-    // (that's the numeric id `executeWithRlsContext` binds to app.current_user_id).
+    // Inject the string form here; `_userDbId` carries the numeric DB id.
     const userIdString = await this.resolveUserIdString(principal, userDbId);
 
     const injectedArgs = {
@@ -50,12 +46,7 @@ export class ToolExecutorService {
     };
 
     try {
-      const raw = await this.aiPrisma.executeWithRlsContext(principal.tenantId, userDbId, role, async () => {
-        const instance = this.moduleRef.get(provider.providerClass as any, {
-          strict: false,
-        });
-        return instance[provider.methodName](injectedArgs);
-      });
+      const raw = await this.invoke(provider, injectedArgs);
 
       if (raw && typeof raw === 'object' && Array.isArray(raw.content)) {
         return raw as ToolResult;
@@ -75,6 +66,21 @@ export class ToolExecutorService {
         isError: true,
       };
     }
+  }
+
+  /**
+   * The one place a tool method is called. Tenant isolation is the tool's own `_tenantId` filter;
+   * no transaction or role switch is opened around the call. Tenant-context plumbing, when it
+   * lands, wraps this call (and only this call).
+   */
+  private async invoke(
+    provider: { providerClass: unknown; methodName: string },
+    injectedArgs: Record<string, unknown>,
+  ): Promise<any> {
+    const instance = this.moduleRef.get(provider.providerClass as any, {
+      strict: false,
+    });
+    return instance[provider.methodName](injectedArgs);
   }
 
   private resolveUserDbId(p: AgentPrincipal): number {
@@ -110,9 +116,5 @@ export class ToolExecutorService {
       select: { userId: true },
     });
     return user?.userId ?? null;
-  }
-
-  private resolveRole(p: AgentPrincipal): string {
-    return p.kind === 'user' ? p.role : 'AGENT';
   }
 }

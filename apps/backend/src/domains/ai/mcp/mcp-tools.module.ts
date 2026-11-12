@@ -6,7 +6,6 @@ import { HealthTool } from './tools/health.tool';
 import { KnowledgeTool } from './tools/knowledge.tool';
 import { McpToolService } from './mcp-tool.service';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
-import { RlsModule } from '../rls/rls.module';
 import { AgentContractModule } from '../agent-contract/agent-contract.module';
 
 /**
@@ -37,7 +36,6 @@ import { AgentContractModule } from '../agent-contract/agent-contract.module';
     PrismaModule,
     CacheModule,
     KnowledgeBaseModule,
-    RlsModule,
     forwardRef(() => AgentContractModule),
     // Import the NestJS modules your tool providers depend on here.
   ],

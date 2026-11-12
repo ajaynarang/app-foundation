@@ -60,10 +60,6 @@ describe('McpToolService — pipeline routing', () => {
     }),
   };
 
-  const mockAiPrisma = {
-    executeWithRlsContext: jest.fn((_t, _u, _r, fn) => fn()),
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -75,7 +71,7 @@ describe('McpToolService — pipeline routing', () => {
       }),
     };
 
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, pipeline as any);
     await svc.onModuleInit();
 
     const tools = await svc.getToolsForPersona('member', {
@@ -93,7 +89,6 @@ describe('McpToolService — pipeline routing', () => {
       { status: 'active' },
     );
     expect(mockRecordsInstance.queryRecords).not.toHaveBeenCalled();
-    expect(mockAiPrisma.executeWithRlsContext).not.toHaveBeenCalled();
     expect(result).toEqual({ count: 5 });
   });
 
@@ -102,7 +97,7 @@ describe('McpToolService — pipeline routing', () => {
       run: jest.fn().mockRejectedValue(new PipelineError('unrecoverable pipeline error')),
     };
 
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, pipeline as any);
     await svc.onModuleInit();
 
     const tools = await svc.getToolsForPersona('member', {
@@ -119,7 +114,7 @@ describe('McpToolService — pipeline routing', () => {
   it('skips pipeline branch when no execution context is provided', async () => {
     const pipeline = { run: jest.fn() };
 
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, pipeline as any);
     await svc.onModuleInit();
 
     const tools = await svc.getToolsForPersona('prospect');

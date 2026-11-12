@@ -90,16 +90,16 @@ tests/         — Playwright QA suite (@app/qa)
 
 ### Backend domains (`apps/backend/src/domains/`)
 
-| Domain           | What it does (all domain-free / generic)                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------- |
-| `billing/`       | Stripe subscriptions, wallet, dunning                                                              |
-| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                            |
-| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                             |
-| `support/`       | Ticketing                                                                                          |
-| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                        |
-| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
-| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
-| `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
+| Domain           | What it does (all domain-free / generic)                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| `billing/`       | Stripe subscriptions, wallet, dunning                                                        |
+| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                      |
+| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                       |
+| `support/`       | Ticketing                                                                                    |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                  |
+| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                     |
+| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + voice |
+| `prompting/`     | Prompt management (one generic assistant fallback)                                           |
 
 <!-- feature:desk:start -->
 
