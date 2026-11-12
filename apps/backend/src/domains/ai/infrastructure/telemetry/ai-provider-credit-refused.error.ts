@@ -56,7 +56,7 @@ const logger = new Logger('AiProviderCreditRefused');
 /**
  * The one place a credit refusal on a PLATFORM-paid route is reported: at error level, because it follows the budget
  * path (a 402, not a 5xx) and so would otherwise reach no alert. On `platform-openrouter` it usually means the
- * platform's OpenRouter balance ran out. The error tracker's call goes here when one is added. A refusal on a
+ * platform's OpenRouter balance ran out or, with a per-workspace sub-key, that the workspace spent its monthly cap. The error tracker's call goes here when one is added. A refusal on a
  * workspace's own key is the workspace's to fix and is not logged as a platform fault.
  */
 export function logPlatformCreditRefusal(route: { payer: AiPayer; routeId: string }, tenantId: number | null): void {

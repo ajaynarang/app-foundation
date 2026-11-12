@@ -436,6 +436,53 @@ role then has its calls refused by AWS (the task role may no longer assume it) u
 FAILING or the owner removes it; it is never moved to a platform route. Reverting the code returns zero-retention
 workspaces to being refused, and stored roles are ignored.
 
+## 11. Per-workspace OpenRouter sub-keys
+
+**What changed.** The platform can give each workspace its own OpenRouter runtime key on the platform's OpenRouter
+account. Its limit is the workspace's monthly hard AI budget, reset monthly, so OpenRouter refuses that workspace's
+calls at its own edge once the cap is spent, and its dashboard shows spend per workspace. The platform still pays:
+the ledger still records `platform-openrouter` and `PLATFORM_OPENROUTER`, the platform cap still applies, and a
+sub-key is never a workspace credential. Off by default.
+
+- New table `tenant_ai_sub_keys` (migration `tenant_ai_sub_keys`, additive, no backfill): one row per workspace with
+  the key as an AES-256-GCM envelope bound to the workspace, OpenRouter's key hash and the last limit sent.
+- New optional variable `OPENROUTER_PROVISIONING_KEY`, an OpenRouter management key. Sub-keys run only when it and
+  `AI_CREDENTIALS_KEY` (section 9) are both set. With the management key alone, nothing is created: the app logs one
+  warning and every workspace keeps the master `OPENROUTER_API_KEY`.
+- When keys are created or changed: when a workspace is approved, changes plan, signs up (personal mode), or is the
+  single-mode workspace at boot, the budget seeder sets the key's limit to the plan's monthly hard cap, creating the
+  key when missing. A workspace whose budget an admin manages keeps its caps; it gets a key at the admin's cap if it
+  has none. Saving a budget in AI Spend pushes the new monthly hard cap to the key. These calls never hold up the
+  approval, signup, plan change or save, and a failure only logs.
+- Calls: `platform-openrouter` uses the workspace's key when one is stored. No row, a key that cannot be decrypted
+  (for example `AI_CREDENTIALS_KEY` removed), or a failed read falls back to the master key; a call is never refused
+  for it. Embeddings, workspaces paying with their own credential, and the global knowledge base never use a sub-key.
+- A key is never left at OpenRouter without the app holding it: if storing a freshly created key fails, it is revoked
+  by its hash at once. If that revoke fails, the hash (never the key) is logged at error level; delete that key in
+  the OpenRouter dashboard.
+- New command, run by hand: `pnpm --filter @app/backend ai:subkey-check` creates a $1 key, changes its cap, reads it
+  back and revokes it by hash. It calls the key management API only (no model), and runs only when
+  `OPENROUTER_PROVISIONING_KEY` is set.
+
+**Who notices.** Nobody until the operator sets the management key. Then a workspace that spends its monthly cap can
+be refused by OpenRouter itself, not only by the ledger check. When OpenRouter answers with a 402 or a credit message,
+the call follows the existing credit-refusal path (the budget message, logged at error level for a platform route).
+The exact status OpenRouter sends for a spent key limit has not been checked live; `ai:subkey-check` does not spend.
+
+**What to do.**
+
+1. Deploy. Nothing must be set; the table stays empty.
+2. To turn sub-keys on: create a management key in OpenRouter (Settings, Provisioning API keys), run
+   `ai:subkey-check` with it against a test account, then set `OPENROUTER_PROVISIONING_KEY` in Doppler next to
+   `AI_CREDENTIALS_KEY`. Existing workspaces get a key the next time their plan or budget changes, or at the next
+   boot in single mode; until then the master key serves them.
+3. Never rotate or remove `AI_CREDENTIALS_KEY` while sub-keys exist unless you accept that every workspace falls back
+   to the master key (and loses its OpenRouter-side cap) until its row is deleted and re-created.
+
+**Rollback.** Unset `OPENROUTER_PROVISIONING_KEY`: no key is created or changed, but stored keys keep serving their
+workspaces at their last limit. To stop using them, delete the rows (`DELETE FROM tenant_ai_sub_keys`) and revoke the
+keys in the OpenRouter dashboard. Reverting the code ignores the table; the migration stays.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops

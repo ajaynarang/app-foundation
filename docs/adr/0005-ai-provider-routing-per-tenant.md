@@ -88,8 +88,9 @@ One root cause: provider choice was a process constant, while retention and paym
   works for it on full-text.
 - Dev mirrors production: there is no special dev provider.
 - Bring-your-own-key added the tenant pool and three registry entries without reshaping the resolver; the Bedrock
-  routes (`platform-bedrock` and `BEDROCK_ROLE`) added two more the same way, and per-workspace OpenRouter sub-keys
-  will too.
+  routes (`platform-bedrock` and `BEDROCK_ROLE`) added two more the same way. Per-workspace OpenRouter sub-keys
+  added one branch to the platform candidate: `platform-openrouter` calls with the workspace's own capped key when
+  one is stored (its own cached bundle, the same route id and payer), and with the master key otherwise.
 - A workspace Bedrock role is assumed with the backend's own task-role credentials, never through an intermediate
   role: the role a workspace trusts (`PLATFORM_ASSUME_ROLE_ARN`) is the role that calls. Both Bedrock routes sign
   through the default AWS credential chain. Connecting a role checks it both ways: with the external id the assume
