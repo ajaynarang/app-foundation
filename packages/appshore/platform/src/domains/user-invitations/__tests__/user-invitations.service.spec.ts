@@ -138,6 +138,48 @@ describe('UserInvitationsService', () => {
       expect(mockPrismaService.userInvitation.create).toHaveBeenCalled();
     });
 
+    it("answers the public invitation and its link: never the token, the Int key or the inviter's whole row", async () => {
+      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 1, tenantId: 'tenant_abc' });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
+      mockPrismaService.userInvitation.create.mockResolvedValue({
+        id: 7,
+        invitationId: 'inv_abc123',
+        tenantId: 1,
+        invitedBy: 1,
+        token: 'secret-token',
+        email: 'newuser@example.com',
+        phone: null,
+        inviteChannel: 'EMAIL',
+        firstName: 'John',
+        lastName: 'Doe',
+        role: 'MEMBER',
+        status: 'PENDING',
+        expiresAt: new Date(),
+        acceptedAt: null,
+        cancelledAt: null,
+        createdAt: new Date(),
+        invitedByUser: { userId: 'user_admin1', email: 'a@example.com', firstName: 'Admin', lastName: 'User' },
+        tenant: { companyName: 'Acme Co' },
+      });
+
+      const result = await service.inviteUser(
+        { email: 'newuser@example.com', firstName: 'John', lastName: 'Doe', role: 'MEMBER' as any },
+        defaultCurrentUser,
+      );
+
+      expect(result).toMatchObject({
+        invitationId: 'inv_abc123',
+        invitedBy: { userId: 'user_admin1' },
+        inviteLink: expect.stringContaining('/accept-invitation?token='),
+      });
+      for (const key of ['id', 'token', 'tenantId', 'tenant', 'invitedByUser']) expect(result).not.toHaveProperty(key);
+      // The inviter is read for the email and the response only: never the password or PIN hash.
+      const include = mockPrismaService.userInvitation.create.mock.calls[0][0].include;
+      expect(include.invitedByUser).toEqual({ select: expect.not.objectContaining({ passwordHash: true }) });
+    });
+
     it('should throw error if user already exists', async () => {
       const inviteDto = {
         email: 'existing@example.com',
@@ -348,7 +390,9 @@ describe('UserInvitationsService', () => {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
 
-      await service.resendInvitation('inv_abc', 'tenant_abc');
+      const resent = await service.resendInvitation('inv_abc', 'tenant_abc');
+      for (const key of ['id', 'token', 'tenantId']) expect(resent).not.toHaveProperty(key);
+      expect(resent.inviteLink).toContain('token=');
 
       expect(mockPrismaService.userInvitation.update).toHaveBeenCalledWith(
         expect.objectContaining({

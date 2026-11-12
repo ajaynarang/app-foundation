@@ -170,9 +170,10 @@ export class UserInvitationsService {
         status: 'PENDING',
         expiresAt,
       },
+      // Only what the email and the public response need: never the inviter's whole row (password hash, PIN hash).
       include: {
-        tenant: true,
-        invitedByUser: true,
+        tenant: { select: { companyName: true } },
+        invitedByUser: INVITATION_LIST_SELECT.invitedByUser,
       },
     });
 
@@ -196,7 +197,7 @@ export class UserInvitationsService {
       );
     }
 
-    return { ...invitation, inviteLink };
+    return { ...toPublicInvitation(invitation), inviteLink };
   }
 
   /**
@@ -455,6 +456,7 @@ export class UserInvitationsService {
         token: newToken,
         expiresAt: newExpiry,
       },
+      select: INVITATION_LIST_SELECT,
     });
 
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
@@ -475,7 +477,7 @@ export class UserInvitationsService {
       );
     }
 
-    return { ...updatedInvitation, inviteLink };
+    return { ...toPublicInvitation(updatedInvitation), inviteLink };
   }
 
   /**
