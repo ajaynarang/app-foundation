@@ -122,7 +122,7 @@ feedback categorization, and chat. Chat agents own no model any more: `mastra.pr
 `perRequestModel`, and every call site (a chat turn, a delegated `execute`, a resume) passes the resolved model in
 the Mastra `RequestContext` under `REQUEST_MODEL_KEY` (`apps/backend/src/domains/ai/routing/request-model-key.ts`).
 An agent invoked without one throws a 500; it never falls back to a default provider. Embeddings are unchanged in
-this step (they still use `ai-provider.ts` and `text-embedding-3-small`; the next step moves them).
+this step (they still use `ai-provider.ts` and `text-embedding-3-small`; section 6 moves them).
 
 - The default language route is `platform-openrouter`. With `OPENROUTER_API_KEY` unset, chat, the classifier,
   feedback categorization, Desk LLM steps and memory extraction answer `AiNotConfigured` (503). `AI_PROVIDER`,
@@ -162,6 +162,66 @@ loses chat and the other language features until a zero-retention route is enabl
 - If you listen for `AI_ZERO_RETENTION_UNAVAILABLE`, read `need` instead of `tier`.
 - Deploy normally: the migration is additive and nullable, with no backfill. Rollback: revert the change; the two
   columns can stay.
+
+## 6. Embeddings move onto the resolver; old vectors are cleared; `ai-provider.ts` and its variables are gone
+
+**What changed.** Every embedding now comes from the route resolver, so the old provider file is deleted. This is
+the change with a data step.
+
+- `EmbeddingService.embedText(text, aiContext, intent)` and `embedBatch(texts, aiContext, intent)` take their model
+  from `resolve(tenantId, 'embedding')`. `aiContext` (the tenant to route by and to bill) and `intent` (`'document'`
+  for stored text, `'query'` for search text) are required. The model is Cohere Embed v4 at 1536 dimensions
+  (`platform-cohere`, `COHERE_API_KEY`), sent with Cohere's input type; every vector is checked at 1536 before it is
+  returned. Each call lands a ledger row with its route (`platform-cohere`, `PLATFORM_COHERE`, provider `cohere`,
+  model `embed-v4.0`); a failed provider call lands an `ERROR` row. `embedForPlatform(texts)` embeds global content
+  (the knowledge base) on the platform route with no tenant ledger row. `text-embedding-3-small` is retired.
+- Zero retention now covers embeddings: a workspace with `aiZeroRetention` is refused (`ZeroRetentionUnavailable`)
+  before its text leaves, until a zero-retention embedding route exists.
+- Migration `20261112220000_clear_embedding_vectors` sets `knowledge_documents.embedding` and
+  `desk_memories.content_embedding` to NULL. Rows and text are kept. OpenAI and Cohere vectors live in different
+  spaces, so an old vector left searchable would match new queries at random.
+- Knowledge-base search never fails because of routing. When the query cannot be embedded (no `COHERE_API_KEY`, a
+  zero-retention workspace, a provider error) or no matching chunk has a vector yet, it answers from full-text. The
+  `search-kb` tool embeds the query on the calling workspace's own route. Desk memory recall already scored without
+  the semantic term when it had no query vector; it now embeds the query on the workspace's route too.
+- `pnpm seed:knowledge` boots again: its module provided `EmbeddingService` without the services it injects. It now
+  loads the app's config schema and the resolver (`IngestionCliModule`). With no `COHERE_API_KEY` it stores the
+  chunks without vectors and says so; search uses full-text until a run with the key. The starter's `welcome.md`
+  gained the `documentType` the loader requires.
+- New command, for a product that kept Desk: `pnpm --filter @app/backend ai:reembed-desk-memory [--tenant <id>]`.
+  It re-embeds Desk memories with no vector, tenant by tenant, on each tenant's own route (so the right payer and
+  retention apply, with a ledger row per batch). A tenant its route refuses is skipped and named; it exits 1 only
+  when a tenant failed for another reason. Safe to re-run. A product scaffolded without Desk does not have it.
+- Removed: `apps/backend/src/domains/ai/infrastructure/providers/ai-provider.ts` (`ai`, `aiDirect`, `aiEmbedding`,
+  `isAiConfigured`, `getRequiredAiEnvVar`, `ZDR_ELIGIBLE_TIERS`), the catalog's `LEGACY_EMBEDDING`, and the config
+  key `anthropicApiKey`. `AI_PROVIDER`, `AI_GATEWAY_API_KEY` and `ANTHROPIC_API_KEY` are no longer read; each one
+  still set logs one warning at boot. `ANTHROPIC_API_KEY` stays in `.env.example` as a developer's test key (the
+  live check reads it); it is not a platform route.
+- Provider packages (`@ai-sdk/*`, `@openrouter/*`, `openai`) and `createGateway` may be imported only under
+  `domains/ai/routing/` and `domains/ai/moderation/` (`ai-provider-clients.spec.ts`).
+- New ADR: "AI provider routing is per tenant; retention is enforced in the resolver".
+
+**Who notices.** Anyone using knowledge-base search or Desk memory: until the re-embed runs, search answers from
+full-text and memory recall has no semantic matches; nothing errors. A deployment without `COHERE_API_KEY` keeps
+full-text search only. A zero-retention workspace loses vector search and memory embeddings.
+
+**What to do (rollout).**
+
+1. Set `OPENROUTER_API_KEY` and `COHERE_API_KEY` in every environment before deploying (see section 4).
+2. Deploy. The migration clears the old vectors.
+3. Run `pnpm --filter @app/backend seed:knowledge` against each environment. If you kept Desk, then run
+   `pnpm --filter @app/backend ai:reembed-desk-memory`. Both need `DATABASE_URL`, `REDIS_URL` and the keys above.
+4. Remove `AI_PROVIDER`, `AI_GATEWAY_API_KEY` and, unless a developer uses it as a test key, `ANTHROPIC_API_KEY` from
+   Doppler and your task definitions. Until then they are ignored and each logs a boot warning.
+5. Tell any workspace with `aiZeroRetention` that AI, including vector search and memory embeddings, stops for it
+   until a zero-retention route is enabled.
+6. In your own code: pass `aiContext` and an intent to every `embedText` / `embedBatch` call; use `embedForPlatform`
+   only for content with no tenant; replace any import of `ai-provider` with the resolver
+   (`AiRouteResolver.resolve(tenantId, need)`); read nothing from `anthropicApiKey`.
+
+**Rollback.** Revert the change and restore the old variables. The vectors were cleared, so re-run
+`pnpm seed:knowledge` on the old code; Desk memory vectors come back only as new memories are written. The ledger
+columns from section 5 are nullable and stay.
 
 ## Deploy order for `ai_reader`
 

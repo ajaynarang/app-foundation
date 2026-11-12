@@ -1376,20 +1376,39 @@ await this.retryService.withRetry(
 
 ## 11. AI Invocation Patterns
 
-**Model aliases** (in `apps/backend/src/domains/ai/infrastructure/providers/ai-provider.ts`):
+**The resolver is the only way to get a model (NON-NEGOTIABLE).** `AiRouteResolver.resolve(tenantId, need)` in `apps/backend/src/domains/ai/routing/` picks the tenant's route for `'language'` or `'embedding'`, applies the tenant's retention policy, and fails closed with a typed error: `AiNotConfigured` (503, nothing serves the need), `ZeroRetentionUnavailable` (400, a route exists but the tenant requires zero retention and it keeps data), `AiModelNotOnRoute` (503, the catalog has no id for that alias on that route). Never catch one of these to fall back to another provider. `resolvePlatform(need)` is only for platform-owned content with no tenant (the global knowledge base). The ADR "AI provider routing is per tenant; retention is enforced in the resolver" has the decision.
 
-| Alias      | Use For                                         |
-| ---------- | ----------------------------------------------- |
-| `fast`     | Chat, classifications, simple extraction        |
-| `standard` | Document parsing, structured extraction         |
-| `powerful` | Complex extraction, fallback for critical tasks |
+**Aliases, never model ids:**
 
-Model IDs are HARDCODED in the model catalog, `MODEL_CATALOG` in `domains/ai/routing/model-catalog.ts` (single source — one row per alias, one id column per route family; the cost ledger and provider routes derive from it). A model bump is a change there plus pricing rows — never an env var. Env vars hold ROUTES and TIERS, never raw model IDs. `model-id-literals.spec.ts` fails on a model id anywhere else. Every model call names an output ceiling from `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`): `maxOutputTokens` on `extract` and AI SDK calls, `modelSettings.maxOutputTokens` on Mastra agent calls (`model-calls-name-a-ceiling.spec.ts`).
+| Alias      | Use For                                                         |
+| ---------- | --------------------------------------------------------------- |
+| `fast`     | Classification, short summaries, memory extraction (effort low) |
+| `standard` | Chat, structured extraction (effort medium)                     |
+| `powerful` | Complex extraction, fallback for critical tasks (effort medium) |
+
+Model ids live only in `MODEL_CATALOG` (`domains/ai/routing/model-catalog.ts`): one row per alias, one id column per route family. A model bump is a change there plus pricing rows, never an env var. `model-id-literals.spec.ts` fails on a model id anywhere else. Env vars hold route keys, never model ids.
+
+**No provider client, no `process.env` outside `AI/routing/`.** Provider packages (`@ai-sdk/<provider>`, `@openrouter/*`, `openai`) and `createGateway` are imported only under `domains/ai/routing/` (the route registry builds every client) and `domains/ai/moderation/` (`ai-provider-clients.spec.ts`). Routing reads its keys through `ConfigService` from the zod schema, never `process.env` (`ai-routing-config.spec.ts`). The `ai` package itself (`generateText`, `embed`) is fine anywhere: it calls the model it is handed.
 
 ```typescript
-import { ai } from '../infrastructure/providers/ai-provider';
-const model = ai('standard');
+// Structured output: aiContext (the tenant to route by and to bill) and maxOutputTokens are required.
+const { object } = await this.structuredOutput.extract({
+  messages, schema, systemPrompt, modelAlias: 'fast', timeoutMs: 30_000,
+  maxOutputTokens: OUTPUT_CEILINGS.VERDICT,
+  aiContext: { tenantId, surface: AiSurface.DESK_STEP },
+});
+
+// A raw AI SDK call (rare; document the reason): resolve first, then call the route's model.
+const route = await this.aiRouteResolver.resolve(tenantId, 'language');
+const result = await generateText({ model: route.languageModel('standard'), maxOutputTokens: OUTPUT_CEILINGS.SUMMARY, ... });
+
+// A Mastra agent has no model of its own: pass the resolved one per call.
+const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageModel('standard')]]);
 ```
+
+**Every model call names an output ceiling** from `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`): `maxOutputTokens` on every `extract` and AI SDK call, `modelSettings.maxOutputTokens` on Mastra agent calls (`model-calls-name-a-ceiling.spec.ts`). Thinking is billed as output on the 5.5 models, so no ceiling is below 1,024.
+
+**Every embedding names its tenant and its intent.** `EmbeddingService.embedText(text, aiContext, intent)` and `embedBatch(texts, aiContext, intent)`: `aiContext` routes and bills the call, `intent` is `'document'` for text you store and `'query'` for text you search with (Embed v4 is asymmetric; mixing them silently degrades retrieval). Every vector is checked at 1536 dimensions. `embedForPlatform(texts)` is for global content only. A search must not fail because the query cannot be embedded: catch the error and answer from full-text (the knowledge base does).
 
 **Fallback pattern (document extraction):**
 
@@ -1399,9 +1418,9 @@ const model = ai('standard');
 
 **Prompt management:** prompts load through `PromptingService` (`apps/backend/src/domains/prompting/`) — Langfuse primary with a code-registered fallback. Register prompts via the domain's registrar; names live in `PROMPT_NAMES` (`prompting.types.ts`).
 
-**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK directly through `StructuredOutputService` (document/structured extraction) and, when the product kept Desk, Desk steps via `runStructuredLlmStep()`, orchestrated by its durable workflow engine, not BullMQ. Don't add new direct-SDK callsites without a documented reason.
+**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK through `StructuredOutputService` (document/structured extraction) and, when the product kept Desk, Desk steps via `runStructuredLlmStep()`, orchestrated by its durable workflow engine, not BullMQ. Don't add new direct-SDK callsites without a documented reason.
 
-**Cost + moderation:** AI calls log to the per-tenant AI spend ledger; user-facing chat goes through moderation. Don't bypass either.
+**Cost + moderation:** every AI call lands a row in the per-tenant ledger (`ai_invocations`) with the route that served it (`routeId`, `credentialType`); user-facing chat goes through moderation. Don't bypass either.
 
 ---
 
