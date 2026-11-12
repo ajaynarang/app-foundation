@@ -373,7 +373,7 @@ export class ProjectsService {
 - Throw standard NestJS exceptions: `NotFoundException`, `BadRequestException`, `ConflictException`, `ForbiddenException`
 - State machine transitions: validate current status before updating (see §3.1)
 - Emit through `DomainEventService` (from `@appshore/kernel`) — never raw `EventEmitter2.emit` (see §8.1)
-- Always pass pagination through `clampPagination()` (`@appshore/kernel`, `shared/utils/pagination.ts`) before hitting the DB — never accept `limit`/`offset` raw
+- A list that can grow is a cursor list: `clampCursorLimit`, `keysetWhere`, `buildCursorPage` from `@appshore/kernel/shared/utils/cursor-pagination` (see §3.3). There is no offset or page paging
 
 ### 3.1 State Machine Transitions
 
@@ -422,6 +422,91 @@ this.notificationTriggers
 - For separate DB writes that aren't part of the main transaction (audit log entries, log tables), wrap in `.catch()` with a logger warn so a failure doesn't 500 the response.
 - Don't `.catch(() => {})` silently — log at minimum. Silent swallow turns a known failure into a mystery.
 - If the side effect MUST succeed (charge customer, persist invoice), it's not a side effect — it's part of the main flow. Put it in the transaction or fail the request.
+
+### 3.3 Lists Are Cursor Lists (NON-NEGOTIABLE)
+
+Every list that can grow answers one envelope, `CursorList<T>` from `@app/shared-types`:
+`{ items, nextCursor, total, counts? }`. Page size is 50 by default and 100 at most. The cursor is opaque. There is
+no offset, no page number, and no second envelope (`{ data, total }`, `{ rows, nextCursor }`).
+
+```typescript
+// The shape of InvoiceService.listInvoices (apps/backend/src/domains/billing/services/invoice.service.ts)
+import { buildCursorPage, clampCursorLimit, encodeCursor, keysetWhere } from '@appshore/kernel/shared/utils/cursor-pagination';
+
+// BillingInvoice.id is a cuid String, so it is public and can be the tiebreak. A table keyed by an Int uses publicId.
+const INVOICE_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+
+async listInvoices(tenantId: number, query: InvoiceListQuery = {}): Promise<CursorList<BillingInvoice>> {
+  const take = clampCursorLimit(query.limit);
+  // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+  const keyset = query.cursor ? keysetWhere({ ...INVOICE_KEYSET, cursor: query.cursor }) : undefined;
+  const scope: Prisma.BillingInvoiceWhereInput = { tenantId };
+  if (query.status) scope.status = query.status;
+
+  const [rows, total] = await Promise.all([
+    this.prisma.billingInvoice.findMany({
+      where: keyset ? { AND: [scope, keyset] } : scope,   // AND, never spread: a search's OR must survive
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,                                      // the probe row says whether a next page exists
+    }),
+    this.prisma.billingInvoice.count({ where: scope }),     // the total ignores the cursor
+  ]);
+  return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id)), total };
+}
+```
+
+**Rules:**
+
+- The query DTO extends `CursorQueryDto` (`limit`, `cursor`), `ListQueryDto` (+ `q`) or `DatedListQueryDto`. The
+  controller passes the DTO to the service; the service clamps the limit and decodes the cursor.
+- **Order by the sort column, then a unique tiebreak in the same direction.** A date column needs
+  `kind: 'date'`: the database keeps microseconds and the cursor milliseconds, so the helper treats the cursor's
+  millisecond as a bucket. A name is `kind: 'text'`; a number or key is `kind: 'value'`.
+- **The tiebreak is a public identifier, never an Int primary key**: the table's string id (`userId`,
+  `tenantId`, `invitationId`, a UUIDv7 row id), its human number (`ticketNumber`), or a `publicId` (§3.4). A
+  cursor is opaque but not encrypted.
+- Join the scope and the keyset with `AND: [scope, keyset]`. Never spread both into one object: each may carry an
+  `OR`, and the second replaces the first.
+- `total` counts the current view (search, filters, dates, status) and never the cursor. `counts` is for a status
+  pivot: per-status totals for the same filters with the status filter left out (`pivotCounts`).
+- A sort over a SQL aggregate (spend per tenant) spells the keyset out in SQL and tags the cursor with whatever
+  the totals depend on (the window's first day), so a cursor from another window is a 400, not a wrong page.
+  See `AdminAiSpendService.listTenants`.
+- **A picker is a cursor list with `q`**: the first page until the user types, then a server search. See
+  `listTenantOptions` (`apps/backend/src/shared/lists/tenant-options.ts`).
+- **A list that does not grow may stay a bare array**, as an entry in `BOUNDED_LISTS` of
+  `apps/backend/src/architecture/api-contract.allowlist.json`, with the reason its size is fixed (one row per
+  enum value, per registry entry, per unique key) or the named `take` that caps it.
+- **Every other read a GET reaches is bounded.** A `findMany` has a `take` with a named maximum
+  (`PAYMENT_METHOD_LIST_CAP`), or the method is an entry in `BOUNDED_READS` with the unique key or registry
+  that fixes its size. Never load rows to count or sum them: `count`, `groupBy`, or one SQL aggregate.
+- **An index backs the keyset**: the list's scope columns, then its sort column, then the tiebreak
+  (`@@index([tenantId, createdAt, publicId])`). Add one only where no existing index already starts with the
+  scope columns followed by the sort column. In the migration: `CREATE INDEX IF NOT EXISTS`.
+- **Test by walking real pages.** `fixtureModel(rows)`, `tiedTimestamps(n)` and `walkCursorList(read)` from
+  `@appshore/platform/test/helpers/cursor-walk` run the service over a fixture through `prisma-where`: assert
+  every row comes back once across pages, rows that share a timestamp included, that the total holds on every
+  page, and that a cursor the service did not issue is a 400 before any query runs.
+- Held by the ratchet rules `output/lists-are-cursor-lists`, `output/list-reads-are-bounded` and
+  `output/no-raw-prisma-from-controllers` in `api-contract.spec.ts`. The starter's routes pass all three: the
+  baseline holds no entry for them.
+
+### 3.4 The ID Boundary (NON-NEGOTIABLE)
+
+An Int primary key never crosses the API. The canonical text is [`id-convention.md`](./id-convention.md) (role 6
+and "The boundary"); the decision record is the ADR "ID boundary".
+
+- **Resolve on the way in.** `@Param('id', ParseUUIDPipe) publicId: string`, then the service resolves it
+  (`findUnique({ where: { publicId } })`) and answers 404 when it is unknown. Never `ParseIntPipe` on a route
+  param, and no DTO property named `id` / `*Id` typed `number`.
+- **Serialize on the way out.** A `toPublic…(row)` function beside the service emits the public id and omits
+  `id` and every numeric foreign key. See `broadcast.serializer.ts`, `invitation.serializer.ts`,
+  `feedback.serializer.ts`, `notification.serializer.ts`.
+- **Public ids in event payloads.**
+- A new aggregate takes `generateId(prefix)` in a `VarChar(30)`. An existing table that needs an address takes
+  `public_id UUID` with the five-step migration in `id-convention.md`.
+- Held by `apps/backend/src/architecture/id-boundary.spec.ts`. The numeric ids that exist today are listed in
+  `id-boundary.allowlist.json` with a reason each; the list may only shrink.
 
 ---
 
@@ -1381,7 +1466,7 @@ Guardrails: `schema-conventions.spec.ts`, `web-status-casing.spec.ts`, `status-c
 
 - NEVER create parent + children as separate operations — wrap in `this.prisma.$transaction()`
 - NEVER check-then-create without atomicity — use `prisma.model.upsert()` instead of `findUnique → if null → create`
-- NEVER accept unbounded pagination — always use `clampPagination()` from `@appshore/kernel`
+- NEVER return an unbounded list: a list that can grow is a cursor list (§3.3); any other `findMany` a GET reaches has a `take`, or a `BOUNDED_READS` entry that says why its size is fixed
 - Financial operations (payments, invoices) MUST check for duplicates before creating
 
 **Correlation:**
@@ -1422,7 +1507,8 @@ Guardrails: `schema-conventions.spec.ts`, `web-status-casing.spec.ts`, `status-c
 - [ ] State machine: status transitions go through a dedicated method that whitelists allowed `from → to` (§3.1)
 - [ ] Multi-tenant isolation: every query filters by `tenantId`; record-level checks for owned resources (§2.1)
 - [ ] Feature flags: `@RequireFeature` at controller, after `@Roles` (§2.2)
-- [ ] Pagination: pass through `clampPagination()` before hitting the DB
+- [ ] Lists: a cursor list with a public-id tiebreak and a page-walking spec; every other read bounded (§3.3)
+- [ ] IDs: the record crosses the API by its public id; no numeric id in a param, DTO, response or tool (§3.4)
 - [ ] Correlation: queue jobs include `correlationId` from request context (§15)
 - [ ] Transactions: parent + children atomic; FK-safe delete order; no external API calls inside `$transaction` (§6.2)
 - [ ] Terraform: if new env vars, add to `infra/terraform/`

@@ -408,7 +408,7 @@ useEffect(() => {
 }, [openParam]);
 ```
 
-**Use URL state for:** active tab (`?tab=history`), deep links into a detail sheet (`?open=<id>`), shareable filters (`?status=OPEN&assignee=42`), pagination offset when deep-linkability matters.
+**Use URL state for:** active tab (`?tab=history`), deep links into a detail sheet (`?open=<id>`), shareable filters, search and sort (`?status=OPEN&q=acme`). A cursor is never put in the URL: it is opaque and belongs to one fetch.
 
 **Use `useState` for:** sheet open/close NOT triggered by a link, form input values, hover/focus/UI affordances.
 
@@ -565,36 +565,25 @@ Branch a list screen in this order, and it is right: `isLoading` → `PageLoadin
 - A picker over a growing list uses `usePickerSearch` (and `SearchSelect` for a form field): the first page until the user types, then a server search. Never filter a loaded page in the browser.
 - Several reads feeding one screen: `combineReads` so "unknown" is never shown as "none".
 
-The two offset patterns below are for the screens that have not moved to a cursor list yet. Do not start a new list on them.
+Every list endpoint of the starter is a cursor list, so there is no offset or page-number paging to write: no
+`offset` state, no Previous / Next pair, no `?page=`. "Load more" appends through `useCursorList`.
 
-**Component-state pagination** (default — small lists, internal tools):
-
-```typescript
-const PAGE_SIZE = 25;
-const [offset, setOffset] = useState(0);
-const { data } = useProjects({ limit: PAGE_SIZE, offset });
-// Prev: setOffset(o => Math.max(0, o - PAGE_SIZE))
-// Next: setOffset(o => o + PAGE_SIZE)  (use placeholderData: keepPreviousData)
-```
-
-**URL-state pagination** (deep-linkable — shareable filtered views):
-
-```typescript
-const sp = useSearchParams();
-const offset = Number(sp.get('offset') ?? 0);
-const router = useRouter();
-const setOffset = (next: number) => {
-  const url = new URLSearchParams(sp.toString());
-  next > 0 ? url.set('offset', String(next)) : url.delete('offset');
-  router.replace(`?${url.toString()}`, { scroll: false });
-};
-```
+- **End every list with `<ListFooter>`**: `shown={list.items.length}`, `total={list.total}`, `hasMore`,
+  `onLoadMore={list.loadMore}`, `isLoadingMore`, `loadMoreFailed={list.isLoadMoreError}`. It says
+  "Showing 50 of 312" and holds the Load more button, so a list never stops silently.
+- **The API function returns `CursorList<T>`** (`@app/shared-types`) and takes `cursor`. The hook wraps
+  `useCursorList`; a changed filter goes in the query key and is a new list, back on page one.
+- **Never filter, count or sum a loaded page in the browser.** A filter is a query param the server applies. A
+  figure over the whole list (a total spend, a status count) comes from the server (`total`, `counts`, or a
+  summary endpoint), because the loaded rows are only the first pages.
+- A screen that needs every row for an aggregate walks `nextCursor` with a page cap, never one unbounded read
+  (`billingApi.getTenants`).
 
 **Always:**
 
-- Cap `limit` at the backend's max page limit — never accept arbitrary user input.
-- Pair pagination with `placeholderData: keepPreviousData` so the table doesn't flash a skeleton between pages.
-- Sort/filter params live in the same place as offset (both URL or both state). Don't mix.
+- The page size is the backend's (50 by default, 100 at most). Pass `limit` only when a screen really wants fewer.
+- `useCursorList` already keeps the previous view's rows on screen while a new filter loads (`isRefreshing`).
+- Sort and filter params live in one place (`useListParams` for the URL, `useLocalListParams` for a sheet or tab).
 
 ---
 
