@@ -3,13 +3,16 @@ import { Test } from '@nestjs/testing';
 import { AdminAiSpendService } from '../admin-ai-spend.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { isSeederOwned } from '../../ai/routing/provisioning/plan-ai-budgets';
+import { OpenRouterProvisioningService } from '../../ai/routing/provisioning/openrouter-provisioning.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 
 describe('AdminAiSpendService', () => {
   let service: AdminAiSpendService;
   let prisma: any;
+  let provisioning: { syncLimit: jest.Mock };
 
   beforeEach(async () => {
+    provisioning = { syncLimit: jest.fn().mockResolvedValue(undefined) };
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       aiInvocation: {
@@ -28,7 +31,11 @@ describe('AdminAiSpendService', () => {
     };
 
     const module = await Test.createTestingModule({
-      providers: [AdminAiSpendService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AdminAiSpendService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: OpenRouterProvisioningService, useValue: provisioning },
+      ],
     }).compile();
 
     service = module.get(AdminAiSpendService);
@@ -392,6 +399,26 @@ describe('AdminAiSpendService', () => {
         expect(isSeederOwned(call.update.notes, true)).toBe(false);
       },
     );
+  });
+
+  describe('updateBudget keeps the OpenRouter sub-key in step', () => {
+    const input = { dailySoftUsd: 10, dailyHardUsd: 40, monthlySoftUsd: 100, monthlyHardUsd: 400, notes: null };
+
+    it('pushes the new monthly hard cap to the workspace sub-key', async () => {
+      await service.updateBudget(7, input);
+      expect(provisioning.syncLimit).toHaveBeenCalledWith(7, 400);
+    });
+
+    it('never waits on OpenRouter: the save returns while the sync is still pending', async () => {
+      provisioning.syncLimit.mockReturnValue(new Promise(() => undefined));
+      await expect(service.updateBudget(7, input)).resolves.toEqual(expect.objectContaining({ monthlyHardUsd: '200' }));
+    });
+
+    it('a failed save syncs nothing', async () => {
+      prisma.tenantAiBudget.upsert.mockRejectedValue(new Error('db down'));
+      await expect(service.updateBudget(7, input)).rejects.toThrow('db down');
+      expect(provisioning.syncLimit).not.toHaveBeenCalled();
+    });
   });
 
   describe('getCostVsQuota', () => {

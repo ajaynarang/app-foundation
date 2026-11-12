@@ -5,6 +5,7 @@ import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cac
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 
 import { BUDGET_SEED_NOTE_PREFIX, PLAN_AI_BUDGETS, isSeederOwned, type PlanAiBudget } from './plan-ai-budgets';
+import { OpenRouterProvisioningService } from './openrouter-provisioning.service';
 
 /**
  * Plan to `TenantAiBudget` seeding. The seeder writes only rows it owns: an absent row, or one whose `notes` still
@@ -15,6 +16,11 @@ import { BUDGET_SEED_NOTE_PREFIX, PLAN_AI_BUDGETS, isSeederOwned, type PlanAiBud
  * for the single-mode workspace (`AiProvisioningModule`); `platform-glue/hooks.module.ts` binds the first three.
  * Idempotent: seeding the same plan twice writes the same row. The write itself matches only a stamped row (or creates
  * an absent one), so an admin save racing the ownership read is never overwritten.
+ *
+ * Each run also keeps the workspace's OpenRouter sub-key in step (`OpenRouterProvisioningService`, a no-op unless
+ * sub-keys are on): after a seed its limit becomes the new monthly hard cap, and an admin-managed workspace with no key
+ * yet gets one at its current cap. That call is fired and not awaited, so an approval or a plan change never waits on
+ * OpenRouter, and it never rejects.
  */
 @Injectable()
 export class AiBudgetSeederService {
@@ -23,6 +29,7 @@ export class AiBudgetSeederService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
+    private readonly provisioning: OpenRouterProvisioningService,
   ) {}
 
   /** Seed from the workspace's current plan. A missing workspace is a no-op. */
@@ -45,6 +52,7 @@ export class AiBudgetSeederService {
     const existing = await this.prisma.tenantAiBudget.findUnique({ where: { tenantId }, select: { notes: true } });
     if (!isSeederOwned(existing?.notes, existing !== null)) {
       this.logger.log(`Workspace ${tenantId} AI budget is admin-managed; plan ${plan} not applied`);
+      this.ensureSubKey(tenantId);
       return;
     }
 
@@ -52,11 +60,19 @@ export class AiBudgetSeederService {
     const written = existing === null ? await this.createOrClaim(tenantId, data) : await this.claim(tenantId, data);
     if (!written) {
       this.logger.log(`Workspace ${tenantId} AI budget was taken over by an admin; plan ${plan} not applied`);
+      this.ensureSubKey(tenantId);
       return;
     }
     // The pre-call check caches the budget row; drop it so the new caps apply on the next call.
     await this.cache.del(buildKey('app:ai-telemetry', 'budget', tenantId));
     this.logger.log(`Seeded AI budget for workspace ${tenantId} from plan ${plan}`);
+    // OpenRouter enforces the monthly hard cap at its edge: keep the workspace's sub-key in step.
+    void this.provisioning.syncLimit(tenantId, Number(budget.monthlyHardUsd));
+  }
+
+  /** An admin-managed budget keeps its caps; the workspace still gets a sub-key at them if it has none. */
+  private ensureSubKey(tenantId: number): void {
+    void this.provisioning.ensureSubKey(tenantId);
   }
 
   /**

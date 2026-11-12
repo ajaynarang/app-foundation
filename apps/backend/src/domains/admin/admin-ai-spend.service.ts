@@ -11,6 +11,7 @@ import { escapeLike } from '@appshore/kernel/shared/utils/list-query';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { BUDGET_SEED_NOTE_DEFAULT, adminBudgetNote } from '../ai/routing/provisioning/plan-ai-budgets';
+import { OpenRouterProvisioningService } from '../ai/routing/provisioning/openrouter-provisioning.service';
 import { PLATFORM_PAID_SQL, payerOf } from '../ai/infrastructure/telemetry/platform-paid';
 import type {
   AiSpendSummary,
@@ -67,7 +68,10 @@ const DECIMAL = /^\d{1,12}(\.\d{1,12})?$/;
 export class AdminAiSpendService {
   private readonly logger = new Logger(AdminAiSpendService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly provisioning: OpenRouterProvisioningService,
+  ) {}
 
   // ───────────────────────────────────────────────────────────────────────
   // Home — one row per tenant, last N days
@@ -274,6 +278,10 @@ export class AdminAiSpendService {
    * so an edit always takes the row out of the plan seeder's hands. Note: this does NOT bust AiTelemetryService's 60s
    * budget cache directly — the next check picks up the new caps within a
    * minute, which is acceptable for an admin config change.
+   *
+   * The workspace's OpenRouter sub-key gets the new monthly hard cap (created when missing; a no-op unless sub-keys
+   * are on), so a raised budget is not still refused at OpenRouter's edge. Fired, not awaited: the save never waits
+   * on OpenRouter, and a failed sync is logged by the provisioning service.
    */
   async updateBudget(tenantId: number, input: UpdateAiBudgetInput): Promise<AiBudget> {
     const notes = adminBudgetNote(input.notes);
@@ -295,6 +303,7 @@ export class AdminAiSpendService {
         notes,
       },
     });
+    void this.provisioning.syncLimit(tenantId, Number(input.monthlyHardUsd));
     return this.toBudget(row);
   }
 

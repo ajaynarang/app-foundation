@@ -15,7 +15,16 @@ function makeSeeder(existingNotes: string | null | undefined, plan: TenantPlan =
     },
   };
   const cache = { del: jest.fn().mockResolvedValue(undefined) };
-  return { seeder: new AiBudgetSeederService(prisma as never, cache as never), prisma, cache };
+  const provisioning = {
+    syncLimit: jest.fn().mockResolvedValue(undefined),
+    ensureSubKey: jest.fn().mockResolvedValue(false),
+  };
+  return {
+    seeder: new AiBudgetSeederService(prisma as never, cache as never, provisioning as never),
+    prisma,
+    cache,
+    provisioning,
+  };
 }
 
 describe('AiBudgetSeederService', () => {
@@ -109,6 +118,49 @@ describe('AiBudgetSeederService', () => {
     prisma.tenantAiBudget.create.mockRejectedValue(new Error('connection lost'));
     await expect(seeder.seedForPlan(TENANT, TenantPlan.TRIAL)).rejects.toThrow('connection lost');
     expect(prisma.tenantAiBudget.updateMany).not.toHaveBeenCalled();
+  });
+
+  describe('OpenRouter sub-key sync', () => {
+    it('after a seed, pushes the new monthly hard cap to the workspace sub-key', async () => {
+      const { seeder, provisioning } = makeSeeder('plan:TRIAL');
+      await seeder.seedForPlan(TENANT, TenantPlan.ENTERPRISE);
+      expect(provisioning.syncLimit).toHaveBeenCalledWith(TENANT, 1500);
+      expect(provisioning.ensureSubKey).not.toHaveBeenCalled();
+    });
+
+    it('a new workspace on an absent row gets its key at the plan cap', async () => {
+      const { seeder, provisioning } = makeSeeder(undefined);
+      await seeder.seedForPlan(TENANT, TenantPlan.TRIAL);
+      expect(provisioning.syncLimit).toHaveBeenCalledWith(TENANT, 25);
+    });
+
+    it('an admin-managed budget keeps its caps; only a missing key is created (at the admin cap)', async () => {
+      const { seeder, provisioning } = makeSeeder('raised for the pilot');
+      await seeder.seedForPlan(TENANT, TenantPlan.STARTER);
+      expect(provisioning.syncLimit).not.toHaveBeenCalled();
+      expect(provisioning.ensureSubKey).toHaveBeenCalledWith(TENANT);
+    });
+
+    it('a row taken over by an admin mid-seed is not synced to the plan cap', async () => {
+      const { seeder, prisma, provisioning } = makeSeeder('plan:TRIAL');
+      prisma.tenantAiBudget.updateMany.mockResolvedValue({ count: 0 });
+      await seeder.seedForPlan(TENANT, TenantPlan.ENTERPRISE);
+      expect(provisioning.syncLimit).not.toHaveBeenCalled();
+      expect(provisioning.ensureSubKey).toHaveBeenCalledWith(TENANT);
+    });
+
+    it('a plan with no preset touches nothing at OpenRouter', async () => {
+      const { seeder, provisioning } = makeSeeder(undefined);
+      await seeder.seedForPlan(TENANT, 'UNKNOWN' as TenantPlan);
+      expect(provisioning.syncLimit).not.toHaveBeenCalled();
+      expect(provisioning.ensureSubKey).not.toHaveBeenCalled();
+    });
+
+    it('does not wait on OpenRouter: a slow sync never delays the seed', async () => {
+      const { seeder, provisioning } = makeSeeder(undefined);
+      provisioning.syncLimit.mockReturnValue(new Promise(() => undefined));
+      await expect(seeder.seedForPlan(TENANT, TenantPlan.TRIAL)).resolves.toBeUndefined();
+    });
   });
 
   it('has a preset for every plan, and STARTER matches the schema defaults', () => {
