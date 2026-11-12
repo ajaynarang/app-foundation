@@ -7,10 +7,8 @@ jest.mock('langfuse', () => ({
   Langfuse: jest.fn().mockImplementation(() => ({ getPrompt: jest.fn() })),
 }));
 jest.mock('langfuse-core', () => ({}));
-jest.mock('../../ai/infrastructure/providers/ai-provider', () => ({
-  ai: jest.fn(() => 'mock-model'),
-}));
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   generateText: jest.fn().mockResolvedValue({ text: 'bug' }),
 }));
 
@@ -20,6 +18,11 @@ import { FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS, FeedbackService } from '../feedbac
 import { PromptingService } from '../../prompting';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { groupCountInMemory } from '@appshore/platform/test/helpers/prisma-where';
+import { AiRouteResolver } from '../../ai/routing/ai-route-resolver.service';
+import { ZeroRetentionUnavailable } from '../../ai/infrastructure/redaction/zero-retention-unavailable.error';
+import { makeResolver } from '../../ai/routing/__tests__/resolver-fixtures';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 
 const FEEDBACK_ID = '0190f1c2-0000-7000-8000-000000000001';
 const MISSING_ID = '0190f1c2-0000-7000-8000-00000000dead';
@@ -61,17 +64,24 @@ const mockPromptService = {
 
 describe('FeedbackService', () => {
   let service: FeedbackService;
+  let fixture: ReturnType<typeof makeResolver>;
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
+  async function build(resolver: AiRouteResolver) {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FeedbackService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: PromptingService, useValue: mockPromptService },
+        { provide: AiRouteResolver, useValue: resolver },
       ],
     }).compile();
-    service = module.get<FeedbackService>(FeedbackService);
+    return module.get<FeedbackService>(FeedbackService);
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    fixture = makeResolver({ config: OPENROUTER });
+    service = await build(fixture.resolver);
   });
 
   describe('create', () => {
@@ -325,6 +335,27 @@ describe('FeedbackService', () => {
         FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS,
       );
     });
+
+    it('categorizes on the route of the tenant the feedback came from, with the fast alias', async () => {
+      mockPrisma.feedback.findUnique.mockResolvedValue(storedRow({ tenantId: 10 }));
+      mockPrisma.feedback.update.mockResolvedValue(storedRow({ category: 'bug' }));
+
+      await service.categorizeWithAi(FEEDBACK_ID);
+
+      expect(fixture.prisma.tenant.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 10 } }));
+      expect((generateText as jest.Mock).mock.calls.at(-1)[0].model).toMatchObject({
+        modelId: 'anthropic/claude-haiku-5.5',
+      });
+    });
+
+    it("never sends a zero-retention tenant's feedback to a retaining route", async () => {
+      service = await build(makeResolver({ aiZeroRetention: true, config: OPENROUTER }).resolver);
+      mockPrisma.feedback.findUnique.mockResolvedValue(storedRow());
+
+      await expect(service.categorizeWithAi(FEEDBACK_ID)).rejects.toThrow(ZeroRetentionUnavailable);
+      expect(generateText).not.toHaveBeenCalled();
+      expect(mockPrisma.feedback.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('bulkCategorize', () => {
@@ -338,8 +369,8 @@ describe('FeedbackService', () => {
 
     it('should categorize each uncategorized feedback', async () => {
       mockPrisma.feedback.findMany.mockResolvedValue([
-        { id: 1, message: 'App crashes on load' },
-        { id: 2, message: 'Would be nice to have dark mode' },
+        { id: 1, message: 'App crashes on load', tenantId: 10 },
+        { id: 2, message: 'Would be nice to have dark mode', tenantId: 11 },
       ]);
       mockPrisma.feedback.update.mockResolvedValue({});
 
@@ -348,6 +379,24 @@ describe('FeedbackService', () => {
       expect(result.total).toBe(2);
       expect(result.categorized).toBe(2);
       expect(mockPrisma.feedback.update).toHaveBeenCalledTimes(2);
+    });
+
+    it("skips a zero-retention tenant's feedback and categorizes the rest", async () => {
+      const zdr = makeResolver({ config: OPENROUTER });
+      zdr.prisma.tenant.findUnique.mockImplementation(async ({ where }: { where: { id: number } }) => ({
+        aiZeroRetention: where.id === 11,
+      }));
+      service = await build(zdr.resolver);
+      mockPrisma.feedback.findMany.mockResolvedValue([
+        { id: 1, message: 'App crashes on load', tenantId: 10 },
+        { id: 2, message: 'Private note', tenantId: 11 },
+      ]);
+      mockPrisma.feedback.update.mockResolvedValue({});
+
+      const result = await service.bulkCategorize();
+
+      expect(result).toEqual({ categorized: 1, total: 2 });
+      expect(generateText).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -11,7 +11,7 @@ import {
 } from '@appshore/kernel/shared/utils/cursor-pagination';
 import { FEEDBACK_ADMIN_INCLUDE, toPublicFeedback, type PublicFeedback } from './feedback.serializer';
 import { listTenantOptions, type TenantOption, type TenantOptionQuery } from '../../shared/lists/tenant-options';
-import { ai } from '../ai/infrastructure/providers/ai-provider';
+import { AiRouteResolver } from '../ai/routing/ai-route-resolver.service';
 import { OUTPUT_CEILINGS } from '../ai/routing/output-ceilings';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PromptingService, PROMPT_NAMES } from '../prompting';
@@ -38,6 +38,7 @@ export class FeedbackService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => PromptingService))
     private readonly promptService: PromptingService,
+    private readonly aiRouteResolver: AiRouteResolver,
   ) {}
 
   async create(userId: number, tenantId: number, dto: CreateFeedbackDto): Promise<PublicFeedback> {
@@ -153,7 +154,7 @@ export class FeedbackService {
 
   async categorizeWithAi(feedbackId: string): Promise<PublicFeedback> {
     const feedback = await this.findRow(feedbackId);
-    const category = await this.inferCategory(feedback.message);
+    const category = await this.inferCategory(feedback.message, feedback.tenantId);
     return this.save(feedback.id, { category });
   }
 
@@ -172,7 +173,7 @@ export class FeedbackService {
   async bulkCategorize() {
     const uncategorized = await this.prisma.feedback.findMany({
       where: { category: null },
-      select: { id: true, publicId: true, message: true },
+      select: { id: true, publicId: true, message: true, tenantId: true },
     });
 
     if (uncategorized.length === 0) {
@@ -184,7 +185,7 @@ export class FeedbackService {
     let categorized = 0;
     for (const fb of uncategorized) {
       try {
-        const category = await this.inferCategory(fb.message, systemPrompt);
+        const category = await this.inferCategory(fb.message, fb.tenantId, systemPrompt);
         await this.prisma.feedback.update({
           where: { id: fb.id },
           data: { category },
@@ -203,11 +204,16 @@ export class FeedbackService {
     return listTenantOptions(this.prisma, { feedback: { some: {} } }, query);
   }
 
-  private async inferCategory(message: string, cachedPrompt?: string): Promise<string> {
+  /**
+   * One category word for a feedback message, on the route of the workspace the feedback came from: its retention
+   * policy applies (a zero-retention workspace with no compliant route is refused, nothing is sent).
+   */
+  private async inferCategory(message: string, tenantId: number, cachedPrompt?: string): Promise<string> {
     const systemPrompt = cachedPrompt ?? (await this.promptService.getPrompt(PROMPT_NAMES.FEEDBACK_CATEGORIZER));
 
+    const route = await this.aiRouteResolver.resolve(tenantId, 'language');
     const { text } = await generateText({
-      model: ai('fast'),
+      model: route.languageModel('fast'),
       system: systemPrompt,
       prompt: message,
       maxOutputTokens: FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS,

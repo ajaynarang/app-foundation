@@ -242,7 +242,7 @@ describe('AssistantAiService', () => {
         chunks.push(chunk);
       }
 
-      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show my summary', 'member');
+      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show my summary', 'member', 1);
       expect(mockAgentRegistry.get).toHaveBeenCalledWith('assistant');
       expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
       expect(chunks.some((c) => c.type === 'complete')).toBe(true);

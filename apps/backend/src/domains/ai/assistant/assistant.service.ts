@@ -238,7 +238,7 @@ export class AssistantAiService {
     }
 
     // 5. Route to domain agent
-    const routeResult = await this.assistantRouter.route(content, conversation.userMode as UserMode);
+    const routeResult = await this.assistantRouter.route(content, conversation.userMode as UserMode, tenantId);
 
     // 6. Get domain agent and stream via chat()
     const domainAgent = this.agentRegistry.get(routeResult.agentId);
