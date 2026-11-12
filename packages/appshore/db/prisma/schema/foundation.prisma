@@ -2343,6 +2343,9 @@ model AiInvocation {
   completionTokens Int  @default(0) @map("completion_tokens")
   totalTokens      Int  @default(0) @map("total_tokens")
   cachedTokens     Int? @map("cached_tokens")
+  /// Prompt tokens written to the provider's prompt cache on this call (billed at the write rate). Included in
+  /// `promptTokens`, like `cachedTokens`. Null when the provider reported nothing.
+  cacheWriteTokens Int? @map("cache_write_tokens")
 
   /// Denormalized cost in USD computed at write time from `ModelPricing`. Null
   /// when no matching pricing row was found (the call still gets recorded —
@@ -2400,16 +2403,18 @@ model AiInvocation {
 /// pricing for replay/backfill. `cachedInputPerMtokUsd` is nullable because
 /// not every provider exposes a separate cached-input price.
 model ModelPricing {
-  id                    Int       @id @default(autoincrement())
-  provider              String    @db.VarChar(40)
-  model                 String    @db.VarChar(80)
-  inputPerMtokUsd       Decimal   @map("input_per_mtok_usd") @db.Decimal(10, 6)
-  outputPerMtokUsd      Decimal   @map("output_per_mtok_usd") @db.Decimal(10, 6)
-  cachedInputPerMtokUsd Decimal?  @map("cached_input_per_mtok_usd") @db.Decimal(10, 6)
-  effectiveFromDate     DateTime  @map("effective_from_date") @db.Date
-  effectiveUntilDate    DateTime? @map("effective_until_date") @db.Date
-  notes                 String?   @db.Text
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id                        Int       @id @default(autoincrement())
+  provider                  String    @db.VarChar(40)
+  model                     String    @db.VarChar(80)
+  inputPerMtokUsd           Decimal   @map("input_per_mtok_usd") @db.Decimal(10, 6)
+  outputPerMtokUsd          Decimal   @map("output_per_mtok_usd") @db.Decimal(10, 6)
+  cachedInputPerMtokUsd     Decimal?  @map("cached_input_per_mtok_usd") @db.Decimal(10, 6)
+  /// The prompt-cache write rate. Null prices a cache write at the plain input rate.
+  cacheWriteInputPerMtokUsd Decimal?  @map("cache_write_input_per_mtok_usd") @db.Decimal(10, 6)
+  effectiveFromDate         DateTime  @map("effective_from_date") @db.Date
+  effectiveUntilDate        DateTime? @map("effective_until_date") @db.Date
+  notes                     String?   @db.Text
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@unique([provider, model, effectiveFromDate])
   @@index([provider, model, effectiveFromDate(sort: Desc)])
@@ -2430,6 +2435,9 @@ model TenantAiBudget {
   monthlySoftUsd Decimal @default(50) @map("monthly_soft_usd") @db.Decimal(10, 2)
   monthlyHardUsd Decimal @default(200) @map("monthly_hard_usd") @db.Decimal(10, 2)
 
+  /// Who owns the caps. A value starting `plan:` (`plan:STARTER`, or `plan:DEFAULT` for a row created lazily with the
+  /// defaults above) is the plan seeder's, and a plan change may rewrite it. Anything else, including null, is an
+  /// admin's, and the seeder never touches it.
   notes String? @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
