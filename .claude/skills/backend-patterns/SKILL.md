@@ -1064,6 +1064,50 @@ real listeners; extend it when you add a consumer.
 - A relayed event fires its in-process listeners in the process that ran the relay, so an SSE client on another
   process sees the change on its next fetch.
 
+### 8.1a Deadlines: a timer is a row (NON-NEGOTIABLE)
+
+The decision is the ADR "Outbox and deadlines". A one-off timer tied to a write ("remind the approver in 3 days",
+"expire the offer at midnight") is a `deadlines` row, written with `DeadlineService`
+(`@appshore/platform/infrastructure/deadlines/deadline.service`) on the write's own transaction. Never a delayed
+BullMQ job, a `setTimeout`, or a workflow-engine sleep: those are lost or orphaned when the write rolls back or the
+subject changes.
+
+```typescript
+await this.outbox.transaction(async (tx, emit) => {
+  const offer = await tx.offer.update({ where: { id }, data: { status: 'SENT' } });
+  await this.deadlines.schedule(tx, {
+    tenantId,
+    kind: DEADLINE_KINDS.OFFER_EXPIRY,
+    subjectType: 'offer',
+    subjectId: offer.offerNumber, // a public id, never an Int primary key
+    dedupeKey: `offer:${offer.offerNumber}:expiry`, // scheduling the key again supersedes the pending row
+    dueAt: offer.expiresAt,
+  });
+  await emit(DOMAIN_EVENTS.OFFER_SENT, tenantId, { offerNumber: offer.offerNumber }, actor);
+});
+// Withdrawn? Cancel in that write's transaction:
+await this.deadlines.cancel(tx, { tenantId, subjectType: 'offer', subjectId: offerNumber }, 'withdrawn');
+```
+
+- **Kinds are the app's.** Declare each in `apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`
+  (`DEADLINE_KINDS`, `as const`). `Deadline.kind` is a VarChar(60), not a Prisma enum (allowlisted in
+  `schema-enum-conventions.spec.ts`), so a product never edits the foundation schema to add one.
+- **One handler per kind.** It implements `DeadlineHandler`, injects `DEADLINE_HANDLERS` and calls
+  `register(this)` in `onModuleInit`; its module imports `DeadlinesModule`. A second handler for a kind throws at
+  boot. A kind with no handler is retried with backoff and shows as failing on the Timers page.
+- **The handler re-reads Postgres.** The row's `payload` is a hint, never the truth. Return `{ outcome: 'fired' }`
+  when it did its work (or found it done), `{ outcome: 'cancelled', reason }` when the timer no longer applies,
+  `{ outcome: 'reschedule', dueAt }` when the subject's due time moved. It must be safe to run twice (a crash
+  between the handler and the stamp re-runs it once the lease lapses), it has 60 seconds, and its own writes and
+  events go through `OutboxService.transaction`.
+- **Throwing is fine.** The sweeper records `lastError`, backs off (30 seconds doubling to an hour) and retries for
+  ever. It never gives up on a timer; a broken handler shows as failing on `/admin/timers`.
+- **The sweeper** is `DeadlineSweeper`, the `deadline-sweep` job on `bulk-ops`, ticking every 30 seconds with no
+  `jobSchedule` row needed (a row `('maintenance', 'deadline-sweep')` pauses or retunes it). It shares the lane
+  with the relay and data retention at concurrency 1, so a long retention run makes timers late by that long.
+- **Tests.** Unit specs use `createMockPrisma()` (it has `deadline`). `platform-glue/deadlines/__tests__/
+deadlines.integration.spec.ts` shows how to register a test kind and drive the real sweeper on a real database.
+
 ### 8.2 SSE Bridge — Tenant vs User Scope
 
 The SSE bridge (`platform-glue/sse/domain-event-sse-bridge.service.ts`) translates domain events to SSE events and decides who receives them. Two scopes:

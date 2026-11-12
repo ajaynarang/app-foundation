@@ -89,7 +89,7 @@ tests/         — Playwright QA suite (@app/qa)
 | `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                            |
 | `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                             |
 | `support/`       | Ticketing                                                                                          |
-| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend)                                |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                        |
 | `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
 | `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
 | `desk/`          | Inngest durable workflow engine (**empty responsibility registry**)                                |
@@ -113,6 +113,10 @@ bind to app implementations.
   inside the write's transaction with `OutboxService.transaction((tx, emit) => …)` so it exists if and only if the
   write committed; delivery is at least once, so every consumer keys on the event id (ADR "Outbox and deadlines",
   held by `no-direct-emit.spec.ts` and `double-delivery.spec.ts`).
+- **Timers (deadlines):** declare a kind in `apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`, register
+  its handler with `DEADLINE_HANDLERS`, and call `DeadlineService.schedule(tx, …)` / `cancel(tx, …)` inside the
+  write's transaction. A timer is a row, fired by the `deadline-sweep` job on `bulk-ops`; never a delayed job or a
+  `setTimeout` (ADR "Outbox and deadlines"). Super-admins see every timer at `/admin/timers`.
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
 - **Notification policies + WhatsApp templates:** bind `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES`
   (and optionally `PLATFORM_TIMEZONE`) in `apps/backend/src/platform-glue/hooks.module.ts`; add your

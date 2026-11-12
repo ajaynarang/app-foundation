@@ -1,8 +1,6 @@
 # ADR-0003 — Outbox and deadlines
 
-**Date:** 2026-11-12 · **Status:** Adopted. The outbox ships with this record. The deadlines part is decided here
-and its code lands in the pull request that adds the `Deadline` table and the sweeper; until then that section
-describes the target, not the code.
+**Date:** 2026-11-12 · **Status:** Adopted. The outbox and the deadlines both ship.
 
 ## Context
 
@@ -115,6 +113,29 @@ fail. The spec fails instead, for every name in `BULK_OPS_JOB_NAMES`.
   and a lease, runs the handler and stamps the outcome. A failing handler gets `lastError` and a capped backoff,
   and is never given up on.
 - A plain timer no longer needs Inngest. That is what lets Desk become optional.
+
+How it is built:
+
+- The mechanism is app-blind and lives in `@appshore/platform/infrastructure/deadlines/`: `DeadlineService`, the
+  handler registry (`DEADLINE_HANDLERS`), `DeadlineSweeper` (the `deadline-sweep` handler on `bulk-ops`) and
+  `DeadlineSweepScheduler` (its tick). The table is `deadlines`; the one-pending-row rule is a partial unique index
+  on `(tenant_id, dedupe_key) WHERE fired_at IS NULL AND cancelled_at IS NULL`, written by hand in the migration
+  because the schema cannot express it. `schedule` cancels the pending row as `superseded` first; two transactions
+  that race on one key get a unique violation, and the loser rolls back.
+- The kinds are the app's: `apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`. The starter ships no
+  production kind. `deadlines.integration.spec.ts` beside it registers a test kind and proves schedule, fire,
+  supersede, cancel and backoff on a real Postgres.
+- A claim leases a row for 2 minutes and counts the attempt. The lease is renewed just before the handler runs, and
+  the handler has 60 seconds; a run that throws or times out (or a kind with no handler) backs off 30 seconds,
+  doubling to at most an hour. A `reschedule` is a healthy run and restarts the count. The outcome is written only
+  while the row is still pending, so a cancel or a new `schedule` of the key that lands while the handler runs wins.
+  Each tick takes at most 20 batches of 50 rows.
+- The tick runs with no `jobSchedule` row, like the relay. A row (`maintenance`, `deadline-sweep`) is read on every
+  boot: `isEnabled: false` removes it, a new `intervalMs` re-registers it.
+- State is derived from the stamps, never a column: pending, failing (pending, and the last run threw), fired,
+  cancelled. The super-admin Timers page (`/admin/timers`, backed by `GET /admin/deadlines`, `/kinds` and
+  `/health`) lists every tenant's timers by state and shows what is pending, failing and overdue (more than five
+  minutes past due), with the outbox backlog beside it.
 
 ## Consequences
 

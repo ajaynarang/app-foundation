@@ -400,3 +400,28 @@ in that spec's map.
 
 **What to do.** Run `prisma migrate deploy`. Move each direct emit into the transaction of the write it describes.
 Make each consumer you added safe to run twice for one event id: delivery is at least once.
+
+## 10. Timers are rows: deadlines and the sweeper
+
+**What changed.** A one-off timer tied to a write ("remind in 3 days", "expire at midnight") is now a row in a new
+table, `deadlines`, written with `DeadlineService.schedule(tx, …)` in the same transaction as the write (the ADR
+"Outbox and deadlines"). A new job, `deadline-sweep` on the `bulk-ops` queue, runs every 30 seconds and fires due
+rows through the handler registered for their `kind`. Three super-admin routes are new, all `GET` and read-only:
+
+| Route                     | Answers                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/admin/deadlines`        | a cursor list of every tenant's timers, `state`, `kind`, `tenant`, `sort` filters, `counts` per state         |
+| `/admin/deadlines/kinds`  | the kinds on record, A to Z, at most 100                                                                      |
+| `/admin/deadlines/health` | `{ deadlines: { pending, failing, overdue, oldestOverdueDueAt }, outbox: { unpublished, oldestAgeSeconds } }` |
+
+The web app gains `/admin/timers` and a "Timers" entry in the super-admin navigation. The migration
+`20261112150000_deadlines` creates the table, its indexes and the partial unique index for pending rows; it touches
+no existing row.
+
+**Who notices.** No existing route changed. A product that added a `bulk-ops` job name sees one more name in
+`BULK_OPS_JOB_NAMES`. A product that schedules timers with a workflow-engine sleep, a delayed BullMQ job or
+`setTimeout` can move them to a deadline kind; nothing forces it.
+
+**What to do.** Run `prisma migrate deploy`. To add a timer, declare its kind in
+`apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`, write a handler that registers itself with
+`DEADLINE_HANDLERS`, and call `DeadlineService.schedule(tx, …)` inside the write's transaction.
