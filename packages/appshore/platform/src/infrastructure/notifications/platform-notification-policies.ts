@@ -32,6 +32,10 @@ export const PLATFORM_NOTIFICATION_POLICIES: Record<PlatformNotificationType, No
     push: NEVER,
     groupLabel: 'settings updates',
   }),
+  [PlatformNotificationType.AI_BUDGET_REACHED]: policy(NotificationCategory.SYSTEM, TIMELY, {
+    email: DEFAULT,
+    groupLabel: 'AI budget alerts',
+  }),
   [PlatformNotificationType.USER_JOINED]: policy(NotificationCategory.TEAM, INFORMATIONAL, {
     email: OPT_IN,
     groupLabel: 'users joined',

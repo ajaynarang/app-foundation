@@ -79,6 +79,22 @@ export class NotificationTriggersService {
     });
   }
 
+  /**
+   * The workspace's platform-paid AI spend hit its hard cap, so AI calls the platform pays for are paused. Sent at
+   * most once a day per workspace (`AiBudgetNudgeListener`).
+   */
+  async aiBudgetReached(tenantId: number) {
+    return this.trigger({
+      tenantId,
+      type: PlatformNotificationType.AI_BUDGET_REACHED,
+      title: 'AI usage limit reached',
+      message:
+        'This workspace reached its AI usage limit, so AI features are paused until the limit resets. An administrator can raise it.',
+      iconType: 'ai',
+      recipientRoles: STAFF,
+    });
+  }
+
   async integrationSyncFailed(tenantId: number, integrationName: string, error: string) {
     return this.trigger({
       tenantId,
