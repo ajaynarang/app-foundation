@@ -19,6 +19,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix && pnpm --filter @appshore/db lint:schema",
     "type-check": "tsc --noEmit",
+    "// — API contract": "",
+    "openapi:generate": "ts-node scripts/generate-openapi.ts",
     "// — Testing": "",
     "test": "jest",
     "test:watch": "jest --watch",
