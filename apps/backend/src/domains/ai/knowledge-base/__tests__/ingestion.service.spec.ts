@@ -164,7 +164,30 @@ describe('IngestionService', () => {
 
   it('locks each file while swapping its chunks', async () => {
     await service.ingestAll();
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+
+    // A tagged template call: (strings, ...values). The key is bound, never interpolated into the SQL.
+    const locks = tx.$executeRaw.mock.calls.map(([strings, ...values]: [TemplateStringsArray, ...unknown[]]) => ({
+      sql: strings.join('$'),
+      values,
+    }));
+    expect(locks).toEqual([
+      {
+        sql: expect.stringMatching(/^SELECT pg_advisory_xact_lock\(hashtext\(\$\)\)$/),
+        values: [`kb:${WELCOME.sourcePath}`],
+      },
+      {
+        sql: expect.stringMatching(/^SELECT pg_advisory_xact_lock\(hashtext\(\$\)\)$/),
+        values: [`kb:${INVITES.sourcePath}`],
+      },
+    ]);
+
+    // Each file's lock is taken inside its transaction before its old chunks are deleted.
+    const lockOrder = tx.$executeRaw.mock.invocationCallOrder;
+    const deleteOrder = tx.knowledgeDocument.deleteMany.mock.invocationCallOrder;
+    expect(deleteOrder).toHaveLength(2);
+    expect(lockOrder[0]).toBeLessThan(deleteOrder[0]);
+    expect(lockOrder[1]).toBeLessThan(deleteOrder[1]);
+    expect(deleteOrder[0]).toBeLessThan(lockOrder[1]);
   });
 
   describe('with no platform embedding route', () => {
