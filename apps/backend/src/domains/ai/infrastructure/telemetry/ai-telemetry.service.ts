@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@appshore/db';
+import { AiUsageUnit, Prisma } from '@appshore/db';
 import type { AiInvocation, ModelPricing, TenantAiBudget } from '@appshore/db';
 import type { AiBudgetState, AiCallContext, AiUsage } from '@app/shared-types';
 
@@ -29,7 +29,8 @@ import { PLATFORM_PAID_SQL } from './platform-paid';
  * Cost math: `(promptTokens - cachedTokens - cacheWriteTokens) * input +
  * cachedTokens * cachedInput + cacheWriteTokens * cacheWrite +
  * completionTokens * output`, all per million tokens. A pricing row with no
- * cache-write rate prices a write at the input rate. If no
+ * cache-write rate prices a write at the input rate. A non-token meter (voice:
+ * `usageUnit` other than `TOKEN`) costs `usageQuantity * unitPriceUsd`. If no
  * `ModelPricing` row matches the provider/model at write time, the row is
  * still written with `costUsd = null` and a warning is logged — untagged
  * cost is a bug we want to see, not a silent failure that drops data.
@@ -119,6 +120,10 @@ export class AiTelemetryService {
       return null;
     }
 
+    if (usage.usageUnit && usage.usageUnit !== AiUsageUnit.TOKEN) {
+      return this.computeUnitCost(usage, pricing);
+    }
+
     // `promptTokens` includes the cache reads and the cache writes (`usageFromAiSdk`); each is priced at its own rate.
     const cachedTokens = usage.cachedTokens ?? 0;
     const writtenTokens = usage.cacheWriteTokens ?? 0;
@@ -136,6 +141,17 @@ export class AiTelemetryService {
     const outputCost = new Prisma.Decimal(usage.completionTokens).mul(pricing.outputPerMtokUsd).div(PER_MTOK);
 
     return inputCost.plus(cachedCost).plus(writeCost).plus(outputCost);
+  }
+
+  /** A non-token meter (voice) is priced per unit. A row with no unit price records the usage with a null cost. */
+  private computeUnitCost(usage: AiUsage, pricing: ModelPricing): Prisma.Decimal | null {
+    if (!pricing.unitPriceUsd) {
+      this.logger.warn(
+        `model_pricing row for ${usage.provider}/${usage.model} has no unit_price_usd; recording ${usage.usageUnit} usage with null cost.`,
+      );
+      return null;
+    }
+    return new Prisma.Decimal(usage.usageQuantity ?? 0).mul(pricing.unitPriceUsd);
   }
 
   /**
@@ -230,6 +246,8 @@ export class AiTelemetryService {
         totalTokens: usage.totalTokens,
         cachedTokens: usage.cachedTokens ?? null,
         cacheWriteTokens: usage.cacheWriteTokens ?? null,
+        usageUnit: usage.usageUnit ?? AiUsageUnit.TOKEN,
+        usageQuantity: usage.usageQuantity ?? null,
         costUsd,
         latencyMs: usage.latencyMs ?? null,
         status: usage.status,

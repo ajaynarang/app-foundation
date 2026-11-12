@@ -49,6 +49,7 @@ const SONNET_PRICING = {
   outputPerMtokUsd: new Prisma.Decimal('15.000000'),
   cachedInputPerMtokUsd: new Prisma.Decimal('0.300000'),
   cacheWriteInputPerMtokUsd: new Prisma.Decimal('3.750000'),
+  unitPriceUsd: null,
   effectiveFromDate: new Date('2026-05-27T00:00:00.000Z'),
   effectiveUntilDate: null,
   notes: null,
@@ -231,6 +232,58 @@ describe('AiTelemetryService', () => {
       const call = prisma.aiInvocation.create.mock.calls[0][0];
       expect(call.data.costUsd).toBeNull();
       expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/no model_pricing row/i));
+    });
+  });
+
+  describe('record() — unit-metered (voice) cost', () => {
+    const DEEPGRAM_PRICING = {
+      ...SONNET_PRICING,
+      provider: 'deepgram',
+      model: 'nova-3',
+      inputPerMtokUsd: new Prisma.Decimal('0'),
+      outputPerMtokUsd: new Prisma.Decimal('0'),
+      cachedInputPerMtokUsd: null,
+      cacheWriteInputPerMtokUsd: null,
+      unitPriceUsd: new Prisma.Decimal('0.00012833'),
+    };
+    const voiceUsage = makeUsage({
+      provider: 'deepgram',
+      model: 'nova-3',
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      usageUnit: 'AUDIO_SECOND',
+      usageQuantity: 60,
+    });
+
+    it('prices quantity x unit price and persists the unit and the quantity', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue(DEEPGRAM_PRICING);
+
+      await service.record(voiceUsage, makeContext({ surface: 'VOICE' }));
+
+      // 60 s * $0.00012833 = $0.0076998
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.0076998');
+      expect(call.data).toMatchObject({ usageUnit: 'AUDIO_SECOND', usageQuantity: 60, totalTokens: 0 });
+    });
+
+    it('records null cost when the pricing row has no unit price', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue({ ...DEEPGRAM_PRICING, unitPriceUsd: null });
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(voiceUsage, makeContext({ surface: 'VOICE' }));
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.costUsd).toBeNull();
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/no unit_price_usd/));
+    });
+
+    it('stores TOKEN and a null quantity on token-metered rows', async () => {
+      await service.record(makeUsage(), makeContext());
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.usageQuantity).toBeNull();
+      expect(call.data.usageUnit).toBe('TOKEN');
     });
   });
 
