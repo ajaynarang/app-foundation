@@ -9,7 +9,7 @@ import { AssistantMessage } from './AssistantMessage';
 import { AssistantActionBar } from './AssistantActionBar';
 import { AssistantInput } from './AssistantInput';
 import { AssistantOrb } from './AssistantOrb';
-import { formatRelativeTime } from '@appshore/web-core/shared/lib/utils/formatters';
+import { AssistantHistory } from './AssistantHistory';
 
 interface AssistantChatProps {
   /**
@@ -28,14 +28,13 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
   const {
     messages,
     orbState,
-    pastConversations,
+    sessionId,
     isViewingHistory,
     viewedMessages,
     isLoadingHistory,
     sendMessage,
     clearSession,
     expandStrip,
-    loadHistory,
     viewConversation,
     clearView,
   } = useAssistantStore();
@@ -46,11 +45,6 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, viewedMessages]);
-
-  // Load history on mount
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
 
   const hasOnlyGreeting = messages.length <= 1;
   const displayMessages = isViewingHistory ? viewedMessages : messages;
@@ -117,7 +111,7 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
             )}
 
             {/* Recent conversations toggle (empty state) */}
-            {!embedded && !isViewingHistory && hasOnlyGreeting && pastConversations.length > 0 && (
+            {!embedded && !isViewingHistory && hasOnlyGreeting && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -132,7 +126,7 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
                 >
                   <div className="h-px flex-1 bg-border" />
                   <span className="text-2xs uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    Recent ({pastConversations.length})
+                    History
                     <svg
                       width="10"
                       height="10"
@@ -158,30 +152,7 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden space-y-1"
                     >
-                      {pastConversations.slice(0, 5).map((conv, i) => (
-                        <motion.div
-                          key={conv.conversationId}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                        >
-                          <Button
-                            variant="ghost"
-                            onClick={() => viewConversation(conv.conversationId)}
-                            className="w-full flex items-center justify-between px-3 py-2 h-auto rounded-lg text-left"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-foreground truncate">
-                                {conv.title || 'Untitled conversation'}
-                              </p>
-                              <p className="text-2xs text-muted-foreground">{conv.messageCount} messages</p>
-                            </div>
-                            <span className="text-2xs text-muted-foreground shrink-0 ml-2">
-                              {formatRelativeTime(conv.lastMessageAt)}
-                            </span>
-                          </Button>
-                        </motion.div>
-                      ))}
+                      <AssistantHistory onOpen={(id) => void viewConversation(id)} activeId={sessionId} />
                     </motion.div>
                   )}
                 </AnimatePresence>

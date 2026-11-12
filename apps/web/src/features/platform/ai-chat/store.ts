@@ -4,13 +4,21 @@ import type { ChatMessage, OrbState, UserMode, InputMode, Intent, ChatLayout } f
 import { DEFAULT_VOICE_PREFS, type VoicePreferences } from './voice/types';
 import { chatErrorCopy, chatRequestError } from './lib/chat-error';
 import {
+  applyCitationFrame,
+  applyReadingFrame,
+  failedTurnText,
+  readFrames,
+  settleMessage,
+  updatePlaceholder,
+  type FrameHandlers,
+  type StreamError,
+} from './lib/stream-frames';
+import {
   createConversation as createConversationApi,
-  listConversations,
   getConversationMessages,
   getStreamingUrl,
   getResumeUrl,
   getAuthHeaders,
-  type ConversationSummary,
 } from './api';
 
 /** Pending HITL confirmation from the agent. */
@@ -55,8 +63,7 @@ interface AssistantState {
 
   openSource: 'tab' | 'orb' | null;
 
-  // Chat history
-  pastConversations: ConversationSummary[];
+  // Chat history (the list itself is a TanStack query: hooks/use-conversation-history)
   isViewingHistory: boolean;
   viewedMessages: ChatMessage[];
   isLoadingHistory: boolean;
@@ -84,7 +91,6 @@ interface AssistantState {
   setSuggestedFollowUps: (followUps: string[]) => void;
   setHasUnreadAsync: (hasUnread: boolean) => void;
   clearSession: () => void;
-  loadHistory: () => Promise<void>;
   viewConversation: (conversationId: string) => Promise<void>;
   clearView: () => void;
 }
@@ -123,6 +129,68 @@ function createFallbackGreeting(mode: UserMode): ChatMessage {
   };
 }
 
+type SetState = (partial: Partial<AssistantState> | ((state: AssistantState) => Partial<AssistantState>)) => void;
+
+/**
+ * Read one turn's stream into the placeholder message: text, cards, follow-ups, citations and the reading line as they
+ * arrive, a confirmation card on suspend. Frames this client does not know are skipped (`lib/stream-frames.ts`).
+ * Returns the text that streamed and, when the turn ended with an `x:` frame, why it failed.
+ */
+async function readTurn(
+  body: ReadableStream<Uint8Array>,
+  placeholderId: string,
+  set: SetState,
+): Promise<{ assistantText: string; failure: StreamError | null }> {
+  let assistantText = '';
+  let failure: StreamError | null = null;
+  const updateMessage = (update: (m: ChatMessage) => ChatMessage) =>
+    set((s) => ({ messages: updatePlaceholder(s.messages, placeholderId, update) }));
+
+  const handlers: FrameHandlers = {
+    text: (delta) => {
+      assistantText += delta;
+      updateMessage((m) => ({ ...settleMessage(m), content: assistantText }));
+    },
+    card: (card) => updateMessage((m) => ({ ...m, card })),
+    reading: (frame) => updateMessage((m) => applyReadingFrame(m, frame)),
+    citation: (citation) => updateMessage((m) => applyCitationFrame(m, citation)),
+    followups: (followUps) => {
+      // The <followups> block is stripped from the visible text.
+      assistantText = assistantText.replace(/<followups>\s*[\s\S]*?<\/followups>\s*$/, '').trimEnd();
+      set((s) => ({
+        messages: updatePlaceholder(s.messages, placeholderId, (m) => ({ ...m, content: assistantText })),
+        suggestedFollowUps: followUps,
+      }));
+    },
+    suspend: (raw) => {
+      // HITL confirmation payload: the agent is suspended, awaiting the person's decision.
+      const payload = raw as unknown as PendingConfirmation;
+      set((s) => ({
+        pendingConfirmation: payload,
+        orbState: 'idle' as OrbState,
+        messages: [
+          ...s.messages,
+          {
+            id: `confirm-${Date.now()}`,
+            role: 'assistant',
+            content: payload.description,
+            inputMode: 'text',
+            timestamp: new Date(),
+            card: { type: 'confirmation', data: payload as unknown as Record<string, unknown> },
+          },
+        ],
+      }));
+    },
+    error: (error) => {
+      failure = error;
+    },
+  };
+
+  await readFrames(body, handlers);
+  updateMessage(settleMessage);
+  return { assistantText, failure };
+}
+
 /** Module-level abort controller for cancelling in-flight streaming requests */
 let activeAbortController: AbortController | null = null;
 
@@ -143,7 +211,6 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   suggestedFollowUps: [],
   hasUnreadAsync: false,
   openSource: null,
-  pastConversations: [],
   pendingConfirmation: null,
   isViewingHistory: false,
   viewedMessages: [],
@@ -215,7 +282,6 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
         userMode: mode,
         sessionId: null,
         messages: [],
-        pastConversations: [],
         isViewingHistory: false,
         viewedMessages: [],
       };
@@ -294,138 +360,39 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
           // Refused before the stream began: the body is the error envelope, whose detail the bubble shows.
           throw await chatRequestError(response);
         }
+        if (!response.body) throw new Error('No response body');
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No response body');
-
-        const decoder = new TextDecoder();
-        let assistantText = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // Parse AI SDK v6 SSE streaming protocol
-          // Format: data: {"type":"text-delta","id":"0","delta":"text"}\n\n
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? ''; // Keep incomplete last line in buffer
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed === 'data: [DONE]') continue;
-
-            if (trimmed.startsWith('data: ')) {
-              try {
-                const event = JSON.parse(trimmed.slice(6));
-                if (event.type === 'text-delta' && event.delta) {
-                  assistantText += event.delta;
-                  set((s) => {
-                    const msgs = s.messages.map((m) =>
-                      m.id === assistantPlaceholderId ? { ...m, content: assistantText } : m,
-                    );
-                    return { messages: msgs };
-                  });
-                }
-              } catch {
-                /* skip malformed chunks */
-              }
-            } else if (trimmed.startsWith('0:')) {
-              // Legacy AI SDK v4/v5 protocol fallback
-              try {
-                const text = JSON.parse(trimmed.slice(2));
-                assistantText += text;
-                set((s) => {
-                  const msgs = s.messages.map((m) =>
-                    m.id === assistantPlaceholderId ? { ...m, content: assistantText } : m,
-                  );
-                  return { messages: msgs };
-                });
-              } catch {
-                /* skip non-text chunks */
-              }
-            } else if (trimmed.startsWith('8:')) {
-              // Card metadata from tool results
-              try {
-                const card = JSON.parse(trimmed.slice(2));
-                set((s) => {
-                  const msgs = s.messages.map((m) => (m.id === assistantPlaceholderId ? { ...m, card } : m));
-                  return { messages: msgs };
-                });
-              } catch {
-                /* skip malformed card data */
-              }
-            } else if (line.startsWith('9:')) {
-              // HITL confirmation payload — agent is suspended, awaiting user decision
-              try {
-                const payload = JSON.parse(line.slice(2));
-                set({
-                  pendingConfirmation: payload,
-                  orbState: 'idle' as OrbState,
-                });
-                // Add confirmation card to the chat as a special message
-                set((s) => {
-                  const confirmMsg: ChatMessage = {
-                    id: `confirm-${Date.now()}`,
-                    role: 'assistant',
-                    content: payload.description,
-                    inputMode: 'text',
-                    timestamp: new Date(),
-                    card: {
-                      type: 'confirmation',
-                      data: payload,
-                    },
-                  };
-                  return { messages: [...s.messages, confirmMsg] };
-                });
-              } catch {
-                /* skip malformed confirmation */
-              }
-            } else if (trimmed.startsWith('a:')) {
-              // Follow-up suggestions from AI — also strip <followups> XML from visible text
-              try {
-                const followUps = JSON.parse(trimmed.slice(2));
-                if (Array.isArray(followUps)) {
-                  // Strip <followups> block from the rendered message text
-                  assistantText = assistantText.replace(/<followups>\s*[\s\S]*?<\/followups>\s*$/, '').trimEnd();
-                  set((s) => {
-                    const msgs = s.messages.map((m) =>
-                      m.id === assistantPlaceholderId ? { ...m, content: assistantText } : m,
-                    );
-                    return { messages: msgs, suggestedFollowUps: followUps };
-                  });
-                }
-              } catch {
-                /* skip malformed follow-ups */
-              }
-            }
-          }
-        }
-
+        const { assistantText, failure } = await readTurn(response.body, assistantPlaceholderId, set);
         activeAbortController = null;
+        if (failure) {
+          // The turn failed after it began: keep what streamed, then say why it stopped.
+          set((s) => ({
+            messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
+              ...settleMessage(m),
+              content: failedTurnText(assistantText, failure),
+            })),
+          }));
+        }
         set({ orbState: 'idle' as OrbState });
       })
       .catch((err) => {
         activeAbortController = null;
         // Aborted by user — keep partial text, just stop thinking
         if (err instanceof DOMException && err.name === 'AbortError') {
-          set({ orbState: 'idle' as OrbState });
+          set((s) => ({
+            messages: updatePlaceholder(s.messages, assistantPlaceholderId, settleMessage),
+            orbState: 'idle' as OrbState,
+          }));
           return;
         }
         // Show error message on failure
-        set((s) => {
-          const msgs = s.messages.map((m) =>
-            m.id === assistantPlaceholderId
-              ? {
-                  ...m,
-                  content: chatErrorCopy(err),
-                }
-              : m,
-          );
-          return { messages: msgs, orbState: 'idle' as OrbState };
-        });
+        set((s) => ({
+          messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
+            ...settleMessage(m),
+            content: chatErrorCopy(err),
+          })),
+          orbState: 'idle' as OrbState,
+        }));
       });
   },
 
@@ -464,65 +431,28 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       credentials: 'include',
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) throw await chatRequestError(response);
+        if (!response.body) throw new Error('No response body');
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No response body');
-
-        const decoder = new TextDecoder();
-        let assistantText = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (line.startsWith('0:')) {
-              try {
-                const text = JSON.parse(line.slice(2));
-                assistantText += text;
-                set((s) => {
-                  const msgs = s.messages.map((m) =>
-                    m.id === assistantPlaceholderId ? { ...m, content: assistantText } : m,
-                  );
-                  return { messages: msgs };
-                });
-              } catch {
-                /* skip */
-              }
-            } else if (line.startsWith('a:')) {
-              try {
-                const followUps = JSON.parse(line.slice(2));
-                if (Array.isArray(followUps)) {
-                  assistantText = assistantText.replace(/<followups>\s*[\s\S]*?<\/followups>\s*$/, '').trimEnd();
-                  set((s) => {
-                    const msgs = s.messages.map((m) =>
-                      m.id === assistantPlaceholderId ? { ...m, content: assistantText } : m,
-                    );
-                    return { messages: msgs, suggestedFollowUps: followUps };
-                  });
-                }
-              } catch {
-                /* skip */
-              }
-            }
-          }
+        const { assistantText, failure } = await readTurn(response.body, assistantPlaceholderId, set);
+        if (failure) {
+          set((s) => ({
+            messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
+              ...settleMessage(m),
+              content: failedTurnText(assistantText, failure),
+            })),
+          }));
         }
-
         set({ orbState: 'idle' as OrbState });
       })
-      .catch(() => {
-        set((s) => {
-          const msgs = s.messages.map((m) =>
-            m.id === assistantPlaceholderId ? { ...m, content: 'Failed to confirm the action. Please try again.' } : m,
-          );
-          return { messages: msgs, orbState: 'idle' as OrbState };
-        });
+      .catch((err) => {
+        set((s) => ({
+          messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
+            ...settleMessage(m),
+            content: chatErrorCopy(err),
+          })),
+          orbState: 'idle' as OrbState,
+        }));
       });
   },
 
@@ -580,16 +510,6 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     });
   },
 
-  loadHistory: async () => {
-    set({ isLoadingHistory: true });
-    try {
-      const res = await listConversations(10);
-      set({ pastConversations: res.conversations, isLoadingHistory: false });
-    } catch {
-      set({ isLoadingHistory: false });
-    }
-  },
-
   viewConversation: async (conversationId: string) => {
     set({ isLoadingHistory: true });
     try {
@@ -606,6 +526,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         action: m.action as any,
         speakText: m.speakText ?? undefined,
+        citations: m.citations,
       }));
       set({ isViewingHistory: true, viewedMessages: messages, isLoadingHistory: false });
     } catch {

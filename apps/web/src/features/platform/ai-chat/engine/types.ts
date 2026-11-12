@@ -1,3 +1,5 @@
+import type { Citation, ReadingFrame } from '@app/shared-types';
+
 // ── User Modes ──
 // Generic platform roles. Drives greetings and placeholders.
 export type UserMode = 'member' | 'admin' | 'owner' | 'super_admin';
@@ -73,4 +75,8 @@ export interface ChatMessage {
   card?: RichCard;
   action?: ActionResult;
   speakText?: string;
+  /** The sources the answer named (`c:` frames while streaming; stored with the message for history). */
+  citations?: Citation[];
+  /** What the assistant is reading right now (`t:` frames). Transient: cleared when text or a citation arrives. */
+  reading?: ReadingFrame | null;
 }

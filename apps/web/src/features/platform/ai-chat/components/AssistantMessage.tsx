@@ -2,10 +2,12 @@
 
 import { motion } from 'framer-motion';
 import { useState, useCallback } from 'react';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@app/ui/components/ui/button';
 import { SEMANTIC_COLORS } from '@appshore/web-core/shared/lib/colors';
+import type { Citation } from '@app/shared-types';
 import type { ChatMessage } from '../engine/types';
 import { RichCardRenderer } from './cards/RichCardRenderer';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
@@ -70,6 +72,28 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** The sources the answer named. A source with an in-app page is a link; one without is plain text. */
+function MessageSources({ citations }: { citations: Citation[] }) {
+  return (
+    <div className="mt-2 text-2xs text-muted-foreground" data-testid="message-sources">
+      <span className="uppercase tracking-wider">Sources</span>
+      <ul className="mt-1 space-y-0.5">
+        {citations.map((citation) => (
+          <li key={`${citation.sourceType}:${citation.sourceId}`} className="truncate">
+            {citation.href ? (
+              <Link href={citation.href} className="text-foreground underline-offset-2 hover:underline">
+                {citation.title}
+              </Link>
+            ) : (
+              <span className="text-foreground">{citation.title}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function AssistantMessage({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const isVoice = message.inputMode === 'voice';
@@ -114,6 +138,12 @@ export function AssistantMessage({ message }: { message: ChatMessage }) {
             <div className="assistant-markdown text-sm leading-relaxed text-foreground">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
             </div>
+            {message.reading && (
+              <p className="mt-1 animate-pulse text-xs text-muted-foreground" aria-live="polite">
+                Reading {message.reading.title}…
+              </p>
+            )}
+            {message.citations && message.citations.length > 0 && <MessageSources citations={message.citations} />}
             {/* Voice playback — future: capture TTS audio to IndexedDB for replay */}
             {message.content && (
               <div className="flex justify-end mt-1">

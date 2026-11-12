@@ -159,6 +159,7 @@ export const queryKeys = {
   },
   conversations: {
     root: ['conversations'] as const,
+    list: () => ['conversations', 'list'] as const,
     detail: (id: string) => ['conversations', id] as const,
     messages: (id: string) => ['conversations', id, 'messages'] as const,
   },
