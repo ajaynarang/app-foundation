@@ -24,6 +24,8 @@ import { AgentContext, AgentDefinition } from '../agent.types';
 import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
 import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
+import { AiProviderCreditRefused } from '../../infrastructure/telemetry/ai-provider-credit-refused.error';
+import { Logger } from '@nestjs/common';
 
 const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 const CTX: AgentContext = {
@@ -48,6 +50,12 @@ function streamingAgent(parts: string[], usage: Record<string, number> = {}) {
       usage: Promise.resolve(usage),
     }),
   };
+}
+
+async function drain(stream: AsyncGenerator<unknown>): Promise<unknown[]> {
+  const out: unknown[] = [];
+  for await (const chunk of stream) out.push(chunk);
+  return out;
 }
 
 class TestAgent extends AbstractBaseAgent {
@@ -127,6 +135,70 @@ describe('AbstractBaseAgent', () => {
         }),
         expect.objectContaining({ tenantId: 1, surface: 'CHAT' }),
       );
+    });
+
+    it('records cache reads and writes from the run total and the per-step provider metadata', async () => {
+      const mockAgent = streamingAgent(['hi']);
+      const response = await mockAgent.stream();
+      mockAgent.stream.mockResolvedValue({
+        ...response,
+        usage: Promise.resolve({ inputTokens: 50, outputTokens: 5 }),
+        totalUsage: Promise.resolve({ inputTokens: 9000, outputTokens: 700 }),
+        steps: Promise.resolve([
+          { providerMetadata: { anthropic: { cacheCreationInputTokens: 1500, cacheReadInputTokens: 2000 } } },
+          { providerMetadata: { anthropic: { cacheCreationInputTokens: 500, cacheReadInputTokens: 4000 } } },
+        ]),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockAiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        promptTokens: 9000,
+        completionTokens: 700,
+        cachedTokens: 6000,
+        cacheWriteTokens: 2000,
+      });
+    });
+
+    it('turns a provider credit refusal into the budget error, whether the stream start or the stream throws', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const refusal = Object.assign(new Error('requires more credits, or fewer max_tokens'), { statusCode: 402 });
+
+      const atStart = streamingAgent([]);
+      atStart.stream.mockRejectedValue(refusal);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(atStart) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+
+      const midStream = streamingAgent([]);
+      const read = jest.fn().mockResolvedValueOnce({ done: false, value: 'par' }).mockRejectedValueOnce(refusal);
+      midStream.stream.mockResolvedValue({
+        textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+        usage: Promise.resolve({}),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(midStream) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+
+      const recorded = streamingAgent(['par']);
+      const recordedResponse = await recorded.stream();
+      recorded.stream.mockResolvedValue({ ...recordedResponse, error: refusal });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(recorded) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      jest.restoreAllMocks();
+    });
+
+    it('still ends quietly on any other stream error, as before', async () => {
+      const broken = streamingAgent([]);
+      const read = jest.fn().mockRejectedValueOnce(new Error('socket hang up'));
+      broken.stream.mockResolvedValue({
+        textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+        usage: Promise.resolve({}),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(broken) });
+      await expect(drain(agent.chat('Test message', CTX))).resolves.toEqual([]);
     });
 
     it('refuses a zero-retention tenant before anything streams: the message never reaches a retaining route', async () => {

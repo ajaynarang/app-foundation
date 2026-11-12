@@ -8,6 +8,11 @@ import { EMBEDDING_CATALOG } from '../../routing/model-catalog';
 import type { ResolvedRoute } from '../../routing/routing.types';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
+import {
+  isProviderCreditRefusal,
+  logPlatformCreditRefusal,
+  mapProviderRefusal,
+} from '../telemetry/ai-provider-credit-refused.error';
 import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 /**
@@ -59,7 +64,7 @@ export class EmbeddingService {
       });
     } catch (err) {
       void this.record(aiContext, route, 0, Date.now() - startedAt, AiInvocationStatus.ERROR);
-      throw err;
+      throw mapProviderRefusal(err, aiContext.tenantId, route);
     }
     this.assertDimensions(result.embedding);
     void this.record(aiContext, route, this.readTokens(result.usage), Date.now() - startedAt, AiInvocationStatus.OK);
@@ -79,7 +84,7 @@ export class EmbeddingService {
       });
     } catch (err) {
       void this.record(aiContext, route, 0, Date.now() - startedAt, AiInvocationStatus.ERROR);
-      throw err;
+      throw mapProviderRefusal(err, aiContext.tenantId, route);
     }
     for (const embedding of result.embeddings) this.assertDimensions(embedding);
     void this.record(aiContext, route, this.readTokens(result.usage), Date.now() - startedAt, AiInvocationStatus.OK);
@@ -89,11 +94,18 @@ export class EmbeddingService {
   /** Platform-owned content only (the global knowledge base), stored as documents. Tenant content never goes here. */
   async embedForPlatform(texts: string[]): Promise<number[][]> {
     const route = this.aiRouteResolver.resolvePlatform('embedding');
-    const result = await embedMany({
-      model: route.embeddingModel(),
-      values: texts,
-      providerOptions: this.providerOptions('document'),
-    });
+    let result: Awaited<ReturnType<typeof embedMany>>;
+    try {
+      result = await embedMany({
+        model: route.embeddingModel(),
+        values: texts,
+        providerOptions: this.providerOptions('document'),
+      });
+    } catch (err) {
+      // No workspace to pin a budget error on: the ingest reports the failure; the platform's balance is logged.
+      if (isProviderCreditRefusal(err)) logPlatformCreditRefusal(route, null);
+      throw err;
+    }
     for (const embedding of result.embeddings) this.assertDimensions(embedding);
     return result.embeddings;
   }

@@ -37,6 +37,7 @@ import { AiRouteResolver } from '../../routing/ai-route-resolver.service';
 import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
 import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
+import { AiBudgetExceededError } from '../../infrastructure/telemetry/ai-budget-exceeded.error';
 
 const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 
@@ -280,6 +281,59 @@ describe('AssistantAiService', () => {
 
       expect(mockAgentRegistry.get).not.toHaveBeenCalled();
       expect(mockTelemetry.assertBudget).not.toHaveBeenCalled();
+    });
+
+    describe('the platform cap applies only when the platform pays', () => {
+      async function* answer() {
+        yield { type: 'text-delta' as const, data: 'Hi' };
+      }
+      const routeWithPayer = (payer: 'PLATFORM' | 'TENANT') => {
+        const platform = makeResolver({ config: OPENROUTER }).resolver;
+        return {
+          resolve: async (tenantId: number, need: 'language' | 'embedding') => ({
+            ...(await platform.resolve(tenantId, need)),
+            payer,
+          }),
+        } as unknown as AiRouteResolver;
+      };
+      const overCap = () =>
+        mockTelemetry.assertBudget.mockRejectedValue(
+          new AiBudgetExceededError(1, {
+            state: 'hard',
+            dailyUsdSpent: '25',
+            monthlyUsdSpent: '25',
+            dailySoftUsd: '5',
+            dailyHardUsd: '20',
+            monthlySoftUsd: '50',
+            monthlyHardUsd: '200',
+          }),
+        );
+
+      it("serves a workspace over the cap when its language route is the workspace's own key", async () => {
+        service = buildService(routeWithPayer('TENANT'));
+        overCap();
+        mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(answer()) });
+
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+
+        expect(mockTelemetry.assertBudget).not.toHaveBeenCalled();
+        expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
+      });
+
+      it('blocks a platform-paid turn over the cap before the agent runs', async () => {
+        service = buildService(routeWithPayer('PLATFORM'));
+        overCap();
+
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+
+        expect(mockTelemetry.assertBudget).toHaveBeenCalledWith(1);
+        expect(chunks[0]).toMatchObject({ type: 'blocked' });
+        expect(mockAgentRegistry.get).not.toHaveBeenCalled();
+      });
     });
 
     it('skips external moderation for a zero-retention tenant (tells the moderator the tenant)', async () => {

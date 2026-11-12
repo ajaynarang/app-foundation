@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import { AiInvocationStatus, AiSurface } from '@appshore/db';
 import { RequestContext } from '@mastra/core/request-context';
 
@@ -10,7 +11,10 @@ import { REQUEST_MODEL_KEY } from '../routing/request-model-key';
 import type { ResolvedRoute } from '../routing/routing.types';
 import { OUTPUT_CEILINGS } from '../routing/output-ceilings';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
+import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
+import { captureUsageShape, usageFromAiSdk } from '../infrastructure/telemetry/usage-from-ai-sdk';
+import { mapProviderRefusal } from '../infrastructure/telemetry/ai-provider-credit-refused.error';
 import { PromptingService } from '../../prompting';
 import {
   AgentContext,
@@ -61,6 +65,8 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     protected readonly mastraProvider: MastraProvider,
     protected readonly aiTelemetry: AiTelemetryService,
     protected readonly aiRouteResolver: AiRouteResolver,
+    /** Reads the local usage-capture switch (`aiUsageCaptureDir`); optional, so a test can leave it out. */
+    protected readonly config?: ConfigService,
   ) {
     this.logger = new Logger(this.constructor.name);
   }
@@ -113,22 +119,28 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     });
 
     const startedAt = Date.now();
-    const response = await agent.stream(message, {
-      instructions,
-      toolsets,
-      memory: {
-        thread: ctx.conversationId,
-        resource: `tenant-${ctx.tenantId}-user-${ctx.userId}`,
-      },
-      maxSteps: this.definition.maxToolSteps,
-      modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
-      requestContext,
-      tracingOptions: { metadata: { sessionId, userId }, tags },
-    });
+    let response: any;
+    try {
+      response = await agent.stream(message, {
+        instructions,
+        toolsets,
+        memory: {
+          thread: ctx.conversationId,
+          resource: `tenant-${ctx.tenantId}-user-${ctx.userId}`,
+        },
+        maxSteps: this.definition.maxToolSteps,
+        modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
+        requestContext,
+        tracingOptions: { metadata: { sessionId, userId }, tags },
+      });
+    } catch (err) {
+      // A provider's credit refusal is the budget error the chat already answers; anything else is unchanged.
+      throw mapProviderRefusal(err, ctx.tenantId, route);
+    }
 
     let streamErrored = false;
     try {
-      yield* this.streamTextChunks(response, ctx.conversationId);
+      yield* this.streamTextChunks(response, ctx, route);
     } catch (err) {
       streamErrored = true;
       throw err;
@@ -173,8 +185,14 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     return parts.filter(Boolean).join('\n\n');
   }
 
-  private async *streamTextChunks(response: any, conversationId: string): AsyncGenerator<ChatChunk> {
+  /**
+   * The answer's text as it streams. A stream error is logged and ends the text, as before, except a provider credit
+   * refusal: that becomes `AiProviderCreditRefused` (a budget error), whether the read threw it or Mastra recorded it
+   * on the response (`response.error`), so the turn fails the way a capped workspace's does instead of ending blank.
+   */
+  private async *streamTextChunks(response: any, ctx: AgentContext, route: ResolvedRoute): AsyncGenerator<ChatChunk> {
     const reader = response.textStream.getReader();
+    let failure: unknown;
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -182,10 +200,13 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
         yield { type: 'text-delta' as const, data: value };
       }
     } catch (streamError) {
-      this.logger.warn(`Stream error for ${conversationId}`, streamError);
+      failure = streamError;
+      this.logger.warn(`Stream error for ${ctx.conversationId}`, streamError);
     } finally {
       reader.releaseLock();
     }
+    const refused = mapProviderRefusal(failure ?? readStreamError(response), ctx.tenantId, route);
+    if (refused instanceof AiBudgetExceededError) throw refused;
   }
 
   private async extractSuspendChunk(response: any): Promise<ChatChunk | null> {
@@ -217,14 +238,18 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     route: ResolvedRoute,
   ): Promise<void> {
     try {
-      const usage = (await Promise.resolve(response?.usage).catch(() => undefined)) as
-        | Record<string, unknown>
-        | undefined;
-      const promptTokens = numberOrZero(usage?.promptTokens ?? usage?.inputTokens);
-      const completionTokens = numberOrZero(usage?.completionTokens ?? usage?.outputTokens);
-      const cachedTokens = optionalNumber(
-        usage?.cachedPromptTokens ?? usage?.cacheReadInputTokens ?? usage?.promptTokensCached,
-      );
+      // The run's total over every step (Mastra's `totalUsage`, else `usage`), plus the per-step provider metadata
+      // that carries the cache counts some routes report nowhere else.
+      const settle = (value: unknown) => Promise.resolve(value).catch(() => undefined);
+      const [totalUsage, usage, providerMetadata, steps] = await Promise.all([
+        settle(response?.totalUsage),
+        settle(response?.usage),
+        settle(response?.providerMetadata),
+        settle(response?.steps),
+      ]);
+      const result = { usage: totalUsage ?? usage, providerMetadata, steps };
+      captureUsageShape(this.mastraAgentId, result, this.config?.get<string>('aiUsageCaptureDir'));
+      const { promptTokens, completionTokens, cachedTokens, cacheWriteTokens } = usageFromAiSdk(result);
 
       const alias = this.definition.modelAlias;
       await this.aiTelemetry.record(
@@ -237,6 +262,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
           completionTokens,
           totalTokens: promptTokens + completionTokens,
           cachedTokens,
+          cacheWriteTokens,
           latencyMs,
           status: streamErrored ? AiInvocationStatus.ERROR : AiInvocationStatus.OK,
         },
@@ -309,10 +335,11 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
   }
 }
 
-function numberOrZero(v: unknown): number {
-  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-}
-
-function optionalNumber(v: unknown): number | undefined {
-  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+/** The error Mastra recorded on a stream that ended early, if any. Never throws. */
+function readStreamError(response: any): unknown {
+  try {
+    return response?.error;
+  } catch {
+    return undefined;
+  }
 }

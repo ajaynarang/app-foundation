@@ -1,10 +1,11 @@
-import { InternalServerErrorException } from '@nestjs/common';
+import { InternalServerErrorException, Logger } from '@nestjs/common';
 import type { AiCallContext } from '@app/shared-types';
 
 import { EmbeddingService } from '../embedding.service';
 import { makeResolver } from '../../../routing/__tests__/resolver-fixtures';
 import { AiNotConfigured } from '../../../routing/ai-not-configured.error';
 import { ZeroRetentionUnavailable } from '../../redaction/zero-retention-unavailable.error';
+import { AiProviderCreditRefused } from '../../telemetry/ai-provider-credit-refused.error';
 
 const mockEmbed = jest.fn();
 const mockEmbedMany = jest.fn();
@@ -144,6 +145,28 @@ describe('EmbeddingService', () => {
     it('writes no tenant ledger row for platform content', async () => {
       await service.embedForPlatform(['a', 'b']);
       expect(aiTelemetry.record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('provider credit refusals', () => {
+    const refusal = () => Object.assign(new Error('insufficient_quota'), { statusCode: 402 });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('turns a refusal on tenant content into the budget error (single and batch), and records the failed row', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      mockEmbed.mockRejectedValue(refusal());
+      mockEmbedMany.mockRejectedValue(refusal());
+      await expect(service.embedText('x', CTX, 'query')).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      await expect(service.embedBatch(['x'], CTX, 'document')).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      expect(aiTelemetry.record).toHaveBeenCalledTimes(2);
+    });
+
+    it('logs a refusal on platform content at error level and rethrows it for the ingest to report', async () => {
+      const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const error = refusal();
+      mockEmbedMany.mockRejectedValue(error);
+      await expect(service.embedForPlatform(['a'])).rejects.toBe(error);
+      expect(String(log.mock.calls[0][0])).toContain('platform-cohere');
     });
   });
 });

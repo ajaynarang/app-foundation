@@ -13,6 +13,7 @@ import type { AiCallContext } from '@app/shared-types';
 import { makeResolver } from '../../../routing/__tests__/resolver-fixtures';
 import { AiNotConfigured } from '../../../routing/ai-not-configured.error';
 import { ZeroRetentionUnavailable } from '../../redaction/zero-retention-unavailable.error';
+import { AiProviderCreditRefused } from '../../telemetry/ai-provider-credit-refused.error';
 
 const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 const CTX: AiCallContext = { tenantId: 7, surface: 'KB_INGEST' };
@@ -463,6 +464,89 @@ describe('StructuredOutputService', () => {
       // Blocked before spending a model call — no generateText, no ledger row.
       expect(generateText).not.toHaveBeenCalled();
       expect(aiTelemetry.record).not.toHaveBeenCalled();
+    });
+
+    it('never checks the platform cap on a route the workspace pays for, even when it is over the cap', async () => {
+      // The workspace's own credential: same route shape, the tenant pays.
+      const platform = makeResolver({ config: OPENROUTER }).resolver;
+      const ownKey = {
+        resolve: async (tenantId: number, need: 'language' | 'embedding') => ({
+          ...(await platform.resolve(tenantId, need)),
+          routeId: 'aicred_x1',
+          credentialType: 'ANTHROPIC_KEY',
+          payer: 'TENANT' as const,
+        }),
+      };
+      service = new StructuredOutputService(aiTelemetry as any, ownKey as any);
+      aiTelemetry.assertBudget.mockRejectedValue(new Error('AiBudgetExceededError'));
+      (generateText as jest.Mock).mockResolvedValue({ output: { x: 1 }, usage: { inputTokens: 1, outputTokens: 1 } });
+
+      const result = await service.extract({
+        messages: [],
+        schema: z.object({ x: z.number() }),
+        modelAlias: 'fast',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        enforceBudget: true,
+        aiContext: ctx,
+      });
+
+      expect(result.object).toEqual({ x: 1 });
+      expect(aiTelemetry.assertBudget).not.toHaveBeenCalled();
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        routeId: 'aicred_x1',
+        credentialType: 'ANTHROPIC_KEY',
+      });
+    });
+  });
+
+  describe('extract — cache usage and provider refusals', () => {
+    const ctx: AiCallContext = { tenantId: 7, surface: 'KB_INGEST' };
+    const call = () =>
+      service.extract({
+        messages: [],
+        schema: z.object({ x: z.number() }),
+        modelAlias: 'standard',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: ctx,
+      });
+
+    it('records cache reads and cache writes read through usageFromAiSdk', async () => {
+      (generateText as jest.Mock).mockResolvedValue({
+        output: { x: 1 },
+        usage: {
+          inputTokens: 5400,
+          outputTokens: 410,
+          inputTokenDetails: { cacheReadTokens: 3000, cacheWriteTokens: 1200 },
+        },
+      });
+      await call();
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        promptTokens: 5400,
+        completionTokens: 410,
+        cachedTokens: 3000,
+        cacheWriteTokens: 1200,
+      });
+    });
+
+    it('turns a provider credit refusal into the budget error every surface handles, and still records the row', async () => {
+      (generateText as jest.Mock).mockRejectedValue(
+        Object.assign(new Error('This request requires more credits, or fewer max_tokens'), { statusCode: 402 }),
+      );
+      await expect(call()).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        status: 'ERROR',
+        errorCode: 'AiProviderCreditRefused',
+      });
+    });
+
+    it('rethrows any other provider error unchanged', async () => {
+      const boom = new Error('upstream 500');
+      (generateText as jest.Mock).mockRejectedValue(boom);
+      await expect(call()).rejects.toBe(boom);
     });
   });
 });

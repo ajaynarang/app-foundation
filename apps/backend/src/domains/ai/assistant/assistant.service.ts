@@ -226,15 +226,17 @@ export class AssistantAiService {
     // 4b. Resolve the tenant's language route before anything streams. Retention and configuration refusals
     // (ZeroRetentionUnavailable, AiNotConfigured) surface here as clean typed errors, which the HTTP route answers
     // as an error envelope; nothing reaches a provider.
-    await this.aiRouteResolver.resolve(tenantId, 'language');
+    const chatRoute = await this.aiRouteResolver.resolve(tenantId, 'language');
 
     // 4c. AI cost budget — block chat if the tenant is over its hard cap.
+    // The cap is a control on PLATFORM money: a workspace whose language route
+    // is its own credential is never blocked from spending its own money.
     // assertBudget fails open (allows on its own infra error), so this only
     // throws on a genuine hard breach. We answer assistant-style rather than
     // surfacing a raw 402 mid-stream, and persist it like the moderation
     // block so the conversation history is coherent.
     try {
-      await this.aiTelemetry.assertBudget(tenantId);
+      if (chatRoute.payer === 'PLATFORM') await this.aiTelemetry.assertBudget(tenantId);
     } catch (budgetError) {
       if (budgetError instanceof AiBudgetExceededError) {
         const budgetText =

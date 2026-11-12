@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AiInvocationStatus } from '@appshore/db';
 import { generateText, Output } from 'ai';
 import type { ZodSchema } from 'zod';
@@ -8,6 +9,8 @@ import type { ResolvedRoute } from '../../routing/routing.types';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { redactMessages } from '../redaction/pii-redactor';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
+import { captureUsageShape, usageFromAiSdk, type LedgerTokens } from '../telemetry/usage-from-ai-sdk';
+import { mapProviderRefusal } from '../telemetry/ai-provider-credit-refused.error';
 import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 interface ExtractOptions {
@@ -40,7 +43,9 @@ interface ExtractOptions {
    * user-facing, billable surfaces (document parsing, desk steps). Leave
    * false for non-user-facing surfaces (memory extraction) that should
    * degrade silently rather than hard-fail. Chat enforces separately in
-   * the Mastra path.
+   * the Mastra path. Checked only when the platform pays for the route: the
+   * cap is a control on platform money, and a workspace on its own key is
+   * never capped.
    */
   enforceBudget?: boolean;
 }
@@ -63,6 +68,7 @@ export class StructuredOutputService {
   constructor(
     private readonly aiTelemetry: AiTelemetryService,
     private readonly aiRouteResolver: AiRouteResolver,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
   async extract<T>(options: ExtractOptions): Promise<ExtractResult<T>> {
@@ -71,11 +77,13 @@ export class StructuredOutputService {
     // AiNotConfigured. No tokens are spent, so no ledger row is written.
     const route = await this.aiRouteResolver.resolve(options.aiContext.tenantId, 'language');
 
-    // Hard-cap enforcement BEFORE we spend a model call. assertBudget throws
-    // AiBudgetExceededError on hard; the caller's existing failure path turns
-    // that into the surface-appropriate fallback (failed job, failed step).
-    // We do NOT record a ledger row for a blocked call — no tokens were spent.
-    if (options.enforceBudget) {
+    // Hard-cap enforcement BEFORE we spend a model call, and only when the
+    // PLATFORM pays: a workspace on its own credential has no platform cap,
+    // just ledger visibility. assertBudget throws AiBudgetExceededError on
+    // hard; the caller's existing failure path turns that into the
+    // surface-appropriate fallback (failed job, failed step). We do NOT record
+    // a ledger row for a blocked call — no tokens were spent.
+    if (options.enforceBudget && route.payer === 'PLATFORM') {
       await this.aiTelemetry.assertBudget(options.aiContext.tenantId);
     }
 
@@ -91,8 +99,7 @@ export class StructuredOutputService {
     // (excessively deep type instantiation). The runtime behavior is correct.
     const output = (Output as any).object({ schema: options.schema });
 
-    let usagePayload: { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null =
-      null;
+    let usagePayload: LedgerTokens | null = null;
     let outcome: AiInvocationStatus = AiInvocationStatus.OK;
     let errorCode: string | undefined;
 
@@ -114,7 +121,12 @@ export class StructuredOutputService {
         ...(telemetryMetadata ? { experimental_telemetry: telemetryMetadata } : {}),
       });
 
-      usagePayload = this.extractUsage(result);
+      captureUsageShape(
+        options.aiContext.agentId ?? options.aiContext.surface,
+        result,
+        this.config?.get<string>('aiUsageCaptureDir'),
+      );
+      usagePayload = usageFromAiSdk(result);
       const aiInvocationId = await this.recordTelemetry(
         options,
         route,
@@ -127,7 +139,9 @@ export class StructuredOutputService {
 
       const objectResult = (result.output as T) ?? null;
       return { object: objectResult, ...(aiInvocationId ? { aiInvocationId } : {}) };
-    } catch (err) {
+    } catch (caught) {
+      // A provider's credit refusal becomes the budget error every surface already handles, never silent emptiness.
+      const err = mapProviderRefusal(caught, options.aiContext.tenantId, route);
       const isTimeout = err instanceof Error && (err.name === 'AbortError' || /timeout/i.test(err.message));
       outcome = isTimeout ? AiInvocationStatus.TIMEOUT : AiInvocationStatus.ERROR;
       errorCode = err instanceof Error ? err.name : 'UnknownError';
@@ -145,7 +159,7 @@ export class StructuredOutputService {
       );
 
       // Re-throw so callers' existing retry/fallback logic keeps working.
-      // The thrown error type is unchanged from prior behavior; we just
+      // The thrown error type is unchanged (bar a credit refusal, typed above); we just
       // stamp the invocation id onto it so callers can join the failed
       // ledger row when they handle the throw.
       if (aiInvocationId && err && typeof err === 'object') {
@@ -155,28 +169,10 @@ export class StructuredOutputService {
     }
   }
 
-  /**
-   * Pull provider/usage shape off the AI SDK result. Different providers
-   * surface usage slightly differently (`promptTokens`/`completionTokens` on
-   * AI SDK v3, `inputTokens`/`outputTokens` on some shapes). Reading both
-   * keeps the wrapper robust to upgrades.
-   */
-  private extractUsage(
-    result: any,
-  ): { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null {
-    const usage = result?.usage ?? result?.totalUsage;
-    if (!usage) return null;
-    const promptTokens = usage.promptTokens ?? usage.inputTokens ?? 0;
-    const completionTokens = usage.completionTokens ?? usage.outputTokens ?? 0;
-    const cachedTokens =
-      usage.cachedPromptTokens ?? usage.cacheReadInputTokens ?? usage.promptTokensCached ?? undefined;
-    return { promptTokens, completionTokens, cachedTokens };
-  }
-
   private async recordTelemetry(
     options: ExtractOptions,
     route: ResolvedRoute,
-    usage: { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null,
+    usage: LedgerTokens | null,
     latencyMs: number,
     status: AiInvocationStatus,
     errorCode: string | undefined,
@@ -197,6 +193,7 @@ export class StructuredOutputService {
           completionTokens,
           totalTokens: promptTokens + completionTokens,
           cachedTokens: usage?.cachedTokens,
+          cacheWriteTokens: usage?.cacheWriteTokens,
           latencyMs,
           status,
           errorCode,
