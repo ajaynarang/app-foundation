@@ -5,11 +5,16 @@ import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.
 import { CacheModule } from '../../../../platform-glue/cache/cache.module';
 import { InAppNotificationsModule } from '../../../notifications/notifications.module';
 
+import { CredentialCryptoService } from '../credential-crypto.service';
 import { AiBudgetNudgeListener } from './ai-budget-nudge.listener';
 import { AiBudgetSeederService } from './ai-budget-seeder.service';
+import { OpenRouterProvisioningService } from './openrouter-provisioning.service';
 
 /**
- * The AI money plane: plan-driven budgets and the notification when a workspace's cap is reached.
+ * The AI money plane: plan-driven budgets, per-workspace OpenRouter sub-keys (the writer that calls OpenRouter; the
+ * row reader the resolver uses lives in `AiRoutingModule`), and the notification when a workspace's cap is reached.
+ * `CredentialCryptoService` is provided here too rather than importing the routing module: it is stateless and reads
+ * only the config key.
  *
  * The seeder runs on the four moments a workspace's plan can start or change: approval and plan change (the
  * platform's `TENANT_PROVISION_HOOKS`, bound in `platform-glue/hooks.module.ts`), personal signup (which calls the
@@ -19,8 +24,8 @@ import { AiBudgetSeederService } from './ai-budget-seeder.service';
  */
 @Module({
   imports: [PrismaModule, CacheModule, InAppNotificationsModule],
-  providers: [AiBudgetSeederService, AiBudgetNudgeListener],
-  exports: [AiBudgetSeederService],
+  providers: [AiBudgetSeederService, OpenRouterProvisioningService, CredentialCryptoService, AiBudgetNudgeListener],
+  exports: [AiBudgetSeederService, OpenRouterProvisioningService],
 })
 export class AiProvisioningModule implements OnApplicationBootstrap {
   private readonly logger = new Logger(AiProvisioningModule.name);
