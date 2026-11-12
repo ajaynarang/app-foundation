@@ -15,6 +15,8 @@ import { APP_NOTIFICATION_TYPES } from './notifications/notification-types';
 import { APP_NOTIFICATION_POLICIES, APP_WHATSAPP_TEMPLATES } from './notifications/app-notification-policies';
 import { OPTIONAL_FEATURES } from './features';
 import { featureHookImports, featureHookProviders } from './features/feature-hooks';
+import { AiBudgetProvisionHooks } from './ai-budget-provision.hooks';
+import { AiProvisioningModule } from '../domains/ai/routing/provisioning/ai-provisioning.module';
 
 /**
  * Binds the platform package's optional hooks to this app's implementations.
@@ -34,13 +36,13 @@ class NotificationUserLifecycleHooks implements UserLifecycleHooks {
 
 @Global()
 @Module({
-  imports: [InAppNotificationsModule, ...featureHookImports(OPTIONAL_FEATURES)],
+  imports: [InAppNotificationsModule, AiProvisioningModule, ...featureHookImports(OPTIONAL_FEATURES)],
   providers: [
     NotificationUserLifecycleHooks,
     { provide: USER_LIFECYCLE_HOOKS, useExisting: NotificationUserLifecycleHooks },
-    // Each optional feature's tenant-provision hook (platform-glue/features), behind one composite; a no-op when
-    // the product kept none.
-    ...featureHookProviders(OPTIONAL_FEATURES),
+    // The always-on tenant-provision hooks (the AI budget seed), then each optional feature's (platform-glue/features),
+    // behind one composite.
+    ...featureHookProviders(OPTIONAL_FEATURES, [AiBudgetProvisionHooks]),
     // Your notification types (notifications/notification-types.ts) and their policies (category, urgency, channel
     // rules; app-notification-policies.ts). The platform's own types are already covered. The policy registry refuses
     // to boot when a declared type has no policy.

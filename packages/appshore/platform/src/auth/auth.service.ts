@@ -1,6 +1,8 @@
 import {
+  Inject,
   Injectable,
   Logger,
+  Optional,
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
@@ -21,6 +23,7 @@ import { EmailService } from '../infrastructure/notification/services/email.serv
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
 
 @Injectable()
 export class AuthService {
@@ -34,6 +37,7 @@ export class AuthService {
     private twilioVerifyService: TwilioVerifyService,
     private loginEventService: LoginEventService,
     private emailService: EmailService,
+    @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
   private static readonly PASSWORD_SALT_ROUNDS = 12;
@@ -325,6 +329,18 @@ export class AuthService {
       await tx.userPreferences.create({ data: { userId: created.id } });
       return created;
     });
+
+    // The workspace is ACTIVE with no approval step, so it gets what an approved one gets (its AI budget, and any
+    // feature's provisioning), after the signup committed. A hook failure is logged and never fails the signup.
+    if (user.tenantId !== null) {
+      try {
+        await this.provisionHooks?.tenantApproved(user.tenantId);
+      } catch (err) {
+        this.logger.warn(
+          `tenantApproved hook failed for personal workspace ${user.tenantId}: ${(err as Error).message}`,
+        );
+      }
+    }
 
     const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
       { id: user.id, userId: user.userId, email: user.email, role: user.role, tenantId: user.tenant?.tenantId },
