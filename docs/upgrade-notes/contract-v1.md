@@ -346,3 +346,31 @@ once a v2 successor ships (`@DeprecatedRoute`).
 acceptance link from `inviteLink`; address an invitation by `invitationId`. Treat a sync `jobId` as an opaque string.
 After changing a route in your product, run `pnpm --filter @app/backend openapi:generate` and commit both files:
 `swagger-completeness.spec.ts` fails on any drift and names that command.
+
+## 8. Idempotency-Key
+
+**What changed.** Every authenticated create (a POST that answers 201 or 202) accepts an optional `Idempotency-Key`
+header, 1 to 255 visible ASCII characters (a UUID). A retry with the same key and the same request, from the same
+user in the same workspace, within 24 hours, gets the first response back with `Idempotent-Replayed: true` instead of
+a second record. The OpenAPI document lists the header on each covered operation.
+
+| Request                                                        | Answer                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------- |
+| No `Idempotency-Key`                                           | unchanged                                                 |
+| A new key                                                      | unchanged; the success is remembered 24 hours             |
+| The same key and request again                                 | the first status and body, `Idempotent-Replayed: true`    |
+| The same key, another route or body                            | 409 `IDEMPOTENCY_KEY_REUSED`                              |
+| The same key while the first request is still running          | 409 `IDEMPOTENCY_KEY_IN_USE`                              |
+| A key with a space, a control character or over 255 characters | 400 `VALIDATION_FAILED`, `fieldErrors["Idempotency-Key"]` |
+
+Not covered, so the header is ignored: sign-up and other public routes, super-admin routes, multipart uploads, routes
+that stream or write their own response, and the four creates that show a secret once (`POST /api-keys`,
+`POST /oauth/clients`, `POST /webhooks`, `POST /invitations`). CORS now allows the `Idempotency-Key` request header
+and exposes `Idempotent-Replayed`. The two codes are new members of `ApiErrorCode`.
+
+**Who notices.** Only a client that already sends an `Idempotency-Key` header: it now gets the behaviour above. A
+client that sends none sees no change.
+
+**What to do.** Nothing is required. To make a create safe to retry (a mobile client on a flaky network, an agent),
+send a fresh UUID per logical create and resend the same one on retry. Treat 409 `IDEMPOTENCY_KEY_IN_USE` as "retry
+in a moment". The keys live in Redis under `app:idempotency:*`, so a product's cache flush also forgets them.

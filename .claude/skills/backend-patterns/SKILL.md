@@ -375,6 +375,31 @@ rules `docs/api-operation` and `docs/response-documented`, and `tests/api/contra
 `pnpm verify:api` (the served document equals the committed one, and every parameterless GET body matches its
 published schema).
 
+### 2.5 Creates Are Retry-Safe: Idempotency-Key (NON-NEGOTIABLE)
+
+A create accepts an optional `Idempotency-Key` (ADR "API contract", section 5). You write nothing for it: the global
+`IdempotencyInterceptor` (`@appshore/platform/infrastructure/idempotency`) covers every authenticated POST whose
+`@HttpCode` is 201 or 202, and the OpenAPI builder documents the header on exactly those operations.
+
+- **What it does.** Scope is tenant and user. The same key and request within 24 hours replays the first status and
+  body with `Idempotent-Replayed: true`; the same key on another route or body is 409 `IDEMPOTENCY_KEY_REUSED`; a
+  retry while the first runs is 409 `IDEMPOTENCY_KEY_IN_USE`. Only a success is remembered. It fails open: if Redis
+  does not answer in 2 seconds the request runs without the key.
+- **Not covered:** no tenant on the request (sign-up, super admin), `@Public()`, multipart uploads, a route with
+  `@Res()` (not `passthrough`), and anything that is not 201 or 202. An action POST (`/:id/verb`, 200) is not covered:
+  make the action itself idempotent (a state check, an upsert) instead.
+- **`@SkipIdempotency()` on every create whose body shows a secret once**: a plaintext API key, a client or signing
+  secret, a token or a token-bearing link. A replay would store that secret in Redis for 24 hours. The starter marks
+  `POST /api-keys`, `POST /oauth/clients`, `POST /webhooks` and `POST /invitations`.
+- **A body over 256 KB is not remembered.** A create answers the record, not a document.
+- **Agent tools** take the same store with a `tool:<name>` target (`IdempotencyStore.claim`); the MCP argument is not
+  wired yet.
+
+Held by `packages/appshore/platform/src/infrastructure/idempotency/idempotency.spec.ts` (the mechanism),
+`apps/backend/src/bootstrap/__tests__/openapi.spec.ts` (the header on exactly the covered creates),
+`swagger-completeness.spec.ts` (a response that carries a secret field is never replayable: mark the route
+`@SkipIdempotency()`), and `tests/api/idempotency.spec.ts` under `pnpm verify:api`.
+
 ---
 
 ## 3. Service Patterns
@@ -1109,8 +1134,8 @@ text (`errors/no-internals-in-messages`): log it, and say what happened in plain
 **Every error carries a machine `code`.** A bare Nest exception gets the code its status implies (404 →
 `NOT_FOUND`, 409 → `INVALID_STATE`). Use a factory when the code is not the status default. The shared codes are
 `ApiErrorCode` in `@app/shared-types`: `VALIDATION_FAILED, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND,
-METHOD_NOT_ALLOWED, INVALID_STATE, STALE, DUPLICATE, PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL,
-UNAVAILABLE, INTERNAL`. A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
+METHOD_NOT_ALLOWED, INVALID_STATE, STALE, DUPLICATE, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_KEY_IN_USE,
+PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL, UNAVAILABLE, INTERNAL` (the two idempotency codes: section 2.5). A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
 (`FEATURE_DISABLED`, `PASSWORD_NOT_SET`); it passes through unchanged. Add a code to `ApiErrorCode` only when every
 domain shares it.
 
