@@ -4,7 +4,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 
-import { BUDGET_SEED_NOTE_PREFIX, PLAN_AI_BUDGETS, isSeederOwned } from './plan-ai-budgets';
+import { BUDGET_SEED_NOTE_PREFIX, PLAN_AI_BUDGETS, isSeederOwned, type PlanAiBudget } from './plan-ai-budgets';
 
 /**
  * Plan to `TenantAiBudget` seeding. The seeder writes only rows it owns: an absent row, or one whose `notes` still
@@ -13,7 +13,8 @@ import { BUDGET_SEED_NOTE_PREFIX, PLAN_AI_BUDGETS, isSeederOwned } from './plan-
  *
  * It runs when a workspace is approved, when its plan changes, when a personal workspace is created, and once at boot
  * for the single-mode workspace (`AiProvisioningModule`); `platform-glue/hooks.module.ts` binds the first three.
- * Idempotent: seeding the same plan twice writes the same row.
+ * Idempotent: seeding the same plan twice writes the same row. The write itself matches only a stamped row (or creates
+ * an absent one), so an admin save racing the ownership read is never overwritten.
  */
 @Injectable()
 export class AiBudgetSeederService {
@@ -48,13 +49,36 @@ export class AiBudgetSeederService {
     }
 
     const data = { ...budget, notes: `${BUDGET_SEED_NOTE_PREFIX}${plan}` };
-    await this.prisma.tenantAiBudget.upsert({
-      where: { tenantId },
-      create: { tenantId, ...data },
-      update: data,
-    });
+    const written = existing === null ? await this.createOrClaim(tenantId, data) : await this.claim(tenantId, data);
+    if (!written) {
+      this.logger.log(`Workspace ${tenantId} AI budget was taken over by an admin; plan ${plan} not applied`);
+      return;
+    }
     // The pre-call check caches the budget row; drop it so the new caps apply on the next call.
     await this.cache.del(buildKey('app:ai-telemetry', 'budget', tenantId));
     this.logger.log(`Seeded AI budget for workspace ${tenantId} from plan ${plan}`);
+  }
+
+  /**
+   * Writes the caps only to a row that still carries the seeder's stamp. The ownership read above can race an admin
+   * save; matching on the stamp in the write itself means the admin's caps win.
+   */
+  private async claim(tenantId: number, data: PlanAiBudget & { notes: string }): Promise<boolean> {
+    const { count } = await this.prisma.tenantAiBudget.updateMany({
+      where: { tenantId, notes: { startsWith: BUDGET_SEED_NOTE_PREFIX } },
+      data,
+    });
+    return count > 0;
+  }
+
+  /** Creates the row; when one appeared since the read (unique key), falls back to the stamped-only write. */
+  private async createOrClaim(tenantId: number, data: PlanAiBudget & { notes: string }): Promise<boolean> {
+    try {
+      await this.prisma.tenantAiBudget.create({ data: { tenantId, ...data } });
+      return true;
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'P2002') throw error;
+      return this.claim(tenantId, data);
+    }
   }
 }
