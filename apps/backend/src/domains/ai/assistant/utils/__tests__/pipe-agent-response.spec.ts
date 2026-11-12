@@ -5,6 +5,7 @@ jest.mock('@mastra/memory', () => ({ Memory: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { pipeAgentResponse } from '../pipe-agent-response';
 
 function createReadableStream(chunks: string[]): ReadableStream<string> {
@@ -84,6 +85,88 @@ describe('pipeAgentResponse', () => {
       expect(frames.filter((f: string) => f.startsWith('x:'))).toHaveLength(1);
       expect(mockRes.end).toHaveBeenCalled();
       expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('a stream that finishes with an error Mastra recorded on `response.error`: one x: frame, nothing after, nothing persisted', async () => {
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+      const text = 'Half an answer\n\n<followups>\nNext?\n</followups>';
+
+      await pipeAgentResponse(
+        {
+          textStream: createReadableStream([text]),
+          error: new Error('provider 500: internal detail'),
+          suspendPayload: { action: 'confirm' },
+          runId: 'run_1',
+        },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+          cardAccumulator: { card: { type: 'summary' } } as any,
+        },
+      );
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(frames[0]).toBe(`0:${JSON.stringify(text)}\n`);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      expect(JSON.parse(last.slice(2))).toEqual({ code: 'INTERNAL', detail: expect.any(String) });
+      expect(last).not.toContain('internal detail');
+      // No follow-up, card or suspend frame for a failed turn.
+      expect(frames.filter((f: string) => /^(a|8|9):/.test(f))).toHaveLength(0);
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('maps a failure through `mapError` (a credit refusal becomes its own code and copy)', async () => {
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+      const mapped = invalidState('mapped copy');
+      const mapError = jest.fn().mockReturnValue(mapped);
+      const recorded = { statusCode: 402 };
+
+      await pipeAgentResponse(
+        { textStream: createReadableStream(['Half']), error: recorded },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+          mapError,
+        },
+      );
+
+      expect(mapError).toHaveBeenCalledWith(recorded);
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(JSON.parse(frames[frames.length - 1].slice(2))).toEqual({ code: 'INVALID_STATE', detail: 'mapped copy' });
+    });
+
+    it('a recorded error that reading throws on is treated as no error', async () => {
+      const response = { textStream: createReadableStream(['Fine']) };
+      Object.defineProperty(response, 'error', {
+        get() {
+          throw new Error('not available');
+        },
+      });
+
+      await pipeAgentResponse(response, {
+        conversationDbId: 1,
+        conversationId: 'conv_1',
+        req: mockReq,
+        res: mockRes,
+        prisma: mockPrisma,
+        logger: mockLogger,
+      });
+
+      expect(mockPrisma.conversationMessage.create).toHaveBeenCalled();
     });
 
     it('before anything was sent: answers the error envelope instead of a frame', async () => {

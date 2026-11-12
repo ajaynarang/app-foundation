@@ -16,6 +16,7 @@ import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.cons
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
 import { captureUsageShape, usageFromAiSdk } from '../infrastructure/telemetry/usage-from-ai-sdk';
 import { mapProviderRefusal } from '../infrastructure/telemetry/ai-provider-credit-refused.error';
+import { readStreamError } from './read-stream-error';
 import { PromptingService } from '../../prompting';
 import {
   AgentContext,
@@ -377,14 +378,5 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
 function* readingChunks(evidence: TurnEvidence): Generator<ChatChunk> {
   for (const frame of evidence.drainReading()) {
     yield { type: 'reading' as const, data: JSON.stringify(frame) };
-  }
-}
-
-/** The error Mastra recorded on a stream that ended early, if any. Never throws. */
-function readStreamError(response: any): unknown {
-  try {
-    return response?.error;
-  } catch {
-    return undefined;
   }
 }

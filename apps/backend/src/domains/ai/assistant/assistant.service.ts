@@ -21,6 +21,7 @@ import { AgentRegistry } from '../agents/agent.registry';
 import { CHAT_STEP_MAX_OUTPUT_TOKENS } from '../agents/base.agent';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
+import { mapProviderRefusal } from '../infrastructure/telemetry/ai-provider-credit-refused.error';
 import { AiRouteResolver } from '../routing/ai-route-resolver.service';
 import { AiNotConfigured } from '../routing/ai-not-configured.error';
 import { CredentialCryptoService } from '../routing/credential-crypto.service';
@@ -509,11 +510,13 @@ export class AssistantAiService {
     const agentId = this.assistantRouter.defaultAgentFor(conversation.userMode);
     const agent = this.mastra.getMastra().getAgent(agentId);
 
+    let route: Awaited<ReturnType<AiRouteResolver['resolve']>> | undefined;
     try {
       // Agents take their model per request: the resumed turn runs on the tenant's route like the original did.
-      const route = await this.aiRouteResolver.resolve(tenantId, 'language');
+      const resolved = await this.aiRouteResolver.resolve(tenantId, 'language');
+      route = resolved;
       const modelAlias = this.agentRegistry.get(agentId).modelAlias;
-      const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageModel(modelAlias)]]);
+      const requestContext = new RequestContext([[REQUEST_MODEL_KEY, resolved.languageModel(modelAlias)]]);
       const response = await agent.resumeStream(
         { confirmed },
         {
@@ -538,12 +541,15 @@ export class AssistantAiService {
         logger: this.logger,
         moderationService: this.moderationService,
         cardAccumulator,
+        // A provider credit refusal keeps its own code and copy, as on the chat path.
+        mapError: (error) =>
+          AssistantAiService.asHttpError(mapProviderRefusal(error, tenantId, resolved), 'Resume failed'),
       });
     } catch (error) {
       endStreamWithError(
         req,
         res,
-        AssistantAiService.asHttpError(error, 'Resume failed'),
+        AssistantAiService.asHttpError(route ? mapProviderRefusal(error, tenantId, route) : error, 'Resume failed'),
         this.logger,
         `Resume error for conversation ${conversationId}`,
       );

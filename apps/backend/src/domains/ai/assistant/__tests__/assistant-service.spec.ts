@@ -38,6 +38,7 @@ import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
 import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
 import { AiBudgetExceededError } from '../../infrastructure/telemetry/ai-budget-exceeded.error';
+import { AI_PROVIDER_CREDIT_REFUSED_DETAIL } from '../../infrastructure/telemetry/ai-provider-credit-refused.error';
 import { CredentialCryptoService } from '../../routing/credential-crypto.service';
 import { AI_SETTINGS_WEB_PATH } from '../../../../shared/web-routes';
 import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
@@ -829,6 +830,47 @@ describe('AssistantAiService', () => {
 
       const requestContext = resumeStream.mock.calls[0][1].requestContext;
       expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
+
+    it('ends a resumed turn whose provider refused for credit (recorded on `response.error`) with the refusal frame', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Test',
+      });
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      const textStream = new ReadableStream<string>({
+        start(controller) {
+          controller.enqueue('Half');
+          controller.close();
+        },
+      });
+      const resumeStream = jest.fn().mockResolvedValue({ textStream, error: { statusCode: 402 } });
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' } as any;
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn().mockImplementation(() => {
+          mockRes.headersSent = true;
+        }),
+        end: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      expect(JSON.parse(last.slice(2)).detail).toBe(AI_PROVIDER_CREDIT_REFUSED_DETAIL);
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
     });
 
     it('handles resume error gracefully', async () => {

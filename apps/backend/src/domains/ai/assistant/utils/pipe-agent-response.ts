@@ -7,6 +7,7 @@ import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { STREAM_FRAME } from '@app/shared-types';
 import { parseFollowups } from './parse-followups';
 import { endStreamWithError } from './end-stream-with-error';
+import { readStreamError } from '../../agents/read-stream-error';
 import type { Request, Response } from 'express';
 
 /**
@@ -18,7 +19,9 @@ import type { Request, Response } from 'express';
  * - Accumulates the full assistant text and persists it to our DB
  * - Handles client disconnect by aborting the stream read
  * - A stream that fails ends with the error envelope (nothing written yet) or one terminal `x:` frame, and nothing is
- *   persisted for the failed turn
+ *   persisted for the failed turn. It fails when the read throws or when the stream closes with an error Mastra
+ *   recorded on `response.error` (it often records a provider failure there instead of throwing); `mapError` turns
+ *   either into the error to answer with (the caller maps a provider credit refusal through `mapProviderRefusal`)
  *
  * When `moderationService` is provided, output is PII-redacted before persistence.
  * When omitted (e.g. anonymous/unauthenticated sessions), text is stored as-is.
@@ -28,6 +31,7 @@ export async function pipeAgentResponse(
     textStream: ReadableStream<string>;
     suspendPayload?: unknown;
     runId?: string;
+    error?: unknown;
   },
   opts: {
     conversationDbId: number;
@@ -39,9 +43,11 @@ export async function pipeAgentResponse(
     moderationService?: ModerationService;
     cardAccumulator?: CardAccumulator;
     inputMode?: string;
+    mapError?: (error: unknown) => unknown;
   },
 ): Promise<void> {
   const { conversationDbId, conversationId, req, res, prisma, logger, moderationService, cardAccumulator } = opts;
+  const mapError = opts.mapError ?? ((error: unknown) => error);
 
   // Set streaming headers
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -59,6 +65,7 @@ export async function pipeAgentResponse(
   // Pipe textStream in AI SDK data stream protocol format.
   // Accumulate text during streaming.
   let assistantText = '';
+  let failure: unknown;
   const reader = response.textStream.getReader();
   try {
     while (true) {
@@ -71,8 +78,12 @@ export async function pipeAgentResponse(
       }
     }
   } catch (streamError) {
+    failure = streamError;
+  }
+  const error = failure ?? (clientDisconnected ? undefined : readStreamError(response));
+  if (error) {
     if (!clientDisconnected) {
-      endStreamWithError(req, res, streamError, logger, `Stream read error for ${conversationId}`);
+      endStreamWithError(req, res, mapError(error), logger, `Stream error for ${conversationId}`);
     }
     if (!res.writableEnded) res.end();
     return;
