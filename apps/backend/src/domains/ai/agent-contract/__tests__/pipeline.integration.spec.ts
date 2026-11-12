@@ -8,6 +8,7 @@ import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { InvocationPipelineService } from '../invocation-pipeline.service';
+import { ToolAccessPolicyService } from '../tool-access-policy.service';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { RequiresScope } from '../requires-scope.decorator';
 import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
@@ -124,7 +125,9 @@ describe('Phase A pipeline integration', () => {
       consume: async () => ({ ok: true }),
       verifyPin: async () => ({ ok: true }),
     } as any;
-    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges);
+    // The read tool declares no plan feature, so the guard is never consulted; the membership read is real.
+    const policy = new ToolAccessPolicyService(scopeRegistry, prisma as any, { canActivate: async () => true } as any);
+    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges, policy);
   }, 30_000);
 
   afterAll(async () => {

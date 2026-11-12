@@ -5,11 +5,20 @@ import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { HitlChallengeService } from '../hitl-challenge.service';
-import { fromUser, fromOAuthUser, fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
+import { ToolAccessPolicyService } from '../tool-access-policy.service';
+import { fromUser, fromOAuthUser, fromDeskResponsibility, fromApiKey } from '@appshore/platform/auth/agent-principal';
+import { z } from 'zod';
+import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
 
 const mockRegistry = {
   scopeForTool: jest.fn(),
   toolsAllowedByScopes: jest.fn(),
+  parametersForTool: jest.fn(),
+};
+const mockPolicy = {
+  actingRole: jest.fn(),
+  checkRole: jest.fn(),
+  checkPlan: jest.fn(),
 };
 const mockHitl = {
   resolveTier: jest.fn(),
@@ -34,6 +43,10 @@ describe('InvocationPipelineService', () => {
     mockHitl.tokenTtlSeconds.mockReturnValue(300);
     mockChallenges.issue.mockReset();
     mockChallenges.consume.mockReset();
+    mockRegistry.parametersForTool.mockReturnValue(undefined);
+    mockPolicy.actingRole.mockResolvedValue('MEMBER');
+    mockPolicy.checkRole.mockReturnValue(null);
+    mockPolicy.checkPlan.mockResolvedValue(null);
     const mod = await Test.createTestingModule({
       providers: [
         InvocationPipelineService,
@@ -42,6 +55,7 @@ describe('InvocationPipelineService', () => {
         { provide: ToolExecutorService, useValue: mockExecutor },
         { provide: AgentInvocationLoggerService, useValue: mockLogger },
         { provide: HitlChallengeService, useValue: mockChallenges },
+        { provide: ToolAccessPolicyService, useValue: mockPolicy },
       ],
     }).compile();
     svc = mod.get(InvocationPipelineService);
@@ -126,7 +140,7 @@ describe('InvocationPipelineService', () => {
         hitlTier: 'none',
       }),
     );
-    expect(mockExecutor.execute).toHaveBeenCalledWith('query-records', { status: 'active' }, p);
+    expect(mockExecutor.execute).toHaveBeenCalledWith('query-records', { status: 'active' }, p, { role: 'MEMBER' });
     expect(mockLogger.completeSuccess).toHaveBeenCalledWith(expect.objectContaining({ rowId: 'row-1', tenantId: 7 }));
     expect(res.content[0].text).toBe('result');
   });
@@ -190,7 +204,7 @@ describe('InvocationPipelineService', () => {
         hitlTier: 'sensitive',
       }),
     );
-    expect(mockExecutor.execute).toHaveBeenCalledWith('void-invoice', { id: 1 }, p);
+    expect(mockExecutor.execute).toHaveBeenCalledWith('void-invoice', { id: 1 }, p, { role: 'MEMBER' });
     expect(mockLogger.completeSuccess).toHaveBeenCalled();
   });
 
@@ -267,5 +281,129 @@ describe('InvocationPipelineService', () => {
     expect(mockChallenges.issue).not.toHaveBeenCalled();
     expect(mockChallenges.consume).not.toHaveBeenCalled();
     expect(mockExecutor.execute).toHaveBeenCalled();
+  });
+
+  describe('arguments (step 2)', () => {
+    const schema = z.object({ subject: z.string().min(1), priority: z.enum(['LOW', 'HIGH']).default('LOW') });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['t']));
+      mockRegistry.parametersForTool.mockReturnValue(schema);
+      mockHitl.resolveTier.mockReturnValue('none');
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+    });
+
+    it('refuses args that do not parse with VALIDATION_FAILED + fieldErrors; nothing runs or is logged', async () => {
+      const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+      const res = await svc.run(p, 't', { subject: 42 });
+      expect(res.isError).toBe(true);
+      const body = JSON.parse(res.content[0].text);
+      expect(body.code).toBe('VALIDATION_FAILED');
+      expect(body.fieldErrors).toHaveProperty('subject');
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockPolicy.checkRole).not.toHaveBeenCalled();
+    });
+
+    it('passes the parsed args (defaults applied, unknown keys dropped) and drops every `_` key the caller sent', async () => {
+      const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+      await svc.run(p, 't', { subject: 'Hi', extra: 'x', _tenantId: 999, _role: 'OWNER', _invocationSource: 'desk' });
+      expect(mockExecutor.execute).toHaveBeenCalledWith('t', { subject: 'Hi', priority: 'LOW' }, p, {
+        role: 'MEMBER',
+      });
+    });
+  });
+
+  describe('role and plan (steps 3 and 4) run before any confirmation', () => {
+    const agent = () =>
+      fromOAuthUser({ onBehalfOfUserDbId: 5, tenantDbId: 1, role: 'ADMIN', scopes: ['platform:write'], clientId: 'c' });
+    const refusalOf = (status: string) => ({ content: [{ type: 'text', text: JSON.stringify({ status }) }] });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['w']));
+      mockHitl.resolveTier.mockReturnValue('standard');
+    });
+
+    it('a role refusal is a plain result (not isError); no challenge is issued and nothing runs', async () => {
+      mockPolicy.checkRole.mockReturnValue(refusalOf('role_not_permitted'));
+      const res = await svc.run(agent(), 'w', {});
+      expect(res.isError).toBeFalsy();
+      expect(res.content[0].text).toMatch(/role_not_permitted/);
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('a plan refusal is a plain result; no challenge is issued and nothing runs', async () => {
+      mockPolicy.checkPlan.mockResolvedValue(refusalOf('not_on_plan'));
+      const res = await svc.run(agent(), 'w', { _confirmToken: 'tok' });
+      expect(res.isError).toBeFalsy();
+      expect(res.content[0].text).toMatch(/not_on_plan/);
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('role and plan are judged with the acting role read for this principal', async () => {
+      mockPolicy.actingRole.mockResolvedValue('ADMIN');
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 300, stepUpRequired: false });
+      const p = agent();
+      await svc.run(p, 'w', {});
+      expect(mockPolicy.actingRole).toHaveBeenCalledWith(p);
+      expect(mockPolicy.checkRole).toHaveBeenCalledWith(p, 'w', 'ADMIN');
+      expect(mockPolicy.checkPlan).toHaveBeenCalledWith(p, 'w', 'ADMIN');
+    });
+
+    it('an API key (deny by default) is challenged for a write', async () => {
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 300, stepUpRequired: false });
+      const p = fromApiKey({ apiKeyId: 3, tenantId: 1, userId: 5, scopes: ['platform:write'] });
+      const res = await svc.run(p, 'w', {});
+      expect(res.content[0].text).toMatch(/hitl_required/);
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Desk at each tier', () => {
+    it.each([
+      ['platform:read', 'none'],
+      ['platform:write', 'standard'],
+      ['platform:write:sensitive', 'sensitive'],
+    ] as const)('%s executes with no challenge and records tier %s in the audit row', async (scope, tier) => {
+      const realTier = new HitlPolicyService();
+      mockHitl.resolveTier.mockImplementation((s, pr) => realTier.resolveTier(s, pr));
+      mockRegistry.scopeForTool.mockReturnValue(scope);
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['d']));
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'done' }] });
+      const p = fromDeskResponsibility({ responsibilityId: 1, tenantId: 7, scopes: [scope], enabledByUserId: 42 });
+
+      const res = await svc.run(p, 'd', {});
+
+      expect(res.content[0].text).toBe('done');
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).toHaveBeenCalledWith(expect.objectContaining({ hitlTier: tier }));
+      mockHitl.resolveTier.mockReset();
+    });
+  });
+
+  it('an executor throw is logged in full on the audit row and answered generically (step 7)', async () => {
+    mockRegistry.scopeForTool.mockReturnValue('platform:read');
+    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['q']));
+    mockHitl.resolveTier.mockReturnValue('none');
+    mockLogger.writePending.mockResolvedValue('row-x');
+    mockExecutor.execute.mockRejectedValue(new Error('connection to 10.0.0.5 refused'));
+    const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+
+    const res = await svc.run(p, 'q', {});
+
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text)).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
+    expect(mockLogger.completeError).toHaveBeenCalledWith(
+      expect.objectContaining({ rowId: 'row-x', error: 'connection to 10.0.0.5 refused' }),
+    );
   });
 });

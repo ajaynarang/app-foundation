@@ -7,20 +7,26 @@ import { AgentInvocationLoggerService } from './agent-invocation-logger.service'
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { redactArgs, digestArgs } from './arg-redactor';
 import { HitlChallengeService } from './hitl-challenge.service';
+import { ToolAccessPolicyService } from './tool-access-policy.service';
+import { validateToolArgs } from './tool-args';
+import { CONFIRM_TOKEN_PARAM } from './tool-input-schema';
+import { toolFailure } from '../mcp/tools/tool-error';
 
 /**
- * Retained for backwards-compatibility of the external error surface (callers
- * that used to distinguish legacy-path fall-through from genuine pipeline
- * failures). The pipeline is now always on; this is thrown for unrecoverable
- * internal errors only.
+ * The one way a tool runs, for every caller: the chat assistant (`McpToolService`), the external MCP server
+ * (OAuth clients and API keys) and Desk (`execute.step.ts`). In this order:
+ *
+ * 1. The tool exists; its scope is not never-external for this principal; the principal holds the scope.
+ * 2. The arguments parse against the tool's own zod schema; every `_`-prefixed key the caller sent is dropped.
+ * 3. Role: `@RestrictToRoles` against the acting person's current role in this workspace.
+ * 4. Plan: `@RequiresPlanFeature` judged by the same rule as the REST guard.
+ * 5. Confirmation for any tier above read (third-party agents answer a challenge; Desk is gated inside Desk).
+ * 6. Audit row, execute, audit result.
+ * 7. Errors: an `HttpException` passes its message and code; anything else is logged and answered generically.
+ *
+ * Role and plan run before confirmation, so nobody confirms something they cannot do. Their refusals are plain
+ * results the model relays, not errors to retry.
  */
-export class PipelineError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PipelineError';
-  }
-}
-
 @Injectable()
 export class InvocationPipelineService {
   private readonly logger = new Logger(InvocationPipelineService.name);
@@ -31,9 +37,11 @@ export class InvocationPipelineService {
     private readonly executor: ToolExecutorService,
     private readonly auditLogger: AgentInvocationLoggerService,
     private readonly challenges: HitlChallengeService,
+    private readonly policy: ToolAccessPolicyService,
   ) {}
 
   async run(principal: AgentPrincipal, toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
+    // ── 1. Tool and scope ───────────────────────────────────────────────────
     const scope = this.registry.scopeForTool(toolName);
     if (!scope) {
       this.logger.warn(`unknown_tool: "${toolName}" requested by ${principal.auditId}`);
@@ -59,16 +67,32 @@ export class InvocationPipelineService {
       return this.scopeDenied(scope, principal.scopes);
     }
 
+    // ── 2. Arguments ────────────────────────────────────────────────────────
+    // The replay token is the one `_` key a caller may send; it is read here and never reaches the tool.
+    const sentToken = (args ?? {})[CONFIRM_TOKEN_PARAM];
+    const validated = validateToolArgs(this.registry.parametersForTool(toolName), args);
+    if ('failure' in validated) {
+      return { content: [{ type: 'text', text: JSON.stringify(validated.failure) }], isError: true };
+    }
+    const toolArgs = validated.data;
+
+    // ── 3. Role, 4. Plan ────────────────────────────────────────────────────
+    const role = await this.policy.actingRole(principal);
+    const roleDenial = this.policy.checkRole(principal, toolName, role);
+    if (roleDenial) return roleDenial;
+    const planDenial = await this.policy.checkPlan(principal, toolName, role);
+    if (planDenial) return planDenial;
+
+    // ── 5. Confirmation ─────────────────────────────────────────────────────
     const tier = this.hitl.resolveTier(scope, principal);
+    // Deny by default: every principal kind except a signed-in user and a Desk duty is challenged. A Desk duty is
+    // never challenged here (nobody is present to answer): Desk's own gate step runs before every execute. A
+    // signed-in user's chat write is confirmed through `confirm-action`.
+    const challenged = tier !== 'none' && principal.kind !== 'user' && principal.kind !== 'desk_responsibility';
+    const confirmToken = challenged && typeof sentToken === 'string' ? sentToken : undefined;
 
-    const confirmToken =
-      tier !== 'none' && principal.kind !== 'user' && principal.kind !== 'desk_responsibility'
-        ? (args._confirmToken as string | undefined)
-        : undefined;
-
-    if (tier !== 'none' && principal.kind !== 'user' && principal.kind !== 'desk_responsibility') {
-      const redacted = redactArgs(args) as Record<string, unknown>;
-      const argsDigest = digestArgs(redacted);
+    if (challenged) {
+      const argsDigest = digestArgs(redactArgs(toolArgs) as Record<string, unknown>);
 
       if (!confirmToken) {
         const issued = await this.challenges.issue({
@@ -119,21 +143,21 @@ export class InvocationPipelineService {
           isError: true,
         };
       }
-      // Fall through to execute; confirmationTokenId captured below.
     }
 
+    // ── 6. Audit, execute, audit ────────────────────────────────────────────
     const startedAt = Date.now();
     const rowId = await this.auditLogger.writePending({
       principal,
       toolName,
       scopeRequired: scope,
       hitlTier: tier,
-      args,
+      args: toolArgs,
       confirmationTokenId: confirmToken ?? null,
     });
 
     try {
-      const result = await this.executor.execute(toolName, args, principal);
+      const result = await this.executor.execute(toolName, toolArgs, principal, { role });
       const durationMs = Date.now() - startedAt;
 
       if (result.isError) {
@@ -152,22 +176,24 @@ export class InvocationPipelineService {
         });
       }
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // ── 7. Errors ─────────────────────────────────────────────────────────
       const durationMs = Date.now() - startedAt;
+      const failure = toolFailure(error, this.logger, toolName);
       await this.auditLogger.completeError({
         rowId,
         tenantId: principal.tenantId,
         durationMs,
-        error: error.message ?? String(error),
+        error: error instanceof Error ? error.message : (JSON.stringify(error) ?? 'unknown error'),
       });
       return {
-        content: [{ type: 'text', text: `Error: ${error.message ?? error}` }],
+        content: [{ type: 'text', text: JSON.stringify(failure) }],
         isError: true,
       };
     }
   }
 
-  private scopeDenied(required: string, granted: string[]): ToolResult {
+  private scopeDenied(required: string, granted: readonly string[]): ToolResult {
     return {
       content: [
         {

@@ -1,4 +1,6 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
 import { ToolExecutorService } from '../tool-executor.service';
 import { ScopeRegistryService } from '../scope-registry.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
@@ -36,7 +38,7 @@ describe('ToolExecutorService', () => {
     svc = mod.get(ToolExecutorService);
   });
 
-  it('calls the tool directly and injects _tenantId/_userId (string)/_userDbId (number)', async () => {
+  it('calls the tool directly and injects _tenantId/_userId (string)/_userDbId (number)/_role', async () => {
     const ToolClass = class {};
     mockScopeRegistry.resolveProvider.mockReturnValue({
       providerClass: ToolClass,
@@ -48,7 +50,7 @@ describe('ToolExecutorService', () => {
     mockModuleRef.get.mockReturnValue(instance);
 
     const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
-    const result = await svc.execute('query-records', { status: 'active' }, principal);
+    const result = await svc.execute('query-records', { status: 'active' }, principal, { role: 'MEMBER' });
 
     // Tools receive the wire-format string userId (what `User.userId`
     // column stores and what VARCHAR audit columns expect), plus the
@@ -58,6 +60,7 @@ describe('ToolExecutorService', () => {
       _tenantId: 7,
       _userId: 'user_demo_owner',
       _userDbId: 42,
+      _role: 'MEMBER',
     });
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: 42 },
@@ -98,6 +101,52 @@ describe('ToolExecutorService', () => {
     expect(result.content[0].text).toBe('bare-string');
   });
 
+  it('the server identity params win over the same keys in args (spread last)', async () => {
+    const ToolClass = class {};
+    mockScopeRegistry.resolveProvider.mockReturnValue({ providerClass: ToolClass, methodName: 'run' });
+    const instance = { run: jest.fn().mockResolvedValue('ok') };
+    mockModuleRef.get.mockReturnValue(instance);
+    const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
+
+    await svc.execute('x', { _tenantId: 999, _userId: 'someone-else', _userDbId: 1, _role: 'OWNER' }, principal, {
+      role: 'MEMBER',
+    });
+
+    expect(instance.run).toHaveBeenCalledWith({
+      _tenantId: 7,
+      _userId: 'user_demo_owner',
+      _userDbId: 42,
+      _role: 'MEMBER',
+    });
+  });
+
+  it('never hands the raw error message of a thrown non-HTTP error to the caller', async () => {
+    const ToolClass = class {};
+    mockScopeRegistry.resolveProvider.mockReturnValue({ providerClass: ToolClass, methodName: 'run' });
+    const instance = { run: jest.fn().mockRejectedValue(new Error('P2002 unique constraint on users.email')) };
+    mockModuleRef.get.mockReturnValue(instance);
+    const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+
+    const result = await svc.execute('x', {}, principal);
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text)).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
+    expect(result.content[0].text).not.toMatch(/P2002/);
+  });
+
+  it('passes an HttpException message and its code through', async () => {
+    const ToolClass = class {};
+    mockScopeRegistry.resolveProvider.mockReturnValue({ providerClass: ToolClass, methodName: 'run' });
+    const instance = { run: jest.fn().mockRejectedValue(new NotFoundException('That ticket was not found')) };
+    mockModuleRef.get.mockReturnValue(instance);
+    const principal = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+
+    const result = await svc.execute('x', {}, principal);
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text)).toEqual({ error: 'That ticket was not found', code: 'NOT_FOUND' });
+  });
+
   it('returns an isError result when the provider method throws', async () => {
     const ToolClass = class {};
     mockScopeRegistry.resolveProvider.mockReturnValue({
@@ -110,7 +159,7 @@ describe('ToolExecutorService', () => {
 
     const result = await svc.execute('x', {}, principal);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/boom/);
+    expect(result.content[0].text).not.toMatch(/boom/);
   });
 
   it('opens no transaction and switches no role around a tool call', async () => {

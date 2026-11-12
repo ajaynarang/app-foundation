@@ -3,6 +3,7 @@ import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ScopeRegistryService } from './scope-registry.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
+import { toolFailure } from '../mcp/tools/tool-error';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -10,6 +11,16 @@ export interface ToolResult {
   _card?: unknown;
 }
 
+/** What the pipeline already knows about a call and the tool should receive. */
+export interface ToolExecutionContext {
+  /** The acting person's role in the principal's workspace (`WorkspaceMember`), or null (Desk, or no membership). */
+  role?: string | null;
+}
+
+/**
+ * Runs one tool for a principal. Called only by `InvocationPipelineService`, which has already checked scope,
+ * arguments, role, plan and confirmation; the arguments it passes are the parsed ones, with no `_` key left.
+ */
 @Injectable()
 export class ToolExecutorService {
   private readonly logger = new Logger(ToolExecutorService.name);
@@ -20,7 +31,12 @@ export class ToolExecutorService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async execute(toolName: string, args: Record<string, unknown>, principal: AgentPrincipal): Promise<ToolResult> {
+  async execute(
+    toolName: string,
+    args: Record<string, unknown>,
+    principal: AgentPrincipal,
+    context: ToolExecutionContext = {},
+  ): Promise<ToolResult> {
     const provider = this.registry.resolveProvider(toolName);
     if (!provider) {
       return {
@@ -31,18 +47,17 @@ export class ToolExecutorService {
 
     const userDbId = this.resolveUserDbId(principal);
 
-    // Tools expect `_userId` to be the *wire-format* string user id (what
-    // `User.userId` column stores — e.g. "user_demo_owner"), because they
-    // write it into VARCHAR audit columns (Alert.acknowledgedBy,
-    // Invoice.voidedBy, etc.) or use it to look up by `firebaseUid`.
-    // Inject the string form here; `_userDbId` carries the numeric DB id.
+    // Tools expect `_userId` to be the *wire-format* string user id (what the `User.userId` column stores, e.g.
+    // "user_demo_owner"); `_userDbId` carries the numeric DB id for foreign keys.
     const userIdString = await this.resolveUserIdString(principal, userDbId);
 
+    // The server's identity params are spread LAST, so a value under the same key in `args` can never win.
     const injectedArgs = {
       ...args,
       _tenantId: principal.tenantId,
       _userId: userIdString,
       _userDbId: userDbId,
+      _role: context.role ?? null,
     };
 
     try {
@@ -59,10 +74,9 @@ export class ToolExecutorService {
           },
         ],
       };
-    } catch (error: any) {
-      this.logger.error(`Tool "${toolName}" failed: ${error.message}`);
+    } catch (error: unknown) {
       return {
-        content: [{ type: 'text', text: `Error executing tool: ${error.message}` }],
+        content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
         isError: true,
       };
     }
@@ -97,15 +111,9 @@ export class ToolExecutorService {
   }
 
   /**
-   * Resolve the wire-format `User.userId` string for a principal, which is
-   * what tools expect in `_userId`. User principals already carry
-   * enough for a single cheap lookup via DB id. Non-user principals
-   * (oauth_client / api_key / desk) attribute to a human user id via the
-   * `onBehalfOfUserId` / `userId` / `enabledByUserId` field — we resolve
-   * through the same `User.id → User.userId` lookup.
-   *
-   * Cached within one request by Prisma's query engine; could add a
-   * per-request memo if this becomes hot.
+   * Resolve the wire-format `User.userId` string for a principal, which is what tools expect in `_userId`. Non-user
+   * principals (oauth_client / api_key / desk) attribute to a human through `onBehalfOfUserId` / `userId` /
+   * `enabledByUserId`, resolved through the same `User.id → User.userId` lookup.
    */
   private async resolveUserIdString(p: AgentPrincipal, userDbId: number): Promise<string | null> {
     // `desk_responsibility` calls may carry a synthetic enabledByUserId (0)
