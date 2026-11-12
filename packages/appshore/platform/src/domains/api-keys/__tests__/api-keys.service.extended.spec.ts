@@ -2,7 +2,8 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiKeysService } from '../api-keys.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../../infrastructure/events/outbox.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
@@ -13,7 +14,7 @@ import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infr
  */
 describe('ApiKeysService — Phase D admin surface', () => {
   const prisma = createMockPrisma();
-  const events = { emit: jest.fn() };
+  const events = createMockOutbox(prisma);
   let svc: ApiKeysService;
 
   const baseRow = {
@@ -41,7 +42,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       providers: [
         ApiKeysService,
         { provide: PrismaService, useValue: prisma },
-        { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: events },
       ],
     }).compile();
     svc = mod.get(ApiKeysService);
@@ -112,9 +113,8 @@ describe('ApiKeysService — Phase D admin surface', () => {
         isWriteEnabled: true,
       };
       prisma.apiKey.findFirst.mockResolvedValue(existing);
-      prisma.$transaction.mockImplementation(async (ops: unknown[]) => {
-        return [null, { ...existing, id: 502, keyLast4: 'WxYz' }];
-      });
+      prisma.apiKey.update.mockResolvedValue({ ...existing, revokedAt: new Date(), isActive: false });
+      prisma.apiKey.create.mockResolvedValue({ ...existing, id: 502, keyLast4: 'WxYz' });
 
       const result = await svc.rotate(501, 7);
 
@@ -125,6 +125,8 @@ describe('ApiKeysService — Phase D admin surface', () => {
       );
       expect(result.plaintextKey).toMatch(/^sk_live_/);
       expect(result.apiKey.id).toBe(502);
+      // The revoke, the new row and the event commit together (one outbox transaction).
+      expect(events.transaction).toHaveBeenCalledTimes(1);
       expect(events.emit).toHaveBeenCalledWith(
         DOMAIN_EVENTS.API_KEY_ROTATED,
         '7',
@@ -172,6 +174,13 @@ describe('ApiKeysService — Phase D admin surface', () => {
       const resumed = await svc.resume(501, 7);
       expect(resumed).toMatchObject({ id: 501, isActive: true });
       expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.API_KEY_RESUMED, '7', expect.any(Object));
+    });
+
+    it('publishes nothing when the write fails: the event exists only if the change committed', async () => {
+      prisma.apiKey.findFirst.mockResolvedValue(baseRow);
+      prisma.apiKey.update.mockRejectedValueOnce(new Error('connection lost'));
+      await expect(svc.pause(501, 7)).rejects.toThrow('connection lost');
+      expect(events.emit).not.toHaveBeenCalled();
     });
 
     it('pause on a revoked key is 409 INVALID_STATE', async () => {

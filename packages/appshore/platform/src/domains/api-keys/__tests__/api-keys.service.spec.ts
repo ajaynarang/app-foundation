@@ -2,12 +2,13 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ApiKeysService } from '../api-keys.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../../infrastructure/events/outbox.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 
 describe('ApiKeysService — scoped keys (Phase B)', () => {
   const prisma = createMockPrisma();
-  const events = { emit: jest.fn() };
+  const events = createMockOutbox(prisma);
   let svc: ApiKeysService;
 
   beforeEach(async () => {
@@ -16,7 +17,7 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
       providers: [
         ApiKeysService,
         { provide: PrismaService, useValue: prisma },
-        { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: events },
       ],
     }).compile();
     svc = mod.get(ApiKeysService);

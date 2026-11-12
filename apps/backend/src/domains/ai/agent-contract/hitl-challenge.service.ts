@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { HitlTier } from './hitl-policy.service';
@@ -51,7 +51,8 @@ export class HitlChallengeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: DomainEventService,
+    // Each challenge write and its event commit together (ADR "Outbox and deadlines").
+    private readonly outbox: OutboxService,
   ) {}
 
   async issue(input: IssueInput): Promise<IssueResult> {
@@ -59,29 +60,30 @@ export class HitlChallengeService {
     const stepUpRequired = input.tier === 'sensitive';
     const stepUpUserId = this.resolveStepUpUserId(input.principal);
 
-    const row = await this.prisma.hitlChallenge.create({
-      data: {
-        tenantId: input.principal.tenantId,
-        principalKind: input.principal.kind,
-        principalId: input.principal.auditId,
+    const token = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.hitlChallenge.create({
+        data: {
+          tenantId: input.principal.tenantId,
+          principalKind: input.principal.kind,
+          principalId: input.principal.auditId,
+          toolName: input.toolName,
+          argsDigest: input.argsDigest,
+          scopeRequired: input.scopeRequired,
+          tier: input.tier,
+          stepUpRequired,
+          stepUpUserId,
+          expiresAt: new Date(Date.now() + ttlSeconds * 1000),
+        },
+        select: { id: true },
+      });
+      const issued = String(row.id);
+      await emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(input.principal.tenantId), {
+        token: issued,
         toolName: input.toolName,
-        argsDigest: input.argsDigest,
-        scopeRequired: input.scopeRequired,
         tier: input.tier,
         stepUpRequired,
-        stepUpUserId,
-        expiresAt: new Date(Date.now() + ttlSeconds * 1000),
-      },
-      select: { id: true },
-    });
-
-    const token = String(row.id);
-
-    await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_ISSUED, String(input.principal.tenantId), {
-      token,
-      toolName: input.toolName,
-      tier: input.tier,
-      stepUpRequired,
+      });
+      return issued;
     });
 
     return { token, ttlSeconds, stepUpRequired };
@@ -108,14 +110,15 @@ export class HitlChallengeService {
     if (row.argsDigest !== input.argsDigest) return null;
     if (row.stepUpRequired && !row.stepUpCompleted) return null;
 
-    await this.prisma.hitlChallenge.update({
-      where: { id },
-      data: { consumedAt: new Date() },
-    });
-
-    await this.events.emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(row.tenantId), {
-      token,
-      toolName: row.toolName,
+    await this.outbox.transaction(async (tx, emit) => {
+      await tx.hitlChallenge.update({
+        where: { id },
+        data: { consumedAt: new Date() },
+      });
+      await emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(row.tenantId), {
+        token,
+        toolName: row.toolName,
+      });
     });
 
     return row;

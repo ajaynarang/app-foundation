@@ -12,6 +12,7 @@ import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { RequiresScope } from '../requires-scope.decorator';
 import type { AiPrismaService } from '../../rls/ai-prisma.service';
 import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row
@@ -96,16 +97,18 @@ describe('Phase A pipeline integration', () => {
       executeWithRlsContext: (_t: number, _u: number, _r: string, fn: () => Promise<unknown>) => fn(),
     } as unknown as AiPrismaService;
 
+    // The real outbox on the real database; publishing is a no-op, so the staged rows are simply marked published.
     const events = {
-      emit: async () => undefined,
+      publish: async () => undefined,
     } as unknown as DomainEventService;
+    const outbox = new OutboxService(prisma as any, events);
 
     const scopeRegistry = new ScopeRegistryService(registry);
     await scopeRegistry.onApplicationBootstrap();
 
     const hitl = new HitlPolicyService();
     const executor = new ToolExecutorService(scopeRegistry, aiPrisma, moduleRef, prisma as any);
-    const logger = new AgentInvocationLoggerService(prisma as any, events);
+    const logger = new AgentInvocationLoggerService(prisma as any, outbox);
     const challenges = {
       issue: async () => ({
         challengeId: 'test-challenge',

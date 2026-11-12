@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OAuthClientsService } from '../oauth-clients.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 
 jest.mock('bcrypt', () => ({
@@ -47,10 +47,11 @@ describe('OAuthClientsService — Phase D admin surface', () => {
         // Tests that exercise the revoked path override with mockResolvedValueOnce.
         count: jest.fn().mockResolvedValue(0),
       },
-      $transaction: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
     cache = { del: jest.fn().mockResolvedValue(undefined) };
-    events = { emit: jest.fn().mockResolvedValue(undefined) };
+    // `events.emit` records what the outbox published after its transaction committed.
+    events = createMockOutbox(prisma);
 
     service = new OAuthClientsService(prisma, cache, events);
   });
@@ -117,11 +118,26 @@ describe('OAuthClientsService — Phase D admin surface', () => {
   describe('revoke (cascades tokens)', () => {
     it('runs a transaction that revokes access + refresh tokens and sets isActive=false', async () => {
       await service.revoke('app_abc123', 7);
+      // One outbox transaction holds the token cascade, the client update and the event.
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      const ops = prisma.$transaction.mock.calls[0][0];
-      expect(ops).toHaveLength(3);
+      expect(prisma.oAuthAccessToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { revokedAt: expect.any(Date) } }),
+      );
+      expect(prisma.oAuthRefreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { revokedAt: expect.any(Date) } }),
+      );
+      expect(prisma.oAuthClient.update).toHaveBeenCalledWith({
+        where: { clientId: 'app_abc123' },
+        data: { isActive: false },
+      });
       expect(events.emit).toHaveBeenCalledWith(DOMAIN_EVENTS.OAUTH_CLIENT_REVOKED, '7', expect.any(Object));
     });
+  });
+
+  it('publishes nothing when the token cascade fails', async () => {
+    prisma.oAuthRefreshToken.updateMany.mockRejectedValueOnce(new Error('deadlock'));
+    await expect(service.revoke('app_abc123', 7)).rejects.toThrow('deadlock');
+    expect(events.emit).not.toHaveBeenCalled();
   });
 
   describe('updateScopes', () => {

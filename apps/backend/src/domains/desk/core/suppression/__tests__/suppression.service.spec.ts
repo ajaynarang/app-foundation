@@ -13,8 +13,7 @@
 import { NotFoundException } from '@nestjs/common';
 
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
-import { createMockEventEmitter } from '@appshore/platform/test/mocks/event-emitter.mock';
-import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 // Mock closeStep at module boundary — the shared-steps module pulls in
@@ -63,12 +62,12 @@ function makeSuppressionRow(overrides: Partial<Record<string, unknown>> = {}) {
 describe('SuppressionService', () => {
   let service: SuppressionService;
   let prisma: ReturnType<typeof createMockPrisma>;
-  let events: ReturnType<typeof createMockEventEmitter>;
+  let events: ReturnType<typeof createMockOutbox>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     prisma = createMockPrisma();
-    events = createMockEventEmitter();
+    events = createMockOutbox(prisma);
     service = new SuppressionService(prisma, events as any);
   });
 
@@ -115,17 +114,24 @@ describe('SuppressionService', () => {
         }),
       );
 
-      // DomainEvent emitted on the right topic with the right envelope.
-      expect(events.emit).toHaveBeenCalledWith('app.desk.episode-snoozed', expect.any(DomainEvent));
-      const emittedEvent = events.emit.mock.calls[0][1] as DomainEvent<{
-        episodeId: string;
-        suppressionId: string;
-        suppressUntil: string | null;
-      }>;
-      expect(emittedEvent.event).toBe('app.desk.episode-snoozed');
-      expect(emittedEvent.tenantId).toBe(String(TENANT_ID));
-      expect(emittedEvent.data.episodeId).toBe(EPISODE_ID);
-      expect(emittedEvent.data.suppressionId).toBe('sup-1');
+      // Staged with the write and published once it committed (ADR "Outbox and deadlines").
+      expect(events.emit).toHaveBeenCalledWith(
+        'app.desk.episode-snoozed',
+        TENANT_ID,
+        expect.objectContaining({ episodeId: EPISODE_ID, suppressionId: 'sup-1' }),
+      );
+    });
+
+    it('a suppression write that rolls back publishes nothing and closes nothing', async () => {
+      prisma.deskEpisode.findFirst.mockResolvedValue(makeEpisode());
+      prisma.deskEntitySuppression.findFirst.mockResolvedValue(null);
+      prisma.deskEntitySuppression.create.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.snooze({ episodeId: EPISODE_ID, tenantId: TENANT_ID, userId: USER_ID, duration: '1d' }),
+      ).rejects.toThrow('db down');
+      expect(events.emit).not.toHaveBeenCalled();
+      expect(closeStep).not.toHaveBeenCalled();
     });
 
     it("maps duration='forever' to suppressUntil=null", async () => {
@@ -253,11 +259,7 @@ describe('SuppressionService', () => {
           }),
         }),
       );
-      expect(events.emit).toHaveBeenCalledWith('app.desk.suppression-cleared', expect.any(DomainEvent));
-      const emittedEvent = events.emit.mock.calls[0][1] as DomainEvent<{ suppressionId: string }>;
-      expect(emittedEvent.event).toBe('app.desk.suppression-cleared');
-      expect(emittedEvent.tenantId).toBe(String(TENANT_ID));
-      expect(emittedEvent.data.suppressionId).toBe('sup-1');
+      expect(events.emit).toHaveBeenCalledWith('app.desk.suppression-cleared', TENANT_ID, { suppressionId: 'sup-1' });
     });
 
     it('404s when the suppression is missing', async () => {

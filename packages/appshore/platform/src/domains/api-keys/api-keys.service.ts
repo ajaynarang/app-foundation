@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../infrastructure/events/outbox.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 import { createHash } from 'crypto';
 import { nanoid } from 'nanoid';
@@ -83,7 +83,8 @@ export class ApiKeysService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: DomainEventService,
+    // Events commit with the write (ADR "Outbox and deadlines").
+    private readonly outbox: OutboxService,
   ) {}
 
   async create(userId: number, dto: CreateApiKeyDto): Promise<ApiKeyDto> {
@@ -205,13 +206,16 @@ export class ApiKeysService {
   /** Tenant-scoped revoke — used by tenant-admin flows (Desk). */
   async revokeForTenant(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
-    const updated = await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { revokedAt: new Date(), isActive: false },
-    });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_REVOKED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { revokedAt: new Date(), isActive: false },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_REVOKED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
     return this.toDto(updated);
   }
@@ -222,13 +226,16 @@ export class ApiKeysService {
     if (apiKey.revokedAt) {
       throw invalidState('A revoked key cannot be paused');
     }
-    const updated = await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { isActive: false },
-    });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_PAUSED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { isActive: false },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_PAUSED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
     return this.toDto(updated);
   }
@@ -238,13 +245,16 @@ export class ApiKeysService {
     if (apiKey.revokedAt) {
       throw invalidState('A revoked key cannot be resumed');
     }
-    const updated = await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { isActive: true },
-    });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_RESUMED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { isActive: true },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_RESUMED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
     return this.toDto(updated);
   }
@@ -261,12 +271,12 @@ export class ApiKeysService {
     }
     const { plaintext: plaintextKey, ...stored } = mintKey();
 
-    const [, created] = await this.prisma.$transaction([
-      this.prisma.apiKey.update({
+    const created = await this.outbox.transaction(async (tx, emit) => {
+      await tx.apiKey.update({
         where: { id: existing.id },
         data: { revokedAt: new Date(), isActive: false },
-      }),
-      this.prisma.apiKey.create({
+      });
+      const row = await tx.apiKey.create({
         data: {
           ...stored,
           name: existing.name,
@@ -278,13 +288,13 @@ export class ApiKeysService {
           isActive: true,
           expiresAt: existing.expiresAt,
         },
-      }),
-    ]);
-
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_ROTATED, String(tenantId), {
-      oldApiKeyId: existing.id,
-      newApiKeyId: created.id,
-      name: existing.name,
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_ROTATED, String(tenantId), {
+        oldApiKeyId: existing.id,
+        newApiKeyId: row.id,
+        name: existing.name,
+      });
+      return row;
     });
 
     return {
@@ -314,20 +324,22 @@ export class ApiKeysService {
       );
     }
 
-    const updated = await this.prisma.apiKey.update({
-      where: { id: existing.id },
-      data: {
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: existing.id },
+        data: {
+          scopes: dto.scopes,
+          ipAllowlist: nextIpAllowlist,
+          rateLimitPerMinute: dto.rateLimitPerMinute ?? existing.rateLimitPerMinute,
+          isWriteEnabled: writeEnabled,
+        },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
+        apiKeyId: row.id,
+        name: row.name,
         scopes: dto.scopes,
-        ipAllowlist: nextIpAllowlist,
-        rateLimitPerMinute: dto.rateLimitPerMinute ?? existing.rateLimitPerMinute,
-        isWriteEnabled: writeEnabled,
-      },
-    });
-
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
-      apiKeyId: updated.id,
-      name: updated.name,
-      scopes: dto.scopes,
+      });
+      return row;
     });
 
     return this.toDto(updated);

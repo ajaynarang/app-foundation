@@ -8,6 +8,7 @@ import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cac
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M, CACHE_TTL_HOT_60S } from '@appshore/kernel/constants/cache.constants';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
@@ -22,7 +23,8 @@ import type { ModelAlias } from '@app/shared-types';
  * intelligence, alert briefings, memory extraction, embeddings, KB ingest)
  * flows through this service via `record()`. Token counts + latency + the
  * computed USD cost land in `ai_invocations` and the per-tenant cost
- * aggregates get invalidated through a hot-path domain event.
+ * aggregates get invalidated through a domain event staged in the same
+ * transaction as the row (the outbox, ADR "Outbox and deadlines").
  *
  * Cost math: `(promptTokens - cachedTokens) * input + cachedTokens *
  * cachedInput + completionTokens * output`, all per million tokens. If no
@@ -45,7 +47,12 @@ export class AiTelemetryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
+    /**
+     * Signals only: the budget breaches and the zero-retention refusal have no write behind them and must fire
+     * with the database down (`no-direct-emit.allowlist.json`).
+     */
     private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -71,7 +78,9 @@ export class AiTelemetryService {
 
     const row = await this.persistRow(usage, context, costUsd);
 
-    void this.emitRecordedEvent(row, costUsd);
+    // Drop this tenant's spent-so-far cache so the next budget check sees the new spend.
+    // Best-effort; a stale 60s window is acceptable.
+    void this.invalidateSpentCache(row.tenantId).catch(() => {});
 
     return row;
   }
@@ -137,22 +146,49 @@ export class AiTelemetryService {
   }
 
   /**
-   * Insert the ledger row. When `idempotencyKey` is set, a duplicate write
-   * returns the existing row instead of creating a second one.
+   * Write the ledger row (or find the one an earlier attempt wrote) and stage
+   * AI_INVOCATION_RECORDED with it — the event commits with the row. An
+   * idempotent replay writes nothing, so it stages nothing: one invocation, one
+   * event. Listeners invalidate per-tenant cost-aggregate caches (super-admin view).
    */
   private async persistRow(
     usage: AiUsage,
     context: AiCallContext,
     costUsd: Prisma.Decimal | null,
   ): Promise<AiInvocation> {
+    return this.outbox.transaction(async (tx, emit) => {
+      const { row, created } = await this.findOrCreateRow(tx, usage, context, costUsd);
+      if (!created) return row;
+      await emit(DOMAIN_EVENTS.AI_INVOCATION_RECORDED, row.tenantId, {
+        invocationId: row.id,
+        surface: row.surface,
+        model: row.model,
+        provider: row.provider,
+        costUsd: costUsd?.toString() ?? null,
+        totalTokens: row.totalTokens,
+      });
+      return row;
+    });
+  }
+
+  /**
+   * Insert the ledger row. When `idempotencyKey` is set, a duplicate write
+   * returns the existing row (`created: false`) instead of creating a second one.
+   */
+  private async findOrCreateRow(
+    tx: Prisma.TransactionClient,
+    usage: AiUsage,
+    context: AiCallContext,
+    costUsd: Prisma.Decimal | null,
+  ): Promise<{ row: AiInvocation; created: boolean }> {
     if (context.idempotencyKey) {
-      const existing = await this.prisma.aiInvocation.findUnique({
+      const existing = await tx.aiInvocation.findUnique({
         where: { idempotencyKey: context.idempotencyKey },
       });
-      if (existing) return existing;
+      if (existing) return { row: existing, created: false };
     }
 
-    return this.prisma.aiInvocation.create({
+    const row = await tx.aiInvocation.create({
       data: {
         id: generateUuidV7(),
         tenantId: context.tenantId,
@@ -176,32 +212,7 @@ export class AiTelemetryService {
         idempotencyKey: context.idempotencyKey ?? null,
       },
     });
-  }
-
-  /**
-   * Fire-and-forget hot-path event + spent-cache bust. Listeners invalidate
-   * per-tenant cost-aggregate caches (super-admin view); we also drop this
-   * tenant's spent-so-far cache here so the next budget check sees the new
-   * spend. Failure never blocks the underlying AI call.
-   */
-  private async emitRecordedEvent(row: AiInvocation, costUsd: Prisma.Decimal | null): Promise<void> {
-    // Bust the spent cache first — cheap and the most important side effect
-    // for budget accuracy. Best-effort; a stale 60s window is acceptable.
-    void this.invalidateSpentCache(row.tenantId).catch(() => {});
-
-    try {
-      await this.events.emit(DOMAIN_EVENTS.AI_INVOCATION_RECORDED, row.tenantId, {
-        invocationId: row.id,
-        surface: row.surface,
-        model: row.model,
-        provider: row.provider,
-        costUsd: costUsd?.toString() ?? null,
-        totalTokens: row.totalTokens,
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`AI_INVOCATION_RECORDED emit failed: ${msg}`);
-    }
+    return { row, created: true };
   }
 
   // ───────────────────────────────────────────────────────────────────────

@@ -1,13 +1,15 @@
 import { Test } from '@nestjs/testing';
 import { HitlChallengeService } from '../hitl-challenge.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 import { fromOAuthUser, fromApiKey } from '@appshore/platform/auth/agent-principal';
 
 describe('HitlChallengeService', () => {
   const prisma = createMockPrisma();
-  const events = { emit: jest.fn() };
+  // `events.emit` records what the outbox published after its transaction committed.
+  const events = createMockOutbox(prisma);
   let svc: HitlChallengeService;
 
   beforeEach(async () => {
@@ -16,7 +18,7 @@ describe('HitlChallengeService', () => {
       providers: [
         HitlChallengeService,
         { provide: PrismaService, useValue: prisma },
-        { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: events },
       ],
     }).compile();
     svc = mod.get(HitlChallengeService);

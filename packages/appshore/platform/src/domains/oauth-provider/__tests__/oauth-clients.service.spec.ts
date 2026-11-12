@@ -3,7 +3,7 @@ import { OAuthClientsService } from '../oauth-clients.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 
 jest.mock('nanoid', () => ({
   nanoid: () => 'mocked_nanoid_32chars_here_xxxxx',
@@ -41,14 +41,15 @@ describe('OAuthClientsService', () => {
       },
       oAuthAccessToken: { updateMany: jest.fn() },
       oAuthRefreshToken: { updateMany: jest.fn() },
-      $transaction: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn().mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     cache = {
       getOrSet: jest.fn().mockImplementation((_key: string, factory: () => any) => factory()),
       del: jest.fn().mockResolvedValue(undefined),
     };
-    events = { emit: jest.fn().mockResolvedValue(undefined) };
+    // `events.emit` records what the outbox published after its transaction committed.
+    events = createMockOutbox(prisma);
 
     service = new OAuthClientsService(prisma, cache, events);
   });

@@ -22,7 +22,7 @@ import {
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { ApprovalEnrichmentService } from '../approval/approval-enrichment.service';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
@@ -70,7 +70,7 @@ export class DeskEpisodeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly approvalEnrichment: ApprovalEnrichmentService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -108,18 +108,21 @@ export class DeskEpisodeService {
         : trimmedNote
       : episode.outcomeNote;
 
-    const updated = await this.prisma.deskEpisode.update({
-      where: { id: episode.id },
-      data: { status: EPISODE_STATUS.RESOLVED, outcomeNote },
-      select: { id: true, status: true },
+    // The event commits with the status (ADR "Outbox and deadlines").
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.deskEpisode.update({
+        where: { id: episode.id },
+        data: { status: EPISODE_STATUS.RESOLVED, outcomeNote },
+        select: { id: true, status: true },
+      });
+      await emit(
+        DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
+        tenantId,
+        { tenantId, episodeId: row.id, status: row.status },
+        { id: String(userId), type: 'user' },
+      );
+      return row;
     });
-
-    await this.events.emit(
-      DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
-      tenantId,
-      { tenantId, episodeId: updated.id, status: updated.status },
-      { id: String(userId), type: 'user' },
-    );
 
     this.logger.log(`desk-episode-resolved episodeId=${updated.id} tenant=${tenantId} byUser=${userId}`);
     return updated;

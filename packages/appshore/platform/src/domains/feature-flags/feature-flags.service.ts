@@ -3,7 +3,7 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_COLD_30M } from '@appshore/kernel/constants/cache.constants';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../infrastructure/events/outbox.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 import { FeatureFlagDto } from './dto/feature-flag.dto';
 
@@ -14,7 +14,8 @@ export class FeatureFlagsService {
   constructor(
     private prisma: PrismaService,
     private cache: AppCacheService,
-    private events: DomainEventService,
+    // Events commit with the write (ADR "Outbox and deadlines").
+    private outbox: OutboxService,
   ) {}
 
   /**
@@ -88,9 +89,20 @@ export class FeatureFlagsService {
   async toggleFlag(key: string, enabled: boolean): Promise<FeatureFlagDto> {
     let flag;
     try {
-      flag = await this.prisma.featureFlag.update({
-        where: { key },
-        data: { enabled },
+      // Cache invalidation is handled by CacheInvalidationSubscriber via the event, which commits with the
+      // toggle and is published right after it.
+      flag = await this.outbox.transaction(async (tx, emit) => {
+        const row = await tx.featureFlag.update({
+          where: { key },
+          data: { enabled },
+        });
+        await emit(DOMAIN_EVENTS.FEATURE_FLAG_TOGGLED, 'global', {
+          entityId: key,
+          entityType: 'feature-flag',
+          key,
+          enabled,
+        });
+        return row;
       });
     } catch (err: any) {
       if (err?.code === 'P2025') {
@@ -100,14 +112,6 @@ export class FeatureFlagsService {
     }
 
     this.logger.log(`Feature flag '${key}' ${enabled ? 'enabled' : 'disabled'}`);
-
-    // Cache invalidation handled by CacheInvalidationSubscriber via event
-    await this.events.emit(DOMAIN_EVENTS.FEATURE_FLAG_TOGGLED, 'global', {
-      entityId: key,
-      entityType: 'feature-flag',
-      key,
-      enabled,
-    });
 
     return {
       key: flag.key,
