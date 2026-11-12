@@ -125,37 +125,6 @@ describe('JobService', () => {
     });
   });
 
-  describe('listJobsPaginated — status filter semantics', () => {
-    beforeEach(() => {
-      mockPrisma.job.findMany.mockResolvedValue([]);
-      mockPrisma.job.count.mockResolvedValue(0);
-    });
-
-    it('applies the status filter when a non-empty array is passed', async () => {
-      await service.listJobsPaginated(1, { status: ['QUEUED', 'PROCESSING'] as JobStatus[] });
-      expect(mockPrisma.job.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: { in: ['QUEUED', 'PROCESSING'] } }),
-        }),
-      );
-    });
-
-    it('applies status: { in: [] } when an EMPTY array is passed (matches zero rows)', async () => {
-      await service.listJobsPaginated(1, { status: [] as JobStatus[] });
-      expect(mockPrisma.job.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: { in: [] } }),
-        }),
-      );
-    });
-
-    it('omits the status filter entirely when status is undefined', async () => {
-      await service.listJobsPaginated(1, { status: undefined });
-      const call = mockPrisma.job.findMany.mock.calls[0][0];
-      expect(call.where).not.toHaveProperty('status');
-    });
-  });
-
   describe('markProcessing', () => {
     it('should update status and increment attempts', async () => {
       mockPrisma.job.update.mockResolvedValue({

@@ -44,20 +44,6 @@ export function expectArrayContract<T>(
 }
 
 /**
- * Assert paginated response shape.
- */
-export function expectPaginatedContract<T>(itemSchema: ZodSchema<T>, data: unknown, context?: string) {
-  const paginatedSchema = z.object({
-    data: z.array(itemSchema),
-    total: z.number(),
-    limit: z.number(),
-    offset: z.number(),
-  });
-
-  return expectContract(paginatedSchema, data, context);
-}
-
-/**
  * The schema of a cursor list of `item`: `{ items, nextCursor, total, counts? }`, the one envelope every list
  * that can grow answers. `nextCursor` is opaque: pass it back as `?cursor=`; null on the last page.
  */

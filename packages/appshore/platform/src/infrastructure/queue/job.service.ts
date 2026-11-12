@@ -45,13 +45,6 @@ interface CreateJobParams {
 
 import type { Job as JobRecord } from '@appshore/db';
 
-export interface PaginatedJobs {
-  items: JobRecord[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
 const JOB_KEYSET = { field: 'createdAt', idField: 'publicId', kind: 'date', direction: 'desc' } as const;
 
 /** `GET /admin/jobs`: every filter is optional. */
@@ -183,46 +176,6 @@ export class JobService {
       orderBy: { createdAt: 'desc' },
       take: filters?.limit ?? 20,
     });
-  }
-
-  async listJobsPaginated(
-    tenantId: number,
-    filters?: {
-      category?: string;
-      type?: string;
-      status?: JobStatus[];
-      dateFrom?: string;
-      dateTo?: string;
-      limit?: number;
-      offset?: number;
-      dismissed?: boolean;
-    },
-  ): Promise<PaginatedJobs> {
-    const where: any = { tenantId };
-    if (filters?.category) where.category = filters.category;
-    if (filters?.type) where.type = filters.type;
-    if (filters?.status !== undefined) where.status = { in: filters.status };
-    if (filters?.dismissed === false) where.dismissedAt = null;
-    if (filters?.dismissed === true) where.dismissedAt = { not: null };
-    const dateFilter = buildDateRangeFilter(filters?.dateFrom, filters?.dateTo);
-    if (dateFilter) where.createdAt = dateFilter;
-
-    const [items, total] = await Promise.all([
-      this.prisma.job.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: filters?.limit ?? 20,
-        skip: filters?.offset ?? 0,
-      }),
-      this.prisma.job.count({ where }),
-    ]);
-
-    return {
-      items,
-      total,
-      limit: filters?.limit ?? 20,
-      offset: filters?.offset ?? 0,
-    };
   }
 
   /**
