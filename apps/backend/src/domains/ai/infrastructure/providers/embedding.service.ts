@@ -34,8 +34,8 @@ const INPUT_TYPE: Record<EmbeddingIntent, 'search_document' | 'search_query'> = 
  *
  * - `embedText` / `embedBatch`: tenant content. `aiContext` (the tenant to route by and to bill) and an intent are
  *   required. Each call lands one ledger row with the route that served it; a failed provider call lands an ERROR row.
- * - `embedForPlatform`: platform-owned content with no tenant (the global knowledge base). The platform route,
- *   standard retention, and no tenant ledger row. Never use it for tenant content.
+ * - `embedForPlatform`: platform-owned content with no tenant (the global knowledge base), with an intent. The
+ *   platform route, standard retention, and no tenant ledger row. Never use it for tenant content.
  *
  * Every vector is dimension-checked before it is returned: two tables carry `vector(1536)`, and a wrong-size write
  * is corruption. Consumers: the knowledge base (ingest and search) and Desk memory (write, recall, re-embed).
@@ -91,15 +91,18 @@ export class EmbeddingService {
     return result.embeddings;
   }
 
-  /** Platform-owned content only (the global knowledge base), stored as documents. Tenant content never goes here. */
-  async embedForPlatform(texts: string[]): Promise<number[][]> {
+  /**
+   * Platform-owned content only (the global knowledge base): `document` to store it, `query` for an operator tool
+   * searching it with no tenant (`pnpm kb:eval`). Tenant content and tenant queries never go here.
+   */
+  async embedForPlatform(texts: string[], intent: EmbeddingIntent): Promise<number[][]> {
     const route = this.aiRouteResolver.resolvePlatform('embedding');
     let result: Awaited<ReturnType<typeof embedMany>>;
     try {
       result = await embedMany({
         model: route.embeddingModel(),
         values: texts,
-        providerOptions: this.providerOptions('document'),
+        providerOptions: this.providerOptions(intent),
       });
     } catch (err) {
       // No workspace to pin a budget error on: the ingest reports the failure; the platform's balance is logged.

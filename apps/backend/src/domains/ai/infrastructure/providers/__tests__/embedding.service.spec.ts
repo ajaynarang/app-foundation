@@ -54,7 +54,7 @@ describe('EmbeddingService', () => {
     it('answers AiNotConfigured when no route serves embeddings, without calling a provider', async () => {
       service = new EmbeddingService(aiTelemetry as any, makeResolver().resolver);
       await expect(service.embedText('x', CTX, 'query')).rejects.toThrow(AiNotConfigured);
-      await expect(service.embedForPlatform(['x'])).rejects.toThrow(AiNotConfigured);
+      await expect(service.embedForPlatform(['x'], 'document')).rejects.toThrow(AiNotConfigured);
       expect(mockEmbed).not.toHaveBeenCalled();
       expect(mockEmbedMany).not.toHaveBeenCalled();
     });
@@ -78,8 +78,13 @@ describe('EmbeddingService', () => {
     });
 
     it('embeds platform content as documents', async () => {
-      await service.embedForPlatform(['a', 'b']);
+      await service.embedForPlatform(['a', 'b'], 'document');
       expect(mockEmbedMany.mock.calls[0][0].providerOptions.cohere.inputType).toBe('search_document');
+    });
+
+    it('embeds a platform-side query as a query (an operator eval searching the global corpus)', async () => {
+      await service.embedForPlatform(['how do I invite a teammate?'], 'query');
+      expect(mockEmbedMany.mock.calls[0][0].providerOptions.cohere.inputType).toBe('search_query');
     });
   });
 
@@ -92,7 +97,7 @@ describe('EmbeddingService', () => {
     it('checks every vector of a batch, and of a platform batch', async () => {
       mockEmbedMany.mockResolvedValue({ embeddings: [vector(0.1), vector(0.1, 3)], usage: { tokens: 1 } });
       await expect(service.embedBatch(['a', 'b'], CTX, 'document')).rejects.toThrow(InternalServerErrorException);
-      await expect(service.embedForPlatform(['a', 'b'])).rejects.toThrow(InternalServerErrorException);
+      await expect(service.embedForPlatform(['a', 'b'], 'document')).rejects.toThrow(InternalServerErrorException);
     });
   });
 
@@ -143,7 +148,7 @@ describe('EmbeddingService', () => {
     });
 
     it('writes no tenant ledger row for platform content', async () => {
-      await service.embedForPlatform(['a', 'b']);
+      await service.embedForPlatform(['a', 'b'], 'document');
       expect(aiTelemetry.record).not.toHaveBeenCalled();
     });
   });
@@ -165,7 +170,7 @@ describe('EmbeddingService', () => {
       const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       const error = refusal();
       mockEmbedMany.mockRejectedValue(error);
-      await expect(service.embedForPlatform(['a'])).rejects.toBe(error);
+      await expect(service.embedForPlatform(['a'], 'document')).rejects.toBe(error);
       expect(String(log.mock.calls[0][0])).toContain('platform-cohere');
     });
   });
