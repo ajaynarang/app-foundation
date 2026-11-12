@@ -3,7 +3,7 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_HOT_30S } from '@appshore/kernel/constants/cache.constants';
-import { NotificationType, type NotificationCategory, type Prisma } from '@appshore/db';
+import { type NotificationCategory, type Prisma } from '@appshore/db';
 import type { CursorList } from '@app/shared-types';
 import {
   buildCursorPage,

@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DeliveryChannel, type NotificationType } from '@appshore/db';
+import { DeliveryChannel } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 import { PrismaService } from '../../database/prisma.service';
 import { DEFAULT_PLATFORM_TIMEZONE, PLATFORM_TIMEZONE } from '../../../config/platform-timezone';
 import { WhatsAppConsentService } from '../channels/whatsapp/whatsapp-consent.service';

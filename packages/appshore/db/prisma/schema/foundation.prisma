@@ -691,23 +691,6 @@ model FeatureFlag {
 // NOTIFICATION MODELS
 // ============================================================================
 
-enum NotificationType {
-  // Platform
-  USER_INVITATION
-  TENANT_REGISTRATION_CONFIRMATION
-  TENANT_APPROVED
-  TENANT_REJECTED
-
-  // System
-  INTEGRATION_SYNC_COMPLETED
-  INTEGRATION_SYNC_FAILED
-  SETTINGS_UPDATED
-
-  // Team
-  USER_JOINED
-  ROLE_CHANGED
-}
-
 enum NotificationChannel {
   EMAIL
   SMS // Future
@@ -732,7 +715,9 @@ model Notification {
   notificationId String @unique @default(cuid()) @map("notification_id") @db.VarChar(50)
 
   // Notification details
-  type      NotificationType
+  /// A string, not an enum: PLATFORM_NOTIFICATION_TYPES (@app/shared-types) plus the app's registry
+  /// (platform-glue/notifications/notification-types.ts). A product adds a type without a schema change.
+  type      String              @db.VarChar(60)
   channel   NotificationChannel @default(EMAIL)
   recipient String              @db.VarChar(255)
   status    NotificationStatus  @default(PENDING)
@@ -838,7 +823,8 @@ model NotificationDelivery {
   id       String           @id @db.Uuid
   tenantId Int              @map("tenant_id")
   userId   Int              @map("user_id")
-  type     NotificationType
+  /// The notification type delivered: a string from the same registry as Notification.type.
+  type     String           @db.VarChar(60)
   channel  DeliveryChannel
   status   DeliveryStatus
 

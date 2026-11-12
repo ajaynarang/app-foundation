@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
-import { NotificationType } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { PrismaService } from '../../../../database/prisma.service';
 import { FeatureFlagsService } from '../../../../../domains/feature-flags/feature-flags.service';
 import { ConfigService } from '@nestjs/config';
@@ -31,7 +31,7 @@ describe('WhatsAppSendHandler', () => {
   const payload: WhatsAppSendJobPayload = {
     deliveryId: 'd1',
     userId: 7,
-    type: NotificationType.INTEGRATION_SYNC_COMPLETED,
+    type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
     send: { templateName: 'sync_completed_v1', languageCode: 'en', bodyValues: ['x', 'c'] },
   };
   const job = (attemptsMade = 0, attempts = 5): Job<JobEnvelope<WhatsAppSendJobPayload>> =>

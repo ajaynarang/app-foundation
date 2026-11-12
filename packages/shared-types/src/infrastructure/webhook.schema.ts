@@ -4,17 +4,17 @@ import {
   JobStatusSchema,
   NotificationCategory,
   NotificationCategorySchema,
-  NotificationType,
-  NotificationTypeSchema,
 } from '../generated/prisma-enums';
+import { NotificationTypeSchema, type NotificationType } from './notification-types';
 import { cursorListSchema } from './cursor-list';
 
 // ─── Notifications ───
 
-// `NotificationCategorySchema` and `NotificationTypeSchema` are re-exported
-// from the codegen mirror — the Prisma enums are the single source of truth.
-// `JobStatusSchema` likewise.
-export { NotificationCategory, NotificationCategorySchema, NotificationType, NotificationTypeSchema };
+// `NotificationCategorySchema` and `JobStatusSchema` are re-exported from the codegen mirror (Prisma enums).
+// `NotificationTypeSchema` is a string, not an enum: types are a platform list plus the app's registry
+// (notification-types.ts).
+export { NotificationCategory, NotificationCategorySchema, NotificationTypeSchema };
+export type { NotificationType };
 
 /**
  * In-app notification user-read state. NOT the same value space as the
@@ -122,8 +122,8 @@ export const JobMetricsSchema = z.object({
 /** `GET /admin/jobs`: a cursor list, newest first. */
 export const PaginatedJobsSchema = cursorListSchema(JobSchema);
 
-// Inferred types — `NotificationCategory`, `NotificationType`, `JobStatus`
-// already come from the generated mirror via the re-export above.
+// Inferred types — `NotificationCategory` and `JobStatus` come from the generated mirror, `NotificationType`
+// (a string) from notification-types.ts, via the re-exports above.
 // `NotificationInboxStatus` is exported next to its Schema declaration.
 export type Notification = z.infer<typeof NotificationSchema>;
 export type NotificationList = z.infer<typeof NotificationListSchema>;

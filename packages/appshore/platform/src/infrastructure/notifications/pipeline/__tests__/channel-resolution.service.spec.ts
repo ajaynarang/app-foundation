@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { DeliveryChannel, NotificationType } from '@appshore/db';
+import { DeliveryChannel } from '@appshore/db';
+import { PlatformNotificationType, type NotificationType } from '@app/shared-types';
 import { CHANNEL_DEFAULTS, ChannelResolutionService } from '../channel-resolution.service';
 import { WhatsAppConsentService } from '../../channels/whatsapp/whatsapp-consent.service';
 import { PrismaService } from '../../../database/prisma.service';
@@ -19,27 +20,33 @@ const { CRITICAL, TIMELY, INFORMATIONAL } = NOTIFICATION_URGENCIES;
 
 /** App-shaped policies with the rules the tests read against (see the table above). */
 const APP_POLICIES = {
-  [NotificationType.TENANT_APPROVED]: policy(NotificationCategory.BILLING, TIMELY, { email: DEFAULT, sms: FALLBACK }),
-  [NotificationType.USER_INVITATION]: policy(NotificationCategory.TEAM, TIMELY, {
+  [PlatformNotificationType.TENANT_APPROVED]: policy(NotificationCategory.BILLING, TIMELY, {
+    email: DEFAULT,
+    sms: FALLBACK,
+  }),
+  [PlatformNotificationType.USER_INVITATION]: policy(NotificationCategory.TEAM, TIMELY, {
     email: OPT_IN,
     sms: FALLBACK,
     whatsapp: DEFAULT,
   }),
-  [NotificationType.ROLE_CHANGED]: policy(NotificationCategory.TEAM, CRITICAL, { inApp: ALWAYS, sms: FALLBACK }),
-  [NotificationType.TENANT_REJECTED]: policy(NotificationCategory.SYSTEM, INFORMATIONAL, {
+  [PlatformNotificationType.ROLE_CHANGED]: policy(NotificationCategory.TEAM, CRITICAL, {
+    inApp: ALWAYS,
+    sms: FALLBACK,
+  }),
+  [PlatformNotificationType.TENANT_REJECTED]: policy(NotificationCategory.SYSTEM, INFORMATIONAL, {
     email: OPT_IN,
     whatsapp: DEFAULT,
   }),
 };
 const APP_TEMPLATES: WhatsAppTemplateMap = {
-  [NotificationType.USER_INVITATION]: {
+  [PlatformNotificationType.USER_INVITATION]: {
     name: 'match_v1',
     languageCode: 'en',
     category: 'UTILITY',
     body: 'Match: {{1}} — {{2}}.',
     bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
-  [NotificationType.TENANT_REJECTED]: {
+  [PlatformNotificationType.TENANT_REJECTED]: {
     name: 'announce_v1',
     languageCode: 'en',
     category: 'MARKETING',
@@ -91,7 +98,7 @@ describe('ChannelResolutionService', () => {
 
   describe('policy rules', () => {
     it('a user with no preferences gets the policy defaults: in-app, push, email now; SMS as fallback', async () => {
-      const result = await resolve(NotificationType.TENANT_APPROVED);
+      const result = await resolve(PlatformNotificationType.TENANT_APPROVED);
 
       expect(result.primary).toEqual([IN_APP, EMAIL, PUSH]);
       expect(result.fallback).toEqual([SMS]);
@@ -102,7 +109,7 @@ describe('ChannelResolutionService', () => {
     it('never beats a stored yes', async () => {
       storedPrefs({ team: { sms: true } });
 
-      const result = await resolve(NotificationType.USER_JOINED);
+      const result = await resolve(PlatformNotificationType.USER_JOINED);
 
       expect(result.primary).not.toContain(SMS);
       expect(result.fallback).toEqual([]);
@@ -112,28 +119,28 @@ describe('ChannelResolutionService', () => {
     it('always beats a stored no — the critical in-app record is written regardless', async () => {
       storedPrefs({ team: { inApp: false, push: false } });
 
-      const result = await resolve(NotificationType.ROLE_CHANGED);
+      const result = await resolve(PlatformNotificationType.ROLE_CHANGED);
 
       expect(result.primary).toContain(IN_APP);
       expect(result.suppressed[PUSH]).toBe('USER_OPT_OUT');
     });
 
     it('optIn needs an explicit stored true', async () => {
-      const silent = await resolve(NotificationType.USER_INVITATION);
+      const silent = await resolve(PlatformNotificationType.USER_INVITATION);
       expect(silent.suppressed[EMAIL]).toBe('USER_OPT_OUT');
 
       storedPrefs({ team: { email: true } });
-      const optedIn = await resolve(NotificationType.USER_INVITATION);
+      const optedIn = await resolve(PlatformNotificationType.USER_INVITATION);
       expect(optedIn.primary).toContain(EMAIL);
     });
 
     it('fallback lands in fallback, not primary, and a stored no removes it', async () => {
-      const on = await resolve(NotificationType.USER_INVITATION);
+      const on = await resolve(PlatformNotificationType.USER_INVITATION);
       expect(on.fallback).toEqual([SMS]);
       expect(on.primary).not.toContain(SMS);
 
       storedPrefs({ team: { sms: false } });
-      const off = await resolve(NotificationType.USER_INVITATION);
+      const off = await resolve(PlatformNotificationType.USER_INVITATION);
       expect(off.fallback).toEqual([]);
       expect(off.suppressed[SMS]).toBe('USER_OPT_OUT');
     });
@@ -141,7 +148,7 @@ describe('ChannelResolutionService', () => {
     it('reads the preference under the policy category, whatever the caller thinks the category is', async () => {
       storedPrefs({ billing: { push: true }, team: { push: false } });
 
-      const result = await resolve(NotificationType.USER_INVITATION);
+      const result = await resolve(PlatformNotificationType.USER_INVITATION);
 
       expect(result.suppressed[PUSH]).toBe('USER_OPT_OUT');
     });
@@ -149,7 +156,7 @@ describe('ChannelResolutionService', () => {
     it('push does not ride the email flag', async () => {
       storedPrefs({ billing: { inApp: true, email: false, sms: true } });
 
-      const result = await resolve(NotificationType.TENANT_APPROVED);
+      const result = await resolve(PlatformNotificationType.TENANT_APPROVED);
 
       expect(result.suppressed[EMAIL]).toBe('USER_OPT_OUT');
       expect(result.primary).toContain(PUSH);
@@ -159,7 +166,7 @@ describe('ChannelResolutionService', () => {
     it('a category missing from stored preferences takes the defaults', async () => {
       storedPrefs({ billing: { inApp: true, email: true, sms: false } });
 
-      const result = await resolve(NotificationType.USER_INVITATION);
+      const result = await resolve(PlatformNotificationType.USER_INVITATION);
 
       expect(result.primary).toEqual([IN_APP, PUSH]);
     });
@@ -169,7 +176,7 @@ describe('ChannelResolutionService', () => {
     it('no consent row → NO_CONSENT, whatever the preference says', async () => {
       storedPrefs({ team: { whatsapp: true } });
 
-      const result = await resolve(NotificationType.USER_INVITATION);
+      const result = await resolve(PlatformNotificationType.USER_INVITATION);
 
       expect(result.suppressed[WHATSAPP]).toBe('NO_CONSENT');
       expect(consent.consentedUserIds).toHaveBeenCalledWith([1], 'utility');
@@ -178,7 +185,7 @@ describe('ChannelResolutionService', () => {
     it('consent with no stored preference turns the channel on', async () => {
       consent.consentedUserIds.mockResolvedValue(new Set([1]));
 
-      const result = await resolve(NotificationType.USER_INVITATION);
+      const result = await resolve(PlatformNotificationType.USER_INVITATION);
 
       expect(result.primary).toContain(WHATSAPP);
     });
@@ -187,13 +194,13 @@ describe('ChannelResolutionService', () => {
       consent.consentedUserIds.mockResolvedValue(new Set([1]));
       storedPrefs({ team: { whatsapp: false } });
 
-      const result = await resolve(NotificationType.USER_INVITATION);
+      const result = await resolve(PlatformNotificationType.USER_INVITATION);
 
       expect(result.suppressed[WHATSAPP]).toBe('USER_OPT_OUT');
     });
 
     it('a marketing template asks for the marketing yes', async () => {
-      await resolve(NotificationType.TENANT_REJECTED);
+      await resolve(PlatformNotificationType.TENANT_REJECTED);
 
       expect(consent.consentedUserIds).toHaveBeenCalledWith([1], 'marketing');
     });
@@ -220,7 +227,7 @@ describe('ChannelResolutionService', () => {
       quietNow();
       consent.consentedUserIds.mockResolvedValue(new Set([1]));
 
-      const result = await resolve(NotificationType.TENANT_APPROVED);
+      const result = await resolve(PlatformNotificationType.TENANT_APPROVED);
 
       expect(result.suppressedByQuietHours).toBe(true);
       expect(result.primary).toEqual([IN_APP, EMAIL]);
@@ -232,7 +239,7 @@ describe('ChannelResolutionService', () => {
     it('a critical type pierces the window with nothing passed by the caller', async () => {
       quietNow();
 
-      const result = await resolve(NotificationType.ROLE_CHANGED);
+      const result = await resolve(PlatformNotificationType.ROLE_CHANGED);
 
       expect(result.suppressedByQuietHours).toBe(true);
       expect(result.primary).toContain(PUSH);
@@ -242,7 +249,7 @@ describe('ChannelResolutionService', () => {
     it('falls back to the platform zone when no timezone is stored', async () => {
       quietNow(null);
 
-      expect((await resolve(NotificationType.TENANT_APPROVED)).suppressedByQuietHours).toBe(true);
+      expect((await resolve(PlatformNotificationType.TENANT_APPROVED)).suppressedByQuietHours).toBe(true);
     });
 
     it('does nothing when quiet hours are disabled', async () => {
@@ -252,7 +259,7 @@ describe('ChannelResolutionService', () => {
         quietHoursEnd: '06:00',
       });
 
-      expect((await resolve(NotificationType.TENANT_APPROVED)).suppressedByQuietHours).toBe(false);
+      expect((await resolve(PlatformNotificationType.TENANT_APPROVED)).suppressedByQuietHours).toBe(false);
     });
 
     describe('the midnight hour', () => {
@@ -274,19 +281,19 @@ describe('ChannelResolutionService', () => {
       it('suppresses at 00:30 inside a 00:00–07:00 window', async () => {
         atUtc('2026-03-04T00:30:00Z');
         window('00:00', '07:00');
-        expect((await resolve(NotificationType.USER_JOINED)).suppressedByQuietHours).toBe(true);
+        expect((await resolve(PlatformNotificationType.USER_JOINED)).suppressedByQuietHours).toBe(true);
       });
 
       it('suppresses at 00:30 inside an overnight 22:00–06:00 window', async () => {
         atUtc('2026-03-04T00:30:00Z');
         window('22:00', '06:00');
-        expect((await resolve(NotificationType.USER_JOINED)).suppressedByQuietHours).toBe(true);
+        expect((await resolve(PlatformNotificationType.USER_JOINED)).suppressedByQuietHours).toBe(true);
       });
 
       it('does NOT suppress at 08:00, outside a 00:00–07:00 window', async () => {
         atUtc('2026-03-04T08:00:00Z');
         window('00:00', '07:00');
-        expect((await resolve(NotificationType.USER_JOINED)).suppressedByQuietHours).toBe(false);
+        expect((await resolve(PlatformNotificationType.USER_JOINED)).suppressedByQuietHours).toBe(false);
       });
     });
 
@@ -299,7 +306,7 @@ describe('ChannelResolutionService', () => {
         timezone: 'UTC',
       });
 
-      expect((await resolve(NotificationType.USER_JOINED)).suppressedByQuietHours).toBe(false);
+      expect((await resolve(PlatformNotificationType.USER_JOINED)).suppressedByQuietHours).toBe(false);
     });
   });
 
@@ -311,7 +318,7 @@ describe('ChannelResolutionService', () => {
     it('a stored opt-out beats the default', async () => {
       storedPrefs({ billing: { email: false, sms: false } });
 
-      const result = await resolve(NotificationType.TENANT_APPROVED);
+      const result = await resolve(PlatformNotificationType.TENANT_APPROVED);
 
       expect(result.primary).toEqual([IN_APP, PUSH]);
       expect(result.fallback).toEqual([]);
@@ -321,7 +328,7 @@ describe('ChannelResolutionService', () => {
   });
 
   describe('resolveForAudience', () => {
-    const audience = (userIds: number[], type: NotificationType = NotificationType.USER_INVITATION) =>
+    const audience = (userIds: number[], type: NotificationType = PlatformNotificationType.USER_INVITATION) =>
       service.resolveForAudience({ userIds, type });
 
     it('asks consent for the whole audience once, with the kind the type needs', async () => {
@@ -336,7 +343,7 @@ describe('ChannelResolutionService', () => {
     });
 
     it('asks the marketing kind for a marketing type', async () => {
-      await audience([1], NotificationType.TENANT_REJECTED);
+      await audience([1], PlatformNotificationType.TENANT_REJECTED);
       expect(consent.consentedUserIds).toHaveBeenCalledWith([1], 'marketing');
     });
 
@@ -349,7 +356,7 @@ describe('ChannelResolutionService', () => {
     });
 
     it('gives a recipient with no stored preferences the defaults', async () => {
-      const resolved = await audience([9], NotificationType.TENANT_APPROVED);
+      const resolved = await audience([9], PlatformNotificationType.TENANT_APPROVED);
 
       expect(resolved.get(9).primary).toContain(EMAIL);
       expect(resolved.get(9).fallback).toEqual([SMS]);
@@ -372,13 +379,13 @@ describe('ChannelResolutionService', () => {
       ]);
       consent.consentedUserIds.mockResolvedValue(new Set([1]));
 
-      const resolved = await audience([1], NotificationType.TENANT_APPROVED);
+      const resolved = await audience([1], PlatformNotificationType.TENANT_APPROVED);
 
       expect(resolved.get(1).suppressed[WHATSAPP]).toBe('POLICY_NEVER');
     });
 
     it('yields the same shape as the single-user path', async () => {
-      const single = await resolve(NotificationType.USER_INVITATION);
+      const single = await resolve(PlatformNotificationType.USER_INVITATION);
       const bulk = (await audience([1])).get(1);
 
       expect(bulk).toEqual(single);

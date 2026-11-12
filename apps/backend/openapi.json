@@ -9299,17 +9299,9 @@
                   "type": "string"
                 },
                 "type": {
-                  "enum": [
-                    "USER_INVITATION",
-                    "TENANT_REGISTRATION_CONFIRMATION",
-                    "TENANT_APPROVED",
-                    "TENANT_REJECTED",
-                    "INTEGRATION_SYNC_COMPLETED",
-                    "INTEGRATION_SYNC_FAILED",
-                    "SETTINGS_UPDATED",
-                    "USER_JOINED",
-                    "ROLE_CHANGED"
-                  ],
+                  "maxLength": 60,
+                  "minLength": 1,
+                  "pattern": "^[A-Z][A-Z0-9_]*$",
                   "type": "string"
                 }
               },

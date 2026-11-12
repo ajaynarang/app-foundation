@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationType, UserRole } from '@appshore/db';
+import { UserRole } from '@appshore/db';
+import { PlatformNotificationType, type NotificationType } from '@app/shared-types';
 import { NotificationDispatcherService } from '@appshore/platform/infrastructure/notifications/pipeline/notification-dispatcher.service';
 import { RecipientResolutionService } from '@appshore/platform/infrastructure/notifications/pipeline/recipient-resolution.service';
 import type { DispatchRecipient } from '@appshore/platform/infrastructure/notifications/pipeline/dispatch.types';
@@ -44,7 +45,7 @@ export class NotificationTriggersService {
   async userJoined(tenantId: number, userName: string, role: string) {
     return this.trigger({
       tenantId,
-      type: NotificationType.USER_JOINED,
+      type: PlatformNotificationType.USER_JOINED,
       title: `${userName} Joined`,
       message: `New ${role.toLowerCase()} added to the team`,
       iconType: 'user',
@@ -57,7 +58,7 @@ export class NotificationTriggersService {
     const admins = await this.recipients.resolveByRoles(tenantId, STAFF);
     return this.trigger({
       tenantId,
-      type: NotificationType.ROLE_CHANGED,
+      type: PlatformNotificationType.ROLE_CHANGED,
       title: `Role Changed — ${userName}`,
       message: `Changed from ${oldRole} to ${newRole}`,
       iconType: 'user',
@@ -68,7 +69,7 @@ export class NotificationTriggersService {
   async integrationSyncCompleted(tenantId: number, integrationName: string, summary: string) {
     return this.trigger({
       tenantId,
-      type: NotificationType.INTEGRATION_SYNC_COMPLETED,
+      type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
       title: `${integrationName} Sync Complete`,
       message: summary,
       actionUrl: INTEGRATIONS_WEB_PATH,
@@ -81,7 +82,7 @@ export class NotificationTriggersService {
   async integrationSyncFailed(tenantId: number, integrationName: string, error: string) {
     return this.trigger({
       tenantId,
-      type: NotificationType.INTEGRATION_SYNC_FAILED,
+      type: PlatformNotificationType.INTEGRATION_SYNC_FAILED,
       title: `${integrationName} Sync Failed`,
       message: error,
       actionUrl: INTEGRATIONS_WEB_PATH,

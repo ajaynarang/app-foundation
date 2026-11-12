@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { NotificationType } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { WHATSAPP_QUEUE_NAME } from '../whatsapp.constants';
 import { WhatsAppDispatchService } from '../whatsapp-dispatch.service';
 
@@ -23,7 +23,7 @@ describe('WhatsAppDispatchService', () => {
         { deliveryId: 'd1', userId: 7, send },
         { deliveryId: 'd2', userId: 8, send },
       ],
-      { tenantId: 1, type: NotificationType.INTEGRATION_SYNC_COMPLETED },
+      { tenantId: 1, type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED },
     );
 
     expect(queue.addBulk).toHaveBeenCalledTimes(1);
@@ -39,7 +39,7 @@ describe('WhatsAppDispatchService', () => {
   });
 
   it('an empty list adds nothing', async () => {
-    await service.enqueue([], { tenantId: 1, type: NotificationType.INTEGRATION_SYNC_COMPLETED });
+    await service.enqueue([], { tenantId: 1, type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED });
     expect(queue.addBulk).not.toHaveBeenCalled();
   });
 
@@ -48,7 +48,7 @@ describe('WhatsAppDispatchService', () => {
     await expect(
       service.enqueue([{ deliveryId: 'd1', userId: 7, send }], {
         tenantId: 1,
-        type: NotificationType.INTEGRATION_SYNC_COMPLETED,
+        type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
       }),
     ).resolves.toBeUndefined();
   });
