@@ -49,6 +49,7 @@ describe('configuration — production boot guard', () => {
     'OPENAI_API_KEY',
     'AI_PROMPT_CACHE_OVERRIDE',
     'AI_USAGE_CAPTURE_DIR',
+    'AI_CREDENTIALS_KEY',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -450,6 +451,33 @@ describe('configuration — production boot guard', () => {
 
       it('refuse an override other than none', () => {
         expect(() => load({ ...dev, ENV_TYPE: undefined, AI_PROMPT_CACHE_OVERRIDE: 'off' })).toThrow();
+      });
+    });
+
+    describe('AI_CREDENTIALS_KEY (the bring-your-own-key switch)', () => {
+      const AI_KEY = '0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0';
+
+      it('is optional and has no default: unset leaves bring-your-own-key off, in development and in production', () => {
+        expect(load({ ...dev }).aiCredentialsKey).toBeUndefined();
+        expect(load(validProduction()).aiCredentialsKey).toBeUndefined();
+        expect(load({ ...dev, AI_CREDENTIALS_KEY: '' }).aiCredentialsKey).toBeUndefined();
+      });
+
+      it('carries a 64-hex-character key', () => {
+        expect(load({ ...dev, AI_CREDENTIALS_KEY: AI_KEY }).aiCredentialsKey).toBe(AI_KEY);
+      });
+
+      it.each([
+        ['too short', 'abc123'],
+        ['64 characters, not all hex (Buffer.from would silently truncate it)', 'g'.repeat(64)],
+        ['too long', `${AI_KEY}00`],
+      ])('refuses to boot with a key that is %s, in any environment', (_label, value) => {
+        expect(() => load({ ...dev, AI_CREDENTIALS_KEY: value })).toThrow(
+          /AI_CREDENTIALS_KEY must be 64 hex characters/,
+        );
+        expect(() => load({ ...validProduction(), AI_CREDENTIALS_KEY: value })).toThrow(
+          /AI_CREDENTIALS_KEY must be 64 hex characters/,
+        );
       });
     });
 

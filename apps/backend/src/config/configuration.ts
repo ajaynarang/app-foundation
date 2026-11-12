@@ -78,6 +78,19 @@ const configSchema = z.object({
   /** External moderation only (OpenAI `omni-moderation-latest`); never a language or embedding route. */
   openaiApiKey: z.string().optional(),
   /**
+   * Encrypts workspace AI credentials (bring-your-own-key) as AES-256-GCM envelopes, and is the switch for the
+   * feature: unset, a workspace cannot connect a key. There is deliberately no default and no fallback key. A value
+   * that is not exactly 64 hex characters stops the boot, because `Buffer.from(hex)` would silently cut a typo short
+   * and encrypt under a different key than the operator meant. Generate one: `openssl rand -hex 32`.
+   */
+  aiCredentialsKey: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'AI_CREDENTIALS_KEY must be 64 hex characters (32 bytes). Generate one: openssl rand -hex 32',
+    )
+    .optional(),
+  /**
    * Names (never values) of retired AI variables that are still set: `AI_PROVIDER`, `AI_GATEWAY_API_KEY`, and
    * `ANTHROPIC_API_KEY`, which is no longer a platform route (a developer connects it in Settings as a workspace
    * credential). Nothing reads them; the routing module logs one boot warning per name so an operator removes them.
@@ -361,6 +374,7 @@ export default (): Configuration => {
     openRouterApiKey: env('OPENROUTER_API_KEY'),
     cohereApiKey: env('COHERE_API_KEY'),
     openaiApiKey: env('OPENAI_API_KEY'),
+    aiCredentialsKey: env('AI_CREDENTIALS_KEY'),
     // Measurement switches: honoured on a local run only. Every deployed task (NODE_ENV or ENV_TYPE production,
     // which covers staging and sandbox on the shipped image) resolves them to unset, so no code that reads them
     // needs an environment check of its own.
