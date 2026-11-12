@@ -26,7 +26,10 @@ export function knowledgeCitations(
   return citations;
 }
 
-/** Server-injected identity, never model arguments: `_tenantId` by the tool runner, `_role` by the pipeline. */
+/**
+ * Server-injected identity: `_tenantId` by the tool runner; `_role` once the tool pipeline injects it. Until then a
+ * `_role` is not trusted (see kb-audience.ts), which is harmless only while `ROLE_AUDIENCE` is empty.
+ */
 interface CallerArgs {
   _tenantId?: number;
   _role?: string;

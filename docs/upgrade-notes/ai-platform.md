@@ -588,6 +588,11 @@ stay archived (set `is_active = true` to bring them back).
 - Audience. `search-kb` and `get-product-info` no longer take an `audience` argument: the server decides it from the
   caller's role (`kbAudiencesFor` in `knowledge-base/kb-audience.ts`). In the starter every caller reads `all`, and
   the role map (`ROLE_AUDIENCE`) is empty. An external MCP agent that still sends `audience` has it ignored.
+  Keep the map empty and every file `audience: all` for now. Role audiences need the caller's role injected as
+  `_role`, and the tool runner does not inject it yet: it spreads the model's arguments and adds only the tenant,
+  user and conversation on top. So a role-tagged file would reach no real caller, and a `_role` sent by the model or
+  an external MCP agent would pass through and pick that role's audience. A later change in this project injects
+  `_role` and strips model-sent `_` keys; add role audiences only after it.
 - Content audiences. The loader now accepts only the audiences some role reads: `all`, plus the values of
   `ROLE_AUDIENCE`. The old `user` audience, which only the model could select, is refused at ingest with a message
   naming the valid ones.
@@ -620,8 +625,9 @@ working until the first sync, and makes the first sync replace them. No `--force
 
 **Who notices.**
 
-- A product whose content files say `audience: user`: `pnpm seed:knowledge` refuses them. Change them to `all`, or
-  add a role audience to `ROLE_AUDIENCE` and tag the files with it.
+- A product whose content files say `audience: user`: `pnpm seed:knowledge` refuses them. Change them to `all`.
+  Do not add a role audience to `ROLE_AUDIENCE` for them yet: it works only once the tool runner injects `_role`
+  (see Audience above).
 - A product that inserted its own `knowledge_documents` rows: the migration marks them `legacy:` too (it cannot tell
   them apart), so the first sync removes them. Re-insert them afterwards with a null `source_path`; from then on the
   ingester leaves them alone.

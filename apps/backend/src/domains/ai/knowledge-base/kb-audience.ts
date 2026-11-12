@@ -4,8 +4,14 @@
  *
  * Every signed-in caller sees `all`. A product that writes content for one role adds that role here
  * (`ROLE_AUDIENCE`, e.g. `ADMIN: 'admin'`), tags the files `audience: admin`, and those callers then see `all` plus
- * their own audience. The content loader accepts only the audiences this file names, so a file can never be tagged
- * for an audience nobody can retrieve.
+ * their own audience. The content loader accepts only the audiences this file names.
+ *
+ * Not yet: keep `ROLE_AUDIENCE` empty and every file `audience: all` until the tool pipeline injects `_role` and
+ * strips any `_`-prefixed key the model sends (a later change in this project). Today the tool runner and
+ * `McpToolService` spread the model's arguments and add only `_tenantId`, `_userId` and `_userDbId` /
+ * `_conversationId` on top, so no real `_role` arrives (files tagged for a role audience reach nobody) and a
+ * `_role` the model or an external MCP agent sends passes straight through (it would read that role's audience).
+ * With the map empty, `_role` changes nothing, which is why the starter is safe.
  *
  * Used by the `search-kb` and `get-product-info` tools and by `pnpm kb:eval`, so the golden set is scored under the
  * same rule production runs.
@@ -32,8 +38,9 @@ export function kbAudiencesFor(role: string | undefined | null): string[] {
 }
 
 /**
- * The caller's role from the server-injected tool arguments (`_role`, set by the tool pipeline beside `_tenantId`).
- * Never a model argument: the tools' schemas have no audience or role field.
+ * The caller's role from the server-injected tool arguments (`_role`, to be set by the tool pipeline beside
+ * `_tenantId`). The tools' schemas have no audience or role field, but until that pipeline strips model-sent `_`
+ * keys a `_role` here may come from the model; see the note above `KB_AUDIENCE`.
  */
 export function kbRoleFromToolArgs(args: { _role?: unknown }): string | undefined {
   return typeof args._role === 'string' && args._role.length > 0 ? args._role : undefined;

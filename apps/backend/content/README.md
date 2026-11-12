@@ -9,5 +9,6 @@ Markdown content ingested into the AI knowledge base.
   retrieval against it (recall at 5, mean reciprocal rank). Replace the starter questions with your own.
 
 Each file needs `title`, `documentType`, `audience` and `category` frontmatter, and may list `keywords`. The audience
-is `all` unless you map a role to an audience of its own in `src/domains/ai/knowledge-base/kb-audience.ts`. Content is
+is `all`. Role audiences (`src/domains/ai/knowledge-base/kb-audience.ts`) wait until the tool runner injects the
+caller's role; see the note in that file. Content is
 split at `##` and `###` headings, so write one topic per heading. `knowledge-base/getting-started/` explains the rest.
