@@ -3865,6 +3865,38 @@
                   "nullable": true,
                   "type": "object"
                 },
+                "citations": {
+                  "items": {
+                    "properties": {
+                      "href": {
+                        "maxLength": 500,
+                        "type": "string"
+                      },
+                      "sourceId": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "sourceType": {
+                        "maxLength": 64,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "title": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "sourceType",
+                      "sourceId",
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
                 "content": {
                   "type": "string"
                 },
@@ -20443,13 +20475,13 @@
         "operationId": "AssistantAiController_listConversations",
         "parameters": [
           {
-            "description": "Page size, 1–100 (out of range is clamped)",
+            "description": "Page size, 1–30 (out of range is clamped)",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 10,
-              "maximum": 100,
+              "default": 30,
+              "maximum": 30,
               "minimum": 1,
               "type": "integer"
             }
@@ -20482,7 +20514,7 @@
             "bearer": []
           }
         ],
-        "summary": "List conversations for the current user",
+        "summary": "List the current user's active conversations (newest first, at most the history cap)",
         "tags": [
           "AI Conversations"
         ]
@@ -20576,6 +20608,46 @@
           }
         ],
         "summary": "Get status of all domain agents for the user persona",
+        "tags": [
+          "AI Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "AssistantAiController_archiveConversation",
+        "parameters": [
+          {
+            "description": "Conversation public id (conv_…)",
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Archived (or already archived)"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive one of your conversations: it leaves history; its messages are kept",
         "tags": [
           "AI Conversations"
         ]

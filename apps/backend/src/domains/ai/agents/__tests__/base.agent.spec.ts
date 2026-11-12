@@ -190,15 +190,31 @@ describe('AbstractBaseAgent', () => {
       jest.restoreAllMocks();
     });
 
-    it('still ends quietly on any other stream error, as before', async () => {
+    it('raises any other stream error after the text that streamed, so the route can end the turn with an x: frame', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
       const broken = streamingAgent([]);
-      const read = jest.fn().mockRejectedValueOnce(new Error('socket hang up'));
+      const failure = new Error('socket hang up');
+      const read = jest.fn().mockResolvedValueOnce({ done: false, value: 'Half' }).mockRejectedValueOnce(failure);
       broken.stream.mockResolvedValue({
         textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
         usage: Promise.resolve({}),
       });
       mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(broken) });
-      await expect(drain(agent.chat('Test message', CTX))).resolves.toEqual([]);
+
+      const seen: unknown[] = [];
+      const run = async () => {
+        for await (const chunk of agent.chat('Test message', CTX)) seen.push(chunk);
+      };
+      await expect(run()).rejects.toBe(failure);
+      expect(seen).toEqual([{ type: 'text-delta', data: 'Half' }]);
+
+      // The same when Mastra ends the text and records the error on the response instead of throwing it.
+      const recorded = streamingAgent(['par']);
+      const recordedResponse = await recorded.stream();
+      recorded.stream.mockResolvedValue({ ...recordedResponse, error: failure });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(recorded) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBe(failure);
+      jest.restoreAllMocks();
     });
 
     it('refuses a zero-retention tenant before anything streams: the message never reaches a retaining route', async () => {

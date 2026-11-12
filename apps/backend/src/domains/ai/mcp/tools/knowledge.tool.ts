@@ -2,8 +2,28 @@ import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { AiSurface } from '@appshore/db';
+import { CITATION_SOURCE_KNOWLEDGE_DOCUMENT, type Citation } from '@app/shared-types';
 import { KnowledgeBaseService } from '../../knowledge-base/knowledge-base.service';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
+import { CITATIONS_SIDE_CHANNEL } from '../turn-evidence';
+
+/**
+ * The citation candidates for knowledge-base rows: one per document (a chunk names its parent), so two chunks of one
+ * guide are one source. The knowledge base has no page in the web app, so a citation carries no `href`.
+ */
+export function knowledgeCitations(
+  rows: { documentId: string; parentDocId?: string | null; title: string }[],
+): Citation[] {
+  const seen = new Set<string>();
+  const citations: Citation[] = [];
+  for (const row of rows) {
+    const sourceId = row.parentDocId ?? row.documentId;
+    if (seen.has(sourceId)) continue;
+    seen.add(sourceId);
+    citations.push({ sourceType: CITATION_SOURCE_KNOWLEDGE_DOCUMENT, sourceId, title: row.title });
+  }
+  return citations;
+}
 
 @Injectable()
 export class KnowledgeTool {
@@ -13,7 +33,7 @@ export class KnowledgeTool {
   @Tool({
     name: 'search-kb',
     description:
-      'Search the knowledge base for product features, how-to guides, and reference content. Use this to answer questions about what the platform does or how to use it. Returns the most relevant content chunks ranked by relevance.',
+      'Search the knowledge base for product features, how-to guides, and reference content. Use this to answer questions about what the platform does or how to use it. Returns the most relevant content chunks ranked by relevance. When your answer uses a result, name its title so the reader sees the source.',
     parameters: z.object({
       query: z.string().describe('The search query — what the user is asking about'),
       audience: z.enum(['user', 'all']).default('all').describe('Filter results by target audience'),
@@ -44,6 +64,7 @@ export class KnowledgeTool {
         relevance: r.similarity,
       })),
       totalResults: results.length,
+      [CITATIONS_SIDE_CHANNEL]: knowledgeCitations(results),
     };
   }
 
@@ -73,6 +94,7 @@ export class KnowledgeTool {
         type: d.documentType,
       })),
       totalDocuments: documents.length,
+      [CITATIONS_SIDE_CHANNEL]: knowledgeCitations(documents),
     };
   }
 }

@@ -4,17 +4,21 @@ import type { PrismaService } from '@appshore/platform/infrastructure/database/p
 import type { ModerationService } from '../../moderation/moderation.service';
 import type { CardAccumulator } from '../../mcp/mcp-tool.service';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
+import { STREAM_FRAME } from '@app/shared-types';
 import { parseFollowups } from './parse-followups';
+import { endStreamWithError } from './end-stream-with-error';
 import type { Request, Response } from 'express';
 
 /**
- * Pipe a Mastra agent response to the HTTP response in AI SDK data stream protocol.
+ * Pipe a Mastra agent response to the HTTP response as stream frames (`STREAM_FRAME` in `@app/shared-types`).
  *
  * - Streams text deltas as `0:"text"\n` lines
  * - Streams card metadata as `8:{card}\n` lines (from tool _card results)
  * - Checks for HITL suspension and sends `9:{payload}\n` if suspended
  * - Accumulates the full assistant text and persists it to our DB
  * - Handles client disconnect by aborting the stream read
+ * - A stream that fails ends with the error envelope (nothing written yet) or one terminal `x:` frame, and nothing is
+ *   persisted for the failed turn
  *
  * When `moderationService` is provided, output is PII-redacted before persistence.
  * When omitted (e.g. anonymous/unauthenticated sessions), text is stored as-is.
@@ -63,11 +67,15 @@ export async function pipeAgentResponse(
       if (done) break;
       assistantText += value;
       if (!clientDisconnected) {
-        res.write(`0:${JSON.stringify(value)}\n`);
+        res.write(`${STREAM_FRAME.TEXT}${JSON.stringify(value)}\n`);
       }
     }
   } catch (streamError) {
-    logger.warn(`Stream read error for ${conversationId}`, streamError);
+    if (!clientDisconnected) {
+      endStreamWithError(req, res, streamError, logger, `Stream read error for ${conversationId}`);
+    }
+    if (!res.writableEnded) res.end();
+    return;
   }
 
   // Parse follow-ups from response text
@@ -76,7 +84,7 @@ export async function pipeAgentResponse(
 
   if (followUps.length > 0 && !clientDisconnected) {
     try {
-      res.write(`a:${JSON.stringify(followUps)}\n`);
+      res.write(`${STREAM_FRAME.FOLLOWUPS}${JSON.stringify(followUps)}\n`);
     } catch {
       // Follow-up streaming is non-fatal
     }
@@ -86,7 +94,7 @@ export async function pipeAgentResponse(
   const cardData = cardAccumulator?.card ?? null;
   if (cardData && !clientDisconnected) {
     try {
-      res.write(`8:${JSON.stringify(cardData)}\n`);
+      res.write(`${STREAM_FRAME.CARD}${JSON.stringify(cardData)}\n`);
     } catch {
       // Card streaming is non-fatal
     }
@@ -102,7 +110,7 @@ export async function pipeAgentResponse(
         typeof suspendPayload === 'object' && suspendPayload !== null
           ? { ...suspendPayload, runId: response.runId }
           : { data: suspendPayload, runId: response.runId };
-      res.write(`9:${JSON.stringify(payload)}\n`);
+      res.write(`${STREAM_FRAME.SUSPEND}${JSON.stringify(payload)}\n`);
     }
   } catch {
     // suspendPayload not available — no suspension

@@ -4,6 +4,8 @@ import { AiInvocationStatus, AiSurface } from '@appshore/db';
 import { RequestContext } from '@mastra/core/request-context';
 
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
+import { TurnEvidence } from '../mcp/turn-evidence';
+import { parseFollowups } from '../assistant/utils/parse-followups';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiRouteResolver } from '../routing/ai-route-resolver.service';
@@ -11,7 +13,6 @@ import { REQUEST_MODEL_KEY } from '../routing/request-model-key';
 import type { ResolvedRoute } from '../routing/routing.types';
 import { OUTPUT_CEILINGS } from '../routing/output-ceilings';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
-import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
 import { captureUsageShape, usageFromAiSdk } from '../infrastructure/telemetry/usage-from-ai-sdk';
 import { mapProviderRefusal } from '../infrastructure/telemetry/ai-provider-credit-refused.error';
@@ -95,6 +96,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     const { route, requestContext } = await this.resolveModel(ctx.tenantId);
     const agent = this.mastraProvider.getMastra().getAgent(this.mastraAgentId);
     const cardAccumulator = new CardAccumulator();
+    const evidence = new TurnEvidence();
     const toolsets = await this.mcpToolService.getToolsetsForPersona(
       ctx.userMode,
       {
@@ -104,6 +106,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
         conversationId: ctx.conversationId,
       },
       cardAccumulator,
+      evidence,
     );
     const domainSkillContent = await this.skillLoader.getSkills(this.domainSkills);
     const instructions = await this.buildChatInstructions(agent, ctx, domainSkillContent);
@@ -139,8 +142,9 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     }
 
     let streamErrored = false;
+    let answer = '';
     try {
-      yield* this.streamTextChunks(response, ctx, route);
+      answer = yield* this.streamTextChunks(response, ctx, route, evidence);
     } catch (err) {
       streamErrored = true;
       throw err;
@@ -149,6 +153,12 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
       // disconnected mid-way. Fire-and-forget; never blocks or throws into
       // the chat path.
       void this.recordChatUsage(response, ctx, Date.now() - startedAt, streamErrored, route);
+    }
+
+    // The sources the answer named, among those its tools read. A follow-up suggestion that names a title is not one.
+    const { cleanText } = parseFollowups(answer);
+    for (const citation of evidence.citedIn(cleanText)) {
+      yield { type: 'citation' as const, data: JSON.stringify(citation) };
     }
 
     if (cardAccumulator.card) {
@@ -186,27 +196,55 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
   }
 
   /**
-   * The answer's text as it streams. A stream error is logged and ends the text, as before, except a provider credit
-   * refusal: that becomes `AiProviderCreditRefused` (a budget error), whether the read threw it or Mastra recorded it
-   * on the response (`response.error`), so the turn fails the way a capped workspace's does instead of ending blank.
+   * The answer's text as it streams, with a `reading` chunk whenever a tool offers a new source mid-turn. One pending
+   * read is carried across iterations, so racing the two never drops a text chunk. Returns the whole answer.
+   *
+   * A stream that fails, whether the read threw or Mastra recorded the error on the response (`response.error`), is
+   * thrown, so the chat route can end the turn with a terminal error frame instead of ending it blank. A provider credit
+   * refusal is thrown as `AiProviderCreditRefused` (a budget error), so the turn fails the way a capped workspace's does.
    */
-  private async *streamTextChunks(response: any, ctx: AgentContext, route: ResolvedRoute): AsyncGenerator<ChatChunk> {
+  private async *streamTextChunks(
+    response: any,
+    ctx: AgentContext,
+    route: ResolvedRoute,
+    evidence: TurnEvidence,
+  ): AsyncGenerator<ChatChunk, string> {
     const reader = response.textStream.getReader();
+    let answer = '';
     let failure: unknown;
+    let pendingRead: Promise<{ kind: 'text'; result: ReadableStreamReadResult<string> }> | null = null;
     try {
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        yield { type: 'text-delta' as const, data: value };
+        pendingRead ??= reader.read().then((result: ReadableStreamReadResult<string>) => ({
+          kind: 'text' as const,
+          result,
+        }));
+        const next = await Promise.race([
+          pendingRead,
+          evidence.waitForReading().then(() => ({ kind: 'reading' as const })),
+        ]);
+        if (next.kind === 'reading') {
+          yield* readingChunks(evidence);
+          continue;
+        }
+        pendingRead = null;
+        if (next.result.done) break;
+        answer += next.result.value;
+        yield { type: 'text-delta' as const, data: next.result.value };
       }
+      yield* readingChunks(evidence);
     } catch (streamError) {
       failure = streamError;
       this.logger.warn(`Stream error for ${ctx.conversationId}`, streamError);
     } finally {
+      // Releasing with a read in flight rejects it (an early client disconnect); nothing awaits it any more, so
+      // observe the rejection to keep it quiet.
+      pendingRead?.catch(() => undefined);
       reader.releaseLock();
     }
-    const refused = mapProviderRefusal(failure ?? readStreamError(response), ctx.tenantId, route);
-    if (refused instanceof AiBudgetExceededError) throw refused;
+    const error = failure ?? readStreamError(response);
+    if (error) throw mapProviderRefusal(error, ctx.tenantId, route);
+    return answer;
   }
 
   private async extractSuspendChunk(response: any): Promise<ChatChunk | null> {
@@ -332,6 +370,13 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
   // eslint-disable-next-line @typescript-eslint/require-await -- default stub, overridden by specific agents
   async getStatus(_tenantId: number): Promise<AgentStatus> {
     return { state: 'idle', summary: 'Ready' };
+  }
+}
+
+/** The reading frames queued since the last drain, as chunks. */
+function* readingChunks(evidence: TurnEvidence): Generator<ChatChunk> {
+  for (const frame of evidence.drainReading()) {
+    yield { type: 'reading' as const, data: JSON.stringify(frame) };
   }
 }
 

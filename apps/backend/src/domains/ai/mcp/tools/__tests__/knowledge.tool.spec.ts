@@ -1,4 +1,5 @@
 import { KnowledgeTool } from '../knowledge.tool';
+import { CITATIONS_SIDE_CHANNEL } from '../../turn-evidence';
 import { KnowledgeBaseService } from '../../../knowledge-base/knowledge-base.service';
 
 describe('KnowledgeTool', () => {
@@ -91,6 +92,31 @@ describe('KnowledgeTool', () => {
           limit: 3,
         }),
       );
+    });
+  });
+
+  describe('citations', () => {
+    it('offers one knowledge-base citation per document a search returned, never shown to the model as data', async () => {
+      mockKbService.hybridSearch.mockResolvedValue([
+        { documentId: 'kb_1_0', parentDocId: 'kb_1', title: 'Getting started', content: 'a', similarity: 0.9 },
+        { documentId: 'kb_1_1', parentDocId: 'kb_1', title: 'Getting started', content: 'b', similarity: 0.8 },
+        { documentId: 'kb_2', parentDocId: null, title: 'Inviting teammates', content: 'c', similarity: 0.7 },
+      ]);
+
+      const result = await tool.searchKB({ query: 'start', audience: 'all' });
+
+      expect(result[CITATIONS_SIDE_CHANNEL]).toEqual([
+        { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' },
+        { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_2', title: 'Inviting teammates' },
+      ]);
+    });
+
+    it('offers citations for the documents of a topic too', async () => {
+      const result = await tool.getProductInfo({ topic: 'pricing', audience: 'all' });
+
+      expect(result[CITATIONS_SIDE_CHANNEL]).toEqual([
+        { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'doc_003', title: 'Pricing Tiers' },
+      ]);
     });
   });
 

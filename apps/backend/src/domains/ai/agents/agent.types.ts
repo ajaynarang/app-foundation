@@ -31,8 +31,12 @@ export interface AgentContext {
   voiceInstructions?: string;
 }
 
+/**
+ * One chunk of a chat turn. `reading` (a source being read, transient) and `citation` (a source the answer named)
+ * carry JSON payloads; the HTTP route writes each as its stream frame (`STREAM_FRAME` in `@app/shared-types`).
+ */
 export interface ChatChunk {
-  type: 'text-delta' | 'card' | 'suspend' | 'blocked' | 'complete' | 'followups';
+  type: 'text-delta' | 'reading' | 'citation' | 'card' | 'suspend' | 'blocked' | 'complete' | 'followups';
   data: string;
 }
 

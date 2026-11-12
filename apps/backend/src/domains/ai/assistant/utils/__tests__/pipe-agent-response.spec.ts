@@ -44,6 +44,74 @@ describe('pipeAgentResponse', () => {
     };
   });
 
+  describe('a stream that fails', () => {
+    /** A text stream that yields `parts`, then throws. */
+    function failingStream(parts: string[], error: Error): ReadableStream<string> {
+      let i = 0;
+      return new ReadableStream<string>({
+        pull(controller) {
+          if (i < parts.length) controller.enqueue(parts[i++]);
+          else controller.error(error);
+        },
+      });
+    }
+
+    it('after text was sent: ends with one terminal x: frame, the generic copy, and persists nothing', async () => {
+      // A response whose headers went out with the first frame.
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+
+      await pipeAgentResponse(
+        { textStream: failingStream(['Half an'], new Error('socket hang up: internal detail')) },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+        },
+      );
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(frames[0]).toBe(`0:${JSON.stringify('Half an')}\n`);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      const payload = JSON.parse(last.slice(2));
+      expect(payload).toEqual({ code: 'INTERNAL', detail: expect.any(String) });
+      expect(payload.detail).not.toContain('internal detail');
+      expect(frames.filter((f: string) => f.startsWith('x:'))).toHaveLength(1);
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('before anything was sent: answers the error envelope instead of a frame', async () => {
+      mockRes.headersSent = false;
+      mockRes.removeHeader = jest.fn();
+      mockRes.status = jest.fn().mockReturnValue(mockRes);
+      mockRes.json = jest.fn();
+      mockReq.url = '/api/v1/conversations/conv_1/resume';
+      mockReq.method = 'POST';
+
+      await pipeAgentResponse(
+        { textStream: failingStream([], new Error('boom')) },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+        },
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
+  });
+
   it('sets streaming headers', async () => {
     const response = {
       textStream: createReadableStream([]),

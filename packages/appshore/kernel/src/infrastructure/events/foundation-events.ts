@@ -174,6 +174,16 @@ export const FOUNDATION_EVENT_REGISTRY = [
     aggregateType: 'conversation',
   },
   {
+    key: 'app.conversation.archived',
+    constantName: 'CONVERSATION_ARCHIVED',
+    label: 'Conversation Archived',
+    description:
+      'A conversation was archived: by its owner (reason "user") or by the rolling history cap (reason "cap"). Rows and messages are kept. Internal-only; no SSE bridge.',
+    category: 'AI',
+    visibility: 'internal' as const,
+    aggregateType: 'conversation',
+  },
+  {
     key: 'app.ai.invocation-recorded',
     constantName: 'AI_INVOCATION_RECORDED',
     label: 'AI Invocation Recorded',

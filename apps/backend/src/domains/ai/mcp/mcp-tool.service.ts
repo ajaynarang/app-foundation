@@ -7,6 +7,7 @@ import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool
 import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';
+import { CITATIONS_SIDE_CHANNEL, type TurnEvidence } from './turn-evidence';
 
 /**
  * Accumulates `_card` metadata emitted by MCP tools during a single request.
@@ -114,6 +115,7 @@ export class McpToolService implements OnModuleInit {
     userMode: string,
     context?: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
+    evidence?: TurnEvidence,
   ): Promise<ToolSet> {
     if (this.allTools.size === 0) {
       this.discoverTools();
@@ -152,7 +154,7 @@ export class McpToolService implements OnModuleInit {
 
           if (context && this.pipeline) {
             const pipelineResult = await this.runViaPipeline(toolName, args, context, userMode, cardAccumulator);
-            if (pipelineResult !== undefined) return pipelineResult;
+            if (pipelineResult !== undefined) return takeCitations(pipelineResult, evidence);
           }
 
           const callTool = async () => {
@@ -182,7 +184,7 @@ export class McpToolService implements OnModuleInit {
             return result;
           };
 
-          return callTool();
+          return takeCitations(await callTool(), evidence);
         },
       };
     }
@@ -319,7 +321,7 @@ export class McpToolService implements OnModuleInit {
             return result;
           };
 
-          return callTool();
+          return takeCitations(await callTool());
         },
       };
     }
@@ -373,8 +375,9 @@ export class McpToolService implements OnModuleInit {
     userMode: string,
     context?: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
+    evidence?: TurnEvidence,
   ): Promise<Record<string, ToolSet>> {
-    const tools = await this.getToolsForPersona(userMode, context, cardAccumulator);
+    const tools = await this.getToolsForPersona(userMode, context, cardAccumulator, evidence);
 
     // Include confirm-action tool if any exposed tool is write-class.
     const hasWriteTools = Object.keys(tools).some((t) => McpToolService.WRITE_TOOLS.has(t));
@@ -384,4 +387,17 @@ export class McpToolService implements OnModuleInit {
 
     return { 'app-tools': tools };
   }
+}
+
+/**
+ * Move a tool result's `_citations` side channel into the turn's evidence and strip it, so the model never sees it.
+ * With no evidence collecting (a delegated execute, a Desk run) the key is still stripped.
+ */
+export function takeCitations(result: unknown, evidence?: TurnEvidence): unknown {
+  if (!result || typeof result !== 'object' || Array.isArray(result) || !(CITATIONS_SIDE_CHANNEL in result)) {
+    return result;
+  }
+  const { [CITATIONS_SIDE_CHANNEL]: offered, ...rest } = result as Record<string, unknown>;
+  if (evidence && Array.isArray(offered)) evidence.offer(offered);
+  return rest;
 }

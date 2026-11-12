@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-12T16:47:31.150Z
+ * Generated: 2026-11-12T18:26:33.866Z
  * Source: 22 domains, 100 endpoints
- * Controllers scanned: 281 total endpoints across all controllers
+ * Controllers scanned: 282 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)

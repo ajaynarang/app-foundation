@@ -18,6 +18,8 @@ export interface SearchOptions {
 
 export interface SearchResult {
   documentId: string;
+  /** The document a chunk belongs to (null for a single-chunk document): what a citation names. */
+  parentDocId: string | null;
   title: string;
   content: string;
   documentType: string;
@@ -97,6 +99,7 @@ export class KnowledgeBaseService {
       WITH vector_search AS (
         SELECT
           document_id,
+          parent_doc_id,
           title,
           content,
           document_type,
@@ -110,6 +113,7 @@ export class KnowledgeBaseService {
       )
       SELECT
         document_id,
+        parent_doc_id,
         title,
         content,
         document_type,
@@ -137,6 +141,7 @@ export class KnowledgeBaseService {
     const sql = `
       SELECT
         document_id,
+        parent_doc_id,
         title,
         content,
         document_type,
@@ -156,6 +161,7 @@ export class KnowledgeBaseService {
   private toResults(rows: any[]): SearchResult[] {
     return rows.map((row) => ({
       documentId: row.document_id,
+      parentDocId: row.parent_doc_id ?? null,
       title: row.title,
       content: row.content,
       documentType: row.document_type,
@@ -178,6 +184,7 @@ export class KnowledgeBaseService {
       orderBy: { chunkIndex: 'asc' },
       select: {
         documentId: true,
+        parentDocId: true,
         title: true,
         content: true,
         documentType: true,

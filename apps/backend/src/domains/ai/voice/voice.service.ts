@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { AccessToken, AgentDispatchClient, RoomAgentDispatch, RoomConfiguration } from 'livekit-server-sdk';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import type { ChatChunk } from '../agents/agent.types';
 
 @Injectable()
 export class VoiceService {
@@ -156,10 +157,7 @@ export class VoiceService {
     text: string,
     userId: string,
     tenantId: number,
-  ): AsyncGenerator<{
-    type: 'text-delta' | 'card' | 'suspend' | 'blocked' | 'complete';
-    data: string;
-  }> {
+  ): AsyncGenerator<ChatChunk> {
     const assistantAi = await this.getAssistantAiService();
     yield* assistantAi.generateResponse(conversationId, text, 'voice', userId, tenantId);
   }
