@@ -28,6 +28,7 @@ function pricedPairs(): Set<string> {
 const PROVIDER_FOR_COLUMN: Record<(typeof ROUTE_ID_COLUMNS)[number], string> = {
   anthropicId: AI_PROVIDER_LABELS.ANTHROPIC,
   openrouterId: AI_PROVIDER_LABELS.OPENROUTER,
+  bedrockId: AI_PROVIDER_LABELS.AWS,
 };
 
 describe('MODEL_CATALOG', () => {
@@ -40,6 +41,16 @@ describe('MODEL_CATALOG', () => {
       else expect(id).toEqual(expect.any(String));
     },
   );
+
+  it('reads three id columns: the direct API, OpenRouter and Bedrock', () => {
+    expect([...ROUTE_ID_COLUMNS]).toEqual(['anthropicId', 'openrouterId', 'bedrockId']);
+  });
+
+  it("uses the Bedrock US geo inference profiles from AWS's 5.5 model cards", () => {
+    expect(MODEL_CATALOG.fast.bedrockId).toBe('us.anthropic.claude-haiku-5-5');
+    expect(MODEL_CATALOG.standard.bedrockId).toBe('us.anthropic.claude-sonnet-5-5');
+    expect(MODEL_CATALOG.powerful.bedrockId).toBe('us.anthropic.claude-opus-5-5');
+  });
 
   it('uses the Claude 5.5 ids: dashed on the direct API, vendor-prefixed and dotted on OpenRouter', () => {
     expect(MODEL_CATALOG.fast).toMatchObject({
@@ -80,8 +91,12 @@ describe('MODEL_CATALOG', () => {
           missing.push(`${PROVIDER_FOR_COLUMN[column]}|${id}`);
       }
     }
-    const embeddingPair = `${AI_PROVIDER_LABELS.COHERE}|${EMBEDDING_CATALOG.cohereDirectId}`;
-    if (!priced.has(embeddingPair)) missing.push(embeddingPair);
+    for (const embeddingPair of [
+      `${AI_PROVIDER_LABELS.COHERE}|${EMBEDDING_CATALOG.cohereDirectId}`,
+      `${AI_PROVIDER_LABELS.AWS}|${EMBEDDING_CATALOG.bedrockId}`,
+    ]) {
+      if (!priced.has(embeddingPair)) missing.push(embeddingPair);
+    }
     expect(missing).toEqual([]);
   });
 });
@@ -116,6 +131,13 @@ describe('ledgerModelIdFor', () => {
     expect(ledgerModelIdFor('fast', 'claude-haiku-5-5-20261001')).toBe('claude-haiku-5-5');
   });
 
+  it('records the Bedrock profile id on a Bedrock route, also when the answering model is reported by another id', () => {
+    expect(ledgerModelIdFor('fast', undefined, 'bedrockId')).toBe('us.anthropic.claude-haiku-5-5');
+    expect(ledgerModelIdFor('fast', 'us.anthropic.claude-sonnet-5-5', 'bedrockId')).toBe(
+      'us.anthropic.claude-sonnet-5-5',
+    );
+  });
+
   it("records the id on the route's own column (OpenRouter rows are priced by their slug)", () => {
     expect(ledgerModelIdFor('fast', undefined, 'openrouterId')).toBe('anthropic/claude-haiku-5.5');
     expect(ledgerModelIdFor('fast', 'anthropic/claude-sonnet-5.5', 'openrouterId')).toBe('anthropic/claude-sonnet-5.5');
@@ -127,6 +149,7 @@ describe('ledgerModelIdFor', () => {
 
 describe('longPromptSurchargeAbove', () => {
   it('flags Haiku 5.5 above 100K prompt tokens, on every id it is recorded under', () => {
+    expect(longPromptSurchargeAbove('us.anthropic.claude-haiku-5-5')).toBe(100_000);
     expect(longPromptSurchargeAbove('claude-haiku-5-5')).toBe(100_000);
     expect(longPromptSurchargeAbove('anthropic/claude-haiku-5.5')).toBe(100_000);
   });

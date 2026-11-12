@@ -91,6 +91,31 @@ const configSchema = z.object({
     )
     .optional(),
   /**
+   * Enables `platform-bedrock`, the platform's zero-retention route (language and embeddings), in this AWS region,
+   * with the task's own credentials. Unset in development, so a zero-retention workspace correctly fails closed there.
+   */
+  platformBedrockRegion: z
+    .string()
+    .regex(/^[a-z]{2}(-gov)?-[a-z]+-\d$/, 'PLATFORM_BEDROCK_REGION must be an AWS region such as us-east-1')
+    .optional(),
+  /**
+   * The ARNs of the roles the backend runs as (`PLATFORM_ASSUME_ROLE_ARN`, a comma-separated list): the principals a
+   * workspace's AWS role must trust. Empty leaves the workspace Bedrock role flow off (its begin step answers 503).
+   * Terraform sets it to the task role. A malformed entry stops the boot, because it would deny every connect.
+   */
+  platformAssumeRoleArn: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^arn:aws[a-z-]*:(iam|sts)::\d{12}:\S+$/,
+          'PLATFORM_ASSUME_ROLE_ARN must be a comma-separated list of IAM ARNs',
+        ),
+    )
+    .default([]),
+  /** Optional: a CloudFormation quick-create link the Bedrock connect sheet offers beside the trust policy. */
+  platformBedrockCfnTemplateUrl: z.string().url().optional(),
+  /**
    * Names (never values) of retired AI variables that are still set: `AI_PROVIDER`, `AI_GATEWAY_API_KEY`, and
    * `ANTHROPIC_API_KEY`, which is no longer a platform route (a developer connects it in Settings as a workspace
    * credential). Nothing reads them; the routing module logs one boot warning per name so an operator removes them.
@@ -375,6 +400,12 @@ export default (): Configuration => {
     cohereApiKey: env('COHERE_API_KEY'),
     openaiApiKey: env('OPENAI_API_KEY'),
     aiCredentialsKey: env('AI_CREDENTIALS_KEY'),
+    platformBedrockRegion: env('PLATFORM_BEDROCK_REGION'),
+    platformAssumeRoleArn: (env('PLATFORM_ASSUME_ROLE_ARN') ?? '')
+      .split(',')
+      .map((arn) => arn.trim())
+      .filter(Boolean),
+    platformBedrockCfnTemplateUrl: env('PLATFORM_BEDROCK_CFN_TEMPLATE_URL'),
     // Measurement switches: honoured on a local run only. Every deployed task (NODE_ENV or ENV_TYPE production,
     // which covers staging and sandbox on the shipped image) resolves them to unset, so no code that reads them
     // needs an environment check of its own.

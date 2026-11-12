@@ -12,7 +12,10 @@ import { PrismaClient } from '../../generated/client';
  * 2026-11-03, not the live page. OpenRouter passes Anthropic list prices
  * through with no token markup, so its rows mirror the Anthropic ones; they
  * are checked against the live slugs when the OpenRouter route lands. The
- * Cohere row is a copy of a sibling product's unverified row. The three voice
+ * Cohere row is a copy of a sibling product's unverified row. The `aws` rows
+ * (Bedrock: the three Claude 5.5 US geo inference profiles and Cohere Embed v4)
+ * mirror the Anthropic and Cohere rows: AWS's price table was not readable when
+ * they were written, so each is marked unverified. The three voice
  * rows (Deepgram, Cartesia, LiveKit) are priced per unit, not per token, and
  * were checked against each vendor's public price page on 2026-11-12.
  *
@@ -60,6 +63,10 @@ const INITIAL_EFFECTIVE_FROM_DATE = new Date('2026-05-27T00:00:00.000Z');
 const CLAUDE_5_5_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
 const ANTHROPIC_5_5 = "From Anthropic's price table cached 2026-11-03; ⚠ verify against the live page before deploy";
 const VIA_OPENROUTER = `Anthropic list pricing via OpenRouter (no token markup). ${VERIFICATION_NEEDED}`;
+const VIA_BEDROCK = `Bedrock on-demand, US geo inference profile, assumed equal to Anthropic list pricing. ${VERIFICATION_NEEDED}`;
+
+// The Bedrock routes (platform zero-retention route and a workspace's own AWS role).
+const BEDROCK_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
 
 // The voice vendors, priced per unit (`AiUsageUnit`). Checked against each vendor's public price page.
 const VOICE_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
@@ -168,6 +175,47 @@ const PRICING: PricingRow[] = [
     cachedInputPerMtokUsd: null,
     notes: `Embeddings: output cost is 0. ${VERIFICATION_NEEDED}`,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+
+  // ─── AWS Bedrock (zero-retention routes; ids are the catalog's bedrockId) ──
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-haiku-5-5',
+    inputPerMtokUsd: '0.100000',
+    outputPerMtokUsd: '0.500000',
+    cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
+    notes: `Base rate only (Haiku 5.5 bills more above 100K prompt tokens). ${VIA_BEDROCK}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-sonnet-5-5',
+    inputPerMtokUsd: '2.000000',
+    outputPerMtokUsd: '10.000000',
+    cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
+    notes: `Cache read at the rate AWS lowered by half on 2026-10-07. ${VIA_BEDROCK}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-opus-5-5',
+    inputPerMtokUsd: '4.000000',
+    outputPerMtokUsd: '20.000000',
+    cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
+    notes: VIA_BEDROCK,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'cohere.embed-v4:0',
+    inputPerMtokUsd: '0.120000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    notes: `Embeddings: output cost is 0. Bedrock on-demand, assumed equal to Cohere direct. ${VERIFICATION_NEEDED}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
   },
 
   // ─── Voice (non-token meters, priced per unit; token rates are 0) ──

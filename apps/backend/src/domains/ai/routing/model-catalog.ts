@@ -9,7 +9,10 @@ import type { ModelAlias } from '@app/shared-types';
  * - `anthropicId` on the direct Anthropic API (a tenant Anthropic key).
  * - `openrouterId` on OpenRouter (the platform default and a tenant OpenRouter key), and as the request slug on the
  *   Vercel AI Gateway, which uses the same vendor-prefixed, dotted form (`anthropic/claude-sonnet-5.5`).
- * - A Bedrock column is added with the Bedrock routes; no repo holds a verified Bedrock id for the 5.5 family yet.
+ * - `bedrockId` on both Bedrock routes (the platform's zero-retention route and a workspace's own AWS role). The 5.5
+ *   models have no in-region on-demand id in US regions, so the column holds the US geo cross-region inference
+ *   profile (`us.` prefix), read from AWS's Bedrock model cards. A deployment whose Bedrock region is outside the US
+ *   needs that geography's profile (`eu.`, `au.`, `jp.`) instead.
  *
  * No 4.x id is ever written here. A 5.5 id that cannot be confirmed on a route is left unset on that column and the
  * alias is listed in `UNREGISTERED_ALIASES`, so the route refuses that alias instead of serving an older model.
@@ -23,7 +26,13 @@ export interface ModelCatalogEntry {
   anthropicId?: string;
   /** OpenRouter slug; also the Vercel AI Gateway slug. */
   openrouterId?: string;
-  /** Whether the model can be served under zero data retention on some route at all. */
+  /** Amazon Bedrock inference profile id (US geo cross-region), on both Bedrock routes. */
+  bedrockId?: string;
+  /**
+   * Whether the model can be served under zero data retention on some route at all. True for the three 5.5 models:
+   * Bedrock's abuse-detection page lists no retention for them (it names only the Fable models and most OpenAI ones),
+   * so a Bedrock account set to `data_retention_mode: none` serves them without keeping prompts or outputs.
+   */
   zdrCapable: boolean;
   /** Effort sent on every call through this alias (`fast` serves high-volume work, so it runs low). */
   effort: ModelEffort;
@@ -38,6 +47,7 @@ export const MODEL_CATALOG: Record<ModelAlias, ModelCatalogEntry> = {
   fast: {
     anthropicId: 'claude-haiku-5-5',
     openrouterId: 'anthropic/claude-haiku-5.5',
+    bedrockId: 'us.anthropic.claude-haiku-5-5',
     zdrCapable: true,
     effort: 'low',
     // Haiku 5.5 bills $0.50 / $2.50 per million above 100K prompt tokens.
@@ -46,19 +56,21 @@ export const MODEL_CATALOG: Record<ModelAlias, ModelCatalogEntry> = {
   standard: {
     anthropicId: 'claude-sonnet-5-5',
     openrouterId: 'anthropic/claude-sonnet-5.5',
+    bedrockId: 'us.anthropic.claude-sonnet-5-5',
     zdrCapable: true,
     effort: 'medium',
   },
   powerful: {
     anthropicId: 'claude-opus-5-5',
     openrouterId: 'anthropic/claude-opus-5.5',
+    bedrockId: 'us.anthropic.claude-opus-5-5',
     zdrCapable: true,
     effort: 'medium',
   },
 };
 
-/** The id columns a route reads today. A Bedrock column joins this list with the Bedrock routes. */
-export const ROUTE_ID_COLUMNS = ['anthropicId', 'openrouterId'] as const;
+/** The id columns a route reads. */
+export const ROUTE_ID_COLUMNS = ['anthropicId', 'openrouterId', 'bedrockId'] as const;
 export type RouteIdColumn = (typeof ROUTE_ID_COLUMNS)[number];
 
 /**

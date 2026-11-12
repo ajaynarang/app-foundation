@@ -50,6 +50,9 @@ describe('configuration — production boot guard', () => {
     'AI_PROMPT_CACHE_OVERRIDE',
     'AI_USAGE_CAPTURE_DIR',
     'AI_CREDENTIALS_KEY',
+    'PLATFORM_BEDROCK_REGION',
+    'PLATFORM_ASSUME_ROLE_ARN',
+    'PLATFORM_BEDROCK_CFN_TEMPLATE_URL',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -451,6 +454,38 @@ describe('configuration — production boot guard', () => {
 
       it('refuse an override other than none', () => {
         expect(() => load({ ...dev, ENV_TYPE: undefined, AI_PROMPT_CACHE_OVERRIDE: 'off' })).toThrow();
+      });
+    });
+
+    describe('the Bedrock keys', () => {
+      const ROLE_A = 'arn:aws:iam::123456789012:role/app-ecs-task';
+      const ROLE_B = 'arn:aws:iam::123456789012:role/app-ecs-worker';
+
+      it('are optional: unset leaves the platform Bedrock route and the tenant role flow off', () => {
+        const config = load({ ...dev });
+        expect(config.platformBedrockRegion).toBeUndefined();
+        expect(config.platformAssumeRoleArn).toEqual([]);
+        expect(config.platformBedrockCfnTemplateUrl).toBeUndefined();
+        expect(() => load(validProduction())).not.toThrow();
+      });
+
+      it('carry the region, the CloudFormation link, and every role ARN of the comma-separated list', () => {
+        const config = load({
+          ...dev,
+          PLATFORM_BEDROCK_REGION: 'us-east-1',
+          PLATFORM_ASSUME_ROLE_ARN: ` ${ROLE_A} , ${ROLE_B},`,
+          PLATFORM_BEDROCK_CFN_TEMPLATE_URL: 'https://example.com/bedrock-role.yaml',
+        });
+        expect(config.platformBedrockRegion).toBe('us-east-1');
+        expect(config.platformAssumeRoleArn).toEqual([ROLE_A, ROLE_B]);
+        expect(config.platformBedrockCfnTemplateUrl).toBe('https://example.com/bedrock-role.yaml');
+      });
+
+      it('refuse to boot with a malformed region or role ARN (a typo would deny every tenant connect)', () => {
+        expect(() => load({ ...dev, PLATFORM_BEDROCK_REGION: 'US East 1' })).toThrow(/PLATFORM_BEDROCK_REGION/);
+        expect(() => load({ ...dev, PLATFORM_ASSUME_ROLE_ARN: `${ROLE_A},app-ecs-worker` })).toThrow(
+          /PLATFORM_ASSUME_ROLE_ARN/,
+        );
       });
     });
 
