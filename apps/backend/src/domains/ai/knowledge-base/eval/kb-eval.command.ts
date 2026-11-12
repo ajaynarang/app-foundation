@@ -3,7 +3,6 @@ import * as path from 'path';
 import { NestFactory } from '@nestjs/core';
 import { KnowledgeBaseService } from '../knowledge-base.service';
 import { kbAudiencesFor } from '../kb-audience';
-import { AiRouteResolver } from '../../routing/ai-route-resolver.service';
 import { KbEvalCliModule } from './kb-eval-cli.module';
 import { scoreQuestion, summarise, type EvalReport, type GoldenQuestion, type QuestionScore } from './kb-eval';
 
@@ -16,12 +15,23 @@ export interface KbEvalArgs {
   reportDir?: string;
 }
 
+/**
+ * How the run's queries were searched, counted from the search itself, not from whether a route is configured: a
+ * configured route with a revoked key or a provider outage falls back to full-text on every query.
+ * `hybrid` when every query was embedded, `full-text` when none was, `mixed` when some fell back.
+ */
+export type KbEvalMode = 'hybrid' | 'full-text' | 'mixed';
+
+export interface KbEvalRun extends EvalReport {
+  mode: KbEvalMode;
+  /** Questions whose query could not be embedded and were answered from full-text alone. */
+  queriesNotEmbedded: number;
+}
+
 /** A dated report: what was measured, how, and when. */
-export interface DatedReport extends EvalReport {
+export interface DatedReport extends KbEvalRun {
   date: string;
   questions: number;
-  /** `hybrid` when queries were embedded; `full-text` when no platform embedding route is configured. */
-  mode: 'hybrid' | 'full-text';
 }
 
 /** The run's date on the machine that ran it (YYYY-MM-DD), not UTC's. */
@@ -45,14 +55,20 @@ export async function runKbEval(
   kb: Pick<KnowledgeBaseService, 'hybridSearch'>,
   questions: GoldenQuestion[],
   k: number = K,
-): Promise<EvalReport> {
+): Promise<KbEvalRun> {
   const scores: QuestionScore[] = [];
+  let queriesNotEmbedded = 0;
   for (const question of questions) {
+    let notEmbedded = false;
     const results = await kb.hybridSearch(question.q, {
       audiences: kbAudiencesFor(question.caller),
       limit: k,
       platformQuery: true,
+      onQueryNotEmbedded: () => {
+        notEmbedded = true;
+      },
     });
+    if (notEmbedded) queriesNotEmbedded++;
     scores.push(
       scoreQuestion(
         question,
@@ -60,12 +76,20 @@ export async function runKbEval(
       ),
     );
   }
-  return summarise(scores, k);
+  const mode: KbEvalMode =
+    queriesNotEmbedded === 0 ? 'hybrid' : queriesNotEmbedded >= questions.length ? 'full-text' : 'mixed';
+  return { ...summarise(scores, k), mode, queriesNotEmbedded };
+}
+
+function modeLabel(report: DatedReport): string {
+  return report.mode === 'mixed'
+    ? `mixed (${report.queriesNotEmbedded} of ${report.questions} queries on full-text)`
+    : report.mode;
 }
 
 export function formatKbEval(report: DatedReport): string {
   const lines = [
-    `${report.date} · ${report.questions} questions · ${report.mode} · recall@${report.k} ${report.recallAtK} · MRR ${report.mrr}`,
+    `${report.date} · ${report.questions} questions · ${modeLabel(report)} · recall@${report.k} ${report.recallAtK} · MRR ${report.mrr}`,
   ];
   for (const miss of report.misses) {
     lines.push(`  MISS  ${miss.q}`, `        got: ${miss.got.join(', ') || '(nothing)'}`);
@@ -86,13 +110,13 @@ export async function bootstrap(argv: readonly string[] = process.argv.slice(2))
   const args = parseKbEvalArgs(argv);
   const golden = JSON.parse(fs.readFileSync(GOLDEN_PATH, 'utf-8')) as { questions: GoldenQuestion[] };
 
-  // Errors only: with no embedding route every question would log the same full-text warning; the mode line says it.
+  // Errors only: a failing embedder logs the same full-text warning per question. The run counts every fallback
+  // itself and the mode line says it, so the suppressed warning cannot hide a full-text run reported as hybrid.
   const app = await NestFactory.createApplicationContext(KbEvalCliModule, { logger: ['error'] });
   let report: DatedReport;
   try {
-    const mode = app.get(AiRouteResolver).describePlatformRoutes().embedding === 'none' ? 'full-text' : 'hybrid';
     const scored = await runKbEval(app.get(KnowledgeBaseService), golden.questions);
-    report = { date: localDate(new Date()), questions: golden.questions.length, mode, ...scored };
+    report = { date: localDate(new Date()), questions: golden.questions.length, ...scored };
   } finally {
     await app.close();
   }

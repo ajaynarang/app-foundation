@@ -1420,7 +1420,7 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 
 1. Gold labels come from a person reading the source, never from the output of the tool under test. A label names a file or record, so a rename fails the eval's data spec instead of scoring as a silent miss.
 2. Matching is mechanical (an id or path in the top k, an exact field), never a model judging a model.
-3. Reports are dated and committed beside the change they measured (`pnpm kb:eval --report <folder>`), with the mode they ran in (for `kb:eval`, `hybrid` or `full-text`), so a later run compares like with like.
+3. Reports are dated and committed beside the change they measured (`pnpm kb:eval --report <folder>`), with the mode they ran in, counted from the run rather than from config (for `kb:eval`: `hybrid`, `full-text`, or `mixed` with how many queries fell back to full-text, since a configured route with a failing key embeds nothing), so a later run compares like with like.
 4. Measurement switches are ignored on every deployed task: resolve them to unset in `config/configuration.ts` when `isProductionEnv()` is true, as `AI_PROMPT_CACHE_OVERRIDE` and `AI_USAGE_CAPTURE_DIR` are.
 5. An eval that spends money (a live model or embedding call) is run by a person, never by CI or a hook; its pure scoring still runs under `pnpm test`.
 

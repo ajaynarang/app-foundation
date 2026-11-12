@@ -29,9 +29,45 @@ describe('kb:eval command', () => {
       audiences: ['all'],
       limit: 5,
       platformQuery: true,
+      onQueryNotEmbedded: expect.any(Function),
     });
-    expect(report).toMatchObject({ k: 5, recallAtK: 0.5, mrr: 0.5 });
+    expect(report).toMatchObject({ k: 5, recallAtK: 0.5, mrr: 0.5, mode: 'hybrid', queriesNotEmbedded: 0 });
     expect(report.misses.map((m) => m.q)).toEqual(['Where do sources show?']);
+  });
+
+  // Fake search: reports a fallback for the questions listed, as hybridSearch does when the embedder rejects.
+  const searchFallingBackOn = (fallbackQuestions: string[]) =>
+    jest.fn((q: string, options: { onQueryNotEmbedded?: (reason: string) => void }) => {
+      if (fallbackQuestions.includes(q)) options.onQueryNotEmbedded?.('AiCredentialFailing: key revoked');
+      return Promise.resolve([]);
+    });
+
+  it('reports full-text, not hybrid, when every query embedding fails even though a route exists', async () => {
+    const report = await runKbEval({ hybridSearch: searchFallingBackOn(QUESTIONS.map((q) => q.q)) }, QUESTIONS, 5);
+
+    expect(report.mode).toBe('full-text');
+    expect(report.queriesNotEmbedded).toBe(2);
+  });
+
+  it('reports mixed, with the count, when only some queries fell back', async () => {
+    const report = await runKbEval({ hybridSearch: searchFallingBackOn([QUESTIONS[1].q]) }, QUESTIONS, 5);
+
+    expect(report.mode).toBe('mixed');
+    expect(report.queriesNotEmbedded).toBe(1);
+  });
+
+  it('prints how many queries fell back to full-text', () => {
+    const text = formatKbEval({
+      date: '2026-11-13',
+      questions: 2,
+      mode: 'mixed',
+      queriesNotEmbedded: 1,
+      k: 5,
+      recallAtK: 1,
+      mrr: 1,
+      misses: [],
+    });
+    expect(text).toBe('2026-11-13 · 2 questions · mixed (1 of 2 queries on full-text) · recall@5 1 · MRR 1');
   });
 
   it('prints the date, the mode and every miss', () => {
@@ -39,6 +75,7 @@ describe('kb:eval command', () => {
       date: '2026-11-13',
       questions: 2,
       mode: 'full-text',
+      queriesNotEmbedded: 2,
       k: 5,
       recallAtK: 0.5,
       mrr: 0.5,

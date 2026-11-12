@@ -141,6 +141,25 @@ describe('KnowledgeBaseService', () => {
       expect(results).toHaveLength(1);
     });
 
+    it('tells the caller when the query was not embedded, so a measurement can say it ran on full-text', async () => {
+      mockEmbedding.embedForPlatform.mockRejectedValue(new Error('invalid api key'));
+      const onQueryNotEmbedded = jest.fn();
+
+      await service.hybridSearch('audit log', { audiences: ['all'], platformQuery: true, onQueryNotEmbedded });
+
+      expect(onQueryNotEmbedded).toHaveBeenCalledTimes(1);
+      expect(onQueryNotEmbedded.mock.calls[0][0]).toContain('invalid api key');
+      expect(isVectorQuery(sqlOf())).toBe(false);
+    });
+
+    it('does not report a fallback when the query was embedded', async () => {
+      const onQueryNotEmbedded = jest.fn();
+
+      await service.hybridSearch('audit log', { audiences: ['all'], platformQuery: true, onQueryNotEmbedded });
+
+      expect(onQueryNotEmbedded).not.toHaveBeenCalled();
+    });
+
     it('never embeds without a tenant to route by', async () => {
       await service.hybridSearch('audit log', { audiences: ['all'] });
 

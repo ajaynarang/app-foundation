@@ -21,6 +21,12 @@ export interface SearchOptions {
    * global corpus (`pnpm kb:eval`); a caller acting for a workspace passes `aiContext`.
    */
   platformQuery?: boolean;
+  /**
+   * Called with the reason when the query could not be embedded and the search answered from full-text alone. The
+   * fallback is also logged as a warning; this lets a measurement (`pnpm kb:eval`) count it instead of trusting
+   * that a configured route means every query was embedded.
+   */
+  onQueryNotEmbedded?: (reason: string) => void;
   documentType?: string;
   category?: string;
   limit?: number;
@@ -145,11 +151,15 @@ export class KnowledgeBaseService {
   private async embedQuery(query: string, options: SearchOptions): Promise<number[] | null> {
     try {
       if (options.platformQuery) return (await this.embeddingService.embedForPlatform([query], 'query'))[0];
-      if (!options.aiContext) return null;
+      if (!options.aiContext) {
+        options.onQueryNotEmbedded?.('no tenant to route the embedding by');
+        return null;
+      }
       return await this.embeddingService.embedText(query, options.aiContext, 'query');
     } catch (err) {
       const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       this.logger.warn(`Knowledge-base query not embedded; answering from full-text (${reason})`);
+      options.onQueryNotEmbedded?.(reason);
       return null;
     }
   }

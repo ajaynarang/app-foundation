@@ -607,7 +607,9 @@ stay archived (set `is_active = true` to bring them back).
   the target environment's values.
 - `pnpm kb:eval` scores retrieval against `apps/backend/content/kb-eval/golden.json`: recall at 5 and mean
   reciprocal rank, and the questions it missed. It embeds each question on the platform route when `COHERE_API_KEY`
-  is set (a small cost; run it by hand) and measures full-text alone otherwise, and says which. `--report <folder>`
+  is set (a small cost; run it by hand) and measures full-text alone otherwise. The mode it reports is counted
+  from the run: `hybrid`, `full-text`, or `mixed` with how many queries fell back, so a failing key is not reported
+  as hybrid. `--report <folder>`
   writes a dated report to commit. The starter ships three short neutral guides and nine questions over them.
 
 **Schema.** Migration `20261113120000_knowledge_documents_incremental_ingest` adds three nullable columns to
