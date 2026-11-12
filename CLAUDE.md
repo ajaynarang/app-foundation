@@ -136,6 +136,9 @@ bind to app implementations.
   The API process consumes too unless `QUEUE_PROCESSORS_ENABLED=false` (Terraform `api_queue_processors_enabled`,
   shipped `true`; turn it off only once a worker task runs).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
+  Every call runs through the one tool pipeline (scope, arguments, role, plan, confirmation, audit): give each tool
+  `@RequiresScope`, and `@RestrictToRoles` / `@RequiresPlanFeature` to match its REST twin (backend-patterns §23.1;
+  `mcp/tools/support-ticket.tool.ts` is the example).
 - **Notification types, policies + WhatsApp templates:** notification types are strings, not a Prisma enum. Declare
   yours in `apps/backend/src/platform-glue/notifications/notification-types.ts` (`APP_NOTIFICATION_TYPES`) and their
   policies and templates in `app-notification-policies.ts` beside it; `hooks.module.ts` binds them to

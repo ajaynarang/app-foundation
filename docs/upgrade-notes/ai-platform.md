@@ -588,11 +588,8 @@ stay archived (set `is_active = true` to bring them back).
 - Audience. `search-kb` and `get-product-info` no longer take an `audience` argument: the server decides it from the
   caller's role (`kbAudiencesFor` in `knowledge-base/kb-audience.ts`). In the starter every caller reads `all`, and
   the role map (`ROLE_AUDIENCE`) is empty. An external MCP agent that still sends `audience` has it ignored.
-  Keep the map empty and every file `audience: all` for now. Role audiences need the caller's role injected as
-  `_role`, and the tool runner does not inject it yet: it spreads the model's arguments and adds only the tenant,
-  user and conversation on top. So a role-tagged file would reach no real caller, and a `_role` sent by the model or
-  an external MCP agent would pass through and pick that role's audience. A later change in this project injects
-  `_role` and strips model-sent `_` keys; add role audiences only after it.
+  Role audiences need the caller's role injected as `_role` and model-sent `_` keys stripped; section 15 does both,
+  so add role audiences only once you have pulled it.
 - Content audiences. The loader now accepts only the audiences some role reads: `all`, plus the values of
   `ROLE_AUDIENCE`. The old `user` audience, which only the model could select, is refused at ingest with a message
   naming the valid ones.
@@ -626,8 +623,7 @@ working until the first sync, and makes the first sync replace them. No `--force
 **Who notices.**
 
 - A product whose content files say `audience: user`: `pnpm seed:knowledge` refuses them. Change them to `all`.
-  Do not add a role audience to `ROLE_AUDIENCE` for them yet: it works only once the tool runner injects `_role`
-  (see Audience above).
+  Add a role audience to `ROLE_AUDIENCE` only once you have pulled section 15 (see Audience above).
 - A product that inserted its own `knowledge_documents` rows: the migration marks them `legacy:` too (it cannot tell
   them apart), so the first sync removes them. Re-insert them afterwards with a null `source_path`; from then on the
   ingester leaves them alone.
@@ -644,6 +640,76 @@ working until the first sync, and makes the first sync replace them. No `--force
 
 **Rollback.** Revert the change. The three columns are nullable and can stay; the old ingester ignores them and
 rewrites the table on its next run.
+
+## 15. One tool pipeline: argument validation, role and plan, safe errors, no bypass, agent rate limits
+
+**What changed.**
+
+- Every tool call, from chat, the external MCP server and Desk, runs through `InvocationPipelineService` in one
+  order: scope, arguments, role, plan, confirmation, audit and execute, errors.
+- Arguments. A call's arguments are parsed against the tool's own zod schema before anything runs (defaults applied,
+  unknown keys dropped). Bad arguments answer `{ error, code: 'VALIDATION_FAILED', fieldErrors }` with `isError`,
+  and nothing runs or is logged. Every `_`-prefixed key a caller sends is dropped first; the executor then injects
+  `_tenantId`, `_userId`, `_userDbId` and, new, `_role` (the acting person's `WorkspaceMember` role in the workspace;
+  null for Desk), spread last.
+- Role. `@RestrictToRoles([...])` on a tool limits it to those workspace roles, read from `WorkspaceMember` for the
+  acting person (the chat user, the person an OAuth client acts for, an API key's owner) in the principal's
+  workspace. A person with no membership row there is refused. Desk is exempt.
+- Plan. `@RequiresPlanFeature(key)` runs the real `PlanGuard` for the workspace, for every principal kind.
+- Role and plan refusals are plain results (`status: 'role_not_permitted'` / `'not_on_plan'` with a `message`), not
+  errors, and they come before any confirmation.
+- Safe errors. A tool that throws an `HttpException` answers `{ error: <its message>, code: <its code> }`; anything
+  else answers `{ error: 'This action failed. Please try again.', code: 'TOOL_FAILED' }` and is logged in full. Raw
+  exception text no longer reaches the model or an external agent.
+- Bypasses removed. `McpToolService` no longer runs a tool directly when the pipeline is missing or throws (it
+  answers `tool_pipeline_unavailable` or the safe failure); `getToolsForNames` is deleted (it had no callers); the
+  `context` argument of `getToolsForPersona` / `getToolsetsForPersona` is required; `PipelineError` is deleted.
+  `confirm-action` no longer accepts `_invocationSource` and never auto-confirms.
+- Write set. The static `WRITE_TOOLS` set is gone: a tool is a write when its `@RequiresScope` is not read tier.
+  Chat now offers `confirm-action` as soon as one registered tool has a write scope.
+- Desk's audit rows now record the tool's tier (`standard` for a standard write; it was `none`). Desk is still never
+  challenged by the pipeline; its gate step is unchanged.
+- `tools/list` builds every input schema with `toolInputSchema`: every `_` property stripped, `_confirmToken`
+  documented in neutral wording.
+- Agent rate limits. An OAuth client's per-minute budget is now per client and person
+  (`oauth:<clientId>:<userId>`), so one popular connector no longer shares 120 calls a minute across every user in
+  every workspace. OAuth clients and API keys of one workspace also share a ceiling,
+  `AGENT_TENANT_CEILING_PER_MINUTE` (default 600). The 429 body is the error envelope with `code: 'RATE_LIMITED'` and
+  a `detail` that names which budget ran out; the limit and wait stay in `X-RateLimit-*` and `Retry-After`.
+- Example tools. `list-support-tickets` (`platform:read`) and `create-support-ticket` (`platform:write`,
+  `@RestrictToRoles(MEMBER, ADMIN, OWNER)` like `POST /support/tickets`) in `mcp/tools/support-ticket.tool.ts`. The
+  file says how to delete it.
+
+**Env.** New, optional: `AGENT_TENANT_CEILING_PER_MINUTE` (zod `edge.agentTenantCeilingPerMinute`, default 600).
+
+**Schema.** None.
+
+**Who notices.**
+
+- A product tool that returned `{ error: err.message }` or relied on its raw exception text reaching the model: the
+  model now sees the generic message for anything that is not an `HttpException`. Throw the service's
+  `HttpException` instead.
+- A product tool that declared a `_`-prefixed parameter or read one the model sent: it is dropped. Take identity
+  from the injected params only.
+- A product that added names to `McpToolService.WRITE_TOOLS`: the set is gone; give the tool a write scope.
+- A product that called `getToolsForNames`, `getToolsForPersona` without a context, or caught `PipelineError`:
+  those are gone.
+- A product with a role-tagged knowledge-base audience waiting on section 14: it now works.
+- An external agent holding a challenge token from before the deploy: the challenge digest is now taken over the
+  parsed arguments (defaults applied, unknown keys dropped), so a replay of such a token may no longer match. It
+  fails closed (`hitl_invalid_or_expired`); call again for a new token. Tokens expire within minutes anyway.
+- Heavy users of one OAuth connector: each person now has their own 120-a-minute budget, under the workspace's
+  ceiling of 600.
+
+**What to do.**
+
+1. For each of your tools, add `@RestrictToRoles` and `@RequiresPlanFeature` matching its REST twin's `@Roles` and
+   `@RequireFeature`.
+2. Replace any `return { error: e.message }` in a tool with a thrown `HttpException`.
+3. Optional: set `AGENT_TENANT_CEILING_PER_MINUTE`.
+4. Optional: delete the example pair (see the header of `support-ticket.tool.ts`).
+
+**Rollback.** Revert the change. Nothing is stored differently.
 
 ## Deploy order for `ai_reader`
 

@@ -1412,7 +1412,7 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 
 **Knowledge-base rules (NON-NEGOTIABLE):**
 
-- **The server picks the audience.** `search-kb` and `get-product-info` take no audience argument; the audiences come from `kbAudiencesFor(role)` (`domains/ai/knowledge-base/kb-audience.ts`): `all`, plus the role's own audience from `ROLE_AUDIENCE` (empty in the starter). `KnowledgeBaseService` searches exactly the set it is given and refuses an empty one. A new audience is a `ROLE_AUDIENCE` entry; the content loader refuses a file tagged for an audience no role reads. **Keep `ROLE_AUDIENCE` empty and every file `audience: all` until the tool pipeline injects `_role` and strips model-sent `_`-prefixed keys.** Until then no real `_role` reaches the tools (a role-tagged file reaches nobody), and a `_role` the model or an external MCP agent sends passes through the argument spread (it would read that audience).
+- **The server picks the audience.** `search-kb` and `get-product-info` take no audience argument; the audiences come from `kbAudiencesFor(role)` (`domains/ai/knowledge-base/kb-audience.ts`): `all`, plus the role's own audience from `ROLE_AUDIENCE` (empty in the starter). `KnowledgeBaseService` searches exactly the set it is given and refuses an empty one. A new audience is a `ROLE_AUDIENCE` entry; the content loader refuses a file tagged for an audience no role reads. The tool pipeline drops every `_`-prefixed key a caller sends and injects `_role` itself (the acting person's `WorkspaceMember` role in the workspace; null for Desk), so a role audience reaches exactly that role's members and nobody can pick one by sending `_role` (§23).
 - **Search never fails because of routing.** `hybridSearch` fuses a vector list and an any-term full-text list by reciprocal rank (`retrieval/rank-fusion.ts`), at most two chunks per source file. When the query cannot be embedded it answers from full-text, which sends nothing to a provider.
 - **The ingester owns only its rows.** `pnpm seed:knowledge` syncs by content hash and touches only rows whose `sourcePath` it wrote; a row you insert yourself keeps a null `sourcePath` and is never deleted. Changing what the chunker emits for the same input means bumping `CHUNKER_VERSION`, which re-embeds the corpus on the next sync.
 
@@ -1843,11 +1843,47 @@ domains/ai/mcp/tools/<domain>/
 
 **Tool patterns:**
 
-- `_tenantId` parameter is system-injected, never from AI input
+- Identity is server-injected: `_tenantId`, `_userId` (wire id), `_userDbId` and `_role` come from the executor,
+  spread last. A tool schema declares no `_`-prefixed field and no tenant or user field.
 - All queries filter by `tenantId` (+ lifecycle status where applicable)
-- Query tools return structured data
+- Query tools return structured data; never a numeric id (§3.4)
 - Action tools resolve entities by public business ID (`projectNumber`) before calling services
-- Error handling: catch exceptions and return `{ error: 'user-friendly message' }` instead of throwing
+- Errors: throw the service's `HttpException` (its message and code reach the caller) or let it propagate. Never
+  `return { error: err.message }`: anything that is not an `HttpException` is logged and answered with a generic
+  message by `toolFailure` (`mcp/tools/tool-error.ts`), and `mcp-arg-validation.spec.ts` fails on the raw form.
+
+### 23.1 The tool pipeline (NON-NEGOTIABLE)
+
+Every tool call, from chat (`McpToolService`), the external MCP server (OAuth clients, API keys) and Desk
+(`execute.step.ts`), runs through `InvocationPipelineService.run`, in this order: scope (exists, not never-external
+for a third party, granted), arguments (parsed against the tool's own zod schema; every `_` key the caller sent is
+dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confirmation, audit + execute, errors.
+
+- **No path around it.** No file calls a tool method except `ToolExecutorService.invoke`. A chat call with no
+  pipeline is refused (`tool_pipeline_unavailable`); there is no fallback, no anonymous toolset, and no
+  `getToolsForNames`. `McpToolInvocationContext` is required.
+- **Scope decides write versus read.** A tool is a write when its `@RequiresScope` is not read tier
+  (`ScopeRegistryService.isWriteTool`, `McpToolService.isWriteTool`). There is no hand-kept write list; chat offers
+  `confirm-action` and an external agent is challenged from the scope alone.
+- **Role.** A tool whose REST twin has `@Roles(...)` declares `@RestrictToRoles([...])` with the same roles. The
+  pipeline reads the acting person's current `WorkspaceMember` role in the principal's workspace (the OAuth
+  client's person, the API key's owner), never the persona or the home tenant. No membership row is a refusal.
+  Desk is exempt.
+- **Plan.** A tool whose REST twin has `@RequireFeature(key)` declares `@RequiresPlanFeature(key)`. The pipeline
+  runs the real `PlanGuard` against a synthetic request (`ToolAccessPolicyService.evaluateFeature`), for every
+  principal kind including Desk. Never copy the plan rule.
+- Role and plan run before confirmation; their refusals are plain results (`role_not_permitted`, `not_on_plan`),
+  not `isError`.
+- **Confirmation.** Deny by default: every principal kind but a signed-in user and a Desk duty gets a challenge
+  token for a non-read tier. Desk is never challenged by the pipeline (Desk's gate step runs before every execute)
+  and the tier is still written on the audit row. No tool or prompt may carry a switch that skips confirmation
+  (the old `_invocationSource` on `confirm-action` was one).
+- `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
+  `_confirmToken` documented. Never build a tool's input schema another way.
+- Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients
+  and API keys also share one per-workspace ceiling (`AGENT_TENANT_CEILING_PER_MINUTE`, default 600).
+- The example pair (`mcp/tools/support-ticket.tool.ts`) shows each rule, and
+  `support-ticket.pipeline.spec.ts` walks it through every step. Copy its shape for a new tool.
 
 ## 23a. Optional features (Desk)
 
