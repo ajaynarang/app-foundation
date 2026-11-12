@@ -298,12 +298,22 @@ describe('configuration — production boot guard', () => {
       load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', ...overrides });
 
     it('defaults to 100 requests per minute and no explicit trust-proxy setting', () => {
-      expect(dev({}).edge).toEqual({ throttleLimit: 100, throttleTtlMs: 60_000 });
+      expect(dev({}).edge).toEqual({ throttleLimit: 100, throttleTtlMs: 60_000, agentTenantCeilingPerMinute: 600 });
+    });
+
+    it('takes the agent workspace ceiling from AGENT_TENANT_CEILING_PER_MINUTE', () => {
+      expect(dev({ AGENT_TENANT_CEILING_PER_MINUTE: '50' }).edge.agentTenantCeilingPerMinute).toBe(50);
+      expect(() => dev({ AGENT_TENANT_CEILING_PER_MINUTE: '0' })).toThrow();
     });
 
     it('takes the limit, the window and trust proxy from the environment', () => {
       const config = dev({ THROTTLE_LIMIT: '600', THROTTLE_TTL_MS: '30000', TRUST_PROXY: '2' });
-      expect(config.edge).toEqual({ throttleLimit: 600, throttleTtlMs: 30_000, trustProxy: '2' });
+      expect(config.edge).toEqual({
+        throttleLimit: 600,
+        throttleTtlMs: 30_000,
+        agentTenantCeilingPerMinute: 600,
+        trustProxy: '2',
+      });
     });
 
     it.each([

@@ -170,6 +170,11 @@ const configSchema = z.object({
       throttleLimit: z.number().int().positive().default(100),
       throttleTtlMs: z.number().int().positive().default(60_000),
       /**
+       * Tool calls per minute that all third-party agents (OAuth clients, API keys) of one workspace may make
+       * together, on top of each agent's own budget. Users and Desk are not counted against it.
+       */
+      agentTenantCeilingPerMinute: z.number().int().positive().default(600),
+      /**
        * Express `trust proxy`: a hop count, `false`, or a subnet list. Unset, production trusts one hop (the load
        * balancer) and other environments trust none. See bootstrap/trust-proxy.ts.
        */
@@ -432,6 +437,7 @@ export default (): Configuration => {
     edge: {
       throttleLimit: positiveIntEnv('THROTTLE_LIMIT'),
       throttleTtlMs: positiveIntEnv('THROTTLE_TTL_MS'),
+      agentTenantCeilingPerMinute: positiveIntEnv('AGENT_TENANT_CEILING_PER_MINUTE'),
       trustProxy: env('TRUST_PROXY'),
     },
     webhooks: {
