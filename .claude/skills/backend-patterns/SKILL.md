@@ -1438,6 +1438,7 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 - **Status moves only through a test.** `validate` (and the daily sweep, which calls it) is the only writer of ACTIVE and FAILING. A provider credit refusal on a workspace key is recorded through `route.reportCreditRefusal` (which `mapProviderRefusal` calls) and leaves the status ACTIVE.
 - **The switch is `AI_CREDENTIALS_KEY`.** Code that needs to know whether bring-your-own-key is on asks `CredentialCryptoService.isConfigured()`; there is no other flag and no fallback key.
 - **A new credential type** is an `AiCredentialType` value plus a `TENANT_CREDENTIAL_CAPABILITIES` entry (serves, retention, prompt cache, a builder that calls the provider only through the catalog), held by `route-registry.parity.spec.ts`.
+- **A workspace AWS role is assumed by the role it trusts.** `BEDROCK_ROLE` and `probeBedrock` assume the workspace role with the backend's own ambient credentials (`fromTemporaryCredentials` with no `masterCredentials`, `new STSClient({ region })` with none), because the workspace's trust policy names `PLATFORM_ASSUME_ROLE_ARN`, the task role. Never chain through another role. The external id is recomputed on the server (`aws-role-naming.ts`), never taken from a client, and a role is stored only after the two-direction check passes: with the id the assume succeeds, without it the assume is refused with access denied (any other error is a refusal). Held by `bedrock-ambient-credentials.spec.ts` and the probe spec.
 
 ---
 
