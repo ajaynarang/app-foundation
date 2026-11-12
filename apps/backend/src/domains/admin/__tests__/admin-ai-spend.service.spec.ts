@@ -114,7 +114,7 @@ describe('AdminAiSpendService', () => {
 
       prisma.$queryRaw.mockReset();
       prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 3n }]);
-      await service.listTenants({ days: 7, limit: 2, cursor: first.nextCursor! });
+      await service.listTenants({ days: 7, limit: 2, cursor: first.nextCursor });
 
       // Same cost, a larger public id: the tie is split by the tenant's public id, never its Int key.
       const page = sqlOf(0);
@@ -138,7 +138,7 @@ describe('AdminAiSpendService', () => {
       const sevenDay = await service.listTenants({ days: 7, limit: 1 });
       prisma.$queryRaw.mockClear();
 
-      await expect(service.listTenants({ days: 30, cursor: sevenDay.nextCursor! })).rejects.toMatchObject({
+      await expect(service.listTenants({ days: 30, cursor: sevenDay.nextCursor })).rejects.toMatchObject({
         status: 400,
       });
       await expect(service.listTenants({ days: 7, cursor: 'not-a-cursor' })).rejects.toMatchObject({ status: 400 });

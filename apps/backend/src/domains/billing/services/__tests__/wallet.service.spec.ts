@@ -249,7 +249,7 @@ describe('WalletService', () => {
       });
 
       it('filters by type in the page and the total', async () => {
-        const page = await service.getTransactions(1, { type: 'TOP_UP' as never, limit: 2 });
+        const page = await service.getTransactions(1, { type: 'TOP_UP', limit: 2 });
         expect(page.total).toBe(4);
         expect(page.items.every((txn) => txn.type === 'TOP_UP')).toBe(true);
         expect(page.nextCursor).not.toBeNull();

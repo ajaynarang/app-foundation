@@ -127,7 +127,7 @@ describe('InvoiceService', () => {
       });
 
       it('filters by status in the page and the total (the usage page sends it)', async () => {
-        const page = await service.listInvoices(1, { status: 'OPEN' as never });
+        const page = await service.listInvoices(1, { status: 'OPEN' });
         expect(page.items.map((invoice) => invoice.status)).toEqual(['OPEN']);
         expect(page.total).toBe(1);
       });

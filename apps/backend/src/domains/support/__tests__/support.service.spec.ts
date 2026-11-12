@@ -175,7 +175,7 @@ describe('SupportService', () => {
         const all = await walkCursorList((cursor) => service.listAllTickets({ limit: 4, cursor }));
         expect(all.items).toHaveLength(9);
 
-        const open = await service.listAllTickets({ tenantId: 1, status: 'OPEN' as never, limit: 2 });
+        const open = await service.listAllTickets({ tenantId: 1, status: 'OPEN', limit: 2 });
         expect(open.total).toBe(7);
         expect(open.nextCursor).not.toBeNull();
 
@@ -195,7 +195,7 @@ describe('SupportService', () => {
       prisma.supportTicket.findMany.mockResolvedValue([]);
       prisma.supportTicket.count.mockResolvedValue(0);
 
-      await service.listTicketsForTenant(1, { status: 'OPEN' as never });
+      await service.listTicketsForTenant(1, { status: 'OPEN' });
 
       expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -545,9 +545,9 @@ describe('SupportService', () => {
 
       await service.listAllTickets({
         tenantId: 1,
-        status: 'OPEN' as never,
-        priority: 'HIGH' as never,
-        category: 'TECHNICAL' as never,
+        status: 'OPEN',
+        priority: 'HIGH',
+        category: 'TECHNICAL',
       });
 
       expect(prisma.supportTicket.findMany).toHaveBeenCalledWith(

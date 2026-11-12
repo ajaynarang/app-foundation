@@ -189,7 +189,7 @@ describe('FeedbackService', () => {
       });
 
       it('counts every status for the filters, ignoring the status filter, and totals the status in view', async () => {
-        const page = await service.listAll({ tenantId: 10, status: 'RESOLVED' as never });
+        const page = await service.listAll({ tenantId: 10, status: 'RESOLVED' });
         expect(page.counts).toEqual({ NEW: 5, REVIEWED: 0, RESOLVED: 2 });
         expect(page.total).toBe(2);
         expect(page.items).toHaveLength(2);
