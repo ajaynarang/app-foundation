@@ -27,6 +27,11 @@ function redactWebhookData(data: unknown): unknown {
   return obj;
 }
 
+/** The delivery job id of one event to one subscription (BullMQ forbids `:` in a custom id). */
+export function webhookDeliveryJobId(eventId: string, subscriptionId: string): string {
+  return `webhook-${eventId}-${subscriptionId}`;
+}
+
 @Injectable()
 export class WebhookDispatcher {
   private readonly logger = new Logger(WebhookDispatcher.name);
@@ -89,14 +94,25 @@ export class WebhookDispatcher {
       await Promise.all(
         subscriptions.map(async (sub) => {
           try {
-            const log = await this.prisma.webhookDeliveryLog.create({
-              data: {
-                id: generateUuidV7(),
-                subscriptionId: sub.id,
-                event: event.event,
-                payload,
-              },
+            // Idempotent per event and subscription: the event reaches this dispatcher at least once (the
+            // outbox relay and the durable job retry can both send it again). A second dispatch reuses the
+            // first delivery's log row and job id; a delivery already finished is left alone.
+            const prior = await this.prisma.webhookDeliveryLog.findFirst({
+              where: { subscriptionId: sub.id, payload: { path: ['id'], equals: event.id } },
+              select: { id: true, deliveredAt: true, failedAt: true },
             });
+            if (prior && (prior.deliveredAt || prior.failedAt)) return;
+
+            const log =
+              prior ??
+              (await this.prisma.webhookDeliveryLog.create({
+                data: {
+                  id: generateUuidV7(),
+                  subscriptionId: sub.id,
+                  event: event.event,
+                  payload,
+                },
+              }));
 
             const jobPayload: WebhookDeliveryPayload = {
               subscriptionId: sub.id,
@@ -112,6 +128,8 @@ export class WebhookDispatcher {
                 causationId: event.id,
               }),
               {
+                // BullMQ ignores an add whose job id it still holds, so a second dispatch queues nothing new.
+                jobId: webhookDeliveryJobId(event.id, sub.id),
                 attempts: 3,
                 backoff: {
                   type: 'exponential',
