@@ -31,7 +31,10 @@ describe('provider credit refusals', () => {
       ['insufficient_quota in the body', { responseBody: '{"error":{"type":"insufficient_quota"}}' }],
       ['insufficient credits', { message: 'Insufficient credits' }],
       ['a RetryError wrapping a 402', { name: 'AI_RetryError', lastError: { statusCode: 402 } }],
-      ['a cause one layer down', new Error('call failed', { cause: { message: 'credit balance is too low' } })],
+      [
+        'a cause one layer down',
+        Object.assign(new Error('call failed'), { cause: { message: 'credit balance is too low' } }),
+      ],
       ['one of several errors', { errors: [new Error('timeout'), { statusCode: 402 }] }],
     ])('detects %s', (_label, error) => {
       expect(isProviderCreditRefusal(error)).toBe(true);
