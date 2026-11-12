@@ -822,11 +822,11 @@ enum DeliveryStatus {
 model NotificationDelivery {
   /// App-generated UUIDv7 via generateUuidV7() — time-sortable PK. No
   /// Prisma @default; every create() must pass `id: generateUuidV7()`.
-  id       String          @id @db.Uuid
-  tenantId Int             @map("tenant_id")
-  userId   Int             @map("user_id")
+  id       String           @id @db.Uuid
+  tenantId Int              @map("tenant_id")
+  userId   Int              @map("user_id")
   /// The notification type delivered: a string from the same registry as Notification.type.
-  type     String          @db.VarChar(60)
+  type     String           @db.VarChar(60)
   channel  DeliveryChannel
   status   DeliveryStatus
 
@@ -1277,9 +1277,9 @@ model WebhookDeliveryLog {
 
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-  @@unique([subscriptionId, eventId]) // idempotent dispatch: one delivery per event per subscription
   @@index([subscriptionId, createdAt])
   @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:id/logs
+  @@unique([subscriptionId, eventId]) // idempotent dispatch: one delivery per event per subscription
   @@map("webhook_delivery_logs")
 }
 
