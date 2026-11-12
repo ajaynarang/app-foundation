@@ -94,6 +94,10 @@ const ALLOWED_STRING_COLUMNS = new Map<string, string>([
   ],
   ['Job.type', 'open-set BullMQ job type registry (one value per background job); grows with each new background job'],
   [
+    'Deadline.kind',
+    'app-owned registry (DEADLINE_KINDS in platform-glue/deadlines/deadline-kinds.ts), like event names; a product adds a kind with its handler, never a foundation schema change',
+  ],
+  [
     'PlanEntitlement.type',
     'classification registry (software | service | display | limit | …); tenant-billing owned and evolves with plan model',
   ],

@@ -195,6 +195,7 @@ model Tenant {
   pushSubscriptions           PushSubscription[]
   members                     WorkspaceMember[]
   feedback                    Feedback[]
+  deadlines                   Deadline[]
 
   // Billing & wallet
   billingCustomer      BillingCustomer?
@@ -1352,6 +1353,43 @@ model OutboxEvent {
   /// Serves the relay claim (published_at IS NULL, by occurred_at) and the purge (published_at < cutoff).
   @@index([publishedAt, occurredAt])
   @@map("outbox_events")
+}
+
+/// A timer as a row (ADR "Outbox and deadlines"). Written by DeadlineService in the
+/// SAME transaction as the change that needs it, so a timer exists if and only if
+/// that change committed; the deadline sweeper on `bulk-ops` fires it. State is
+/// derived from the stamps (pending, failing, fired, cancelled), never a column.
+/// At most one pending row per (tenant, dedupe key): a partial unique index in the
+/// migration, which this schema cannot express. `kind` is an app-owned vocabulary
+/// (`platform-glue/deadlines/deadline-kinds.ts`), so it is a string, not an enum.
+model Deadline {
+  /// App-generated UUIDv7 via generateUuidV7() — time-sortable and safe in a
+  /// client-held cursor. No Prisma @default.
+  id            String    @id @db.Uuid
+  tenantId      Int       @map("tenant_id")
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind          String    @map("kind") @db.VarChar(60)
+  /// The subject's type and public id, never an Int primary key.
+  subjectType   String    @map("subject_type") @db.VarChar(40)
+  subjectId     String    @map("subject_id") @db.VarChar(100)
+  dedupeKey     String    @map("dedupe_key") @db.VarChar(200)
+  dueAt         DateTime  @map("due_at") @db.Timestamptz
+  payload       Json      @default("{}") @map("payload") @db.JsonB
+  firedAt       DateTime? @map("fired_at") @db.Timestamptz
+  cancelledAt   DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelReason  String?   @map("cancel_reason") @db.VarChar(200)
+  /// Handler runs so far (incremented at claim; a reschedule restarts it).
+  attempts      Int       @default(0) @map("attempts")
+  /// Sweeper lease, or the backoff after a failed run — the row is not claimed before it.
+  lockedUntilAt DateTime? @map("locked_until_at") @db.Timestamptz
+  lastError     String?   @map("last_error") @db.VarChar(500)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([dueAt])
+  @@index([tenantId, subjectType, subjectId])
+  @@index([kind])
+  @@map("deadlines")
 }
 
 /// Permanent queue failures — when a BullMQ job exhausts its retries, the
