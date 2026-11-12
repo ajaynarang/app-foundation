@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { AI_ERROR_CODE } from '@app/shared-types';
 
 /** What a reader with no say over the deployment's AI is told. */
 export const AI_NOT_CONFIGURED_DETAIL =
@@ -17,6 +18,6 @@ export class AiNotConfigured extends ServiceUnavailableException {
     readonly need: string,
     detail: string = AI_NOT_CONFIGURED_DETAIL,
   ) {
-    super({ statusCode: 503, detail, need });
+    super({ statusCode: 503, code: AI_ERROR_CODE.AI_NOT_CONFIGURED, detail, need });
   }
 }

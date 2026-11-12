@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { AiBudgetState } from '@app/shared-types';
+import { AI_ERROR_CODE, type AiBudgetState } from '@app/shared-types';
 
 /**
  * Thrown by `AiTelemetryService.assertBudget()` when a tenant has hit its
@@ -22,6 +22,7 @@ export class AiBudgetExceededError extends HttpException {
     super(
       {
         statusCode: HttpStatus.PAYMENT_REQUIRED,
+        code: AI_ERROR_CODE.AI_BUDGET_EXCEEDED,
         detail,
       },
       HttpStatus.PAYMENT_REQUIRED,
