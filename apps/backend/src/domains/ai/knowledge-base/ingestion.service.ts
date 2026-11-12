@@ -3,6 +3,14 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { EmbeddingService } from '../infrastructure/providers/embedding.service';
 import { loadAllEntries, type KnowledgeEntry } from './content/content-loader';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
+import { AiNotConfigured } from '../routing/ai-not-configured.error';
+
+export interface IngestResult {
+  documentCount: number;
+  chunkCount: number;
+  /** False when no platform embedding route is configured: the chunks are stored for full-text search only. */
+  embedded: boolean;
+}
 
 const MAX_CHUNK_SIZE = 1000; // ~250 tokens (4 chars/token)
 const CHUNK_OVERLAP = 100; // ~25 tokens overlap
@@ -57,11 +65,13 @@ export class IngestionService {
   }
 
   /**
-   * Ingest all product knowledge: chunk, batch-embed, store.
-   * Uses a transaction to ensure atomicity — the KB is either fully
-   * replaced or left untouched on failure.
+   * Ingest all product knowledge: chunk, batch-embed, store. Embeds first, so a provider failure leaves the stored
+   * rows untouched. The content is global (no tenant), so it embeds on the platform route as documents.
+   *
+   * With no platform embedding route (`COHERE_API_KEY` unset) the chunks are stored without vectors, and search
+   * answers from full-text; a later run with a route embeds them.
    */
-  async ingestAll(): Promise<{ documentCount: number; chunkCount: number }> {
+  async ingestAll(): Promise<IngestResult> {
     this.logger.log('Starting knowledge base ingestion...');
 
     const entries = loadAllEntries();
@@ -94,9 +104,9 @@ export class IngestionService {
       }
     }
 
-    // Batch-embed all chunks at once (I3 fix)
+    // Batch-embed all chunks at once
     const textsToEmbed = allRecords.map((r) => `${r.entry.title}: ${r.chunk}`);
-    const embeddings = await this.embeddingService.embedBatch(textsToEmbed);
+    const embeddings = await this.embedOrNull(textsToEmbed);
 
     // Delete existing and re-insert (no transaction to avoid SSM tunnel timeout)
     await this.prisma.knowledgeDocument.deleteMany({});
@@ -119,6 +129,7 @@ export class IngestionService {
         },
       });
 
+      if (!embeddings) continue;
       const embeddingStr = `[${embeddings[i].join(',')}]`;
       await this.prisma.$executeRawUnsafe(
         `UPDATE knowledge_documents SET embedding = $1::vector WHERE id = $2`,
@@ -137,6 +148,19 @@ export class IngestionService {
     return {
       documentCount: entries.length,
       chunkCount: allRecords.length,
+      embedded: embeddings !== null,
     };
+  }
+
+  /** The chunks' vectors, or null when no platform embedding route is configured. Any other failure throws. */
+  private async embedOrNull(texts: string[]): Promise<number[][] | null> {
+    if (texts.length === 0) return [];
+    try {
+      return await this.embeddingService.embedForPlatform(texts);
+    } catch (err) {
+      if (!(err instanceof AiNotConfigured)) throw err;
+      this.logger.warn('No platform embedding route (COHERE_API_KEY unset): storing chunks for full-text search only');
+      return null;
+    }
   }
 }

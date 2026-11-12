@@ -332,6 +332,7 @@ describe('DeskMemoryWriterService — writeOperatorRule (Rules tab "Add a rule")
     expect(embedder.embedText).toHaveBeenCalledWith(
       'Escalate invoices > $10k to Bill before Friday',
       expect.objectContaining({ surface: 'MEMORY_EXTRACT', tenantId: expect.any(Number) }),
+      'document',
     );
   });
 });

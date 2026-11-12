@@ -1,7 +1,6 @@
 import { IngestionService } from '../ingestion.service';
-import { EmbeddingService } from '../../infrastructure/providers/embedding.service';
-import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { loadAllEntries } from '../content/content-loader';
+import { AiNotConfigured } from '../../routing/ai-not-configured.error';
 
 jest.mock('@appshore/kernel/shared/utils/id-generator', () => ({
   generateId: jest.fn().mockReturnValue('doc_mock_id'),
@@ -46,8 +45,9 @@ describe('IngestionService', () => {
     };
 
     mockEmbedding = {
-      embedText: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]),
-      embedBatch: jest.fn().mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => [0.1, 0.2, 0.3]))),
+      embedForPlatform: jest
+        .fn()
+        .mockImplementation((texts: string[]) => Promise.resolve(texts.map(() => [0.1, 0.2, 0.3]))),
     };
 
     service = new IngestionService(mockPrisma, mockEmbedding);
@@ -91,15 +91,33 @@ describe('IngestionService', () => {
       expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
       expect(result.documentCount).toBe(2);
       expect(result.chunkCount).toBe(2);
+      expect(result.embedded).toBe(true);
     });
 
-    it('should batch-embed all chunks with title prefix', async () => {
+    it('embeds all chunks in one batch on the platform route (global content, no tenant), with title prefix', async () => {
       await service.ingestAll();
 
-      expect(mockEmbedding.embedBatch).toHaveBeenCalled();
-      const batchTexts = mockEmbedding.embedBatch.mock.calls[0][0];
+      expect(mockEmbedding.embedForPlatform).toHaveBeenCalledTimes(1);
+      const batchTexts = mockEmbedding.embedForPlatform.mock.calls[0][0];
       expect(batchTexts.length).toBe(2);
       expect(batchTexts[0]).toContain('What is the platform?:');
+    });
+
+    it('stores the chunks without vectors when no platform embedding route is configured, and says so', async () => {
+      mockEmbedding.embedForPlatform.mockRejectedValue(new AiNotConfigured('embedding'));
+
+      const result = await service.ingestAll();
+
+      expect(mockPrisma.knowledgeDocument.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.$executeRawUnsafe).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ documentCount: 2, chunkCount: 2, embedded: false });
+    });
+
+    it('leaves the stored rows untouched when the provider fails (embeds before it deletes)', async () => {
+      mockEmbedding.embedForPlatform.mockRejectedValue(new Error('provider down'));
+
+      await expect(service.ingestAll()).rejects.toThrow('provider down');
+      expect(mockPrisma.knowledgeDocument.deleteMany).not.toHaveBeenCalled();
     });
   });
 });

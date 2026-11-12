@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
+import { AiSurface } from '@appshore/db';
 import { KnowledgeBaseService } from '../../knowledge-base/knowledge-base.service';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 
@@ -24,11 +25,14 @@ export class KnowledgeTool {
       idempotentHint: true,
     },
   })
-  async searchKB(params: { query: string; audience: string; category?: string; limit?: number }) {
+  async searchKB(params: { query: string; audience: string; category?: string; limit?: number; _tenantId?: number }) {
+    // The query is embedded on the calling tenant's route (`_tenantId` is injected by the server, never the model).
+    // Without a tenant the search is full-text alone.
     const results = await this.knowledgeBaseService.hybridSearch(params.query, {
       audience: params.audience,
       category: params.category,
       limit: params.limit ?? 5,
+      aiContext: params._tenantId ? { tenantId: params._tenantId, surface: AiSurface.EMBEDDING } : undefined,
     });
 
     return {

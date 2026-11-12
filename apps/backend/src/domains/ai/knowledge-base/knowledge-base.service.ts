@@ -1,9 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { AiCallContext } from '@app/shared-types';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { EmbeddingService } from '../infrastructure/providers/embedding.service';
 
 export interface SearchOptions {
   audience: string;
+  /**
+   * The tenant the query is embedded for (its route, its retention policy, its bill). Without one there is no route
+   * to embed by, and the search is full-text alone.
+   */
+  aiContext?: AiCallContext;
   documentType?: string;
   category?: string;
   limit?: number;
@@ -31,55 +37,61 @@ export class KnowledgeBaseService {
   ) {}
 
   /**
-   * Hybrid search: combines cosine similarity (pgvector) with full-text search (tsvector).
-   * Results scored by: 0.7 * vector_score + 0.3 * text_score (normalized).
+   * Hybrid search: cosine similarity (pgvector) blended with full-text rank (tsvector), scored
+   * `0.7 * vector_score + 0.3 * text_score`. The query is embedded on the caller's tenant route as a `query`.
+   *
+   * Search never fails because of routing. When the query cannot be embedded (no embedding route, a zero-retention
+   * tenant with no zero-retention route, a provider error, no tenant) or no stored chunk has a vector yet (vectors
+   * cleared and not re-embedded), it answers from full-text alone, which sends nothing to a provider.
    */
   async hybridSearch(query: string, options: SearchOptions): Promise<SearchResult[]> {
-    const { audience, documentType, category, limit = 5, similarityThreshold = 0.3 } = options;
+    const queryEmbedding = await this.embedQuery(query, options.aiContext);
+    if (queryEmbedding) {
+      const results = await this.vectorSearch(query, queryEmbedding, options);
+      if (results.length > 0) return results;
+    }
+    return this.textSearch(query, options);
+  }
 
-    const queryEmbedding = await this.embeddingService.embedText(query);
-    const embeddingStr = `[${queryEmbedding.join(',')}]`;
+  /** The query's vector, or null when it cannot be embedded (the reason is logged). */
+  private async embedQuery(query: string, aiContext: AiCallContext | undefined): Promise<number[] | null> {
+    if (!aiContext) return null;
+    try {
+      return await this.embeddingService.embedText(query, aiContext, 'query');
+    } catch (err) {
+      const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      this.logger.warn(`Knowledge-base query not embedded; answering from full-text (${reason})`);
+      return null;
+    }
+  }
 
-    // All values are parameterized to prevent SQL injection
+  /** The filters both queries share, as SQL conditions over positional params starting at `$<first>`. */
+  private filters(options: SearchOptions, first: number): { conditions: string[]; params: (string | number)[] } {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
-    let paramIndex = 1;
+    const next = () => `$${first + params.length}`;
 
-    // $1: embedding vector
-    params.push(embeddingStr);
-    const embeddingIdx = paramIndex++;
-
-    conditions.push(`(audience = $${paramIndex} OR audience = 'all')`);
-    params.push(audience);
-    paramIndex++;
-
-    if (documentType) {
-      conditions.push(`document_type = $${paramIndex}`);
-      params.push(documentType);
-      paramIndex++;
+    conditions.push(`(audience = ${next()} OR audience = 'all')`);
+    params.push(options.audience);
+    if (options.documentType) {
+      conditions.push(`document_type = ${next()}`);
+      params.push(options.documentType);
     }
-
-    if (category) {
-      conditions.push(`category = $${paramIndex}`);
-      params.push(category);
-      paramIndex++;
+    if (options.category) {
+      conditions.push(`category = ${next()}`);
+      params.push(options.category);
     }
+    return { conditions, params };
+  }
 
+  private async vectorSearch(query: string, queryEmbedding: number[], options: SearchOptions): Promise<SearchResult[]> {
+    const { limit = 5, similarityThreshold = 0.3 } = options;
+    // $1: the query vector; then the filters; then the full-text query, the threshold and the limit. Every value is
+    // a parameter, never interpolated.
+    const { conditions, params } = this.filters(options, 2);
     conditions.push('embedding IS NOT NULL');
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    // $N: full-text query
-    const queryIdx = paramIndex++;
-    params.push(query);
-
-    // $N: similarity threshold
-    const thresholdIdx = paramIndex++;
-    params.push(similarityThreshold);
-
-    // $N: result limit
-    const limitIdx = paramIndex++;
-    params.push(limit);
+    const queryIdx = 2 + params.length;
+    const allParams = [`[${queryEmbedding.join(',')}]`, ...params, query, similarityThreshold, limit];
 
     const sql = `
       WITH vector_search AS (
@@ -91,10 +103,10 @@ export class KnowledgeBaseService {
           audience,
           category,
           keywords,
-          1 - (embedding <=> $${embeddingIdx}::vector) AS vector_score,
+          1 - (embedding <=> $1::vector) AS vector_score,
           ts_rank_cd(content_tsv, plainto_tsquery('english', $${queryIdx})) AS text_score
         FROM knowledge_documents
-        ${whereClause}
+        WHERE ${conditions.join(' AND ')}
       )
       SELECT
         document_id,
@@ -106,14 +118,43 @@ export class KnowledgeBaseService {
         keywords,
         (0.7 * vector_score + 0.3 * LEAST(text_score, 1.0)) AS similarity
       FROM vector_search
-      WHERE vector_score >= $${thresholdIdx}
+      WHERE vector_score >= $${queryIdx + 1}
+      ORDER BY similarity DESC
+      LIMIT $${queryIdx + 2}
+    `;
+
+    return this.toResults(await this.prisma.$queryRawUnsafe<any[]>(sql, ...allParams));
+  }
+
+  /** Full-text alone: rows whose text matches the query, by rank. Needs no vector on either side. */
+  private async textSearch(query: string, options: SearchOptions): Promise<SearchResult[]> {
+    const { limit = 5 } = options;
+    // $1: the full-text query; then the filters; then the limit.
+    const { conditions, params } = this.filters(options, 2);
+    conditions.push(`content_tsv @@ plainto_tsquery('english', $1)`);
+    const limitIdx = 2 + params.length;
+
+    const sql = `
+      SELECT
+        document_id,
+        title,
+        content,
+        document_type,
+        audience,
+        category,
+        keywords,
+        LEAST(ts_rank_cd(content_tsv, plainto_tsquery('english', $1)), 1.0) AS similarity
+      FROM knowledge_documents
+      WHERE ${conditions.join(' AND ')}
       ORDER BY similarity DESC
       LIMIT $${limitIdx}
     `;
 
-    const results = await this.prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    return this.toResults(await this.prisma.$queryRawUnsafe<any[]>(sql, query, ...params, limit));
+  }
 
-    return results.map((row) => ({
+  private toResults(rows: any[]): SearchResult[] {
+    return rows.map((row) => ({
       documentId: row.document_id,
       title: row.title,
       content: row.content,

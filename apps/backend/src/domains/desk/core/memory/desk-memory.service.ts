@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { MemoryPolarity, MemoryScope, Prisma } from '@appshore/db';
+import { AiSurface, MemoryPolarity, MemoryScope, Prisma } from '@appshore/db';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { EmbeddingService } from '../../../ai/infrastructure/providers/embedding.service';
@@ -62,7 +62,7 @@ export class DeskMemoryService {
     queryIntent?: MemoryPolarity;
     limit?: number;
   }): Promise<MemoryScored[]> {
-    const queryEmbedding = await this.safeEmbed(input.queryContext);
+    const queryEmbedding = await this.safeEmbed(input.queryContext, input.tenantId, input.agentId);
     const rows = await this.fetchCandidates(input.tenantId, input.agentId);
 
     const now = Date.now();
@@ -258,9 +258,18 @@ export class DeskMemoryService {
     return row;
   }
 
-  private async safeEmbed(text: string): Promise<number[] | null> {
+  /**
+   * The recall query's vector, embedded on the tenant's own route as a `query`. Null when it cannot be embedded (no
+   * route, a zero-retention tenant with no zero-retention route, a provider error): recall then scores without the
+   * semantic term, and never fails.
+   */
+  private async safeEmbed(text: string, tenantId: number, agentId: number): Promise<number[] | null> {
     try {
-      return await this.embedder.embedText(text);
+      return await this.embedder.embedText(
+        text,
+        { tenantId, surface: AiSurface.EMBEDDING, agentId: String(agentId) },
+        'query',
+      );
     } catch (err) {
       this.logger.warn(`Embedder unreachable; falling back to structural-only scoring (${describeError(err)})`);
       return null;

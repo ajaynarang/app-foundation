@@ -60,6 +60,21 @@ describe('KnowledgeTool', () => {
       expect(result.results[0].relevance).toBe(0.89);
     });
 
+    it('embeds the query for the calling tenant, from the server-injected _tenantId', async () => {
+      await tool.searchKB({ query: 'pricing', audience: 'all', _tenantId: 42 });
+
+      expect(mockKbService.hybridSearch).toHaveBeenCalledWith(
+        'pricing',
+        expect.objectContaining({ aiContext: { tenantId: 42, surface: 'EMBEDDING' } }),
+      );
+    });
+
+    it('passes no routing context without a tenant, so the search is full-text', async () => {
+      await tool.searchKB({ query: 'pricing', audience: 'all' });
+
+      expect(mockKbService.hybridSearch.mock.calls[0][1].aiContext).toBeUndefined();
+    });
+
     it('should pass optional filters through', async () => {
       await tool.searchKB({
         query: 'pricing',

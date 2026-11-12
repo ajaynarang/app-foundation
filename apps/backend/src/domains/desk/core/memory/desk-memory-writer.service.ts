@@ -287,9 +287,10 @@ export class DeskMemoryWriterService {
     return `${input.outcome} (transition=${input.transition}) for ${JSON.stringify(input.entityRef)}`;
   }
 
-  private async safeEmbed(text: string, aiContext?: AiCallContext): Promise<number[] | null> {
+  /** The memory's vector, embedded on the tenant's own route as a `document`; null (written without one) on failure. */
+  private async safeEmbed(text: string, aiContext: AiCallContext): Promise<number[] | null> {
     try {
-      return await this.embedder.embedText(text, aiContext);
+      return await this.embedder.embedText(text, aiContext, 'document');
     } catch (err) {
       this.logger.warn(`Embedder unreachable; writing memory without embedding (${describeError(err)})`);
       return null;
