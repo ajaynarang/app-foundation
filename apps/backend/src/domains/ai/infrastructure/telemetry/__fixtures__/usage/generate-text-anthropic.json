@@ -1,0 +1,23 @@
+{
+  "_source": "ai@6 generateText result on @ai-sdk/anthropic 3.0: usage.inputTokenDetails carries cacheReadTokens / cacheWriteTokens; providerMetadata.anthropic.cacheCreationInputTokens mirrors the write. Numbers synthetic; the live-*.json fixtures are live captures.",
+  "usage": {
+    "inputTokens": 5400,
+    "outputTokens": 410,
+    "totalTokens": 5810,
+    "inputTokenDetails": {
+      "noCacheTokens": 1200,
+      "cacheReadTokens": 3000,
+      "cacheWriteTokens": 1200
+    },
+    "outputTokenDetails": {
+      "textTokens": 410,
+      "reasoningTokens": 0
+    },
+    "cachedInputTokens": 3000
+  },
+  "providerMetadata": {
+    "anthropic": {
+      "cacheCreationInputTokens": 1200
+    }
+  }
+}

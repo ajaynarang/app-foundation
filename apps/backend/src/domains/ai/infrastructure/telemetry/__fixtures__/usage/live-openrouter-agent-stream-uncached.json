@@ -1,0 +1,66 @@
+{
+  "_source": "Captured live (2026-10-18) by a sibling product: Mastra 1.41 Agent.stream usage + providerMetadata on OpenRouter -> Anthropic. Its stable prefix was under the 1,024-token minimum, so nothing was cached and the counts are reported as zero. Numbers and provider names only.",
+  "usage": {
+    "inputTokens": 6821,
+    "outputTokens": 7065,
+    "totalTokens": 13886,
+    "reasoningTokens": 0,
+    "cachedInputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "raw": {
+      "inputTokens": {
+        "total": 6821,
+        "noCache": 6821,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "outputTokens": {
+        "total": 7065,
+        "text": 7065,
+        "reasoning": 0
+      },
+      "raw": {
+        "prompt_tokens": 6821,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "completion_tokens": 7065,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        },
+        "total_tokens": 13886,
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_cost": 0.126438,
+          "upstream_inference_prompt_cost": 0.020463,
+          "upstream_inference_completions_cost": 0.105975
+        }
+      }
+    }
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "usage": {
+        "promptTokens": 6821,
+        "promptTokensDetails": {
+          "cachedTokens": 0
+        },
+        "completionTokens": 7065,
+        "completionTokensDetails": {
+          "reasoningTokens": 0
+        },
+        "cost": 0,
+        "totalTokens": 13886,
+        "costDetails": {
+          "upstreamInferenceCost": 0.126438
+        }
+      },
+      "provider": "Anthropic"
+    }
+  }
+}

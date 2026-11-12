@@ -1,0 +1,66 @@
+{
+  "_source": "Captured live (2026-10-18) by a sibling product: the same tool loop with a breakpoint on the newest message, set before Mastra. Mastra did not carry the mark to the request, so almost nothing was read from cache. Numbers and provider names only.",
+  "usage": {
+    "inputTokens": 373313,
+    "outputTokens": 12382,
+    "totalTokens": 385695,
+    "reasoningTokens": 0,
+    "cachedInputTokens": 0,
+    "cacheCreationInputTokens": 2441,
+    "raw": {
+      "inputTokens": {
+        "total": 34296,
+        "noCache": 34296,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "outputTokens": {
+        "total": 754,
+        "text": 754,
+        "reasoning": 0
+      },
+      "raw": {
+        "prompt_tokens": 34296,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "completion_tokens": 754,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        },
+        "total_tokens": 35050,
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_cost": 0.114198,
+          "upstream_inference_prompt_cost": 0.102888,
+          "upstream_inference_completions_cost": 0.01131
+        }
+      }
+    }
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "provider": "Anthropic",
+      "usage": {
+        "promptTokens": 34296,
+        "promptTokensDetails": {
+          "cachedTokens": 0
+        },
+        "completionTokens": 754,
+        "completionTokensDetails": {
+          "reasoningTokens": 0
+        },
+        "totalTokens": 35050,
+        "cost": 0,
+        "costDetails": {
+          "upstreamInferenceCost": 0.114198
+        }
+      }
+    }
+  }
+}

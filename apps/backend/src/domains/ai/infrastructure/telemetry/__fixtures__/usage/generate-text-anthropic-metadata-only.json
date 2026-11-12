@@ -1,0 +1,19 @@
+{
+  "_source": "An Anthropic generateText result whose usage carries no cache details (older provider shape): the write comes from providerMetadata.anthropic.cacheCreationInputTokens and the read from providerMetadata.anthropic.usage.cache_read_input_tokens. Numbers synthetic; the live-*.json fixtures are live captures.",
+  "usage": {
+    "inputTokens": 5400,
+    "outputTokens": 410,
+    "totalTokens": 5810
+  },
+  "providerMetadata": {
+    "anthropic": {
+      "cacheCreationInputTokens": 1200,
+      "usage": {
+        "input_tokens": 1200,
+        "cache_read_input_tokens": 3000,
+        "cache_creation_input_tokens": 1200,
+        "output_tokens": 410
+      }
+    }
+  }
+}
