@@ -33,7 +33,7 @@ type Prompt = Parameters<NonNullable<LanguageModelMiddleware['transformParams']>
 type PromptMessage = Prompt[number];
 
 function withBreakpoint(message: PromptMessage, marker: ProviderOptions): PromptMessage {
-  const options: ProviderOptions = { ...((message.providerOptions as ProviderOptions | undefined) ?? {}) };
+  const options: ProviderOptions = { ...(message.providerOptions ?? {}) };
   for (const [key, value] of Object.entries(marker)) options[key] = { ...(options[key] ?? {}), ...value };
   return { ...message, providerOptions: options } as PromptMessage;
 }
