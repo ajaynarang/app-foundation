@@ -337,6 +337,7 @@ describe('settings and admin pages wear the shared chrome', () => {
     // Pages that hand their whole body to a feature component, which renders the header.
     const delegated: Record<string, string> = {
       '../app/admin/ai-spend/page.tsx': 'admin/ai-spend/components/AiSpendPage.tsx',
+      '../app/admin/timers/page.tsx': 'admin/timers/components/TimersPage.tsx',
     };
     const missing = pages
       .filter(({ path, text }) => !text.includes('<PageHeader') && !(path in delegated))

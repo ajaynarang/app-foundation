@@ -17,6 +17,7 @@ import {
   Webhook,
   Send,
   DollarSign,
+  Timer,
 } from 'lucide-react';
 
 /**
@@ -192,13 +193,14 @@ export const navigationConfig: Record<string, NavigationItem[]> = {
   owner: memberNav,
 
   // Super-admin surfaces that ship with the starter: tenant lifecycle
-  // management and AI spend. The backend exposes more admin modules
+  // management, AI spend and timers (deadlines and the outbox backlog). The backend exposes more admin modules
   // (feature flags, broadcasts, background jobs, events, login activity,
   // plans, billing, cache) — add pages under apps/web/src/app/admin/ and
   // list them here as you build their UIs.
   super_admin: [
     { label: 'Tenants', href: '/admin/tenants', icon: Building2 },
     { label: 'AI Spend', href: '/admin/ai-spend', icon: DollarSign },
+    { label: 'Timers', href: '/admin/timers', icon: Timer },
     { label: 'Settings', href: '/settings/profile', icon: Settings, subPanel: 'settings' },
   ],
 };

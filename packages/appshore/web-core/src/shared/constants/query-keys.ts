@@ -133,6 +133,14 @@ export const queryKeys = {
     costVsQuota: (tenantId: number, days: number) => ['ai-spend', 'cost-vs-quota', tenantId, days] as const,
   },
 
+  // ─── Timers: deadlines and the durability health strip (super-admin) ─────
+  deadlines: {
+    root: ['deadlines'] as const,
+    list: (params: Record<string, unknown>) => ['deadlines', 'list', params] as const,
+    kinds: ['deadlines', 'kinds'] as const,
+    health: ['deadlines', 'health'] as const,
+  },
+
   // ─── AI / conversations ─────────────────────────────────────────────────
   ai: {
     root: ['ai'] as const,
