@@ -6,6 +6,8 @@ import {
   AiSpendSummarySchema,
   AiSpendSurfaceRowSchema,
   AiSpendTenantSummarySchema,
+  DeadlineListItemSchema,
+  DurabilityHealthSchema,
   JobMetricsSchema,
   JobStatusSchema,
   TypeSummarySchema,
@@ -29,6 +31,12 @@ export const AdminAiSpendInvocationListResponse = defineResponseSchema(
 );
 export const AdminAiBudgetResponse = defineResponseSchema('AdminAiBudget', AiBudgetSchema);
 export const AdminAiCostVsQuotaResponse = defineResponseSchema('AdminAiCostVsQuota', AiCostVsQuotaSchema);
+
+// ─── Deadlines ───────────────────────────────────────────────────────────────
+
+export const AdminDeadlineListResponse = defineCursorListSchema('AdminDeadlineList', DeadlineListItemSchema);
+export const AdminDeadlineKindResponse = defineResponseSchema('AdminDeadlineKind', z.string());
+export const AdminDurabilityHealthResponse = defineResponseSchema('AdminDurabilityHealth', DurabilityHealthSchema);
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 

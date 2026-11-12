@@ -645,6 +645,188 @@
         ],
         "type": "object"
       },
+      "AdminDeadlineKind": {
+        "type": "string"
+      },
+      "AdminDeadlineList": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "exclusiveMinimum": false,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "attempts": {
+                  "type": "integer"
+                },
+                "cancelReason": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "cancelledAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "dedupeKey": {
+                  "type": "string"
+                },
+                "dueAt": {
+                  "type": "string"
+                },
+                "firedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "lastError": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "lockedUntilAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "payload": {
+                  "additionalProperties": {},
+                  "type": "object"
+                },
+                "state": {
+                  "enum": [
+                    "PENDING",
+                    "FAILING",
+                    "FIRED",
+                    "CANCELLED"
+                  ],
+                  "type": "string"
+                },
+                "subjectId": {
+                  "type": "string"
+                },
+                "subjectType": {
+                  "type": "string"
+                },
+                "tenant": {
+                  "properties": {
+                    "companyName": {
+                      "type": "string"
+                    },
+                    "tenantId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "tenantId",
+                    "companyName"
+                  ],
+                  "type": "object"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tenant",
+                "kind",
+                "subjectType",
+                "subjectId",
+                "dedupeKey",
+                "state",
+                "dueAt",
+                "firedAt",
+                "cancelledAt",
+                "cancelReason",
+                "attempts",
+                "lockedUntilAt",
+                "lastError",
+                "payload",
+                "createdAt",
+                "updatedAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          },
+          "total": {
+            "exclusiveMinimum": false,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AdminDurabilityHealth": {
+        "properties": {
+          "deadlines": {
+            "properties": {
+              "failing": {
+                "type": "integer"
+              },
+              "oldestOverdueDueAt": {
+                "nullable": true,
+                "type": "string"
+              },
+              "overdue": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "pending",
+              "failing",
+              "overdue",
+              "oldestOverdueDueAt"
+            ],
+            "type": "object"
+          },
+          "outbox": {
+            "nullable": true,
+            "properties": {
+              "oldestAgeSeconds": {
+                "nullable": true,
+                "type": "number"
+              },
+              "unpublished": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "unpublished",
+              "oldestAgeSeconds"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "deadlines",
+          "outbox"
+        ],
+        "type": "object"
+      },
       "AdminEventList": {
         "properties": {
           "counts": {
@@ -15867,6 +16049,180 @@
         "summary": "Cache stats — namespaces, hit/miss counters and key counts per namespace",
         "tags": [
           "AdminCache"
+        ]
+      }
+    },
+    "/api/v1/admin/deadlines": {
+      "get": {
+        "operationId": "AdminDeadlinesController_list",
+        "parameters": [
+          {
+            "description": "Page size, 1–100 (out of range is clamped)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`nextCursor` from the previous page",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-joined or repeated, of: PENDING, FAILING, FIRED, CANCELLED",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort order",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "soonest",
+              "enum": [
+                "soonest",
+                "latest"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeadlineList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deadlines across tenants — cursor-paged by due time, with per-state counts",
+        "tags": [
+          "Admin Deadlines"
+        ]
+      }
+    },
+    "/api/v1/admin/deadlines/health": {
+      "get": {
+        "operationId": "AdminDeadlinesController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDurabilityHealth"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deadline sweeper health (pending, failing, overdue) and the outbox backlog",
+        "tags": [
+          "Admin Deadlines"
+        ]
+      }
+    },
+    "/api/v1/admin/deadlines/kinds": {
+      "get": {
+        "operationId": "AdminDeadlinesController_kinds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminDeadlineKind"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deadline kinds on record, A → Z — the options of the kind filter",
+        "tags": [
+          "Admin Deadlines"
         ]
       }
     },

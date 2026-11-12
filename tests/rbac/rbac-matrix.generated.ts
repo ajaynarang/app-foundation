@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-11T21:49:56.401Z
- * Source: 22 domains, 92 endpoints
- * Controllers scanned: 270 total endpoints across all controllers
+ * Generated: 2026-11-12T07:39:53.444Z
+ * Source: 22 domains, 95 endpoints
+ * Controllers scanned: 273 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -38,6 +38,27 @@ export const RBAC_MATRIX: RbacEntry[] = [
   {
     method: 'GET', path: '/admin/ai-spend/tenants',
     description: 'AdminAiSpendController: GET /admin/ai-spend/tenants',
+    domain: 'super-admin',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/admin/deadlines',
+    description: 'AdminDeadlinesController: GET /admin/deadlines',
+    domain: 'super-admin',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/admin/deadlines/health',
+    description: 'AdminDeadlinesController: GET /admin/deadlines/health',
+    domain: 'super-admin',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/admin/deadlines/kinds',
+    description: 'AdminDeadlinesController: GET /admin/deadlines/kinds',
     domain: 'super-admin',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },

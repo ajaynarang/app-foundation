@@ -22,6 +22,7 @@
   },
   "BOUNDED_LISTS": {
     "apps/backend/src/domains/admin/admin-ai-spend.controller.ts :: GET /admin/ai-spend/tenants/:tenant_id/by-surface": "One row per AI surface: the query groups by the AiSurface enum",
+    "apps/backend/src/domains/admin/admin-deadlines.controller.ts :: GET /admin/deadlines/kinds": "The kind filter's options: one row per deadline kind on record, an app-owned vocabulary, grouped in SQL and capped at MAX_DEADLINE_KINDS (100)",
     "apps/backend/src/domains/admin/admin-events.controller.ts :: GET /admin/events/volume": "One bucket per hour and event type over a fixed 24 hours, counted in SQL: at most 24 rows per event in the registry",
     "apps/backend/src/domains/admin/admin-jobs.controller.ts :: GET /admin/jobs/categories/summary": "One row per job category in the JOB_CATEGORIES registry (code-defined)",
     "apps/backend/src/domains/admin/admin-schedules.controller.ts :: GET /admin/schedules": "One row per registered repeatable schedule: job_schedules is unique on (category, job_type) and both are code-defined",

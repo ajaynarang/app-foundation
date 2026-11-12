@@ -30,6 +30,7 @@ test.describe('Lists are cursor lists @api', () => {
     '/admin/feedback/tenants',
     '/admin/jobs',
     '/admin/events',
+    '/admin/deadlines',
     '/admin/ai-spend/tenants',
     '/support/admin/tickets',
     '/support/admin/tenants',
