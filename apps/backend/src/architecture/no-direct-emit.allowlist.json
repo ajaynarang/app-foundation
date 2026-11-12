@@ -1,11 +1,11 @@
 {
   "apps/backend/src/domains/ai/infrastructure/telemetry/ai-telemetry.service.ts": {
-    "count": 3,
-    "reason": "AI_BUDGET_HARD_BREACHED, AI_BUDGET_SOFT_BREACHED and AI_ZERO_RETENTION_UNAVAILABLE: signals with no write behind them, raised on every AI pre-flight from cached spend or tenant settings, so they must not add a database write per call or need the database to be up. AI_INVOCATION_RECORDED, which has a write, goes through the outbox."
+    "count": 2,
+    "reason": "AI_BUDGET_HARD_BREACHED and AI_BUDGET_SOFT_BREACHED: signals with no write behind them, raised on every AI pre-flight from cached spend, so they must not add a database write per call or need the database to be up. AI_INVOCATION_RECORDED, which has a write, goes through the outbox."
   },
   "apps/backend/src/domains/ai/routing/ai-route-resolver.service.ts": {
     "count": 1,
-    "reason": "AI_ZERO_RETENTION_UNAVAILABLE: a signal with no write behind it, raised on the AI call path when the tenant's retention policy rules out every route, so it must not add a database write per call or need the database to be up. It joins the same signal in ai-telemetry.service.ts, which keeps its emit until the language callers move onto the resolver; that entry then shrinks by one."
+    "reason": "AI_ZERO_RETENTION_UNAVAILABLE: a signal with no write behind it, raised on the AI call path when the tenant's retention policy rules out every route, so it must not add a database write per call or need the database to be up. The resolver is the only place that raises it."
   },
   "packages/appshore/platform/src/infrastructure/notifications/pipeline/delivery.service.ts": {
     "count": 1,

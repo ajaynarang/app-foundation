@@ -12,10 +12,7 @@ import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.s
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
-import { ZeroRetentionUnavailable } from '../redaction/zero-retention-unavailable.error';
-import { ZDR_ELIGIBLE_TIERS } from '../providers/ai-provider';
 import { longPromptSurchargeAbove } from '../../routing/model-catalog';
-import type { ModelAlias } from '@app/shared-types';
 
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
@@ -49,8 +46,8 @@ export class AiTelemetryService {
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
     /**
-     * Signals only: the budget breaches and the zero-retention refusal have no write behind them and must fire
-     * with the database down (`no-direct-emit.allowlist.json`).
+     * Signals only: the budget breaches have no write behind them and must fire with the database down
+     * (`no-direct-emit.allowlist.json`). The zero-retention refusal is the route resolver's.
      */
     private readonly events: DomainEventService,
     private readonly outbox: OutboxService,
@@ -237,45 +234,6 @@ export class AiTelemetryService {
       },
     });
     return { row, created: true };
-  }
-
-  // ───────────────────────────────────────────────────────────────────────
-  // Zero-data-retention enforcement (Sprint 2)
-  // ───────────────────────────────────────────────────────────────────────
-
-  /**
-   * For a tenant flagged `aiZeroRetention`, ensure the requested model tier
-   * has a verified ZDR provider route — else throw `ZeroRetentionUnavailable`
-   * (fail-closed). No-op for tenants without the flag.
-   *
-   * Tenant flag is cached 60s (changes rarely). The ZDR-eligible tier set is
-   * currently empty pending the provider-route decision (see
-   * `ZDR_ELIGIBLE_TIERS`), so a ZDR tenant is correctly blocked until a
-   * compliant route is wired — rather than leaking to a retaining endpoint.
-   */
-  async assertZeroRetention(tenantId: number, tier: ModelAlias): Promise<void> {
-    const requiresZdr = await this.tenantRequiresZeroRetention(tenantId);
-    if (!requiresZdr) return;
-    if (!ZDR_ELIGIBLE_TIERS.has(tier)) {
-      void this.events
-        .emit(DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE, tenantId, { tier })
-        .catch((e) => this.logger.warn(`zdr-unavailable event emit failed: ${e.message}`));
-      throw new ZeroRetentionUnavailable(tier);
-    }
-  }
-
-  private async tenantRequiresZeroRetention(tenantId: number): Promise<boolean> {
-    return this.cache.getOrSet(
-      buildKey('app:ai-telemetry', 'zdr', tenantId),
-      async () => {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id: tenantId },
-          select: { aiZeroRetention: true },
-        });
-        return tenant?.aiZeroRetention ?? false;
-      },
-      CACHE_TTL_HOT_60S,
-    );
   }
 
   // ───────────────────────────────────────────────────────────────────────

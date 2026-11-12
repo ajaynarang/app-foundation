@@ -548,31 +548,4 @@ describe('AiTelemetryService', () => {
       expect(cache.del).toHaveBeenCalledWith('app:ai-telemetry:spent:42');
     });
   });
-
-  describe('assertZeroRetention()', () => {
-    it('is a no-op when the tenant does not require zero-retention', async () => {
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: false });
-      await expect(service.assertZeroRetention(TENANT_ID, 'standard')).resolves.toBeUndefined();
-    });
-
-    it('throws ZeroRetentionUnavailable when the tenant requires ZDR but no eligible tier is configured', async () => {
-      // ZDR_ELIGIBLE_TIERS ships empty (pending provider decision) — so a
-      // ZDR tenant is fail-closed on every tier today.
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: true });
-      await expect(service.assertZeroRetention(TENANT_ID, 'standard')).rejects.toMatchObject({
-        // BadRequestException-derived; tier carried in the response payload.
-        response: expect.objectContaining({ tier: 'standard' }),
-      });
-    });
-
-    it('emits AI_ZERO_RETENTION_UNAVAILABLE when it blocks', async () => {
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: true });
-      await service.assertZeroRetention(TENANT_ID, 'fast').catch(() => undefined);
-      expect(events.emit).toHaveBeenCalledWith(
-        DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE,
-        TENANT_ID,
-        expect.objectContaining({ tier: 'fast' }),
-      );
-    });
-  });
 });
