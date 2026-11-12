@@ -16,6 +16,10 @@ import { applyTrustProxy } from './bootstrap/trust-proxy';
 import { applyGlobalPrefix, buildServedOpenApiDocument, OPENAPI_DOCUMENT_PATH } from './bootstrap/openapi';
 import { mountOAuthMetadata } from './bootstrap/oauth-metadata';
 import { DEPRECATION_HEADERS } from '@appshore/platform/shared/http/deprecation';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENT_REPLAYED_HEADER,
+} from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 
 async function bootstrap() {
   // Initialize Firebase Admin SDK
@@ -115,9 +119,9 @@ async function bootstrap() {
   app.enableCors({
     origin: parsedCorsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Mcp-Session-Id'],
-    // The deprecation headers (ADR "API contract", section 4) are readable by a browser client.
-    exposedHeaders: ['Mcp-Session-Id', ...DEPRECATION_HEADERS],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Mcp-Session-Id', IDEMPOTENCY_KEY_HEADER],
+    // The replay marker and the deprecation headers (ADR "API contract", sections 4 and 5) are readable by a browser.
+    exposedHeaders: ['Mcp-Session-Id', IDEMPOTENT_REPLAYED_HEADER, ...DEPRECATION_HEADERS],
     credentials: true, // Allow cookies
   });
 

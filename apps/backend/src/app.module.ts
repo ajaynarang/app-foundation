@@ -50,6 +50,7 @@ import { SearchModule } from './platform-glue/search/search.module';
 import { DevModule } from './dev/dev.module';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { EventContextInterceptor } from '@appshore/kernel/infrastructure/events/event-context.interceptor';
+import { IdempotencyInterceptor } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
 import { PromptingModule } from './domains/prompting/prompting.module';
 
 @Module({
@@ -176,6 +177,12 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: EventContextInterceptor,
+    },
+    // Idempotency-Key on every authenticated create (ADR "API contract", section 5): interceptors run after the
+    // guards, so the tenant and user are known.
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: IdempotencyInterceptor,
     },
   ],
 })
