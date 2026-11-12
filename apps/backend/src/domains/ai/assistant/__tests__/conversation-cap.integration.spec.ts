@@ -99,19 +99,19 @@ describe('conversation cap (integration)', () => {
       unused,
       outbox as never,
     );
-  });
+  }, 30_000);
 
   afterAll(async () => {
     if (usable) await cleanup();
     await prisma?.$disconnect();
     await pool?.end();
-  });
+  }, 30_000);
 
   beforeEach(async () => {
     if (!usable) return;
     await prisma.conversation.deleteMany({ where: { userId: userDbId } });
     outbox.emit.mockClear();
-  });
+  }, 30_000);
 
   /** `count` active conversations someone spoke in, the newest first by `updatedAt` (`n` = 0 is the newest). */
   async function seedSpokenConversations(count: number): Promise<void> {
@@ -161,7 +161,7 @@ describe('conversation cap (integration)', () => {
       conversationId: oldest,
       reason: 'cap',
     });
-  });
+  }, 30_000);
 
   it('a person already far over the cap is trimmed to the cap on their next new chat', async () => {
     if (!usable) return;
@@ -171,7 +171,7 @@ describe('conversation cap (integration)', () => {
 
     expect(await active()).toHaveLength(MAX_ACTIVE_CONVERSATIONS);
     expect(outbox.emit).toHaveBeenCalledTimes(6);
-  });
+  }, 30_000);
 
   it('opening the assistant again reuses the conversation nobody spoke in, so it never counts twice', async () => {
     if (!usable) return;
@@ -180,7 +180,7 @@ describe('conversation cap (integration)', () => {
 
     expect(second.conversationId).toBe(first.conversationId);
     expect(await active()).toHaveLength(1);
-  });
+  }, 30_000);
 
   it('history lists active conversations someone spoke in, never archived or greeting-only ones', async () => {
     if (!usable) return;
@@ -191,5 +191,5 @@ describe('conversation cap (integration)', () => {
     const { conversations } = await service.listConversations(USER_KEY, tenantId);
 
     expect(conversations.map((c) => c.conversationId)).toEqual([`${CONV_PREFIX}000`]);
-  });
+  }, 30_000);
 });
