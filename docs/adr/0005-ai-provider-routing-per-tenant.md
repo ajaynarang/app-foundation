@@ -27,8 +27,9 @@ One root cause: provider choice was a process constant, while retention and paym
    (503) when nothing serves the need. A tenant is blocked, never downgraded to a retaining route.
 3. **A pool has one payer.** It is the tenant's credentials or the platform's routes, never both, decided per need.
    A tenant credential that would serve the need but is failing blocks the call (`AiCredentialFailing`, 503); the
-   platform's key never stands in for a tenant's. (Tenant credentials arrive with bring-your-own-key; the resolver's
-   shape already has the pool.)
+   platform's key never stands in for a tenant's. A credential the retention policy rules out is inert (absent); a
+   DISABLED one is absent too. When any compatible ACTIVE credential exists the tenant pays and the first by
+   `priority` serves; a stored secret that cannot be decrypted is refused the same way as a failing one.
 4. **Platform routes are configured by environment, never the database**, and each is off until its key is set:
    `platform-openrouter` for language (`OPENROUTER_API_KEY`) and `platform-cohere` for embeddings
    (`COHERE_API_KEY`). The Vercel AI Gateway is not a platform route: its fallback to system credentials cannot be
@@ -62,6 +63,19 @@ One root cause: provider choice was a process constant, while retention and paym
   for the app's relay.
 - External moderation (OpenAI) stays a platform call on `OPENAI_API_KEY`, skipped for a zero-retention tenant; the
   local guardrails still run.
+- Bring-your-own-key is switched on by its own key, `AI_CREDENTIALS_KEY` (64 hex characters, no default, no
+  fallback; a malformed value stops the boot). The port has no switch and answers 500 on first use without its key.
+  Unset, connecting or testing a key answers 404, and reading the settings, removing a key and the retention policy
+  still work. The tenant secret is an AES-256-GCM envelope bound to `tenantId:credentialPublicId`, in its own cipher
+  (`CredentialCryptoService`), not the integrations cipher (which has a development default and no binding).
+- The paste-key types are `ANTHROPIC_KEY`, `OPENROUTER_KEY` and `VERCEL_GATEWAY_KEY` (the gateway pinned to
+  Anthropic, priced as Anthropic). `BEDROCK_ROLE` is in the enum but serves nothing until the AWS role flow lands.
+- A provider credit refusal on a tenant's own key records the redacted reason on the credential and tells its owners
+  at most once a day; the status stays ACTIVE, because a low-credit key can still pass the test. The port has no such
+  path.
+- The daily revalidation sweep works in two-minute slices on the shared `bulk-ops` lane and hands over to one
+  continuation job, so the outbox relay and the deadline sweeper are never held behind it for long.
+- A workspace holds at most 20 credentials (`MAX_AI_CREDENTIALS_PER_WORKSPACE`), so every read of them is bounded.
 
 ## Consequences
 
@@ -72,7 +86,9 @@ One root cause: provider choice was a process constant, while retention and paym
 - Until a zero-retention route exists (Bedrock, later in this project), a zero-retention tenant is refused on every
   AI call; knowledge-base search still works for it on full-text.
 - Dev mirrors production: there is no special dev provider.
-- Bring-your-own-key, the Bedrock routes and per-workspace OpenRouter sub-keys each add a pool or a registry entry
-  without reshaping the resolver.
+- Bring-your-own-key added the tenant pool and three registry entries without reshaping the resolver; the Bedrock
+  routes and per-workspace OpenRouter sub-keys each add an entry the same way.
+- Removing `AI_CREDENTIALS_KEY` while workspaces hold keys blocks those workspaces (`AiCredentialFailing`), never
+  moves them to the platform key; boot logs an error with the count of stored credentials.
 - Open: the embedding A/B gate (whether Cohere direct and Bedrock produce interchangeable vectors) has not been run
   for the starter. Its outcome is recorded here when the Bedrock route lands.

@@ -1431,6 +1431,14 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 - **Budgets come from the plan.** `AiBudgetSeederService` writes a workspace's caps from `PLAN_AI_BUDGETS` on approval, plan change (`planAssigned`), personal signup and single-mode boot. It owns a row only while `notes` starts with `plan:` (`plan:DEFAULT` on a row created lazily with the defaults). An admin edit writes its own note and takes the row over; never write a `plan:` note from anywhere else.
 - **Prompt caching is the route's.** Each registry entry declares `promptCache` (`anthropic`, `openrouter`, `bedrock` or `none`) and the resolver wraps its language models with the breakpoints (`routing/prompt-cache.ts`). Don't set `cacheControl` by hand on a message. `AI_PROMPT_CACHE_OVERRIDE=none` turns it off on a local run only.
 
+**Workspace credential rules (bring-your-own-key, NON-NEGOTIABLE):**
+
+- **A secret is never read back.** A pasted key exists only inside `AiCredentialConnectService.connectKey`; it is stored only as the `CredentialCryptoService` envelope (AES-256-GCM, bound to `tenantId:credentialPublicId`) and leaves the API only as `lastFour`. Every credential response goes through `toAiCredentialSummary`; never return a row, the envelope, `keyVersion` or `externalId`. Provider error text is passed through `redactSecret` before it is stored, logged or returned. Events carry the public id and type only.
+- **A failing workspace key is never served on the platform key.** A pool is the workspace's credentials or the platform's routes, decided per need, never both. A compatible credential that is FAILING, or whose secret cannot be decrypted, raises `AiCredentialFailing` (503); never catch it to retry on a platform route. A credential the retention policy rules out is inert (treated as absent), never deleted.
+- **Status moves only through a test.** `validate` (and the daily sweep, which calls it) is the only writer of ACTIVE and FAILING. A provider credit refusal on a workspace key is recorded through `route.reportCreditRefusal` (which `mapProviderRefusal` calls) and leaves the status ACTIVE.
+- **The switch is `AI_CREDENTIALS_KEY`.** Code that needs to know whether bring-your-own-key is on asks `CredentialCryptoService.isConfigured()`; there is no other flag and no fallback key.
+- **A new credential type** is an `AiCredentialType` value plus a `TENANT_CREDENTIAL_CAPABILITIES` entry (serves, retention, prompt cache, a builder that calls the provider only through the catalog), held by `route-registry.parity.spec.ts`.
+
 ---
 
 ## 12. Integration Adapter Pattern

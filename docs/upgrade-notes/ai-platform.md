@@ -328,6 +328,53 @@ includes it).
 **Rollback.** Revert the change. The new columns are nullable or defaulted and can stay; old code ignores them. The
 `VOICE` enum value cannot be removed without recreating the type; it is harmless to leave.
 
+## 9. Bring-your-own-key: workspace AI keys and the retention policy
+
+**What changed.** A workspace can connect its own Anthropic, OpenRouter or Vercel AI Gateway key and pay for its own
+language calls, and an owner can require zero data retention. Both are API only for now; the settings screen comes
+in a later change.
+
+- Migration `20261112235000_ai_credentials`: new table `ai_credentials` and enums `AiCredentialType` (`ANTHROPIC_KEY`,
+  `BEDROCK_ROLE`, `OPENROUTER_KEY`, `VERCEL_GATEWAY_KEY`) and `AiCredentialStatus` (`ACTIVE`, `FAILING`, `DISABLED`).
+  Additive; no existing row is touched. `BEDROCK_ROLE` is reserved for the AWS role flow and is refused until then.
+- New optional variable `AI_CREDENTIALS_KEY`: 64 hex characters (`openssl rand -hex 32`), no default. It encrypts the
+  keys and is the switch. Unset, `POST /ai-settings/credentials` and `POST .../validate` answer 404 and
+  `GET /ai-settings` says `byokEnabled: false`; the policy, reading and removing still work. A value that is not 64
+  hex characters stops the boot.
+- New routes under `/ai-settings` (OWNER writes, ADMIN reads): `GET` (policy, `byokEnabled`, who pays per need, the
+  cards), `PATCH policy`, `POST credentials` (`{ type, secret, zdrAttested? }`; the key is tested with one small call
+  before anything is stored, and a failure answers 400 with the provider's reason, the key redacted),
+  `POST credentials/:credential_id/validate`, `DELETE credentials/:credential_id`. A workspace holds at most 20 keys.
+- Routing: when a workspace has a compatible ACTIVE key for a need, that key serves the need and the workspace pays;
+  the platform cap does not apply to those calls (section 7). A key that is FAILING, or that the app can no longer
+  decrypt, blocks the need with `AiCredentialFailing` (503); the platform key is never used in its place. Under zero
+  retention only an Anthropic key the owner attested to counts; the others stay stored but unused. The ledger
+  records the credential's public id as `routeId` and its type as `credentialType`.
+- The retention policy flip takes effect on the next call (the cached policy is deleted after the commit).
+- A daily sweep on `bulk-ops` (`ai-credential-revalidate`) re-tests every ACTIVE or FAILING key, five at a time, in
+  two-minute slices. A key that turns FAILING tells owners and admins through the new platform notification type
+  `AI_CREDENTIAL_FAILING`; a key that passes again goes back to ACTIVE.
+- A provider credit refusal on a workspace key stores the redacted reason as the key's `lastError` and tells owners
+  and admins, at most once a day per key. The key stays ACTIVE.
+- Five new events: `AI_CREDENTIAL_CONNECTED`, `AI_CREDENTIAL_VALIDATED`, `AI_CREDENTIAL_FAILED`,
+  `AI_CREDENTIAL_REMOVED`, `WORKSPACE_RETENTION_POLICY_CHANGED` (external; webhook subscribers can receive them).
+- `pnpm --filter @app/backend ai:probe-check` runs the key test against real keys (`ANTHROPIC_API_KEY`,
+  `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`), each only when set.
+
+**Who notices.** Nobody until the operator sets `AI_CREDENTIALS_KEY`. Then workspace owners (new routes, a new
+notification) and super-admins (tenant-paid rows in AI Spend).
+
+**What to do.**
+
+1. Deploy. The migration is additive and nothing must be set.
+2. To turn the feature on, set `AI_CREDENTIALS_KEY` in every environment and keep it safe: losing or changing it
+   makes every stored key unreadable, and those workspaces are blocked until they remove and reconnect their keys.
+   Boot logs an error with the count of stored keys when the variable is unset.
+3. If you subscribe to webhooks by event list, decide whether you want the five new events.
+
+**Rollback.** Revert the change. The table and enums can stay; old code never reads them. Workspaces that connected
+keys go back to the platform routes, and their stored keys stay encrypted until the change is redeployed.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
