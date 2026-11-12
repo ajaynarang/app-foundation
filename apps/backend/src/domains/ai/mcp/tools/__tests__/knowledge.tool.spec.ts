@@ -14,19 +14,19 @@ describe('KnowledgeTool', () => {
           title: 'Audit Log',
           content: 'The platform optimizes your workflows...',
           documentType: 'feature',
-          audience: 'prospect',
-          category: 'route_planning',
-          keywords: ['route'],
+          audience: 'all',
+          category: 'getting-started',
+          keywords: ['audit'],
           similarity: 0.89,
         },
         {
           documentId: 'doc_002',
-          title: 'HOS Compliance',
+          title: 'Billing',
           content: 'The platform keeps you compliant...',
           documentType: 'faq',
-          audience: 'prospect',
-          category: 'hos_compliance',
-          keywords: ['hos'],
+          audience: 'all',
+          category: 'billing',
+          keywords: ['billing'],
           similarity: 0.82,
         },
       ]),
@@ -47,14 +47,11 @@ describe('KnowledgeTool', () => {
 
   describe('searchKB', () => {
     it('should search knowledge base and return formatted results', async () => {
-      const result = await tool.searchKB({
-        query: 'How does the audit log work?',
-        audience: 'prospect',
-      });
+      const result = await tool.searchKB({ query: 'How does the audit log work?' });
 
       expect(mockKbService.hybridSearch).toHaveBeenCalledWith(
         'How does the audit log work?',
-        expect.objectContaining({ audience: 'prospect', limit: 5 }),
+        expect.objectContaining({ audiences: ['all'], limit: 5 }),
       );
       expect(result.results).toHaveLength(2);
       expect(result.results[0].title).toBe('Audit Log');
@@ -62,7 +59,7 @@ describe('KnowledgeTool', () => {
     });
 
     it('embeds the query for the calling tenant, from the server-injected _tenantId', async () => {
-      await tool.searchKB({ query: 'pricing', audience: 'all', _tenantId: 42 });
+      await tool.searchKB({ query: 'pricing', _tenantId: 42 });
 
       expect(mockKbService.hybridSearch).toHaveBeenCalledWith(
         'pricing',
@@ -71,27 +68,39 @@ describe('KnowledgeTool', () => {
     });
 
     it('passes no routing context without a tenant, so the search is full-text', async () => {
-      await tool.searchKB({ query: 'pricing', audience: 'all' });
+      await tool.searchKB({ query: 'pricing' });
 
       expect(mockKbService.hybridSearch.mock.calls[0][1].aiContext).toBeUndefined();
     });
 
     it('should pass optional filters through', async () => {
-      await tool.searchKB({
-        query: 'pricing',
-        audience: 'prospect',
-        category: 'pricing',
-        limit: 3,
-      });
+      await tool.searchKB({ query: 'pricing', category: 'pricing', limit: 3 });
 
       expect(mockKbService.hybridSearch).toHaveBeenCalledWith(
         'pricing',
-        expect.objectContaining({
-          audience: 'prospect',
-          category: 'pricing',
-          limit: 3,
-        }),
+        expect.objectContaining({ audiences: ['all'], category: 'pricing', limit: 3 }),
       );
+    });
+  });
+
+  describe('audience is decided by the server', () => {
+    const schemaOf = (method: 'searchKB' | 'getProductInfo') => {
+      const meta = Reflect.getMetadataKeys(KnowledgeTool.prototype[method])
+        .map((key) => Reflect.getMetadata(key, KnowledgeTool.prototype[method]))
+        .find((m) => m && typeof m === 'object' && 'parameters' in m);
+      return meta.parameters.shape as Record<string, unknown>;
+    };
+
+    it.each(['searchKB', 'getProductInfo'] as const)('%s offers the model no audience argument', (method) => {
+      expect(Object.keys(schemaOf(method))).not.toContain('audience');
+    });
+
+    it('ignores an audience the model sends, searching what the caller may read', async () => {
+      await tool.searchKB({ query: 'pricing', audience: 'admin' } as never);
+      await tool.getProductInfo({ topic: 'pricing', audience: 'admin' } as never);
+
+      expect(mockKbService.hybridSearch.mock.calls[0][1].audiences).toEqual(['all']);
+      expect(mockKbService.getByCategory).toHaveBeenCalledWith('pricing', ['all']);
     });
   });
 
@@ -103,7 +112,7 @@ describe('KnowledgeTool', () => {
         { documentId: 'kb_2', parentDocId: null, title: 'Inviting teammates', content: 'c', similarity: 0.7 },
       ]);
 
-      const result = await tool.searchKB({ query: 'start', audience: 'all' });
+      const result = await tool.searchKB({ query: 'start' });
 
       expect(result[CITATIONS_SIDE_CHANNEL]).toEqual([
         { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' },
@@ -112,7 +121,7 @@ describe('KnowledgeTool', () => {
     });
 
     it('offers citations for the documents of a topic too', async () => {
-      const result = await tool.getProductInfo({ topic: 'pricing', audience: 'all' });
+      const result = await tool.getProductInfo({ topic: 'pricing' });
 
       expect(result[CITATIONS_SIDE_CHANNEL]).toEqual([
         { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'doc_003', title: 'Pricing Tiers' },
@@ -122,12 +131,9 @@ describe('KnowledgeTool', () => {
 
   describe('getProductInfo', () => {
     it('should return documents for a given topic/category', async () => {
-      const result = await tool.getProductInfo({
-        topic: 'pricing',
-        audience: 'prospect',
-      });
+      const result = await tool.getProductInfo({ topic: 'pricing' });
 
-      expect(mockKbService.getByCategory).toHaveBeenCalledWith('pricing', 'prospect');
+      expect(mockKbService.getByCategory).toHaveBeenCalledWith('pricing', ['all']);
       expect(result.documents).toHaveLength(1);
       expect(result.topic).toBe('pricing');
     });
