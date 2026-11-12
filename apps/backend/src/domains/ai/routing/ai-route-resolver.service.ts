@@ -14,6 +14,7 @@ import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.const
 import { AiNotConfigured } from './ai-not-configured.error';
 import { ZeroRetentionUnavailable } from '../infrastructure/redaction/zero-retention-unavailable.error';
 import { MODEL_CATALOG } from './model-catalog';
+import { tunedLanguageModel } from './model-tuning.middleware';
 import { PLATFORM_ROUTES, type PlatformRoute, type PlatformRouteConfig } from './route-registry';
 import { AI_NEEDS, type AiNeed, type AiPayer, type ProviderBundle, type ResolvedRoute } from './routing.types';
 import type { RetentionClass } from './routing.types';
@@ -187,12 +188,19 @@ export class AiRouteResolver {
       providerLabel: resolved.providerLabel,
       languageModel: (alias: ModelAlias): LanguageModel => {
         if (policy === 'ZDR' && !MODEL_CATALOG[alias].zdrCapable) throw new ZeroRetentionUnavailable(alias);
-        if (!resolved.languageModel) throw new AiNotConfigured('language');
-        return resolved.languageModel(alias);
+        const base = resolved.languageModel;
+        if (!base) throw new AiNotConfigured('language');
+        // The tuning is the resolver's, applied per route: effort in the route family's shape, and one retry of a
+        // refused generate call on the next alias up, on the same route.
+        return tunedLanguageModel(base, alias, resolved.effortFamily ?? 'anthropic');
       },
       modelIdFor: (alias: ModelAlias): string => {
         if (!resolved.modelIdFor) throw new AiNotConfigured('language');
         return resolved.modelIdFor(alias);
+      },
+      ledgerModelIdFor: (alias: ModelAlias, answeredByModelId?: string): string => {
+        if (!resolved.ledgerModelIdFor) throw new AiNotConfigured('language');
+        return resolved.ledgerModelIdFor(alias, answeredByModelId);
       },
       embeddingModel: (): EmbeddingModel => {
         if (!resolved.embeddingModel) throw new AiNotConfigured('embedding');

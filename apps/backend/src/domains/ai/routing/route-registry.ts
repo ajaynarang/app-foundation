@@ -2,7 +2,13 @@ import { createCohere } from '@ai-sdk/cohere';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import type { ModelAlias } from '@app/shared-types';
 
-import { AI_PROVIDER_LABELS, EMBEDDING_CATALOG, MODEL_CATALOG, type RouteIdColumn } from './model-catalog';
+import {
+  AI_PROVIDER_LABELS,
+  EMBEDDING_CATALOG,
+  MODEL_CATALOG,
+  ledgerModelIdFor,
+  type RouteIdColumn,
+} from './model-catalog';
 import { AiModelNotOnRoute } from './ai-model-not-on-route.error';
 import type { AiNeed, ProviderBundle, RetentionClass } from './routing.types';
 
@@ -60,6 +66,9 @@ export const PLATFORM_ROUTES: readonly PlatformRoute[] = [
         providerLabel: AI_PROVIDER_LABELS.OPENROUTER,
         languageModel: (alias: ModelAlias) => openrouter.chat(modelIdFor(alias)),
         modelIdFor,
+        effortFamily: 'openrouter',
+        ledgerModelIdFor: (alias: ModelAlias, answeredByModelId?: string) =>
+          ledgerModelIdFor(alias, answeredByModelId, 'openrouterId'),
       };
     },
   },

@@ -1,5 +1,6 @@
 import type { EmbeddingModel, LanguageModel } from 'ai';
 import type { ModelAlias } from '@app/shared-types';
+import type { EffortFamily, ProviderModel } from './model-tuning.middleware';
 
 /** What a caller asks the resolver for: a chat or structured-output model by alias, or the one embedding model. */
 export type AiNeed = 'language' | 'embedding';
@@ -25,8 +26,14 @@ export interface ResolvedRoute {
   retention: RetentionClass;
   /** Ledger vendor label: who bills the tokens (`AI_PROVIDER_LABELS`). */
   providerLabel: string;
+  /** The alias's model on this route, tuned (effort in the route family's shape, one retry one alias up). */
   languageModel(alias: ModelAlias): LanguageModel;
   modelIdFor(alias: ModelAlias): string;
+  /**
+   * The model id the ledger records for a call through `alias`: the alias's id on this route, or the id of the model
+   * that actually answered (`response.modelId`) when a refused call fell back one alias up.
+   */
+  ledgerModelIdFor(alias: ModelAlias, answeredByModelId?: string): string;
   embeddingModel(): EmbeddingModel;
   embeddingModelId(): string;
 }
@@ -34,8 +41,13 @@ export interface ResolvedRoute {
 /** What a registry entry builds: a language leg, an embedding leg, or both. */
 export interface ProviderBundle {
   providerLabel: string;
-  languageModel?: (alias: ModelAlias) => LanguageModel;
+  /** The alias's untuned provider model; the resolver wraps it with the tuning for `effortFamily`. */
+  languageModel?: (alias: ModelAlias) => ProviderModel;
   modelIdFor?: (alias: ModelAlias) => string;
+  /** How this route takes effort. Required with `languageModel`. */
+  effortFamily?: EffortFamily;
+  /** The ledger model id for an alias (and the model that answered), on this route's id column. */
+  ledgerModelIdFor?: (alias: ModelAlias, answeredByModelId?: string) => string;
   embeddingModel?: () => EmbeddingModel;
   embeddingModelId?: string;
 }

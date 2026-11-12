@@ -9,7 +9,7 @@ import {
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { ModelAlias } from '@app/shared-types';
 import { AI_PROVIDER_LABELS, LEGACY_EMBEDDING, MODEL_CATALOG, type AiProviderLabel } from '../../routing/model-catalog';
-import { modelTuningMiddleware } from './model-tuning.middleware';
+import { tunedLanguageModel, type ProviderModel } from '../../routing/model-tuning.middleware';
 
 // Pin Anthropic-model traffic to the Anthropic provider only.
 // Without this, AI Gateway's default routing falls back to Bedrock/Vertex when
@@ -78,23 +78,17 @@ export const LANGUAGE_PROVIDER_LABEL: AiProviderLabel = AI_PROVIDER_LABELS.ANTHR
  */
 export const ZDR_ELIGIBLE_TIERS: ReadonlySet<ModelAlias> = new Set<ModelAlias>([]);
 
-type ProviderModel = Parameters<typeof wrapLanguageModel>[0]['model'];
-
 /**
- * Build the three alias models over the direct Anthropic provider, each on its catalog `anthropicId` with its tuning.
- * A refused generate call retries exactly once on the next alias up (fast → standard → powerful): the fallback is a
- * tuned model with no fallback of its own, so a refusal never cascades. Exported for tests.
+ * Build the three alias models over the direct Anthropic provider, each on its catalog `anthropicId` with its tuning
+ * (the same builder the route resolver applies per route). A refused generate call retries exactly once on the next
+ * alias up. Exported for tests.
  */
 export function buildAliasModels(base: (modelId: string) => ProviderModel): Record<ModelAlias, ProviderModel> {
-  const build = (alias: ModelAlias, fallback?: ProviderModel) =>
-    wrapLanguageModel({
-      model: base(anthropicIdFor(alias)),
-      middleware: modelTuningMiddleware({ alias, fallback }),
-    });
+  const byAlias = (alias: ModelAlias) => base(anthropicIdFor(alias));
   return {
-    fast: build('fast', build('standard')),
-    standard: build('standard', build('powerful')),
-    powerful: build('powerful'),
+    fast: tunedLanguageModel(byAlias, 'fast', 'anthropic'),
+    standard: tunedLanguageModel(byAlias, 'standard', 'anthropic'),
+    powerful: tunedLanguageModel(byAlias, 'powerful', 'anthropic'),
   };
 }
 

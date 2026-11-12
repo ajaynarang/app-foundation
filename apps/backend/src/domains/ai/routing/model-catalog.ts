@@ -99,19 +99,24 @@ export const LEGACY_EMBEDDING = {
 } as const;
 
 /**
- * The model id the ledger records for a call through `alias`. A refused call retries once one alias up, and is then
- * answered (and billed) by that model, so the id the provider reports wins when it is one of ours. Any other id (an
- * unknown or dated one) would have no pricing row, so the alias's own id is kept.
+ * The model id the ledger records for a call through `alias` on a route that reads `column`. A refused call retries
+ * once one alias up, and is then answered (and billed) by that model, so the id the provider reports wins when it is
+ * one of ours (on any column): the ledger records that model's id on the route's column. Any other id (an unknown or
+ * dated one) would have no pricing row, so the alias's own id is kept.
  */
-export function ledgerModelIdFor(alias: ModelAlias, answeredByModelId: string | undefined): string {
+export function ledgerModelIdFor(
+  alias: ModelAlias,
+  answeredByModelId: string | undefined,
+  column: RouteIdColumn = 'anthropicId',
+): string {
   if (answeredByModelId) {
     for (const entry of Object.values(MODEL_CATALOG)) {
-      if (ROUTE_ID_COLUMNS.some((column) => entry[column] === answeredByModelId) && entry.anthropicId) {
-        return entry.anthropicId;
+      if (ROUTE_ID_COLUMNS.some((c) => entry[c] === answeredByModelId) && entry[column]) {
+        return entry[column];
       }
     }
   }
-  return MODEL_CATALOG[alias].anthropicId ?? alias;
+  return MODEL_CATALOG[alias][column] ?? alias;
 }
 
 /** The long-prompt threshold of the model behind `modelId` (any route column), when it has one. */

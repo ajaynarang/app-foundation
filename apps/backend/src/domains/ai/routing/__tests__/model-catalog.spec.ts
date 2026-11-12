@@ -120,6 +120,14 @@ describe('ledgerModelIdFor', () => {
   it('keeps the alias model when the reported id is not one of ours (it would have no pricing row)', () => {
     expect(ledgerModelIdFor('fast', 'claude-haiku-5-5-20261001')).toBe('claude-haiku-5-5');
   });
+
+  it("records the id on the route's own column (OpenRouter rows are priced by their slug)", () => {
+    expect(ledgerModelIdFor('fast', undefined, 'openrouterId')).toBe('anthropic/claude-haiku-5.5');
+    expect(ledgerModelIdFor('fast', 'anthropic/claude-sonnet-5.5', 'openrouterId')).toBe('anthropic/claude-sonnet-5.5');
+    expect(ledgerModelIdFor('fast', 'anthropic/claude-haiku-5.5-20261001', 'openrouterId')).toBe(
+      'anthropic/claude-haiku-5.5',
+    );
+  });
 });
 
 describe('longPromptSurchargeAbove', () => {

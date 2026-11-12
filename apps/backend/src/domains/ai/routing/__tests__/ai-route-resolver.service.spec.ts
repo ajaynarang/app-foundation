@@ -134,6 +134,68 @@ describe('AiRouteResolver (platform pool)', () => {
     });
   });
 
+  describe('tuning, applied per route', () => {
+    /** The OpenRouter bundle with a fake provider model per alias that records each call's options. */
+    function fakeOpenRouterBundle(refusing: string[]) {
+      const calls: Array<{ modelId: string; options: unknown }> = [];
+      const real = PLATFORM_ROUTES[0].buildProvider(OPENROUTER);
+      const fake = (alias: 'fast' | 'standard' | 'powerful') => {
+        const modelId = real.modelIdFor!(alias);
+        return {
+          specificationVersion: 'v3',
+          provider: 'fake',
+          modelId,
+          supportedUrls: {},
+          doGenerate: async (p: any) => {
+            calls.push({ modelId, options: p.providerOptions });
+            const refused = refusing.includes(alias);
+            return {
+              content: refused ? [] : [{ type: 'text', text: 'ok' }],
+              finishReason: { unified: refused ? 'content-filter' : 'stop', raw: 'x' },
+              usage: { inputTokens: { total: 1 }, outputTokens: { total: 1 } },
+              warnings: [],
+            };
+          },
+          doStream: async () => {
+            throw new Error('not used');
+          },
+        } as any;
+      };
+      jest.spyOn(PLATFORM_ROUTES[0], 'buildProvider').mockReturnValue({ ...real, languageModel: fake });
+      return calls;
+    }
+
+    it("sends the alias effort in OpenRouter's shape on platform-openrouter", async () => {
+      const calls = fakeOpenRouterBundle([]);
+      const route = await makeResolver({ config: OPENROUTER }).resolver.resolve(TENANT, 'language');
+      await (route.languageModel('fast') as any).doGenerate({ prompt: [] });
+      expect(calls).toEqual([
+        {
+          modelId: MODEL_CATALOG.fast.openrouterId,
+          options: { openrouter: { reasoning: { effort: MODEL_CATALOG.fast.effort } } },
+        },
+      ]);
+    });
+
+    it('retries a refused call once on the next alias up, on the same route', async () => {
+      const calls = fakeOpenRouterBundle(['fast']);
+      const route = await makeResolver({ config: OPENROUTER }).resolver.resolve(TENANT, 'language');
+      await (route.languageModel('fast') as any).doGenerate({ prompt: [] });
+      expect(calls.map((c) => c.modelId)).toEqual([
+        MODEL_CATALOG.fast.openrouterId,
+        MODEL_CATALOG.standard.openrouterId,
+      ]);
+    });
+
+    it("records the route's id for the model that answered, on the route's own column", async () => {
+      const route = await makeResolver({ config: OPENROUTER }).resolver.resolve(TENANT, 'language');
+      expect(route.ledgerModelIdFor('fast')).toBe(MODEL_CATALOG.fast.openrouterId);
+      expect(route.ledgerModelIdFor('fast', MODEL_CATALOG.standard.openrouterId)).toBe(
+        MODEL_CATALOG.standard.openrouterId,
+      );
+    });
+  });
+
   it('builds a platform bundle once and reuses it across resolves', async () => {
     const build = jest.spyOn(PLATFORM_ROUTES[0], 'buildProvider');
     const { resolver } = makeResolver({ config: OPENROUTER });

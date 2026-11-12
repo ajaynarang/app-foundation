@@ -24,6 +24,9 @@ describe('route registry builders', () => {
       if (r.serves.includes('language')) {
         expect(bundle.languageModel?.('standard')).toBeDefined();
         expect(bundle.modelIdFor?.('standard')).toBeTruthy();
+        // The resolver tunes every language model in the route family's shape and prices it on the route's column.
+        expect(bundle.effortFamily).toBeTruthy();
+        expect(bundle.ledgerModelIdFor?.('standard')).toBe(bundle.modelIdFor?.('standard'));
       } else {
         expect(bundle.languageModel).toBeUndefined();
       }
@@ -69,6 +72,10 @@ describe('route registry builders', () => {
     } finally {
       MODEL_CATALOG.powerful.openrouterId = original;
     }
+  });
+
+  it('platform-openrouter takes effort the OpenRouter way', () => {
+    expect(route('platform-openrouter').buildProvider(CONFIGURED).effortFamily).toBe('openrouter');
   });
 
   it('platform-cohere embeds with Cohere Embed v4, labelled cohere', () => {

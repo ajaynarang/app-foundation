@@ -25,6 +25,7 @@ import { MODEL_ALIASES, type ModelAlias } from '@app/shared-types';
 import { aiDirect } from '../src/domains/ai/infrastructure/providers/ai-provider';
 import { EMBEDDING_CATALOG, MODEL_CATALOG } from '../src/domains/ai/routing/model-catalog';
 import { OUTPUT_CEILINGS } from '../src/domains/ai/routing/output-ceilings';
+import { effortProviderOptions } from '../src/domains/ai/routing/model-tuning.middleware';
 import { PLATFORM_ROUTES, type PlatformRoute } from '../src/domains/ai/routing/route-registry';
 
 export const CEILING = OUTPUT_CEILINGS.WORD;
@@ -42,9 +43,12 @@ export interface CheckLine {
 
 type ProviderOptions = Parameters<typeof generateText>[0]['providerOptions'];
 
-/** How the OpenRouter route family takes the alias's effort: OpenRouter's `reasoning.effort`. */
+/**
+ * How the OpenRouter route family takes the alias's effort: OpenRouter's `reasoning.effort`, from the same helper the
+ * route resolver's tuning uses, so the live check proves the shape production sends.
+ */
 export function openRouterEffortOptions(alias: ModelAlias): ProviderOptions {
-  return { openrouter: { reasoning: { effort: MODEL_CATALOG[alias].effort } } };
+  return effortProviderOptions('openrouter', alias) as ProviderOptions;
 }
 
 function platformRoute(id: PlatformRoute['routeId']): PlatformRoute {
