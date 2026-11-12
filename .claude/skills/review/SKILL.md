@@ -87,6 +87,8 @@ Review every file against the backend patterns skill. For each violation found, 
 11. A new @Processor class added to an existing queue (one dispatcher per queue — add a QueueJobHandler instead)
 11a. A `bulk-ops` job name whose handler is not injected into and returned by the factory in `bulk-ops-queue.module.ts`, or missing from the map in architecture/bulk-ops-handlers.spec.ts (an unwired handler is a silent no-op)
 11b. An event consumer (an `@OnEvent` listener, a durable-path step, a job it enqueues) that is not safe to run twice for one event id: a write or a job id not keyed on `event.id`, an insert where an upsert belongs. Delivery is at least once; architecture-level proof is platform-glue/events/__tests__/double-delivery.spec.ts
+11c. Product vocabulary in the kernel (held by architecture/foundation-vocabulary.spec.ts): a queue, job name, job label, job category or manual type added to `@appshore/kernel` `queue.constants.ts` / `job.types.ts` for an app job; it belongs in `platform-glue/queue/job-names.ts`. A notification type added to `PLATFORM_NOTIFICATION_TYPES` for an app use, or a Prisma enum reintroduced for it; app types go in `platform-glue/notifications/notification-types.ts` with a policy in `NOTIFICATION_POLICIES`
+11d. The queue role switch read or set anywhere but `main.ts` (`applyQueueProcessingMode()`) and Terraform's `api_queue_processors_enabled`: `worker.ts` reading `QUEUE_PROCESSORS_ENABLED`, the key copied into Doppler or an env example as a default, or `api_queue_processors_enabled = false` with no worker task
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 12. DTO validation: class-validator decorators, @ApiProperty, @Transform for optional strings, cents for money

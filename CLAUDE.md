@@ -117,9 +117,18 @@ bind to app implementations.
   its handler with `DEADLINE_HANDLERS`, and call `DeadlineService.schedule(tx, …)` / `cancel(tx, …)` inside the
   write's transaction. A timer is a row, fired by the `deadline-sweep` job on `bulk-ops`; never a delayed job or a
   `setTimeout` (ADR "Outbox and deadlines"). Super-admins see every timer at `/admin/timers`.
+- **Background jobs:** declare your queues, job names, labels and categories in
+  `apps/backend/src/platform-glue/queue/job-names.ts` (`APP_QUEUE_NAMES`, `APP_JOB_NAMES`, `APP_JOB_DISPLAY_NAMES`,
+  `APP_JOB_CATEGORIES`, `APP_MANUAL_TYPES`); never in `@appshore/kernel`, whose lists are pinned by
+  `foundation-vocabulary.spec.ts`. A handler implements `QueueJobHandler`; a new queue gets its one dispatcher.
+  The API process consumes too unless `QUEUE_PROCESSORS_ENABLED=false` (Terraform `api_queue_processors_enabled`,
+  shipped `true`; turn it off only once a worker task runs).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
-- **Notification policies + WhatsApp templates:** bind `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES`
-  (and optionally `PLATFORM_TIMEZONE`) in `apps/backend/src/platform-glue/hooks.module.ts`; add your
+- **Notification types, policies + WhatsApp templates:** notification types are strings, not a Prisma enum. Declare
+  yours in `apps/backend/src/platform-glue/notifications/notification-types.ts` (`APP_NOTIFICATION_TYPES`) and their
+  policies and templates in `app-notification-policies.ts` beside it; `hooks.module.ts` binds them to
+  `NOTIFICATION_TYPES`, `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES` (and optionally `PLATFORM_TIMEZONE`). The
+  policy registry refuses to boot when a declared type has no policy. Add your
   named triggers to `apps/backend/src/domains/notifications/notification-triggers.service.ts`. The
   pipeline and every channel live in `@appshore/platform/infrastructure/notifications/`.
 - **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`.
@@ -175,6 +184,9 @@ the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); fro
 import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
 Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
 via the db package's `scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it.
+One decided exception: notification types are strings with an app registry (`PLATFORM_NOTIFICATION_TYPES` in
+`@app/shared-types` plus the app's `notification-types.ts`), so a product adds a type without editing
+`foundation.prisma`.
 
 ### API errors (one envelope)
 

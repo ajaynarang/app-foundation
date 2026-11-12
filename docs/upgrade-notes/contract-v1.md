@@ -425,3 +425,82 @@ no existing row.
 **What to do.** Run `prisma migrate deploy`. To add a timer, declare its kind in
 `apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`, write a handler that registers itself with
 `DEADLINE_HANDLERS`, and call `DeadlineService.schedule(tx, …)` inside the write's transaction.
+
+## 11. Queue roles, app job vocabulary, notification types, shadow database, `realmId`
+
+### The API and worker role switch (shipped off)
+
+**What changed.** `QUEUE_PROCESSORS_ENABLED=false` makes a process producer-only: its `@Processor` classes stay wired
+but never pull a job. Only the API entry point (`main.ts`) reads the key; the worker never does. Terraform gains
+`api_queue_processors_enabled` (default `true`), which adds the key to the API task only when set to `false`, and a
+precondition in `ecs.tf` refuses `false` while `worker_desired_count` is 0.
+
+**Who notices.** Nobody, until the switch is turned on: unset, the API consumes as before, and pulling this changes no
+running task.
+
+**What to do.** Nothing to keep today's behaviour. To turn it on: run at least one worker task, then set
+`api_queue_processors_enabled = false`. Roll back by setting it to `true`. Never put the key in Doppler: Doppler values
+override the task environment.
+
+### Job vocabulary moves to the app
+
+**What changed.** The kernel's `QUEUE_NAMES`, `*_JOB_NAMES`, `TYPE_DISPLAY_NAMES`, `JOB_CATEGORIES` and
+`MANUAL_CATEGORY_TYPES` now list only the foundation's own, pinned by `foundation-vocabulary.spec.ts`. App queues and
+jobs go in `apps/backend/src/platform-glue/queue/job-names.ts` (`APP_QUEUE_NAMES`, `APP_JOB_NAMES`,
+`APP_JOB_DISPLAY_NAMES`, `APP_JOB_CATEGORIES`, `APP_MANUAL_TYPES`), merged at boot and bound to the platform token
+`JOB_VOCABULARY`. A key defined twice fails at boot. `JobService.createJob` refuses a category no vocabulary declares.
+
+**Who notices.** A product that added its own queue, job name, label or category to the kernel files: the vocabulary
+spec fails and names `job-names.ts`.
+
+**What to do.** Move each app entry out of `@appshore/kernel` into `job-names.ts`. A queue you added also goes in
+`APP_QUEUE_NAMES`, which registers it with BullMQ and Bull Board; drop your own `registerQueue` line for it.
+
+### Notification types are strings, not a Prisma enum
+
+**What changed.** `notifications.type` and `notification_deliveries.type` are `VARCHAR(60)`, and the
+`NotificationType` enum is gone from the schema, the Prisma client and the shared-types mirror. Two migrations:
+`20261112180000_notification_type_strings` casts both columns to text (every row is kept, the value unchanged) and
+`20261112180100_drop_notification_type_enum` drops the type. The platform's types are `PLATFORM_NOTIFICATION_TYPES`
+(value bag `PlatformNotificationType`) in `@app/shared-types`; `NotificationTypeSchema` is now a SCREAMING_SNAKE string
+of at most 60 characters. An app declares its own in `apps/backend/src/platform-glue/notifications/notification-types.ts`,
+bound to `NOTIFICATION_TYPES` next to `NOTIFICATION_POLICIES`; the policy registry refuses to boot when a declared type
+has no policy or a policy names an undeclared type. In `openapi.json` the notification `type` field changes from an
+enum to that string pattern.
+
+**Who notices.** Backend code that imported `NotificationType` from `@appshore/db`: it no longer exists. Use
+`PlatformNotificationType.X` for values and the `NotificationType` type (a string) from `@app/shared-types`. A
+product that added a value to the enum moves it to `APP_NOTIFICATION_TYPES` with its policy. A client that validated
+`type` against the old enum list now receives the same values, typed as a string.
+
+**What to do.** Run `prisma migrate deploy`, then move your types and policies as above.
+
+**Rollback.** A code rollback past this change needs the SQL first, because the old client cannot read the string
+column. It works only while every stored value is in the old list:
+
+```sql
+CREATE TYPE "NotificationType" AS ENUM ('USER_INVITATION', 'TENANT_REGISTRATION_CONFIRMATION', 'TENANT_APPROVED',
+  'TENANT_REJECTED', 'INTEGRATION_SYNC_COMPLETED', 'INTEGRATION_SYNC_FAILED', 'SETTINGS_UPDATED', 'USER_JOINED',
+  'ROLE_CHANGED');
+ALTER TABLE "notifications" ALTER COLUMN "type" TYPE "NotificationType" USING "type"::"NotificationType";
+ALTER TABLE "notification_deliveries" ALTER COLUMN "type" TYPE "NotificationType" USING "type"::"NotificationType";
+```
+
+Then delete the two rows from `_prisma_migrations`.
+
+### A shadow database for migration diffs
+
+**What changed.** `packages/appshore/db/prisma.config.ts` passes `SHADOW_DATABASE_URL` to Prisma as the shadow
+database. `prisma migrate dev` and `prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema`
+replay the migration history there instead of in the dev database. `apps/backend/.env.example` documents the variable
+and the command that creates it (`docker compose exec postgres createdb -U postgres app_shadow`).
+
+**Who notices.** Nobody: unset, Prisma behaves as before.
+
+### `IntegrationConfig.realmId` is `VARCHAR(100)`
+
+**What changed.** The migration `20261112190000_widen_integration_realm_id` widens `integration_configs.realm_id`
+from 30 to 100 characters, so a 36-character vendor account id (an Atlassian cloud id) fits. Widening a varchar is
+metadata-only in Postgres; no row changes.
+
+**What to do.** Run `prisma migrate deploy`.
