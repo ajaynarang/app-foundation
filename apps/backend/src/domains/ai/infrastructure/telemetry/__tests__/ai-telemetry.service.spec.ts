@@ -48,6 +48,7 @@ const SONNET_PRICING = {
   inputPerMtokUsd: new Prisma.Decimal('3.000000'),
   outputPerMtokUsd: new Prisma.Decimal('15.000000'),
   cachedInputPerMtokUsd: new Prisma.Decimal('0.300000'),
+  cacheWriteInputPerMtokUsd: new Prisma.Decimal('3.750000'),
   effectiveFromDate: new Date('2026-05-27T00:00:00.000Z'),
   effectiveUntilDate: null,
   notes: null,
@@ -178,6 +179,33 @@ describe('AiTelemetryService', () => {
       // 800 billable * $3 / 1M = $0.0024, no cached cost, no output cost
       const call = prisma.aiInvocation.create.mock.calls[0][0];
       expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.0024');
+    });
+
+    it('prices cache writes at the write rate, apart from plain input and cache reads', async () => {
+      // 10,000 prompt = 6,000 read + 3,000 written + 1,000 plain:
+      //   1,000 plain @ $3 = $0.003
+      //   6,000 read @ $0.30 = $0.0018
+      //   3,000 written @ $3.75 = $0.01125
+      //   500 completion @ $15 = $0.0075
+      //   Total: $0.02355
+      await service.record(
+        makeUsage({ promptTokens: 10_000, completionTokens: 500, cachedTokens: 6_000, cacheWriteTokens: 3_000 }),
+        makeContext(),
+      );
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.02355');
+      expect(call.data.cacheWriteTokens).toBe(3_000);
+    });
+
+    it('prices a cache write at the input rate when the pricing row has no write rate', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue({ ...SONNET_PRICING, cacheWriteInputPerMtokUsd: null });
+      // 2,000 prompt = 1,000 written + 1,000 plain, all at $3 = $0.006; no output.
+      await service.record(
+        makeUsage({ promptTokens: 2_000, completionTokens: 0, cacheWriteTokens: 1_000 }),
+        makeContext(),
+      );
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.006');
     });
 
     it('clamps negative billable input to zero (defensive)', async () => {
@@ -335,6 +363,13 @@ describe('AiTelemetryService', () => {
           expect.objectContaining({ surface: 'KB_INGEST', totalTokens: 1500 }),
         ],
       ]);
+    });
+  });
+
+  describe('record() — cache-write tokens', () => {
+    it('writes null when the provider reported no cache writes', async () => {
+      await service.record(makeUsage(), makeContext());
+      expect(prisma.aiInvocation.create.mock.calls[0][0].data.cacheWriteTokens).toBeNull();
     });
   });
 
@@ -537,8 +572,37 @@ describe('AiTelemetryService', () => {
     it('upserts a default budget row (getOrCreate)', async () => {
       await service.checkBudget(TENANT_ID);
       expect(prisma.tenantAiBudget.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: TENANT_ID }, create: { tenantId: TENANT_ID }, update: {} }),
+        expect.objectContaining({
+          where: { tenantId: TENANT_ID },
+          create: { tenantId: TENANT_ID, notes: 'plan:DEFAULT' },
+          update: {},
+        }),
       );
+    });
+  });
+
+  describe('budget — the spend it counts', () => {
+    const isSql = (value: unknown): value is { sql: string; values: unknown[] } =>
+      typeof value === 'object' && value !== null && 'sql' in value && 'values' in value;
+
+    function spendQuerySql(): string {
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+      const parts: string[] = [];
+      strings.forEach((text, i) => {
+        parts.push(text);
+        const value = values[i];
+        if (isSql(value)) parts.push(value.sql);
+        else if (i < values.length) parts.push('?');
+      });
+      return parts.join('');
+    }
+
+    it('sums platform-paid rows only: a null credential type or a PLATFORM_ one', async () => {
+      await service.checkBudget(TENANT_ID);
+      const sql = spendQuerySql();
+      expect(sql).toMatch(/credential_type IS NULL OR credential_type LIKE/);
+      const fragment = (prisma.$queryRaw.mock.calls[0] as unknown[]).find(isSql);
+      expect(fragment?.values).toEqual(['PLATFORM\\_%']);
     });
   });
 

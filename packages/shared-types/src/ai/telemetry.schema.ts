@@ -57,7 +57,10 @@ export const AiUsageSchema = z.object({
   promptTokens: z.number().int().min(0),
   completionTokens: z.number().int().min(0),
   totalTokens: z.number().int().min(0),
+  /** Prompt tokens read from the provider's prompt cache. Inside `promptTokens`. */
   cachedTokens: z.number().int().min(0).optional(),
+  /** Prompt tokens written to the provider's prompt cache. Inside `promptTokens`; billed at the write rate. */
+  cacheWriteTokens: z.number().int().min(0).optional(),
   latencyMs: z.number().int().min(0).optional(),
   status: AiInvocationStatusSchema,
   errorCode: z.string().max(80).optional(),

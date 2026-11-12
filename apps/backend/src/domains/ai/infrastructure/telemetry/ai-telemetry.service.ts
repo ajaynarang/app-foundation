@@ -13,6 +13,8 @@ import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.co
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
 import { longPromptSurchargeAbove } from '../../routing/model-catalog';
+import { BUDGET_SEED_NOTE_DEFAULT } from '../../routing/provisioning/plan-ai-budgets';
+import { PLATFORM_PAID_SQL } from './platform-paid';
 
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
@@ -24,8 +26,10 @@ import { longPromptSurchargeAbove } from '../../routing/model-catalog';
  * aggregates get invalidated through a domain event staged in the same
  * transaction as the row (the outbox, ADR "Outbox and deadlines").
  *
- * Cost math: `(promptTokens - cachedTokens) * input + cachedTokens *
- * cachedInput + completionTokens * output`, all per million tokens. If no
+ * Cost math: `(promptTokens - cachedTokens - cacheWriteTokens) * input +
+ * cachedTokens * cachedInput + cacheWriteTokens * cacheWrite +
+ * completionTokens * output`, all per million tokens. A pricing row with no
+ * cache-write rate prices a write at the input rate. If no
  * `ModelPricing` row matches the provider/model at write time, the row is
  * still written with `costUsd = null` and a warning is logged — untagged
  * cost is a bug we want to see, not a silent failure that drops data.
@@ -115,8 +119,10 @@ export class AiTelemetryService {
       return null;
     }
 
+    // `promptTokens` includes the cache reads and the cache writes (`usageFromAiSdk`); each is priced at its own rate.
     const cachedTokens = usage.cachedTokens ?? 0;
-    const billableInput = Math.max(0, usage.promptTokens - cachedTokens);
+    const writtenTokens = usage.cacheWriteTokens ?? 0;
+    const billableInput = Math.max(0, usage.promptTokens - cachedTokens - writtenTokens);
 
     const PER_MTOK = new Prisma.Decimal(1_000_000);
 
@@ -124,9 +130,12 @@ export class AiTelemetryService {
     const cachedCost = pricing.cachedInputPerMtokUsd
       ? new Prisma.Decimal(cachedTokens).mul(pricing.cachedInputPerMtokUsd).div(PER_MTOK)
       : new Prisma.Decimal(0);
+    const writeCost = new Prisma.Decimal(writtenTokens)
+      .mul(pricing.cacheWriteInputPerMtokUsd ?? pricing.inputPerMtokUsd)
+      .div(PER_MTOK);
     const outputCost = new Prisma.Decimal(usage.completionTokens).mul(pricing.outputPerMtokUsd).div(PER_MTOK);
 
-    return inputCost.plus(cachedCost).plus(outputCost);
+    return inputCost.plus(cachedCost).plus(writeCost).plus(outputCost);
   }
 
   /**
@@ -220,6 +229,7 @@ export class AiTelemetryService {
         completionTokens: usage.completionTokens,
         totalTokens: usage.totalTokens,
         cachedTokens: usage.cachedTokens ?? null,
+        cacheWriteTokens: usage.cacheWriteTokens ?? null,
         costUsd,
         latencyMs: usage.latencyMs ?? null,
         status: usage.status,
@@ -316,7 +326,8 @@ export class AiTelemetryService {
       async () =>
         this.prisma.tenantAiBudget.upsert({
           where: { tenantId },
-          create: { tenantId },
+          // Stamped so the plan seeder may still replace these defaults: nobody chose them.
+          create: { tenantId, notes: BUDGET_SEED_NOTE_DEFAULT },
           update: {},
         }),
       CACHE_TTL_HOT_60S,
@@ -324,10 +335,16 @@ export class AiTelemetryService {
   }
 
   /**
-   * Sum the tenant's spend for today + the current calendar month from the
-   * ledger. Cached 60s (HOT) and busted on every new invocation, so the
-   * window of staleness is bounded. Uses a single grouped raw query rather
-   * than two findMany scans.
+   * Sum the tenant's PLATFORM-PAID spend for today + the current calendar
+   * month from the ledger. Cached 60s (HOT) and busted on every new
+   * invocation, so the window of staleness is bounded. Uses a single grouped
+   * raw query rather than two findMany scans.
+   *
+   * Only what the platform paid counts (`PLATFORM_PAID_SQL`): the cap is a
+   * control on platform money. Dollars a workspace spent on its own key never
+   * count, so removing that key mid-month, or one platform-paid call beside
+   * its own-key calls, does not trip the cap with spend that was never the
+   * platform's.
    */
   private async getSpent(tenantId: number): Promise<{ daily: Prisma.Decimal; monthly: Prisma.Decimal }> {
     const cached = await this.cache.getOrSet(
@@ -342,7 +359,7 @@ export class AiTelemetryService {
             COALESCE(SUM(cost_usd) FILTER (WHERE created_at >= ${startOfDay}), 0)::text   AS daily,
             COALESCE(SUM(cost_usd) FILTER (WHERE created_at >= ${startOfMonth}), 0)::text AS monthly
           FROM ai_invocations
-          WHERE tenant_id = ${tenantId} AND created_at >= ${startOfMonth}
+          WHERE tenant_id = ${tenantId} AND created_at >= ${startOfMonth} AND ${PLATFORM_PAID_SQL}
         `;
         const row = rows[0] ?? { daily: '0', monthly: '0' };
         return { daily: row.daily ?? '0', monthly: row.monthly ?? '0' };
