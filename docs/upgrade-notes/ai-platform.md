@@ -87,6 +87,33 @@ of yours that names a model id, reads `MODEL_ID_BY_ALIAS`, or calls `extract` wi
   alias at the smallest ceiling. It spends a few cents and is skipped when `ANTHROPIC_API_KEY` is unset.
 - No environment variable and no schema change.
 
+## 4. The route resolver arrives (nothing uses it yet)
+
+**What changed.** A new module, `apps/backend/src/domains/ai/routing/` (`AiRoutingModule`, `AiRouteResolver`,
+`route-registry.ts`), is the future single way to get a model: `resolve(tenantId, 'language' | 'embedding')` picks a
+route for the tenant and fails closed with a typed error (`AiNotConfigured` 503, `ZeroRetentionUnavailable` 400, and
+`AiModelNotOnRoute` 503 for an alias the catalog left without an id on that route). It knows two platform routes:
+`platform-openrouter` for language (the catalog's `openrouterId` slugs) and `platform-cohere` for embeddings (Cohere
+Embed v4 at 1536 dimensions). No caller is moved onto it yet; the app still runs on `ai-provider.ts`. Two packages
+are added: `@openrouter/ai-sdk-provider` and `@ai-sdk/cohere`.
+
+- Three optional keys join the config schema: `OPENROUTER_API_KEY` (`openRouterApiKey`), `COHERE_API_KEY`
+  (`cohereApiKey`) and `OPENAI_API_KEY` (`openaiApiKey`). The moderation client now reads `OPENAI_API_KEY` through the
+  schema instead of `process.env`; its behaviour is unchanged (unset means external moderation is off).
+- `pnpm --filter @app/backend ai:live-check` gains two legs: with `OPENROUTER_API_KEY`, one plain and one
+  structured call per alias through OpenRouter (effort sent as `reasoning.effort`, smallest ceiling); with
+  `COHERE_API_KEY`, one embedding that must come back at 1536 dimensions. Each leg is skipped without its key.
+
+**Who notices.** Nobody yet. Setting the two new keys changes nothing until the callers move onto the resolver.
+
+**What to do.**
+
+- Create an OpenRouter account and a Cohere account now, and put `OPENROUTER_API_KEY` and `COHERE_API_KEY` in every
+  environment (Doppler) ahead of the change that moves chat and embeddings onto the resolver. Run the live check
+  once with both keys and keep its output.
+- If you read `process.env.OPENAI_API_KEY` yourself, read `openaiApiKey` through `ConfigService` instead.
+- No schema change.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
