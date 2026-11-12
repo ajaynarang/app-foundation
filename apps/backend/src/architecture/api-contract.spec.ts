@@ -734,6 +734,16 @@ describe('API contract (ratchet)', () => {
     });
   });
 
+  /**
+   * The template ships with no debt: every route of the starter follows every rule, so the baseline is empty and stays
+   * empty. A product that later needs an entry (a rule it adopts before its code follows it) removes this test in a
+   * reviewed diff, and its baseline then shrinks like any other.
+   */
+  it('the baseline is empty: the starter follows every rule', () => {
+    const entries = Object.entries(baseline).filter(([, keys]) => keys.length > 0);
+    expect(entries.map(([rule, keys]) => `${rule}: ${keys.length}`)).toEqual([]);
+  });
+
   describe.each(Object.keys(RULES))('%s', (rule) => {
     const allowed = new Set(baseline[rule] ?? []);
 

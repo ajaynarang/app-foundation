@@ -94,12 +94,16 @@
       "reason": "Login activity is an admin audit view: rows and the Notable panel carry numeric event, user and tenant ids, and the super-admin filter takes one. Rows also carry publicId, which the list pages by"
     },
     "packages/shared-types/src/platform/plans.schema.ts": {
-      "count": 1,
-      "reason": "PlanConfig carries its numeric row id; a plan is identified by its TenantPlan value. Drop the id when the plan admin screens are next touched"
+      "count": 4,
+      "reason": "PlanConfig carries its numeric row id; a plan is identified by its TenantPlan value. The published contract documents the rows the plan routes already answer (PlanConfigRecord, PlanEntitlementRecord, the tenant plan events with their numeric tenantId), so it lists those ids too. Drop them when the plan admin screens are next touched"
     },
     "packages/shared-types/src/platform/preferences.schema.ts": {
+      "count": 4,
+      "reason": "UserPreferences returns its row id and the owner's numeric user id to the user themselves; the published contract documents that row (UserPreferencesRecord). Serialize them out when preferences are next touched"
+    },
+    "packages/shared-types/src/platform/tenant.schema.ts": {
       "count": 2,
-      "reason": "UserPreferences returns its row id and the owner's numeric user id to the user themselves. Serialize them out when preferences are next touched"
+      "reason": "The super-admin tenant views answer the numeric tenant id that the admin billing, AI-spend and jobs routes take (TenantRecord, TenantAdminDetails); the published contract documents what they already send. They move with those routes"
     }
   }
 }
