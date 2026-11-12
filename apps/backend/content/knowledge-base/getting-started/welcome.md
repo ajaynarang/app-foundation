@@ -14,4 +14,5 @@ Add your own product documentation as Markdown files under
 (`pnpm seed:knowledge`) will chunk, embed, and index every document here so the
 AI assistant can answer questions grounded in your content.
 
-Each file supports frontmatter: `title`, `audience`, `category`.
+Each file supports frontmatter: `title`, `documentType`, `audience`, `category` and `keywords`. See "Writing
+knowledge-base content" for how files are split and synced.
