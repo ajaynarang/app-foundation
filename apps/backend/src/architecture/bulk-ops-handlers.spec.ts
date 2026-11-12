@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { BULK_OPS_JOB_NAMES, QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { jobHandlersToken, QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { BulkOpsQueueModule } from '../platform-glue/queue/dispatchers/bulk-ops-queue.module';
 
 /**
  * A bulk-ops handler that is never added to the dispatcher's factory is silently dropped: BaseQueueDispatcher
@@ -34,8 +36,34 @@ describe('bulk-ops queue wiring', () => {
   const injectMatch = moduleSrc.match(/inject:\s*\[([^\]]+)\]/);
   const factoryMatch = moduleSrc.match(/QueueJobHandler\[\]\s*=>\s*\[([^\]]+)\]/);
 
+  /**
+   * Runs the module's real factory with one instance per injected class (built with no dependencies: a handler's
+   * constructor only stores them), so a handler injected but swapped out of the returned array is caught.
+   */
+  function resolvedHandlers(): QueueJobHandler[] {
+    const providers = (Reflect.getMetadata('providers', BulkOpsQueueModule) ?? []) as Array<{
+      provide?: unknown;
+      useFactory?: (...deps: unknown[]) => QueueJobHandler[];
+      inject?: Array<new (...args: unknown[]) => unknown>;
+    }>;
+    const provider = providers.find((p) => p.provide === jobHandlersToken(QUEUE_NAMES.BULK_OPS));
+    expect(provider?.useFactory).toBeDefined();
+    const deps = (provider.inject ?? []).map((Cls) => new Cls(...new Array(Cls.length).fill(undefined)));
+    return provider.useFactory(...deps);
+  }
+
+  it.each(Object.keys(handlerFileByJobName))('job %s: the factory returns a handler that claims it', (jobName) => {
+    const owners = resolvedHandlers().filter((handler) => handler.jobNames.includes(jobName));
+    expect(owners).toHaveLength(1);
+  });
+
+  it('returns each handler once', () => {
+    const handlers = resolvedHandlers();
+    expect(new Set(handlers.map((handler) => handler.constructor)).size).toBe(handlers.length);
+  });
+
   it.each([...new Set(Object.values(handlerFileByJobName))])(
-    'handler %s is injected into the factory and returned by it',
+    'handler %s is injected into the factory',
     (handlerFile) => {
       const src = fs.readFileSync(path.join(__dirname, handlerFile), 'utf8');
       const classMatch = src.match(/export class (\w+)\s+implements QueueJobHandler/);
