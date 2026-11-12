@@ -262,6 +262,7 @@ const REQUIRED_QUERY_PARAM_PATHS = new Set([
 // tenant selector query param from super admins.
 const SUPER_ADMIN_TENANT_SELECTOR_PATHS = new Set([
   '/api-keys/admin/tenant',
+  // feature:desk:start
   '/desk/agents',
   '/desk/agents/eligible-supervisors',
   '/desk/approvals',
@@ -271,6 +272,7 @@ const SUPER_ADMIN_TENANT_SELECTOR_PATHS = new Set([
   '/desk/memories',
   '/desk/responsibilities',
   '/desk/schedule',
+  // feature:desk:end
 ]);
 
 function generateExpectations(ep: EndpointInfo): Record<string, number | null> {

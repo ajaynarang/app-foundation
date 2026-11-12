@@ -1218,7 +1218,7 @@ default both consume every queue and the worker task is optional extra capacity.
 makes a process producer-only: `applyQueueProcessingMode()` (`@appshore/kernel`,
 `infrastructure/queue/queue-processing-mode.ts`, held by its spec) swaps BullMQ's worker class for one that never
 starts, before the app is created. Every `@Processor` stays wired; `queue.add()` and repeatable registration are
-unaffected; Inngest functions run over HTTP and stay in the API. Only `main.ts` calls it, so no value of the key can
+unaffected; Desk workflow functions, when the product kept Desk, run over HTTP and stay in the API. Only `main.ts` calls it, so no value of the key can
 stop the worker.
 
 - Ships off: Terraform `api_queue_processors_enabled` defaults to `true`, and the API task gets no env var.
@@ -1399,7 +1399,7 @@ const model = ai('standard');
 
 **Prompt management:** prompts load through `PromptingService` (`apps/backend/src/domains/prompting/`) — Langfuse primary with a code-registered fallback. Register prompts via the domain's registrar; names live in `PROMPT_NAMES` (`prompting.types.ts`).
 
-**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK directly through `StructuredOutputService` (document/structured extraction) and Desk steps via `runStructuredLlmStep()` — orchestrated by **Inngest** (durable workflows), not BullMQ. Don't add new direct-SDK callsites without a documented reason.
+**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK directly through `StructuredOutputService` (document/structured extraction) and, when the product kept Desk, Desk steps via `runStructuredLlmStep()`, orchestrated by its durable workflow engine, not BullMQ. Don't add new direct-SDK callsites without a documented reason.
 
 **Cost + moderation:** AI calls log to the per-tenant AI spend ledger; user-facing chat goes through moderation. Don't bypass either.
 
@@ -1797,6 +1797,27 @@ domains/ai/mcp/tools/<domain>/
 - Action tools resolve entities by public business ID (`projectNumber`) before calling services
 - Error handling: catch exceptions and return `{ error: 'user-friendly message' }` instead of throwing
 
+## 23a. Optional features (Desk)
+
+A feature a product chooses at scaffold time (today: Desk) is reached only through
+`apps/backend/src/platform-glue/features/`: `<name>.feature.ts` is the one file outside the feature's folder that
+imports from it, and `OPTIONAL_FEATURES` in `index.ts` lists what the product kept. The app module spreads the
+features' modules, `hooks.module.ts` binds `TENANT_PROVISION_HOOKS` to a composite of their hooks, and `main.ts`
+calls each `onAppReady`. Held by `apps/backend/src/architecture/optional-features.spec.ts`.
+
+- A Desk change stays inside `apps/backend/src/domains/desk/`.
+- A Desk-only line outside that folder (an env line, a doc line, a seed row, a package script) sits between
+  `feature:desk:start` and `feature:desk:end` comment lines, and its file is listed in
+  `tools/init-app/features/desk.json` (`markers`). A Desk-only file goes in `paths`; a JSON key or array value in
+  `jsonEntries`; an allowlist entry under the Desk folder is covered by `allowlistPrefixes`.
+- A line that must stay in every product and still names `inngest` or `domains/desk` (a guard that tests whether the
+  Desk folder exists) goes on `tools/init-app/features/desk.residue.json` with its reason.
+- `pnpm verify:scaffold` proves both scaffolds (`--desk no`, `--desk yes`) still install, type-check and pass. Run it
+  before a pull request that touches `tools/init-app/`, `platform-glue/features/`, a file the manifest names, or a
+  Desk file outside the Desk folder. The Desk tables stay in the schema either way, empty without Desk.
+
+<!-- feature:desk:start -->
+
 ---
 
 ## 24. Desk — Durable AI Workflow Engine (summary)
@@ -1813,3 +1834,5 @@ Key rules (full authoring guide: the **`desk-patterns`** skill):
 - Responsibilities call existing domain services via MCP tools in the execute step. Never duplicate business logic.
 - Use `DESK_OUTCOMES` constants (`shared-steps/outcomes.ts`), never bare outcome strings.
 - LLM steps go through `runStructuredLlmStep()` (`shared-steps/_llm-step.helper.ts`) — prompt via PromptingService, Zod-validated output, cost-ledger logging.
+
+<!-- feature:desk:end -->

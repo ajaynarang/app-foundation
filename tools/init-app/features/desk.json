@@ -1,0 +1,48 @@
+{
+  "$comment": "Desk, the Inngest workflow engine for background AI agents. `node tools/init-app/apply-feature.mjs --remove desk` deletes `paths`, strips the feature:desk blocks in `markers`, removes `jsonEntries` and drops allowlist keys under `allowlistPrefixes`. A Desk-only file, line or entry added outside apps/backend/src/domains/desk/ is registered here in the same pull request (held by apps/backend/src/architecture/optional-features.spec.ts and pnpm verify:scaffold).",
+  "paths": [
+    "apps/backend/src/domains/desk",
+    "apps/backend/src/platform-glue/features/desk.feature.ts",
+    "packages/appshore/db/prisma/seeds/07-desk.seed.ts",
+    "packages/test-utils/src/factories/desk.ts",
+    "packages/test-utils/src/schemas/desk.ts",
+    ".claude/skills/desk-patterns"
+  ],
+  "markers": [
+    "apps/backend/src/platform-glue/features/index.ts",
+    "apps/backend/scripts/seed-langfuse-prompts.ts",
+    "apps/backend/.env.example",
+    "packages/appshore/db/prisma/seeds/index.ts",
+    "packages/appshore/db/prisma/seeds/02-feature-flags.seed.ts",
+    "packages/appshore/db/prisma/seeds/04-plan-entitlements.seed.ts",
+    "apps/web/src/features/platform/plans/config/upgrade-registry.ts",
+    "apps/web/src/features/platform/settings/use-organization.ts",
+    "packages/appshore/web-core/src/shared/constants/query-keys.ts",
+    "packages/test-utils/src/factories/index.ts",
+    "packages/test-utils/src/schemas/index.ts",
+    "tests/config/detect-capabilities.ts",
+    "tests/scripts/generate-rbac-matrix.ts",
+    "docker-compose.yml",
+    "docs/doppler.md",
+    "docs/WHAT-YOU-GET.md",
+    "README.md",
+    "CLAUDE.md",
+    ".claude/skills/backend-patterns/SKILL.md"
+  ],
+  "jsonEntries": [
+    { "file": "package.json", "path": ["scripts", "// — Inngest (Desk durable workflow engine — local dev)"] },
+    { "file": "package.json", "path": ["scripts", "inngest:dev"] },
+    { "file": "apps/backend/package.json", "path": ["dependencies", "inngest"] },
+    { "file": "tests/config/tenant-capabilities.json", "path": ["enabledFeatures"], "value": "desk" }
+  ],
+  "allowlistPrefixes": [
+    {
+      "prefix": "apps/backend/src/domains/desk/",
+      "files": [
+        "apps/backend/src/architecture/api-contract.allowlist.json",
+        "apps/backend/src/architecture/no-direct-emit.allowlist.json",
+        "apps/backend/src/architecture/id-boundary.allowlist.json"
+      ]
+    }
+  ]
+}

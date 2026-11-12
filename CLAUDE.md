@@ -26,8 +26,15 @@ removed. Everything cross-cutting remains and works:
 - **AI** — a working streaming chat assistant (Mastra + AI SDK + Anthropic, Langfuse tracing,
   moderation, per-tenant AI budget, HITL) and an **empty MCP toolset** as your extension point.
 - **Billing** — Stripe subscriptions, wallet, plan entitlements, add-ons (generic).
-- **Infra** — Postgres (pgvector) + Redis, BullMQ queues, Inngest (Desk workflow engine,
-  empty), SSE realtime, S3 storage, email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+- **Infra** — Postgres (pgvector) + Redis, BullMQ queues, transactional outbox, timers, SSE realtime, S3 storage,
+  email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+
+<!-- feature:desk:start -->
+
+- **Desk** — Inngest durable workflow engine for background AI agents (empty responsibility registry). Optional:
+  chosen at scaffold time, off by default.
+
+<!-- feature:desk:end -->
 
 ---
 
@@ -92,8 +99,13 @@ tests/         — Playwright QA suite (@app/qa)
 | `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                        |
 | `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
 | `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
-| `desk/`          | Inngest durable workflow engine (**empty responsibility registry**)                                |
 | `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
+
+<!-- feature:desk:start -->
+
+With Desk: `desk/` is the Inngest durable workflow engine (**empty responsibility registry**).
+
+<!-- feature:desk:end -->
 
 Tenants/users/plans/flags/api-keys/oauth-provider now live in `@appshore/platform`
 (`packages/appshore/platform/src/domains/`). `apps/backend/src/platform-glue/` holds the
@@ -131,7 +143,20 @@ bind to app implementations.
   policy registry refuses to boot when a declared type has no policy. Add your
   named triggers to `apps/backend/src/domains/notifications/notification-triggers.service.ts`. The
   pipeline and every channel live in `@appshore/platform/infrastructure/notifications/`.
+- **Optional features:** a feature chosen at scaffold time (today: Desk) is wired only through
+  `apps/backend/src/platform-glue/features/` (`OPTIONAL_FEATURES`). Its manifest
+  (`tools/init-app/features/<name>.json`) names every file, marked block, JSON entry and allowlist entry that goes
+  with it; `node tools/init-app/apply-feature.mjs --remove <name>` strips it. A Desk-only line outside the Desk
+  folder sits between `feature:desk:start` / `feature:desk:end` comments and is registered there (ADR "Optional
+  features: Desk is opt-in at scaffold time", held by `optional-features.spec.ts`; `pnpm verify:scaffold` checks
+  both scaffolds).
+
+<!-- feature:desk:start -->
+
 - **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`.
+
+<!-- feature:desk:end -->
+
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
 - **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`.
 
@@ -160,7 +185,7 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 | Layer    | Tech                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------- |
-| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ, Inngest   |
+| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ            |
 | Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                    |
 | Auth     | First-party email+password, phone PIN/OTP (Twilio optional), Firebase optional, JWT+refresh |
 | AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                    |
@@ -227,6 +252,12 @@ success + error toasts; every loading state shows a Skeleton.
   or error body), and paste its last line too. It builds the backend, migrates, seeds, boots it and runs the
   Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
   third-party key. `API_QA_PORT` picks the port when 8000 is taken.
+- **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
+  `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
+  Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,
+  builds the foundation packages, regenerates OpenAPI and the RBAC matrix, type-checks the backend, web and
+  `tests/`, runs the backend specs, and checks that nothing names `inngest` or `domains/desk` in the `--desk no` copy
+  unless `tools/init-app/features/desk.residue.json` lists it. It takes minutes and needs Postgres and Redis.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook

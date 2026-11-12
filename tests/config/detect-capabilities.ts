@@ -126,6 +126,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // the token via `TESTS_HITL_TOKEN=…`.
   'voice-agent-secret', // `VOICE_AGENT_SECRET` env var is set on the backend —
   // precondition for `POST /voice/internal/respond` happy path.
+  // feature:desk:start
   // ── Desk (Inngest workflow engine — responsibility registry ships empty) ──
   'desk-approval', // At least one PENDING DeskApproval row exists on the
   // tenant — precondition for the approval claim/decide tests.
@@ -140,6 +141,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   'inngest-configured', // `INNGEST_EVENT_KEY` AND `INNGEST_SIGNING_KEY` env
   // vars are set on the backend — precondition for manual responsibility
   // runs and the Inngest serve handler.
+  // feature:desk:end
 ] as const;
 
 export type DataCapability = (typeof KNOWN_DATA_CAPABILITIES)[number];

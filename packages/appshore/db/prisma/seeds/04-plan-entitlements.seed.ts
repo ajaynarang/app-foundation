@@ -24,7 +24,9 @@ const entitlements: {
   { plan: TenantPlan.TRIAL, feature: 'audit_log', displayName: 'Audit Log', enabled: true, type: 'software' },
   // AI
   { plan: TenantPlan.TRIAL, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
+  // feature:desk:start
   { plan: TenantPlan.TRIAL, feature: 'desk', displayName: 'Desk', enabled: true, type: 'software' },
+  // feature:desk:end
   { plan: TenantPlan.TRIAL, feature: 'voice_mode', displayName: 'Voice Mode', enabled: true, type: 'software' },
   // Integrations
   { plan: TenantPlan.TRIAL, feature: 'integrations', displayName: 'Integrations', enabled: true, type: 'software' },
@@ -60,7 +62,9 @@ const entitlements: {
   { plan: TenantPlan.STARTER, feature: 'audit_log', displayName: 'Audit Log', enabled: false, type: 'software' },
   // AI
   { plan: TenantPlan.STARTER, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
+  // feature:desk:start
   { plan: TenantPlan.STARTER, feature: 'desk', displayName: 'Desk', enabled: true, type: 'software' },
+  // feature:desk:end
   { plan: TenantPlan.STARTER, feature: 'voice_mode', displayName: 'Voice Mode', enabled: false, type: 'software' },
   // Integrations
   { plan: TenantPlan.STARTER, feature: 'integrations', displayName: 'Integrations', enabled: false, type: 'software' },
@@ -113,7 +117,9 @@ const entitlements: {
   { plan: TenantPlan.PROFESSIONAL, feature: 'audit_log', displayName: 'Audit Log', enabled: true, type: 'software' },
   // AI
   { plan: TenantPlan.PROFESSIONAL, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
+  // feature:desk:start
   { plan: TenantPlan.PROFESSIONAL, feature: 'desk', displayName: 'Desk', enabled: true, type: 'software' },
+  // feature:desk:end
   { plan: TenantPlan.PROFESSIONAL, feature: 'voice_mode', displayName: 'Voice Mode', enabled: true, type: 'software' },
   // Integrations
   {
@@ -173,7 +179,9 @@ const entitlements: {
   { plan: TenantPlan.ENTERPRISE, feature: 'audit_log', displayName: 'Audit Log', enabled: true, type: 'software' },
   // AI
   { plan: TenantPlan.ENTERPRISE, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
+  // feature:desk:start
   { plan: TenantPlan.ENTERPRISE, feature: 'desk', displayName: 'Desk', enabled: true, type: 'software' },
+  // feature:desk:end
   { plan: TenantPlan.ENTERPRISE, feature: 'voice_mode', displayName: 'Voice Mode', enabled: true, type: 'software' },
   // Integrations — all enabled
   {

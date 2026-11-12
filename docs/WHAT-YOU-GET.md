@@ -77,8 +77,13 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
   human-in-the-loop approval for risky agent actions, Langfuse tracing.
 - **MCP server** with two sample tools (health, knowledge search) — add `@Tool` providers
   and your app is callable from Claude.
+
+<!-- feature:desk:start -->
+
 - **Desk**: durable agent workflow engine on Inngest (episodes, approvals, memory,
-  suppression) with one sample responsibility (`welcome`).
+  suppression) with one sample responsibility (`welcome`). Chosen at scaffold time; off by default.
+
+<!-- feature:desk:end -->
 
 **The plumbing**
 
@@ -165,9 +170,14 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
    `apiClient` from `@appshore/web-core`, shadcn/ui components). Replace the landing page
    (`apps/web/src/app/page.tsx`) and the legal placeholder copy.
 5. **Your mobile screens** — `apps/mobile/lib/features/<your-domain>/`.
-6. **Your AI surface** — `@Tool` providers in `domains/ai/mcp/mcp-tools.module.ts`, desk
-   responsibilities in `domains/desk/responsibilities/`, knowledge-base content, search
+6. **Your AI surface** — `@Tool` providers in `domains/ai/mcp/mcp-tools.module.ts`, knowledge-base content, search
    providers for @-mentions.
+   <!-- feature:desk:start -->
+
+   With Desk: responsibilities in `domains/desk/responsibilities/`.
+
+   <!-- feature:desk:end -->
+
 7. **Your integrations** — connectors in `domains/integrations/` `VENDOR_REGISTRY`
    (QuickBooks sample shows the pattern).
 8. **Branding** — `init-app` does the renames; you bring logo, colors (tailwind preset in

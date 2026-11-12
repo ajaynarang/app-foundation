@@ -159,9 +159,11 @@ export const queryKeys = {
     messages: (id: string) => ['conversations', id, 'messages'] as const,
   },
 
+  // feature:desk:start
   // ─── Desk (agentic runtime — schedule; no screen ships with the template) ─
   desk: {
     root: ['desk'] as const,
     schedule: () => ['desk', 'schedule'] as const,
   },
+  // feature:desk:end
 } as const;

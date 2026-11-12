@@ -27,7 +27,15 @@ endpoint.
   or consumer-style personal workspaces. Same code, same queries.
 - **A working AI product surface** — streaming assistant (Anthropic + AI SDK + Mastra),
   RAG knowledge base (pgvector), per-tenant AI budgets, human-in-the-loop approvals, an
-  **MCP server** with sample tools, and a durable agent workflow engine (Inngest).
+  **MCP server** with sample tools.
+
+<!-- feature:desk:start -->
+
+- **Desk** — a durable workflow engine (Inngest) for background AI agents, with approvals and memory. A new
+  product chooses it at scaffold time (`pnpm init-app --desk yes`); it is off by default.
+
+<!-- feature:desk:end -->
+
 - **Plans & billing** — entitlements enforced in the guard chain, Stripe
   subscriptions/invoices, credit wallet, trials, dunning.
 - **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
@@ -115,7 +123,7 @@ flowchart LR
     domain["2 · API<br/>backend/src/domains/<b>projects/</b>"]
     events["3 · Events<br/>platform-glue/events<br/><b>APP_EVENT_REGISTRY</b>"]
     feature["4 · UI<br/>web/src/features/<b>projects/</b>"]
-    extras["5 · Optional<br/>MCP tool · mobile screen<br/>desk responsibility · connector"]
+    extras["5 · Optional<br/>MCP tool · mobile screen<br/>connector"]
 
     schema --> domain --> events --> feature --> extras
 ```
@@ -138,13 +146,13 @@ guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what tha
 
 ## Tech stack
 
-| Layer    | Tech                                                                                          |
-| -------- | --------------------------------------------------------------------------------------------- |
-| Backend  | NestJS 11 · TypeScript 5.9 · Prisma 7 · PostgreSQL 16 (pgvector) · Redis 7 · BullMQ · Inngest |
-| Frontend | Next.js 15 (App Router) · Tailwind · shadcn/ui · TanStack Query · Zustand                     |
-| Mobile   | Flutter 3                                                                                     |
-| AI       | Anthropic · AI SDK · Mastra · MCP · Langfuse                                                  |
-| Infra    | Docker Compose (dev) · Terraform + AWS ECS (prod) · Loki/Tempo/Grafana                        |
+| Layer    | Tech                                                                                |
+| -------- | ----------------------------------------------------------------------------------- |
+| Backend  | NestJS 11 · TypeScript 5.9 · Prisma 7 · PostgreSQL 16 (pgvector) · Redis 7 · BullMQ |
+| Frontend | Next.js 15 (App Router) · Tailwind · shadcn/ui · TanStack Query · Zustand           |
+| Mobile   | Flutter 3                                                                           |
+| AI       | Anthropic · AI SDK · Mastra · MCP · Langfuse                                        |
+| Infra    | Docker Compose (dev) · Terraform + AWS ECS (prod) · Loki/Tempo/Grafana              |
 
 ---
 
