@@ -290,6 +290,44 @@ plan change or, in single mode, the next boot). Personal-mode products with Desk
 so the old code reads them by name unchanged. Budget notes stamped `plan:DEFAULT` are harmless to the old code, which
 ignores notes.
 
+## 8. Voice usage in the ledger
+
+**What changed.** A voice session's speech half (Deepgram speech-to-text, Cartesia text-to-speech, the LiveKit agent
+session) cost money and wrote no ledger row. It now writes one `VOICE` row per meter, priced per unit. The language
+turns of a voice session were already recorded as `CHAT` and still are.
+
+- Migration `20261112233000_ai_voice_usage`: `AiSurface` gains `VOICE`; new enum `AiUsageUnit` (`TOKEN`,
+  `AUDIO_SECOND`, `CHARACTER`, `SESSION_SECOND`); `ai_invocations` gains `usage_unit` (default `TOKEN`) and
+  `usage_quantity` (nullable); `model_pricing` gains `unit_price_usd` (nullable). Existing rows become `TOKEN` rows
+  with a null quantity.
+- A voice row has 0 tokens and `usageQuantity` in its unit; its cost is `usageQuantity x unitPriceUsd`. A pricing row
+  with no unit price records the usage with a null cost and logs a warning.
+- The voice agent (`voice-agent.entry.ts`) reports the session's totals once, when the session closes or the job
+  shuts down, to the new internal route `POST /api/v1/voice/internal/usage` (204). It uses the same
+  `X-Voice-Agent-Secret` as `internal/respond`, and the conversation must be the body's user's in the body's
+  workspace (404 otherwise). The report carries a session id minted by the agent, so a retried report records
+  nothing new. A failed report is logged by the agent and never breaks the call.
+- Voice rows carry no route and no credential type: the voice vendors run on platform keys, so the rows are
+  platform-paid and count toward the workspace's AI cap. A workspace that talks a lot reaches its cap sooner than
+  before.
+- The pricing seed adds `deepgram` / `nova-3` (per audio second), `cartesia` / `sonic-3` (per character, at the
+  Startup plan's credit rate) and `livekit` / `agent-session` (per session second, at the overage rate). Checked
+  against each vendor's price page on 2026-11-12. If you pay another plan, or run another model
+  (`DEEPGRAM_STT_MODEL`, `CARTESIA_TTS_MODEL`), add your own row; without one, those rows record a null cost.
+- Admin AI Spend labels the new surface "Voice (speech)".
+
+**Who notices.** Super-admins (voice rows in AI Spend). Workspaces that use voice (their platform-paid spend now
+includes it).
+
+**What to do.**
+
+1. Deploy. The migration is additive.
+2. Run the pricing seed (`pnpm --filter @app/backend seed:model-pricing`, or the full seed) so the voice rows exist.
+3. Check the three unit prices against the plans you actually pay for.
+
+**Rollback.** Revert the change. The new columns are nullable or defaulted and can stay; old code ignores them. The
+`VOICE` enum value cannot be removed without recreating the type; it is harmless to leave.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
