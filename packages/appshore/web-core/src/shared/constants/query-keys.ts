@@ -87,6 +87,10 @@ export const queryKeys = {
   webhooks: {
     root: ['webhooks'] as const,
   },
+  // ─── Workspace AI settings (retention policy + workspace AI keys) ───────
+  aiSettings: {
+    root: ['ai-settings'] as const,
+  },
   developerScopes: {
     root: ['developer-scopes'] as const,
   },

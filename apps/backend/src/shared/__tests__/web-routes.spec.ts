@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { INTEGRATIONS_WEB_PATH } from '../web-routes';
+import { AI_SETTINGS_WEB_PATH, INTEGRATIONS_WEB_PATH } from '../web-routes';
 
 const WEB_APP_DIR = join(__dirname, '../../../../web/src/app');
 
@@ -30,5 +30,12 @@ describe('INTEGRATIONS_WEB_PATH', () => {
     const pageAndLayouts = [readFileSync(pagePath, 'utf8'), ...layouts];
 
     expect(pageAndLayouts.some((source) => source.includes('<OAuthReturnNotice />'))).toBe(true);
+  });
+});
+
+/** The failing-key and budget notices, and the chat's connect-your-key link, send people here. */
+describe('AI_SETTINGS_WEB_PATH', () => {
+  it('is a page of the web app', () => {
+    expect(existsSync(join(WEB_APP_DIR, AI_SETTINGS_WEB_PATH, 'page.tsx'))).toBe(true);
   });
 });

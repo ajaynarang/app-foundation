@@ -36,6 +36,9 @@ export type AiCredentialSummary = z.infer<typeof AiCredentialSummarySchema>;
  * Who pays for a need right now: `platform`, the serving credential's public id, or `none` when the need is blocked
  * (nothing configured, a failing workspace key, or no route the retention policy allows).
  */
+/** The two payer values that are not a credential's public id. */
+export const AI_NEED_PAYER = { PLATFORM: 'platform', NONE: 'none' } as const;
+
 export const AiNeedPayersSchema = z.object({
   language: z.string(),
   embedding: z.string(),
