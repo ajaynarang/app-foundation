@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { CursorList } from '@app/shared-types';
+import { api } from '@appshore/web-core/shared/lib/api';
+import { useCursorList } from '@appshore/web-core/shared/list';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@app/ui/components/ui/tabs';
 import {
   AlertDialog,
@@ -13,16 +16,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@app/ui/components/ui/alert-dialog';
-import { useAuth } from '@/features/auth';
 import { showSuccess, showError } from '@app/ui';
+import { ListFooter } from '@/shared/components/page-chrome';
 import { TenantTable } from './tenant-table';
 import { RejectTenantDialog } from './reject-tenant-dialog';
 import { SuspendTenantDialog } from './suspend-tenant-dialog';
 import { ReactivateTenantDialog } from './reactivate-tenant-dialog';
 import { TenantDetailsSheet } from './tenant-details-sheet';
 
+type TenantStatusTab = 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
+
 interface Tenant {
-  id: number;
   tenantId: string;
   companyName: string;
   subdomain: string;
@@ -47,10 +51,37 @@ interface Tenant {
   };
 }
 
+/**
+ * One status tab's tenants: a cursor list, "Load more" appends. The key stays under ['tenants'] so every
+ * mutation below refreshes all four tabs.
+ */
+function useTenantsByStatus(status: TenantStatusTab) {
+  return useCursorList<Tenant>({
+    queryKey: ['tenants', status],
+    queryFn: (cursor) =>
+      api.get<CursorList<Tenant>>(`/tenants?status=${status}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+  });
+}
+
+/** The server's total for the tab, once the first page is in. */
+const tabCount = (list: ReturnType<typeof useTenantsByStatus>) => (list.isLoading ? '' : `(${list.total})`);
+
+function TenantListFooter({ list }: { list: ReturnType<typeof useTenantsByStatus> }) {
+  if (list.items.length === 0) return null;
+  return (
+    <ListFooter
+      shown={list.items.length}
+      total={list.total}
+      hasMore={list.hasMore}
+      onLoadMore={list.loadMore}
+      isLoadingMore={list.isLoadingMore}
+      loadMoreFailed={list.isLoadMoreError}
+    />
+  );
+}
+
 export function TenantManagementTabs() {
-  const { accessToken } = useAuth();
   const queryClient = useQueryClient();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   const [activeTab, setActiveTab] = useState('pending');
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; tenant?: Tenant }>({
@@ -68,53 +99,13 @@ export function TenantManagementTabs() {
   });
   const [approveConfirm, setApproveConfirm] = useState<{ tenant: Tenant; fromDetails?: boolean } | null>(null);
 
-  // Fetch tenants by status
-  const fetchTenants = async (status: string) => {
-    const response = await fetch(`${apiUrl}/tenants?status=${status}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch tenants');
-    return response.json();
-  };
+  const pending = useTenantsByStatus('PENDING_APPROVAL');
+  const active = useTenantsByStatus('ACTIVE');
+  const suspended = useTenantsByStatus('SUSPENDED');
+  const rejected = useTenantsByStatus('REJECTED');
 
-  const { data: pendingTenants, isLoading: pendingLoading } = useQuery({
-    queryKey: ['tenants', 'PENDING_APPROVAL'],
-    queryFn: () => fetchTenants('PENDING_APPROVAL'),
-    enabled: !!accessToken,
-  });
-
-  const { data: activeTenants, isLoading: activeLoading } = useQuery({
-    queryKey: ['tenants', 'ACTIVE'],
-    queryFn: () => fetchTenants('ACTIVE'),
-    enabled: !!accessToken,
-  });
-
-  const { data: suspendedTenants, isLoading: suspendedLoading } = useQuery({
-    queryKey: ['tenants', 'SUSPENDED'],
-    queryFn: () => fetchTenants('SUSPENDED'),
-    enabled: !!accessToken,
-  });
-
-  const { data: rejectedTenants, isLoading: rejectedLoading } = useQuery({
-    queryKey: ['tenants', 'REJECTED'],
-    queryFn: () => fetchTenants('REJECTED'),
-    enabled: !!accessToken,
-  });
-
-  // Approve mutation
   const approveMutation = useMutation({
-    mutationFn: async (tenantId: string) => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}/approve`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to approve tenant');
-      return response.json();
-    },
+    mutationFn: (tenantId: string) => api.post(`/tenants/${tenantId}/approve`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       showSuccess('Tenant approved');
@@ -124,20 +115,9 @@ export function TenantManagementTabs() {
     },
   });
 
-  // Reject mutation
   const rejectMutation = useMutation({
-    mutationFn: async ({ tenantId, reason }: { tenantId: string; reason: string }) => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ reason }),
-      });
-      if (!response.ok) throw new Error('Failed to reject tenant');
-      return response.json();
-    },
+    mutationFn: ({ tenantId, reason }: { tenantId: string; reason: string }) =>
+      api.post(`/tenants/${tenantId}/reject`, { reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setRejectDialog({ open: false });
@@ -148,20 +128,9 @@ export function TenantManagementTabs() {
     },
   });
 
-  // Suspend mutation
   const suspendMutation = useMutation({
-    mutationFn: async ({ tenantId, reason }: { tenantId: string; reason: string }) => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}/suspend`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ reason }),
-      });
-      if (!response.ok) throw new Error('Failed to suspend tenant');
-      return response.json();
-    },
+    mutationFn: ({ tenantId, reason }: { tenantId: string; reason: string }) =>
+      api.post(`/tenants/${tenantId}/suspend`, { reason }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setSuspendDialog({ open: false });
@@ -172,18 +141,8 @@ export function TenantManagementTabs() {
     },
   });
 
-  // Reactivate mutation
   const reactivateMutation = useMutation({
-    mutationFn: async (tenantId: string) => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}/reactivate`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to reactivate tenant');
-      return response.json();
-    },
+    mutationFn: (tenantId: string) => api.post(`/tenants/${tenantId}/reactivate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setReactivateDialog({ open: false });
@@ -218,52 +177,54 @@ export function TenantManagementTabs() {
     <>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="pending">Pending {pendingTenants ? `(${pendingTenants.length})` : ''}</TabsTrigger>
-          <TabsTrigger value="active">Active {activeTenants ? `(${activeTenants.length})` : ''}</TabsTrigger>
-          <TabsTrigger value="suspended">
-            Suspended {suspendedTenants ? `(${suspendedTenants.length})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="rejected">Rejected {rejectedTenants ? `(${rejectedTenants.length})` : ''}</TabsTrigger>
+          <TabsTrigger value="pending">Pending {tabCount(pending)}</TabsTrigger>
+          <TabsTrigger value="active">Active {tabCount(active)}</TabsTrigger>
+          <TabsTrigger value="suspended">Suspended {tabCount(suspended)}</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected {tabCount(rejected)}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending">
           <TenantTable
-            tenants={pendingTenants || []}
+            tenants={pending.items}
             status="PENDING_APPROVAL"
             onApprove={handleApprove}
             onReject={handleReject}
             onViewDetails={handleViewDetails}
-            isLoading={pendingLoading}
+            isLoading={pending.isLoading}
           />
+          <TenantListFooter list={pending} />
         </TabsContent>
 
         <TabsContent value="active">
           <TenantTable
-            tenants={activeTenants || []}
+            tenants={active.items}
             status="ACTIVE"
             onSuspend={handleSuspend}
             onViewDetails={handleViewDetails}
-            isLoading={activeLoading}
+            isLoading={active.isLoading}
           />
+          <TenantListFooter list={active} />
         </TabsContent>
 
         <TabsContent value="suspended">
           <TenantTable
-            tenants={suspendedTenants || []}
+            tenants={suspended.items}
             status="SUSPENDED"
             onReactivate={handleReactivate}
             onViewDetails={handleViewDetails}
-            isLoading={suspendedLoading}
+            isLoading={suspended.isLoading}
           />
+          <TenantListFooter list={suspended} />
         </TabsContent>
 
         <TabsContent value="rejected">
           <TenantTable
-            tenants={rejectedTenants || []}
+            tenants={rejected.items}
             status="REJECTED"
             onViewDetails={handleViewDetails}
-            isLoading={rejectedLoading}
+            isLoading={rejected.isLoading}
           />
+          <TenantListFooter list={rejected} />
         </TabsContent>
       </Tabs>
 

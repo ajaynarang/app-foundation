@@ -19,7 +19,6 @@ const PLAN_DISPLAY_NAMES: Record<string, string> = {
 };
 
 interface Tenant {
-  id: number;
   tenantId: string;
   companyName: string;
   subdomain: string;
@@ -135,7 +134,7 @@ export function TenantTable({
         </TableHeader>
         <TableBody>
           {tenants.map((tenant) => (
-            <TableRow key={tenant.id}>
+            <TableRow key={tenant.tenantId}>
               <TableCell className="font-medium">{tenant.companyName}</TableCell>
               <TableCell className="hidden sm:table-cell">
                 <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
