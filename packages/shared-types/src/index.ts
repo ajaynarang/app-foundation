@@ -46,6 +46,7 @@ export * from './infrastructure/outbound-webhook.schema';
 export * from './infrastructure/sse-events';
 export * from './infrastructure/job-envelope';
 export * from './infrastructure/cursor-list';
+export * from './infrastructure/deadline.schema';
 export * from './infrastructure/api-error';
 
 // AI platform schemas

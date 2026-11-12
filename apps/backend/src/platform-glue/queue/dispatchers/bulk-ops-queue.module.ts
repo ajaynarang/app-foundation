@@ -8,6 +8,8 @@ import { DataRetentionJobHandler } from '@appshore/platform/infrastructure/queue
 import { LoginEventCleanupJobHandler } from '@appshore/platform/auth/login-event-cleanup.processor';
 import { OutboxRelayJobHandler } from '@appshore/platform/infrastructure/events/outbox-relay.handler';
 import { OutboxRelayModule } from '../../events/outbox/outbox-relay.module';
+import { DeadlinesModule } from '@appshore/platform/infrastructure/deadlines/deadlines.module';
+import { DeadlineSweeper } from '@appshore/platform/infrastructure/deadlines/deadline.sweeper';
 import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
 
 /**
@@ -17,7 +19,13 @@ import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
  * `bulk-ops-handlers.spec.ts` fails when a BULK_OPS job name has no handler in the factory.
  */
 @Module({
-  imports: [QueueModule, forwardRef(() => DataRetentionModule), forwardRef(() => AuthModule), OutboxRelayModule],
+  imports: [
+    QueueModule,
+    forwardRef(() => DataRetentionModule),
+    forwardRef(() => AuthModule),
+    OutboxRelayModule,
+    DeadlinesModule,
+  ],
   providers: [
     BulkOpsQueueProcessor,
     {
@@ -26,8 +34,9 @@ import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
         retention: DataRetentionJobHandler,
         login: LoginEventCleanupJobHandler,
         outboxRelay: OutboxRelayJobHandler,
-      ): QueueJobHandler[] => [retention, login, outboxRelay],
-      inject: [DataRetentionJobHandler, LoginEventCleanupJobHandler, OutboxRelayJobHandler],
+        deadlineSweep: DeadlineSweeper,
+      ): QueueJobHandler[] => [retention, login, outboxRelay, deadlineSweep],
+      inject: [DataRetentionJobHandler, LoginEventCleanupJobHandler, OutboxRelayJobHandler, DeadlineSweeper],
     },
   ],
 })

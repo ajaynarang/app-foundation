@@ -59,6 +59,8 @@ export const BULK_OPS_JOB_NAMES = {
   TOKENS_CLEANUP: 'tokens-cleanup',
   // The outbox relay tick (ADR "Outbox and deadlines"): publishes what a crash left unpublished.
   OUTBOX_RELAY: 'outbox-relay',
+  // The deadline sweeper tick (ADR "Outbox and deadlines"): fires timers that came due.
+  DEADLINE_SWEEP: 'deadline-sweep',
 } as const;
 
 /**
