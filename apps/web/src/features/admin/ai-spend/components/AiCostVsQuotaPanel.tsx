@@ -13,7 +13,8 @@ interface AiCostVsQuotaPanelProps {
 
 /**
  * Side-by-side: USD cost (from the ledger) vs feature-use quota (from the
- * plan system). Makes the distinction explicit — they're independent limits.
+ * plan system). The cost figure set against the caps is what the platform
+ * paid; spend on the workspace's own credentials is shown, never capped. Makes the distinction explicit — they're independent limits.
  * Quota data is best-effort; when the quota read API isn't wired the right
  * column shows a "not yet available" note rather than empty space.
  */
@@ -29,12 +30,18 @@ export function AiCostVsQuotaPanel({ tenantId, days }: AiCostVsQuotaPanelProps) 
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {/* Cost — what we pay */}
+      {/* Cost — what the platform paid, against the caps; the workspace's own-key spend beside it, never capped */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-1">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Cost — last {data.windowDays}d</p>
-        <p className="text-xl font-bold text-foreground tabular-nums">{formatUsdPrecise(data.cost.totalUsd)}</p>
-        <p className="text-xs text-muted-foreground">{data.cost.callCount.toLocaleString()} AI calls</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          Platform-paid cost — last {data.windowDays}d
+        </p>
+        <p className="text-xl font-bold text-foreground tabular-nums">{formatUsdPrecise(data.cost.platformUsd)}</p>
+        <p className="text-xs text-muted-foreground">
+          {data.cost.callCount.toLocaleString()} AI calls · {formatUsdPrecise(data.cost.totalUsd)} total,{' '}
+          {formatUsdPrecise(data.cost.tenantUsd)} on the workspace&apos;s own keys
+        </p>
         <div className="pt-2 text-xs text-muted-foreground space-y-0.5">
+          <div>The caps count platform-paid cost only.</div>
           <div>
             Daily cap: {formatUsdPrecise(data.budget.dailySoftUsd)} soft / {formatUsdPrecise(data.budget.dailyHardUsd)}{' '}
             hard

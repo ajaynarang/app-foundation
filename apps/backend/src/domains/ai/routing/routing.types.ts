@@ -1,5 +1,5 @@
 import type { EmbeddingModel, LanguageModel } from 'ai';
-import type { ModelAlias } from '@app/shared-types';
+import type { AiPayer, ModelAlias } from '@app/shared-types';
 import type { EffortFamily, ProviderModel } from './model-tuning.middleware';
 
 /** What a caller asks the resolver for: a chat or structured-output model by alias, or the one embedding model. */
@@ -9,8 +9,8 @@ export const AI_NEEDS: readonly AiNeed[] = ['language', 'embedding'];
 /** Whether a route keeps prompts (`STANDARD`) or is contracted to keep nothing (`ZDR`, zero data retention). */
 export type RetentionClass = 'ZDR' | 'STANDARD';
 
-/** Who the provider bills for a call: the platform's own key, or the workspace's. */
-export type AiPayer = 'TENANT' | 'PLATFORM';
+/** Who the provider bills for a call: the platform's own key, or the workspace's. The wire enum is shared. */
+export type { AiPayer } from '@app/shared-types';
 
 /**
  * The resolver's answer: everything a consumer needs to make the call and to attribute it in the ledger. The model
