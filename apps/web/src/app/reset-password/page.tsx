@@ -100,7 +100,7 @@ function ResetPasswordInner() {
                 transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                 className="mx-auto w-16 h-16 rounded-full bg-critical/10 flex items-center justify-center"
               >
-                <AlertCircle className="h-8 w-8 text-critical" />
+                <AlertCircle className="h-8 w-8 text-critical-text" />
               </motion.div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">Link expired</h1>
@@ -171,7 +171,7 @@ function ResetPasswordInner() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-xs text-critical"
+                        className="text-xs text-critical-text"
                       >
                         Passwords don&apos;t match
                       </motion.p>
@@ -185,7 +185,7 @@ function ResetPasswordInner() {
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
-                      className="text-sm text-critical text-center"
+                      className="text-sm text-critical-text text-center"
                     >
                       {error}
                     </motion.p>
@@ -224,7 +224,7 @@ function ResetPasswordInner() {
                 }}
                 className="mx-auto w-16 h-16 rounded-full bg-success/10 flex items-center justify-center"
               >
-                <CheckCircle2 className="h-8 w-8 text-success" />
+                <CheckCircle2 className="h-8 w-8 text-success-text" />
               </motion.div>
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">Password updated</h1>

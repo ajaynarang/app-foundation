@@ -20,7 +20,7 @@ import {
 } from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
 import { resolveNotificationLink } from '@/shared/lib/notification-links';
-import { ListFooter } from '@/shared/components/page-chrome';
+import { ListErrorState, ListFooter } from '@/shared/components/page-chrome';
 
 interface NotificationSheetProps {
   open: boolean;
@@ -179,7 +179,16 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                 </>
               )}
 
-              {!isLoading && notifications.length === 0 && (
+              {!isLoading && inbox.isError && (
+                <ListErrorState
+                  title="Couldn't load your notifications."
+                  error={inbox.error}
+                  onRetry={() => void refetch()}
+                  isRetrying={inbox.isRefetching}
+                />
+              )}
+
+              {!isLoading && !inbox.isError && notifications.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Check className="h-10 w-10 text-muted-foreground mb-3" />
                   <p className="text-sm text-muted-foreground">You&apos;re all caught up</p>
@@ -219,12 +228,15 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium text-foreground truncate">{notif.title}</p>
-                            <button
-                              className="opacity-0 group-hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-opacity"
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Dismiss notification"
+                              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                               onClick={(e) => handleDismiss(e, notif.notificationId)}
                             >
                               <X className="h-3.5 w-3.5 text-muted-foreground" />
-                            </button>
+                            </Button>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
                           <div className="flex items-center gap-2 mt-1">
@@ -232,7 +244,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                               {formatRelativeTime(notif.createdAt)}
                             </span>
                             {notif.actionLabel && (
-                              <span className="text-2xs text-info">{notif.actionLabel} &rarr;</span>
+                              <span className="text-2xs text-info-text">{notif.actionLabel} &rarr;</span>
                             )}
                             {isGrouped && (
                               <button

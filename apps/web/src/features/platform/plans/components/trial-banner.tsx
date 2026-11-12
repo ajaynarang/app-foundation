@@ -24,9 +24,9 @@ export function TrialBanner() {
 
     return (
       <Alert className="rounded-none border-x-0 border-t-0 border-b border-caution/20 bg-caution/10">
-        <Clock className="h-4 w-4 text-caution" />
+        <Clock className="h-4 w-4 text-caution-text" />
         <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <span className="text-caution font-medium">
+          <span className="text-caution-text font-medium">
             Your trial expires {daysText}.{' '}
             {canManageBilling ? 'Upgrade to keep full access.' : 'Ask your admin to upgrade.'}
           </span>
@@ -63,9 +63,9 @@ export function PlanBlockedScreen() {
         {/* Icon */}
         <div className="mx-auto w-16 h-16 rounded-full bg-critical/10 flex items-center justify-center">
           {isSuspended ? (
-            <ShieldOff className="h-8 w-8 text-critical" />
+            <ShieldOff className="h-8 w-8 text-critical-text" />
           ) : (
-            <AlertTriangle className="h-8 w-8 text-critical" />
+            <AlertTriangle className="h-8 w-8 text-critical-text" />
           )}
         </div>
 

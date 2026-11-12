@@ -33,7 +33,7 @@ function LayoutModeButton({
           variant="ghost"
           size="icon"
           onClick={onClick}
-          className={`h-7 w-7 ${active ? 'bg-gray-200 dark:bg-gray-700 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`h-7 w-7 ${active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           aria-label={label}
         >
           {children}

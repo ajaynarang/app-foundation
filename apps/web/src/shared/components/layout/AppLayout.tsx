@@ -106,7 +106,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               {showOnboardingBanner && <OnboardingBanner onDismiss={handleDismissBanner} />}
 
               {/* Main content */}
-              <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950">
+              <main className="flex-1 overflow-y-auto bg-muted/30">
                 <PageTransition pageKey={pathname?.split('/').slice(0, 3).join('/') ?? '/'} className="p-4 md:p-8">
                   {children}
                 </PageTransition>

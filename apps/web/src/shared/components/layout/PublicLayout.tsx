@@ -68,8 +68,8 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               />
               <span className="text-lg sm:text-xl font-bold text-foreground font-space-grotesk">Platform</span>
             </Link>
-            <span className="hidden sm:inline text-xs text-gray-400">|</span>
-            <p className="hidden sm:block text-xs text-gray-500">Your platform, ready to build on.</p>
+            <span className="hidden sm:inline text-xs text-muted-foreground">|</span>
+            <p className="hidden sm:block text-xs text-muted-foreground">Your platform, ready to build on.</p>
           </div>
 
           {/* Desktop Navigation */}
@@ -139,7 +139,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                 {/* Profile dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600">
+                    <button className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring">
                       <Avatar className="h-9 w-9">
                         <AvatarFallback className="bg-black dark:bg-white text-white dark:text-black text-sm">
                           {getInitials(user?.firstName, user?.lastName)}
@@ -165,7 +165,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                       <span>Settings</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-critical">
+                    <DropdownMenuItem onClick={handleLogout} className="text-critical-text">
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Logout</span>
                     </DropdownMenuItem>
@@ -285,7 +285,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="w-full justify-start text-critical"
+                    className="w-full justify-start text-critical-text"
                     onClick={() => {
                       handleLogout();
                       setIsMobileMenuOpen(false);

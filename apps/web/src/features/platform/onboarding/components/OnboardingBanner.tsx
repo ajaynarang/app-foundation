@@ -17,11 +17,11 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
   }
 
   return (
-    <div className="relative z-50 border-b border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+    <div className="relative z-50 border-b border-caution/40 bg-caution/10">
       <div className="flex items-center justify-between px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-900 dark:text-amber-100" />
-          <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
+          <AlertTriangle className="h-5 w-5 text-caution-text" />
+          <span className="text-sm font-medium text-caution-text">
             Finish setting up your workspace to unlock everything — invite your team and configure your settings
           </span>
         </div>
@@ -30,7 +30,7 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
             size="sm"
             variant="outline"
             onClick={() => router.push('/onboarding')}
-            className="border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-100 dark:hover:bg-amber-800"
+            className="border-caution/40 bg-caution/15 text-caution-text hover:bg-caution/25"
           >
             Complete Setup
           </Button>
@@ -38,7 +38,7 @@ export function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
             variant="ghost"
             size="icon"
             onClick={onDismiss}
-            className="h-7 w-7 text-amber-900 hover:bg-amber-100 dark:text-amber-100 dark:hover:bg-amber-900"
+            className="h-7 w-7 text-caution-text hover:bg-caution/15"
             aria-label="Dismiss banner"
           >
             <X className="h-4 w-4" />

@@ -78,7 +78,7 @@ export function PageActionsMenu({ items, label = 'More actions', align = 'end', 
                 <DropdownMenuItem
                   disabled={item.disabled}
                   onSelect={() => item.onClick()}
-                  className={cn('gap-2', item.destructive && 'text-critical focus:text-critical')}
+                  className={cn('gap-2', item.destructive && 'text-critical-text focus:text-critical-text')}
                 >
                   {Icon && <Icon className="h-4 w-4" />}
                   {item.label}

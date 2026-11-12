@@ -23,7 +23,7 @@ export function AssistantUpgradePrompt({ feature }: AssistantUpgradePromptProps)
     return (
       <div className="min-h-[60vh] flex items-center justify-center bg-background px-4">
         <div className="text-center max-w-md">
-          <Sparkles className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+          <Sparkles className="h-10 w-10 text-caution-text mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">Upgrade Required</h2>
           <p className="text-sm text-muted-foreground mb-6">
             {canManageBilling
@@ -86,13 +86,13 @@ function AddOnUpsellCard({ feature }: { feature: string }) {
         <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-4 text-sm text-muted-foreground">
           {config.benefits.slice(0, 4).map((b) => (
             <span key={b} className="flex items-center gap-1">
-              <span className="text-violet-400">&#10003;</span> {b}
+              <span className="text-brand-text">&#10003;</span> {b}
             </span>
           ))}
         </div>
 
         <div className="mt-6">
-          <div className="text-violet-400 font-bold text-2xl">{config.addOnPrice}</div>
+          <div className="text-brand-text font-bold text-2xl">{config.addOnPrice}</div>
         </div>
 
         {canManageBilling ? (
@@ -139,13 +139,13 @@ function PlanUpgradeCard({ feature }: { feature: string }) {
           {/* Assistant's message */}
           <div className="flex-1 bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Icon className="h-5 w-5 text-amber-500" />
+              <Icon className="h-5 w-5 text-caution-text" />
               <span className="text-sm font-semibold text-foreground">{config.displayName}</span>
             </div>
 
             <p className="text-sm text-foreground mb-2">
               This feature is available on the{' '}
-              <span className="font-semibold text-amber-500">{config.requiredPlan}</span> plan.
+              <span className="font-semibold text-caution-text">{config.requiredPlan}</span> plan.
             </p>
             <p className="text-sm text-muted-foreground mb-5">
               {canManageBilling ? config.description : `${config.description} Ask your account admin to upgrade.`}
