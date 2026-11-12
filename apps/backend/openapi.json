@@ -200,12 +200,20 @@
               "callCount": {
                 "type": "integer"
               },
+              "platformUsd": {
+                "type": "string"
+              },
+              "tenantUsd": {
+                "type": "string"
+              },
               "totalUsd": {
                 "type": "string"
               }
             },
             "required": [
               "totalUsd",
+              "platformUsd",
+              "tenantUsd",
               "callCount"
             ],
             "type": "object"
@@ -258,6 +266,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "cacheWriteTokens": {
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "cachedTokens": {
                   "nullable": true,
                   "type": "integer"
@@ -270,6 +282,10 @@
                   "type": "string"
                 },
                 "createdAt": {
+                  "type": "string"
+                },
+                "credentialType": {
+                  "nullable": true,
                   "type": "string"
                 },
                 "id": {
@@ -295,10 +311,21 @@
                 "model": {
                   "type": "string"
                 },
+                "payer": {
+                  "enum": [
+                    "PLATFORM",
+                    "TENANT"
+                  ],
+                  "type": "string"
+                },
                 "promptTokens": {
                   "type": "integer"
                 },
                 "provider": {
+                  "type": "string"
+                },
+                "routeId": {
+                  "nullable": true,
                   "type": "string"
                 },
                 "status": {
@@ -332,8 +359,12 @@
                 "promptTokens",
                 "completionTokens",
                 "cachedTokens",
+                "cacheWriteTokens",
                 "latencyMs",
                 "status",
+                "routeId",
+                "credentialType",
+                "payer",
                 "langfuseTraceId",
                 "linkRefType",
                 "linkRefId",
@@ -369,10 +400,14 @@
           },
           "windowCostUsd": {
             "type": "string"
+          },
+          "windowPlatformCostUsd": {
+            "type": "string"
           }
         },
         "required": [
           "windowCostUsd",
+          "windowPlatformCostUsd",
           "tenantCount"
         ],
         "type": "object"
@@ -398,6 +433,9 @@
           "windowErrorCount": {
             "type": "integer"
           },
+          "windowPlatformCostUsd": {
+            "type": "string"
+          },
           "windowTotalTokens": {
             "type": "integer"
           }
@@ -405,6 +443,7 @@
         "required": [
           "surface",
           "windowCostUsd",
+          "windowPlatformCostUsd",
           "windowCallCount",
           "windowErrorCount",
           "windowTotalTokens"
@@ -463,6 +502,9 @@
                 },
                 "windowErrorCount": {
                   "type": "integer"
+                },
+                "windowPlatformCostUsd": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -470,6 +512,7 @@
                 "tenantSlug",
                 "companyName",
                 "windowCostUsd",
+                "windowPlatformCostUsd",
                 "windowCallCount",
                 "windowErrorCount",
                 "sparkline",
