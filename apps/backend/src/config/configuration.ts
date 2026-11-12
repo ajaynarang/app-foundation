@@ -83,6 +83,16 @@ const configSchema = z.object({
    * credential). Nothing reads them; the routing module logs one boot warning per name so an operator removes them.
    */
   retiredAiEnvVars: z.array(z.string()).default([]),
+  /**
+   * `none` turns prompt caching off on every route, so an uncached baseline can be measured. A local switch only:
+   * unset on every deployed task (`isProductionEnv()`), whatever the variable says.
+   */
+  aiPromptCacheOverride: z.enum(['none']).optional(),
+  /**
+   * A folder where each AI call's usage shape is written (numbers and provider names only), to capture the fixtures
+   * behind `usageFromAiSdk`'s spec from live calls. A local switch only: unset on every deployed task.
+   */
+  aiUsageCaptureDir: z.string().optional(),
 
   // Encrypts third-party integration credentials at rest (AES-256).
   credentialsEncryptionKey: z
@@ -351,6 +361,11 @@ export default (): Configuration => {
     openRouterApiKey: env('OPENROUTER_API_KEY'),
     cohereApiKey: env('COHERE_API_KEY'),
     openaiApiKey: env('OPENAI_API_KEY'),
+    // Measurement switches: honoured on a local run only. Every deployed task (NODE_ENV or ENV_TYPE production,
+    // which covers staging and sandbox on the shipped image) resolves them to unset, so no code that reads them
+    // needs an environment check of its own.
+    aiPromptCacheOverride: isProductionEnv(process.env) ? undefined : env('AI_PROMPT_CACHE_OVERRIDE'),
+    aiUsageCaptureDir: isProductionEnv(process.env) ? undefined : env('AI_USAGE_CAPTURE_DIR'),
     oauthJwtSecret: env('OAUTH_JWT_SECRET'),
     oauthConsentSecret: env('OAUTH_CONSENT_SECRET'),
     credentialsEncryptionKey: env('CREDENTIALS_ENCRYPTION_KEY'),

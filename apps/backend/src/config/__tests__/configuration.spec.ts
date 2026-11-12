@@ -47,6 +47,8 @@ describe('configuration — production boot guard', () => {
     'OPENROUTER_API_KEY',
     'COHERE_API_KEY',
     'OPENAI_API_KEY',
+    'AI_PROMPT_CACHE_OVERRIDE',
+    'AI_USAGE_CAPTURE_DIR',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -423,6 +425,32 @@ describe('configuration — production boot guard', () => {
       expect(config.retiredAiEnvVars).toEqual(['AI_PROVIDER', 'AI_GATEWAY_API_KEY', 'ANTHROPIC_API_KEY']);
       expect(JSON.stringify(config)).not.toMatch(/vck-test|sk-ant-test/);
       expect(config).not.toHaveProperty('anthropicApiKey');
+    });
+
+    describe('the AI measurement switches (local runs only)', () => {
+      const switches = { AI_PROMPT_CACHE_OVERRIDE: 'none', AI_USAGE_CAPTURE_DIR: '/tmp/usage-capture' };
+
+      it('are honoured on a local run', () => {
+        const config = load({ ...dev, ENV_TYPE: undefined, ...switches });
+        expect(config.aiPromptCacheOverride).toBe('none');
+        expect(config.aiUsageCaptureDir).toBe('/tmp/usage-capture');
+      });
+
+      it('resolve to unset when ENV_TYPE=production', () => {
+        const config = load({ ...validProduction(), NODE_ENV: 'development', ENV_TYPE: 'production', ...switches });
+        expect(config.aiPromptCacheOverride).toBeUndefined();
+        expect(config.aiUsageCaptureDir).toBeUndefined();
+      });
+
+      it('resolve to unset on a sandbox or staging task, which runs with NODE_ENV=production', () => {
+        const config = load({ ...validProduction(), ENV_TYPE: 'sandbox', ...switches });
+        expect(config.aiPromptCacheOverride).toBeUndefined();
+        expect(config.aiUsageCaptureDir).toBeUndefined();
+      });
+
+      it('refuse an override other than none', () => {
+        expect(() => load({ ...dev, ENV_TYPE: undefined, AI_PROMPT_CACHE_OVERRIDE: 'off' })).toThrow();
+      });
     });
 
     it('lists no retired variable when none is set (a blank one counts as unset)', () => {
