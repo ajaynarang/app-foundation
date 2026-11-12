@@ -47,6 +47,23 @@ describe('zero-retention tenant embedding fails closed', () => {
     expect(createCohere).toHaveBeenCalledTimes(1);
   });
 
+  it('the same tenant WITH a zero-retention platform route embeds on Bedrock (fail-closed, not fail-always)', async () => {
+    const { resolver } = makeResolver({
+      aiZeroRetention: true,
+      config: { cohereApiKey: 'co-test', platformBedrockRegion: 'us-east-1' },
+    });
+    mockEmbedMany.mockResolvedValue({ embeddings: [new Array(1536).fill(0)], usage: { tokens: 3 } });
+    const telemetry = { record: jest.fn() };
+    const service = new EmbeddingService(telemetry as never, resolver);
+
+    const vectors = await service.embedBatch(['text'], { tenantId: TENANT, surface: 'EMBEDDING' as const }, 'document');
+    expect(vectors).toHaveLength(1);
+    expect(mockEmbedMany).toHaveBeenCalledTimes(1);
+    expect(mockEmbedMany.mock.calls[0][0].model).toMatchObject({ modelId: 'cohere.embed-v4:0' });
+    // The standard Cohere route is configured and still never built for this tenant.
+    expect(createCohere).not.toHaveBeenCalled();
+  });
+
   it('EmbeddingService sends nothing for that tenant: no embed call, no ledger row', async () => {
     const { resolver } = makeResolver({ aiZeroRetention: true, config: { cohereApiKey: 'co-test' } });
     const telemetry = { record: jest.fn() };

@@ -1,7 +1,9 @@
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createCohere } from '@ai-sdk/cohere';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGateway, wrapLanguageModel, type LanguageModelMiddleware } from 'ai';
+import { fromNodeProviderChain, fromTemporaryCredentials } from '@aws-sdk/credential-providers';
 import { AiCredentialType, type AiCredential } from '@appshore/db';
 import type { ModelAlias } from '@app/shared-types';
 
@@ -16,11 +18,13 @@ import { AiModelNotOnRoute } from './ai-model-not-on-route.error';
 import { AiCredentialFailing } from './ai-credential-failing.error';
 import type { AiNeed, ProviderBundle, RetentionClass } from './routing.types';
 import type { PromptCacheStrategy } from './prompt-cache';
+import { FALLBACK_PROJECT_SLUG, bedrockSessionName } from './aws-role-naming';
 
 /** Ledger `credentialType` strings for the platform's own routes. "Platform paid" is derived from the prefix. */
 export const PLATFORM_CREDENTIAL_TYPES = {
   OPENROUTER: 'PLATFORM_OPENROUTER',
   COHERE: 'PLATFORM_COHERE',
+  BEDROCK: 'PLATFORM_BEDROCK',
 } as const;
 
 /**
@@ -30,10 +34,12 @@ export const PLATFORM_CREDENTIAL_TYPES = {
 export interface PlatformRouteConfig {
   openRouterApiKey?: string;
   cohereApiKey?: string;
+  /** The AWS region of `platform-bedrock`. Setting it is the switch; the task's own credentials sign the calls. */
+  platformBedrockRegion?: string;
 }
 
 export interface PlatformRoute {
-  routeId: 'platform-openrouter' | 'platform-cohere';
+  routeId: 'platform-openrouter' | 'platform-cohere' | 'platform-bedrock';
   credentialType: (typeof PLATFORM_CREDENTIAL_TYPES)[keyof typeof PLATFORM_CREDENTIAL_TYPES];
   serves: readonly AiNeed[];
   retention: RetentionClass;
@@ -54,10 +60,32 @@ export function catalogModelId(alias: ModelAlias, column: RouteIdColumn, routeId
   return id;
 }
 
+/** Signs Bedrock calls: the task's own credentials, or a workspace role's temporary ones. */
+type BedrockCredentialProvider = NonNullable<Parameters<typeof createAmazonBedrock>[0]>['credentialProvider'];
+
+/**
+ * A Bedrock bundle: language on the catalog's `bedrockId` (an alias without one is refused, never substituted) and
+ * Cohere Embed v4 for embeddings. Both Bedrock routes build through here, so they call the same models.
+ */
+function bedrockBundle(region: string, credentialProvider: BedrockCredentialProvider, routeId: string): ProviderBundle {
+  const bedrock = createAmazonBedrock({ region, credentialProvider });
+  const modelIdFor = (alias: ModelAlias) => catalogModelId(alias, 'bedrockId', routeId);
+  return {
+    providerLabel: AI_PROVIDER_LABELS.AWS,
+    languageModel: (alias: ModelAlias) => bedrock(modelIdFor(alias)),
+    modelIdFor,
+    effortFamily: 'bedrock',
+    ledgerModelIdFor: (alias: ModelAlias, answeredByModelId?: string) =>
+      ledgerModelIdFor(alias, answeredByModelId, 'bedrockId'),
+    embeddingModel: () => bedrock.embeddingModel(EMBEDDING_CATALOG.bedrockId),
+    embeddingModelId: EMBEDDING_CATALOG.bedrockId,
+  };
+}
+
 /**
  * The platform's own routes, keyed by environment variables, never the database. ORDER IS THE PREFERENCE ORDER within
- * a need after filtering. Workspace credential types (bring-your-own-key) and the zero-retention platform route join
- * this registry later; each adds an entry, the resolver does not change shape.
+ * a need after filtering: a standard-retention workspace gets OpenRouter for language and Cohere for embeddings; a
+ * zero-retention workspace gets `platform-bedrock`, the only route the retention filter leaves.
  */
 export const PLATFORM_ROUTES: readonly PlatformRoute[] = [
   {
@@ -96,6 +124,19 @@ export const PLATFORM_ROUTES: readonly PlatformRoute[] = [
       };
     },
   },
+  {
+    routeId: 'platform-bedrock',
+    credentialType: PLATFORM_CREDENTIAL_TYPES.BEDROCK,
+    serves: ['language', 'embedding'],
+    retention: 'ZDR',
+    promptCache: 'bedrock',
+    // The region is the switch: unset (a developer machine), a zero-retention workspace correctly fails closed.
+    isConfigured: (config) => !!config.platformBedrockRegion,
+    // The task's own credentials through the default AWS chain (the ECS task role on a deployed task). The Bedrock
+    // provider alone reads only the AWS_ACCESS_KEY_ID pair from the environment, which a task role does not set.
+    buildProvider: (config) =>
+      bedrockBundle(config.platformBedrockRegion ?? '', fromNodeProviderChain(), 'platform-bedrock'),
+  },
 ];
 
 /**
@@ -117,6 +158,16 @@ export const anthropicOnlyMiddleware: LanguageModelMiddleware = {
   },
 };
 
+/** The credential fields a registry entry may read to build its provider. */
+export type BuildableCredential = Pick<AiCredential, 'type' | 'publicId'> &
+  Partial<Pick<AiCredential, 'roleArn' | 'externalId' | 'awsRegion'>>;
+
+/** Deployment facts a workspace credential's provider needs beyond its own row. */
+export interface TenantBuildContext {
+  /** `PROJECT_NAME`, slugged (`aws-role-naming.ts`): the start of a Bedrock role's STS session name. */
+  projectSlug: string;
+}
+
 /** What a workspace credential type is: what it serves, its retention, its cache strategy, and how to build it. */
 export interface TenantCapability {
   serves: readonly AiNeed[];
@@ -124,7 +175,33 @@ export interface TenantCapability {
   /** Retention is per row: an Anthropic key is zero-retention only when its owner attested to it. */
   retention: (credential: Pick<AiCredential, 'zdrAttested'>) => RetentionClass;
   /** `secret` is the decrypted key, or null for a type that stores none. */
-  buildProvider: (credential: Pick<AiCredential, 'type' | 'publicId'>, secret: string | null) => ProviderBundle;
+  buildProvider: (
+    credential: BuildableCredential,
+    secret: string | null,
+    context?: TenantBuildContext,
+  ) => ProviderBundle;
+}
+
+/** One hour: the life of a workspace role session. The provider refreshes it before it expires. */
+export const BEDROCK_ROLE_SESSION_SECONDS = 3600;
+
+/**
+ * The STS `AssumeRole` options for a workspace's Bedrock role. No `masterCredentials`: the role is assumed with the
+ * backend's own ambient credentials (the task role), which is exactly the principal the tenant's trust policy names
+ * (`PLATFORM_ASSUME_ROLE_ARN`). A row missing its role fields is a failing credential, never served elsewhere.
+ */
+export function bedrockRoleCredentialOptions(credential: BuildableCredential, sessionName: string) {
+  const { roleArn, externalId, awsRegion } = credential;
+  if (!roleArn || !externalId || !awsRegion) throw new AiCredentialFailing('language');
+  return {
+    params: {
+      RoleArn: roleArn,
+      ExternalId: externalId,
+      RoleSessionName: sessionName,
+      DurationSeconds: BEDROCK_ROLE_SESSION_SECONDS,
+    },
+    clientConfig: { region: awsRegion },
+  };
 }
 
 /** The types a workspace connects by pasting a key. The connect API takes these and nothing else. */
@@ -210,14 +287,16 @@ export const TENANT_CREDENTIAL_CAPABILITIES: Record<AiCredentialType, TenantCapa
       };
     },
   },
-  // A workspace's own AWS account, through a cross-account role. The enum value exists so that flow needs no
-  // migration; until it ships the type serves nothing and the connect API refuses it.
+  // A workspace's own AWS account, through a cross-account role it trusts us to assume with an external id. No secret
+  // is stored: temporary credentials come from STS per session (one hour) and refresh themselves.
   [AiCredentialType.BEDROCK_ROLE]: {
-    serves: [],
+    serves: ['language', 'embedding'],
     promptCache: 'bedrock',
     retention: () => 'ZDR',
-    buildProvider: () => {
-      throw new Error('BEDROCK_ROLE has no route on this version: it serves nothing, so no resolve picks it');
+    buildProvider: (credential, _secret, context) => {
+      const sessionName = bedrockSessionName(context?.projectSlug ?? FALLBACK_PROJECT_SLUG, credential.publicId);
+      const options = bedrockRoleCredentialOptions(credential, sessionName);
+      return bedrockBundle(options.clientConfig.region, fromTemporaryCredentials(options), credential.publicId);
     },
   },
 };

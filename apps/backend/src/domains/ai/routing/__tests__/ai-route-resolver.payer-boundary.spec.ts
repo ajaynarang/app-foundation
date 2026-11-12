@@ -123,12 +123,57 @@ describe('AiRouteResolver: the payer boundary', () => {
     expect(pools.candidates.every((c) => c.payer === 'PLATFORM')).toBe(true);
   });
 
-  it('a BEDROCK_ROLE row serves nothing yet: it never enters a pool and never blocks one', async () => {
-    const pools = await makeResolver({
-      config: BYOK_ON,
-      credentials: [credentialRow({ type: AiCredentialType.BEDROCK_ROLE, encryptedSecret: null })],
-    }).resolver.candidatePools(TENANT, 'language');
-    expect(pools.payer).toBe('PLATFORM');
+  const roleRow = (overrides: Record<string, unknown> = {}) =>
+    credentialRow({
+      type: AiCredentialType.BEDROCK_ROLE,
+      publicId: 'aicred_role00001',
+      encryptedSecret: null,
+      lastFour: null,
+      roleArn: 'arn:aws:iam::123456789012:role/app-bedrock-access',
+      externalId: 'app-ws_test01',
+      awsRegion: 'eu-west-1',
+      ...overrides,
+    });
+
+  it('a BEDROCK_ROLE serves both needs on the workspace AWS account: payer TENANT, zero retention, labelled aws', async () => {
+    const { resolver } = makeResolver({ config: BYOK_ON, credentials: [roleRow()] });
+    for (const need of ['language', 'embedding'] as const) {
+      const route = await resolver.resolve(TENANT, need);
+      expect(route).toMatchObject({
+        routeId: 'aicred_role00001',
+        credentialType: 'BEDROCK_ROLE',
+        payer: 'TENANT',
+        retention: 'ZDR',
+        providerLabel: 'aws',
+      });
+    }
+  });
+
+  it('a zero-retention workspace with its own role is served by it, never by platform-bedrock', async () => {
+    const { resolver } = makeResolver({
+      aiZeroRetention: true,
+      config: { ...BYOK_ON, platformBedrockRegion: 'us-east-1' },
+      credentials: [roleRow()],
+    });
+    const route = await resolver.resolve(TENANT, 'embedding');
+    expect(route.routeId).toBe('aicred_role00001');
+    expect(route.payer).toBe('TENANT');
+  });
+
+  it('a FAILING role blocks both needs with AiCredentialFailing, even with platform-bedrock configured', async () => {
+    const { resolver } = makeResolver({
+      aiZeroRetention: true,
+      config: { ...BYOK_ON, platformBedrockRegion: 'us-east-1' },
+      credentials: [roleRow({ status: AiCredentialStatus.FAILING })],
+    });
+    await expect(resolver.resolve(TENANT, 'language')).rejects.toThrow(AiCredentialFailing);
+    await expect(resolver.resolve(TENANT, 'embedding')).rejects.toThrow(AiCredentialFailing);
+  });
+
+  it('a role stores no secret, so it keeps serving when AI_CREDENTIALS_KEY is unset', async () => {
+    const { resolver } = makeResolver({ config: PLATFORM_KEYS, credentials: [roleRow()] });
+    expect((await resolver.resolve(TENANT, 'language')).routeId).toBe('aicred_role00001');
+    expect((await resolver.describePayers(TENANT)).embedding).toBe('aicred_role00001');
   });
 
   describe('the operator removed AI_CREDENTIALS_KEY while workspaces still hold keys', () => {

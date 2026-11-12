@@ -5,10 +5,8 @@ import { PLATFORM_CREDENTIAL_TYPE_PREFIX } from '../../infrastructure/telemetry/
 import { PROMPT_CACHE_STRATEGIES } from '../prompt-cache';
 
 /**
- * Every registry entry declares what it serves, its retention and how to tell whether it is configured. Ported from
- * the reference implementation in steps: this file holds the cases true for the two platform routes registered so
- * far, and the prompt-cache strategy of each. The workspace credential types and the zero-retention platform floor join
- * it with the pull requests that add them.
+ * Every registry entry declares what it serves, its retention and how to tell whether it is configured, and the
+ * prompt-cache strategy of each: the three platform routes and the four workspace credential types.
  */
 describe('route registry parity', () => {
   it('every platform route declares serves, retention and a config probe', () => {
@@ -53,11 +51,34 @@ describe('route registry parity', () => {
     for (const route of PLATFORM_ROUTES) expect(PROMPT_CACHE_STRATEGIES).toContain(route.promptCache);
   });
 
-  it('the exact prompt-cache map for the routes registered so far', () => {
+  it('the exact prompt-cache map of the platform routes', () => {
     expect(Object.fromEntries(PLATFORM_ROUTES.map((r) => [r.routeId, r.promptCache]))).toEqual({
       'platform-openrouter': 'openrouter',
       'platform-cohere': 'none',
+      'platform-bedrock': 'bedrock',
     });
+  });
+
+  it('platform-bedrock serves both needs at zero retention, labelled PLATFORM_BEDROCK', () => {
+    expect(PLATFORM_ROUTES.find((r) => r.routeId === 'platform-bedrock')).toMatchObject({
+      credentialType: 'PLATFORM_BEDROCK',
+      serves: ['language', 'embedding'],
+      retention: 'ZDR',
+    });
+  });
+
+  it('a zero-retention platform floor exists for both needs (failing closed has somewhere to open to)', () => {
+    for (const need of AI_NEEDS) {
+      expect(PLATFORM_ROUTES.some((r) => r.retention === 'ZDR' && r.serves.includes(need))).toBe(true);
+    }
+  });
+
+  it('the zero-retention route sits last, so a standard workspace keeps the standard routes', () => {
+    for (const need of AI_NEEDS) {
+      const serving = PLATFORM_ROUTES.filter((r) => r.serves.includes(need));
+      expect(serving[0].retention).toBe('STANDARD');
+      expect(serving[serving.length - 1].routeId).toBe('platform-bedrock');
+    }
   });
 
   it("every platform credential type starts with the ledger's platform-paid prefix", () => {
@@ -73,30 +94,33 @@ describe('route registry parity', () => {
   });
 });
 
-/**
- * Workspace credential types (bring-your-own-key). `BEDROCK_ROLE` is in the enum so the AWS role flow needs no
- * migration, but its route arrives with that flow: until then it serves nothing, and the one assertion that every type
- * serves a need skips it by name. The AWS role change removes the skip.
- */
+/** Workspace credential types (bring-your-own-key). */
 describe('route registry parity: workspace credential types', () => {
-  const NOT_YET_SERVING: readonly AiCredentialType[] = [AiCredentialType.BEDROCK_ROLE];
-
   it('every AiCredentialType has a registry entry, and nothing else does', () => {
     expect(Object.keys(TENANT_CREDENTIAL_CAPABILITIES).sort()).toEqual(Object.values(AiCredentialType).sort());
   });
 
   it('every type declares serves, a retention rule and a prompt-cache strategy', () => {
-    for (const [type, capability] of Object.entries(TENANT_CREDENTIAL_CAPABILITIES)) {
+    for (const capability of Object.values(TENANT_CREDENTIAL_CAPABILITIES)) {
       for (const need of capability.serves) expect(AI_NEEDS).toContain(need);
       expect(['ZDR', 'STANDARD']).toContain(capability.retention({ zdrAttested: false }));
       expect(PROMPT_CACHE_STRATEGIES).toContain(capability.promptCache);
       expect(typeof capability.buildProvider).toBe('function');
-      if (!NOT_YET_SERVING.includes(type as AiCredentialType)) expect(capability.serves.length).toBeGreaterThan(0);
+      expect(capability.serves.length).toBeGreaterThan(0);
+      expect(['ZDR', 'STANDARD']).toContain(capability.retention({ zdrAttested: true }));
     }
   });
 
-  it('BEDROCK_ROLE serves nothing yet, so no resolve can pick it', () => {
-    expect(TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.serves).toEqual([]);
+  it('BEDROCK_ROLE serves both needs at zero retention', () => {
+    expect(TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.serves).toEqual(['language', 'embedding']);
+    expect(TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.retention({ zdrAttested: false })).toBe('ZDR');
+  });
+
+  it('only BEDROCK_ROLE is zero-retention without an attestation', () => {
+    const zdrTypes = Object.entries(TENANT_CREDENTIAL_CAPABILITIES)
+      .filter(([, capability]) => capability.retention({ zdrAttested: false }) === 'ZDR')
+      .map(([type]) => type);
+    expect(zdrTypes).toEqual([AiCredentialType.BEDROCK_ROLE]);
   });
 
   it('the paste-key types serve language at the retention the design gives them', () => {

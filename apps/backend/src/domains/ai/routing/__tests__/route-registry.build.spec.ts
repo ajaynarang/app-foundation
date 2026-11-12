@@ -9,6 +9,7 @@ import {
 } from '../route-registry';
 import { EMBEDDING_CATALOG, MODEL_CATALOG, UNREGISTERED_ALIASES } from '../model-catalog';
 import { AiModelNotOnRoute } from '../ai-model-not-on-route.error';
+import { AiCredentialFailing } from '../ai-credential-failing.error';
 
 /**
  * Builder-shape spec: every registry entry builds a working bundle (provider objects are constructed for real, which
@@ -16,7 +17,11 @@ import { AiModelNotOnRoute } from '../ai-model-not-on-route.error';
  * bundle cannot build. Config comes in as a value, never from `process.env`.
  */
 describe('route registry builders', () => {
-  const CONFIGURED: PlatformRouteConfig = { openRouterApiKey: 'sk-or-test', cohereApiKey: 'co-test' };
+  const CONFIGURED: PlatformRouteConfig = {
+    openRouterApiKey: 'sk-or-test',
+    cohereApiKey: 'co-test',
+    platformBedrockRegion: 'us-east-1',
+  };
   const route = (id: string) => {
     const found = PLATFORM_ROUTES.find((r) => r.routeId === id);
     if (!found) throw new Error(`no route ${id}`);
@@ -49,13 +54,17 @@ describe('route registry builders', () => {
   it('platform routes report unconfigured when their key is absent or blank', () => {
     for (const r of PLATFORM_ROUTES) {
       expect(r.isConfigured({})).toBe(false);
-      expect(r.isConfigured({ openRouterApiKey: '', cohereApiKey: '' })).toBe(false);
+      expect(r.isConfigured({ openRouterApiKey: '', cohereApiKey: '', platformBedrockRegion: '' })).toBe(false);
     }
   });
 
   it('each route reads only its own key', () => {
     expect(route('platform-openrouter').isConfigured({ cohereApiKey: 'co-test' })).toBe(false);
     expect(route('platform-cohere').isConfigured({ openRouterApiKey: 'sk-or-test' })).toBe(false);
+    expect(route('platform-bedrock').isConfigured({ openRouterApiKey: 'sk-or-test', cohereApiKey: 'co-test' })).toBe(
+      false,
+    );
+    expect(route('platform-bedrock').isConfigured({ platformBedrockRegion: 'us-east-1' })).toBe(true);
   });
 
   it('platform-openrouter serves every alias by its catalog openrouterId, labelled openrouter', () => {
@@ -83,6 +92,31 @@ describe('route registry builders', () => {
 
   it('platform-openrouter takes effort the OpenRouter way', () => {
     expect(route('platform-openrouter').buildProvider(CONFIGURED).effortFamily).toBe('openrouter');
+  });
+
+  it('platform-bedrock serves every alias by its catalog bedrockId and embeds with Cohere Embed v4 on Bedrock', () => {
+    const bundle = route('platform-bedrock').buildProvider(CONFIGURED);
+    expect(bundle.providerLabel).toBe('aws');
+    expect(bundle.effortFamily).toBe('bedrock');
+    for (const alias of MODEL_ALIASES) {
+      expect(bundle.modelIdFor?.(alias)).toBe(MODEL_CATALOG[alias].bedrockId);
+      expect(bundle.languageModel?.(alias)).toMatchObject({ modelId: MODEL_CATALOG[alias].bedrockId });
+      expect(bundle.ledgerModelIdFor?.(alias)).toBe(MODEL_CATALOG[alias].bedrockId);
+    }
+    expect(bundle.embeddingModelId).toBe(EMBEDDING_CATALOG.bedrockId);
+    expect(bundle.embeddingModel?.()).toMatchObject({ modelId: EMBEDDING_CATALOG.bedrockId });
+  });
+
+  it('platform-bedrock refuses an alias the catalog left without a bedrockId, never another model', () => {
+    const original = MODEL_CATALOG.powerful.bedrockId;
+    MODEL_CATALOG.powerful.bedrockId = undefined;
+    try {
+      const bundle = route('platform-bedrock').buildProvider(CONFIGURED);
+      expect(() => bundle.languageModel?.('powerful')).toThrow(AiModelNotOnRoute);
+      expect(bundle.modelIdFor?.('standard')).toBe(MODEL_CATALOG.standard.bedrockId);
+    } finally {
+      MODEL_CATALOG.powerful.bedrockId = original;
+    }
   });
 
   it('platform-cohere embeds with Cohere Embed v4, labelled cohere', () => {
@@ -159,7 +193,33 @@ describe('route registry builders: workspace credential types', () => {
     });
   });
 
-  it('BEDROCK_ROLE refuses to build until the AWS role flow ships', () => {
-    expect(() => TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.buildProvider(row('BEDROCK_ROLE'), null)).toThrow();
+  const roleRow = (overrides: Record<string, unknown> = {}) =>
+    ({
+      type: AiCredentialType.BEDROCK_ROLE,
+      publicId: 'aicred_role00001',
+      roleArn: 'arn:aws:iam::123456789012:role/app-bedrock-access',
+      externalId: 'app-ws_test01',
+      awsRegion: 'eu-west-1',
+      ...overrides,
+    }) as never;
+
+  it('BEDROCK_ROLE builds language and embedding with no secret, labelled aws, on the catalog bedrockId', () => {
+    const bundle = TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.buildProvider(roleRow(), null, { projectSlug: 'app' });
+    expect(bundle.providerLabel).toBe('aws');
+    expect(bundle.effortFamily).toBe('bedrock');
+    expect(bundle.modelIdFor?.('fast')).toBe(MODEL_CATALOG.fast.bedrockId);
+    expect(bundle.languageModel?.('fast')).toMatchObject({ modelId: MODEL_CATALOG.fast.bedrockId });
+    expect(bundle.ledgerModelIdFor?.('standard')).toBe(MODEL_CATALOG.standard.bedrockId);
+    expect(bundle.embeddingModelId).toBe(EMBEDDING_CATALOG.bedrockId);
+    expect(bundle.embeddingModel?.()).toMatchObject({ modelId: EMBEDDING_CATALOG.bedrockId });
   });
+
+  it.each(['roleArn', 'externalId', 'awsRegion'])(
+    'BEDROCK_ROLE without its %s is a failing credential (never served elsewhere)',
+    (field) => {
+      expect(() => TENANT_CREDENTIAL_CAPABILITIES.BEDROCK_ROLE.buildProvider(roleRow({ [field]: null }), null)).toThrow(
+        AiCredentialFailing,
+      );
+    },
+  );
 });

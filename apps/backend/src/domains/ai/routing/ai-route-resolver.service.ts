@@ -24,7 +24,9 @@ import {
   TENANT_CREDENTIAL_CAPABILITIES,
   type PlatformRoute,
   type PlatformRouteConfig,
+  type TenantBuildContext,
 } from './route-registry';
+import { projectSlug } from './aws-role-naming';
 import { AI_NEEDS, type AiNeed, type AiPayer, type ProviderBundle, type ResolvedRoute } from './routing.types';
 import type { RetentionClass } from './routing.types';
 
@@ -98,9 +100,10 @@ function isProductionEnvType(): boolean {
  *
  * Two pools, decided per need and never mixed. The workspace's credentials (bring-your-own-key) when any compatible
  * one exists: the workspace pays, the first ACTIVE one by priority serves. Otherwise the platform routes:
- * `platform-openrouter` (language) and `platform-cohere` (embeddings), both standard retention. A credential the
- * retention policy rules out is inert, treated as absent. The zero-retention platform route and per-workspace
- * sub-keys each add an entry without reshaping this class.
+ * `platform-openrouter` (language) and `platform-cohere` (embeddings), both standard retention, then
+ * `platform-bedrock` (both needs, zero retention) once the operator sets its region. A credential the retention
+ * policy rules out is inert, treated as absent. So a zero-retention workspace is served by its own Bedrock role, else
+ * its attested Anthropic key (language only), else `platform-bedrock`, else refused.
  */
 @Injectable()
 export class AiRouteResolver {
@@ -261,7 +264,7 @@ export class AiRouteResolver {
       // superseded bundle so an old secret does not stay in memory. `new Date()` accepts a serialized date too.
       cacheKey: `cred:${credential.id}:${credential.keyVersion}:${new Date(credential.updatedAt).getTime()}`,
       evictPrefix: `cred:${credential.id}:`,
-      build: () => capability.buildProvider(credential, this.secretOf(credential)),
+      build: () => capability.buildProvider(credential, this.secretOf(credential), this.tenantBuildContext()),
       credential: { tenantId: credential.tenantId, publicId: credential.publicId },
       hasSecret: !!credential.encryptedSecret,
     };
@@ -374,7 +377,13 @@ export class AiRouteResolver {
     return {
       openRouterApiKey: this.config.get<string>('openRouterApiKey'),
       cohereApiKey: this.config.get<string>('cohereApiKey'),
+      platformBedrockRegion: this.config.get<string>('platformBedrockRegion'),
     };
+  }
+
+  /** What a workspace credential's provider needs beyond its row: the product's name, for AWS session names. */
+  private tenantBuildContext(): TenantBuildContext {
+    return { projectSlug: projectSlug(this.config.get<string>('projectName')) };
   }
 
   /**

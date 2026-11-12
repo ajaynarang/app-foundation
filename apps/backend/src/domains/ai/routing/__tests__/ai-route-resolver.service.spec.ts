@@ -3,7 +3,7 @@ import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.co
 import { AiNotConfigured } from '../ai-not-configured.error';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
 import { EMBEDDING_CATALOG, MODEL_CATALOG } from '../model-catalog';
-import { PLATFORM_ROUTES, type PlatformRoute } from '../route-registry';
+import { PLATFORM_ROUTES } from '../route-registry';
 import { retentionPolicyCacheKey } from '../ai-route-resolver.service';
 import { makeResolver, TENANT } from './resolver-fixtures';
 
@@ -59,6 +59,12 @@ describe('AiRouteResolver (platform pool)', () => {
     expect(route.embeddingModel()).toBeDefined();
   });
 
+  it('a standard tenant keeps OpenRouter and Cohere with Bedrock configured too (Bedrock sits last)', async () => {
+    const { resolver } = makeResolver({ config: { ...BOTH, platformBedrockRegion: 'us-east-1' } });
+    expect((await resolver.resolve(TENANT, 'language')).routeId).toBe('platform-openrouter');
+    expect((await resolver.resolve(TENANT, 'embedding')).routeId).toBe('platform-cohere');
+  });
+
   it('the pool is decided per need: a key for one need does not serve the other', async () => {
     const { resolver } = makeResolver({ config: OPENROUTER });
     await expect(resolver.resolve(TENANT, 'embedding')).rejects.toThrow(AiNotConfigured);
@@ -102,25 +108,40 @@ describe('AiRouteResolver (platform pool)', () => {
     });
 
     it('a zero-retention route refuses an alias that is not zdrCapable, at the model getter', async () => {
-      // No zero-retention platform route is registered yet, so the spec adds one for its duration.
-      const zdrRoute: PlatformRoute = {
-        ...PLATFORM_ROUTES[0],
-        retention: 'ZDR',
-        isConfigured: () => true,
-      };
-      const registry = PLATFORM_ROUTES as PlatformRoute[];
-      registry.push(zdrRoute);
       const original = MODEL_CATALOG.fast.zdrCapable;
       MODEL_CATALOG.fast.zdrCapable = false;
       try {
-        const route = await makeResolver({ aiZeroRetention: true }).resolver.resolve(TENANT, 'language');
+        const route = await makeResolver({
+          aiZeroRetention: true,
+          config: { platformBedrockRegion: 'us-east-1' },
+        }).resolver.resolve(TENANT, 'language');
         expect(route.retention).toBe('ZDR');
         expect(() => route.languageModel('fast')).toThrow(ZeroRetentionUnavailable);
         expect(() => route.languageModel('standard')).not.toThrow();
       } finally {
         MODEL_CATALOG.fast.zdrCapable = original;
-        registry.splice(registry.indexOf(zdrRoute), 1);
       }
+    });
+
+    it('is served on platform-bedrock for both needs once its region is set, platform-paid, labelled aws', async () => {
+      const { resolver, events } = makeResolver({
+        aiZeroRetention: true,
+        config: { ...BOTH, platformBedrockRegion: 'us-east-1' },
+      });
+      const language = await resolver.resolve(TENANT, 'language');
+      expect(language).toMatchObject({
+        routeId: 'platform-bedrock',
+        credentialType: 'PLATFORM_BEDROCK',
+        payer: 'PLATFORM',
+        retention: 'ZDR',
+        providerLabel: 'aws',
+        promptCache: 'bedrock',
+      });
+      expect(language.modelIdFor('standard')).toBe(MODEL_CATALOG.standard.bedrockId);
+      const embedding = await resolver.resolve(TENANT, 'embedding');
+      expect(embedding.routeId).toBe('platform-bedrock');
+      expect(embedding.embeddingModelId()).toBe('cohere.embed-v4:0');
+      expect(events.emit).not.toHaveBeenCalled();
     });
   });
 
