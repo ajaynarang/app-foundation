@@ -1,5 +1,7 @@
 import {
   Controller,
+  Inject,
+  Optional,
   Get,
   Post,
   Param,
@@ -14,12 +16,13 @@ import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.dec
 import { UserRole } from '@appshore/db';
 import { JobStatusSchema } from '@app/shared-types';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
-import { ALL_CATEGORIES, JOB_CATEGORIES } from '@appshore/kernel/infrastructure/queue/job.types';
-import type { JobCategory } from '@appshore/kernel/infrastructure/queue/job.types';
+import { buildJobVocabulary, type JobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '@appshore/platform/infrastructure/queue/job-vocabulary.token';
+import { queueByName } from '@appshore/platform/infrastructure/queue/queue-by-name';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { InjectQueue } from '@nestjs/bullmq';
+import { ModuleRef } from '@nestjs/core';
 import { Queue } from 'bullmq';
-import { QUEUE_NAMES, bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from './dto/admin-jobs-query.dto';
@@ -59,33 +62,32 @@ export function toJobsPauseState(tenant: {
 @Controller('admin/jobs')
 @Roles(UserRole.SUPER_ADMIN)
 export class AdminJobsController {
+  private readonly vocabulary: JobVocabulary;
+
   constructor(
     private readonly jobService: JobService,
     private readonly prisma: PrismaService,
-    @InjectQueue(QUEUE_NAMES.EVENTS) private eventsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.NOTIFICATIONS) private notificationsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.WEBHOOKS) private webhooksQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.AI_BACKGROUND) private aiBackgroundQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.BULK_OPS) private bulkOpsQueue: Queue,
-  ) {}
+    private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(JOB_VOCABULARY) vocabulary?: JobVocabulary,
+  ) {
+    this.vocabulary = vocabulary ?? buildJobVocabulary();
+  }
 
-  /** Map a job category to its backing queue instance. */
+  /** Map a job category (kernel or app, from the merged job vocabulary) to its backing queue instance. */
   private queueForCategory(category: string): Queue | null {
-    const queueName = JOB_CATEGORIES[category as JobCategory]?.queue;
-    switch (queueName) {
-      case QUEUE_NAMES.EVENTS:
-        return this.eventsQueue;
-      case QUEUE_NAMES.NOTIFICATIONS:
-        return this.notificationsQueue;
-      case QUEUE_NAMES.WEBHOOKS:
-        return this.webhooksQueue;
-      case QUEUE_NAMES.AI_BACKGROUND:
-        return this.aiBackgroundQueue;
-      case QUEUE_NAMES.BULK_OPS:
-        return this.bulkOpsQueue;
-      default:
-        return null;
+    const queueName = this.vocabulary.categories[category]?.queue;
+    return queueName ? queueByName(this.moduleRef, queueName) : null;
+  }
+
+  /** Every queue some category runs on, keyed by queue name. */
+  private categoryQueues(): Record<string, Queue> {
+    const queues: Record<string, Queue> = {};
+    for (const category of this.vocabulary.allCategories) {
+      const name = this.vocabulary.categories[category].queue;
+      const queue = name in queues ? null : queueByName(this.moduleRef, name);
+      if (queue) queues[name] = queue;
     }
+    return queues;
   }
 
   @Get()
@@ -111,13 +113,7 @@ export class AdminJobsController {
     if (query.tenantId === undefined) {
       throw fieldError('tenant_id', 'tenant_id is required for the category summary');
     }
-    return this.jobService.getCategorySummary(query.tenantId, ALL_CATEGORIES, {
-      [QUEUE_NAMES.EVENTS]: this.eventsQueue,
-      [QUEUE_NAMES.NOTIFICATIONS]: this.notificationsQueue,
-      [QUEUE_NAMES.WEBHOOKS]: this.webhooksQueue,
-      [QUEUE_NAMES.AI_BACKGROUND]: this.aiBackgroundQueue,
-      [QUEUE_NAMES.BULK_OPS]: this.bulkOpsQueue,
-    });
+    return this.jobService.getCategorySummary(query.tenantId, this.vocabulary.allCategories, this.categoryQueues());
   }
 
   @Get(':job_id')

@@ -3,6 +3,8 @@ import type { JobStatus } from '@appshore/db';
 import { JobService } from '../job.service';
 import { PrismaService } from '../../database/prisma.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
+import { buildJobVocabulary, EMPTY_APP_JOB_VOCABULARY } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '../job-vocabulary.token';
 
 const mockPrisma = {
   job: {
@@ -213,6 +215,67 @@ describe('JobService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('reads the job vocabulary merged with the app (JOB_VOCABULARY)', () => {
+    const appVocabulary = buildJobVocabulary({
+      ...EMPTY_APP_JOB_VOCABULARY,
+      queueNames: { REPORTS: 'reports' },
+      jobNames: { REPORTS: { BUILD: 'report-build' } },
+      displayNames: { 'report-build': 'Report Build' },
+      categories: { reports: { display: 'Reports', queue: 'reports', requiredIntegration: null, tenantVisible: true } },
+      manualTypes: { reports: ['report-build'] },
+    });
+    let appService: JobService;
+
+    beforeEach(async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          JobService,
+          { provide: PrismaService, useValue: mockPrisma },
+          { provide: JOB_VOCABULARY, useValue: appVocabulary },
+        ],
+      }).compile();
+      appService = module.get(JobService);
+    });
+
+    it('creates a job in an app category', async () => {
+      mockPrisma.job.create.mockResolvedValue({ id: 7 });
+      await appService.createJob({
+        tenantId: 1,
+        submittedBy: null,
+        category: 'reports',
+        type: 'report-build',
+        inputData: {},
+      });
+      expect(mockPrisma.job.create).toHaveBeenCalledWith({ data: expect.objectContaining({ category: 'reports' }) });
+    });
+
+    it('refuses a category no vocabulary declares, before any write', async () => {
+      await expect(
+        service.createJob({ tenantId: 1, submittedBy: null, category: 'reports', type: 'report-build', inputData: {} }),
+      ).rejects.toThrow(/unknown job category "reports"/);
+      expect(mockPrisma.job.create).not.toHaveBeenCalled();
+    });
+
+    it('shows an app tenant-visible category to tenants', async () => {
+      mockPrisma.integrationConfig.findMany.mockResolvedValue([]);
+      await expect(appService.getVisibleCategories(1)).resolves.toContain('reports');
+      await expect(service.getVisibleCategories(1)).resolves.not.toContain('reports');
+    });
+
+    it("lists an app category's manual types and labels them with the app's display names", async () => {
+      mockPrisma.job.groupBy.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      const queue = { getRepeatableJobs: jest.fn().mockResolvedValue([]) };
+
+      const [summary] = await appService.getCategorySummary(1, ['reports'], { reports: queue as never });
+
+      expect(summary.displayName).toBe('Reports');
+      expect(summary.types).toEqual([
+        expect.objectContaining({ type: 'report-build', displayName: 'Report Build', schedule: 'Manual' }),
+      ]);
     });
   });
 });

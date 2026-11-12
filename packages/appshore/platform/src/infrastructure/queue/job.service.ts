@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import type { JobStatus, Prisma } from '@appshore/db';
 import type { CursorList } from '@app/shared-types';
@@ -15,13 +15,10 @@ import {
   CategorySummary,
   ScheduledTypeInfo,
   JobMetrics,
-  JOB_CATEGORIES,
-  JobCategory,
-  TYPE_DISPLAY_NAMES,
-  TENANT_VISIBLE_CATEGORIES,
-  MANUAL_CATEGORY_TYPES,
   cronToHuman,
 } from '@appshore/kernel/infrastructure/queue/job.types';
+import { buildJobVocabulary, type JobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from './job-vocabulary.token';
 import { JobStatusSchema } from '@app/shared-types';
 
 const JOB_STATUS = JobStatusSchema.enum;
@@ -34,8 +31,8 @@ const SCHEDULE_OVERDUE_CRITICAL_MS = 30 * 60 * 1000; // 30 minutes
 interface CreateJobParams {
   tenantId: number;
   submittedBy: number | null;
-  /** Must be a key of `JOB_CATEGORIES` — no magic strings. */
-  category: JobCategory;
+  /** A category of the job vocabulary (kernel `JOB_CATEGORIES` or the app's `APP_JOB_CATEGORIES`); refused otherwise. */
+  category: string;
   type: string;
   inputData: Record<string, any>;
   inputHash?: string;
@@ -65,7 +62,14 @@ export type AdminJobListItem = JobRecord & { tenant: { id: number; companyName: 
 export class JobService {
   private readonly logger = new Logger(JobService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly vocabulary: JobVocabulary;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(JOB_VOCABULARY) vocabulary?: JobVocabulary,
+  ) {
+    this.vocabulary = vocabulary ?? buildJobVocabulary();
+  }
 
   async findCompletedByHash(tenantId: number, category: string, type: string, inputHash: string) {
     return this.prisma.job.findFirst({
@@ -81,6 +85,11 @@ export class JobService {
   }
 
   async createJob(params: CreateJobParams) {
+    if (!(params.category in this.vocabulary.categories)) {
+      throw new Error(
+        `unknown job category "${params.category}": declare it in APP_JOB_CATEGORIES (platform-glue/queue/job-names.ts)`,
+      );
+    }
     const job = await this.prisma.job.create({
       data: {
         publicId: generateUuidV7(),
@@ -241,7 +250,7 @@ export class JobService {
     }
 
     // Add manual-only types (always shown, even if category already has scheduled types)
-    for (const [category, types] of Object.entries(MANUAL_CATEGORY_TYPES)) {
+    for (const [category, types] of Object.entries(this.vocabulary.manualTypes)) {
       const existing = result.get(category) ?? [];
       const existingTypes = new Set(existing.map((e) => e.type));
       for (const type of types) {
@@ -255,7 +264,7 @@ export class JobService {
     return result;
   }
 
-  async getVisibleCategories(tenantId: number): Promise<JobCategory[]> {
+  async getVisibleCategories(tenantId: number): Promise<string[]> {
     const activeIntegrations = await this.prisma.integrationConfig.findMany({
       where: {
         tenantId,
@@ -265,17 +274,17 @@ export class JobService {
       select: { integrationType: true },
       distinct: ['integrationType'],
     });
-    const activeTypes = new Set(activeIntegrations.map((i) => i.integrationType));
+    const activeTypes = new Set<string>(activeIntegrations.map((i) => i.integrationType));
 
-    return Object.entries(JOB_CATEGORIES)
+    return Object.entries(this.vocabulary.categories)
       .filter(([_, meta]) => meta.tenantVisible)
       .filter(([_, meta]) => !meta.requiredIntegration || activeTypes.has(meta.requiredIntegration))
-      .map(([key]) => key as JobCategory);
+      .map(([key]) => key);
   }
 
   async getCategorySummary(
     tenantId: number,
-    categories: string[] = TENANT_VISIBLE_CATEGORIES,
+    categories: readonly string[] = this.vocabulary.tenantVisibleCategories,
     queues?: Record<string, Queue>,
   ): Promise<CategorySummary[]> {
     const todayStart = new Date();
@@ -288,7 +297,7 @@ export class JobService {
         by: ['category', 'type', 'status'],
         where: {
           tenantId,
-          category: { in: categories },
+          category: { in: [...categories] },
           createdAt: { gte: todayStart },
         },
         _count: true,
@@ -298,7 +307,7 @@ export class JobService {
         by: ['category', 'type'],
         where: {
           tenantId,
-          category: { in: categories },
+          category: { in: [...categories] },
         },
         _max: { createdAt: true },
       }),
@@ -398,7 +407,7 @@ export class JobService {
 
       return {
         category,
-        displayName: JOB_CATEGORIES[category as JobCategory]?.display ?? category,
+        displayName: this.vocabulary.categoryDisplayNames[category] ?? category,
         lastRunAt,
         todayTotal,
         todaySucceeded,
@@ -410,7 +419,7 @@ export class JobService {
           const scheduleInfo = scheduleMap.get(`${category}:${type}`);
           return {
             type,
-            displayName: TYPE_DISPLAY_NAMES[type] ?? type,
+            displayName: this.vocabulary.displayNames[type] ?? type,
             lastRunAt: typeLastRun?.toISOString() ?? null,
             lastRunStatus:
               (lastRunStatusMap.get(`${category}:${type}`) as 'COMPLETED' | 'FAILED' | 'CANCELLED') ?? null,

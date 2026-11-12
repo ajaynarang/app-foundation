@@ -1,8 +1,11 @@
 /**
- * Queue topology — generic platform starter.
+ * Queue topology — the foundation's own queues and job names.
  *
- * Queues are grouped by failure-domain tier. Add app-specific queues here and
- * register them in `queue.module.ts`.
+ * Queues are grouped by failure-domain tier. This list is the kernel's and is
+ * pinned by `apps/backend/src/architecture/foundation-vocabulary.spec.ts`: an app
+ * never adds a queue or a job name here. App queues and job names go in
+ * `apps/backend/src/platform-glue/queue/job-names.ts` (`APP_QUEUE_NAMES`,
+ * `APP_JOB_NAMES`), merged with these by `buildJobVocabulary` (job-vocabulary.ts).
  *
  * Tier 1 — Real-time (humans waiting)
  *  events         : durable event bus, fan-out spine

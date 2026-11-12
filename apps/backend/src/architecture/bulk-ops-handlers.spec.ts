@@ -3,12 +3,14 @@ import * as path from 'path';
 import { BULK_OPS_JOB_NAMES, QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { jobHandlersToken, QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { BulkOpsQueueModule } from '../platform-glue/queue/dispatchers/bulk-ops-queue.module';
+import { APP_JOB_NAMES } from '../platform-glue/queue/job-names';
 
 /**
  * A bulk-ops handler that is never added to the dispatcher's factory is silently dropped: BaseQueueDispatcher
  * completes an unknown job name as a no-op, so a relay or sweeper tick would never run and nothing would fail.
- * This spec fails when a job name in BULK_OPS_JOB_NAMES has no handler wired into the factory of
- * `bulk-ops-queue.module.ts`. A product that adds a bulk-ops job name adds its handler file here too.
+ * This spec fails when a job name in BULK_OPS_JOB_NAMES, or in the app's APP_JOB_NAMES.BULK_OPS (job-names.ts), has
+ * no handler wired into the factory of `bulk-ops-queue.module.ts`. A product that adds a bulk-ops job name adds it to
+ * APP_JOB_NAMES.BULK_OPS and its handler file here too.
  */
 describe('bulk-ops queue wiring', () => {
   const moduleSrc = fs.readFileSync(
@@ -29,8 +31,16 @@ describe('bulk-ops queue wiring', () => {
   /** Named in the constants but claimed by no handler today (foundation leftovers) — listed so a new one cannot hide. */
   const unclaimed = new Set<string>([BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP, BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]);
 
-  it('maps every BULK_OPS job name to a handler file (or names it as unclaimed)', () => {
-    const claimed = Object.values(BULK_OPS_JOB_NAMES).filter((name) => !unclaimed.has(name));
+  /** Constant expression per bulk-ops job name: the kernel's, then the app's. */
+  const constantByJobName = new Map<string, string>([
+    ...Object.entries(BULK_OPS_JOB_NAMES).map(([key, name]) => [name, `BULK_OPS_JOB_NAMES.${key}`] as const),
+    ...Object.entries(APP_JOB_NAMES.BULK_OPS as Record<string, string>).map(
+      ([key, name]) => [name, `APP_JOB_NAMES.BULK_OPS.${key}`] as const,
+    ),
+  ]);
+
+  it('maps every BULK_OPS job name, kernel and app, to a handler file (or names it as unclaimed)', () => {
+    const claimed = [...constantByJobName.keys()].filter((name) => !unclaimed.has(name));
     expect(Object.keys(handlerFileByJobName).sort()).toEqual(claimed.sort());
   });
 
@@ -85,7 +95,6 @@ describe('bulk-ops queue wiring', () => {
 
   it.each(Object.entries(handlerFileByJobName))('job %s: its handler declares the name', (jobName, handlerFile) => {
     const src = fs.readFileSync(path.join(__dirname, handlerFile), 'utf8');
-    const constant = Object.entries(BULK_OPS_JOB_NAMES).find(([, value]) => value === jobName)[0];
-    expect(src).toContain(`BULK_OPS_JOB_NAMES.${constant}`);
+    expect(src).toContain(constantByJobName.get(jobName));
   });
 });

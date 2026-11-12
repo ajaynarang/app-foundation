@@ -8,6 +8,8 @@ import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constan
 import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
 import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from '../dto/admin-jobs-query.dto';
+import { buildJobVocabulary, EMPTY_APP_JOB_VOCABULARY } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '@appshore/platform/infrastructure/queue/job-vocabulary.token';
 
 describe('AdminJobsController', () => {
   let controller: AdminJobsController;
@@ -403,6 +405,60 @@ describe('AdminJobsController', () => {
         select: { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true },
       });
       expect(result).toEqual({ tenantId: 'acme', companyName: 'Test', jobsPaused: false, jobsPausedAt: null });
+    });
+  });
+
+  // ─── the app's job vocabulary ────────────────────────────────────────────
+
+  describe("with the app's job vocabulary (JOB_VOCABULARY)", () => {
+    let appController: AdminJobsController;
+    const reports = { add: jest.fn().mockResolvedValue({}) };
+
+    beforeEach(async () => {
+      const vocabulary = buildJobVocabulary({
+        ...EMPTY_APP_JOB_VOCABULARY,
+        queueNames: { REPORTS: 'reports' },
+        jobNames: { REPORTS: { BUILD: 'report-build' } },
+        categories: {
+          reports: { display: 'Reports', queue: 'reports', requiredIntegration: null, tenantVisible: true },
+        },
+      });
+      const module = await Test.createTestingModule({
+        controllers: [AdminJobsController],
+        providers: [
+          { provide: JobService, useValue: jobService },
+          { provide: PrismaService, useValue: prisma },
+          { provide: JOB_VOCABULARY, useValue: vocabulary },
+          { provide: getQueueToken('reports'), useValue: reports },
+          ...Object.entries(queues).map(([name, queue]) => ({ provide: getQueueToken(name), useValue: queue })),
+        ],
+      }).compile();
+      appController = module.get(AdminJobsController);
+    });
+
+    it("retries a failed job of an app category on the app's queue", async () => {
+      jobService.getJob.mockResolvedValue({
+        id: 201,
+        status: 'FAILED',
+        category: 'reports',
+        type: 'report-build',
+        tenantId: 1,
+        inputData: {},
+      });
+
+      await appController.retryJob(201);
+
+      expect(reports.add).toHaveBeenCalledWith('report-build', expect.any(Object), { jobId: 'reports-201' });
+    });
+
+    it('summarizes every category, app ones included, with their queues', async () => {
+      await appController.getCategorySummary(await tenantQuery({ tenant_id: '10' }));
+
+      expect(jobService.getCategorySummary).toHaveBeenCalledWith(
+        10,
+        expect.arrayContaining(['maintenance', 'reports']),
+        expect.objectContaining({ reports: reports, [QUEUE_NAMES.BULK_OPS]: queues[QUEUE_NAMES.BULK_OPS] }),
+      );
     });
   });
 });
