@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import { Prisma } from '@appshore/db';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
@@ -43,7 +44,7 @@ function fakeQueue() {
 
 function fakePrisma() {
   const eventLog = new Map<string, unknown>();
-  const deliveryLogs: Array<{ id: string; subscriptionId: string; payload: { id: string } }> = [];
+  const deliveryLogs: Array<{ id: string; subscriptionId: string; eventId: string; payload: { id: string } }> = [];
   return {
     eventLog,
     deliveryLogs,
@@ -61,18 +62,30 @@ function fakePrisma() {
       }),
     },
     webhookDeliveryLog: {
-      findFirst: jest.fn(
-        async ({ where }: { where: { subscriptionId: string; payload: { path: string[]; equals: string } } }) => {
-          const row = deliveryLogs.find(
-            (log) => log.subscriptionId === where.subscriptionId && log.payload.id === where.payload.equals,
-          );
+      // The (subscription_id, event_id) unique index: a keyed lookup, and an insert of a second row for one pair fails.
+      findUnique: jest.fn(
+        async ({ where }: { where: { subscriptionId_eventId: { subscriptionId: string; eventId: string } } }) => {
+          const { subscriptionId, eventId } = where.subscriptionId_eventId;
+          const row = deliveryLogs.find((log) => log.subscriptionId === subscriptionId && log.eventId === eventId);
           return row ? { id: row.id, deliveredAt: null, failedAt: null } : null;
         },
       ),
-      create: jest.fn(async ({ data }: { data: { id: string; subscriptionId: string; payload: { id: string } } }) => {
-        deliveryLogs.push(data);
-        return data;
-      }),
+      create: jest.fn(
+        async ({
+          data,
+        }: {
+          data: { id: string; subscriptionId: string; eventId: string; payload: { id: string } };
+        }) => {
+          if (deliveryLogs.some((log) => log.subscriptionId === data.subscriptionId && log.eventId === data.eventId)) {
+            throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+              code: 'P2002',
+              clientVersion: 'test',
+            });
+          }
+          deliveryLogs.push(data);
+          return data;
+        },
+      ),
     },
   };
 }
@@ -153,7 +166,7 @@ describe('one event delivered twice', () => {
 
     // Outbound webhooks: one log row and one delivery job per subscription, the payload id is the event id.
     expect(t.prisma.deliveryLogs.map((log) => log.subscriptionId).sort()).toEqual(['sub-a', 'sub-b']);
-    expect(t.prisma.deliveryLogs.every((log) => log.payload.id === event.id)).toBe(true);
+    expect(t.prisma.deliveryLogs.every((log) => log.payload.id === event.id && log.eventId === event.id)).toBe(true);
     expect([...t.webhooksQueue.jobs.keys()].sort()).toEqual(
       [webhookDeliveryJobId(event.id, 'sub-a'), webhookDeliveryJobId(event.id, 'sub-b')].sort(),
     );

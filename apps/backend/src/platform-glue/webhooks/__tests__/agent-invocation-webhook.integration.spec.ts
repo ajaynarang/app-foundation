@@ -65,7 +65,7 @@ describe('app.agent.invocation-completed webhook integration', () => {
     webhookDeliveryLog: {
       create: jest.fn(),
       // No earlier delivery of this event to this subscription (the dispatcher is idempotent per both).
-      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
     },
   };
   const mockWebhookQueue = { add: jest.fn().mockResolvedValue(undefined) };

@@ -95,24 +95,11 @@ export class WebhookDispatcher {
         subscriptions.map(async (sub) => {
           try {
             // Idempotent per event and subscription: the event reaches this dispatcher at least once (the
-            // outbox relay and the durable job retry can both send it again). A second dispatch reuses the
-            // first delivery's log row and job id; a delivery already finished is left alone.
-            const prior = await this.prisma.webhookDeliveryLog.findFirst({
-              where: { subscriptionId: sub.id, payload: { path: ['id'], equals: event.id } },
-              select: { id: true, deliveredAt: true, failedAt: true },
-            });
-            if (prior && (prior.deliveredAt || prior.failedAt)) return;
-
-            const log =
-              prior ??
-              (await this.prisma.webhookDeliveryLog.create({
-                data: {
-                  id: generateUuidV7(),
-                  subscriptionId: sub.id,
-                  event: event.event,
-                  payload,
-                },
-              }));
+            // outbox relay and the durable job retry can both send it again). The (subscription_id, event_id)
+            // unique index makes the lookup a keyed read and refuses a concurrent second row. A second dispatch
+            // reuses the first delivery's log row and job id; a delivery already finished is left alone.
+            const log = await this.findOrCreateLog(sub.id, event, payload);
+            if (!log) return;
 
             const jobPayload: WebhookDeliveryPayload = {
               subscriptionId: sub.id,
@@ -149,6 +136,35 @@ export class WebhookDispatcher {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`WebhookDispatcher failed for event ${event.event} (tenant ${event.tenantId}): ${msg}`);
     }
+  }
+
+  /** The pending delivery log of this event to this subscription, written once; null when it already finished. */
+  private async findOrCreateLog(
+    subscriptionId: string,
+    event: DomainEvent,
+    payload: Prisma.InputJsonValue,
+  ): Promise<{ id: string } | null> {
+    const prior = await this.findLog(subscriptionId, event.id);
+    if (prior) return prior.deliveredAt || prior.failedAt ? null : prior;
+    try {
+      return await this.prisma.webhookDeliveryLog.create({
+        data: { id: generateUuidV7(), subscriptionId, eventId: event.id, event: event.event, payload },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      // A concurrent dispatch of the same event wrote the row first; continue with that one.
+      const winner = await this.findLog(subscriptionId, event.id);
+      if (!winner || winner.deliveredAt || winner.failedAt) return null;
+      return winner;
+    }
+  }
+
+  private findLog(subscriptionId: string, eventId: string) {
+    return this.prisma.webhookDeliveryLog.findUnique({
+      where: { subscriptionId_eventId: { subscriptionId, eventId } },
+      select: { id: true, deliveredAt: true, failedAt: true },
+    });
   }
 
   async deliverToSubscription(subscriptionId: string, eventName: string, data: unknown): Promise<string | null> {

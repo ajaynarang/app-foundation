@@ -4,6 +4,7 @@ import { WebhookDispatcher } from '../dispatcher.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { Prisma } from '@appshore/db';
 
 const mockQueue = { add: jest.fn() };
 const mockPrisma = {
@@ -16,7 +17,7 @@ const mockPrisma = {
   },
   webhookDeliveryLog: {
     create: jest.fn().mockResolvedValue({ id: 'log-1' }),
-    findFirst: jest.fn().mockResolvedValue(null),
+    findUnique: jest.fn().mockResolvedValue(null),
   },
 };
 
@@ -27,7 +28,7 @@ describe('WebhookDispatcher', () => {
     jest.clearAllMocks();
     mockPrisma.tenant.findUnique.mockResolvedValue({ id: 1 });
     mockPrisma.webhookDeliveryLog.create.mockResolvedValue({ id: 'log-1' });
-    mockPrisma.webhookDeliveryLog.findFirst.mockResolvedValue(null);
+    mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue(null);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -162,16 +163,25 @@ describe('WebhookDispatcher', () => {
     it('keys the delivery job on the event id and the subscription', async () => {
       await dispatcher.dispatchEvent(event);
 
-      expect(mockPrisma.webhookDeliveryLog.findFirst).toHaveBeenCalledWith({
-        where: { subscriptionId: 'sub-1', payload: { path: ['id'], equals: event.id } },
+      // A keyed lookup on the (subscription_id, event_id) unique index, not a scan of the subscription's log rows.
+      expect(mockPrisma.webhookDeliveryLog.findUnique).toHaveBeenCalledWith({
+        where: { subscriptionId_eventId: { subscriptionId: 'sub-1', eventId: event.id } },
         select: { id: true, deliveredAt: true, failedAt: true },
+      });
+      expect(mockPrisma.webhookDeliveryLog.create.mock.calls[0][0].data).toMatchObject({
+        subscriptionId: 'sub-1',
+        eventId: event.id,
       });
       expect(mockQueue.add.mock.calls[0][2]).toMatchObject({ jobId: `webhook-${event.id}-sub-1` });
       expect(mockQueue.add.mock.calls[0][1].payload.payload.id).toBe(event.id);
     });
 
     it('writes no second log row and re-adds the same job id while the first delivery is pending', async () => {
-      mockPrisma.webhookDeliveryLog.findFirst.mockResolvedValue({ id: 'log-first', deliveredAt: null, failedAt: null });
+      mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue({
+        id: 'log-first',
+        deliveredAt: null,
+        failedAt: null,
+      });
 
       await dispatcher.dispatchEvent(event);
 
@@ -186,11 +196,39 @@ describe('WebhookDispatcher', () => {
       ['delivered', { deliveredAt: new Date(), failedAt: null }],
       ['given up on', { deliveredAt: null, failedAt: new Date() }],
     ])('does nothing for a subscription whose delivery was already %s', async (_label, state) => {
-      mockPrisma.webhookDeliveryLog.findFirst.mockResolvedValue({ id: 'log-first', ...state });
+      mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue({ id: 'log-first', ...state });
 
       await dispatcher.dispatchEvent(event);
 
       expect(mockPrisma.webhookDeliveryLog.create).not.toHaveBeenCalled();
+      expect(mockQueue.add).not.toHaveBeenCalled();
+    });
+
+    const uniqueViolation = () =>
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' });
+
+    it('reuses the row a concurrent dispatch wrote first when the unique index refuses its own insert', async () => {
+      mockPrisma.webhookDeliveryLog.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'log-concurrent', deliveredAt: null, failedAt: null });
+      mockPrisma.webhookDeliveryLog.create.mockRejectedValueOnce(uniqueViolation());
+
+      await dispatcher.dispatchEvent(event);
+
+      expect(mockPrisma.webhookDeliveryLog.create).toHaveBeenCalledTimes(1);
+      expect(mockQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockQueue.add.mock.calls[0][1].payload.logId).toBe('log-concurrent');
+      expect(mockQueue.add.mock.calls[0][2]).toMatchObject({ jobId: `webhook-${event.id}-sub-1` });
+    });
+
+    it('does nothing when the concurrent dispatch that won the insert has already finished', async () => {
+      mockPrisma.webhookDeliveryLog.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'log-concurrent', deliveredAt: new Date(), failedAt: null });
+      mockPrisma.webhookDeliveryLog.create.mockRejectedValueOnce(uniqueViolation());
+
+      await dispatcher.dispatchEvent(event);
+
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
   });

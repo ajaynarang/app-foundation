@@ -1273,6 +1273,10 @@ model WebhookDeliveryLog {
   subscriptionId String    @map("subscription_id")
   event          String    @db.VarChar(100)
   payload        Json      @db.JsonB
+  /// The domain event this delivery carries (`payload.id`), so a second dispatch of one event to one
+  /// subscription finds the first delivery by key and the unique index refuses a concurrent duplicate.
+  /// Null for a test delivery (`deliverToSubscription`), which carries no domain event.
+  eventId        String?   @map("event_id") @db.VarChar(64)
   responseStatus Int?      @map("response_status")
   responseBody   String?   @map("response_body") @db.Text
   attempts       Int       @default(0)
@@ -1284,6 +1288,7 @@ model WebhookDeliveryLog {
 
   @@index([subscriptionId, createdAt])
   @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:id/logs
+  @@unique([subscriptionId, eventId]) // idempotent dispatch: one delivery per event per subscription
   @@map("webhook_delivery_logs")
 }
 
