@@ -120,7 +120,7 @@ function fakeRoute(refusing: string[], unregistered: string[] = []) {
 describe('tunedLanguageModel (applied per route by the resolver)', () => {
   it("sends the alias effort in the route family's shape", async () => {
     const { base, calls } = fakeRoute([]);
-    await tunedLanguageModel(base, 'fast', 'openrouter').doGenerate({ prompt: [] } as any);
+    await tunedLanguageModel(base, 'fast', 'openrouter').doGenerate({ prompt: [] });
     expect(calls).toEqual([
       { alias: 'fast', options: { openrouter: { reasoning: { effort: MODEL_CATALOG.fast.effort } } } },
     ]);
@@ -128,21 +128,21 @@ describe('tunedLanguageModel (applied per route by the resolver)', () => {
 
   it('retries a refused call once, one alias up, with that alias effort', async () => {
     const { base, calls } = fakeRoute(['fast']);
-    await tunedLanguageModel(base, 'fast', 'openrouter').doGenerate({ prompt: [] } as any);
+    await tunedLanguageModel(base, 'fast', 'openrouter').doGenerate({ prompt: [] });
     expect(calls.map((c) => c.alias)).toEqual(['fast', 'standard']);
     expect(calls[1].options).toEqual({ openrouter: { reasoning: { effort: MODEL_CATALOG.standard.effort } } });
   });
 
   it('stops after one hop even when the fallback refuses too', async () => {
     const { base, calls } = fakeRoute(['fast', 'standard']);
-    const out = await tunedLanguageModel(base, 'fast', 'anthropic').doGenerate({ prompt: [] } as any);
+    const out = await tunedLanguageModel(base, 'fast', 'anthropic').doGenerate({ prompt: [] });
     expect(calls.map((c) => c.alias)).toEqual(['fast', 'standard']);
     expect(out.finishReason.unified).toBe('content-filter');
   });
 
   it('has no fallback when the next alias is not registered on the route', async () => {
     const { base, calls } = fakeRoute(['standard'], ['powerful']);
-    const out = await tunedLanguageModel(base, 'standard', 'openrouter').doGenerate({ prompt: [] } as any);
+    const out = await tunedLanguageModel(base, 'standard', 'openrouter').doGenerate({ prompt: [] });
     expect(calls.map((c) => c.alias)).toEqual(['standard']);
     expect(out.finishReason.unified).toBe('content-filter');
   });

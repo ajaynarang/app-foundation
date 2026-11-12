@@ -140,7 +140,7 @@ describe('AiRouteResolver (platform pool)', () => {
       const calls: Array<{ modelId: string; options: unknown }> = [];
       const real = PLATFORM_ROUTES[0].buildProvider(OPENROUTER);
       const fake = (alias: 'fast' | 'standard' | 'powerful') => {
-        const modelId = real.modelIdFor!(alias);
+        const modelId = real.modelIdFor(alias);
         return {
           specificationVersion: 'v3',
           provider: 'fake',

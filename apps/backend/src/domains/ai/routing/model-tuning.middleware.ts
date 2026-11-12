@@ -41,10 +41,7 @@ export function modelTuningMiddleware(opts: {
   return {
     specificationVersion: 'v3',
     transformParams: ({ params }) => {
-      const providerOptions: Record<string, Record<string, unknown>> = { ...(params.providerOptions ?? {}) } as Record<
-        string,
-        Record<string, unknown>
-      >;
+      const providerOptions: Record<string, Record<string, unknown>> = { ...(params.providerOptions ?? {}) };
       for (const [key, value] of Object.entries(tuning)) {
         providerOptions[key] = { ...(providerOptions[key] ?? {}), ...value };
       }
