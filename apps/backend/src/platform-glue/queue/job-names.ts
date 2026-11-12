@@ -28,11 +28,16 @@ export const APP_JOB_NAMES = {
   WEBHOOKS: {},
   AI_INTERACTIVE: {},
   AI_BACKGROUND: {},
-  BULK_OPS: {},
+  BULK_OPS: {
+    /** The daily re-test of every workspace AI credential (`domains/ai/routing/connect`), sliced to share the lane. */
+    AI_CREDENTIAL_REVALIDATE: 'ai-credential-revalidate',
+  },
 } as const satisfies Record<string, Record<string, string>>;
 
 /** Friendly labels for the app's job types on the super-admin Jobs screens, keyed by job name. */
-export const APP_JOB_DISPLAY_NAMES = {} as const satisfies Record<string, string>;
+export const APP_JOB_DISPLAY_NAMES = {
+  'ai-credential-revalidate': 'AI Key Revalidation',
+} as const satisfies Record<string, string>;
 
 /** App job categories (what a `jobs` row's `category` may hold beside the kernel's). */
 export const APP_JOB_CATEGORIES = {} as const satisfies Record<string, JobCategoryDefinition>;

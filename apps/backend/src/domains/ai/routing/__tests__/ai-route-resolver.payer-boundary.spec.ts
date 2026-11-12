@@ -4,6 +4,7 @@ import { AiCredentialFailing } from '../ai-credential-failing.error';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
 import { MODEL_CATALOG } from '../model-catalog';
 import { PLATFORM_ROUTES } from '../route-registry';
+import { MAX_AI_CREDENTIALS_PER_WORKSPACE } from '../ai-route-resolver.service';
 import { credentialRow, makeResolver, TENANT, TEST_CREDENTIALS_KEY } from './resolver-fixtures';
 
 const PLATFORM_KEYS = { openRouterApiKey: 'sk-or-test', cohereApiKey: 'co-test' };
@@ -66,6 +67,7 @@ describe('AiRouteResolver: the payer boundary', () => {
     expect(prisma.aiCredential.findMany).toHaveBeenCalledWith({
       where: { tenantId: TENANT },
       orderBy: { priority: 'asc' },
+      take: MAX_AI_CREDENTIALS_PER_WORKSPACE,
     });
   });
 

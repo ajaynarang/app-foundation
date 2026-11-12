@@ -4,3 +4,4 @@ export * from './capability.schema';
 export * from './model-alias';
 export * from './telemetry.schema';
 export * from './spend.schema';
+export * from './ai-credential.schema';

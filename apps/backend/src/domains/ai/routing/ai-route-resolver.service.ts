@@ -39,6 +39,8 @@ interface Candidate {
   /** When set, stale bundles sharing this prefix are evicted on rebuild, so an old secret does not linger. */
   evictPrefix?: string;
   build: () => ProviderBundle;
+  /** True for a workspace credential that stores an encrypted secret. */
+  hasSecret?: boolean;
   /** A workspace credential's tenant and public id: where a provider credit refusal is recorded. */
   credential?: { tenantId: number; publicId: string };
 }
@@ -61,6 +63,12 @@ export interface CandidatePools {
   /** True when a route serving the need existed but the retention policy filtered it out. */
   hadRetentionInert: boolean;
 }
+
+/**
+ * The most AI credentials one workspace may hold. A template bound, so every read of them is bounded: the resolver
+ * reads them on each call, and a workspace has a handful at most (several per type are allowed).
+ */
+export const MAX_AI_CREDENTIALS_PER_WORKSPACE = 20;
 
 /** The cache key of a tenant's retention policy. Whatever changes `Tenant.aiZeroRetention` deletes it after commit. */
 export function retentionPolicyCacheKey(tenantId: number): string {
@@ -168,7 +176,10 @@ export class AiRouteResolver {
     for (const need of AI_NEEDS) {
       try {
         const first = (await this.candidatePools(tenantId, need, policy)).candidates[0];
-        out[need] = !first ? 'none' : first.payer === 'TENANT' ? first.routeId : 'platform';
+        if (!first) out[need] = 'none';
+        else if (first.payer === 'PLATFORM') out[need] = 'platform';
+        // A stored secret the app cannot decrypt (no credentials key) blocks the need: nobody pays, nothing runs.
+        else out[need] = first.hasSecret && !this.credentialCrypto.isConfigured() ? 'none' : first.routeId;
       } catch {
         out[need] = 'none';
       }
@@ -252,6 +263,7 @@ export class AiRouteResolver {
       evictPrefix: `cred:${credential.id}:`,
       build: () => capability.buildProvider(credential, this.secretOf(credential)),
       credential: { tenantId: credential.tenantId, publicId: credential.publicId },
+      hasSecret: !!credential.encryptedSecret,
     };
   }
 
@@ -370,7 +382,11 @@ export class AiRouteResolver {
    * ciphertext or role ARN sits in a second store, and a change takes effect on the next call.
    */
   private async tenantCredentials(tenantId: number): Promise<AiCredential[]> {
-    return this.prisma.aiCredential.findMany({ where: { tenantId }, orderBy: { priority: 'asc' } });
+    return this.prisma.aiCredential.findMany({
+      where: { tenantId },
+      orderBy: { priority: 'asc' },
+      take: MAX_AI_CREDENTIALS_PER_WORKSPACE,
+    });
   }
 
   /** The tenant's policy, cached hot. */

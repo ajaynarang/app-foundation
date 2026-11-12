@@ -1689,6 +1689,225 @@
         ],
         "type": "object"
       },
+      "AiCredentialConnectResult": {
+        "properties": {
+          "credential": {
+            "properties": {
+              "awsRegion": {
+                "nullable": true,
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "inertUnderPolicy": {
+                "type": "boolean"
+              },
+              "lastError": {
+                "nullable": true,
+                "type": "string"
+              },
+              "lastFour": {
+                "nullable": true,
+                "type": "string"
+              },
+              "lastValidatedAt": {
+                "nullable": true,
+                "type": "string"
+              },
+              "priority": {
+                "type": "integer"
+              },
+              "publicId": {
+                "type": "string"
+              },
+              "roleArn": {
+                "nullable": true,
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "ACTIVE",
+                  "FAILING",
+                  "DISABLED"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "ANTHROPIC_KEY",
+                  "BEDROCK_ROLE",
+                  "OPENROUTER_KEY",
+                  "VERCEL_GATEWAY_KEY"
+                ],
+                "type": "string"
+              },
+              "zdrAttested": {
+                "type": "boolean"
+              },
+              "zdrAttestedAt": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicId",
+              "type",
+              "status",
+              "priority",
+              "lastFour",
+              "awsRegion",
+              "roleArn",
+              "zdrAttested",
+              "zdrAttestedAt",
+              "inertUnderPolicy",
+              "lastValidatedAt",
+              "lastError",
+              "createdAt"
+            ],
+            "type": "object"
+          },
+          "probe": {
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "latencyMs": {
+                "type": "integer"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok",
+              "latencyMs",
+              "detail"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "credential",
+          "probe"
+        ],
+        "type": "object"
+      },
+      "AiSettings": {
+        "properties": {
+          "byokEnabled": {
+            "type": "boolean"
+          },
+          "credentials": {
+            "items": {
+              "properties": {
+                "awsRegion": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "inertUnderPolicy": {
+                  "type": "boolean"
+                },
+                "lastError": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "lastFour": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "lastValidatedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "integer"
+                },
+                "publicId": {
+                  "type": "string"
+                },
+                "roleArn": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "ACTIVE",
+                    "FAILING",
+                    "DISABLED"
+                  ],
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "ANTHROPIC_KEY",
+                    "BEDROCK_ROLE",
+                    "OPENROUTER_KEY",
+                    "VERCEL_GATEWAY_KEY"
+                  ],
+                  "type": "string"
+                },
+                "zdrAttested": {
+                  "type": "boolean"
+                },
+                "zdrAttestedAt": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "publicId",
+                "type",
+                "status",
+                "priority",
+                "lastFour",
+                "awsRegion",
+                "roleArn",
+                "zdrAttested",
+                "zdrAttestedAt",
+                "inertUnderPolicy",
+                "lastValidatedAt",
+                "lastError",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "payers": {
+            "properties": {
+              "embedding": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "embedding"
+            ],
+            "type": "object"
+          },
+          "policy": {
+            "enum": [
+              "STANDARD",
+              "ZDR"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy",
+          "byokEnabled",
+          "payers",
+          "credentials"
+        ],
+        "type": "object"
+      },
       "ApiErrorEnvelope": {
         "properties": {
           "code": {
@@ -3444,6 +3663,35 @@
         },
         "required": [
           "sessionsRevoked"
+        ],
+        "type": "object"
+      },
+      "ConnectKeyDto": {
+        "properties": {
+          "secret": {
+            "description": "The provider API key. Tested, then stored encrypted; it is never returned or readable again.",
+            "maxLength": 4096,
+            "minLength": 8,
+            "type": "string",
+            "writeOnly": true
+          },
+          "type": {
+            "description": "The provider. An AWS role is not connected by pasting a key.",
+            "enum": [
+              "ANTHROPIC_KEY",
+              "OPENROUTER_KEY",
+              "VERCEL_GATEWAY_KEY"
+            ],
+            "type": "string"
+          },
+          "zdrAttested": {
+            "description": "An Anthropic key only: the owner attests the organisation has a zero-retention agreement with Anthropic.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "secret"
         ],
         "type": "object"
       },
@@ -12517,6 +12765,22 @@
         ],
         "type": "object"
       },
+      "UpdateAiPolicyDto": {
+        "properties": {
+          "policy": {
+            "description": "`ZDR` requires zero data retention: AI calls run only on routes that keep nothing, or are refused.",
+            "enum": [
+              "STANDARD",
+              "ZDR"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
       "UpdateAnnouncementDto": {
         "properties": {
           "body": {
@@ -17864,6 +18128,235 @@
         "summary": "List agent invocation activity for a principal (redacted args)",
         "tags": [
           "Agent Activity"
+        ]
+      }
+    },
+    "/api/v1/ai-settings": {
+      "get": {
+        "operationId": "AiCredentialController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The retention policy, who pays for each AI need, and the workspace AI key cards",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials": {
+      "post": {
+        "operationId": "AiCredentialController_connectKey",
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectKeyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "Created: the new resource"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Connect a provider key: it is tested with one small call, then stored encrypted",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/{credential_id}": {
+      "delete": {
+        "operationId": "AiCredentialController_remove",
+        "parameters": [
+          {
+            "description": "AI credential public id (aicred_…)",
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The key is removed"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a workspace AI key",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/{credential_id}/validate": {
+      "post": {
+        "operationId": "AiCredentialController_validate",
+        "parameters": [
+          {
+            "description": "AI credential public id (aicred_…)",
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Test a workspace AI key again (it may turn Active or Failing)",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/policy": {
+      "patch": {
+        "operationId": "AiCredentialController_updatePolicy",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiPolicyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Require or drop zero data retention (keys it rules out are kept, unused)",
+        "tags": [
+          "AI Settings"
         ]
       }
     },

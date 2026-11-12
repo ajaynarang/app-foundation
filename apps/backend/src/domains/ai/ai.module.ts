@@ -7,6 +7,7 @@ import { ModerationModule } from './moderation/moderation.module';
 import { McpExternalServerModule } from './mcp-server/mcp-server.module';
 import { VoiceModule } from './voice/voice.module';
 import { AgentContractModule } from './agent-contract/agent-contract.module';
+import { AiConnectModule } from './routing/connect/ai-connect.module';
 /**
  * AI Domain Module — aggregates all AI-related functionality.
  *
@@ -18,6 +19,7 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
  * - Knowledge Base: RAG knowledge base with pgvector search
  * - Moderation: Content moderation, guardrails, PII redaction
  * - Voice: LiveKit voice sessions
+ * - AI settings: the workspace retention policy and its own AI keys (bring-your-own-key)
  */
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     ModerationModule,
     VoiceModule,
     AgentContractModule,
+    AiConnectModule,
   ],
   exports: [
     AssistantAiModule,

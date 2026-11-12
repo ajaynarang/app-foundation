@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   AgentActivityPageSchema,
+  AiCredentialConnectResultSchema,
+  AiSettingsSchema,
   AgentScopeSchema,
   ConversationGreetingSchema,
   CreateConversationResponseSchema,
@@ -106,4 +108,14 @@ export const VoiceTokenResponse = defineResponseSchema(
     /** LiveKit server URL. */
     url: z.string(),
   }),
+);
+
+// ─── AI settings (retention policy and workspace AI keys) ─────────────────────
+
+/** `GET /ai-settings` and the policy flip: policy, `byokEnabled`, who pays per need, the credential cards. */
+export const AiSettingsResponse = defineResponseSchema('AiSettings', AiSettingsSchema);
+/** Connect and "Test again": the card and the live test's redacted result. */
+export const AiCredentialConnectResultResponse = defineResponseSchema(
+  'AiCredentialConnectResult',
+  AiCredentialConnectResultSchema,
 );

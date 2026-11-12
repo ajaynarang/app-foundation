@@ -212,6 +212,54 @@ export const FOUNDATION_EVENT_REGISTRY = [
     visibility: 'internal' as const,
     aggregateType: 'tenant',
   },
+  {
+    key: 'app.ai.credential-connected',
+    constantName: 'AI_CREDENTIAL_CONNECTED',
+    label: 'AI Credential Connected',
+    description:
+      "A workspace connected its own AI provider key: a test call passed and the key is stored encrypted. Carries the credential's public id and type, never the key.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-validated',
+    constantName: 'AI_CREDENTIAL_VALIDATED',
+    label: 'AI Credential Validated',
+    description: 'A workspace AI credential passed a test (on connect, "Test again" or the daily sweep) and is ACTIVE.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-failed',
+    constantName: 'AI_CREDENTIAL_FAILED',
+    label: 'AI Credential Failed',
+    description:
+      'A workspace AI credential failed a test and is FAILING: the AI calls it served are blocked, never moved to the platform key. Owners and admins are told.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-removed',
+    constantName: 'AI_CREDENTIAL_REMOVED',
+    label: 'AI Credential Removed',
+    description: 'A workspace removed one of its own AI provider keys.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.retention-policy-changed',
+    constantName: 'WORKSPACE_RETENTION_POLICY_CHANGED',
+    label: 'Workspace Retention Policy Changed',
+    description:
+      'A workspace owner required or dropped zero data retention for AI calls. Routing changes on the next call; credentials the policy rules out stay stored, unused.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'tenant',
+  },
 
   // ─── Agent Contract ────────────────────────────────────────────────
   {
