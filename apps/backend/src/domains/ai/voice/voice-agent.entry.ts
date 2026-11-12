@@ -9,11 +9,16 @@
  *   - voiceId: curated voice key → Cartesia UUID
  *   - voiceSpeed: TTS speed parameter
  *
+ * Reports the session's speech usage (speech-to-text audio, text-to-speech characters, session time) once, when the
+ * session closes or the job shuts down, to the backend's `voice/internal/usage` route for the AI cost ledger.
+ *
  * Uses module.exports (not export default) to avoid CJS/ESM double-wrapping.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { defineAgent, voice: voiceModule } = require('@livekit/agents');
+const { defineAgent, voice: voiceModule, metrics: metricsModule } = require('@livekit/agents');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const nodeCrypto = require('crypto');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const silero = require('@livekit/agents-plugin-silero');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -133,6 +138,41 @@ async function callAssistantApi(
   });
 }
 
+interface SessionUsageReport {
+  sessionId: string;
+  conversationId: string;
+  userId: string;
+  tenantId: number;
+  sttModel: string;
+  ttsModel: string;
+  sttAudioMs: number;
+  ttsCharacters: number;
+  sessionMs: number;
+}
+
+/**
+ * Report a finished session's speech meters to the cost ledger. Never throws: a lost report means missing cost data,
+ * not a broken call.
+ */
+async function reportSessionUsage(report: SessionUsageReport): Promise<void> {
+  try {
+    const response = await fetch(`${APP_API_URL}/api/v1/voice/internal/usage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Voice-Agent-Secret': VOICE_AGENT_SECRET,
+      },
+      body: JSON.stringify(report),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      console.error(`[VoiceAgent] Usage report rejected: ${response.status}`);
+    }
+  } catch (err: any) {
+    console.error(`[VoiceAgent] Usage report failed: ${err.message}`);
+  }
+}
+
 interface VoicePrefs {
   voiceMode: string;
   voiceId: string;
@@ -192,8 +232,9 @@ module.exports = defineAgent({
     );
 
     // ── Deepgram STT — model configurable via env ──
+    const sttModel = process.env.DEEPGRAM_STT_MODEL || 'nova-3';
     const stt = new dgPlugin.STT({
-      model: process.env.DEEPGRAM_STT_MODEL || 'nova-3',
+      model: sttModel,
       language: process.env.DEEPGRAM_STT_LANGUAGE || 'en-US',
       interimResults: true,
       smartFormat: true,
@@ -214,8 +255,9 @@ module.exports = defineAgent({
       fastest: 1.4,
     };
 
+    const ttsModel = process.env.CARTESIA_TTS_MODEL || 'sonic-3';
     const tts = new cartesiaPlugin.TTS({
-      model: process.env.CARTESIA_TTS_MODEL || 'sonic-3',
+      model: ttsModel,
       language: process.env.CARTESIA_TTS_LANGUAGE || 'en',
       voice: VOICE_MAP[voicePrefs.voiceId] || VOICE_MAP.warm,
       speed: SPEED_MAP[voicePrefs.voiceSpeed] || 1.0,
@@ -354,6 +396,32 @@ module.exports = defineAgent({
         text: 'Voice encountered an error. Please try again or use text mode.',
       });
     });
+
+    // ── Usage metering — one report per session, on close or job shutdown ──
+    const usageCollector = new metricsModule.UsageCollector();
+    session.on('metrics_collected', (ev: any) => usageCollector.collect(ev.metrics));
+
+    const sessionId: string = nodeCrypto.randomUUID();
+    const sessionStartedAt = Date.now();
+    let usageReported = false;
+    const reportUsage = async () => {
+      if (usageReported) return;
+      usageReported = true;
+      const summary = usageCollector.getSummary();
+      await reportSessionUsage({
+        sessionId,
+        conversationId: authContext.conversationId,
+        userId: authContext.userId,
+        tenantId: authContext.tenantId,
+        sttModel,
+        ttsModel,
+        sttAudioMs: Math.round(summary.sttAudioDurationMs),
+        ttsCharacters: summary.ttsCharactersCount,
+        sessionMs: Date.now() - sessionStartedAt,
+      });
+    };
+    session.on('close', () => void reportUsage());
+    ctx.addShutdownCallback(reportUsage);
 
     const agent = new voiceModule.Agent({ instructions: '' });
 
