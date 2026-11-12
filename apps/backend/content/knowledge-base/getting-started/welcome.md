@@ -1,5 +1,6 @@
 ---
 title: Welcome
+documentType: guide
 audience: all
 category: getting-started
 ---

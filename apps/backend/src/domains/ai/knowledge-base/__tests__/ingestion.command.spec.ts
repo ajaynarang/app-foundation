@@ -1,127 +1,50 @@
 /**
- * Tests for ingestion.command.ts — the standalone CLI bootstrap for ingesting
- * product knowledge into pgvector.
- *
- * The command creates a minimal NestJS application context and calls
- * IngestionService.ingestAll(). We test the module structure and
- * bootstrapping logic via mocks.
+ * The `pnpm seed:knowledge` entry point: it boots `IngestionCliModule` (whose graph `ingestion-cli.module.spec.ts`
+ * builds for real), runs the ingest, prints a summary and always closes the context. Importing the file must not
+ * start an ingest: it runs only as the main module.
  */
-
-// Mock NestFactory to avoid real NestJS bootstrapping
-const mockApp = {
-  get: jest.fn(),
-  close: jest.fn(),
-};
+const mockApp = { get: jest.fn(), close: jest.fn().mockResolvedValue(undefined) };
 
 jest.mock('@nestjs/core', () => ({
-  NestFactory: {
-    createApplicationContext: jest.fn().mockResolvedValue(mockApp),
-  },
+  NestFactory: { createApplicationContext: jest.fn(() => Promise.resolve(mockApp)) },
 }));
+jest.mock('../ingestion-cli.module', () => ({ IngestionCliModule: class MockIngestionCliModule {} }));
+jest.mock('../ingestion.service', () => ({ IngestionService: class MockIngestionService {} }));
 
-jest.mock('@nestjs/config', () => ({
-  ConfigModule: {
-    forRoot: jest.fn().mockReturnValue({
-      module: class MockConfigModule {},
-    }),
-  },
-}));
+import { NestFactory } from '@nestjs/core';
+import { bootstrap, formatIngestSummary } from '../ingestion.command';
+import { IngestionCliModule } from '../ingestion-cli.module';
 
-jest.mock('@appshore/platform/infrastructure/database/prisma.module', () => ({
-  PrismaModule: class MockPrismaModule {},
-}));
+describe('seed:knowledge command', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-jest.mock('../../infrastructure/providers/embedding.service', () => ({
-  EmbeddingService: class MockEmbeddingService {},
-}));
-
-jest.mock('../ingestion.service', () => ({
-  IngestionService: class MockIngestionService {},
-}));
-
-describe('IngestionCommand (module structure)', () => {
-  it('should export the NestFactory mock correctly', () => {
-    // Verify our mocks are set up
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NestFactory } = require('@nestjs/core');
-    expect(NestFactory.createApplicationContext).toBeDefined();
+  it('does not boot anything on import', () => {
+    expect(NestFactory.createApplicationContext).not.toHaveBeenCalled();
   });
 
-  it('bootstrap should create app context, run ingestAll, and close', async () => {
-    const mockIngestionService = {
-      ingestAll: jest.fn().mockResolvedValue({
-        documentCount: 15,
-        chunkCount: 120,
-      }),
-    };
+  it('boots the CLI module, ingests, prints the summary and closes the context', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation();
+    mockApp.get.mockReturnValue({
+      ingestAll: jest.fn().mockResolvedValue({ documentCount: 3, chunkCount: 9, embedded: true }),
+    });
 
-    mockApp.get.mockReturnValue(mockIngestionService);
+    await expect(bootstrap()).resolves.toEqual({ documentCount: 3, chunkCount: 9, embedded: true });
 
-    // Simulate the bootstrap function logic
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NestFactory } = require('@nestjs/core');
-    const app = await NestFactory.createApplicationContext(expect.anything(), expect.anything());
+    expect(NestFactory.createApplicationContext).toHaveBeenCalledWith(IngestionCliModule, expect.anything());
+    expect(log.mock.calls[0][0]).toContain('Chunks: 9');
+    expect(mockApp.close).toHaveBeenCalled();
+    log.mockRestore();
+  });
 
-    const ingestionService = app.get(
-      require('../ingestion.service').IngestionService, // eslint-disable-line @typescript-eslint/no-require-imports
-    );
-    const result = await ingestionService.ingestAll();
+  it('closes the context when the ingest fails', async () => {
+    mockApp.get.mockReturnValue({ ingestAll: jest.fn().mockRejectedValue(new Error('provider down')) });
 
-    expect(result.documentCount).toBe(15);
-    expect(result.chunkCount).toBe(120);
-
-    await app.close();
+    await expect(bootstrap()).rejects.toThrow('provider down');
     expect(mockApp.close).toHaveBeenCalled();
   });
 
-  it('should handle errors from ingestAll', async () => {
-    const mockIngestionService = {
-      ingestAll: jest.fn().mockRejectedValue(new Error('Embedding API failure')),
-    };
-
-    mockApp.get.mockReturnValue(mockIngestionService);
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { NestFactory } = require('@nestjs/core');
-    const app = await NestFactory.createApplicationContext(expect.anything(), expect.anything());
-
-    const ingestionService = app.get(
-      require('../ingestion.service').IngestionService, // eslint-disable-line @typescript-eslint/no-require-imports
-    );
-
-    await expect(ingestionService.ingestAll()).rejects.toThrow('Embedding API failure');
-  });
-
-  it('should use ConfigModule.forRoot and PrismaModule', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { ConfigModule } = require('@nestjs/config');
-    expect(ConfigModule.forRoot).toBeDefined();
-
-    const { PrismaModule } = require('@appshore/platform/infrastructure/database/prisma.module'); // eslint-disable-line @typescript-eslint/no-require-imports
-    expect(PrismaModule).toBeDefined();
-  });
-
-  it('should produce formatted console output', async () => {
-    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-    const mockIngestionService = {
-      ingestAll: jest.fn().mockResolvedValue({
-        documentCount: 10,
-        chunkCount: 80,
-      }),
-    };
-    mockApp.get.mockReturnValue(mockIngestionService);
-
-    // Simulate the console.log part of bootstrap
-    const result = await mockIngestionService.ingestAll();
-    console.log(`\nIngestion complete!`);
-    console.log(`Documents: ${result.documentCount}`);
-    console.log(`Chunks: ${result.chunkCount}`);
-
-    expect(consoleSpy).toHaveBeenCalledWith('\nIngestion complete!');
-    expect(consoleSpy).toHaveBeenCalledWith('Documents: 10');
-    expect(consoleSpy).toHaveBeenCalledWith('Chunks: 80');
-
-    consoleSpy.mockRestore();
+  it('says when chunks were stored without vectors, and how to fix it', () => {
+    expect(formatIngestSummary({ documentCount: 1, chunkCount: 2, embedded: false })).toContain('COHERE_API_KEY');
+    expect(formatIngestSummary({ documentCount: 1, chunkCount: 2, embedded: true })).not.toContain('COHERE_API_KEY');
   });
 });
