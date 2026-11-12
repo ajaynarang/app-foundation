@@ -17,8 +17,9 @@ Your product's own decisions go in this folder too, with the same numbering.
 
 ## Records
 
-| #                                    | Decision                                                                                                     | Status  |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------- |
-| [0001](0001-api-contract.md)         | API contract: one contract for people and agents (status, errors, inputs, lists, versioning)                 | Adopted |
-| [0002](0002-id-boundary.md)          | ID boundary: an Int primary key never crosses the API; the public id is a sixth id role                      | Adopted |
-| [0003](0003-outbox-and-deadlines.md) | Outbox and deadlines: every domain event commits with its write; delivery is at least once; a timer is a row | Adopted |
+| #                                             | Decision                                                                                                     | Status  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- |
+| [0001](0001-api-contract.md)                  | API contract: one contract for people and agents (status, errors, inputs, lists, versioning)                 | Adopted |
+| [0002](0002-id-boundary.md)                   | ID boundary: an Int primary key never crosses the API; the public id is a sixth id role                      | Adopted |
+| [0003](0003-outbox-and-deadlines.md)          | Outbox and deadlines: every domain event commits with its write; delivery is at least once; a timer is a row | Adopted |
+| [0004](0004-optional-features-desk-opt-in.md) | Optional features: Desk is opt-in at scaffold time; the seam and the manifest remove it; its tables stay     | Adopted |

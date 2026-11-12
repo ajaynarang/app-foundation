@@ -504,3 +504,34 @@ from 30 to 100 characters, so a 36-character vendor account id (an Atlassian clo
 metadata-only in Postgres; no row changes.
 
 **What to do.** Run `prisma migrate deploy`.
+
+## 12. Desk is opt-in at scaffold time
+
+**What changed.** Desk (the durable workflow engine for background AI agents) is now an optional feature, off by
+default for a new product (ADR "Optional features: Desk is opt-in at scaffold time"). The backend reaches it only
+through `apps/backend/src/platform-glue/features/`: `app.module.ts` spreads `OPTIONAL_FEATURES`' modules in place
+of importing `DeskModule`, `hooks.module.ts` binds `TENANT_PROVISION_HOOKS` to a composite of each feature's hook in
+place of the Desk class, and `main.ts` calls each feature's `onAppReady` in place of `setNestAppContext`. Desk-only
+lines outside the Desk folder (seed rows, env keys, the compose service, docs, the Langfuse seed script, the web
+query keys and the upgrade card) sit between `feature:desk:start` and `feature:desk:end` comments, listed in
+`tools/init-app/features/desk.json`. `pnpm init-app` takes `--desk yes|no`. The landing card no longer names the
+workflow engine, and a stale jest ignore for a Desk spec that no longer exists is gone.
+
+**Who notices.** Nobody on the wire: the routes, statuses and bodies are the same, and no migration comes with it. A
+product that edited `app.module.ts`, `main.ts` or `hooks.module.ts` near the Desk lines gets a merge conflict there;
+keep the template's version of the Desk lines and your own changes.
+
+**What to do.** To keep Desk: nothing beyond resolving those conflicts. Keep the `feature:desk` comments, so a later
+`apply-feature.mjs` run still finds every block. To drop Desk now: `node tools/init-app/apply-feature.mjs --remove
+desk --dry-run`, then without `--dry-run`, then `pnpm install`, `pnpm --filter @app/backend openapi:generate` and
+`pnpm --filter @app/qa generate:rbac`. The Desk tables stay, empty; `tools/init-app/README.md` ("Optional features")
+covers removing them, pulling later updates without Desk, and adding it back.
+
+**Rollback.** Revert the code; nothing in the database changed.
+
+## Pulling this work
+
+Sections 1 to 12 are one piece of work. Pull it as a whole, not one section at a time. Then run
+`prisma migrate deploy` (sections 6, 9, 10 and 11 add migrations; every one keeps existing rows), regenerate the
+OpenAPI documents, run `pnpm verify` and `pnpm verify:api`, and plan the cutover for clients this repo cannot move
+(sections 1 to 8).
