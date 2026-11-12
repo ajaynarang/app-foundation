@@ -11,7 +11,7 @@ import helmet from 'helmet';
 import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
 import { resolveOAuthIssuer } from '@appshore/platform/domains/oauth-provider/oauth-settings';
-import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
+import { OPTIONAL_FEATURES } from './platform-glue/features';
 import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
 import { applyTrustProxy } from './bootstrap/trust-proxy';
 import { applyGlobalPrefix, buildServedOpenApiDocument, OPENAPI_DOCUMENT_PATH } from './bootstrap/openapi';
@@ -156,9 +156,8 @@ async function bootstrap() {
 
   const logger = app.get(Logger);
 
-  // Expose the DI container to Inngest step handlers (plain async functions,
-  // not NestJS classes). See domains/desk/core/inngest/nest-context.ts.
-  setNestAppContext(app);
+  // Each optional feature this product kept gets the app once it exists (platform-glue/features).
+  for (const feature of OPTIONAL_FEATURES) feature.onAppReady?.(app);
 
   try {
     await app.listen(port);

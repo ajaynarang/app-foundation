@@ -3,7 +3,6 @@ import {
   USER_LIFECYCLE_HOOKS,
   TENANT_PROVISION_HOOKS,
   type UserLifecycleHooks,
-  type TenantProvisionHooks,
 } from '@appshore/platform/domains/platform-hooks';
 import {
   NOTIFICATION_POLICIES,
@@ -14,8 +13,8 @@ import { NotificationTriggersService } from '../domains/notifications/notificati
 import { InAppNotificationsModule } from '../domains/notifications/notifications.module';
 import { APP_NOTIFICATION_TYPES } from './notifications/notification-types';
 import { APP_NOTIFICATION_POLICIES, APP_WHATSAPP_TEMPLATES } from './notifications/app-notification-policies';
-import { DeskBootstrapService } from '../domains/desk/responsibilities/desk-bootstrap.service';
-import { DeskResponsibilityModule } from '../domains/desk/responsibilities/desk-responsibility.module';
+import { OPTIONAL_FEATURES } from './features';
+import { featureHookImports, featureHookProviders } from './features/feature-hooks';
 
 /**
  * Binds the platform package's optional hooks to this app's implementations.
@@ -33,22 +32,15 @@ class NotificationUserLifecycleHooks implements UserLifecycleHooks {
   }
 }
 
-@Injectable()
-class DeskTenantProvisionHooks implements TenantProvisionHooks {
-  constructor(private readonly deskBootstrap: DeskBootstrapService) {}
-  tenantApproved(tenantDbId: number) {
-    return this.deskBootstrap.bootstrapForTenant(tenantDbId);
-  }
-}
-
 @Global()
 @Module({
-  imports: [InAppNotificationsModule, DeskResponsibilityModule],
+  imports: [InAppNotificationsModule, ...featureHookImports(OPTIONAL_FEATURES)],
   providers: [
     NotificationUserLifecycleHooks,
-    DeskTenantProvisionHooks,
     { provide: USER_LIFECYCLE_HOOKS, useExisting: NotificationUserLifecycleHooks },
-    { provide: TENANT_PROVISION_HOOKS, useExisting: DeskTenantProvisionHooks },
+    // Each optional feature's tenant-provision hook (platform-glue/features), behind one composite; a no-op when
+    // the product kept none.
+    ...featureHookProviders(OPTIONAL_FEATURES),
     // Your notification types (notifications/notification-types.ts) and their policies (category, urgency, channel
     // rules; app-notification-policies.ts). The platform's own types are already covered. The policy registry refuses
     // to boot when a declared type has no policy.

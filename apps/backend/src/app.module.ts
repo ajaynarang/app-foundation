@@ -29,7 +29,7 @@ import { AiModule } from './domains/ai/ai.module';
 import { AdminModule } from './domains/admin/admin.module';
 import { BillingModule } from './domains/billing/billing.module';
 import { SupportModule } from './domains/support/support.module';
-import { DeskModule } from './domains/desk/desk.module';
+import { OPTIONAL_FEATURES } from './platform-glue/features';
 import { FeedbackModule } from './domains/feedback/feedback.module';
 import { InAppNotificationsModule } from './domains/notifications/notifications.module';
 
@@ -142,7 +142,8 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     AdminModule,
     BillingModule,
     SupportModule,
-    DeskModule,
+    // The optional features this product kept at scaffold time (platform-glue/features).
+    ...OPTIONAL_FEATURES.flatMap((f) => f.modules),
     FeedbackModule,
     OutboundWebhooksModule,
     SearchModule,
