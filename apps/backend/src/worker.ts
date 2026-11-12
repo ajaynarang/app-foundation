@@ -15,8 +15,9 @@
  * the worker. The switch ships off: with it unset the API consumes too, and
  * this worker is optional extra capacity. Turn it on only after a worker task
  * runs (Terraform `api_queue_processors_enabled = false` refuses while
- * `worker_desired_count` is 0). Inngest (Desk) functions are the exception:
- * they execute over HTTP via /api/inngest and run in the API process only.
+ * `worker_desired_count` is 0). Desk workflow functions, in a product that
+ * kept Desk, are the exception: they execute over HTTP and run in the API
+ * process only.
  *
  * ECS task definition: command = ["node", "dist/worker.js"]
  */

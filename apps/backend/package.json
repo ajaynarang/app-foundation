@@ -190,8 +190,7 @@
     "testPathIgnorePatterns": [
       "\\.schema\\.spec\\.ts$",
       "assistant\\.service\\.spec\\.ts$",
-      "langfuse-prompt\\.service\\.spec\\.ts$",
-      "desk/engine/__tests__/invocation\\.service\\.spec\\.ts$"
+      "langfuse-prompt\\.service\\.spec\\.ts$"
     ],
     "transform": {
       "^.+\\.(t|j)s$": [

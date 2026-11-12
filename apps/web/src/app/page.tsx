@@ -54,7 +54,7 @@ const FEATURES = [
   {
     icon: Workflow,
     title: 'Background jobs & workflows',
-    description: 'BullMQ queues plus Inngest durable workflows.',
+    description: 'BullMQ queues, durable timers and a transactional event outbox.',
   },
   {
     icon: Activity,
