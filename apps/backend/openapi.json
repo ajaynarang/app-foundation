@@ -3870,6 +3870,7 @@
                     "properties": {
                       "href": {
                         "maxLength": 500,
+                        "pattern": "^\\/(?![/\\\\])",
                         "type": "string"
                       },
                       "sourceId": {

@@ -56,13 +56,18 @@ export const CITATION_SOURCE_KNOWLEDGE_DOCUMENT = 'KNOWLEDGE_DOCUMENT';
 /**
  * A source the assistant read and named in its answer. Generic: `sourceType` says what kind of record it is (a
  * product adds its own types), `sourceId` is that record's public id, never a numeric one. `href` is an in-app path
- * when the source has a page to open; a source without one is shown as plain text.
+ * when the source has a page to open (one leading slash: `//host` and `/\host` are off-site links, so refused); a
+ * source without one is shown as plain text.
  */
 export const CitationSchema = z.object({
   sourceType: z.string().min(1).max(64),
   sourceId: z.string().min(1).max(120),
   title: z.string().min(1).max(255),
-  href: z.string().startsWith('/').max(500).optional(),
+  href: z
+    .string()
+    .regex(/^\/(?![/\\])/, 'An in-app path starting with a single /')
+    .max(500)
+    .optional(),
 });
 export type Citation = z.infer<typeof CitationSchema>;
 
