@@ -43,7 +43,8 @@
     "// — AI Seeding (knowledge base, LLM prompts, model pricing)": "",
     "seed:knowledge": "ts-node src/domains/ai/knowledge-base/ingestion.command.ts",
     "seed:langfuse": "tsx scripts/seed-langfuse-prompts.ts",
-    "seed:model-pricing": "tsx scripts/seed-model-pricing.ts"
+    "seed:model-pricing": "tsx scripts/seed-model-pricing.ts",
+    "ai:live-check": "tsx scripts/ai-live-check.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.136",

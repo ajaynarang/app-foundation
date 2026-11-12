@@ -1384,7 +1384,7 @@ await this.retryService.withRetry(
 | `standard` | Document parsing, structured extraction         |
 | `powerful` | Complex extraction, fallback for critical tasks |
 
-Model IDs are HARDCODED in `MODEL_ID_BY_ALIAS` (single source — the cost ledger and provider routes derive from it). A model bump is a one-line change there — never an env var. Env vars hold ROUTES and TIERS, never raw model IDs.
+Model IDs are HARDCODED in the model catalog, `MODEL_CATALOG` in `domains/ai/routing/model-catalog.ts` (single source — one row per alias, one id column per route family; the cost ledger and provider routes derive from it). A model bump is a change there plus pricing rows — never an env var. Env vars hold ROUTES and TIERS, never raw model IDs. `model-id-literals.spec.ts` fails on a model id anywhere else. Every model call names an output ceiling from `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`): `maxOutputTokens` on `extract` and AI SDK calls, `modelSettings.maxOutputTokens` on Mastra agent calls (`model-calls-name-a-ceiling.spec.ts`).
 
 ```typescript
 import { ai } from '../infrastructure/providers/ai-provider';
