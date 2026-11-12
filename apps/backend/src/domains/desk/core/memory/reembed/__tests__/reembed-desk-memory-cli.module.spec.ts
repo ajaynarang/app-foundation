@@ -4,7 +4,7 @@ import { REDIS_CLIENT } from '@appshore/platform/infrastructure/cache/redis-clie
 
 import { ReembedDeskMemoryCliModule } from '../reembed-desk-memory-cli.module';
 import { DeskMemoryReembedService } from '../desk-memory-reembed.service';
-import { formatReembedSummary } from '../reembed-desk-memory.command';
+import { formatReembedSummary, parseTenantIds } from '../reembed-desk-memory.command';
 
 /**
  * `pnpm ai:reembed-desk-memory` boots this module on its own, outside the app. This builds the real module graph,
@@ -45,5 +45,11 @@ describe('ReembedDeskMemoryCliModule', () => {
     expect(text).toContain('Memories embedded: 4');
     expect(text).toContain('Skipped tenant 1: its route refused (ZeroRetentionUnavailable)');
     expect(text).toContain('Failed tenant 2: Error: provider down');
+  });
+
+  it('reads --tenant ids, and refuses one that is not a number', () => {
+    expect(parseTenantIds([])).toBeUndefined();
+    expect(parseTenantIds(['--tenant', '4', '--tenant', '9'])).toEqual([4, 9]);
+    expect(() => parseTenantIds(['--tenant', 'acme'])).toThrow('numeric tenant id');
   });
 });

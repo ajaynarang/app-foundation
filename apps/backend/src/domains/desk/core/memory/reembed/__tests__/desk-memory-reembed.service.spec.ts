@@ -40,7 +40,10 @@ function fakePrisma(rows: Row[]) {
     const sql = sqlOf(call);
     const values = valuesOf(call);
     if (sql.includes('DISTINCT tenant_id')) {
-      const tenants = [...new Set(rows.filter((r) => !r.embedded).map((r) => r.tenant_id))].sort((a, b) => a - b);
+      const only = values as number[];
+      const tenants = [...new Set(rows.filter((r) => !r.embedded).map((r) => r.tenant_id))]
+        .filter((t) => only.length === 0 || only.includes(t))
+        .sort((a, b) => a - b);
       return Promise.resolve(tenants.map((tenant_id) => ({ tenant_id })));
     }
     const [tenantId] = values as [number];
@@ -157,6 +160,16 @@ describe('DeskMemoryReembedService', () => {
     expect(summary.failed).toEqual([{ tenantId: 1, reason: 'Error: provider down' }]);
     expect(rows.map((r) => r.embedded)).toEqual([true, false, true]);
     expect(summary.reembedded).toBe(2);
+  });
+
+  it('touches only the tenants it is limited to', async () => {
+    const rows = [memory(1, 1), memory(2, 1)];
+    const service = new DeskMemoryReembedService(fakePrisma(rows) as never, embedder as never);
+
+    const summary = await service.reembedAll({ tenantIds: [2] });
+
+    expect(summary.tenants).toBe(1);
+    expect(rows.map((r) => r.embedded)).toEqual([false, true]);
   });
 
   it('is a no-op when every row already has a vector (safe to re-run)', async () => {

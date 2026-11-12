@@ -49,10 +49,12 @@ export class DeskMemoryReembedService {
     private readonly embedder: EmbeddingService,
   ) {}
 
-  async reembedAll(): Promise<ReembedSummary> {
-    const tenants = await this.prisma.$queryRaw<{ tenant_id: number }[]>`
-      SELECT DISTINCT tenant_id FROM desk_memories WHERE content_embedding IS NULL ORDER BY tenant_id
-    `;
+  /** Every tenant with a memory that has no vector, or only `tenantIds` when given. */
+  async reembedAll(options: { tenantIds?: readonly number[] } = {}): Promise<ReembedSummary> {
+    const only = options.tenantIds ? Prisma.sql`AND tenant_id IN (${Prisma.join(options.tenantIds)})` : Prisma.empty;
+    const tenants: { tenant_id: number }[] = await this.prisma.$queryRaw(Prisma.sql`
+      SELECT DISTINCT tenant_id FROM desk_memories WHERE content_embedding IS NULL ${only} ORDER BY tenant_id
+    `);
     const summary: ReembedSummary = { tenants: tenants.length, reembedded: 0, skipped: [], failed: [] };
 
     for (const { tenant_id: tenantId } of tenants) {

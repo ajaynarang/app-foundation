@@ -18,18 +18,31 @@ export function formatReembedSummary(summary: ReembedSummary): string {
   return lines.join('\n');
 }
 
+/** `--tenant <id>` (repeatable) limits the run to those tenants' numeric ids. */
+export function parseTenantIds(argv: readonly string[]): number[] | undefined {
+  const ids: number[] = [];
+  argv.forEach((arg, i) => {
+    if (arg !== '--tenant') return;
+    const id = Number(argv[i + 1]);
+    if (!Number.isInteger(id) || id <= 0) throw new Error(`--tenant needs a numeric tenant id, got "${argv[i + 1]}"`);
+    ids.push(id);
+  });
+  return ids.length > 0 ? ids : undefined;
+}
+
 /**
  * Re-embed Desk memories that have no vector, tenant by tenant, on each tenant's own route. Safe to re-run.
  * A tenant its route refuses is skipped and named. Exits 1 when a tenant failed for any other reason.
  *
- * Usage: pnpm --filter @app/backend ai:reembed-desk-memory
+ * Usage: pnpm --filter @app/backend ai:reembed-desk-memory [--tenant <id> ...]
  */
-export async function bootstrap(): Promise<ReembedSummary> {
+export async function bootstrap(argv: readonly string[] = process.argv.slice(2)): Promise<ReembedSummary> {
+  const tenantIds = parseTenantIds(argv);
   const app = await NestFactory.createApplicationContext(ReembedDeskMemoryCliModule, {
     logger: ['log', 'error', 'warn'],
   });
   try {
-    const summary = await app.get(DeskMemoryReembedService).reembedAll();
+    const summary = await app.get(DeskMemoryReembedService).reembedAll({ tenantIds });
     console.log(`\n${formatReembedSummary(summary)}`);
     return summary;
   } finally {
