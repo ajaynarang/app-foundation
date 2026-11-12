@@ -18,6 +18,15 @@ import {
   AdminCreateSubscriptionDto,
   AdminChangePlanDto,
 } from '../dto/billing.dto';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  BillingAdminPlanChangeResponse,
+  BillingAdminRefundResponse,
+  BillingAdminSubscriptionCreatedResponse,
+  BillingAdminTenantBillingResponse,
+  BillingRevenueStatsResponse,
+} from '../openapi.responses';
 
 @Controller('admin/billing')
 export class BillingAdminController {
@@ -29,6 +38,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/subscription')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Provision a subscription for a tenant without checkout — refused while one is active' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminSubscriptionCreatedResponse, HttpStatus.CREATED)
   async createSubscription(
     @Param('tenant_id', ParseIntPipe) tenantId: number,
     @Body() dto: AdminCreateSubscriptionDto,
@@ -41,6 +53,11 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('tenants/:tenant_id')
+  @ApiOperation({
+    summary: "A tenant's full billing state — plan, subscription, wallet, payment methods, recent invoices",
+  })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async getTenantBilling(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     return this.billingAdminService.getTenantBilling(tenantId);
   }
@@ -51,6 +68,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/credit')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Gift wallet credit to a tenant; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async addCredit(
     @Param('tenant_id', ParseIntPipe) tenantId: number,
     @Body() dto: AddWalletCreditDto,
@@ -66,6 +86,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/refund')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refund a provider payment, optionally crediting the wallet' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminRefundResponse)
   async issueRefund(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: IssueRefundDto) {
     return this.billingAdminService.issueRefund(tenantId, dto.paymentId, dto.amountCents, dto.reason, dto.creditWallet);
   }
@@ -75,6 +98,9 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch('tenants/:tenant_id/price')
+  @ApiOperation({ summary: "Override the subscription's unit price; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async overrideUnitPrice(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: OverrideUnitPriceDto) {
     await this.billingAdminService.overrideUnitPrice(tenantId, dto.unitPriceCents);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -86,6 +112,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/pause')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Pause a tenant's billing; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async pauseBilling(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     await this.billingAdminService.pauseBilling(tenantId);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -97,6 +126,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/resume')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resume a paused tenant's billing; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async resumeBilling(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     await this.billingAdminService.resumeBilling(tenantId);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -108,6 +140,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/change-plan')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Change a tenant's plan immediately (upgrade, downgrade, or create when none is active)" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminPlanChangeResponse)
   async changeSubscriptionPlan(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: AdminChangePlanDto) {
     return this.billingAdminService.changeSubscriptionPlan(tenantId, dto.plan, dto.quantity);
   }
@@ -118,6 +153,11 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/cancel-immediately')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Cancel a tenant's subscription now, not at period end; answers the tenant's billing state",
+  })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async cancelImmediately(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     await this.billingAdminService.cancelSubscriptionImmediately(tenantId);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -129,6 +169,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/extend-trial')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Extend a tenant's trial; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async extendTrial(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: ExtendTrialDto) {
     await this.billingAdminService.extendTrial(tenantId, dto.days);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -140,6 +183,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/suspend')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Force-suspend a tenant; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async forceSuspend(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: ForceSuspendDto) {
     await this.billingAdminService.forceSuspend(tenantId, dto.reason);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -151,6 +197,9 @@ export class BillingAdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/reactivate')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Reactivate a suspended tenant; answers the tenant's billing state" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
+  @ApiResult(BillingAdminTenantBillingResponse)
   async reactivate(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     await this.billingAdminService.reactivate(tenantId);
     return this.billingAdminService.getTenantBilling(tenantId);
@@ -161,6 +210,8 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('revenue')
+  @ApiOperation({ summary: 'Revenue statistics — MRR, ARR, ARPU, churn, add-on adoption' })
+  @ApiResult(BillingRevenueStatsResponse)
   async getRevenueStats() {
     return this.billingAdminService.getRevenueStats();
   }

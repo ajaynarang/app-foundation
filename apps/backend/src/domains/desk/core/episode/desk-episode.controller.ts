@@ -12,6 +12,13 @@ import { resolveApprovalScope } from '../approval/approval.service';
 import { DeskEpisodeService } from './desk-episode.service';
 import { ResolveEpisodeDto } from './dto/resolve-episode.dto';
 import { DeskEpisodeListQueryDto, HandledEpisodeListQueryDto } from './dto/episode-list-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  DeskEpisodeDetailResponse,
+  DeskEpisodeListResponse,
+  DeskEpisodeResolveResultResponse,
+  DeskHandledEpisodeListResponse,
+} from '../../openapi.responses';
 
 /**
  * HTTP surface for Desk episode reads. Writes (close/retry/approve)
@@ -34,6 +41,7 @@ export class DeskEpisodeController extends BaseTenantController {
   @ApiOperation({
     summary: 'List episodes for this tenant. Supports status filter + cursor pagination + scope (mine|all).',
   })
+  @ApiResult(DeskEpisodeListResponse)
   async list(@CurrentUser() user: any, @Query() query: DeskEpisodeListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const resolvedScope = resolveApprovalScope(query.scope, user.role);
@@ -51,6 +59,7 @@ export class DeskEpisodeController extends BaseTenantController {
    */
   @Get('handled')
   @ApiOperation({ summary: 'List handled (terminal) episodes in a window with rich filters' })
+  @ApiResult(DeskHandledEpisodeListResponse)
   async listHandled(@CurrentUser() user: any, @Query() query: HandledEpisodeListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const tenant = await this.prisma.tenant.findUnique({
@@ -86,7 +95,8 @@ export class DeskEpisodeController extends BaseTenantController {
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Resolve an escalated episode (ESCALATED → RESOLVED) with an optional operator note' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Episode id (uuid)' })
+  @ApiResult(DeskEpisodeResolveResultResponse)
   async resolve(
     @CurrentUser() user: any,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -98,7 +108,8 @@ export class DeskEpisodeController extends BaseTenantController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get one episode with its steps + approvals' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Episode id (uuid)' })
+  @ApiResult(DeskEpisodeDetailResponse)
   async get(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.episodes.getForTenant(tenantDbId, id);

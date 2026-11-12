@@ -14,7 +14,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -30,6 +30,8 @@ import { AddPlaybookRuleDto } from './dto/add-playbook-rule.dto';
 import { SetMemoryPinnedDto } from './dto/set-pinned.dto';
 import { UpdateMemoryDto } from './dto/update-memory.dto';
 import { MemoryListQueryDto } from './dto/memory-list-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeskMemoryListResponse, DeskMemoryPinnedResponse, DeskMemoryRefResponse } from '../../openapi.responses';
 
 /**
  * HTTP surface for the Crew → Agent sheet.
@@ -55,6 +57,7 @@ export class DeskMemoryController extends BaseTenantController {
 
   @Get()
   @ApiOperation({ summary: 'List memories (Memory tab and Rules tab use the same endpoint with different filters)' })
+  @ApiResult(DeskMemoryListResponse)
   async list(@CurrentUser() user: any, @Query() query: MemoryListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const rows = await this.memories.listForUI({
@@ -73,7 +76,8 @@ export class DeskMemoryController extends BaseTenantController {
   @Patch(':id')
   @UseGuards(DeskAgentEditGuard)
   @ApiOperation({ summary: 'Edit a memory (content + isActive)' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Memory id (uuid)' })
+  @ApiResult(DeskMemoryRefResponse)
   async update(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: UpdateMemoryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     await this.memories.updateForTenant({
@@ -88,7 +92,8 @@ export class DeskMemoryController extends BaseTenantController {
   @Patch(':id/pinned')
   @UseGuards(DeskAgentEditGuard)
   @ApiOperation({ summary: 'Pin or unpin a memory (pinned memories are exempt from auto-decay)' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Memory id (uuid)' })
+  @ApiResult(DeskMemoryPinnedResponse)
   async setPinned(
     @CurrentUser() user: any,
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -103,7 +108,8 @@ export class DeskMemoryController extends BaseTenantController {
   @UseGuards(DeskAgentEditGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Soft-delete a memory (prune what the assistant learned or what the operator wrote)' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Memory id (uuid)' })
+  @ApiNoContentResponse({ description: 'The memory is soft-deleted' })
   async remove(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);
     await this.memories.softDelete(id, tenantDbId);
@@ -113,6 +119,7 @@ export class DeskMemoryController extends BaseTenantController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(DeskAgentEditGuard)
   @ApiOperation({ summary: 'Add an operator-authored playbook rule (Rules tab "Add a rule")' })
+  @ApiResult(DeskMemoryRefResponse, HttpStatus.CREATED)
   async addPlaybookRule(@CurrentUser() user: any, @Body() body: AddPlaybookRuleDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const agent = await this.prisma.deskAgent.findFirst({

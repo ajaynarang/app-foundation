@@ -8,6 +8,8 @@ import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.dec
 import { AgentActivityService } from './agent-activity.service';
 import type { AgentActivityPage } from '@app/shared-types';
 import { AgentActivityQueryDto } from './dto/agent-activity-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { AgentActivityPageResponse } from '../openapi.responses';
 
 @ApiTags('Agent Activity')
 @ApiBearerAuth()
@@ -25,6 +27,7 @@ export class AgentActivityController extends BaseTenantController {
   @ApiOperation({
     summary: 'List agent invocation activity for a principal (redacted args)',
   })
+  @ApiResult(AgentActivityPageResponse)
   async list(
     @CurrentUser() user: { tenantId: string },
     @Query() query: AgentActivityQueryDto,

@@ -13,6 +13,14 @@ import { DeskAgentService } from './agent.service';
 import { DeskAgentEditGuard } from './desk-agent-edit.guard';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { AgentActivityWindowQueryDto } from './dto/agent-activity-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  DeskAgentActivityStatsResponse,
+  DeskAgentDetailResponse,
+  DeskAgentRosterItemResponse,
+  DeskAgentUpdateResultResponse,
+  DeskEligibleSupervisorListResponse,
+} from '../../openapi.responses';
 
 const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
 
@@ -38,6 +46,7 @@ export class DeskAgentController extends BaseTenantController {
 
   @Get()
   @ApiOperation({ summary: 'List agents with rollup counts + supervisor for the Crew tab' })
+  @ApiResult([DeskAgentRosterItemResponse])
   async list(@CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.agents.listForTenant(tenantDbId);
@@ -47,6 +56,7 @@ export class DeskAgentController extends BaseTenantController {
   @Get('eligible-supervisors')
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Tenant users eligible to supervise an agent, by last name (a picker: cursor list with q)' })
+  @ApiResult(DeskEligibleSupervisorListResponse)
   async listEligibleSupervisors(@CurrentUser() user: any, @Query() query: ListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.agents.listEligibleSupervisors(tenantDbId, query);
@@ -54,7 +64,8 @@ export class DeskAgentController extends BaseTenantController {
 
   @Get(':key')
   @ApiOperation({ summary: 'Get one agent detail for the sheet header' })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Desk agent key (from the agent roster)' })
+  @ApiResult(DeskAgentDetailResponse)
   async get(@CurrentUser() user: any, @Param('key') key: string) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.agents.getDetailForTenant(tenantDbId, key);
@@ -62,7 +73,8 @@ export class DeskAgentController extends BaseTenantController {
 
   @Get(':key/activity')
   @ApiOperation({ summary: 'Windowed activity stats for the Crew row + sheet tri-cell' })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Desk agent key (from the agent roster)' })
+  @ApiResult(DeskAgentActivityStatsResponse)
   async activity(@CurrentUser() user: any, @Param('key') key: string, @Query() query: AgentActivityWindowQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.agents.getActivity(tenantDbId, key, query.window ?? '7d');
@@ -73,7 +85,8 @@ export class DeskAgentController extends BaseTenantController {
   @ApiOperation({
     summary: 'Update agent — bulk enable + supervisor reassignment (owner/admin only)',
   })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Desk agent key (from the agent roster)' })
+  @ApiResult(DeskAgentUpdateResultResponse)
   async update(@CurrentUser() user: any, @Param('key') key: string, @Body() body: UpdateAgentDto) {
     const tenantDbId = await this.getTenantDbId(user);
     if (body.supervisorUserId !== undefined && !SUPERVISOR_REASSIGN_ROLES.includes(user.role as UserRole)) {

@@ -23,8 +23,21 @@ import { QUEUE_NAMES, bullJobIdFromDbId } from '@appshore/kernel/infrastructure/
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from './dto/admin-jobs-query.dto';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  AdminJobCategorySummaryResponse,
+  AdminJobListResponse,
+  AdminJobMetricsResponse,
+  AdminJobResponse,
+  AdminJobRetryResponse,
+  AdminJobsPauseStateResponse,
+} from './openapi.responses';
 
 const JOB_STATUS = JobStatusSchema.enum;
+
+const JOB_ID_PARAM = { name: 'job_id', description: 'Job numeric id (listed in id-boundary.allowlist.json)' };
+const TENANT_ID_PARAM = { name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' };
 
 const JOBS_PAUSE_SELECT = { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true } as const;
 
@@ -76,16 +89,24 @@ export class AdminJobsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List jobs across tenants — a cursor list, newest first' })
+  @ApiResult(AdminJobListResponse)
   async listJobs(@Query() query: AdminJobListQueryDto) {
     return this.jobService.listAllJobs(query);
   }
 
   @Get('metrics')
+  @ApiOperation({
+    summary: "Today's job metrics — totals, success rate, failures, average duration (optionally one tenant)",
+  })
+  @ApiResult(AdminJobMetricsResponse)
   async getMetrics(@Query() query: AdminJobsTenantQueryDto) {
     return this.jobService.getMetrics(query.tenantId);
   }
 
   @Get('categories/summary')
+  @ApiOperation({ summary: 'Per-category job summary for one tenant — 400 without tenant_id' })
+  @ApiResult([AdminJobCategorySummaryResponse])
   async getCategorySummary(@Query() query: AdminJobsTenantQueryDto) {
     if (query.tenantId === undefined) {
       throw fieldError('tenant_id', 'tenant_id is required for the category summary');
@@ -100,6 +121,9 @@ export class AdminJobsController {
   }
 
   @Get(':job_id')
+  @ApiOperation({ summary: 'Get one job' })
+  @ApiParam(JOB_ID_PARAM)
+  @ApiResult(AdminJobResponse)
   async getJob(@Param('job_id', ParseIntPipe) jobId: number) {
     const job = await this.jobService.getJob(jobId);
     if (!job) throw new NotFoundException('Job not found');
@@ -108,6 +132,9 @@ export class AdminJobsController {
 
   @Post(':job_id/retry')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Retry a failed job (queued) — 409 when the job has not failed' })
+  @ApiParam(JOB_ID_PARAM)
+  @ApiResult(AdminJobRetryResponse, HttpStatus.ACCEPTED)
   async retryJob(@Param('job_id', ParseIntPipe) jobId: number) {
     const job = await this.jobService.getJob(jobId);
     if (!job) throw new NotFoundException('Job not found');
@@ -144,6 +171,9 @@ export class AdminJobsController {
 
   @Post('tenants/:tenant_id/pause-jobs')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Pause a tenant's background jobs" })
+  @ApiParam(TENANT_ID_PARAM)
+  @ApiResult(AdminJobsPauseStateResponse)
   async pauseJobs(@Param('tenant_id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');
@@ -158,6 +188,9 @@ export class AdminJobsController {
 
   @Post('tenants/:tenant_id/resume-jobs')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resume a tenant's background jobs" })
+  @ApiParam(TENANT_ID_PARAM)
+  @ApiResult(AdminJobsPauseStateResponse)
   async resumeJobs(@Param('tenant_id', ParseIntPipe) id: number) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new NotFoundException('Tenant not found');

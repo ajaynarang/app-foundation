@@ -24,8 +24,19 @@ import { AuthTokenService } from './auth-token.service';
 import { OAuthTokenRefreshJob } from './oauth-token-refresh.job';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
 import { INTEGRATIONS_WEB_PATH } from '../../../shared/web-routes';
-import { ApiExcludeEndpoint } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiExcludeEndpoint,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { IntegrationOAuthConnectResponse } from '../openapi.responses';
 
+@ApiTags('Integrations')
+@ApiBearerAuth()
 @Controller('integrations/oauth')
 export class OAuthController extends BaseTenantController {
   private readonly logger = new Logger(OAuthController.name);
@@ -45,6 +56,12 @@ export class OAuthController extends BaseTenantController {
    */
   @Get(':vendor/connect')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Start an OAuth connect for a vendor (returns the authorization URL)' })
+  @ApiParam({
+    name: 'vendor',
+    description: 'Vendor id from the registry (e.g. JIRA, SLACK, QUICKBOOKS) — 404 when it has no OAuth method',
+  })
+  @ApiResult(IntegrationOAuthConnectResponse)
   async connect(@Param('vendor') vendor: string, @CurrentUser() user: any) {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     const oauthConfig = vendorMeta ? getVendorOAuth(vendorMeta) : undefined;
@@ -127,6 +144,12 @@ export class OAuthController extends BaseTenantController {
   @Post(':vendor/disconnect')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Revoke and clear a vendor OAuth connection' })
+  @ApiParam({
+    name: 'vendor',
+    description: 'Vendor id from the registry (e.g. JIRA, SLACK, QUICKBOOKS) — 404 when it has no OAuth method',
+  })
+  @ApiNoContentResponse({ description: 'Disconnected' })
   async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any): Promise<void> {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     if (!vendorMeta || !getVendorOAuth(vendorMeta)) {

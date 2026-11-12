@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -21,7 +21,20 @@ import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { AdminTicketListQueryDto, TicketListQueryDto } from './dto/ticket-list-query.dto';
 import { ListQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  SupportStatsResponse,
+  SupportTenantListResponse,
+  SupportTicketDetailResponse,
+  SupportTicketListResponse,
+  SupportTicketMessageResponse,
+  SupportTicketResponse,
+} from './openapi.responses';
 
+const TICKET_ID_PARAM = {
+  name: 'id',
+  description: 'Ticket numeric id (listed in id-boundary.allowlist.json)',
+} as const;
 @ApiTags('Support')
 @Controller('support')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
@@ -35,12 +48,14 @@ export class SupportController {
   @Post('tickets')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a support ticket' })
+  @ApiResult(SupportTicketResponse, HttpStatus.CREATED)
   async createTicket(@CurrentUser() user: any, @Body() dto: CreateTicketDto) {
     return this.supportService.createTicket(user.tenantDbId, user.dbId, dto);
   }
 
   @Get('tickets')
   @ApiOperation({ summary: 'List my support tickets' })
+  @ApiResult(SupportTicketListResponse)
   async listMyTickets(@CurrentUser() user: any, @Query() query: TicketListQueryDto) {
     return this.supportService.listTicketsForTenant(user.tenantDbId, {
       status: query.status,
@@ -51,6 +66,8 @@ export class SupportController {
 
   @Get('tickets/:id')
   @ApiOperation({ summary: 'Get ticket detail' })
+  @ApiParam(TICKET_ID_PARAM)
+  @ApiResult(SupportTicketDetailResponse)
   async getTicket(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.supportService.getTicket(id, user.tenantDbId);
   }
@@ -58,6 +75,8 @@ export class SupportController {
   @Post('tickets/:id/messages')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Reply to a ticket' })
+  @ApiParam(TICKET_ID_PARAM)
+  @ApiResult(SupportTicketMessageResponse, HttpStatus.CREATED)
   async addMessage(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any, @Body() dto: CreateMessageDto) {
     return this.supportService.addMessage(id, user.dbId, 'user', dto, user.tenantDbId);
   }
@@ -67,6 +86,7 @@ export class SupportController {
   @Get('admin/tickets')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all tickets across tenants (super admin)' })
+  @ApiResult(SupportTicketListResponse)
   async listAllTickets(@Query() query: AdminTicketListQueryDto) {
     return this.supportService.listAllTickets({
       tenantId: query.tenantId,
@@ -82,6 +102,8 @@ export class SupportController {
   @Get('admin/tickets/:id')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get ticket detail (super admin)' })
+  @ApiParam(TICKET_ID_PARAM)
+  @ApiResult(SupportTicketDetailResponse)
   async getAdminTicket(@Param('id', ParseIntPipe) id: number) {
     return this.supportService.getTicket(id, 0, true);
   }
@@ -89,6 +111,8 @@ export class SupportController {
   @Put('admin/tickets/:id')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update ticket status/priority (super admin)' })
+  @ApiParam(TICKET_ID_PARAM)
+  @ApiResult(SupportTicketResponse)
   async updateTicket(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTicketDto) {
     return this.supportService.updateTicket(id, dto);
   }
@@ -99,6 +123,8 @@ export class SupportController {
   @ApiOperation({
     summary: 'Reply to ticket or add internal note (super admin)',
   })
+  @ApiParam(TICKET_ID_PARAM)
+  @ApiResult(SupportTicketMessageResponse, HttpStatus.CREATED)
   async addAdminMessage(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: any,
@@ -110,6 +136,7 @@ export class SupportController {
   @Get('admin/stats')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get support ticket stats (super admin)' })
+  @ApiResult(SupportStatsResponse)
   async getStats() {
     return this.supportService.getStats();
   }
@@ -117,6 +144,7 @@ export class SupportController {
   @Get('admin/tenants')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Tenants that have opened a ticket, by name (a picker: cursor list with q)' })
+  @ApiResult(SupportTenantListResponse)
   async getTenants(@Query() query: ListQueryDto) {
     return this.supportService.getTenants(query);
   }

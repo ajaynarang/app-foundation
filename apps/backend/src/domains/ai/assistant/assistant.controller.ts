@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Query, Body, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -10,7 +10,15 @@ import { SendMessageDto } from './dto/send-message.dto';
 import { ResumeAgentDto } from './dto/resume-agent.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 import type { Request, Response } from 'express';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  AssistantAgentStatusesResponse,
+  ConversationCreatedResponse,
+  ConversationListResponse,
+  ConversationMessagesResponse,
+} from '../openapi.responses';
 
+@ApiBearerAuth()
 @ApiTags('AI Conversations')
 @Controller('conversations')
 export class AssistantAiController {
@@ -23,6 +31,7 @@ export class AssistantAiController {
   @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Create a new assistant conversation' })
+  @ApiResult(ConversationCreatedResponse, HttpStatus.CREATED)
   async createConversation(@CurrentUser() user: any, @Body() dto: CreateConversationDto) {
     return this.service.createConversation(user.userId, user.tenantDbId, dto.userMode);
   }
@@ -30,6 +39,7 @@ export class AssistantAiController {
   @Post(':conversation_id/messages')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'Send a message and stream assistant response' })
+  @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
   async sendMessage(
     @CurrentUser() user: any,
     @Param('conversation_id') conversationId: string,
@@ -55,6 +65,7 @@ export class AssistantAiController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({ summary: 'List conversations for the current user' })
+  @ApiResult(ConversationListResponse)
   async listConversations(@CurrentUser() user: any, @Query() query: ListConversationsQueryDto) {
     return this.service.listConversations(user.userId, user.tenantDbId, query.limit);
   }
@@ -64,6 +75,7 @@ export class AssistantAiController {
   @ApiOperation({
     summary: 'Resume a suspended assistant agent (HITL confirmation)',
   })
+  @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
   async resumeAgent(
     @CurrentUser() user: any,
     @Param('conversation_id') conversationId: string,
@@ -88,6 +100,8 @@ export class AssistantAiController {
   @ApiOperation({
     summary: 'Get messages for a conversation (view-only history)',
   })
+  @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
+  @ApiResult(ConversationMessagesResponse)
   async getMessages(@CurrentUser() user: any, @Param('conversation_id') conversationId: string) {
     return this.service.getMessages(conversationId, user.userId, user.tenantDbId);
   }
@@ -97,6 +111,7 @@ export class AssistantAiController {
   @ApiOperation({
     summary: 'Get status of all domain agents for the user persona',
   })
+  @ApiResult(AssistantAgentStatusesResponse)
   async getAgentStatuses(@CurrentUser() user: any) {
     const agents = this.agentRegistry.getForPersona(user.userMode);
     const statuses = await Promise.all(

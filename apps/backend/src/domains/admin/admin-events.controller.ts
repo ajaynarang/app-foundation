@@ -4,6 +4,13 @@ import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { AdminEventsService } from './admin-events.service';
 import { AdminEventListQueryDto } from './dto/admin-events-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  AdminEventListResponse,
+  AdminEventStatsResponse,
+  AdminEventVolumeBucketResponse,
+  AdminWebhookHealthResponse,
+} from './openapi.responses';
 
 @Controller('admin/events')
 @Roles(UserRole.SUPER_ADMIN)
@@ -16,6 +23,7 @@ export class AdminEventsController {
 
   @Get()
   @ApiOperation({ summary: 'List domain events across tenants, newest first (cursor-paged)' })
+  @ApiResult(AdminEventListResponse)
   async listEvents(@Query() query: AdminEventListQueryDto) {
     return this.adminEventsService.listEvents({
       search: query.q,
@@ -30,18 +38,21 @@ export class AdminEventsController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Get event volume stats' })
+  @ApiResult(AdminEventStatsResponse)
   async getStats() {
     return this.adminEventsService.getStats();
   }
 
   @Get('volume')
   @ApiOperation({ summary: 'Get hourly event volume for last 24h' })
+  @ApiResult([AdminEventVolumeBucketResponse])
   async getVolume() {
     return this.adminEventsService.getVolume();
   }
 
   @Get('webhooks/health')
   @ApiOperation({ summary: 'Get webhook delivery health across tenants' })
+  @ApiResult(AdminWebhookHealthResponse)
   async getWebhookHealth() {
     return this.adminEventsService.getWebhookHealth();
   }

@@ -11,6 +11,8 @@ import { PinService } from '@appshore/platform/auth/pin.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
 import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { HitlChallengeContextResponse, HitlStepUpResultResponse } from '../openapi.responses';
 
 @ApiTags('MCP HITL')
 @ApiBearerAuth()
@@ -30,6 +32,8 @@ export class HitlStepUpController {
     description:
       'Returns redacted args, the calling principal label, expiry, and whether the user has a PIN set. The PIN itself is never returned. Tenant-scoped.',
   })
+  @ApiParam({ name: 'token', description: 'HITL challenge token returned by the prior tools/call attempt' })
+  @ApiResult(HitlChallengeContextResponse)
   async getContext(
     @Param('token') token: string,
     @CurrentUser()
@@ -86,6 +90,7 @@ export class HitlStepUpController {
     name: 'token',
     description: 'HITL challenge token returned by the prior tools/call attempt',
   })
+  @ApiResult(HitlStepUpResultResponse)
   async complete(@Param('token') token: string, @Body() dto: StepUpDto, @CurrentUser() user: { dbId: number }) {
     const record = await this.prisma.user.findUnique({
       where: { id: user.dbId },

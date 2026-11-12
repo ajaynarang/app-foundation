@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
 
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -11,6 +11,15 @@ import {
   AiSpendQuotaWindowQueryDto,
   AiSpendWindowQueryDto,
 } from './dto/ai-spend-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  AdminAiBudgetResponse,
+  AdminAiCostVsQuotaResponse,
+  AdminAiSpendInvocationListResponse,
+  AdminAiSpendSummaryResponse,
+  AdminAiSpendSurfaceRowResponse,
+  AdminAiSpendTenantListResponse,
+} from './openapi.responses';
 
 /**
  * Super-admin AI Spend view. Reads from the `vw_ai_cost_*` views over
@@ -40,55 +49,54 @@ export class AdminAiSpendController {
 
   @Get('tenants')
   @ApiOperation({ summary: 'Tenants with their N-day AI spend: cursor-paged, highest spend first' })
+  @ApiResult(AdminAiSpendTenantListResponse)
   async listTenants(@Query() query: AiSpendTenantListQueryDto) {
     return this.service.listTenants(query);
   }
 
   @Get('summary')
   @ApiOperation({ summary: 'The N-day AI spend across every tenant, in one figure' })
-  @ApiOkResponse({
-    description: 'The window total and how many tenants spent anything',
-    schema: {
-      type: 'object',
-      required: ['windowCostUsd', 'tenantCount'],
-      properties: { windowCostUsd: { type: 'string' }, tenantCount: { type: 'integer', minimum: 0 } },
-    },
-  })
+  @ApiResult(AdminAiSpendSummaryResponse)
   async summary(@Query() query: AiSpendWindowQueryDto) {
     return this.service.getSummary({ days: query.days });
   }
 
   @Get('tenants/:tenant_id/by-surface')
   @ApiOperation({ summary: 'Per-surface AI spend breakdown for one tenant' })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult([AdminAiSpendSurfaceRowResponse])
   async surfaceBreakdown(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendWindowQueryDto) {
     return this.service.listSurfaceBreakdown({ tenantId, days: query.days });
   }
 
   @Get('tenants/:tenant_id/invocations')
   @ApiOperation({ summary: 'List AI invocations for one tenant (cursor-paginated)' })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiSpendInvocationListResponse)
   async invocations(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendInvocationListQueryDto) {
     return this.service.listInvocations({ tenantId, surface: query.surface, limit: query.limit, cursor: query.cursor });
   }
 
   @Get('tenants/:tenant_id/budget')
   @ApiOperation({ summary: "Get a tenant's AI cost budget caps" })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiBudgetResponse)
   async getBudget(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     return this.service.getBudget(tenantId);
   }
 
   @Patch('tenants/:tenant_id/budget')
   @ApiOperation({ summary: "Update a tenant's AI cost budget caps" })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiBudgetResponse)
   async updateBudget(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: UpdateAiBudgetDto) {
     return this.service.updateBudget(tenantId, dto);
   }
 
   @Get('tenants/:tenant_id/cost-vs-quota')
   @ApiOperation({ summary: 'Cost (USD) vs quota (feature counts) for one tenant, side by side' })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiCostVsQuotaResponse)
   async costVsQuota(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendQuotaWindowQueryDto) {
     return this.service.getCostVsQuota({ tenantId, days: query.days });
   }

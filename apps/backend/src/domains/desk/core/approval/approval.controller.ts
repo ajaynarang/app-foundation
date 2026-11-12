@@ -22,6 +22,8 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { ApprovalService, resolveApprovalScope } from './approval.service';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { ApprovalListQueryDto } from './dto/approval-list-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeskApprovalListResponse, DeskApprovalResponse, DeskHandoffCountsResponse } from '../../openapi.responses';
 
 /**
  * HTTP surface for Desk approvals. Consumed by the Desk UI's
@@ -47,6 +49,7 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'List pending Desk approvals for the tenant, oldest first (queue view, cursor-paged)',
   })
+  @ApiResult(DeskApprovalListResponse)
   async listPending(@CurrentUser() user: any, @Query() query: ApprovalListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const resolvedScope = resolveApprovalScope(query.scope, user.role);
@@ -70,6 +73,7 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Handoff counts (Mine/All × waiting/escalated) for the Handoffs tab segmented control',
   })
+  @ApiResult(DeskHandoffCountsResponse)
   async counts(@CurrentUser() user: any): Promise<HandoffCounts> {
     const tenantDbId = await this.getTenantDbId(user);
     return this.approvals.countPending(tenantDbId, user.dbId);
@@ -80,7 +84,8 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Claim an approval for the current operator. First-write-wins; returns 409 if already claimed.',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Approval id (uuid)' })
+  @ApiResult(DeskApprovalResponse)
   async claim(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);
     await this.assertApprovalInTenant(id, tenantDbId);
@@ -92,7 +97,8 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Decide a pending approval: APPROVE / EDIT / REJECT (optionally terminate the episode)',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Approval id (uuid)' })
+  @ApiResult(DeskApprovalResponse)
   async decide(
     @CurrentUser() user: any,
     @Param('id', new ParseUUIDPipe()) id: string,

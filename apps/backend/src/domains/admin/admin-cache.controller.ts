@@ -5,6 +5,9 @@ import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cac
 import { CACHE_NAMESPACES, CacheNamespace } from '@appshore/kernel/constants/cache.constants';
 import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
 import { FlushCacheDto } from './dto/flush-cache.dto';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { AdminCacheFlushResponse, AdminCacheHealthResponse, AdminCacheStatsResponse } from './openapi.responses';
 
 @Controller('admin/cache')
 @Roles(UserRole.SUPER_ADMIN)
@@ -14,6 +17,8 @@ export class AdminCacheController {
   constructor(private readonly cacheService: AppCacheService) {}
 
   @Get('health')
+  @ApiOperation({ summary: 'Cache backend health — Redis INFO highlights, or unavailable' })
+  @ApiResult(AdminCacheHealthResponse)
   async getHealth() {
     const info = await this.cacheService.getRedisInfo();
     if (!info) {
@@ -39,6 +44,8 @@ export class AdminCacheController {
   }
 
   @Get('stats')
+  @ApiOperation({ summary: 'Cache stats — namespaces, hit/miss counters and key counts per namespace' })
+  @ApiResult(AdminCacheStatsResponse)
   async getStats() {
     const keyCounts: Record<string, number> = {};
     await Promise.all(
@@ -56,6 +63,8 @@ export class AdminCacheController {
 
   @Post('flush')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Flush every app cache key — requires { "confirm": true }' })
+  @ApiResult(AdminCacheFlushResponse)
   async flushAll(@Body() body: FlushCacheDto) {
     if (!body?.confirm) {
       throw fieldError('confirm', 'Send { "confirm": true } to flush all caches');
@@ -68,6 +77,9 @@ export class AdminCacheController {
 
   @Post('flush/:namespace')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Flush one cache namespace — 400 when the namespace is not a known one' })
+  @ApiParam({ name: 'namespace', description: 'Cache namespace, e.g. app:plans (one of CACHE_NAMESPACES)' })
+  @ApiResult(AdminCacheFlushResponse)
   async flushNamespace(@Param('namespace') namespace: string) {
     if (!CACHE_NAMESPACES.includes(namespace as CacheNamespace)) {
       throw fieldError('namespace', `Pick one of: ${CACHE_NAMESPACES.join(', ')}`);

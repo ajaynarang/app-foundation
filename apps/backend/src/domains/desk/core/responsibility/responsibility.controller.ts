@@ -25,6 +25,13 @@ import { findResponsibilityDefinition } from '../../responsibilities';
 import { DeskResponsibilityService } from './responsibility.service';
 import { UpdateResponsibilityDto } from './dto/update-responsibility.dto';
 import { UpdateResponsibilityAutonomyDto } from './dto/update-responsibility-autonomy.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  DeskResponsibilityDetailResponse,
+  DeskResponsibilityListItemResponse,
+  DeskResponsibilityRunResultResponse,
+  DeskResponsibilityUiSpecResponse,
+} from '../../openapi.responses';
 
 /**
  * HTTP surface for the Desk index + responsibility settings page.
@@ -46,6 +53,7 @@ export class DeskResponsibilityController extends BaseTenantController {
 
   @Get()
   @ApiOperation({ summary: 'List all Desk responsibilities for this tenant' })
+  @ApiResult([DeskResponsibilityListItemResponse])
   async list(@CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.responsibilities.listForTenant(tenantDbId);
@@ -53,7 +61,8 @@ export class DeskResponsibilityController extends BaseTenantController {
 
   @Get(':key')
   @ApiOperation({ summary: 'Get one responsibility (config + rollups)' })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Responsibility key (from the responsibility registry)' })
+  @ApiResult(DeskResponsibilityDetailResponse)
   async get(@CurrentUser() user: any, @Param('key') key: string) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.responsibilities.getForTenant(tenantDbId, key);
@@ -63,7 +72,8 @@ export class DeskResponsibilityController extends BaseTenantController {
   @ApiOperation({
     summary: 'Get the conditions UI spec + defaults for the settings form. Code-authored; same for every tenant.',
   })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Responsibility key (from the responsibility registry)' })
+  @ApiResult(DeskResponsibilityUiSpecResponse)
   uiSpec(@Param('key') key: string) {
     const def = findResponsibilityDefinition(key);
     if (!def) throw new NotFoundException(`Unknown responsibility ${key}`);
@@ -84,7 +94,8 @@ export class DeskResponsibilityController extends BaseTenantController {
   @ApiOperation({
     summary: 'Update per-tenant settings (enabled/trust/conditions/notes)',
   })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Responsibility key (from the responsibility registry)' })
+  @ApiResult(DeskResponsibilityDetailResponse)
   async update(@CurrentUser() user: any, @Param('key') key: string, @Body() body: UpdateResponsibilityDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.responsibilities.updateForTenant(tenantDbId, key, body);
@@ -95,7 +106,8 @@ export class DeskResponsibilityController extends BaseTenantController {
   @ApiOperation({
     summary: 'Toggle the per-responsibility "Run automatically" switch (governs all non-manual triggers)',
   })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Responsibility key (from the responsibility registry)' })
+  @ApiResult(DeskResponsibilityDetailResponse)
   async updateAutonomy(
     @CurrentUser() user: any,
     @Param('key') key: string,
@@ -111,7 +123,8 @@ export class DeskResponsibilityController extends BaseTenantController {
   @ApiOperation({
     summary: 'Manually trigger a responsibility run (fan-out + episode open + Inngest dispatch)',
   })
-  @ApiParam({ name: 'key', type: 'string' })
+  @ApiParam({ name: 'key', type: 'string', description: 'Responsibility key (from the responsibility registry)' })
+  @ApiResult(DeskResponsibilityRunResultResponse, HttpStatus.ACCEPTED)
   async run(@CurrentUser() user: any, @Param('key') key: string) {
     const tenantDbId = await this.getTenantDbId(user);
     // TriggerService.runByKey centralizes the key → run-method routing
