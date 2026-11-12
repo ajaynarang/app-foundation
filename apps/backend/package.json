@@ -47,7 +47,8 @@
     "seed:model-pricing": "tsx scripts/seed-model-pricing.ts",
     "ai:live-check": "tsx scripts/ai-live-check.ts",
     "ai:probe-check": "tsx scripts/ai-credential-probe-check.ts",
-    "ai:ab-gate": "tsx scripts/ai-embedding-ab-gate.ts"
+    "ai:ab-gate": "tsx scripts/ai-embedding-ab-gate.ts",
+    "ai:subkey-check": "tsx scripts/ai-subkey-check.ts"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.132",
