@@ -1,4 +1,4 @@
-import type { PlatformNotificationType } from '@app/shared-types';
+import type { PLATFORM_NOTIFICATION_TYPES } from '@app/shared-types';
 
 /**
  * YOUR notification types, like the event registry: strings, not a Prisma enum. `notifications.type` and
@@ -16,5 +16,5 @@ export const APP_NOTIFICATION_TYPES = [] as const satisfies readonly string[];
 
 export type AppNotificationType = (typeof APP_NOTIFICATION_TYPES)[number];
 
-/** Every type this app can send: the platform's and its own. */
-export type KnownNotificationType = PlatformNotificationType | AppNotificationType;
+/** Every type this app can send: the platform's and its own (the union of the two `as const` lists). */
+export type KnownNotificationType = [...typeof PLATFORM_NOTIFICATION_TYPES, ...typeof APP_NOTIFICATION_TYPES][number];
