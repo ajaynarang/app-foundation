@@ -336,7 +336,7 @@ in a later change.
 
 - Migration `20261112235000_ai_credentials`: new table `ai_credentials` and enums `AiCredentialType` (`ANTHROPIC_KEY`,
   `BEDROCK_ROLE`, `OPENROUTER_KEY`, `VERCEL_GATEWAY_KEY`) and `AiCredentialStatus` (`ACTIVE`, `FAILING`, `DISABLED`).
-  Additive; no existing row is touched. `BEDROCK_ROLE` is reserved for the AWS role flow and is refused until then.
+  Additive; no existing row is touched. `BEDROCK_ROLE` is reserved for the AWS role flow (section 10).
 - New optional variable `AI_CREDENTIALS_KEY`: 64 hex characters (`openssl rand -hex 32`), no default. It encrypts the
   keys and is the switch. Unset, `POST /ai-settings/credentials` and `POST .../validate` answer 404 and
   `GET /ai-settings` says `byokEnabled: false`; the policy, reading and removing still work. A value that is not 64
@@ -374,6 +374,67 @@ notification) and super-admins (tenant-paid rows in AI Spend).
 
 **Rollback.** Revert the change. The table and enums can stay; old code never reads them. Workspaces that connected
 keys go back to the platform routes, and their stored keys stay encrypted until the change is redeployed.
+
+## 10. AWS Bedrock: the zero-retention routes
+
+**What changed.** Zero data retention now has somewhere to run. A zero-retention workspace is served by its own AWS
+Bedrock role, else its attested Anthropic key (language only), else the platform's Bedrock route when the operator
+turns it on, else refused as before. Both Bedrock routes are off by default. No migration: the AWS role columns came
+with section 9.
+
+- The model catalog gains `bedrockId`, the US geo cross-region inference profiles from AWS's Bedrock model cards:
+  `us.anthropic.claude-haiku-5-5` (`fast`), `us.anthropic.claude-sonnet-5-5` (`standard`),
+  `us.anthropic.claude-opus-5-5` (`powerful`). Embeddings on Bedrock use `cohere.embed-v4:0` at 1536 dimensions, the
+  same model as Cohere direct. These ids have not yet been proved with a live call (see "What to do").
+- Pricing: four `aws` rows (the three models and the embedding model). They mirror the Anthropic and Cohere list
+  prices and are marked unverified in `notes`; check them against the Bedrock price page before relying on AI Spend.
+- `platform-bedrock` (new platform route): language and embeddings, zero retention, platform-paid, ledger
+  `credentialType` `PLATFORM_BEDROCK` and provider `aws`. It sits last, so standard workspaces keep OpenRouter and
+  Cohere. It signs with the default AWS credential chain (the ECS task role on a deployed task).
+- `BEDROCK_ROLE` (workspace credential): the workspace's own AWS account, through a role it creates that trusts this
+  deployment's task role and requires the workspace's external id (`<project>-<workspace public id>`, from
+  `PROJECT_NAME`). Nothing secret is stored. Temporary credentials come from STS for one hour at a time.
+- New routes (OWNER only; 404 while `AI_CREDENTIALS_KEY` is unset; 503 while `PLATFORM_ASSUME_ROLE_ARN` is unset):
+  `POST /ai-settings/credentials/bedrock/begin` returns the external id, the trust policy, a permissions policy
+  limited to the catalog's models, a Terraform snippet and the optional CloudFormation link; nothing is stored.
+  `POST /ai-settings/credentials/bedrock/complete` takes `{ roleArn, awsRegion }`, assumes the role with the external
+  id (must succeed), assumes it without (must be refused with access denied; any other error is a refusal too), makes
+  one model call, and only then stores the role. The region must be one the `us.` profiles serve (`us-east-1`,
+  `us-east-2`, `us-west-1`, `us-west-2`, `ca-central-1`, `ca-west-1`). "Test again" and the daily sweep re-run the
+  same check.
+- A Bedrock role stores no secret, so it keeps serving if `AI_CREDENTIALS_KEY` is later removed; only connecting and
+  testing stop.
+- New optional variables: `PLATFORM_BEDROCK_REGION` (turns `platform-bedrock` on), `PLATFORM_ASSUME_ROLE_ARN`
+  (comma-separated; the role a workspace must trust), `PLATFORM_BEDROCK_CFN_TEMPLATE_URL`. A malformed region or ARN
+  stops the boot.
+- Terraform, off by default: `bedrock_models` (list) adds a Bedrock invoke statement for those models to the task
+  role; `bedrock_tenant_roles_enabled` (bool) adds `sts:AssumeRole` on any role to the task role and sets
+  `PLATFORM_ASSUME_ROLE_ARN` on the API and worker tasks to the task role's ARN. With both left at their defaults the
+  plan is empty.
+- New commands, run by hand (they spend money): `pnpm --filter @app/backend ai:ab-gate` (Cohere direct against
+  Bedrock vectors; exit 0 pass, 1 diverged, 2 not run, 3 errored) and a `bedrock` leg in `ai:live-check` (runs when
+  `PLATFORM_BEDROCK_REGION` is set).
+
+**Who notices.** Nobody until the operator sets a variable. Then zero-retention workspaces stop being refused.
+
+**What to do.**
+
+1. Deploy. Nothing must be set.
+2. To serve zero-retention workspaces on the platform's AWS account: enable the three Claude 5.5 models and Cohere
+   Embed v4 in the Bedrock console, set the account's Bedrock data retention mode to `none` in that region, set
+   `bedrock_models` in Terraform and apply, then run `ai:live-check` with `PLATFORM_BEDROCK_REGION` set. If the
+   environment also has `COHERE_API_KEY`, run `ai:ab-gate`; on a measured divergence unset `COHERE_API_KEY` so Bedrock
+   is the only embedding route, and record it in the routing ADR. Then set `PLATFORM_BEDROCK_REGION` in Doppler.
+3. To let workspaces connect their own AWS account: set `AI_CREDENTIALS_KEY` (section 9) and
+   `bedrock_tenant_roles_enabled = true`, and apply. Do not set `PLATFORM_ASSUME_ROLE_ARN` in Doppler: it would
+   override the task definition.
+4. If a model id does not answer on Bedrock, remove that alias's `bedrockId` from the catalog: the Bedrock routes then
+   refuse that alias with a typed error instead of serving another model.
+
+**Rollback.** Unset the variables and set the Terraform variables back to their defaults. A workspace with a stored
+role then has its calls refused by AWS (the task role may no longer assume it) until the daily sweep marks the role
+FAILING or the owner removes it; it is never moved to a platform route. Reverting the code returns zero-retention
+workspaces to being refused, and stored roles are ignored.
 
 ## Deploy order for `ai_reader`
 

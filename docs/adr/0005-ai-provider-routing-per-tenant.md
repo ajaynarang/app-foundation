@@ -83,12 +83,20 @@ One root cause: provider choice was a process constant, while retention and paym
   warning and is otherwise ignored.
 - A deployment with no key boots: AI answers `AiNotConfigured` and everything else works. At boot the routing module
   logs one line per need (`language: platform-openrouter`, `embedding: none`).
-- Until a zero-retention route exists (Bedrock, later in this project), a zero-retention tenant is refused on every
-  AI call; knowledge-base search still works for it on full-text.
+- A zero-retention tenant is served by its own Bedrock role, else its attested Anthropic key (language only), else
+  `platform-bedrock` once the operator sets `PLATFORM_BEDROCK_REGION`, else refused; knowledge-base search still
+  works for it on full-text.
 - Dev mirrors production: there is no special dev provider.
 - Bring-your-own-key added the tenant pool and three registry entries without reshaping the resolver; the Bedrock
-  routes and per-workspace OpenRouter sub-keys each add an entry the same way.
+  routes (`platform-bedrock` and `BEDROCK_ROLE`) added two more the same way, and per-workspace OpenRouter sub-keys
+  will too.
+- A workspace Bedrock role is assumed with the backend's own task-role credentials, never through an intermediate
+  role: the role a workspace trusts (`PLATFORM_ASSUME_ROLE_ARN`) is the role that calls. Both Bedrock routes sign
+  through the default AWS credential chain. Connecting a role checks it both ways: with the external id the assume
+  must succeed, without it the assume must be refused with access denied.
 - Removing `AI_CREDENTIALS_KEY` while workspaces hold keys blocks those workspaces (`AiCredentialFailing`), never
   moves them to the platform key; boot logs an error with the count of stored credentials.
-- Open: the embedding A/B gate (whether Cohere direct and Bedrock produce interchangeable vectors) has not been run
-  for the starter. Its outcome is recorded here when the Bedrock route lands.
+- Open: the embedding A/B gate (`ai:ab-gate`, whether Cohere direct and Bedrock produce interchangeable vectors) has
+  shipped but has not been run for the starter: it needs AWS credentials and spends money. Until an operator runs it
+  and records the result here, run it before enabling `platform-bedrock` beside `COHERE_API_KEY`; on a measured
+  divergence Bedrock becomes the only embedding route.
