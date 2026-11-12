@@ -52,28 +52,11 @@ export class VoiceService {
     tenantId: number,
   ): Promise<{ token: string; url: string }> {
     // Validate conversation ownership before issuing a room token
-    const user = await this.prisma.user.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { conversationId },
-    });
-    if (!conversation) {
-      throw new NotFoundException('Conversation not found');
-    }
-    if (conversation.userId !== user.id || conversation.tenantId !== tenantId) {
-      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
-      throw new NotFoundException('Conversation not found');
-    }
+    const { userDbId } = await this.assertConversationOwner(conversationId, userId, tenantId);
 
     // Fetch user's voice preferences
     const prefs = await this.prisma.userPreferences.findUnique({
-      where: { userId: user.id },
+      where: { userId: userDbId },
       select: { voiceMode: true, voiceId: true, voiceSpeed: true },
     });
     const voicePrefs = {
@@ -133,6 +116,32 @@ export class VoiceService {
     this.logger.log(`Generated voice token for user=${userId} room=${roomName}`);
 
     return { token: jwt, url };
+  }
+
+  /**
+   * The conversation must exist and belong to this user (public id) in this tenant. Anything else answers 404: a 403
+   * would confirm that someone else's conversation exists. Returns the owner's database id.
+   */
+  async assertConversationOwner(
+    conversationId: string,
+    userId: string,
+    tenantId: number,
+  ): Promise<{ userDbId: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { conversationId },
+    });
+    if (!conversation || conversation.userId !== user.id || conversation.tenantId !== tenantId) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return { userDbId: user.id };
   }
 
   /**

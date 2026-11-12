@@ -344,7 +344,8 @@
                     "DESK_STEP",
                     "MEMORY_EXTRACT",
                     "EMBEDDING",
-                    "KB_INGEST"
+                    "KB_INGEST",
+                    "VOICE"
                   ],
                   "type": "string"
                 }
@@ -420,7 +421,8 @@
               "DESK_STEP",
               "MEMORY_EXTRACT",
               "EMBEDDING",
-              "KB_INGEST"
+              "KB_INGEST",
+              "VOICE"
             ],
             "type": "string"
           },
@@ -13891,6 +13893,55 @@
         ],
         "type": "object"
       },
+      "VoiceUsageDto": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Minted once per agent session; a retried report with the same id records nothing",
+            "type": "string"
+          },
+          "sessionMs": {
+            "description": "How long the agent session was connected, in milliseconds",
+            "type": "number"
+          },
+          "sttAudioMs": {
+            "description": "Audio sent to speech-to-text, in milliseconds",
+            "type": "number"
+          },
+          "sttModel": {
+            "description": "The speech-to-text model that ran (a `model_pricing` model for provider `deepgram`)",
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "number"
+          },
+          "ttsCharacters": {
+            "description": "Characters sent to text-to-speech",
+            "type": "number"
+          },
+          "ttsModel": {
+            "description": "The text-to-speech model that ran (a `model_pricing` model for provider `cartesia`)",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "conversationId",
+          "userId",
+          "tenantId",
+          "sttModel",
+          "ttsModel",
+          "sttAudioMs",
+          "ttsCharacters",
+          "sessionMs"
+        ],
+        "type": "object"
+      },
       "WebhookDeliveryLog": {
         "properties": {
           "attempts": {
@@ -14982,7 +15033,8 @@
                 "DESK_STEP",
                 "MEMORY_EXTRACT",
                 "EMBEDDING",
-                "KB_INGEST"
+                "KB_INGEST",
+                "VOICE"
               ],
               "type": "string"
             }
@@ -27346,6 +27398,46 @@
           }
         ],
         "summary": "Internal: stream the assistant reply for a voice transcript as NDJSON (voice agent only, X-Voice-Agent-Secret)",
+        "tags": [
+          "Voice"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/usage": {
+      "post": {
+        "operationId": "VoiceController_internalUsage",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceUsageDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Internal: record a finished voice session’s speech usage in the AI cost ledger (voice agent only, X-Voice-Agent-Secret)",
         "tags": [
           "Voice"
         ]

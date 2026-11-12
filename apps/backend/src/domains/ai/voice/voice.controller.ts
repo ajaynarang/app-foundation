@@ -20,8 +20,10 @@ import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { VoiceService } from './voice.service';
 import { VoiceTokenDto } from './dto/voice-token.dto';
 import { VoiceRespondDto } from './dto/voice-respond.dto';
+import { VoiceUsageDto } from './dto/voice-usage.dto';
+import { VoiceUsageService } from './voice-usage.service';
 import type { Request, Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { VoiceStatusResponse, VoiceTokenResponse } from '../openapi.responses';
 
@@ -31,7 +33,10 @@ import { VoiceStatusResponse, VoiceTokenResponse } from '../openapi.responses';
 export class VoiceController {
   private readonly logger = new Logger(VoiceController.name);
 
-  constructor(private readonly voiceService: VoiceService) {}
+  constructor(
+    private readonly voiceService: VoiceService,
+    private readonly voiceUsage: VoiceUsageService,
+  ) {}
 
   /** Check if voice mode is available (all vendor keys configured). */
   @Get('status')
@@ -77,22 +82,7 @@ export class VoiceController {
       'Internal: stream the assistant reply for a voice transcript as NDJSON (voice agent only, X-Voice-Agent-Secret)',
   })
   async internalRespond(@Req() req: Request, @Res() res: Response, @Body() dto: VoiceRespondDto) {
-    // Validate shared secret — constant-time comparison to prevent timing attacks
-    const secret = req.headers['x-voice-agent-secret'] as string;
-    const expectedSecret = process.env.VOICE_AGENT_SECRET;
-    if (!expectedSecret || !secret) {
-      throw new ForbiddenException('Invalid voice agent secret');
-    }
-    try {
-      const a = Buffer.from(secret, 'utf8');
-      const b = Buffer.from(expectedSecret, 'utf8');
-      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-        throw new ForbiddenException('Invalid voice agent secret');
-      }
-    } catch (e) {
-      if (e instanceof ForbiddenException) throw e;
-      throw new ForbiddenException('Invalid voice agent secret');
-    }
+    this.assertAgentSecret(req);
 
     this.logger.log(`Voice respond — conversation=${dto.conversationId} user=${dto.userId}`);
 
@@ -118,5 +108,40 @@ export class VoiceController {
     }
 
     res.end();
+  }
+
+  /**
+   * Internal endpoint the forked voice agent calls once when a session ends, with that session's speech-to-text,
+   * text-to-speech and session-time totals. They become VOICE rows in the AI cost ledger, priced per unit. Same
+   * shared-secret auth as `internal/respond`, and the conversation must be the body's user's in the body's tenant.
+   * A retried report with the same `sessionId` records nothing new.
+   */
+  @Post('internal/usage')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({
+    summary:
+      'Internal: record a finished voice session’s speech usage in the AI cost ledger (voice agent only, X-Voice-Agent-Secret)',
+  })
+  @ApiNoContentResponse({ description: 'Recorded' })
+  async internalUsage(@Req() req: Request, @Body() dto: VoiceUsageDto): Promise<void> {
+    this.assertAgentSecret(req);
+    const { userDbId } = await this.voiceService.assertConversationOwner(dto.conversationId, dto.userId, dto.tenantId);
+    await this.voiceUsage.recordSessionUsage(dto, userDbId);
+  }
+
+  /** Constant-time check of the shared secret the forked agent sends. */
+  private assertAgentSecret(req: Request): void {
+    const secret = req.headers['x-voice-agent-secret'];
+    const expectedSecret = process.env.VOICE_AGENT_SECRET;
+    if (!expectedSecret || typeof secret !== 'string' || !secret) {
+      throw new ForbiddenException('Invalid voice agent secret');
+    }
+    const a = Buffer.from(secret, 'utf8');
+    const b = Buffer.from(expectedSecret, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      throw new ForbiddenException('Invalid voice agent secret');
+    }
   }
 }
