@@ -114,6 +114,55 @@ are added: `@openrouter/ai-sdk-provider` and `@ai-sdk/cohere`.
 - If you read `process.env.OPENAI_API_KEY` yourself, read `openaiApiKey` through `ConfigService` instead.
 - No schema change.
 
+## 5. Language calls move onto the resolver; zero retention is enforced for them; the ledger records the route
+
+**What changed.** Every language call now gets its model from `AiRouteResolver.resolve(tenantId, 'language')`:
+structured output (`StructuredOutputService`, so Desk steps and Desk memory extraction too), the skill classifier,
+feedback categorization, and chat. Chat agents own no model any more: `mastra.provider.ts` registers each agent with
+`perRequestModel`, and every call site (a chat turn, a delegated `execute`, a resume) passes the resolved model in
+the Mastra `RequestContext` under `REQUEST_MODEL_KEY` (`apps/backend/src/domains/ai/routing/request-model-key.ts`).
+An agent invoked without one throws a 500; it never falls back to a default provider. Embeddings are unchanged in
+this step (they still use `ai-provider.ts` and `text-embedding-3-small`; the next step moves them).
+
+- The default language route is `platform-openrouter`. With `OPENROUTER_API_KEY` unset, chat, the classifier,
+  feedback categorization, Desk LLM steps and memory extraction answer `AiNotConfigured` (503). `AI_PROVIDER`,
+  `AI_GATEWAY_API_KEY` and `ANTHROPIC_API_KEY` no longer reach any language call (they are removed from the config in
+  the next step).
+- The model tuning moved into the resolver and is applied per route: the alias's effort goes in the route family's
+  own shape (`reasoning.effort` on OpenRouter), and a refused generate call is retried once on the next alias up on
+  the same route (`routing/model-tuning.middleware.ts`).
+- Zero retention is enforced in the resolver for every language call, not only structured output. Until a
+  zero-retention route exists (Bedrock, later in this project), a workspace with `aiZeroRetention` is refused with
+  `ZeroRetentionUnavailable` (400) on chat, Desk steps, memory extraction and feedback categorization, and the
+  classifier sends nothing and routes to the default agent. External input moderation (OpenAI) is skipped for such a
+  workspace; the local guardrails still run. `AiTelemetryService.assertZeroRetention` is gone; the resolver raises
+  `AI_ZERO_RETENTION_UNAVAILABLE` (with `{ need }` in the payload, where the old check sent `{ tier }`).
+- `StructuredOutputService.extract` now requires `aiContext` (the tenant to route by) and no longer accepts a
+  pre-built `model`.
+- Chat answers a routing refusal before the first byte as the error envelope with its own status and code (503 or
+  400), not a generic 500.
+- The ledger (`ai_invocations`) gains `route_id` (`VARCHAR(64)`) and `credential_type` (`VARCHAR(40)`), both
+  nullable, in migration `20261112210000_ai_invocation_route`. Each language row records the route that served it
+  (`platform-openrouter`, `PLATFORM_OPENROUTER`), its provider label (`openrouter`) and the model id on that route
+  (`anthropic/claude-sonnet-5.5`), which is what the `openrouter` pricing rows are keyed by. Rows written before keep
+  null in both, which reads as platform-paid.
+
+**Who notices.** Everyone who uses AI: language calls now run through OpenRouter. A deployment without
+`OPENROUTER_API_KEY` loses chat and every other language feature until the key is set. A zero-retention workspace
+loses chat and the other language features until a zero-retention route is enabled.
+
+**What to do.**
+
+- Before deploying, set `OPENROUTER_API_KEY` in every environment (see section 4) and run the pricing seed so the
+  `openrouter` rows exist.
+- Tell any workspace with `aiZeroRetention` that AI stops for it until a zero-retention route is enabled.
+- If your code calls `extract` without `aiContext` or with `model`, pass the tenant's context and drop `model`.
+- If you invoke a Mastra agent yourself, resolve the route and pass
+  `new RequestContext([[REQUEST_MODEL_KEY, route.languageModel(alias)]])` as `requestContext`.
+- If you listen for `AI_ZERO_RETENTION_UNAVAILABLE`, read `need` instead of `tier`.
+- Deploy normally: the migration is additive and nullable, with no backfill. Rollback: revert the change; the two
+  columns can stay.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops

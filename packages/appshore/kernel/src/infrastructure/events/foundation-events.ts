@@ -207,7 +207,7 @@ export const FOUNDATION_EVENT_REGISTRY = [
     constantName: 'AI_ZERO_RETENTION_UNAVAILABLE',
     label: 'AI Zero-Retention Route Unavailable',
     description:
-      'A tenant requires zero-data-retention AI routing but no ZDR-eligible model is configured for the requested tier.',
+      'A tenant requires zero-data-retention AI routing but no zero-retention route serves the requested need. The call is refused, never downgraded.',
     category: 'AI',
     visibility: 'internal' as const,
     aggregateType: 'tenant',
