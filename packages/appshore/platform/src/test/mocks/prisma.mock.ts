@@ -92,6 +92,7 @@ const MODEL_NAMES = [
   'modelPricing',
   'tenantAiBudget',
   'aiCredential',
+  'tenantAiSubKey',
 ] as const;
 
 export function createMockPrisma() {

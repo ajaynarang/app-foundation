@@ -217,6 +217,7 @@ model Tenant {
   aiInvocations          AiInvocation[]
   aiBudget               TenantAiBudget?
   aiCredentials          AiCredential[]
+  aiSubKey               TenantAiSubKey?
 
   @@index([status])
   // Serves the every-minute scheduler heartbeat scan for tenants with the
@@ -2527,4 +2528,32 @@ model AiCredential {
 
   @@index([tenantId, status])
   @@map("ai_credentials")
+}
+
+/// A workspace's own OpenRouter runtime key on the platform's account (per-workspace sub-keys). The platform still pays,
+/// so this is not a workspace credential and never joins the tenant pool: `platform-openrouter` simply calls with this
+/// key instead of the master `OPENROUTER_API_KEY`, and OpenRouter enforces `limitUsd` (the workspace's monthly hard
+/// cap, reset monthly) at its own edge. Created and kept in step by `OpenRouterProvisioningService` only when
+/// `OPENROUTER_PROVISIONING_KEY` and `AI_CREDENTIALS_KEY` are both set. The key is stored only as an AES-256-GCM
+/// envelope bound to `tenantId:subkey_openrouter`.
+model TenantAiSubKey {
+  id       Int    @id @default(autoincrement())
+  tenantId Int    @unique @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// The provider that issued the key. `openrouter` is the only one today.
+  provider     String  @default("openrouter") @db.VarChar(20)
+  /// `<ivHex>:<authTagHex>:<cipherHex>`.
+  encryptedKey String  @map("encrypted_key") @db.Text
+  /// Which `AI_CREDENTIALS_KEY` generation encrypted the key.
+  keyVersion   Int     @default(1) @map("key_version")
+  /// OpenRouter's hash of the key: the handle for updating its limit or revoking it. Not a secret.
+  keyHash      String  @map("key_hash") @db.VarChar(128)
+  /// The monthly limit last pushed to OpenRouter, in USD.
+  limitUsd     Decimal @map("limit_usd") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("tenant_ai_sub_keys")
 }
