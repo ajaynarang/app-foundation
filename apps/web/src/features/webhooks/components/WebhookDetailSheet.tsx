@@ -8,7 +8,7 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import { Textarea } from '@app/ui/components/ui/textarea';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   DropdownMenu,
@@ -26,8 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@app/ui/components/ui/alert-dialog';
-import { MoreHorizontal, Play, Pencil, Trash2, RotateCw, FileText, KeyRound } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { MoreHorizontal, Play, Pencil, Trash2, FileText, KeyRound } from 'lucide-react';
 import {
   useUpdateWebhook,
   useDeleteWebhook,
@@ -40,7 +39,15 @@ import {
 import { EventPicker } from './event-picker';
 import { RotateWebhookSecretDialog } from './rotate-webhook-secret-dialog';
 import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
-import { ListFooter } from '@/shared/components/page-chrome';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  RelativeTime,
+  RowActions,
+} from '@/shared/components/page-chrome';
+import { DELIVERY_STATUS_VARIANTS, subscriptionState } from '../constants';
 
 interface Props {
   webhook: WebhookSubscription | null;
@@ -50,30 +57,10 @@ interface Props {
 
 const PAGE_SIZE = 20;
 
-function getDeliveryStatus(log: WebhookDeliveryLog): 'Delivered' | 'Failed' | 'Pending' {
-  if (log.deliveredAt) return 'Delivered';
-  if (log.failedAt) return 'Failed';
-  return 'Pending';
-}
-
-function StatusBadge({ status }: { status: 'Delivered' | 'Failed' | 'Pending' }) {
-  if (status === 'Delivered')
-    return (
-      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-600/20 dark:text-emerald-400 dark:border-emerald-600/30">
-        Delivered
-      </Badge>
-    );
-  if (status === 'Failed')
-    return (
-      <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-600/20 dark:text-red-400 dark:border-red-600/30">
-        Failed
-      </Badge>
-    );
-  return (
-    <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-600/20 dark:text-yellow-400 dark:border-yellow-600/30">
-      Pending
-    </Badge>
-  );
+function getDeliveryStatus(log: WebhookDeliveryLog): keyof typeof DELIVERY_STATUS_VARIANTS {
+  if (log.deliveredAt) return 'DELIVERED';
+  if (log.failedAt) return 'FAILED';
+  return 'PENDING';
 }
 
 export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
@@ -277,15 +264,9 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
                   <code className="block break-all rounded bg-muted px-2 py-1 font-mono text-xs">{webhook.url}</code>
                 </Field>
                 <Field label="Status">
-                  <Badge
-                    className={
-                      webhook.active
-                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-600/20 dark:text-emerald-400 dark:border-emerald-600/30'
-                        : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-600/20 dark:text-gray-400 dark:border-gray-600/30'
-                    }
-                  >
-                    {webhook.active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <StatusBadge tone={subscriptionState(webhook.active).tone}>
+                    {subscriptionState(webhook.active).label}
+                  </StatusBadge>
                 </Field>
                 <Field label="Events">
                   <div className="flex flex-wrap gap-1">
@@ -307,9 +288,7 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
                 )}
                 <Field label="Created">
                   <p className="text-sm text-muted-foreground">
-                    {formatDistanceToNow(new Date(webhook.createdAt), {
-                      addSuffix: true,
-                    })}
+                    <RelativeTime iso={webhook.createdAt} />
                   </p>
                 </Field>
                 {webhook._count && (
@@ -340,20 +319,24 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
             </div>
 
             {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-9 w-full" />
-                ))}
-              </div>
+              <PageLoadingSkeleton variant="table" rows={5} />
+            ) : deliveries.isError ? (
+              <ListErrorState
+                title="Couldn't load the delivery log."
+                error={deliveries.error}
+                onRetry={() => void deliveries.refetch()}
+                isRetrying={deliveries.isRefetching}
+              />
             ) : logs.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {dateFrom || dateTo
-                    ? 'No deliveries in this date range. Try widening the window.'
-                    : 'Delivery attempts will appear here once events are triggered.'}
-                </p>
-              </div>
+              <PageEmptyState
+                icon={FileText}
+                title={dateFrom || dateTo ? 'No deliveries in this date range' : 'No deliveries yet'}
+                description={
+                  dateFrom || dateTo
+                    ? 'Try widening the window.'
+                    : 'Delivery attempts will appear here once events are triggered.'
+                }
+              />
             ) : (
               <>
                 <div className="rounded-md border border-border overflow-x-auto">
@@ -365,43 +348,38 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
                         <TableHead className="hidden sm:table-cell">Code</TableHead>
                         <TableHead className="hidden sm:table-cell">Attempts</TableHead>
                         <TableHead>Time</TableHead>
-                        <TableHead className="w-[60px]" />
+                        <TableHead className="w-[1%]">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {logs.map((log) => {
-                        const status = getDeliveryStatus(log);
+                        const statusKey = getDeliveryStatus(log);
+                        const status = DELIVERY_STATUS_VARIANTS[statusKey];
                         return (
                           <TableRow key={log.id}>
                             <TableCell className="font-mono text-xs">{log.event}</TableCell>
                             <TableCell>
-                              <StatusBadge status={status} />
+                              <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell font-mono text-xs">
                               {log.responseStatus ?? '—'}
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">{log.attempts}</TableCell>
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDistanceToNow(new Date(log.createdAt), {
-                                addSuffix: true,
-                              })}
+                              <RelativeTime iso={log.createdAt} />
                             </TableCell>
-                            <TableCell>
-                              {status === 'Failed' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  loading={retryDelivery.isPending && retryDelivery.variables?.logId === log.id}
-                                  onClick={() =>
-                                    retryDelivery.mutate({
-                                      subscriptionId: webhook.id,
-                                      logId: log.id,
-                                    })
-                                  }
-                                >
-                                  <RotateCw className="h-3.5 w-3.5" />
-                                  <span className="sr-only">Retry</span>
-                                </Button>
+                            <TableCell className="text-right">
+                              {statusKey === 'FAILED' && (
+                                <RowActions
+                                  primary={{
+                                    label: 'Retry',
+                                    ariaLabel: `Retry the ${log.event} delivery`,
+                                    loading: retryDelivery.isPending && retryDelivery.variables?.logId === log.id,
+                                    onClick: () => retryDelivery.mutate({ subscriptionId: webhook.id, logId: log.id }),
+                                  }}
+                                />
                               )}
                             </TableCell>
                           </TableRow>
