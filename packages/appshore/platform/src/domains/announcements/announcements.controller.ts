@@ -7,6 +7,8 @@ import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { BroadcastListQueryDto } from './dto/broadcast-list-query.dto';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { Broadcast, BroadcastList } from './openapi.responses';
 
 const BROADCAST_ID_PARAM = { name: 'id', description: 'The broadcast public id (uuid)' };
 
@@ -22,6 +24,7 @@ export class AnnouncementsController {
   @ApiQuery({ name: 'status', required: false, enum: AnnouncementStatus })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'cursor', required: false })
+  @ApiResult(BroadcastList)
   findAll(@Query() query: BroadcastListQueryDto) {
     return this.service.findAll(query);
   }
@@ -29,6 +32,7 @@ export class AnnouncementsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get broadcast by its public id' })
   @ApiParam(BROADCAST_ID_PARAM)
+  @ApiResult(Broadcast)
   findOne(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.findOne(broadcastId);
   }
@@ -36,6 +40,7 @@ export class AnnouncementsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a broadcast (starts as DRAFT)' })
+  @ApiResult(Broadcast, HttpStatus.CREATED)
   create(@Body() dto: CreateAnnouncementDto, @CurrentUser() user: any) {
     return this.service.create(dto, user.dbId);
   }
@@ -43,6 +48,7 @@ export class AnnouncementsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
+  @ApiResult(Broadcast)
   update(@Param('id', ParseUUIDPipe) broadcastId: string, @Body() dto: UpdateAnnouncementDto) {
     return this.service.update(broadcastId, dto);
   }
@@ -51,6 +57,7 @@ export class AnnouncementsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Publish a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
+  @ApiResult(Broadcast)
   publish(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.publish(broadcastId);
   }
@@ -59,6 +66,7 @@ export class AnnouncementsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive a broadcast' })
   @ApiParam(BROADCAST_ID_PARAM)
+  @ApiResult(Broadcast)
   archive(@Param('id', ParseUUIDPipe) broadcastId: string) {
     return this.service.archive(broadcastId);
   }

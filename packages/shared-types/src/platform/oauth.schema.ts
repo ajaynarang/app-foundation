@@ -53,6 +53,16 @@ export const OAuthClientCreatedResponseSchema = OAuthClientResponseSchema.extend
   clientSecret: z.string(),
 });
 
+/** `POST /oauth/authorize/consent`: where the consent page sends the person's browser next (the code rides it). */
+export const OAuthConsentApprovedSchema = z.object({ redirectUrl: z.string() });
+export type OAuthConsentApproved = z.infer<typeof OAuthConsentApprovedSchema>;
+
+/** `POST /oauth/clients/:client_id/rotate-secret`: the new secret in plaintext, shown once. */
+export const OAuthClientSecretRotatedSchema = z.object({
+  clientSecret: z.string().describe('The new client secret; returned only on this response'),
+});
+export type OAuthClientSecretRotated = z.infer<typeof OAuthClientSecretRotatedSchema>;
+
 export type CreateOAuthClientInput = z.infer<typeof CreateOAuthClientSchema>;
 export type UpdateOAuthClientInput = z.infer<typeof UpdateOAuthClientSchema>;
 export type OAuthClientResponse = z.infer<typeof OAuthClientResponseSchema>;

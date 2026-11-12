@@ -4,6 +4,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { RedisHealthIndicator } from './indicators/redis.health-indicator';
 import { PrismaService } from '../infrastructure/database/prisma.service';
+import { ApiOperation } from '@nestjs/swagger';
 
 @Controller('health')
 export class HealthController {
@@ -18,6 +19,7 @@ export class HealthController {
   @SkipThrottle()
   @Get('live')
   @HealthCheck()
+  @ApiOperation({ summary: 'Liveness probe — the process is up (public, never throttled)' })
   liveness(): Promise<HealthCheckResult> {
     return this.health.check([() => Promise.resolve({ liveness: { status: 'up' as const } })]);
   }
@@ -26,6 +28,7 @@ export class HealthController {
   @SkipThrottle()
   @Get('ready')
   @HealthCheck()
+  @ApiOperation({ summary: 'Readiness probe — database and Redis reachable; 503 when either is down (public)' })
   readiness(): Promise<HealthCheckResult> {
     return this.health.check([
       () =>

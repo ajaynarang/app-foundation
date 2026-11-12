@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
@@ -21,6 +21,15 @@ import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
 import type { OAuthClientResponse } from '@app/shared-types';
 import { CreateOAuthClientDto, UpdateOAuthClientDto } from './dto/oauth-client.dto';
+import { ApiResult } from '../../shared/openapi/api-result';
+import {
+  OAuthClientCreatedResponse,
+  OAuthClientListResponse,
+  OAuthClientResponse as OAuthClientResponseRef,
+  OAuthClientSecretRotatedResponse,
+} from './openapi.responses';
+
+const CLIENT_ID_PARAM = { name: 'client_id', description: 'OAuth client id (app_…)' };
 
 @ApiTags('OAuth Clients')
 @Controller('oauth/clients')
@@ -37,7 +46,7 @@ export class OAuthClientsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new OAuth client' })
-  @ApiResponse({ status: 201, description: 'Client created' })
+  @ApiResult(OAuthClientCreatedResponse, HttpStatus.CREATED)
   async create(@Body() body: CreateOAuthClientDto, @Req() req: Request) {
     const user = (req as unknown as { user: { dbId: number } }).user;
     const tenantId = this.resolveTenantId(req);
@@ -46,18 +55,23 @@ export class OAuthClientsController {
 
   @Get()
   @ApiOperation({ summary: "List tenant's OAuth clients, newest first (cursor-paged)" })
+  @ApiResult(OAuthClientListResponse)
   async findAll(@Req() req: Request, @Query() query: CursorQueryDto) {
     return this.clientsService.findAll(this.resolveTenantId(req), query);
   }
 
   @Get(':client_id')
   @ApiOperation({ summary: 'Get OAuth client details' })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async findOne(@Param('client_id') clientId: string, @Req() req: Request) {
     return this.clientsService.findByClientId(clientId, this.resolveTenantId(req));
   }
 
   @Put(':client_id')
   @ApiOperation({ summary: 'Update OAuth client' })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async update(@Param('client_id') clientId: string, @Body() body: UpdateOAuthClientDto, @Req() req: Request) {
     return this.clientsService.update(clientId, body, this.resolveTenantId(req));
   }
@@ -65,6 +79,8 @@ export class OAuthClientsController {
   @Delete(':client_id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke/delete OAuth client (cascades tokens)' })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiNoContentResponse({ description: 'Client revoked; its access and refresh tokens are revoked too' })
   async revoke(@Param('client_id') clientId: string, @Req() req: Request): Promise<void> {
     await this.clientsService.revoke(clientId, this.resolveTenantId(req));
   }
@@ -77,6 +93,8 @@ export class OAuthClientsController {
     summary:
       'Rotate the client secret (returns the new plaintext value once). Does NOT cascade-revoke existing tokens — use revoke for that.',
   })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientSecretRotatedResponse)
   async rotateSecret(@Param('client_id') clientId: string, @Req() req: Request): Promise<{ clientSecret: string }> {
     return this.clientsService.rotateSecret(clientId, this.resolveTenantId(req));
   }
@@ -86,6 +104,8 @@ export class OAuthClientsController {
   @ApiOperation({
     summary: 'Pause the OAuth client (isActive=false); reversible via resume',
   })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async pause(@Param('client_id') clientId: string, @Req() req: Request): Promise<OAuthClientResponse> {
     const tenantId = this.resolveTenantId(req);
     await this.clientsService.pause(clientId, tenantId);
@@ -96,6 +116,8 @@ export class OAuthClientsController {
   @Post(':client_id/resume')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resume a paused OAuth client' })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async resume(@Param('client_id') clientId: string, @Req() req: Request): Promise<OAuthClientResponse> {
     const tenantId = this.resolveTenantId(req);
     await this.clientsService.resume(clientId, tenantId);
@@ -108,6 +130,8 @@ export class OAuthClientsController {
   @ApiOperation({
     summary: 'Revoke the OAuth client (sets isActive=false and cascades to active access + refresh tokens)',
   })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async revokeViaAction(@Param('client_id') clientId: string, @Req() req: Request): Promise<OAuthClientResponse> {
     const tenantId = this.resolveTenantId(req);
     await this.clientsService.revoke(clientId, tenantId);
@@ -119,6 +143,8 @@ export class OAuthClientsController {
   @ApiOperation({
     summary: 'Update the grantable scope set on an OAuth client',
   })
+  @ApiParam(CLIENT_ID_PARAM)
+  @ApiResult(OAuthClientResponseRef)
   async updateScopes(
     @Param('client_id') clientId: string,
     @Body() body: UpdateOAuthClientScopesDto,

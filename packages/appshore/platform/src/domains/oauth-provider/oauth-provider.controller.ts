@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Query, Req, Res, HttpCode, HttpStatus, UseFilters } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Throttle } from '@nestjs/throttler';
@@ -11,6 +11,8 @@ import { OAUTH_SCOPES } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { ApproveOAuthConsentDto, OAuthRevokeRequestDto, OAuthTokenRequestDto } from './dto/oauth-protocol.dto';
 import { RegisterOAuthClientDto } from './dto/register-oauth-client.dto';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { OAuthConsentApprovedResponse, OAuthTokenIssuedResponse } from './openapi.responses';
 
 // The four protocol routes below (authorize, token, revoke, register) answer errors in the shape the standards
 // define, `{ error, error_description }`, through OAuthErrorFilter. The consent route is called by the web app
@@ -61,6 +63,7 @@ export class OAuthProviderController {
   @Public()
   @Throttle(GENEROUS_THROTTLE)
   @ApiOperation({ summary: 'OAuth 2.1 authorization endpoint' })
+  @ApiResponse({ status: HttpStatus.FOUND, description: "Redirects the person's browser to the consent page" })
   async authorize(
     @Query('response_type') responseType: string,
     @Query('client_id') clientId: string,
@@ -106,6 +109,7 @@ export class OAuthProviderController {
   @Post('authorize/consent')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve OAuth consent' })
+  @ApiResult(OAuthConsentApprovedResponse)
   async approveConsent(@Body() body: ApproveOAuthConsentDto, @Req() req: Request) {
     const { challenge, selectedScopes } = body;
     const user = (req as any).user;
@@ -122,6 +126,8 @@ export class OAuthProviderController {
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token endpoint' })
+  @ApiConsumes('application/x-www-form-urlencoded', 'application/json')
+  @ApiResult(OAuthTokenIssuedResponse)
   async token(@Body() body: OAuthTokenRequestDto) {
     const {
       grant_type: grantType,
@@ -160,6 +166,7 @@ export class OAuthProviderController {
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token revocation' })
+  @ApiConsumes('application/x-www-form-urlencoded', 'application/json')
   async revoke(@Body() body: OAuthRevokeRequestDto) {
     const { token } = body;
     if (!token) {

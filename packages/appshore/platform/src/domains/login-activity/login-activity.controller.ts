@@ -8,6 +8,8 @@ import { BaseTenantController } from '../../shared/base/base-tenant.controller';
 import { LoginActivityService } from './login-activity.service';
 import { ListLoginActivityQueryDto } from './dto/list-login-activity.query.dto';
 import { LoginActivitySummaryQueryDto } from './dto/login-activity-summary.query.dto';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { LoginActivityListResponse, LoginActivitySummaryResponse } from './openapi.responses';
 
 @ApiTags('Login Activity')
 @ApiBearerAuth()
@@ -23,6 +25,7 @@ export class LoginActivityController extends BaseTenantController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: "List login events for the caller's tenant" })
+  @ApiResult(LoginActivityListResponse)
   async list(@CurrentUser() user: any, @Query() query: ListLoginActivityQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     // `excludeSuperAdmin` is a Super-Admin-only filter — strip it here as
@@ -34,6 +37,7 @@ export class LoginActivityController extends BaseTenantController {
   @Get('summary')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({ summary: "Login activity KPIs + Notable for the caller's tenant" })
+  @ApiResult(LoginActivitySummaryResponse)
   async summary(@CurrentUser() user: any, @Query() query: LoginActivitySummaryQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
     const { tenantId: _ignoredTenant, excludeSuperAdmin: _ignoredFlag, ...safe } = query;

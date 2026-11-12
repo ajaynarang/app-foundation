@@ -7,6 +7,15 @@ import { UserRole, TenantPlan } from '@appshore/db';
 import { UpdatePlanConfigDto } from './dto/update-plan-config.dto';
 import { ToggleEntitlementDto } from './dto/toggle-entitlement.dto';
 import { AssignTenantPlanDto, UpdateProviderPriceDto } from './dto/assign-plan.dto';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiResult } from '../../shared/openapi/api-result';
+import {
+  PlanConfigRecordResponse,
+  PlanConfigWithEntitlementsResponse,
+  PlanEntitlementRecordResponse,
+  TenantPlanSnapshotResponse,
+} from './openapi.responses';
+import { TenantRecordResponse } from '../tenants/openapi.responses';
 
 @Controller('plans')
 export class PlansController {
@@ -17,6 +26,8 @@ export class PlansController {
    */
   @Public()
   @Get()
+  @ApiOperation({ summary: 'List the active plan configs with their entitlements — public, for the pricing page' })
+  @ApiResult([PlanConfigWithEntitlementsResponse])
   async getAllPlans() {
     return this.plansService.getAllPlanConfigs();
   }
@@ -26,6 +37,8 @@ export class PlansController {
    */
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @Get('my-plan')
+  @ApiOperation({ summary: "The current tenant's plan — config, seats used, trial days left and recent plan events" })
+  @ApiResult(TenantPlanSnapshotResponse)
   async getMyPlan(@CurrentUser() user: any) {
     if (!user?.tenantId) {
       // No field of the request is at fault: the caller has no workspace (a super admin). 403 with the code
@@ -40,6 +53,9 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('tenant/:tenant_id')
+  @ApiOperation({ summary: "A tenant's plan details (SUPER_ADMIN)" })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
+  @ApiResult(TenantPlanSnapshotResponse)
   async getTenantPlan(@Param('tenant_id') tenantId: string) {
     return this.plansService.getTenantPlanDetails(tenantId);
   }
@@ -49,6 +65,11 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch('tenant/:tenant_id')
+  @ApiOperation({
+    summary: 'Assign a plan to a tenant and record the plan event (SUPER_ADMIN) — answers the updated tenant',
+  })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
+  @ApiResult(TenantRecordResponse)
   async assignPlan(@Param('tenant_id') tenantId: string, @Body() body: AssignTenantPlanDto, @CurrentUser() user: any) {
     return this.plansService.assignPlan(tenantId, body.plan, user.email ?? user.userId, body.reason);
   }
@@ -58,6 +79,9 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan/provider-price')
+  @ApiOperation({ summary: "Set a plan's billing-provider price id (SUPER_ADMIN)" })
+  @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
+  @ApiResult(PlanConfigRecordResponse)
   async updateProviderPrice(@Param('plan') plan: TenantPlan, @Body() body: UpdateProviderPriceDto) {
     return this.plansService.updateProviderPriceId(plan, body.providerPriceId);
   }
@@ -67,6 +91,9 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan')
+  @ApiOperation({ summary: 'Update a plan config — name, pricing, limits, CTA (SUPER_ADMIN)' })
+  @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
+  @ApiResult(PlanConfigRecordResponse)
   async updatePlanConfig(@Param('plan') plan: TenantPlan, @Body() body: UpdatePlanConfigDto) {
     return this.plansService.updatePlanConfig(plan, body);
   }
@@ -76,6 +103,10 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan/entitlements/:feature')
+  @ApiOperation({ summary: 'Turn one feature entitlement on or off for a plan (SUPER_ADMIN)' })
+  @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
+  @ApiParam({ name: 'feature', description: 'Feature key of the entitlement' })
+  @ApiResult(PlanEntitlementRecordResponse)
   async toggleEntitlement(
     @Param('plan') plan: TenantPlan,
     @Param('feature') feature: string,

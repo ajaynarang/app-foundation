@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsArray, IsEnum, IsDateString } from 'class-validator';
 
 export enum AnnouncementTargetType {
@@ -13,9 +14,11 @@ export enum AnnouncementPriority {
 }
 
 export class CreateAnnouncementDto {
+  @ApiProperty()
   @IsString()
   title: string;
 
+  @ApiProperty()
   @IsString()
   body: string;
 
@@ -32,6 +35,7 @@ export class CreateAnnouncementDto {
   @IsEnum(AnnouncementPriority)
   priority?: AnnouncementPriority = AnnouncementPriority.INFO;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()
   expiresAt?: string;

@@ -8,6 +8,11 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { Public } from '../../auth/decorators/public.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
+import { ApiNoContentResponse, ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { InvitationIssued, InvitationLink, InvitationList } from './openapi.responses';
+
+const INVITATION_ID_PARAM = { name: 'invitation_id', description: 'Invitation public id (inv_…)' };
 
 @Controller('invitations')
 export class UserInvitationsController {
@@ -23,6 +28,8 @@ export class UserInvitationsController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Invite a person to the workspace by email or SMS; answers the invitation and its link' })
+  @ApiResult(InvitationIssued, HttpStatus.CREATED)
   async inviteUser(@Body() dto: InviteUserDto, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.inviteUser(dto, currentUser);
   }
@@ -33,6 +40,8 @@ export class UserInvitationsController {
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Get()
+  @ApiOperation({ summary: "List the workspace's invitations, newest first (cursor-paged; never the token)" })
+  @ApiResult(InvitationList)
   async getInvitations(@CurrentUser() currentUser: any, @Query() query: InvitationListQueryDto) {
     return this.userInvitationsService.listInvitations(currentUser.tenantId, query);
   }
@@ -42,6 +51,8 @@ export class UserInvitationsController {
    */
   @Public()
   @Get('by-token/:token')
+  @ApiOperation({ summary: 'Read a pending invitation by its token (public — the acceptance page)' })
+  @ApiParam({ name: 'token', description: 'Invitation acceptance token (from the invite link)' })
   async getInvitationByToken(@Param('token') token: string) {
     return this.userInvitationsService.getInvitationByToken(token);
   }
@@ -52,6 +63,7 @@ export class UserInvitationsController {
   @Public()
   @Post('accept')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Accept an email invitation with a Firebase identity (public)' })
   async acceptInvitation(@Body() dto: AcceptInvitationDto) {
     return this.userInvitationsService.acceptInvitation(dto.token, dto.firebaseUid);
   }
@@ -62,6 +74,9 @@ export class UserInvitationsController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Delete(':invitation_id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cancel a pending invitation (OWNER/ADMIN)' })
+  @ApiParam(INVITATION_ID_PARAM)
+  @ApiNoContentResponse({ description: 'Invitation cancelled' })
   async cancelInvitation(
     @Param('invitation_id') invitationId: string,
     @CurrentUser() currentUser: any,
@@ -75,6 +90,9 @@ export class UserInvitationsController {
    */
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @Get(':invitation_id/link')
+  @ApiOperation({ summary: 'Get the shareable link of a pending invitation (token unchanged)' })
+  @ApiParam(INVITATION_ID_PARAM)
+  @ApiResult(InvitationLink)
   async getInvitationLink(@Param('invitation_id') invitationId: string, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.getInvitationLink(invitationId, currentUser.tenantId);
   }
@@ -85,6 +103,9 @@ export class UserInvitationsController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @Post(':invitation_id/resend')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend a pending invitation with a new token and expiry (OWNER/ADMIN)' })
+  @ApiParam(INVITATION_ID_PARAM)
+  @ApiResult(InvitationIssued)
   async resendInvitation(@Param('invitation_id') invitationId: string, @CurrentUser() currentUser: any) {
     return this.userInvitationsService.resendInvitation(invitationId, currentUser.tenantId);
   }
@@ -95,6 +116,7 @@ export class UserInvitationsController {
   @Public()
   @Post('accept-phone')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Accept an SMS invitation — verify the OTP, set a PIN, sign in (public)' })
   async acceptPhoneInvitation(@Body() dto: AcceptPhoneInvitationDto) {
     const user = await this.userInvitationsService.acceptPhoneInvitation(dto);
     return this.authService.generateTokensForUser(user);
