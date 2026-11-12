@@ -46,7 +46,7 @@
     "seed:model-pricing": "tsx scripts/seed-model-pricing.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.44",
+    "@ai-sdk/anthropic": "^3.0.136",
     "@ai-sdk/openai": "^3.0.52",
     "@app/shared-types": "workspace:*",
     "@appshore/db": "workspace:*",
