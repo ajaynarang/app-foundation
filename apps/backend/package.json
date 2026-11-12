@@ -42,6 +42,7 @@
     "setup:status": "pnpm --filter @appshore/db setup:status",
     "// — AI Seeding (knowledge base, LLM prompts, model pricing)": "",
     "seed:knowledge": "ts-node src/domains/ai/knowledge-base/ingestion.command.ts",
+    "ai:reembed-desk-memory": "ts-node src/domains/desk/core/memory/reembed/reembed-desk-memory.command.ts",
     "seed:langfuse": "tsx scripts/seed-langfuse-prompts.ts",
     "seed:model-pricing": "tsx scripts/seed-model-pricing.ts",
     "ai:live-check": "tsx scripts/ai-live-check.ts"

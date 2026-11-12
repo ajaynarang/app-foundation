@@ -32,7 +32,8 @@
   "jsonEntries": [
     { "file": "package.json", "path": ["scripts", "// — Inngest (Desk durable workflow engine — local dev)"] },
     { "file": "package.json", "path": ["scripts", "inngest:dev"] },
-    { "file": "apps/backend/package.json", "path": ["dependencies", "inngest"] }
+    { "file": "apps/backend/package.json", "path": ["dependencies", "inngest"] },
+    { "file": "apps/backend/package.json", "path": ["scripts", "ai:reembed-desk-memory"] }
   ],
   "allowlistPrefixes": [
     {
