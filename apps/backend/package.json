@@ -45,7 +45,8 @@
     "ai:reembed-desk-memory": "ts-node src/domains/desk/core/memory/reembed/reembed-desk-memory.command.ts",
     "seed:langfuse": "tsx scripts/seed-langfuse-prompts.ts",
     "seed:model-pricing": "tsx scripts/seed-model-pricing.ts",
-    "ai:live-check": "tsx scripts/ai-live-check.ts"
+    "ai:live-check": "tsx scripts/ai-live-check.ts",
+    "ai:probe-check": "tsx scripts/ai-credential-probe-check.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.136",
