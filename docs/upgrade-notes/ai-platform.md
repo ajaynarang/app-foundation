@@ -483,6 +483,32 @@ The exact status OpenRouter sends for a spent key limit has not been checked liv
 workspaces at their last limit. To stop using them, delete the rows (`DELETE FROM tenant_ai_sub_keys`) and revoke the
 keys in the OpenRouter dashboard. Reverting the code ignores the table; the migration stays.
 
+## 12. The AI Keys settings screen and connect-your-key copy
+
+**What changed.** The web app gains **Settings > AI Keys** (`/settings/ai`) over the `/ai-settings` API of sections
+9 and 10. It shows the retention policy (the owner flips it; requiring zero retention is confirmed first), one line
+per need saying who pays right now and that spending caps cover only platform-paid usage, and the workspace's own
+credentials, each with its status, last four characters (or "No secret stored" for an AWS role), last test, last
+error, attestation and an "inert under the current policy" line. The owner adds a credential from a menu (Anthropic,
+AWS Bedrock, OpenRouter, Vercel AI Gateway; under zero retention only the first two), pastes a key in a dialog (or
+follows the Bedrock sheet), tests one again or removes one. An admin sees it all read-only; a member has no entry.
+
+- With `AI_CREDENTIALS_KEY` unset the Add menu and the credentials section are hidden; stored credentials still show,
+  with Remove only. The retention card always shows. In personal mode the page reads "Your AI keys".
+- Chat: a turn refused before it streams now shows the server's `detail` instead of a generic "trouble connecting"
+  line. When nothing serves chat (`AiNotConfigured`) and when the workspace is over its platform budget, the answer
+  links to AI Keys only for the workspace owner on a deployment with `AI_CREDENTIALS_KEY` set; anyone else there is
+  told to ask the workspace owner; without the key nobody is offered one.
+- The "AI usage limit reached" notification gains a "Connect a key" action (to `/settings/ai`) when
+  `AI_CREDENTIALS_KEY` is set.
+
+**Who notices.** Owners and admins see a new Settings entry. Nothing changes for routing, billing or the schema.
+
+**What to do.** Nothing. A product that renamed or moved the Settings sidebar keeps the new entry in
+`packages/appshore/web-core/src/shared/lib/navigation.ts`.
+
+**Rollback.** Revert the change. No data is involved.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
