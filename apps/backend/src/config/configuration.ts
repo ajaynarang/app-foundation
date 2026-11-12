@@ -91,6 +91,12 @@ const configSchema = z.object({
     )
     .optional(),
   /**
+   * An OpenRouter management (provisioning) key. When set together with `aiCredentialsKey`, each workspace gets its own
+   * OpenRouter runtime key, capped at its monthly hard budget at OpenRouter's edge; `platform-openrouter` then calls
+   * with that key instead of `openRouterApiKey`. Unset, sub-keys are off and the master key serves every workspace.
+   */
+  openRouterProvisioningKey: z.string().optional(),
+  /**
    * Enables `platform-bedrock`, the platform's zero-retention route (language and embeddings), in this AWS region,
    * with the task's own credentials. Unset in development, so a zero-retention workspace correctly fails closed there.
    */
@@ -400,6 +406,7 @@ export default (): Configuration => {
     cohereApiKey: env('COHERE_API_KEY'),
     openaiApiKey: env('OPENAI_API_KEY'),
     aiCredentialsKey: env('AI_CREDENTIALS_KEY'),
+    openRouterProvisioningKey: env('OPENROUTER_PROVISIONING_KEY'),
     platformBedrockRegion: env('PLATFORM_BEDROCK_REGION'),
     platformAssumeRoleArn: (env('PLATFORM_ASSUME_ROLE_ARN') ?? '')
       .split(',')

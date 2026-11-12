@@ -516,6 +516,20 @@ describe('configuration — production boot guard', () => {
       });
     });
 
+    describe('OPENROUTER_PROVISIONING_KEY (per-workspace sub-keys)', () => {
+      it('is optional with no default, so sub-keys are off until an operator sets it', () => {
+        expect(load({ ...dev }).openRouterProvisioningKey).toBeUndefined();
+        expect(load(validProduction()).openRouterProvisioningKey).toBeUndefined();
+        expect(load({ ...dev, OPENROUTER_PROVISIONING_KEY: '' }).openRouterProvisioningKey).toBeUndefined();
+      });
+
+      it('carries the management key', () => {
+        expect(load({ ...dev, OPENROUTER_PROVISIONING_KEY: 'sk-or-mgmt-test' }).openRouterProvisioningKey).toBe(
+          'sk-or-mgmt-test',
+        );
+      });
+    });
+
     it('lists no retired variable when none is set (a blank one counts as unset)', () => {
       const config = load({ ...dev, AI_PROVIDER: undefined, AI_GATEWAY_API_KEY: '', ANTHROPIC_API_KEY: undefined });
       expect(config.retiredAiEnvVars).toEqual([]);
