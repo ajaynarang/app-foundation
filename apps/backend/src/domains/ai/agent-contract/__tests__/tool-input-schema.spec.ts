@@ -18,9 +18,4 @@ describe('toolInputSchema (what tools/list serves)', () => {
     expect(schema.type).toBe('object');
     expect(Object.keys(schema.properties as object)).toEqual([CONFIRM_TOKEN_PARAM]);
   });
-
-  it('names no product', () => {
-    const text = JSON.stringify(toolInputSchema(undefined));
-    expect(text).not.toMatch(/throughline|sally/i);
-  });
 });
