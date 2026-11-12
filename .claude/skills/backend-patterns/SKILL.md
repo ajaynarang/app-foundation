@@ -1422,6 +1422,15 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 
 **Cost + moderation:** every AI call lands a row in the per-tenant ledger (`ai_invocations`) with the route that served it (`routeId`, `credentialType`); user-facing chat goes through moderation. Don't bypass either.
 
+**Cost rules (NON-NEGOTIABLE):**
+
+- **Read usage through `usageFromAiSdk`** (`domains/ai/infrastructure/telemetry/usage-from-ai-sdk.ts`) for every AI SDK or Mastra result you record: it reads cache reads and cache writes on the Anthropic, OpenRouter and Bedrock shapes and sums them over a multi-step run. Never read `usage.inputTokens` by hand. `promptTokens` includes the cached and written tokens; `computeCost` prices plain input, cache reads (`cachedInputPerMtokUsd`) and cache writes (`cacheWriteInputPerMtokUsd`, else the input rate) apart.
+- **The AI budget counts platform-paid spend only.** The platform paid when `credentialType` is null or starts with `PLATFORM_`; the one statement of the rule is `PLATFORM_PAID_SQL` / `payerOf` in `telemetry/platform-paid.ts`, and the `vw_ai_cost_*` views carry `platform_cost_usd` beside `total_cost_usd`. A spend sum or report that feeds the cap uses it.
+- **Check the cap only when the platform pays:** `if (route.payer === 'PLATFORM') await aiTelemetry.assertBudget(tenantId)`, after resolving the route and before the model call. A workspace on its own key is never capped.
+- **A provider credit refusal is a budget error.** In a model call's catch block, `throw mapProviderRefusal(err, tenantId, route)` (`telemetry/ai-provider-credit-refused.error.ts`): a 402 or "credit too low" body becomes `AiProviderCreditRefused`, which every surface already handles as `AiBudgetExceededError`, and a platform-paid one is logged at error level in `logPlatformCreditRefusal`.
+- **Budgets come from the plan.** `AiBudgetSeederService` writes a workspace's caps from `PLAN_AI_BUDGETS` on approval, plan change (`planAssigned`), personal signup and single-mode boot. It owns a row only while `notes` starts with `plan:` (`plan:DEFAULT` on a row created lazily with the defaults). An admin edit writes its own note and takes the row over; never write a `plan:` note from anywhere else.
+- **Prompt caching is the route's.** Each registry entry declares `promptCache` (`anthropic`, `openrouter`, `bedrock` or `none`) and the resolver wraps its language models with the breakpoints (`routing/prompt-cache.ts`). Don't set `cacheControl` by hand on a message. `AI_PROMPT_CACHE_OVERRIDE=none` turns it off on a local run only.
+
 ---
 
 ## 12. Integration Adapter Pattern
