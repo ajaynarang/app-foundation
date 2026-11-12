@@ -64,7 +64,7 @@ Review every file against the backend patterns skill. For each violation found, 
 
 ## CRITICAL violations (always check, all files):
 1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and the wire `name` of a query DTO param, which is snake_case: rule `naming/snake-case-query-keys`)
-2. Event emission bypassing DomainEventService / the APP_EVENT_REGISTRY (raw EventEmitter2.emit or plain-object events)
+2. A domain event raised outside the write's transaction (ADR "Outbox and deadlines"; held by architecture/no-direct-emit.spec.ts): `DomainEventService.emit` / `.publish` after a write instead of `emit` inside `OutboxService.transaction((tx, emit) => …)`; a write the event describes done on `this.prisma` instead of `tx`; raw `EventEmitter2.emit(name, new DomainEvent(…))`; an event not in the APP_EVENT_REGISTRY; a new or raised entry in `no-direct-emit.allowlist.json` for anything but a signal with no write behind it, or an entry with no reason
 3. `throw new Error()` instead of NestJS exceptions in HTTP paths (BadRequestException, NotFoundException, etc.)
 3a. An error body written by hand (`res.status(4xx).json({ message })`) or an exception carrying keys beyond `code`, `detail`, `fieldErrors` — every error leaves through the one envelope (`writeErrorEnvelope`; held by architecture/error-envelope.spec.ts)
 3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/404/409 with a code; rule `errors/controller-400-names-its-field`); error copy that carries an internal id, a storage key or raw exception text (rule `errors/no-internals-in-messages`); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
@@ -84,6 +84,8 @@ Review every file against the backend patterns skill. For each violation found, 
 9. Missing @ApiTags, @ApiBearerAuth on controllers
 10. Cross-domain direct imports (domain A importing domain B internals), or app code imported into packages/appshore/* (layer rule: kernel ← db ← platform ← apps)
 11. A new @Processor class added to an existing queue (one dispatcher per queue — add a QueueJobHandler instead)
+11a. A `bulk-ops` job name whose handler is not injected into and returned by the factory in `bulk-ops-queue.module.ts`, or missing from the map in architecture/bulk-ops-handlers.spec.ts (an unwired handler is a silent no-op)
+11b. An event consumer (an `@OnEvent` listener, a durable-path step, a job it enqueues) that is not safe to run twice for one event id: a write or a job id not keyed on `event.id`, an insert where an upsert belongs. Delivery is at least once; architecture-level proof is platform-glue/events/__tests__/double-delivery.spec.ts
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 12. DTO validation: class-validator decorators, @ApiProperty, @Transform for optional strings, cents for money

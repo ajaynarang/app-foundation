@@ -6,6 +6,8 @@ Add your own product documentation here as you build.
 - [`adr/`](adr/README.md): architecture decision records. Start with
   [API contract](adr/0001-api-contract.md): status codes, the error envelope and its codes, inputs, lists,
   versioning. [ID boundary](adr/0002-id-boundary.md): which ids cross the API, and the public id a table takes.
+  [Outbox and deadlines](adr/0003-outbox-and-deadlines.md): an event exists if and only if its write committed;
+  a timer is a row.
 - [`upgrade-notes/`](upgrade-notes/contract-v1.md): what changed on the wire, for a product scaffolded before a
   change and pulling it now.
 - [`doppler.md`](doppler.md): secrets and environment configuration.

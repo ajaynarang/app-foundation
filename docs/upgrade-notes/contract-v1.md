@@ -374,3 +374,29 @@ client that sends none sees no change.
 **What to do.** Nothing is required. To make a create safe to retry (a mobile client on a flaky network, an agent),
 send a fresh UUID per logical create and resend the same one on retry. Treat 409 `IDEMPOTENCY_KEY_IN_USE` as "retry
 in a moment". The keys live in Redis under `app:idempotency:*`, so a product's cache flush also forgets them.
+
+## 9. Domain events go through an outbox
+
+**What changed.** Every domain event with a write behind it is now written to a new table, `outbox_events`, in the
+same transaction as the write, and published after the commit (the ADR "Outbox and deadlines"). A relay job,
+`outbox-relay` on the `bulk-ops` queue, runs every 10 seconds and publishes what a crash left unpublished.
+Published rows are purged after 7 days.
+
+| Before                                                                                                                     | Now                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An event was emitted after the commit; a crash or an unreachable Redis in between lost it                                  | The event is a row in the write's transaction; a rollback has none, a crash is relayed                                                                                  |
+| A webhook could be delivered twice for one event (a retry of the durable job wrote a second log row and a second delivery) | One delivery-log row and one delivery job per event and subscription. The payload `id` is the event id                                                                  |
+| The two Desk suppression events were in-process only                                                                       | They also reach the event log (both are internal, so no webhook leaves)                                                                                                 |
+| `AI_INVOCATION_RECORDED` fired again on an idempotent ledger replay                                                        | It fires once per invocation                                                                                                                                            |
+| `DomainEventService.emit` was the way to raise an event                                                                    | `OutboxService.transaction((tx, emit) => …)`. A direct emit outside the outbox fails `no-direct-emit.spec.ts` unless it is a signal with no write, listed with a reason |
+
+The migration `20261112090000_outbox_events` creates the table and its index; it touches no existing row.
+
+**Who notices.** A webhook receiver that relied on getting the same event twice (it now gets it once). A product
+that added its own `DomainEventService.emit` calls: the architecture spec fails on them until they move into
+`OutboxService.transaction` or, for a signal with no write, onto the allowlist with a reason. A product that added
+a `bulk-ops` job name: `bulk-ops-handlers.spec.ts` now fails until its handler is in the dispatcher's factory and
+in that spec's map.
+
+**What to do.** Run `prisma migrate deploy`. Move each direct emit into the transaction of the write it describes.
+Make each consumer you added safe to run twice for one event id: delivery is at least once.

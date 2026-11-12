@@ -158,7 +158,7 @@ export class ProjectsModule {}
 - Register in the parent domain module (`imports` AND `exports`)
 - Import only what you need (PrismaModule is always needed)
 - Add CacheModule if using `AppCacheService`
-- Add EventBusModule if emitting domain events
+- Domain events need no import: `EventBusModule` is global and provides `OutboxService` (§8.1)
 - Add QueueModule if using BullMQ queues
 
 ---
@@ -412,7 +412,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService, // `@appshore/platform/infrastructure/events/outbox.service`
   ) {}
 
   async findAll(tenantId: number, filters?: ProjectFilters) {
@@ -438,20 +438,14 @@ export class ProjectsService {
   }
 
   async create(tenantId: number, data: CreateProjectDto, actor?: EventActor) {
-    const project = await this.prisma.project.create({
-      data: { ...data, tenantId },
+    // The row and its event commit together; the event is published after the commit (§8.1).
+    return this.outbox.transaction(async (tx, emit) => {
+      const project = await tx.project.create({
+        data: { ...data, tenantId },
+      });
+      await emit(DOMAIN_EVENTS.PROJECT_CREATED, tenantId, { projectNumber: project.projectNumber }, actor);
+      return project;
     });
-
-    await this.events.emit(
-      DOMAIN_EVENTS.PROJECT_CREATED,
-      tenantId,
-      {
-        projectNumber: project.projectNumber,
-      },
-      actor,
-    );
-
-    return project;
   }
 }
 ```
@@ -462,7 +456,8 @@ export class ProjectsService {
 - Use `Logger` with class name: `new Logger(ClassName.name)`
 - Throw standard NestJS exceptions: `NotFoundException`, `BadRequestException`, `ConflictException`, `ForbiddenException`
 - State machine transitions: validate current status before updating (see §3.1)
-- Emit through `DomainEventService` (from `@appshore/kernel`) — never raw `EventEmitter2.emit` (see §8.1)
+- Raise a domain event inside `OutboxService.transaction((tx, emit) => …)`, with the write it describes — never
+  `DomainEventService.emit` after the commit, never raw `EventEmitter2.emit` (see §8.1)
 - A list that can grow is a cursor list: `clampCursorLimit`, `keysetWhere`, `buildCursorPage` from `@appshore/kernel/shared/utils/cursor-pagination` (see §3.3). There is no offset or page paging
 
 ### 3.1 State Machine Transitions
@@ -473,9 +468,11 @@ Status changes are not free-form updates. Every status transition belongs in a d
 async updateStatus(taskId: number, tenantId: number, next: TaskStatus, actor: EventActor) {
   const task = await this.findOne(taskId, tenantId);
   this.assertTransition(task.status, next);   // throws 409 INVALID_STATE on an illegal transition
-  const updated = await this.prisma.task.update({ where: { id: task.id }, data: { status: next } });
-  await this.events.emit(DOMAIN_EVENTS.TASK_STATUS_CHANGED, tenantId, { taskId, from: task.status, to: next }, actor);
-  return updated;
+  return this.outbox.transaction(async (tx, emit) => {
+    const updated = await tx.task.update({ where: { id: task.id }, data: { status: next } });
+    await emit(DOMAIN_EVENTS.TASK_STATUS_CHANGED, tenantId, { taskId, from: task.status, to: next }, actor);
+    return updated;
+  });
 }
 
 private assertTransition(from: TaskStatus, to: TaskStatus) {
@@ -508,7 +505,8 @@ this.notificationTriggers
 
 **Rules:**
 
-- The hot path is `events.emit()` — that's already non-blocking.
+- A domain event is not a side effect to fire and forget: it is staged in the write's transaction (§8.1), and
+  publishing it never fails the caller.
 - For separate DB writes that aren't part of the main transaction (audit log entries, log tables), wrap in `.catch()` with a logger warn so a failure doesn't 500 the response.
 - Don't `.catch(() => {})` silently — log at minimum. Silent swallow turns a known failure into a mystery.
 - If the side effect MUST succeed (charge customer, persist invoice), it's not a side effect — it's part of the main flow. Put it in the transaction or fail the request.
@@ -1008,30 +1006,62 @@ export const APP_EVENT_REGISTRY = [
 4. `packages/shared-types` — SSE event type (infrastructure schemas)
 5. `packages/appshore/web-core/src/shared/realtime/invalidation-map.ts` — map SSE event → query keys
 
-### 8.1 Hot Path vs Durable Path (every emit goes through both)
+### 8.1 The Outbox: an event exists if and only if its write committed (NON-NEGOTIABLE)
 
-`DomainEventService.emit()` (`@appshore/kernel`, `infrastructure/events/domain-event.service.ts`) fans every event into two pipelines:
-
-- **Hot path** — synchronous `EventEmitter2.emit()`. Listeners: cache invalidation subscriber, SSE bridge, in-process `@OnEvent` handlers. Instant, in-process. Failures here are non-fatal — log and move on.
-- **Durable path** — `BullMQ.add(QUEUE_NAMES.EVENTS, …)`. Processed by the durable event processor (`platform-glue/events/durable-event.processor.ts`) for persistence + outbound webhook dispatch. Crash-safe and cross-instance. If enqueue fails, the hot path has already delivered — log a warning, don't throw.
+The decision is the ADR "Outbox and deadlines" (`docs/adr/`). Raise every domain event with a write behind it
+through `OutboxService` (`@appshore/platform/infrastructure/events/outbox.service`), inside the transaction of
+that write:
 
 ```typescript
-// Always use the service, NOT eventEmitter.emit() directly
-await this.events.emit(
-  DOMAIN_EVENTS.PROJECT_CREATED,
-  tenantId,
-  { projectNumber, ...payload },
-  actor, // optional — who triggered this
-  { correlationId, causationId }, // optional — request correlation
-);
+const project = await this.outbox.transaction(async (tx, emit) => {
+  const row = await tx.project.update({ where: { id }, data: { status } });
+  await emit(DOMAIN_EVENTS.PROJECT_UPDATED, tenantId, { projectNumber: row.projectNumber }, actor);
+  return row;
+});
+// The event is published here, after the commit. A rollback publishes nothing.
 ```
 
-**Rules:**
+- `emit` takes the same arguments as `DomainEventService.emit` and writes an `outbox_events` row on `tx`. After the
+  commit the events are published in order through `DomainEventService.publish(event)` (the hot in-process bus,
+  then the durable `events` queue), keeping the row's id, and the rows are marked published.
+- Publishing never fails the caller. Whatever did not publish (a crash, an unreachable Redis) is published by the
+  relay, the `outbox-relay` job on `bulk-ops`, every 10 seconds.
+- Do every write the event describes on `tx`, never on `this.prisma`. Keep external calls (HTTP, AI, queues) out of
+  the callback: the transaction is capped at 15 seconds (`OUTBOX_TRANSACTION_TIMEOUT_MAX_MS`).
+- Code that already owns its transaction stages with `outbox.stage(tx, …)`, keeps the returned events and calls
+  `outbox.publishStaged(events)` after the commit.
+- Do work that is not part of the change (cache busts, notifications) after the transaction returns.
+- In unit specs use `createMockOutbox(prisma)` from `@appshore/platform/test/mocks`: `outbox.emit` records what was
+  published, and a callback that throws publishes nothing, so a "rollback publishes nothing" test is one line.
 
-- Inject `DomainEventService` (alias `events`), not raw `EventEmitter2`. The service owns both paths and the `DomainEvent` envelope construction.
-- Never `await` slow listeners on the hot path — they'll block the response. Heavy work (dispatch, ML, external calls) belongs in the durable processor or its own queue.
+**Signals.** An event with no write behind it (a budget breach raised on every AI pre-flight, the in-process
+`NOTIFICATION_SENT` push) may use `DomainEventService.emit` directly, and only with an entry in
+`apps/backend/src/architecture/no-direct-emit.allowlist.json`: file, count and reason. `no-direct-emit.spec.ts`
+counts every `DomainEventService.emit` or `.publish` and every `new DomainEvent(` outside the outbox, and fails on a
+new one, a stale entry or a missing reason. A change is never a signal.
+
+**Consumers are idempotent (delivery is at least once).** A crash after publish and before the mark publishes the
+same event again, and a failed durable job retries. Key every consumer on the event id, or make it re-read state:
+
+| Consumer                                       | What makes a second delivery a no-op                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Durable enqueue                                | the BullMQ job id is `<event name>-<event id>`                                                    |
+| Event log                                      | upsert on the event id                                                                            |
+| Outbound webhooks                              | one delivery-log row per event and subscription, reused; the job id is `webhook-<event id>-<sub>` |
+| Cache invalidation, SSE bridge                 | deleting a key or sending a refetch signal twice is harmless                                      |
+| A new `@OnEvent` listener or queue job you add | key its writes and job ids on `event.id`, or re-read state before acting                          |
+
+`apps/backend/src/platform-glue/events/__tests__/double-delivery.spec.ts` publishes one event twice through the
+real listeners; extend it when you add a consumer.
+
+**Listeners:**
+
+- Never `await` slow listeners on the hot path — they'll block the response. Heavy work (dispatch, ML, external
+  calls) belongs in the durable processor or its own queue.
 - Listeners that NEED durability (webhooks, audit persistence) subscribe on the durable processor, not the hot bus.
 - Listeners that CAN be lossy (cache busting — re-fetched on next read; SSE — clients reconnect) live on the hot bus.
+- A relayed event fires its in-process listeners in the process that ran the relay, so an SSE client on another
+  process sees the change on its next fetch.
 
 ### 8.2 SSE Bridge — Tenant vs User Scope
 
@@ -1086,6 +1116,13 @@ export interface QueueJobHandler {
 ```
 
 Job names live in per-queue `*_JOB_NAMES` constants in `queue.constants.ts` (e.g. `NOTIFICATIONS_JOB_NAMES.DIGEST`). Never add a new `@Processor` class — add a handler and register it under the queue's token.
+
+**Wire every handler, or it never runs.** A dispatcher completes a job whose name no handler claims as a silent
+no-op. On `bulk-ops` the handlers are listed in the factory of
+`platform-glue/queue/dispatchers/bulk-ops-queue.module.ts`, and `architecture/bulk-ops-handlers.spec.ts` maps every
+`BULK_OPS_JOB_NAMES` entry to its handler file and fails when a name has no handler in that factory. The outbox
+relay (`outbox-relay`, every 10 seconds) runs there, beside data retention, at concurrency 1: a long job on the lane
+delays crash recovery by that long.
 
 **Job dispatch:**
 
@@ -1303,7 +1340,7 @@ await adapter.syncInvoice(accessToken, realmId, payload);
 **Bridge pattern:** Domain events → SSE events → Query invalidation
 
 ```
-Service emits via DomainEventService → hot bus → DomainEventSseBridge → SseService.emitToTenant()
+Service stages via OutboxService → (after commit) hot bus → DomainEventSseBridge → SseService.emitToTenant()
 ```
 
 **SseService methods:**
@@ -1559,6 +1596,7 @@ Guardrails: `schema-conventions.spec.ts`, `web-status-casing.spec.ts`, `status-c
 - NEVER check-then-create without atomicity — use `prisma.model.upsert()` instead of `findUnique → if null → create`
 - NEVER return an unbounded list: a list that can grow is a cursor list (§3.3); any other `findMany` a GET reaches has a `take`, or a `BOUNDED_READS` entry that says why its size is fixed
 - Financial operations (payments, invoices) MUST check for duplicates before creating
+- NEVER emit a domain event after the commit (`await this.events.emit(...)` below a write) or with raw `EventEmitter2` — stage it in the write's transaction through `OutboxService` (§8.1)
 
 **Correlation:**
 
@@ -1594,7 +1632,7 @@ Guardrails: `schema-conventions.spec.ts`, `web-status-casing.spec.ts`, `status-c
 - [ ] External API errors: logged with details, thrown with generic message (§10.3)
 - [ ] No magic strings: all statuses, roles, events, queues use enums/constants (§20)
 - [ ] MCP tools: if the entity has AI-facing operations, add/update tools in `domains/ai/mcp/tools/` (§23)
-- [ ] Domain events: emit via `DomainEventService.emit()` (hot + durable paths), NOT raw `EventEmitter2` (§8.1)
+- [ ] Domain events: staged in the write's transaction with `OutboxService.transaction((tx, emit) => …)`; every consumer safe to run twice for one event id (§8.1)
 - [ ] State machine: status transitions go through a dedicated method that whitelists allowed `from → to` (§3.1)
 - [ ] Multi-tenant isolation: every query filters by `tenantId`; record-level checks for owned resources (§2.1)
 - [ ] Feature flags: `@RequireFeature` at controller, after `@Roles` (§2.2)

@@ -109,7 +109,10 @@ bind to app implementations.
   `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma).
 - **Domain events:** add entries to `APP_EVENT_REGISTRY` in
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
-  automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events).
+  automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events). Raise an event
+  inside the write's transaction with `OutboxService.transaction((tx, emit) => …)` so it exists if and only if the
+  write committed; delivery is at least once, so every consumer keys on the event id (ADR "Outbox and deadlines",
+  held by `no-direct-emit.spec.ts` and `double-delivery.spec.ts`).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
 - **Notification policies + WhatsApp templates:** bind `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES`
   (and optionally `PLATFORM_TIMEZONE`) in `apps/backend/src/platform-glue/hooks.module.ts`; add your
