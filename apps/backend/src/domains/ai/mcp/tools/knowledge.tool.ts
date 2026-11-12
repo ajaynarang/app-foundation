@@ -27,12 +27,12 @@ export function knowledgeCitations(
 }
 
 /**
- * Server-injected identity: `_tenantId` by the tool runner; `_role` once the tool pipeline injects it. Until then a
- * `_role` is not trusted (see kb-audience.ts), which is harmless only while `ROLE_AUDIENCE` is empty.
+ * Server-injected identity, both set by the tool pipeline's executor (it drops any `_` key the caller sent):
+ * `_tenantId`, and `_role`, the acting person's role in the workspace (see kb-audience.ts).
  */
 interface CallerArgs {
   _tenantId?: number;
-  _role?: string;
+  _role?: string | null;
 }
 
 @Injectable()
