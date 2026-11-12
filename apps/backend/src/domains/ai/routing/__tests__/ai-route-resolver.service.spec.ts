@@ -137,7 +137,7 @@ describe('AiRouteResolver (platform pool)', () => {
   describe('tuning, applied per route', () => {
     /** The OpenRouter bundle with a fake provider model per alias that records each call's options. */
     function fakeOpenRouterBundle(refusing: string[]) {
-      const calls: Array<{ modelId: string; options: unknown }> = [];
+      const calls: Array<{ modelId: string; options: unknown; prompt?: unknown }> = [];
       const real = PLATFORM_ROUTES[0].buildProvider(OPENROUTER);
       const fake = (alias: 'fast' | 'standard' | 'powerful') => {
         const modelId = real.modelIdFor(alias);
@@ -147,7 +147,7 @@ describe('AiRouteResolver (platform pool)', () => {
           modelId,
           supportedUrls: {},
           doGenerate: async (p: any) => {
-            calls.push({ modelId, options: p.providerOptions });
+            calls.push({ modelId, options: p.providerOptions, ...(p.prompt?.length ? { prompt: p.prompt } : {}) });
             const refused = refusing.includes(alias);
             return {
               content: refused ? [] : [{ type: 'text', text: 'ok' }],
@@ -185,6 +185,31 @@ describe('AiRouteResolver (platform pool)', () => {
         MODEL_CATALOG.fast.openrouterId,
         MODEL_CATALOG.standard.openrouterId,
       ]);
+    });
+
+    it("marks the route's prompt-cache breakpoint on the request the provider receives", async () => {
+      const calls = fakeOpenRouterBundle([]);
+      const route = await makeResolver({ config: OPENROUTER }).resolver.resolve(TENANT, 'language');
+      expect(route.promptCache).toBe('openrouter');
+      await (route.languageModel('standard') as any).doGenerate({
+        prompt: [
+          { role: 'system', content: 'instructions' },
+          { role: 'user', content: [{ type: 'text', text: 'hi' }] },
+        ],
+      });
+      const prompt = calls[0].prompt as Array<{ providerOptions?: unknown }>;
+      expect(prompt[0].providerOptions).toEqual({ openrouter: { cacheControl: { type: 'ephemeral' } } });
+      expect(prompt[1].providerOptions).toBeUndefined();
+    });
+
+    it('AI_PROMPT_CACHE_OVERRIDE=none turns the breakpoints off (a local measurement switch)', async () => {
+      const calls = fakeOpenRouterBundle([]);
+      const route = await makeResolver({
+        config: { ...OPENROUTER, aiPromptCacheOverride: 'none' } as never,
+      }).resolver.resolve(TENANT, 'language');
+      expect(route.promptCache).toBe('none');
+      await (route.languageModel('standard') as any).doGenerate({ prompt: [{ role: 'system', content: 'x' }] });
+      expect((calls[0].prompt as Array<{ providerOptions?: unknown }>)[0].providerOptions).toBeUndefined();
     });
 
     it("records the route's id for the model that answered, on the route's own column", async () => {

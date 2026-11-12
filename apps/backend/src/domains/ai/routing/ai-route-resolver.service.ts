@@ -15,6 +15,7 @@ import { AiNotConfigured } from './ai-not-configured.error';
 import { ZeroRetentionUnavailable } from '../infrastructure/redaction/zero-retention-unavailable.error';
 import { MODEL_CATALOG } from './model-catalog';
 import { tunedLanguageModel } from './model-tuning.middleware';
+import { withPromptCache, type PromptCacheStrategy } from './prompt-cache';
 import { PLATFORM_ROUTES, type PlatformRoute, type PlatformRouteConfig } from './route-registry';
 import { AI_NEEDS, type AiNeed, type AiPayer, type ProviderBundle, type ResolvedRoute } from './routing.types';
 import type { RetentionClass } from './routing.types';
@@ -24,6 +25,7 @@ interface Candidate {
   credentialType: string;
   payer: AiPayer;
   retention: RetentionClass;
+  promptCache: PromptCacheStrategy;
   /** Key of the built bundle in the in-process cache. */
   cacheKey: string;
   /** When set, stale bundles sharing this prefix are evicted on rebuild, so an old secret does not linger. */
@@ -163,6 +165,7 @@ export class AiRouteResolver {
       credentialType: route.credentialType,
       payer: 'PLATFORM',
       retention: route.retention,
+      promptCache: route.promptCache,
       cacheKey: `platform:${route.routeId}`,
       build: () => route.buildProvider(config),
     };
@@ -180,19 +183,21 @@ export class AiRouteResolver {
       this.providerCache.set(candidate.cacheKey, bundle);
     }
     const resolved = bundle;
+    const promptCache = this.promptCacheOverride() ?? candidate.promptCache;
     return {
       routeId: candidate.routeId,
       credentialType: candidate.credentialType,
       payer: candidate.payer,
       retention: candidate.retention,
       providerLabel: resolved.providerLabel,
+      promptCache,
       languageModel: (alias: ModelAlias): LanguageModel => {
         if (policy === 'ZDR' && !MODEL_CATALOG[alias].zdrCapable) throw new ZeroRetentionUnavailable(alias);
         const base = resolved.languageModel;
         if (!base) throw new AiNotConfigured('language');
         // The tuning is the resolver's, applied per route: effort in the route family's shape, and one retry of a
-        // refused generate call on the next alias up, on the same route.
-        return tunedLanguageModel(base, alias, resolved.effortFamily ?? 'anthropic');
+        // refused generate call on the next alias up, on the same route. Outside it, the route's cache breakpoints.
+        return withPromptCache(tunedLanguageModel(base, alias, resolved.effortFamily ?? 'anthropic'), promptCache);
       },
       modelIdFor: (alias: ModelAlias): string => {
         if (!resolved.modelIdFor) throw new AiNotConfigured('language');
@@ -211,6 +216,14 @@ export class AiRouteResolver {
         return resolved.embeddingModelId;
       },
     };
+  }
+
+  /**
+   * `none` when a developer turned prompt caching off (`AI_PROMPT_CACHE_OVERRIDE=none`) to measure the uncached
+   * baseline. The config factory resolves it to unset on every deployed task, so no environment check is needed here.
+   */
+  private promptCacheOverride(): 'none' | undefined {
+    return this.config.get<string>('aiPromptCacheOverride') === 'none' ? 'none' : undefined;
   }
 
   /** The platform keys, read through the zod config schema. */

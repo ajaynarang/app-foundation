@@ -1,11 +1,13 @@
 import { PLATFORM_CREDENTIAL_TYPES, PLATFORM_ROUTES } from '../route-registry';
 import { AI_NEEDS } from '../routing.types';
+import { PLATFORM_CREDENTIAL_TYPE_PREFIX } from '../../infrastructure/telemetry/platform-paid';
+import { PROMPT_CACHE_STRATEGIES } from '../prompt-cache';
 
 /**
  * Every registry entry declares what it serves, its retention and how to tell whether it is configured. Ported from
  * the reference implementation in steps: this file holds the cases true for the two platform routes registered so
- * far. Prompt-cache strategies, the workspace credential types and the zero-retention platform floor join it with the
- * pull requests that add them.
+ * far, and the prompt-cache strategy of each. The workspace credential types and the zero-retention platform floor join
+ * it with the pull requests that add them.
  */
 describe('route registry parity', () => {
   it('every platform route declares serves, retention and a config probe', () => {
@@ -44,6 +46,23 @@ describe('route registry parity', () => {
       serves: ['embedding'],
       retention: 'STANDARD',
     });
+  });
+
+  it('every platform route declares a prompt-cache strategy', () => {
+    for (const route of PLATFORM_ROUTES) expect(PROMPT_CACHE_STRATEGIES).toContain(route.promptCache);
+  });
+
+  it('the exact prompt-cache map for the routes registered so far', () => {
+    expect(Object.fromEntries(PLATFORM_ROUTES.map((r) => [r.routeId, r.promptCache]))).toEqual({
+      'platform-openrouter': 'openrouter',
+      'platform-cohere': 'none',
+    });
+  });
+
+  it("every platform credential type starts with the ledger's platform-paid prefix", () => {
+    for (const route of PLATFORM_ROUTES) {
+      expect(route.credentialType.startsWith(PLATFORM_CREDENTIAL_TYPE_PREFIX)).toBe(true);
+    }
   });
 
   it('every need is served by some platform route (registry order is the preference order within a need)', () => {

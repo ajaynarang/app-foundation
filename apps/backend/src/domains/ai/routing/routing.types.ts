@@ -1,6 +1,7 @@
 import type { EmbeddingModel, LanguageModel } from 'ai';
 import type { AiPayer, ModelAlias } from '@app/shared-types';
 import type { EffortFamily, ProviderModel } from './model-tuning.middleware';
+import type { PromptCacheStrategy } from './prompt-cache';
 
 /** What a caller asks the resolver for: a chat or structured-output model by alias, or the one embedding model. */
 export type AiNeed = 'language' | 'embedding';
@@ -26,7 +27,15 @@ export interface ResolvedRoute {
   retention: RetentionClass;
   /** Ledger vendor label: who bills the tokens (`AI_PROVIDER_LABELS`). */
   providerLabel: string;
-  /** The alias's model on this route, tuned (effort in the route family's shape, one retry one alias up). */
+  /**
+   * How this route's language models mark prompt-cache breakpoints, after the local `AI_PROMPT_CACHE_OVERRIDE`
+   * (which turns it to `none` on a developer's machine only).
+   */
+  promptCache: PromptCacheStrategy;
+  /**
+   * The alias's model on this route, tuned (effort in the route family's shape, one retry one alias up) and with the
+   * route's prompt-cache breakpoints.
+   */
   languageModel(alias: ModelAlias): LanguageModel;
   modelIdFor(alias: ModelAlias): string;
   /**

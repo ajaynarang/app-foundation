@@ -11,6 +11,7 @@ import {
 } from './model-catalog';
 import { AiModelNotOnRoute } from './ai-model-not-on-route.error';
 import type { AiNeed, ProviderBundle, RetentionClass } from './routing.types';
+import type { PromptCacheStrategy } from './prompt-cache';
 
 /** Ledger `credentialType` strings for the platform's own routes. "Platform paid" is derived from the prefix. */
 export const PLATFORM_CREDENTIAL_TYPES = {
@@ -32,6 +33,8 @@ export interface PlatformRoute {
   credentialType: (typeof PLATFORM_CREDENTIAL_TYPES)[keyof typeof PLATFORM_CREDENTIAL_TYPES];
   serves: readonly AiNeed[];
   retention: RetentionClass;
+  /** How the route marks prompt-cache breakpoints on its language models (`prompt-cache.ts`). */
+  promptCache: PromptCacheStrategy;
   /** True when the route's key is set: every route is off until then. */
   isConfigured: (config: PlatformRouteConfig) => boolean;
   buildProvider: (config: PlatformRouteConfig) => ProviderBundle;
@@ -58,6 +61,7 @@ export const PLATFORM_ROUTES: readonly PlatformRoute[] = [
     credentialType: PLATFORM_CREDENTIAL_TYPES.OPENROUTER,
     serves: ['language'],
     retention: 'STANDARD',
+    promptCache: 'openrouter',
     isConfigured: (config) => !!config.openRouterApiKey,
     buildProvider: (config) => {
       const openrouter = createOpenRouter({ apiKey: config.openRouterApiKey });
@@ -77,6 +81,7 @@ export const PLATFORM_ROUTES: readonly PlatformRoute[] = [
     credentialType: PLATFORM_CREDENTIAL_TYPES.COHERE,
     serves: ['embedding'],
     retention: 'STANDARD',
+    promptCache: 'none', // embeddings only
     isConfigured: (config) => !!config.cohereApiKey,
     buildProvider: (config) => {
       const cohere = createCohere({ apiKey: config.cohereApiKey });
