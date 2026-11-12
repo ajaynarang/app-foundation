@@ -41,19 +41,3 @@ export const TENANT_PLAN_VARIANTS: Record<TenantPlan, StatusVariant> = {
   [TenantPlan.ENTERPRISE]: { label: 'Enterprise', tone: 'neutral' },
   [TenantPlan.SUSPENDED]: { label: 'Suspended', tone: 'danger' },
 };
-
-const UNKNOWN: StatusVariant = { label: 'Unknown', tone: 'neutral' };
-
-/** The variant for a status string the API sent; an unknown value reads as a neutral label of itself. */
-export function variantOf<K extends string>(
-  map: Record<K, StatusVariant>,
-  value: string | null | undefined,
-): StatusVariant {
-  if (!value) return UNKNOWN;
-  return (map as Record<string, StatusVariant>)[value] ?? { label: value, tone: 'neutral' };
-}
-
-/** A status map as filter options, in the map's order. */
-export function variantOptions<K extends string>(map: Record<K, StatusVariant>): { value: K; label: string }[] {
-  return (Object.entries(map) as [K, StatusVariant][]).map(([value, variant]) => ({ value, label: variant.label }));
-}

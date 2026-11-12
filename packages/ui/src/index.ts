@@ -19,6 +19,8 @@ export {
   STATUS_TONES,
   STATUS_TONE_ORDER,
   toneBadgeClass,
+  variantOf,
+  variantOptions,
   type StatusTone,
   type StatusVariant,
 } from './components/ui/status-tone';

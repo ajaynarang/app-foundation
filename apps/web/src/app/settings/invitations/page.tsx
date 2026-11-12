@@ -1,18 +1,37 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CursorList } from '@app/shared-types';
 import { useCursorList } from '@appshore/web-core/shared/list';
-import { ListFooter } from '@/shared/components/page-chrome';
-import { Button } from '@app/ui/components/ui/button';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageHeader,
+  PageLoadingSkeleton,
+  RowActions,
+} from '@/shared/components/page-chrome';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
+import { variantOf } from '@app/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@app/ui/components/ui/alert-dialog';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@app/ui/components/ui/table';
 import { apiClient, api } from '@appshore/web-core/shared/lib/api';
 import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { useCopyInviteLink } from '@/features/platform/settings/hooks/use-copy-invite-link';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
+import { INVITATION_STATUS_VARIANTS } from '@/features/platform/settings/constants';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,78 +46,6 @@ interface Invitation {
   status: string;
   createdAt: string;
   expiresAt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Status badge
-// ---------------------------------------------------------------------------
-function StatusBadge({ status }: { status: string }) {
-  const lower = status.toLowerCase();
-  if (lower === 'pending') {
-    return (
-      <Badge className="border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-        Pending
-      </Badge>
-    );
-  }
-  if (lower === 'expired') {
-    return (
-      <Badge className="border-transparent bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-        Expired
-      </Badge>
-    );
-  }
-  return <Badge variant="muted">{status}</Badge>;
-}
-
-// ---------------------------------------------------------------------------
-// Loading skeleton
-// ---------------------------------------------------------------------------
-function InvitationsSkeleton() {
-  return (
-    <div className="rounded-lg border border-border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead className="hidden sm:table-cell">Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden md:table-cell">Sent</TableHead>
-            <TableHead className="hidden md:table-cell">Expires</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
-                <Skeleton className="h-4 w-32" />
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-4 w-40" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-5 w-20" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-5 w-16" />
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell className="text-right">
-                <Skeleton className="h-8 w-32 ml-auto" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
 }
 
 /** What this screen lists: invitations someone can still act on. */
@@ -148,22 +95,25 @@ export default function InvitationsPage() {
   });
 
   const copyInviteLink = useCopyInviteLink();
+  const [cancelling, setCancelling] = useState<Invitation | null>(null);
 
   const activeInvitations = invitations.items;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Invitations</h1>
-        <p className="text-muted-foreground mt-1">Pending invites, waiting on a yes</p>
-      </div>
+      <PageHeader title="Invitations" subtitle="Pending invites, waiting on a yes" />
 
       {isLoading ? (
-        <InvitationsSkeleton />
+        <PageLoadingSkeleton variant="table" rows={3} />
+      ) : invitations.isError ? (
+        <ListErrorState
+          title="Couldn't load your invitations."
+          error={invitations.error}
+          onRetry={() => void invitations.refetch()}
+          isRetrying={invitations.isRefetching}
+        />
       ) : activeInvitations.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-12 text-center">
-          <p className="text-muted-foreground">No pending invitations</p>
-        </div>
+        <PageEmptyState title="No pending invitations" description="Invite someone from Members." />
       ) : (
         <div className="rounded-lg border border-border bg-card overflow-x-auto">
           <Table>
@@ -175,12 +125,16 @@ export default function InvitationsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Sent</TableHead>
                 <TableHead className="hidden md:table-cell">Expires</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[1%]">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activeInvitations.map((inv) => {
                 const isPending = inv.status.toLowerCase() === 'pending';
+                const status = variantOf(INVITATION_STATUS_VARIANTS, inv.status);
+                const name = `${inv.firstName} ${inv.lastName}`;
                 return (
                   <TableRow key={inv.invitationId}>
                     <TableCell className="font-medium text-foreground">
@@ -189,10 +143,10 @@ export default function InvitationsPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{inv.email || '--'}</TableCell>
                     <TableCell>
-                      <Badge variant="muted">{inv.role}</Badge>
+                      <Badge variant="outline">{inv.role}</Badge>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={inv.status} />
+                      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
                       {formatDate(inv.createdAt)}
@@ -201,37 +155,31 @@ export default function InvitationsPage() {
                       {formatDate(inv.expiresAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          loading={resendInvitation.isPending}
-                          onClick={() => resendInvitation.mutate(inv.invitationId)}
-                        >
-                          Resend
-                        </Button>
-                        {isPending && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            loading={copyInviteLink.isPending && copyInviteLink.variables === inv.invitationId}
-                            onClick={() => copyInviteLink.mutate(inv.invitationId)}
-                          >
-                            Copy link
-                          </Button>
-                        )}
-                        {isPending && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
-                            loading={cancelInvitation.isPending}
-                            onClick={() => cancelInvitation.mutate(inv.invitationId)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
+                      <RowActions
+                        primary={{
+                          label: 'Resend',
+                          ariaLabel: `Resend the invitation to ${name}`,
+                          loading: resendInvitation.isPending && resendInvitation.variables === inv.invitationId,
+                          onClick: () => resendInvitation.mutate(inv.invitationId),
+                        }}
+                        items={
+                          isPending
+                            ? [
+                                {
+                                  label: 'Copy link',
+                                  ariaLabel: `Copy the invitation link for ${name}`,
+                                  onSelect: () => copyInviteLink.mutate(inv.invitationId),
+                                },
+                                {
+                                  label: 'Cancel invitation…',
+                                  ariaLabel: `Cancel the invitation to ${name}`,
+                                  destructive: true,
+                                  onSelect: () => setCancelling(inv),
+                                },
+                              ]
+                            : undefined
+                        }
+                      />
                     </TableCell>
                   </TableRow>
                 );
@@ -251,6 +199,29 @@ export default function InvitationsPage() {
           loadMoreFailed={invitations.isLoadMoreError}
         />
       )}
+
+      <AlertDialog open={cancelling !== null} onOpenChange={(open) => !open && setCancelling(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this invitation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelling
+                ? `${cancelling.firstName} ${cancelling.lastName} will no longer be able to join with this link.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelling && cancelInvitation.mutate(cancelling.invitationId)}
+              disabled={cancelInvitation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Cancel invitation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

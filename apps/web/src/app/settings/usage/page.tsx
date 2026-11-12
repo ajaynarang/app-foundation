@@ -11,15 +11,10 @@ import {
   useDownloadBillingInvoice,
 } from '@/features/billing/hooks/use-billing';
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
-import {
-  INVOICE_STATUS_VARIANTS,
-  TRANSACTION_TYPE_VARIANTS,
-  variantOf,
-  variantOptions,
-} from '@/features/billing/constants';
+import { INVOICE_STATUS_VARIANTS, TRANSACTION_TYPE_VARIANTS } from '@/features/billing/constants';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { formatTimestampDate, DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
-import { cn } from '@app/ui';
+import { cn, variantOf, variantOptions } from '@app/ui';
 import {
   FilterSelect,
   ListErrorState,

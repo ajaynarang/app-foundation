@@ -36,11 +36,11 @@ import { useFeatureFlagEnabled } from '@/features/platform/feature-flags/hooks/u
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import { useQuery } from '@tanstack/react-query';
 import type { PlanConfig, TenantPlan } from '@app/shared-types';
-import { cn } from '@app/ui';
+import { cn, variantOf } from '@app/ui';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { PageHeader, PageLoadingSkeleton, PageSection } from '@/shared/components/page-chrome';
-import { SUBSCRIPTION_STATUS_VARIANTS, TENANT_PLAN_VARIANTS, variantOf } from '@/features/billing/constants';
+import { SUBSCRIPTION_STATUS_VARIANTS, TENANT_PLAN_VARIANTS } from '@/features/billing/constants';
 
 // ---------------------------------------------------------------------------
 // Helpers

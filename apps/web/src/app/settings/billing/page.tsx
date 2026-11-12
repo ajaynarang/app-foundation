@@ -32,8 +32,8 @@ import {
   useSetupPaymentMethod,
 } from '@/features/billing/hooks/use-billing';
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
-import { TRANSACTION_TYPE_VARIANTS, variantOf } from '@/features/billing/constants';
-import { cn } from '@app/ui';
+import { TRANSACTION_TYPE_VARIANTS } from '@/features/billing/constants';
+import { cn, variantOf } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import {
   ListErrorState,

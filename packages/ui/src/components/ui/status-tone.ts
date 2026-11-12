@@ -41,3 +41,20 @@ export interface StatusVariant {
   label: string;
   tone: StatusTone;
 }
+
+/**
+ * The variant for a status value the API sent. A value the map does not know reads as a neutral label of itself,
+ * so a new backend status shows up as text instead of breaking the screen.
+ */
+export function variantOf<K extends string>(
+  map: Record<K, StatusVariant>,
+  value: string | null | undefined,
+): StatusVariant {
+  if (!value) return { label: 'Unknown', tone: 'neutral' };
+  return (map as Record<string, StatusVariant>)[value] ?? { label: value, tone: 'neutral' };
+}
+
+/** A status map as filter options, in the map's order. */
+export function variantOptions<K extends string>(map: Record<K, StatusVariant>): { value: K; label: string }[] {
+  return (Object.entries(map) as [K, StatusVariant][]).map(([value, variant]) => ({ value, label: variant.label }));
+}

@@ -4,12 +4,18 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CursorList } from '@app/shared-types';
 import { useCursorList } from '@appshore/web-core/shared/list';
-import { ListFooter } from '@/shared/components/page-chrome';
-import { formatRelativeTime } from '@appshore/web-core/shared/lib/utils/formatters';
-import { Card, CardContent } from '@app/ui/components/ui/card';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageHeader,
+  PageLoadingSkeleton,
+  RelativeTime,
+  RowActions,
+} from '@/shared/components/page-chrome';
 import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import {
   Dialog,
@@ -37,6 +43,7 @@ import { useAuthStore } from '@/features/auth';
 import { apiClient, api } from '@appshore/web-core/shared/lib/api';
 import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { memberState, roleLabel } from '@/features/platform/settings/constants';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,67 +57,6 @@ interface TeamMember {
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function getRoleBadgeVariant(role: string) {
-  switch (role) {
-    case 'OWNER':
-    case 'ADMIN':
-      return 'default' as const;
-    case 'MEMBER':
-      return 'muted' as const;
-    default:
-      return 'muted' as const;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Loading skeleton
-// ---------------------------------------------------------------------------
-function MembersSkeleton() {
-  return (
-    <div className="rounded-lg border border-border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead className="hidden sm:table-cell">Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden md:table-cell">Last Login</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
-                <Skeleton className="h-4 w-32" />
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-4 w-40" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-5 w-20" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-5 w-16" />
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-8 w-24" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -277,25 +223,28 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Members</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Who&apos;s on your team and what they can do</p>
-        </div>
-        <Button onClick={() => setInviteOpen(true)} size="sm">
-          <UserPlus className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Invite Staff Member</span>
-        </Button>
-      </div>
+      <PageHeader
+        title="Members"
+        subtitle="Who's on your team and what they can do"
+        actions={
+          <Button onClick={() => setInviteOpen(true)} size="sm">
+            <UserPlus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Invite Staff Member</span>
+          </Button>
+        }
+      />
 
       {isLoading ? (
-        <MembersSkeleton />
+        <PageLoadingSkeleton variant="table" rows={4} />
+      ) : members.isError ? (
+        <ListErrorState
+          title="Couldn't load your team."
+          error={members.error}
+          onRetry={() => void members.refetch()}
+          isRetrying={members.isRefetching}
+        />
       ) : staffUsers.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">No team members found</p>
-          </CardContent>
-        </Card>
+        <PageEmptyState title="No team members yet" description="Invite someone to get started." />
       ) : (
         <div className="rounded-lg border border-border bg-card overflow-x-auto">
           <Table>
@@ -306,7 +255,9 @@ export default function MembersPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Last Login</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="w-[1%]">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -316,6 +267,7 @@ export default function MembersPage() {
                 const isAdmin = member.role === 'ADMIN';
                 const canManage = user?.role === 'OWNER' || (user?.role === 'ADMIN' && !isAdmin && !isOwner);
                 const memberName = `${member.firstName} ${member.lastName}`;
+                const state = memberState(member.isActive);
 
                 return (
                   <TableRow key={member.userId}>
@@ -326,53 +278,39 @@ export default function MembersPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{member.email}</TableCell>
                     <TableCell>
-                      <Badge variant={getRoleBadgeVariant(member.role)}>{member.role}</Badge>
+                      <Badge variant="outline">{roleLabel(member.role)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={member.isActive ? 'default' : 'muted'}>
-                        {member.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {member.lastLoginAt ? formatRelativeTime(member.lastLoginAt) : 'Never'}
+                      {member.lastLoginAt ? <RelativeTime iso={member.lastLoginAt} /> : 'Never'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       {isOwner ? (
                         <span className="text-xs text-muted-foreground">Protected</span>
-                      ) : !canManage ? (
-                        <span className="text-xs text-muted-foreground">--</span>
-                      ) : member.isActive ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            setConfirmAction({
-                              type: 'deactivate',
-                              userId: member.userId,
-                              name: memberName,
-                            })
-                          }
-                          loading={deactivating}
-                          disabled={isCurrentUser}
-                        >
-                          Deactivate
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            setConfirmAction({
-                              type: 'activate',
-                              userId: member.userId,
-                              name: memberName,
-                            })
-                          }
-                          loading={activating}
-                        >
-                          Activate
-                        </Button>
-                      )}
+                      ) : canManage ? (
+                        <RowActions
+                          items={[
+                            member.isActive
+                              ? {
+                                  label: 'Deactivate…',
+                                  ariaLabel: `Deactivate ${memberName}`,
+                                  destructive: true,
+                                  disabled: isCurrentUser,
+                                  disabledReason: isCurrentUser ? 'You cannot deactivate yourself.' : undefined,
+                                  onSelect: () =>
+                                    setConfirmAction({ type: 'deactivate', userId: member.userId, name: memberName }),
+                                }
+                              : {
+                                  label: 'Activate…',
+                                  ariaLabel: `Activate ${memberName}`,
+                                  onSelect: () =>
+                                    setConfirmAction({ type: 'activate', userId: member.userId, name: memberName }),
+                                },
+                          ]}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 );
@@ -413,6 +351,7 @@ export default function MembersPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmAction}
+              disabled={deactivating || activating}
               className={
                 confirmAction?.type === 'deactivate'
                   ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
