@@ -13,15 +13,22 @@ import { RequiresScope } from '../requires-scope.decorator';
 import type { AiPrismaService } from '../../rls/ai-prisma.service';
 import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
+import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row
  * into agent_invocation_logs, with mocked registry/moduleRef/aiPrisma. The
- * pipeline is always on. Skipped only when there is no usable database: Postgres
- * is unreachable, refuses the login, has no such database, is not migrated, or
- * holds no seeded tenant. Any other failure in setup fails the spec.
+ * pipeline is always on. Skipped when DATABASE_URL is unset or names no usable
+ * database: Postgres is unreachable, refuses the login, has no such database, is
+ * not migrated, or holds no seeded tenant. Any other failure in setup fails the spec.
+ * The rows a run writes (its agent_invocation_logs row and the outbox_events row of
+ * app.agent.invocation-completed) are deleted in afterAll.
  */
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
+// No default: the spec writes rows, so it runs only against a database someone named.
+const DATABASE_URL = process.env.DATABASE_URL;
+
+/** The tool this spec registers; no real tool has this name, so cleanup can key on it. */
+const TOOL_NAME = 'query-records';
 
 /** Error codes that mean "no usable database here", as opposed to a defect. */
 const NO_DATABASE_CODES = new Set([
@@ -55,8 +62,13 @@ describe('Phase A pipeline integration', () => {
   let pipeline: InvocationPipelineService;
   let dbReachable = false;
   let testTenantId: number;
+  const suiteStart = new Date();
 
   beforeAll(async () => {
+    if (!DATABASE_URL) {
+      console.warn('pipeline.integration: DATABASE_URL is unset — skipping');
+      return;
+    }
     try {
       pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
       const adapter = new PrismaPg(pool);
@@ -82,7 +94,7 @@ describe('Phase A pipeline integration', () => {
       getMcpModuleIds: () => ['m1'],
       getTools: () => [
         {
-          metadata: { name: 'query-records', description: 'q', parameters: null },
+          metadata: { name: TOOL_NAME, description: 'q', parameters: null },
           providerClass: TestRecordsReadTool,
           methodName: 'queryRecords',
         },
@@ -121,6 +133,18 @@ describe('Phase A pipeline integration', () => {
   }, 30_000);
 
   afterAll(async () => {
+    if (dbReachable) {
+      const rows = await prisma.agentInvocationLog.findMany({
+        where: { tenantId: testTenantId, toolName: TOOL_NAME, createdAt: { gte: suiteStart } },
+        select: { id: true },
+      });
+      for (const { id } of rows) {
+        await prisma.outboxEvent.deleteMany({
+          where: { event: DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED, data: { path: ['rowId'], equals: id } },
+        });
+      }
+      await prisma.agentInvocationLog.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+    }
     await prisma?.$disconnect().catch(() => undefined);
     await pool?.end().catch(() => undefined);
   });
@@ -138,13 +162,13 @@ describe('Phase A pipeline integration', () => {
       role: 'MEMBER',
       scopes: ['platform:read'],
     });
-    const result = await pipeline.run(principal, 'query-records', {});
+    const result = await pipeline.run(principal, TOOL_NAME, {});
     expect(result.isError).toBeFalsy();
 
     const row = await prisma.agentInvocationLog.findFirst({
       where: {
         tenantId: testTenantId,
-        toolName: 'query-records',
+        toolName: TOOL_NAME,
         principalKind: 'user',
         createdAt: { gte: before },
       },
