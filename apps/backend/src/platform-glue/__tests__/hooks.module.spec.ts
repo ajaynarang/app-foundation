@@ -23,9 +23,8 @@ describe('TENANT_PROVISION_HOOKS binding', () => {
   it('the composite runs the AI budget seed hook first, ahead of any optional feature', () => {
     const providers = featureHookProviders([], ALWAYS_ON_TENANT_PROVISION_HOOKS);
     const binding = providers.find(
-      (p): p is { provide: unknown; inject: unknown[] } =>
-        typeof p === 'object' && (p as { provide?: unknown }).provide === TENANT_PROVISION_HOOKS,
-    );
+      (p) => typeof p === 'object' && (p as { provide?: unknown }).provide === TENANT_PROVISION_HOOKS,
+    ) as { inject: unknown[] } | undefined;
     expect(binding?.inject[0]).toBe(AiBudgetProvisionHooks);
     expect(providers).toContain(AiBudgetProvisionHooks);
   });
