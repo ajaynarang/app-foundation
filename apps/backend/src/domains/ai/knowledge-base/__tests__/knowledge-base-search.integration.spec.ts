@@ -35,7 +35,7 @@ describe('KnowledgeBaseService search (integration)', () => {
   let prisma: PrismaClient;
   let pool: pg.Pool;
   let usable = false;
-  const embedder = { embedText: jest.fn() };
+  const embedder = { embedText: jest.fn(), embedForPlatform: jest.fn() };
   let service: KnowledgeBaseService;
 
   beforeAll(async () => {
@@ -48,33 +48,58 @@ describe('KnowledgeBaseService search (integration)', () => {
       prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
       await prisma.knowledgeDocument.deleteMany({ where: { documentId: { startsWith: PREFIX } } });
       const base = { documentType: 'guide', category: 'kbsearch-spec', keywords: [] as string[] };
-      await prisma.knowledgeDocument.create({
-        data: {
-          ...base,
-          documentId: `${PREFIX}vec`,
+      const rows = [
+        {
+          id: 'vec',
           title: 'Invoices',
           content: 'Invoices are sent monthly.',
           audience: 'all',
+          path: 'spec/invoices.md',
         },
-      });
-      await prisma.knowledgeDocument.create({
-        data: {
-          ...base,
-          documentId: `${PREFIX}novec`,
+        {
+          id: 'novec',
           title: 'Refunds',
           content: 'Refunds settle in five days.',
           audience: 'all',
+          path: 'spec/refunds.md',
         },
-      });
-      await prisma.knowledgeDocument.create({
-        data: {
-          ...base,
-          documentId: `${PREFIX}admin`,
+        {
+          id: 'admin',
           title: 'Refunds (admin)',
           content: 'Refunds need approval.',
           audience: 'admin',
+          path: 'spec/admin.md',
         },
-      });
+        // Three chunks of one file, and three chunks of a product's own document (no source path).
+        ...[1, 2, 3].map((n) => ({
+          id: `long${n}`,
+          title: 'Exports',
+          content: `Exports chunk ${n} covers zebrafile.`,
+          audience: 'all',
+          path: 'spec/exports.md',
+        })),
+        ...[1, 2, 3].map((n) => ({
+          id: `own${n}`,
+          title: 'Own doc',
+          content: `Own chunk ${n} covers quokkaword.`,
+          audience: 'all',
+          path: null,
+          parent: `${PREFIX}ownparent`,
+        })),
+      ];
+      for (const r of rows) {
+        await prisma.knowledgeDocument.create({
+          data: {
+            ...base,
+            documentId: `${PREFIX}${r.id}`,
+            title: r.title,
+            content: r.content,
+            audience: r.audience,
+            sourcePath: r.path,
+            parentDocId: 'parent' in r ? r.parent : null,
+          },
+        });
+      }
       await prisma.$executeRawUnsafe(
         `UPDATE knowledge_documents SET embedding = $1::vector WHERE document_id = $2`,
         `[${new Array(1536).fill(0.1).join(',')}]`,
@@ -97,44 +122,55 @@ describe('KnowledgeBaseService search (integration)', () => {
 
   beforeEach(() => embedder.embedText.mockReset());
 
-  it('ranks by vector when the query embeds and a stored chunk has a vector', async () => {
+  const search = (q: string, aiContext?: typeof CTX) =>
+    service.hybridSearch(q, { audiences: ['all'], category: 'kbsearch-spec', aiContext });
+
+  it('ranks a chunk found by both lists first when the query embeds and a stored chunk has a vector', async () => {
     if (!usable) return;
     embedder.embedText.mockResolvedValue(new Array(1536).fill(0.1));
 
-    const results = await service.hybridSearch('invoices', {
-      audience: 'user',
-      category: 'kbsearch-spec',
-      aiContext: CTX,
-    });
+    const results = await search('invoices', CTX);
 
-    expect(results.map((r) => r.documentId)).toEqual([`${PREFIX}vec`]);
-    expect(results[0].similarity).toBeGreaterThan(0.6);
+    expect(results[0].documentId).toBe(`${PREFIX}vec`);
+    expect(results[0].similarity).toBe(1);
+    expect(results[0].sourcePath).toBe('spec/invoices.md');
   });
 
   it('answers from full-text, audience-filtered, when the query cannot be embedded', async () => {
     if (!usable) return;
     embedder.embedText.mockRejectedValue(new AiNotConfigured('embedding'));
 
-    const results = await service.hybridSearch('refunds', {
-      audience: 'user',
-      category: 'kbsearch-spec',
-      aiContext: CTX,
-    });
+    const results = await search('How do refunds work?', CTX);
 
     expect(results.map((r) => r.documentId)).toEqual([`${PREFIX}novec`]);
   });
 
-  it('answers from full-text when the query embeds but no matching chunk has a vector', async () => {
+  it('finds a chunk with no vector by full-text when the query embeds (vectors cleared, not re-embedded)', async () => {
     if (!usable) return;
-    // Opposite direction: cosine below the threshold for the one vectored row, so the vector query is empty.
     embedder.embedText.mockResolvedValue(new Array(1536).fill(-0.1));
 
-    const results = await service.hybridSearch('refunds', {
-      audience: 'user',
-      category: 'kbsearch-spec',
-      aiContext: CTX,
-    });
+    const results = await search('refunds', CTX);
 
-    expect(results.map((r) => r.documentId)).toEqual([`${PREFIX}novec`]);
+    expect(results.map((r) => r.documentId)).toContain(`${PREFIX}novec`);
+    expect(results.map((r) => r.documentId)).not.toContain(`${PREFIX}admin`);
+  });
+
+  it('returns at most two chunks of one file, and of one product-owned document', async () => {
+    if (!usable) return;
+
+    const files = await search('zebrafile');
+    const own = await search('quokkaword');
+
+    expect(files).toHaveLength(2);
+    expect(own).toHaveLength(2);
+    expect(new Set(own.map((r) => r.parentDocId))).toEqual(new Set([`${PREFIX}ownparent`]));
+  });
+
+  it('survives a query full of tsquery operators', async () => {
+    if (!usable) return;
+
+    await expect(search("app.example:8080 & !refunds' (x) | <-> 'y'")).resolves.toEqual([
+      expect.objectContaining({ documentId: `${PREFIX}novec` }),
+    ]);
   });
 });
