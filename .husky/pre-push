@@ -1,6 +1,8 @@
 # Runs on every push. CI is manual-only, so this hook is the always-on enforcement: the backend's
 # architecture specs hold the repo's rules (layer boundaries, schema conventions, the error envelope).
 # The foundation packages are built first because the backend reads them through their dist; turbo
-# skips the build when nothing changed. The web app's own guard runs after them: one component set
-# (apps/web/src/shared/components/__tests__/single-component-set.test.ts).
+# skips the build when nothing changed. The web app's own guards run after them: one component set
+# (apps/web/src/shared/components/__tests__/single-component-set.test.ts), the theme-token contrast
+# (apps/web/src/shared/components/page-chrome/__tests__/theme-tokens.test.ts) and the UI grammar
+# (apps/web/src/features/__tests__/ui-grammar-guard.test.ts).
 pnpm verify:arch

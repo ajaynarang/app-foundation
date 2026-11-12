@@ -688,6 +688,8 @@ export const PROJECT_STATUS_VARIANTS: Record<ProjectStatus, StatusVariant> = {
 // render: <StatusBadge tone={variant.tone}>{variant.label}</StatusBadge>
 ```
 
+**Read a status map with `variantOf(MAP, value)` and turn it into filter options with `variantOptions(MAP)`** (both from `@app/ui`): an unknown value reads as a neutral label of itself instead of crashing the screen. Every status map is listed in `STATUS_MAPS` of `apps/web/src/features/__tests__/ui-grammar-guard.test.ts`, which fails when the same label wears two tones or a common word (Active, Paid, Failed, Expired…) wears the wrong one. A role or a category is not a status: it renders as `<Badge variant="outline">`, never a tone and never `variant="muted"`.
+
 **Status tones.** Six meanings, mapped once to theme tokens in `@app/ui` (`status-tone.ts`): `neutral` not started, `info` moving, `warning` waiting on a person, `success` done well, `danger` stopped, `muted` retired. A feature maps its Prisma enum to a tone and renders `StatusBadge`. It never writes a colour class for a status.
 
 **Tinted text wears the `-text` token.** `text-info-text`, `text-caution-text`, `text-success-text`, `text-critical-text` clear WCAG AA on their own 15% tint in both themes. The fill hues (`text-caution`, `text-success`) read 1.7 to 2.8:1 on that tint in light theme, so they are for fills and icons only. `--brand` and `--brand-text` in `packages/ui/src/styles/globals.css` are the one place a product sets its brand colour; `theme-tokens.test.ts` holds the contrast.
@@ -705,14 +707,15 @@ const PROJECT_KINDS = [
 
 ## 12. Dark Theme (NON-NEGOTIABLE)
 
-| Element     | NEVER                               | ALWAYS                                                    |
-| ----------- | ----------------------------------- | --------------------------------------------------------- |
-| Backgrounds | `bg-white`, `bg-gray-50` standalone | `bg-background`, `bg-card`, `bg-gray-50 dark:bg-gray-900` |
-| Text        | `text-gray-900` standalone          | `text-foreground`, `text-muted-foreground`                |
-| Borders     | `border-gray-200` standalone        | `border-border`                                           |
-| Hover       | `hover:bg-gray-100` standalone      | `hover:bg-gray-100 dark:hover:bg-gray-800`                |
+| Element     | NEVER                                        | ALWAYS                                                   |
+| ----------- | -------------------------------------------- | -------------------------------------------------------- |
+| Backgrounds | `bg-white`, `bg-gray-50 dark:bg-gray-900`    | `bg-background`, `bg-card`, `bg-muted/50`                |
+| Text        | `text-gray-900`, `text-gray-500`             | `text-foreground`, `text-muted-foreground`               |
+| Borders     | `border-gray-200`                            | `border-border`                                          |
+| Hover       | `hover:bg-gray-100 dark:hover:bg-gray-800`   | `hover:bg-muted/50`                                      |
+| A status    | `bg-red-500/10 text-red-500`, `text-caution` | `<StatusBadge tone=…>`; tinted text `text-critical-text` |
 
-Prefer semantic tokens over paired raw colors. Status colors are allowed with opacity/dark-safe variants: `bg-red-500/10 text-red-500`.
+**No raw palette class, paired or not, and no hex class.** A surface wears a theme token; a status wears a tone (§11); tinted text wears the `-text` token, because the fill hues read 1.7 to 2.8:1 on their tint in light theme. A product's brand colour is `--brand` / `--brand-text` in `packages/ui/src/styles/globals.css`, nowhere else. This holds in `apps/web/src`, `packages/ui/src` and web-core, and `ui-grammar-guard.test.ts` fails on the first raw class.
 
 ---
 
@@ -745,6 +748,8 @@ Mobile-first. Test at 375px, 768px, 1440px in both themes.
 | Date/time formatters        | `@appshore/web-core/shared/lib/` (date-utils, format-time) | Dates, relative time        |
 
 **NEVER create inline `formatRelativeTime`, `formatDate`, or similar helpers** — check `@appshore/web-core/shared/lib/` first; add new formatters there, not in feature code.
+
+**Formatters (one display rule for dates and times).** A user-facing date or time goes through `useFormatters()` from `@/shared/providers/PreferencesProvider` (`formatDate`, `formatTime`, `formatDateTime`, `formatTimestamp`), which applies the user's date format, clock and timezone. A relative time is `<RelativeTime iso={…} />` from the page chrome: "5m ago" with the full timestamp on hover; never `formatDistanceToNow`, `timeAgo` or a hand-rolled helper on screen. `apps/web/eslint.config.mjs` bans `toLocaleDateString` and `toLocaleTimeString` (`no-restricted-syntax`); the maintenance page, which renders outside the app providers, is the one exception. `toLocaleString` on a date is the same mistake even though lint does not catch it.
 
 ---
 
@@ -797,6 +802,17 @@ Rule of thumb: clicking it changes the _dataset/entity_ → underline tab; it _f
 - **`ViewSwitcher` vs group switcher**: view = how data is _drawn_ (Board/Table); group = how it's _clustered_. They are separate axes — never a single multi-way toggle that mixes layouts and groupings.
 - **Canvas opt-out**: full-bleed workspaces that escape shell padding and own their chrome opt OUT of `PageHeader`/`PageToolbar` — document the reason with a code comment. They still honor the spirit of the zones: lift workspace-wide controls into a **single control row above the panes**. One filter, one place, all panes — a multi-pane canvas must NOT have the same filter twice.
 - **Empty/loading**: use `PageEmptyState` and `PageLoadingSkeleton` (shaped, never a bare spinner) — see §10.
+
+## 15.6 UI grammar (held by `ui-grammar-guard.test.ts`, no baseline)
+
+The pre-push hook runs `apps/web/src/features/__tests__/ui-grammar-guard.test.ts` beside `theme-tokens.test.ts` (the contrast of every token pair). It has no baseline: a screen that breaks a rule fails the push.
+
+- **Settings and admin pages** (`app/settings/**`, `app/admin/**` and the feature folders they render, listed in `SETTINGS_ADMIN_DIRS`): every page renders `PageHeader` (or hands its body to a feature component that does, listed with its target); a section heading is `PageSection`; no raw `<h1>`/`<h2>`; no `Loader2` as a loading state; no raw `fetch` with a hand-built bearer token (`apiClient` carries auth and the one-shot refresh). A product adds its own settings feature folders to that list.
+- **States, app-wide:** a file that renders a list (`ListFooter`, `ListRows`, `ListCardGrid`, `TableBody`) and reads `isLoading` also renders `ListErrorState`; an `Alert` is never an empty state (`PageEmptyState`) or a read's error state. Order the branches loading → error → empty → rows, so a failed fetch never reads as "No … yet".
+- **Row actions:** no raw `<Button>` inside a `<TableCell>` or `<li>` on a settings or admin screen; the row's actions are `RowActions` (one visible primary, the rest behind ⋯, a destructive item last and confirmed by an `AlertDialog` before it acts, a `disabled` item with its `disabledReason`).
+- **Status:** a status never rides a raw `Badge` (no `variant={…status…}`, no `{x.status}` as text); no `variant="muted"` chip and no `bg-muted` + `text-muted-foreground` chip (4.36:1); no `*_VARIANTS` map of class strings.
+- **Colour, app-wide and in the packages:** no raw palette class, no hex class, no fill hue as text (§12).
+- **Reveal:** a control hidden until hover (`opacity-0 group-hover:opacity-100`) also carries `group-focus-within:opacity-100` or `focus-visible:opacity-100`, and `[@media(hover:none)]:opacity-100`, on the same line, so a keyboard and a phone reach it. `RowActions` does this itself.
 
 ---
 

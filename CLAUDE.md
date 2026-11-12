@@ -211,8 +211,11 @@ success + error toasts; every loading state shows a Skeleton.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
-  holds it. It then runs the web guard `single-component-set.test.ts`: the shadcn components live in `@app/ui`
-  and `apps/web/src/shared/components/ui/` holds no copy.
+  holds it. It then runs the web guards: `single-component-set.test.ts` (the shadcn components live in `@app/ui`
+  and `apps/web/src/shared/components/ui/` holds no copy), `theme-tokens.test.ts` (every text token clears WCAG AA)
+  and `ui-grammar-guard.test.ts` (theme tokens only, status tones, `RowActions`, `PageHeader` on every settings and
+  admin page, `ListErrorState` on every list). Dates go through `useFormatters()`: lint bans `toLocaleDateString`
+  and `toLocaleTimeString`.
 - **The API contract ratchet** (`apps/backend/src/architecture/api-contract.spec.ts`) — one rule per line of the
   ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. A violation that predates a
   rule sits in `api-contract.baseline.json`, which can only shrink. A decision that is not debt (a route whose wire

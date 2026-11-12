@@ -139,15 +139,17 @@ Review every file against the frontend patterns skill. For each violation found,
 
 ## CRITICAL violations (always check, all files):
 1. Plain HTML elements instead of @app/ui shadcn components: <button>, <input>, <select>, <table>, <label>, <textarea>. A shadcn component is imported from `@app/ui/components/ui/*` only: no copy under `apps/web/src/shared/components/ui/` and no import through `@/shared/components/ui/` (single-component-set.test.ts)
-2. Standalone light-only colors without dark variant or semantic token: bg-white, bg-gray-50, text-gray-900, text-gray-600, border-gray-200, hover:bg-gray-100
+2. A raw Tailwind palette class (`bg-gray-50`, `text-red-500`, `border-yellow-600`, even with a `dark:` pair) or a hex class (`bg-[#…]`) anywhere in `apps/web/src`, `packages/ui/src` or web-core: a surface wears a theme token (`bg-background`, `bg-muted/50`, `border-border`), a status a tone. Tinted text wears the `-text` token (`text-caution-text`), never the fill hue (`text-caution`) (ui-grammar-guard.test.ts)
 3. Missing mutation toasts: every useMutation must have both showSuccess() and showError() (or a verified global fallback)
-4. Loading states using Loader2/spinner/null instead of <Skeleton>
+4. Loading states using Loader2/spinner/null instead of <Skeleton> or a shaped `PageLoadingSkeleton`
 5. Manual Loader2 in buttons instead of the loading={isPending} prop
 6. Local entity type definitions instead of importing from @app/shared-types
 7. Dialog used for forms with 4+ fields (should be Sheet/FormSheet)
 8. Direct Zustand for server state (should be TanStack Query)
 9. Missing 'use client' directive on components using hooks
 10. Hardcoded values that exist in shared-types or centralized constants (query keys, storage keys, enum values)
+10a. A date written with `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString`, `formatDistanceToNow` or a hand-rolled "5m ago" helper: dates go through `useFormatters()` (the user's format and timezone) and relative times through `RelativeTime` (eslint `no-restricted-syntax`; ui-grammar-guard.test.ts)
+10b. A list that reads a query with no `ListErrorState` branch, or an `Alert` used as an empty or error state: a failed fetch must never read as empty (ui-grammar-guard.test.ts)
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 11. Sheet patterns: FormSheet usage, onInteractOutside for edit mode, sticky footer action placement, destructive actions behind AlertDialog
@@ -160,7 +162,7 @@ Review every file against the frontend patterns skill. For each violation found,
 18. API layer: object namespace pattern (entityApi.method()), no direct fetch calls in components
 19. Query tier: QUERY_TIERS used instead of hardcoded staleTime/refetchInterval
 20. Error handling: extractErrorMessage usage, error boundaries per route segment; a raw fetch reads `detail` (never `message`) from an error body, and branches on `code` via extractErrorCode
-21. Page chrome: PageHeader + PageToolbar + ListFilterRow from @/shared/components/page-chrome; title AND subtitle present; no hand-rolled headers. A new growing list uses useListParams + useCursorList and renders ListErrorState and ListFooter. A status maps to a tone (StatusVariant) and renders StatusBadge, never a colour class; tinted text wears a `-text` token. Row actions go through RowActions. `@app/ui` imports no `@appshore/*`, `@/`, `next` or app code (foundation-boundaries.spec.ts)
+21. Page chrome: PageHeader + PageToolbar + ListFilterRow from @/shared/components/page-chrome; title AND subtitle present; no hand-rolled headers. Every settings and admin page renders `PageHeader`, and a section heading is `PageSection`, never a raw h1/h2; a feature folder those pages render is listed in `SETTINGS_ADMIN_DIRS` of ui-grammar-guard.test.ts. A new growing list uses useListParams + useCursorList and renders ListErrorState and ListFooter. A status maps to a tone (StatusVariant) and renders StatusBadge, never a colour class; tinted text wears a `-text` token. Row actions go through RowActions (no raw `<Button>` in a `<TableCell>` or `<li>`; a destructive item confirms first), a status map is added to `STATUS_MAPS` in ui-grammar-guard.test.ts so its labels keep one tone app-wide, a control hidden until hover also shows on focus and touch, and no raw fetch hand-builds a bearer token. `@app/ui` imports no `@appshore/*`, `@/`, `next` or app code (foundation-boundaries.spec.ts)
 22. Button variants: correct variant for context (default/destructive/outline/ghost)
 23. Toasts imported from @app/ui, never raw toast()
 
