@@ -1,7 +1,7 @@
 import { AiBudgetNudgeListener, budgetReachedClaimKey } from '../ai-budget-nudge.listener';
 
 describe('AiBudgetNudgeListener', () => {
-  function makeListener() {
+  function makeListener(byokEnabled = false) {
     const claimed = new Set<string>();
     const cache = {
       claim: jest.fn(async (key: string) => {
@@ -11,7 +11,12 @@ describe('AiBudgetNudgeListener', () => {
       }),
     };
     const notifications = { aiBudgetReached: jest.fn().mockResolvedValue(undefined) };
-    return { listener: new AiBudgetNudgeListener(cache as never, notifications as never), notifications, cache };
+    const credentialCrypto = { isConfigured: () => byokEnabled };
+    return {
+      listener: new AiBudgetNudgeListener(cache as never, notifications as never, credentialCrypto as never),
+      notifications,
+      cache,
+    };
   }
 
   const event = (tenantId: string) => ({ tenantId, data: {} }) as never;
@@ -19,7 +24,13 @@ describe('AiBudgetNudgeListener', () => {
   it('tells the workspace owners and admins through the named trigger on a hard breach', async () => {
     const { listener, notifications } = makeListener();
     await listener.onHardBreach(event('7'));
-    expect(notifications.aiBudgetReached).toHaveBeenCalledWith(7);
+    expect(notifications.aiBudgetReached).toHaveBeenCalledWith(7, { byokEnabled: false });
+  });
+
+  it('tells the trigger the deployment allows workspace keys, so the notice can offer to connect one', async () => {
+    const { listener, notifications } = makeListener(true);
+    await listener.onHardBreach(event('7'));
+    expect(notifications.aiBudgetReached).toHaveBeenCalledWith(7, { byokEnabled: true });
   });
 
   it('notifies once a day per workspace: repeat breaches stay silent, another workspace still hears', async () => {

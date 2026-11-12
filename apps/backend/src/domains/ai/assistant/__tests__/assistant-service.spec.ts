@@ -38,6 +38,8 @@ import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
 import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
 import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
 import { AiBudgetExceededError } from '../../infrastructure/telemetry/ai-budget-exceeded.error';
+import { CredentialCryptoService } from '../../routing/credential-crypto.service';
+import { AI_SETTINGS_WEB_PATH } from '../../../../shared/web-routes';
 
 const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 
@@ -51,6 +53,8 @@ describe('AssistantAiService', () => {
   let mockAssistantRouter: any;
   let mockAgentRegistry: any;
   let mockTelemetry: { assertBudget: jest.Mock };
+  /** Whether the deployment allows workspace AI keys (`AI_CREDENTIALS_KEY` set). */
+  let byokEnabled: boolean;
 
   const buildService = (resolver: AiRouteResolver) =>
     new AssistantAiService(
@@ -63,6 +67,7 @@ describe('AssistantAiService', () => {
       mockAgentRegistry,
       mockTelemetry as unknown as AiTelemetryService,
       resolver,
+      { isConfigured: () => byokEnabled } as unknown as CredentialCryptoService,
     );
 
   beforeEach(() => {
@@ -95,7 +100,11 @@ describe('AssistantAiService', () => {
       conversationMessage: {
         create: jest.fn().mockResolvedValue({ id: 1 }),
       },
+      workspaceMember: {
+        findUnique: jest.fn().mockResolvedValue({ role: 'OWNER' }),
+      },
     };
+    byokEnabled = false;
 
     mockMcpTools = {
       getToolsForPersona: jest.fn().mockResolvedValue({}),
@@ -333,6 +342,37 @@ describe('AssistantAiService', () => {
         expect(mockTelemetry.assertBudget).toHaveBeenCalledWith(1);
         expect(chunks[0]).toMatchObject({ type: 'blocked' });
         expect(mockAgentRegistry.get).not.toHaveBeenCalled();
+      });
+
+      const blockedText = async () => {
+        service = buildService(routeWithPayer('PLATFORM'));
+        overCap();
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+        return chunks[0].data as string;
+      };
+
+      it('links the workspace owner to AI Keys when the deployment allows workspace keys', async () => {
+        byokEnabled = true;
+        expect(await blockedText()).toContain(`](${AI_SETTINGS_WEB_PATH})`);
+        expect(mockPrisma.workspaceMember.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { userId_tenantId: { userId: 1, tenantId: 1 } } }),
+        );
+      });
+
+      it('tells anyone but the owner to ask the workspace owner, with no link', async () => {
+        byokEnabled = true;
+        mockPrisma.workspaceMember.findUnique.mockResolvedValue({ role: 'ADMIN' });
+        const text = await blockedText();
+        expect(text).not.toContain(AI_SETTINGS_WEB_PATH);
+        expect(text).toMatch(/Ask the workspace owner/);
+      });
+
+      it('offers no key when the deployment has bring-your-own-key off, even to the owner', async () => {
+        const text = await blockedText();
+        expect(text).not.toContain(AI_SETTINGS_WEB_PATH);
+        expect(text).not.toMatch(/own AI key/);
       });
     });
 
@@ -605,6 +645,50 @@ describe('AssistantAiService', () => {
       expect(mockRes.status).toHaveBeenCalledWith(503);
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
       expect(mockRes.write).not.toHaveBeenCalled();
+    });
+
+    const notConfiguredDetail = async () => {
+      service = buildService(makeResolver().resolver);
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+      });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
+      const mockRes = {
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        headersSent: false,
+      } as any;
+      await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
+      expect(mockRes.status).toHaveBeenCalledWith(503);
+      return mockRes.json.mock.calls[0][0].detail as string;
+    };
+
+    it('links the workspace owner to AI Keys when nothing serves chat and workspace keys are allowed', async () => {
+      byokEnabled = true;
+      expect(await notConfiguredDetail()).toContain(`](${AI_SETTINGS_WEB_PATH})`);
+    });
+
+    it('tells a member to ask the workspace owner when nothing serves chat', async () => {
+      byokEnabled = true;
+      mockPrisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+      const detail = await notConfiguredDetail();
+      expect(detail).not.toContain(AI_SETTINGS_WEB_PATH);
+      expect(detail).toMatch(/Ask the workspace owner/);
+    });
+
+    it("keeps the deployment's own message when workspace keys are off", async () => {
+      const detail = await notConfiguredDetail();
+      expect(detail).not.toContain(AI_SETTINGS_WEB_PATH);
+      expect(detail).toMatch(/Ask your administrator/);
     });
   });
 

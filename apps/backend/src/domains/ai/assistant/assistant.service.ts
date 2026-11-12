@@ -13,6 +13,14 @@ import { CHAT_STEP_MAX_OUTPUT_TOKENS } from '../agents/base.agent';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
 import { AiRouteResolver } from '../routing/ai-route-resolver.service';
+import { AiNotConfigured } from '../routing/ai-not-configured.error';
+import { CredentialCryptoService } from '../routing/credential-crypto.service';
+import {
+  type AiKeysViewer,
+  aiKeysViewer,
+  budgetReachedChatCopy,
+  notConfiguredChatCopy,
+} from '../routing/connect/connect-key-copy';
 import { REQUEST_MODEL_KEY } from '../routing/request-model-key';
 import { UserMode } from '../agents/agent.types';
 import type { Request, Response } from 'express';
@@ -38,7 +46,20 @@ export class AssistantAiService {
     private readonly agentRegistry: AgentRegistry,
     private readonly aiTelemetry: AiTelemetryService,
     private readonly aiRouteResolver: AiRouteResolver,
+    private readonly credentialCrypto: CredentialCryptoService,
   ) {}
+
+  /**
+   * Who is reading a refusal, for the connect-your-key copy: whether they own this workspace and whether the
+   * deployment allows workspace keys. Read only when a refusal is about to be written.
+   */
+  private async keysViewer(userDbId: number, tenantId: number): Promise<AiKeysViewer> {
+    const membership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_tenantId: { userId: userDbId, tenantId } },
+      select: { role: true },
+    });
+    return aiKeysViewer(membership?.role, this.credentialCrypto.isConfigured());
+  }
 
   /**
    * A typed refusal (a routing error such as `AiNotConfigured` or `ZeroRetentionUnavailable`, a 404) keeps its own
@@ -226,7 +247,13 @@ export class AssistantAiService {
     // 4b. Resolve the tenant's language route before anything streams. Retention and configuration refusals
     // (ZeroRetentionUnavailable, AiNotConfigured) surface here as clean typed errors, which the HTTP route answers
     // as an error envelope; nothing reaches a provider.
-    const chatRoute = await this.aiRouteResolver.resolve(tenantId, 'language');
+    const chatRoute = await this.aiRouteResolver.resolve(tenantId, 'language').catch(async (error: unknown) => {
+      // Nothing serves chat: say who can fix it. Only the owner, on a deployment with workspace keys, gets the link.
+      if (error instanceof AiNotConfigured) {
+        throw new AiNotConfigured(error.need, notConfiguredChatCopy(await this.keysViewer(userDbId, tenantId)));
+      }
+      throw error;
+    });
 
     // 4c. AI cost budget — block chat if the tenant is over its hard cap.
     // The cap is a control on PLATFORM money: a workspace whose language route
@@ -239,8 +266,7 @@ export class AssistantAiService {
       if (chatRoute.payer === 'PLATFORM') await this.aiTelemetry.assertBudget(tenantId);
     } catch (budgetError) {
       if (budgetError instanceof AiBudgetExceededError) {
-        const budgetText =
-          "I've hit your account's AI usage limit for now. Ask your administrator to raise the budget and I'll be right back.";
+        const budgetText = budgetReachedChatCopy(await this.keysViewer(userDbId, tenantId));
         await this.prisma.conversationMessage.create({
           data: {
             messageId: generateId('msg'),

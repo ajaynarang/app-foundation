@@ -89,15 +89,21 @@ export class NotificationTriggersService {
 
   /**
    * The workspace's platform-paid AI spend hit its hard cap, so AI calls the platform pays for are paused. Sent at
-   * most once a day per workspace (`AiBudgetNudgeListener`).
+   * most once a day per workspace (`AiBudgetNudgeListener`). When the deployment allows workspace keys
+   * (`byokEnabled`), it also offers "Connect a key": calls on the workspace's own key are not counted against the cap.
+   * Only the owner can connect one; an admin who follows the link sees the screen read-only.
    */
-  async aiBudgetReached(tenantId: number) {
+  async aiBudgetReached(tenantId: number, options: { byokEnabled: boolean }) {
+    const base =
+      'This workspace reached its AI usage limit, so AI features are paused until the limit resets. An administrator can raise it.';
     return this.trigger({
       tenantId,
       type: PlatformNotificationType.AI_BUDGET_REACHED,
       title: 'AI usage limit reached',
-      message:
-        'This workspace reached its AI usage limit, so AI features are paused until the limit resets. An administrator can raise it.',
+      message: options.byokEnabled
+        ? `${base} The workspace owner can also connect the workspace's own AI key, which the limit does not cover.`
+        : base,
+      ...(options.byokEnabled ? { actionUrl: AI_SETTINGS_WEB_PATH, actionLabel: 'Connect a key' } : {}),
       iconType: 'ai',
       recipientRoles: STAFF,
     });

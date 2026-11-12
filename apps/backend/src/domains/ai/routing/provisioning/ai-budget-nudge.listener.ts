@@ -6,6 +6,7 @@ import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.consta
 import { CACHE_TTL_FROZEN_24H } from '@appshore/kernel/constants/cache.constants';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { NotificationTriggersService } from '../../../notifications/notification-triggers.service';
+import { CredentialCryptoService } from '../credential-crypto.service';
 
 /** The once-a-day claim per workspace. */
 export function budgetReachedClaimKey(tenantId: number): string {
@@ -24,6 +25,7 @@ export class AiBudgetNudgeListener {
   constructor(
     private readonly cache: AppCacheService,
     private readonly notifications: NotificationTriggersService,
+    private readonly credentialCrypto: CredentialCryptoService,
   ) {}
 
   @OnEvent(DOMAIN_EVENTS.AI_BUDGET_HARD_BREACHED, { async: true })
@@ -33,7 +35,7 @@ export class AiBudgetNudgeListener {
     try {
       const first = await this.cache.claim(budgetReachedClaimKey(tenantId), true, CACHE_TTL_FROZEN_24H);
       if (!first) return;
-      await this.notifications.aiBudgetReached(tenantId);
+      await this.notifications.aiBudgetReached(tenantId, { byokEnabled: this.credentialCrypto.isConfigured() });
     } catch (err) {
       this.logger.warn(`AI budget notification failed for workspace ${tenantId}: ${(err as Error).message}`);
     }

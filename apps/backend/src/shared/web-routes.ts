@@ -17,6 +17,6 @@ export const INTEGRATIONS_WEB_PATH = '/settings/general';
 
 /**
  * The workspace AI settings screen (retention policy and the workspace's own AI keys), where a failing-key notice
- * sends its owner. The screen ships with the AI settings UI; until then the link lands on the web app's not-found page.
+ * sends its owner and the budget notice's "Connect a key" action points (the web app's AI Keys screen).
  */
 export const AI_SETTINGS_WEB_PATH = '/settings/ai';

@@ -66,6 +66,22 @@ describe('NotificationTriggersService', () => {
     },
   );
 
+  it('aiBudgetReached offers "Connect a key" (AI settings) only when the deployment allows workspace keys', async () => {
+    await service.aiBudgetReached(7, { byokEnabled: true });
+    expect(dispatcher.dispatch.mock.calls[0][0]).toMatchObject({
+      type: PlatformNotificationType.AI_BUDGET_REACHED,
+      actionUrl: '/settings/ai',
+      actionLabel: 'Connect a key',
+    });
+    expect(dispatcher.dispatch.mock.calls[0][0].message).toMatch(/own AI key/);
+
+    await service.aiBudgetReached(7, { byokEnabled: false });
+    const off = dispatcher.dispatch.mock.calls[1][0];
+    expect(off.actionUrl).toBeUndefined();
+    expect(off.actionLabel).toBeUndefined();
+    expect(off.message).not.toMatch(/own AI key/);
+  });
+
   it('userRoleChanged notifies the person and every admin, once each', async () => {
     await service.userRoleChanged(7, 2, 'Arun', 'MEMBER', 'ADMIN');
     expect(recipients.resolveByUserIds).toHaveBeenCalledWith(7, [2, 1], { scopeToMembership: true });
