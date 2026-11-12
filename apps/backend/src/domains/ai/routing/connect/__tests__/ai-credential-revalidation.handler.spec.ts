@@ -102,7 +102,7 @@ describe('AiCredentialRevalidationHandler (the daily sweep)', () => {
       slices++;
       expect(slices).toBeLessThan(50);
     }
-    const tested = connect.validate.mock.calls.map((c) => c[1]);
+    const tested = (connect.validate.mock.calls as unknown as Array<[number, string]>).map((c) => c[1]);
     expect(tested).toHaveLength(fleet.length);
     expect(new Set(tested).size).toBe(fleet.length);
     expect(slices).toBeGreaterThan(1);

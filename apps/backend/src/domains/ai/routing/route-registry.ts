@@ -112,7 +112,7 @@ export const anthropicOnlyMiddleware: LanguageModelMiddleware = {
       providerOptions: {
         ...providerOptions,
         gateway: { ...(providerOptions.gateway ?? {}), only: ['anthropic'] },
-      } as typeof params.providerOptions,
+      },
     });
   },
 };

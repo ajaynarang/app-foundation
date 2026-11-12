@@ -54,8 +54,8 @@ export interface CreditRefusalSink {
 }
 export const AI_CREDIT_REFUSAL_SINK = Symbol('AI_CREDIT_REFUSAL_SINK');
 
-/** Who pays for a need right now: the platform, a workspace credential (its public id), or nobody (blocked). */
-export type NeedPayer = 'platform' | 'none' | string;
+/** Who pays for a need right now: `platform`, a workspace credential's public id (`aicred_…`), or `none` (blocked). */
+export type NeedPayer = string;
 
 export interface CandidatePools {
   payer: AiPayer;

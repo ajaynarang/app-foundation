@@ -107,7 +107,7 @@ function makeHarness(opts: HarnessOptions = {}) {
     outbox as never,
     notifications as never,
     crypto,
-    probe as never,
+    probe,
     resolver,
   );
   return { service, prisma, cache, cacheStore, outbox, notifications, probe, rows, tenant, resolver, crypto };
