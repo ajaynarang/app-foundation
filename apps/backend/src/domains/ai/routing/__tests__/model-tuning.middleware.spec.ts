@@ -42,6 +42,17 @@ describe('modelTuningMiddleware', () => {
     });
   });
 
+  it("writes effort in the Bedrock family's own shape (`reasoningConfig.maxReasoningEffort`), keeping the cache point", async () => {
+    const out = await modelTuningMiddleware({ alias: 'standard', family: 'bedrock' }).transformParams({
+      params: params({ bedrock: { cachePoint: { type: 'default' } } }),
+      type: 'generate',
+      model: {} as any,
+    });
+    expect(out.providerOptions).toEqual({
+      bedrock: { cachePoint: { type: 'default' }, reasoningConfig: { maxReasoningEffort: 'medium' } },
+    });
+  });
+
   it('returns the first answer when the model did not refuse', async () => {
     const fallback = { doGenerate: jest.fn() };
     const mw = modelTuningMiddleware({ alias: 'fast', fallback: fallback as any });
@@ -84,6 +95,9 @@ describe('effortProviderOptions', () => {
     expect(effortProviderOptions('anthropic', 'fast')).toEqual({ anthropic: { effort: 'low' } });
     expect(effortProviderOptions('openrouter', 'standard')).toEqual({
       openrouter: { reasoning: { effort: 'medium' } },
+    });
+    expect(effortProviderOptions('bedrock', 'powerful')).toEqual({
+      bedrock: { reasoningConfig: { maxReasoningEffort: 'medium' } },
     });
   });
 });

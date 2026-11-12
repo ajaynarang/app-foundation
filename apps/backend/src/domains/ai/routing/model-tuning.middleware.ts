@@ -8,9 +8,10 @@ export type ProviderModel = Parameters<typeof wrapLanguageModel>[0]['model'];
 
 /**
  * How a route family takes the model's effort. The direct Anthropic API reads `anthropic.effort`; OpenRouter reads
- * `reasoning.effort` from its own options key (it spreads `providerOptions.openrouter` into the request body).
+ * `reasoning.effort` from its own options key (it spreads `providerOptions.openrouter` into the request body); the
+ * Bedrock provider reads `reasoningConfig.maxReasoningEffort` and sends it to a Claude model as `output_config.effort`.
  */
-export type EffortFamily = 'anthropic' | 'openrouter';
+export type EffortFamily = 'anthropic' | 'openrouter' | 'bedrock';
 
 const logger = new Logger('ModelTuning');
 
@@ -20,7 +21,14 @@ export function effortProviderOptions(
   alias: ModelAlias,
 ): Record<string, Record<string, unknown>> {
   const effort = MODEL_CATALOG[alias].effort;
-  return family === 'openrouter' ? { openrouter: { reasoning: { effort } } } : { anthropic: { effort } };
+  switch (family) {
+    case 'openrouter':
+      return { openrouter: { reasoning: { effort } } };
+    case 'bedrock':
+      return { bedrock: { reasoningConfig: { maxReasoningEffort: effort } } };
+    case 'anthropic':
+      return { anthropic: { effort } };
+  }
 }
 
 /**
