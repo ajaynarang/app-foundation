@@ -23,6 +23,10 @@ export const ApiErrorCode = {
   STALE: 'STALE',
   /** 409 — a record with this value already exists. */
   DUPLICATE: 'DUPLICATE',
+  /** 409 — this `Idempotency-Key` was already used for a different request (another route or body). */
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  /** 409 — a request with this `Idempotency-Key` is still running; retry once it has finished. */
+  IDEMPOTENCY_KEY_IN_USE: 'IDEMPOTENCY_KEY_IN_USE',
   /** 413 — the upload or body is too large. */
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   /** 429 — rate limited; `Retry-After` says when to try again. */

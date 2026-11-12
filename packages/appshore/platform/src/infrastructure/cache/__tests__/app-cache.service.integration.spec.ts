@@ -196,6 +196,23 @@ describe('AppCacheService (integration, real Redis)', () => {
     });
   });
 
+  it('claim: the first caller wins, a second never overwrites, and the claim expires with its TTL', async () => {
+    if (!available) return;
+
+    const key = `${TEST_PREFIX}:claim`;
+    const otherReplica = new AppCacheService(redis);
+    const [one, two] = await Promise.all([
+      service.claim(key, { owner: 'a' }, 60_000),
+      otherReplica.claim(key, { owner: 'b' }, 60_000),
+    ]);
+    expect([one, two].sort()).toEqual([false, true]);
+    const winner = one ? 'a' : 'b';
+    expect(JSON.parse((await probe.get(key)) as string)).toEqual({ owner: winner });
+    const ttl = await probe.pttl(key);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(60_000);
+  });
+
   it('increment is atomic — INCRBY then first-touch EXPIRE', async () => {
     if (!available) return;
 
