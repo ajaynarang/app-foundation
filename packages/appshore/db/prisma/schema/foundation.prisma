@@ -153,9 +153,9 @@ model Tenant {
 
   // When true, this tenant's AI traffic must route through zero-data-retention
   // (ZDR) provider endpoints — no prompt/response retention at the provider.
-  // Enforced in AiProvider.resolveModel; if no ZDR-eligible model exists for
-  // the requested tier, the call throws ZeroRetentionUnavailable. For
-  // compliance-sensitive customers.
+  // Enforced in AiRouteResolver; if no zero-retention route serves the need,
+  // the call throws ZeroRetentionUnavailable, never a downgrade. The owner
+  // flips it at PATCH /ai-settings/policy. For compliance-sensitive customers.
   aiZeroRetention Boolean @default(false) @map("ai_zero_retention")
 
   isActive  Boolean  @default(false) @map("is_active")
@@ -216,6 +216,7 @@ model Tenant {
   hitlChallenges         HitlChallenge[]
   aiInvocations          AiInvocation[]
   aiBudget               TenantAiBudget?
+  aiCredentials          AiCredential[]
 
   @@index([status])
   // Serves the every-minute scheduler heartbeat scan for tenants with the
@@ -2462,4 +2463,68 @@ model TenantAiBudget {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("tenant_ai_budgets")
+}
+
+/// The provider a workspace credential connects. Every type has an entry in the route registry
+/// (`TENANT_CREDENTIAL_CAPABILITIES`), which says what it serves and its retention. `BEDROCK_ROLE` exists so the AWS
+/// role flow adds no migration; until it ships it serves nothing and the connect API refuses it.
+enum AiCredentialType {
+  ANTHROPIC_KEY
+  BEDROCK_ROLE
+  OPENROUTER_KEY
+  VERCEL_GATEWAY_KEY
+}
+
+/// A workspace credential's health. ACTIVE serves. FAILING failed its last test and blocks the needs it would serve
+/// (the platform's key is never used in its place). DISABLED is the owner's choice and counts as absent. A test moves a
+/// credential between ACTIVE and FAILING only.
+enum AiCredentialStatus {
+  ACTIVE
+  FAILING
+  DISABLED
+}
+
+/// A workspace's own AI route (bring-your-own-key): the workspace pays for the calls it serves, and the platform cap
+/// does not apply to them. A pasted secret is stored only as an AES-256-GCM envelope bound to
+/// `tenantId:publicId` (`CredentialCryptoService`), so a ciphertext moved to another row fails to decrypt; it is never
+/// read back by the API. A `BEDROCK_ROLE` stores no secret. The resolver reads these rows straight from Postgres on
+/// every resolve, never from a cache.
+model AiCredential {
+  id       Int    @id @default(autoincrement())
+  /// `aicred_…` (`generateId`). Also the ledger's `routeId` for every call this credential served.
+  publicId String @unique @map("public_id") @db.VarChar(30)
+  tenantId Int    @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type     AiCredentialType
+  status   AiCredentialStatus @default(ACTIVE)
+  /// Lower serves first. A new credential gets the tenant's highest plus one.
+  priority Int                @default(0)
+
+  /// `<ivHex>:<authTagHex>:<cipherHex>`. Null for a `BEDROCK_ROLE`.
+  encryptedSecret String? @map("encrypted_secret") @db.Text
+  /// Which `AI_CREDENTIALS_KEY` generation encrypted the secret.
+  keyVersion      Int     @default(1) @map("key_version")
+  /// The only trace of the secret the API shows.
+  lastFour        String? @map("last_four") @db.VarChar(4)
+
+  roleArn    String? @map("role_arn") @db.VarChar(2048)
+  externalId String? @map("external_id") @db.VarChar(64)
+  awsRegion  String? @map("aws_region") @db.VarChar(32)
+
+  /// An Anthropic key only: the owner attested the organisation has a zero-retention agreement with Anthropic.
+  zdrAttested   Boolean   @default(false) @map("zdr_attested")
+  zdrAttestedBy Int?      @map("zdr_attested_by")
+  zdrAttestedAt DateTime? @map("zdr_attested_at") @db.Timestamptz
+
+  lastValidatedAt DateTime? @map("last_validated_at") @db.Timestamptz
+  /// The provider's reason for the last failed test or credit refusal, with the secret redacted.
+  lastError       String?   @map("last_error") @db.Text
+  createdBy       Int       @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([tenantId, status])
+  @@map("ai_credentials")
 }

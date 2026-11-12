@@ -14,6 +14,16 @@
  */
 import { z } from 'zod';
 
+// AiCredentialStatus
+export const AiCredentialStatusSchema = z.enum(['ACTIVE', 'FAILING', 'DISABLED'] as const);
+export type AiCredentialStatus = z.infer<typeof AiCredentialStatusSchema>;
+export const AiCredentialStatus = AiCredentialStatusSchema.enum;
+
+// AiCredentialType
+export const AiCredentialTypeSchema = z.enum(['ANTHROPIC_KEY', 'BEDROCK_ROLE', 'OPENROUTER_KEY', 'VERCEL_GATEWAY_KEY'] as const);
+export type AiCredentialType = z.infer<typeof AiCredentialTypeSchema>;
+export const AiCredentialType = AiCredentialTypeSchema.enum;
+
 // AiInvocationStatus
 export const AiInvocationStatusSchema = z.enum(['OK', 'ERROR', 'TIMEOUT', 'RATE_LIMITED', 'BUDGET_BLOCKED'] as const);
 export type AiInvocationStatus = z.infer<typeof AiInvocationStatusSchema>;
