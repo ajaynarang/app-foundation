@@ -36,7 +36,10 @@ actor?, opts?)` takes the same arguments as `DomainEventService.emit` and stages
   committed and the row is durable. The first failure stops the run, so a later event never overtakes an earlier
   one; the rest wait for the relay.
 - **`stage(tx, …)` + `publishStaged(events)`** is the lower-level form for code that already owns its
-  transaction. Publication is always an explicit step after the commit.
+  transaction. Publication is always an explicit step after the commit. It is also the form for a hot path that
+  must not wait on the enqueue: `AiTelemetryService.record` (every AI call) stages `AI_INVOCATION_RECORDED` with
+  its ledger row and starts `publishStaged` without awaiting it. A slow or reconnecting Redis then costs that event
+  a relay tick, never the AI call its latency. `publishStaged` never throws.
 - **Publishing reuses the kernel's two paths** (the in-process bus and the durable `events` queue) through
   `DomainEventService.publish(event)`, which keeps the staged event's id and timestamp. So the durable job id, the
   `domain_event_log` row and the webhook payload `id` all equal the outbox row's id. Unlike `emit`, `publish`

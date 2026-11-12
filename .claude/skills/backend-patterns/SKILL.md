@@ -1029,7 +1029,8 @@ const project = await this.outbox.transaction(async (tx, emit) => {
 - Do every write the event describes on `tx`, never on `this.prisma`. Keep external calls (HTTP, AI, queues) out of
   the callback: the transaction is capped at 15 seconds (`OUTBOX_TRANSACTION_TIMEOUT_MAX_MS`).
 - Code that already owns its transaction stages with `outbox.stage(tx, …)`, keeps the returned events and calls
-  `outbox.publishStaged(events)` after the commit.
+  `outbox.publishStaged(events)` after the commit. On a hot path that must not wait on Redis (the AI ledger write),
+  start `publishStaged` without awaiting it (`void`): it never throws, and the relay covers what it misses.
 - Do work that is not part of the change (cache busts, notifications) after the transaction returns.
 - In unit specs use `createMockOutbox(prisma)` from `@appshore/platform/test/mocks`: `outbox.emit` records what was
   published, and a callback that throws publishes nothing, so a "rollback publishes nothing" test is one line.

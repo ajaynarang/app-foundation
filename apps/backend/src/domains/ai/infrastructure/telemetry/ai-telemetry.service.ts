@@ -150,25 +150,32 @@ export class AiTelemetryService {
    * AI_INVOCATION_RECORDED with it — the event commits with the row. An
    * idempotent replay writes nothing, so it stages nothing: one invocation, one
    * event. Listeners invalidate per-tenant cost-aggregate caches (super-admin view).
+   *
+   * The publish runs after commit without being awaited: every AI call passes
+   * through here, so it must not wait on a Redis enqueue (a slow or reconnecting
+   * Redis would hold the call as long as the add hangs). The row is durable, and
+   * `publishStaged` never throws; what it fails to publish the relay publishes.
    */
   private async persistRow(
     usage: AiUsage,
     context: AiCallContext,
     costUsd: Prisma.Decimal | null,
   ): Promise<AiInvocation> {
-    return this.outbox.transaction(async (tx, emit) => {
-      const { row, created } = await this.findOrCreateRow(tx, usage, context, costUsd);
-      if (!created) return row;
-      await emit(DOMAIN_EVENTS.AI_INVOCATION_RECORDED, row.tenantId, {
-        invocationId: row.id,
-        surface: row.surface,
-        model: row.model,
-        provider: row.provider,
+    const { row, staged } = await this.prisma.$transaction(async (tx) => {
+      const found = await this.findOrCreateRow(tx, usage, context, costUsd);
+      if (!found.created) return { row: found.row, staged: [] };
+      const event = await this.outbox.stage(tx, DOMAIN_EVENTS.AI_INVOCATION_RECORDED, found.row.tenantId, {
+        invocationId: found.row.id,
+        surface: found.row.surface,
+        model: found.row.model,
+        provider: found.row.provider,
         costUsd: costUsd?.toString() ?? null,
-        totalTokens: row.totalTokens,
+        totalTokens: found.row.totalTokens,
       });
-      return row;
+      return { row: found.row, staged: [event] };
     });
+    if (staged.length > 0) void this.outbox.publishStaged(staged);
+    return row;
   }
 
   /**
