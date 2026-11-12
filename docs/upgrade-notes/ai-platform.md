@@ -223,6 +223,73 @@ full-text search only. A zero-retention workspace loses vector search and memory
 `pnpm seed:knowledge` on the old code; Desk memory vectors come back only as new memories are written. The ledger
 columns from section 5 are nullable and stay.
 
+## 7. Cost: cache writes, who paid, plan budgets, prompt caching, credit refusals
+
+**What changed.** The ledger prices what the provider bills, and the AI budget caps only the platform's money.
+
+- Migration `20261112230000_ai_cost_cache_write_and_payer`:
+  - `ai_invocations.cache_write_tokens` and `model_pricing.cache_write_input_per_mtok_usd`, both nullable. A pricing
+    row with no write rate prices a cache write at its input rate.
+  - The three `vw_ai_cost_*` views are dropped and created again with `platform_cost_usd` beside `total_cost_usd`.
+    If you query them with `SELECT *` by position, check your code: the column order changed.
+  - Budget rows nobody chose become the plan seeder's: `notes` is set to `plan:DEFAULT` where it is null and all four
+    caps are still the schema defaults (5 / 20 / 50 / 200). A row with any other cap was edited by an admin and is
+    left alone. An admin row left at exactly the defaults with no note is now seeder-owned: a plan change rewrites
+    it. Give it a note in the admin AI Spend editor if it must stay put.
+- Every AI call's usage is read through `usageFromAiSdk` (`telemetry/usage-from-ai-sdk.ts`), so cache reads and
+  cache writes are recorded on every route and summed over multi-step chat turns. Cost = plain input + cache reads at
+  the read rate + cache writes at the write rate + output. The pricing seed adds the write rate (1.25x input) to every
+  Claude row and fills it in once on rows seeded before the column existed (`pnpm --filter @app/backend
+seed:model-pricing`, or the full seed).
+- Who paid: the platform when the row's `credentialType` is null or starts with `PLATFORM_`, the workspace otherwise
+  (`PLATFORM_PAID_SQL` / `payerOf` in `telemetry/platform-paid.ts`). The budget's spend sum counts platform-paid rows
+  only, and chat and structured output check the cap only when the resolved route's payer is `PLATFORM`. Today every
+  route is the platform's, so nothing is capped differently yet; this is in place before workspaces can bring their
+  own keys.
+- Admin AI Spend shows the route and the payer on each call, and the platform-paid part of every total. The
+  cost-versus-budget panel sets the caps against platform-paid cost. Wire changes (additive):
+  `windowPlatformCostUsd` on the tenant rows, the summary and the surface rows; `cacheWriteTokens`, `routeId`,
+  `credentialType` and `payer` on each invocation; `platformUsd` and `tenantUsd` on the cost-versus-quota body.
+- Plan budgets: `PLAN_AI_BUDGETS` (`domains/ai/routing/provisioning/plan-ai-budgets.ts`) sets each plan's caps.
+  **The dollar values are placeholders; set your own.** The seeder writes them when a workspace is approved, when
+  its plan changes (`PlansService.assignPlan` now calls the new optional `planAssigned` tenant-provision hook), after
+  a personal-mode signup, and once at boot in single mode for `IMPLICIT_TENANT_ID`. It never touches a budget whose
+  note does not start with `plan:`; an admin edit keeps it that way. Both lazy creators of a budget row now stamp
+  `plan:DEFAULT`.
+- Personal-mode signup now calls `tenantApproved` after the workspace is created. Every tenant-provision hook runs
+  for a personal workspace, so with Desk kept, a personal workspace is now Desk-bootstrapped too, which it was not
+  before. A hook failure is logged and never fails the signup.
+- New platform notification type `AI_BUDGET_REACHED`: when a workspace's platform-paid spend hits its hard cap,
+  owners and admins are told, at most once a day per workspace (`AiBudgetNudgeListener`).
+- Prompt caching by route: each route declares `promptCache` and the resolver adds the cache breakpoint (the last
+  system message, and the last message once the prompt has an assistant turn) to the provider request.
+  `platform-openrouter` uses OpenRouter's `cacheControl`. Expect a cache write on the first turn of a conversation and
+  cheaper reads after it.
+- A provider credit refusal (a 402, "credit balance is too low", "insufficient_quota", OpenRouter's "requires more
+  credits" or "Key limit exceeded") becomes `AiProviderCreditRefused`, a 402 budget error, in structured output, the
+  chat stream and embeddings, instead of a 5xx or an empty answer. On a platform-paid route it is logged at error
+  level: top up the platform's provider balance.
+- New local-only variables: `AI_PROMPT_CACHE_OVERRIDE=none` (turn caching off to measure the uncached baseline) and
+  `AI_USAGE_CAPTURE_DIR` (write usage shapes for fixtures). Both are ignored on every deployed task.
+
+**Who notices.** Super-admins (new columns in AI Spend). Workspace owners and admins (a new notification when the
+cap is reached). Workspaces on a plan whose preset differs from the defaults (their caps move at the next approval,
+plan change or, in single mode, the next boot). Personal-mode products with Desk (new workspaces get Desk agents).
+
+**What to do.**
+
+1. Set your own dollar values in `PLAN_AI_BUDGETS` before you rely on the caps.
+2. Deploy. The migration is additive; the backfill touches only default rows with no note.
+3. Run the pricing seed so existing pricing rows get their cache-write rate.
+4. If you implement `TenantProvisionHooks` yourself, `planAssigned` is optional; add it if you react to plan changes.
+   `featureHookProviders(features, alwaysOn)` now takes the app's always-on hooks first.
+5. If you sum `ai_invocations.cost_usd` for a cap or a bill, decide whether it should be platform-paid only and use
+   `PLATFORM_PAID_SQL`.
+
+**Rollback.** Revert the change. The new columns are nullable and can stay, and the new views keep every old column,
+so the old code reads them by name unchanged. Budget notes stamped `plan:DEFAULT` are harmless to the old code, which
+ignores notes.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
