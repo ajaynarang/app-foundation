@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
 import type { ChatMessage, OrbState, UserMode, InputMode, Intent, ChatLayout } from './engine/types';
 import { DEFAULT_VOICE_PREFS, type VoicePreferences } from './voice/types';
+import { chatErrorCopy, chatRequestError } from './lib/chat-error';
 import {
   createConversation as createConversationApi,
   listConversations,
@@ -290,7 +291,8 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     })
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          // Refused before the stream began: the body is the error envelope, whose detail the bubble shows.
+          throw await chatRequestError(response);
         }
 
         const reader = response.body?.getReader();
@@ -418,7 +420,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
             m.id === assistantPlaceholderId
               ? {
                   ...m,
-                  content: "I'm having trouble connecting right now. Please try again in a moment.",
+                  content: chatErrorCopy(err),
                 }
               : m,
           );
