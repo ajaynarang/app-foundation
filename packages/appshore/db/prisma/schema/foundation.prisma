@@ -1012,12 +1012,20 @@ model KnowledgeDocument {
   parentDocId String? @map("parent_doc_id") @db.VarChar(50)
   totalChunks Int     @default(1) @map("total_chunks")
 
+  // Incremental ingest: the content file a chunk came from (relative to the content root), the hash of what shaped
+  // its chunks, and its heading path. A row with a null sourcePath was written by other means; the ingester never
+  // touches it.
+  sourcePath  String? @map("source_path") @db.VarChar(255)
+  contentHash String? @map("content_hash") @db.Char(64)
+  section     String? @db.VarChar(255)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([documentType, audience])
   @@index([audience])
   @@index([category])
+  @@index([sourcePath])
   @@map("knowledge_documents")
 }
 
