@@ -23,7 +23,8 @@ import { PrismaClient } from '../../generated/client';
  * historical cost reconciliation.
  *
  * Idempotency: this seed is upsert-keyed by `(provider, model,
- * effectiveFromDate)`. Re-running it without changes is a no-op.
+ * effectiveFromDate)`. Re-running it without changes is a no-op. An existing
+ * row is never re-priced; only a cache-write rate still null is filled in.
  */
 
 interface PricingRow {
@@ -32,6 +33,12 @@ interface PricingRow {
   inputPerMtokUsd: string;
   outputPerMtokUsd: string;
   cachedInputPerMtokUsd: string | null;
+  /**
+   * The prompt-cache write rate. Anthropic bills a five-minute cache write at 1.25x input (the rate this seed uses for
+   * every Claude row, on every route). Omitted where the provider has no separate write price: a write then prices at
+   * the input rate.
+   */
+  cacheWriteInputPerMtokUsd?: string;
   notes: string;
   /** Defaults to `INITIAL_EFFECTIVE_FROM_DATE`; a row added later carries the date it was added. */
   effectiveFromDate?: Date;
@@ -58,6 +65,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '1.000000',
     outputPerMtokUsd: '5.000000',
     cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '1.250000',
     notes: VERIFIED_ANTHROPIC,
   },
   {
@@ -66,6 +74,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '3.000000',
     outputPerMtokUsd: '15.000000',
     cachedInputPerMtokUsd: '0.300000',
+    cacheWriteInputPerMtokUsd: '3.750000',
     notes: VERIFIED_ANTHROPIC,
   },
   {
@@ -74,6 +83,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '5.000000',
     outputPerMtokUsd: '25.000000',
     cachedInputPerMtokUsd: '0.500000',
+    cacheWriteInputPerMtokUsd: '6.250000',
     notes: VERIFIED_ANTHROPIC,
   },
 
@@ -85,6 +95,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '0.100000',
     outputPerMtokUsd: '0.500000',
     cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
     notes: `Base rate only: Haiku 5.5 bills $0.50 / $2.50 per million above 100K prompt tokens, so a call that large is understated (the telemetry writer warns). ${ANTHROPIC_5_5}`,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -94,6 +105,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '2.000000',
     outputPerMtokUsd: '10.000000',
     cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
     notes: ANTHROPIC_5_5,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -103,6 +115,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '4.000000',
     outputPerMtokUsd: '20.000000',
     cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
     notes: ANTHROPIC_5_5,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -114,6 +127,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '0.100000',
     outputPerMtokUsd: '0.500000',
     cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
     notes: `Base rate only (Haiku 5.5 bills more above 100K prompt tokens). ${VIA_OPENROUTER}`,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -123,6 +137,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '2.000000',
     outputPerMtokUsd: '10.000000',
     cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
     notes: VIA_OPENROUTER,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -132,6 +147,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '4.000000',
     outputPerMtokUsd: '20.000000',
     cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
     notes: VIA_OPENROUTER,
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
@@ -186,9 +202,10 @@ export const seed = {
   name: 'Model Pricing',
   description: `Seeds ${PRICING.length} model_pricing rows for AI cost telemetry`,
 
-  async run(prisma: PrismaClient): Promise<{ created: number; skipped: number }> {
+  async run(prisma: PrismaClient): Promise<{ created: number; skipped: number; filled: number }> {
     let created = 0;
     let skipped = 0;
+    let filled = 0;
 
     for (const row of PRICING) {
       const effectiveFromDate = row.effectiveFromDate ?? INITIAL_EFFECTIVE_FROM_DATE;
@@ -203,6 +220,17 @@ export const seed = {
       });
 
       if (existing) {
+        // A price is never rewritten in place. The one exception is a column added after the row was seeded: the
+        // cache-write rate fills in once, where it is still null, so a product that seeded before it existed prices
+        // cache writes too.
+        if (existing.cacheWriteInputPerMtokUsd === null && row.cacheWriteInputPerMtokUsd) {
+          await prisma.modelPricing.update({
+            where: { id: existing.id },
+            data: { cacheWriteInputPerMtokUsd: row.cacheWriteInputPerMtokUsd },
+          });
+          filled++;
+          continue;
+        }
         skipped++;
         continue;
       }
@@ -214,6 +242,7 @@ export const seed = {
           inputPerMtokUsd: row.inputPerMtokUsd,
           outputPerMtokUsd: row.outputPerMtokUsd,
           cachedInputPerMtokUsd: row.cachedInputPerMtokUsd,
+          cacheWriteInputPerMtokUsd: row.cacheWriteInputPerMtokUsd ?? null,
           effectiveFromDate,
           effectiveUntilDate: null,
           notes: row.notes,
@@ -222,6 +251,6 @@ export const seed = {
       created++;
     }
 
-    return { created, skipped };
+    return { created, skipped, filled };
   },
 };
