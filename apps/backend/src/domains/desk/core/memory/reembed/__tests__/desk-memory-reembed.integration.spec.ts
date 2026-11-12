@@ -89,7 +89,9 @@ describe('DeskMemoryReembedService (integration)', () => {
   it('fills every null vector of the tenant, page by page, and leaves an existing vector alone', async () => {
     if (!usable) return;
     const embedder = {
-      embedBatch: jest.fn((texts: string[]) => Promise.resolve(texts.map(() => new Array(1536).fill(0.25)))),
+      embedBatch: jest.fn((texts: string[], _ctx: { tenantId: number }, _intent: string) =>
+        Promise.resolve(texts.map(() => new Array(1536).fill(0.25))),
+      ),
     };
     const service = new DeskMemoryReembedService(prisma as never, embedder as never);
     service.batchSize = 1;

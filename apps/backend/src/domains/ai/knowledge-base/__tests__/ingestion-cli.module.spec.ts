@@ -50,7 +50,7 @@ describe('IngestionCliModule', () => {
 
 /** Names of every module reachable through `imports`, statically declared. */
 function collectModuleNames(root: unknown, seen = new Set<string>()): string[] {
-  const imports: unknown[] = Reflect.getMetadata('imports', root as object) ?? [];
+  const imports: unknown[] = Reflect.getMetadata('imports', root) ?? [];
   for (const entry of imports) {
     const mod = (entry as { module?: unknown })?.module ?? entry;
     const name = (mod as { name?: string })?.name;
