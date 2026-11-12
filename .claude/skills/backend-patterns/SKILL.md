@@ -1408,7 +1408,21 @@ const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageMod
 
 **Every model call names an output ceiling** from `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`): `maxOutputTokens` on every `extract` and AI SDK call, `modelSettings.maxOutputTokens` on Mastra agent calls (`model-calls-name-a-ceiling.spec.ts`). Thinking is billed as output on the 5.5 models, so no ceiling is below 1,024.
 
-**Every embedding names its tenant and its intent.** `EmbeddingService.embedText(text, aiContext, intent)` and `embedBatch(texts, aiContext, intent)`: `aiContext` routes and bills the call, `intent` is `'document'` for text you store and `'query'` for text you search with (Embed v4 is asymmetric; mixing them silently degrades retrieval). Every vector is checked at 1536 dimensions. `embedForPlatform(texts)` is for global content only. A search must not fail because the query cannot be embedded: catch the error and answer from full-text (the knowledge base does).
+**Every embedding names its tenant and its intent.** `EmbeddingService.embedText(text, aiContext, intent)` and `embedBatch(texts, aiContext, intent)`: `aiContext` routes and bills the call, `intent` is `'document'` for text you store and `'query'` for text you search with (Embed v4 is asymmetric; mixing them silently degrades retrieval). Every vector is checked at 1536 dimensions. `embedForPlatform(texts, intent)` is for global content only (the knowledge-base ingest, and `kb:eval`'s queries). A search must not fail because the query cannot be embedded: catch the error and answer from full-text (the knowledge base does).
+
+**Knowledge-base rules (NON-NEGOTIABLE):**
+
+- **The server picks the audience.** `search-kb` and `get-product-info` take no audience argument; the audiences come from `kbAudiencesFor(role)` (`domains/ai/knowledge-base/kb-audience.ts`): `all`, plus the role's own audience from `ROLE_AUDIENCE` (empty in the starter). `KnowledgeBaseService` searches exactly the set it is given and refuses an empty one. A new audience is a `ROLE_AUDIENCE` entry; the content loader refuses a file tagged for an audience no role reads.
+- **Search never fails because of routing.** `hybridSearch` fuses a vector list and an any-term full-text list by reciprocal rank (`retrieval/rank-fusion.ts`), at most two chunks per source file. When the query cannot be embedded it answers from full-text, which sends nothing to a provider.
+- **The ingester owns only its rows.** `pnpm seed:knowledge` syncs by content hash and touches only rows whose `sourcePath` it wrote; a row you insert yourself keeps a null `sourcePath` and is never deleted. Changing what the chunker emits for the same input means bumping `CHUNKER_VERSION`, which re-embeds the corpus on the next sync.
+
+**Measuring retrieval and other AI behaviour (evals):** ship one eval that runs, not a framework. `pnpm kb:eval` (`domains/ai/knowledge-base/eval/`) is the worked example: pure scoring (`kb-eval.ts`, recall at k and mean reciprocal rank, unit-tested), a command that asks a golden set (`content/kb-eval/golden.json`) through the same code path and the same audience rule production runs. The method for any eval you add:
+
+1. Gold labels come from a person reading the source, never from the output of the tool under test. A label names a file or record, so a rename fails the eval's data spec instead of scoring as a silent miss.
+2. Matching is mechanical (an id or path in the top k, an exact field), never a model judging a model.
+3. Reports are dated and committed beside the change they measured (`pnpm kb:eval --report <folder>`), with the mode they ran in (for `kb:eval`, `hybrid` or `full-text`), so a later run compares like with like.
+4. Measurement switches are ignored on every deployed task: resolve them to unset in `config/configuration.ts` when `isProductionEnv()` is true, as `AI_PROMPT_CACHE_OVERRIDE` and `AI_USAGE_CAPTURE_DIR` are.
+5. An eval that spends money (a live model or embedding call) is run by a person, never by CI or a hook; its pure scoring still runs under `pnpm test`.
 
 **Fallback pattern (document extraction):**
 

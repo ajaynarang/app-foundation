@@ -72,7 +72,8 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 
 - Streaming chat assistant (Anthropic + AI SDK + Mastra) with conversation history, voice
   (Deepgram/Cartesia/LiveKit scaffolding), @-mentions, product tour.
-- Markdown **knowledge base** (pgvector RAG) — drop files, run `pnpm seed:knowledge`.
+- Markdown **knowledge base** (pgvector RAG) — drop files, run `pnpm seed:knowledge` (incremental: only changed
+  files are re-embedded); hybrid search by rank fusion; `pnpm kb:eval` measures retrieval against a golden set.
 - Per-tenant **AI budgets** (soft/hard caps), model-pricing spend ledger, moderation,
   human-in-the-loop approval for risky agent actions, Langfuse tracing.
 - **MCP server** with two sample tools (health, knowledge search) — add `@Tool` providers

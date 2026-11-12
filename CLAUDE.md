@@ -158,7 +158,8 @@ bind to app implementations.
 <!-- feature:desk:end -->
 
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
-- **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`.
+- **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge` (incremental;
+  `--force` re-embeds all). Measure retrieval with `pnpm kb:eval` against `apps/backend/content/kb-eval/golden.json`.
 
 ---
 

@@ -571,6 +571,72 @@ product that adds a frame adds it to `STREAM_FRAME` and to the reader in the sam
 **Rollback.** Revert the change. The `citations` column is nullable and can stay; conversations archived by the cap
 stay archived (set `is_active = true` to bring them back).
 
+## 14. Knowledge-base retrieval, incremental sync and `kb:eval`
+
+**What changed.**
+
+- Chunking. Files are split at `##` and `###` headings, then packed by paragraph and sentence (about 1,200
+  characters, with overlap inside a section). Each stored chunk starts with its title and heading path
+  (`Members and roles › Inviting teammates`). The old chunker could store long runs of tiny fragments at the end of
+  a document. The chunker carries a version (`CHUNKER_VERSION`); bumping it re-embeds the corpus on the next sync.
+- Search. `search-kb` fuses a vector list and an any-term full-text list by reciprocal rank instead of blending
+  scores, so a chunk that only matches a keyword can rank, and returns at most two chunks per source file. Terms
+  found in more than 30% of chunks are dropped from the full-text list (Postgres ranking has no IDF), except a term
+  in three chunks or fewer, so a small corpus still matches. When the query cannot be embedded (no embedding route,
+  a zero-retention workspace with no zero-retention route, a failing key, a credit refusal) search answers from
+  full-text alone, as before. Results now carry `section` and `sourcePath`.
+- Audience. `search-kb` and `get-product-info` no longer take an `audience` argument: the server decides it from the
+  caller's role (`kbAudiencesFor` in `knowledge-base/kb-audience.ts`). In the starter every caller reads `all`, and
+  the role map (`ROLE_AUDIENCE`) is empty. An external MCP agent that still sends `audience` has it ignored.
+- Content audiences. The loader now accepts only the audiences some role reads: `all`, plus the values of
+  `ROLE_AUDIENCE`. The old `user` audience, which only the model could select, is refused at ingest with a message
+  naming the valid ones.
+- Sync. `pnpm seed:knowledge` is incremental: it compares each file's content hash with the stored one and adds,
+  updates, skips or removes files; `--force` re-embeds everything. It embeds before it writes, so a provider failure
+  leaves the knowledge base as it was, and it swaps each file's chunks in one transaction under a per-file lock. A
+  file whose chunks have no vectors (after section 6 cleared them, or a run with no `COHERE_API_KEY`) is re-embedded
+  on the next run that has a route, even when its hash is unchanged. It touches only rows it wrote (a `source_path`);
+  a row your product inserted by other means keeps a null `source_path` and is never deleted. Before, every run
+  deleted the whole table.
+- `embedForPlatform(texts, intent)` now takes the intent. Only the knowledge base calls it.
+- `tools/db/migrate.sh` runs `pnpm seed:knowledge` after the base seeds in its full and seed-only modes. Unchanged
+  content is a no-op; a failure prints a warning and the run continues. The deploy workflow's migration jobs do not
+  run it yet (a later project adds that step), so a deployed environment is synced by running `migrate.sh` against
+  it, or `pnpm seed:knowledge` with that environment's `DATABASE_URL`. The command also needs `REDIS_URL`, and it
+  embeds only with `COHERE_API_KEY`; it reads both from the environment or from `apps/backend/.env`, so point them at
+  the target environment's values.
+- `pnpm kb:eval` scores retrieval against `apps/backend/content/kb-eval/golden.json`: recall at 5 and mean
+  reciprocal rank, and the questions it missed. It embeds each question on the platform route when `COHERE_API_KEY`
+  is set (a small cost; run it by hand) and measures full-text alone otherwise, and says which. `--report <folder>`
+  writes a dated report to commit. The starter ships three short neutral guides and nine questions over them.
+
+**Schema.** Migration `20261113120000_knowledge_documents_incremental_ingest` adds three nullable columns to
+`knowledge_documents` (`source_path`, `content_hash`, `section`) and an index on `source_path`. In the same migration
+every existing row gets `source_path = 'legacy:' || COALESCE(parent_doc_id, document_id)`. Every row that exists was
+written by the old ingester, which rewrote the whole table on each run; the mark keeps the two-chunks-per-source cap
+working until the first sync, and makes the first sync replace them. No `--force` is needed.
+
+**Who notices.**
+
+- A product whose content files say `audience: user`: `pnpm seed:knowledge` refuses them. Change them to `all`, or
+  add a role audience to `ROLE_AUDIENCE` and tag the files with it.
+- A product that inserted its own `knowledge_documents` rows: the migration marks them `legacy:` too (it cannot tell
+  them apart), so the first sync removes them. Re-insert them afterwards with a null `source_path`; from then on the
+  ingester leaves them alone.
+- Anyone reading `search-kb` output: the order of results changes, and two chunks per file at most.
+
+**What to do.**
+
+1. Run `prisma migrate deploy`.
+2. Rename any `audience: user` in your content.
+3. Run `pnpm seed:knowledge` (or `migrate.sh`) in each environment. With `COHERE_API_KEY` set it embeds; without it
+   the files are searchable by full-text and the next run with the key embeds them.
+4. Optional: replace `content/kb-eval/golden.json` with questions over your content, labelled by reading it, and run
+   `pnpm kb:eval` before and after a content or retrieval change.
+
+**Rollback.** Revert the change. The three columns are nullable and can stay; the old ingester ignores them and
+rewrites the table on its next run.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
