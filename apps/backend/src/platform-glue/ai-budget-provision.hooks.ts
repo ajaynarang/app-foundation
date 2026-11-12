@@ -4,7 +4,8 @@ import type { TenantProvisionHooks } from '@appshore/platform/domains/platform-h
 import { AiBudgetSeederService } from '../domains/ai/routing/provisioning/ai-budget-seeder.service';
 
 /**
- * The tenant-provision hook that runs whatever optional features a product kept (bound in `hooks.module.ts`): a workspace's AI budget is seeded
+ * The always-on tenant-provision hook (bound through `ALWAYS_ON_TENANT_PROVISION_HOOKS` in `hooks.module.ts`, so it
+ * runs before any optional feature's hook, with or without optional features): a workspace's AI budget is seeded
  * from its plan when it is approved (and after a personal signup), and re-seeded when its plan changes. The seeder
  * leaves admin-edited budgets alone. A seeding failure is logged and never fails an approval, a signup or a plan
  * change.
