@@ -271,3 +271,53 @@ or `invalid_redirect_uri` on registration, where it used to reach the handler.
 **What to do.** Rename the keys. Send only declared fields. Read `fieldErrors` to place a message on the right
 input: its keys are the wire names (`tenant_id`, `subscription.keys.auth`). The web app's own callers
 (`agentActivityApi`, `getWebhookLogs`, the dev user switcher) moved in the same change.
+
+## 6. Cursor lists and public ids
+
+**What changed.** Every list that can grow answers one envelope, `{ items, nextCursor, total, counts? }`, and pages
+by an opaque cursor. Page size is 50 by default and 100 at most. `total` counts the filtered view; `counts`, where
+present, holds per-status totals. There is no `offset` and no `page` any more.
+
+| Before                                                                                        | Now                                                               |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| A bare array (API keys, OAuth clients, Desk approvals, per-integration sync history, pickers) | `{ items, nextCursor, total }`                                    |
+| `{ items, total, limit, offset }` (admin jobs, unified sync history and others)               | `{ items, nextCursor, total }`                                    |
+| `{ rows, nextCursor }` (agent activity, Desk episodes)                                        | `{ items, nextCursor, total }`                                    |
+| `?offset=` or `?page=`                                                                        | `?cursor=<nextCursor of the previous page>`; the old key is a 400 |
+| A cursor the server did not issue                                                             | 400                                                               |
+
+The routes: users, invitations, tenants, API keys (own and tenant), OAuth clients, webhooks and their delivery
+logs, broadcasts, feedback (member and admin), notifications, support tickets (member and admin), invoices, wallet
+transactions, integrations sync history, agent activity, admin jobs, admin events, admin AI spend tenants, login
+activity, Desk approvals, episodes and eligible supervisors, and the tenant pickers
+(`/admin/feedback/tenants`, `/support/admin/tenants`), which also take `q` for a server search.
+
+**Figures over a whole list come from the server.** `GET /admin/ai-spend/summary` (new) gives the window total
+across every tenant; a client that summed a loaded page of `/admin/ai-spend/tenants` showed only the loaded rows.
+
+**Public ids.** No Int primary key crosses the API on these routes (the rule and its listed exceptions are the ADR
+"ID boundary").
+
+| Route or body                                           | Before                                | Now                                                                    |
+| ------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `/admin/broadcasts/:id` (get, update, publish, archive) | the Int `id`                          | the broadcast's `publicId` (a uuid); a number is a 400                 |
+| `/admin/feedback/:id` (detail and every action)         | the Int `id`                          | the feedback's `feedbackId` (a uuid); a number is a 400                |
+| Feedback rows                                           | `id`, numeric `tenantId` and `userId` | `feedbackId`; people and tenants by their public `userId` / `tenantId` |
+| Broadcast rows                                          | `id`, `createdById`                   | `publicId`; the author by public `userId`                              |
+| Notification rows                                       | numeric `id`                          | `notificationId`                                                       |
+| A sync-history run                                      | the job's Int id                      | the job's `publicId`                                                   |
+
+**Schema.** Migration `20261111213800_list_public_ids` adds `public_id UUID`, unique, default `gen_random_uuid()`,
+to `announcements`, `feedback`, `jobs` and `login_events`. Each statement is guarded: the column is added nullable,
+filled where null, then given its default, `NOT NULL` and the unique index, so no table is rewritten and existing
+rows keep their data. Migration `20261111213900_list_keyset_indexes` adds the indexes the cursor lists read
+(`CREATE INDEX IF NOT EXISTS`). On a large table, run the backfill in batches and build the indexes `CONCURRENTLY`
+by hand first; the shipped migrations then find nothing left to do.
+
+**Who notices.** Any client that read a list as an array or read `rows`, `limit` or `offset`; that sent `offset` or
+`page`; that put a broadcast or feedback Int id in a URL; or that read `id` on a feedback, broadcast or notification
+row.
+
+**What to do.** Read `items` and pass `nextCursor` back as `?cursor=` until it is `null`. Show `total` rather than
+counting loaded rows. Address broadcasts and feedback by the id the list now returns. The web app's own callers
+moved in the same change (`useCursorList` and `ListFooter`).
