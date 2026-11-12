@@ -12,6 +12,7 @@ import { apiClient, api } from '@appshore/web-core/shared/lib/api';
 import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { useCopyInviteLink } from '@/features/platform/settings/hooks/use-copy-invite-link';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,6 +109,7 @@ const ACTIONABLE_STATUSES = 'PENDING,EXPIRED';
 // ---------------------------------------------------------------------------
 export default function InvitationsPage() {
   const queryClient = useQueryClient();
+  const { formatDate } = useFormatters();
 
   // Only actionable invitations (pending or expired). The server filters: a paged list is never filtered in the
   // browser. A cursor list, newest first; the key stays under ['invitations'] so mutations refresh it.
@@ -193,10 +195,10 @@ export default function InvitationsPage() {
                       <StatusBadge status={inv.status} />
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {new Date(inv.createdAt).toLocaleDateString()}
+                      {formatDate(inv.createdAt)}
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {new Date(inv.expiresAt).toLocaleDateString()}
+                      {formatDate(inv.expiresAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

@@ -36,6 +36,7 @@ import {
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import { formatTransactionType, getTransactionTypeVariant } from '@/features/billing/utils';
 import { cn } from '@app/ui';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 // ---------------------------------------------------------------------------
 // Skeleton
@@ -261,6 +262,7 @@ function AutoReloadSheet({
 // Page
 // ---------------------------------------------------------------------------
 export default function BillingPage() {
+  const { formatDate } = useFormatters();
   const { data: walletData, isLoading: walletLoading } = useWalletBalance();
   const { data: paymentMethods, isLoading: pmLoading } = usePaymentMethods();
   const { data: upcomingInvoice, isLoading: invoiceLoading } = useUpcomingInvoice();
@@ -529,10 +531,7 @@ export default function BillingPage() {
                   {/* Total */}
                   <TableRow className="bg-muted/50">
                     <TableCell colSpan={3} className="text-sm font-semibold text-foreground text-right">
-                      Total due{' '}
-                      {upcomingInvoice.periodEnd
-                        ? `on ${new Date(upcomingInvoice.periodEnd).toLocaleDateString()}`
-                        : ''}
+                      Total due {upcomingInvoice.periodEnd ? `on ${formatDate(upcomingInvoice.periodEnd)}` : ''}
                     </TableCell>
                     <TableCell className="text-right text-sm font-bold text-foreground tabular-nums">
                       {formatCents(upcomingInvoice.amountDueCents)}

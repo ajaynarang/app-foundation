@@ -10,6 +10,7 @@ import type { TenantApiKeyListItem } from '../api';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
 import { ApiKeyMintSheet } from './ApiKeyMintSheet';
 import { ListFooter } from '@/shared/components/page-chrome';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 function summariseScopes(scopes: readonly string[]): string {
   if (scopes.length === 0) return 'None';
@@ -25,6 +26,7 @@ function renderStatus(key: TenantApiKeyListItem) {
 
 export function ApiKeysPage() {
   const keys = useTenantApiKeys();
+  const { formatDate } = useFormatters();
   const { data, isLoading } = keys;
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -86,7 +88,7 @@ export function ApiKeysPage() {
                   <TableCell className="font-mono text-xs text-muted-foreground">{summariseScopes(k.scopes)}</TableCell>
                   <TableCell>{renderStatus(k)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : '—'}
+                    {k.lastUsedAt ? formatDate(k.lastUsedAt) : '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

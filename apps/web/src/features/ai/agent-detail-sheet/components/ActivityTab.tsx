@@ -9,7 +9,7 @@ import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '
 import { useAgentActivity } from '@/features/ai/agent-activity';
 import { ScopeChip } from '@/features/ai/agent-scope-ui';
 import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
-import { ListFooter } from '@/shared/components/page-chrome';
+import { ListFooter, RelativeTime } from '@/shared/components/page-chrome';
 
 interface ActivityTabProps {
   principalKind: AgentPrincipalKind;
@@ -26,16 +26,6 @@ const FILTERS: Array<{ value: AgentActivityFilter; label: string }> = [
   { value: 'tool_calls', label: 'Tool calls' },
   { value: 'approvals', label: 'Approvals' },
 ];
-
-function formatRelative(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.round((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString();
-}
 
 function tierBadgeVariant(tier: 'none' | 'standard' | 'sensitive'): 'muted' | 'info' | 'caution' {
   if (tier === 'sensitive') return 'caution';
@@ -113,8 +103,8 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="whitespace-nowrap" title={r.createdAt}>
-                    {formatRelative(r.createdAt)}
+                  <TableCell className="whitespace-nowrap">
+                    <RelativeTime iso={r.createdAt} />
                   </TableCell>
                   <TableCell className="font-mono text-xs">{r.toolName}</TableCell>
                   <TableCell>

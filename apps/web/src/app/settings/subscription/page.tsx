@@ -37,6 +37,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { PlanConfig, TenantPlan } from '@app/shared-types';
 import { cn } from '@app/ui';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -354,6 +355,7 @@ function PlanSelectorSheet({
 // Page
 // ---------------------------------------------------------------------------
 export default function SubscriptionPage() {
+  const { formatDate } = useFormatters();
   const {
     plan,
     displayName,
@@ -464,16 +466,14 @@ export default function SubscriptionPage() {
                     {daysLeftInTrial === 0
                       ? 'Trial expires today'
                       : `${daysLeftInTrial} day${daysLeftInTrial !== 1 ? 's' : ''} left in trial`}
-                    {trialEndsAt && (
-                      <span className="text-xs ml-1">(ends {new Date(trialEndsAt).toLocaleDateString()})</span>
-                    )}
+                    {trialEndsAt && <span className="text-xs ml-1">(ends {formatDate(trialEndsAt)})</span>}
                   </p>
                 )}
 
                 {/* Period */}
                 {subscription && !isOnTrial && subscription.currentPeriodEnd && (
                   <p className="text-xs text-muted-foreground">
-                    Current period ends {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    Current period ends {formatDate(subscription.currentPeriodEnd)}
                   </p>
                 )}
               </div>
@@ -503,14 +503,13 @@ export default function SubscriptionPage() {
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       {(subscription as any).pendingDowngradePlan === 'STARTER' ? 'Starter' : 'Professional'}
                     </span>{' '}
-                    at the end of the current billing period (
-                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    at the end of the current billing period ({formatDate(subscription.currentPeriodEnd)}
                     ). Click &quot;Keep {displayName}&quot; to stay on your current plan.
                   </>
                 ) : (
                   <>
                     Your subscription will cancel at the end of the current billing period (
-                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    {formatDate(subscription.currentPeriodEnd)}
                     ). Click &quot;Reactivate&quot; to keep your plan.
                   </>
                 )}
