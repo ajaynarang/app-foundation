@@ -80,3 +80,40 @@ export const NotificationConfigurationSchema = z.object({
   defaultChannels: z.record(z.string(), ChannelConfigSchema),
 });
 export type NotificationConfiguration = z.infer<typeof NotificationConfigurationSchema>;
+
+// ─── Wire shapes of the settings routes (the published contract) ─────────
+
+/**
+ * The `UserPreferences` row as `GET|PUT /settings/general` and `POST /settings/reset` answer it: every column,
+ * JSON columns as stored, dates as ISO strings.
+ */
+export const UserPreferencesRecordSchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  distanceUnit: z.string(),
+  timeFormat: z.string(),
+  timezone: z.string(),
+  dateFormat: z.string(),
+  alertChannels: z.record(z.string(), ChannelConfigSchema),
+  soundSettings: z.record(z.string(), z.boolean()),
+  notificationPreferences: z.record(z.string(), z.unknown()).nullable(),
+  quietHoursEnabled: z.boolean(),
+  quietHoursStart: z.string().nullable(),
+  quietHoursEnd: z.string().nullable(),
+  platformTourStatus: z.string().nullable().describe('null, `dismissed` or `completed`'),
+  platformTourStatusAt: z.string().nullable(),
+  voiceMode: z.string(),
+  voiceId: z.string(),
+  voiceSpeed: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type UserPreferencesRecord = z.infer<typeof UserPreferencesRecordSchema>;
+
+/** `GET|PUT /settings/admin`: the super-admin's own notification preferences. */
+export const SuperAdminPreferencesSchema = z.object({
+  notifyNewTenants: z.boolean(),
+  notifyStatusChanges: z.boolean(),
+  notificationFrequency: z.string().describe('`immediate` or `daily`'),
+});
+export type SuperAdminPreferences = z.infer<typeof SuperAdminPreferencesSchema>;

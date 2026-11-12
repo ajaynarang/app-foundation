@@ -30,3 +30,10 @@ export const QUERY_TIERS = {
     refetchInterval: 30_000,
   },
 } as const;
+
+/**
+ * Fast conditional polling interval — for `refetchInterval` CALLBACKS that
+ * poll only while something is in-flight (a build, a job) and stop when it
+ * settles. Centralized here so no feature hardcodes its own interval.
+ */
+export const CONDITIONAL_POLL_INTERVAL_MS = 4_000;

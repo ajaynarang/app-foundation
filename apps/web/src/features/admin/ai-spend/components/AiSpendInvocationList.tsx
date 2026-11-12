@@ -4,14 +4,27 @@ import { ExternalLink } from 'lucide-react';
 
 import { AiInvocationStatus } from '@app/shared-types';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Button } from '@app/ui/components/ui/button';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 
-import { formatRelativeTime, formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
+import { formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
+
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  RelativeTime,
+} from '@/shared/components/page-chrome';
 
 import { useAiSpendInvocations } from '../hooks';
-import { SURFACE_LABELS, getLangfuseTraceUrl, getLangfuseSessionUrl, buildLangfuseSessionId } from '../constants';
+import {
+  INVOCATION_STATUS_VARIANTS,
+  SURFACE_LABELS,
+  getLangfuseTraceUrl,
+  getLangfuseSessionUrl,
+  buildLangfuseSessionId,
+} from '../constants';
 import type { AiSurface } from '../types';
 
 interface AiSpendInvocationListProps {
@@ -26,26 +39,26 @@ function formatInvocationCost(value: string | null): string {
 }
 
 export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationListProps) {
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useAiSpendInvocations(
-    tenantId,
-    surface,
-    true,
-  );
+  const list = useAiSpendInvocations(tenantId, surface, true);
+  const { items, isLoading } = list;
 
-  if (isLoading) {
+  if (isLoading) return <PageLoadingSkeleton variant="table" rows={6} />;
+
+  if (list.isError) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
+      <ListErrorState
+        title="Couldn't load the invocations."
+        error={list.error}
+        onRetry={() => void list.refetch()}
+        isRetrying={list.isRefetching}
+      />
     );
   }
 
-  const items = data?.pages.flatMap((p) => p.items) ?? [];
-
   if (items.length === 0) {
-    return <p className="text-muted-foreground text-sm py-6 text-center">No AI invocations in this window.</p>;
+    return (
+      <PageEmptyState title="No AI calls in this window" description="Calls show here as this tenant makes them." />
+    );
   }
 
   return (
@@ -63,7 +76,8 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
         </TableHeader>
         <TableBody>
           {items.map((row) => {
-            const surfaceMeta = SURFACE_LABELS[row.surface as AiSurface];
+            const surfaceLabel = SURFACE_LABELS[row.surface as AiSurface];
+            const outcome = INVOCATION_STATUS_VARIANTS[row.status as AiInvocationStatus];
             // Prefer a direct trace link when the id is present; otherwise fall
             // back to the session-filtered Langfuse view, which is always
             // derivable from the row (langfuseTraceId is not yet populated).
@@ -72,13 +86,11 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
             return (
               <TableRow key={row.id}>
                 <TableCell>
-                  <Badge variant="outline" className={surfaceMeta?.className}>
-                    {surfaceMeta?.label ?? row.surface}
-                  </Badge>
+                  <Badge variant="outline">{surfaceLabel ?? row.surface}</Badge>
                   {row.status !== AiInvocationStatus.OK && (
-                    <Badge variant="outline" className="ml-2 bg-red-500/10 text-red-500">
-                      {row.status}
-                    </Badge>
+                    <StatusBadge tone={outcome?.tone ?? 'danger'} className="ml-2">
+                      {outcome?.label ?? row.status}
+                    </StatusBadge>
                   )}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-muted-foreground text-xs">{row.model}</TableCell>
@@ -87,7 +99,7 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
                   {(row.promptTokens + row.completionTokens).toLocaleString()}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell text-muted-foreground text-xs">
-                  {formatRelativeTime(row.createdAt)}
+                  <RelativeTime iso={row.createdAt} />
                 </TableCell>
                 <TableCell className="text-right">
                   {traceUrl ? (
@@ -95,7 +107,7 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
                       href={traceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-info-text hover:underline"
                       aria-label="Open trace"
                     >
                       Trace <ExternalLink className="h-3 w-3" />
@@ -110,13 +122,14 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
         </TableBody>
       </Table>
 
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
-            Load more
-          </Button>
-        </div>
-      )}
+      <ListFooter
+        shown={items.length}
+        total={list.total}
+        hasMore={list.hasMore}
+        onLoadMore={list.loadMore}
+        isLoadingMore={list.isLoadingMore}
+        loadMoreFailed={list.isLoadMoreError}
+      />
     </div>
   );
 }

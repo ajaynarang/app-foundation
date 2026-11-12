@@ -1,5 +1,9 @@
 import { format } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
+import { parseCalendarDate } from '@app/ui/lib/calendar-date';
+
+// Calendar-date primitives the page chrome needs live in @app/ui (it cannot import web-core); one implementation.
+export { addCalendarDays, dateToCalendarDate, parseCalendarDate } from '@app/ui/lib/calendar-date';
 
 // ============================================================================
 // DATE FORMAT CONSTANTS
@@ -26,14 +30,17 @@ export const DISPLAY_FORMATS = {
 
 const MONTH_ABBR = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/**
+ * True for a real calendar day in `YYYY-MM-DD` form. The shape alone is not enough: `2026-99-99` or `2026-02-30`
+ * would overflow into another date (2034-06-07, 2026-03-02) wherever it is turned into an instant.
+ */
 export function isCalendarDateString(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-export function parseCalendarDate(dateStr: string): { year: number; month: number; day: number } {
-  const datePart = dateStr.split('T')[0];
-  const [year, month, day] = datePart.split('-').map(Number);
-  return { year, month, day };
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (month < 1 || month > 12 || day < 1) return false;
+  // Day 0 of the next month is the last day of this one (UTC, so no DST or local-zone drift).
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 export function formatCalendarDate(dateStr: string | null | undefined, fmt: string = 'MM/DD/YYYY'): string {
@@ -101,9 +108,16 @@ export function calendarDateToDate(dateStr: string): Date {
   return new Date(dateStr + 'T12:00:00');
 }
 
-export function dateToCalendarDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
-  const d = date.getDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
+/**
+ * The instant a calendar day starts or ends in a timezone, as an ISO-8601 UTC string.
+ * Use it to turn a date-range filter (`YYYY-MM-DD`, read in the user's timezone) into the
+ * inclusive `from` / `to` bounds an API expects.
+ */
+export function calendarDateToInstant(dateStr: string, timezone: string, edge: 'start' | 'end'): string {
+  const { year, month, day } = parseCalendarDate(dateStr);
+  const zoned =
+    edge === 'start'
+      ? new TZDate(year, month - 1, day, 0, 0, 0, 0, timezone)
+      : new TZDate(year, month - 1, day, 23, 59, 59, 999, timezone);
+  return new Date(zoned.getTime()).toISOString();
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Cookie, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '@app/ui/components/ui/button';
-import { Switch } from '@/shared/components/ui/switch';
+import { Switch } from '@app/ui/components/ui/switch';
 import { useCookieConsent } from './useCookieConsent';
 
 export function CookieConsentBanner() {

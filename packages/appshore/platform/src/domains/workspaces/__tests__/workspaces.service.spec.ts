@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { WorkspacesService } from '../workspaces.service';
+import { MAX_WORKSPACES_LISTED, WorkspacesService } from '../workspaces.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { JwtTokenService } from '../../../auth/jwt.service';
 
@@ -60,6 +60,17 @@ describe('WorkspacesService', () => {
         { tenantId: 'demo', name: 'Demo Workspace', subdomain: 'demo', role: 'OWNER', isDefault: true },
         { tenantId: 'demo-two', name: 'Second Workspace', subdomain: 'demo-two', role: 'ADMIN', isDefault: false },
       ]);
+    });
+
+    it('never reads without a ceiling: the default workspace sorts first, so it survives the cut', async () => {
+      mockPrisma.workspaceMember.findMany.mockResolvedValue([]);
+      await service.listForUser(1);
+      expect(mockPrisma.workspaceMember.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: MAX_WORKSPACES_LISTED,
+          orderBy: [{ isDefault: 'desc' }, { tenant: { companyName: 'asc' } }],
+        }),
+      );
     });
   });
 

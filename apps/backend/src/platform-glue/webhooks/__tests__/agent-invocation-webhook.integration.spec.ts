@@ -5,6 +5,7 @@ import { AgentInvocationLoggerService } from '../../../domains/ai/agent-contract
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { FeatureFlagsService } from '@appshore/platform/domains/feature-flags/feature-flags.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { WebhookDispatcher } from '../dispatcher.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
@@ -45,7 +46,13 @@ describe('app.agent.invocation-completed webhook integration', () => {
     createdAt: new Date('2026-04-20T12:00:00Z'),
   };
 
-  const mockPrisma = {
+  const mockPrisma: Record<string, any> = {
+    // ADR "Outbox and deadlines": the logger stages its event through the real OutboxService on this client.
+    outboxEvent: {
+      create: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(mockPrisma)),
     agentInvocationLog: {
       update: jest.fn(),
     },
@@ -57,6 +64,8 @@ describe('app.agent.invocation-completed webhook integration', () => {
     },
     webhookDeliveryLog: {
       create: jest.fn(),
+      // No earlier delivery of this event to this subscription (the dispatcher is idempotent per both).
+      findUnique: jest.fn().mockResolvedValue(null),
     },
   };
   const mockWebhookQueue = { add: jest.fn().mockResolvedValue(undefined) };
@@ -90,6 +99,7 @@ describe('app.agent.invocation-completed webhook integration', () => {
       providers: [
         AgentInvocationLoggerService,
         DomainEventService,
+        OutboxService,
         WebhookDispatcher,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: FeatureFlagsService, useValue: mockFlags },

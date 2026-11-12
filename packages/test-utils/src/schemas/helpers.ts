@@ -44,17 +44,23 @@ export function expectArrayContract<T>(
 }
 
 /**
- * Assert paginated response shape.
+ * The schema of a cursor list of `item`: `{ items, nextCursor, total, counts? }`, the one envelope every list
+ * that can grow answers. `nextCursor` is opaque: pass it back as `?cursor=`; null on the last page.
  */
-export function expectPaginatedContract<T>(itemSchema: ZodSchema<T>, data: unknown, context?: string) {
-  const paginatedSchema = z.object({
-    data: z.array(itemSchema),
-    total: z.number(),
-    limit: z.number(),
-    offset: z.number(),
-  });
+export function cursorListOf<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .object({
+      items: z.array(item),
+      nextCursor: z.string().nullable(),
+      total: z.number().int().nonnegative(),
+      counts: z.record(z.string(), z.number().int().nonnegative()).optional(),
+    })
+    .strict();
+}
 
-  return expectContract(paginatedSchema, data, context);
+/** Assert a cursor-list response and return its typed page. */
+export function expectCursorListContract<T extends z.ZodTypeAny>(itemSchema: T, data: unknown, context?: string) {
+  return expectContract(cursorListOf(itemSchema), data, context);
 }
 
 function formatZodErrors(error: ZodError): string {
@@ -87,3 +93,23 @@ export const dbId = z.number().int().positive();
 
 /** String ID field (e.g. "drv-xxx") */
 export const stringId = z.string().min(1);
+
+/**
+ * The one error envelope every non-protocol route answers (`ApiErrorEnvelope` in `@app/shared-types`):
+ * `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing else. There is no
+ * `message` and no `error` key. Pass a status to pin it.
+ */
+export function apiErrorEnvelope(status?: number) {
+  return z
+    .object({
+      statusCode: status === undefined ? z.number().int().positive() : z.literal(status),
+      code: z.string().min(1),
+      detail: z.string().min(1),
+      fieldErrors: z.record(z.string(), z.string()).optional(),
+      timestamp: z.string(),
+      path: z.string(),
+      method: z.string(),
+      debugDetail: z.string().optional(),
+    })
+    .strict();
+}

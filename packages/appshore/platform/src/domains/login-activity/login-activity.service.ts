@@ -9,16 +9,20 @@ import type {
   LoginActivitySummary,
   LoginActivitySummaryQuery,
 } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 import { LOGIN_ACTIVITY, parseDeviceLabel } from './constants';
 import { loginActivityCacheKeys, rolesKey } from './login-activity.cache';
 
-// The Zod schema applies `.default()` to limit/offset, which makes those
-// fields required on the inferred output type but optional on the input
-// the controller receives. The service accepts the looser input shape.
-type ListLoginActivityInput = Omit<ListLoginActivityQuery, 'limit' | 'offset'> & {
-  limit?: number;
-  offset?: number;
-};
+// The controller hands the limit over as it arrived; the service clamps it.
+type ListLoginActivityInput = Omit<ListLoginActivityQuery, 'limit'> & { limit?: number | string };
+
+/** Newest first; the public id (uuid) is the tiebreak. The Int key never goes in a cursor. */
+const LOGIN_EVENT_KEYSET = { field: 'createdAt', idField: 'publicId', kind: 'date', direction: 'desc' } as const;
 
 /**
  * Scope under which the caller is allowed to read login activity.
@@ -44,9 +48,10 @@ export class LoginActivityService {
 
   async list(scope: LoginActivityScope, params: ListLoginActivityInput): Promise<ListLoginActivityResponse> {
     this.assertScope(scope);
+    const take = clampCursorLimit(params.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = params.cursor ? keysetWhere({ ...LOGIN_EVENT_KEYSET, cursor: params.cursor }) : undefined;
     const where = this.buildWhere(scope, params);
-    const limit = Math.min(params.limit ?? LOGIN_ACTIVITY.DEFAULT_PAGE_LIMIT, LOGIN_ACTIVITY.MAX_PAGE_LIMIT);
-    const offset = Math.max(params.offset ?? 0, 0);
 
     const include: Prisma.LoginEventInclude = {
       user: {
@@ -58,20 +63,19 @@ export class LoginActivityService {
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.loginEvent.findMany({
-        where,
+        where: keyset ? { AND: [where, keyset] } : where,
         include,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: take + 1,
       }),
       this.prisma.loginEvent.count({ where }),
     ]);
 
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.publicId));
     return {
-      items: rows.map((r: any) => this.toResponseEvent(r, scope.isSuperAdmin)),
+      items: page.items.map((r: any) => this.toResponseEvent(r, scope.isSuperAdmin)),
+      nextCursor: page.nextCursor,
       total,
-      limit,
-      offset,
     };
   }
 
@@ -177,6 +181,7 @@ export class LoginActivityService {
 
   private toResponseEvent(row: any, includeTenant: boolean): LoginActivityEvent {
     const base: LoginActivityEvent = {
+      publicId: row.publicId,
       id: row.id,
       createdAt: row.createdAt.toISOString(),
       status: row.status,

@@ -28,7 +28,7 @@ interface CapabilityResult {
 // ── Detection ─────────────────────────────────────────────────────────────────
 
 /**
- * Calls GET /plans/tenant/:tenantId with a super-admin token and returns the
+ * Calls GET /plans/tenant/:tenant_id with a super-admin token and returns the
  * sets of enabled and disabled plan feature keys.
  *
  * The feature keys are raw snake_case strings as stored in the
@@ -96,25 +96,25 @@ export const KNOWN_DATA_CAPABILITIES = [
   'in-app-notification', // At least one UNREAD in-app notification owned by the
   // current user — notifications are system-generated, no public POST exists.
   'pending-tenant', // At least one Tenant with status=PENDING_APPROVAL exists.
-  // Precondition for `POST /tenants/:tenantId/approve` (and `/reject`).
+  // Precondition for `POST /tenants/:tenant_id/approve` (and `/reject`).
   // Flip on via `TESTS_DATA_CAPABILITIES=pending-tenant` after confirming
   // `GET /tenants?status=PENDING_APPROVAL` returns a non-empty list.
   'suspended-tenant', // At least one Tenant with status=SUSPENDED exists.
-  // Precondition for `POST /tenants/:tenantId/reactivate`.
+  // Precondition for `POST /tenants/:tenant_id/reactivate`.
   'suspendable-tenant', // At least one non-critical ACTIVE tenant exists that
   // is safe to suspend+reactivate as part of a test (never the seeded demo
   // tenant). In practice: dedicated QA tenants seeded for this purpose.
   'assignable-tenant', // At least one non-demo, non-SUSPENDED, non-REJECTED
-  // Tenant exists — precondition for `PATCH /plans/tenant/:tenantId`.
+  // Tenant exists — precondition for `PATCH /plans/tenant/:tenant_id`.
   'tenant-register-bypass', // Turnstile bot-verification is DISABLED for
   // `POST /tenants/register` (no `TURNSTILE_SECRET_KEY`, or a development
   // stub returns `success: true` for any token). Precondition for the
   // happy-path register test.
   // ── Jobs ──────────────────────────────────────────────────────────────────
   'job-row', // At least one Job row exists on the tenant — precondition for
-  // GET /jobs/:jobId, PATCH /jobs/:jobId/dismiss, DELETE /jobs/:jobId.
+  // GET /jobs/:job_id, PATCH /jobs/:job_id/dismiss, DELETE /jobs/:job_id.
   'failed-job', // At least one Job with status='failed' exists on the tenant —
-  // precondition for POST /jobs/:jobId/retry.
+  // precondition for POST /jobs/:job_id/retry.
   // ── AI ────────────────────────────────────────────────────────────────────
   'ai-gateway-credits', // The configured AI provider has a positive credit
   // balance. Tests that invoke LLM-backed endpoints fail when credits are
@@ -126,6 +126,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   // the token via `TESTS_HITL_TOKEN=…`.
   'voice-agent-secret', // `VOICE_AGENT_SECRET` env var is set on the backend —
   // precondition for `POST /voice/internal/respond` happy path.
+  // feature:desk:start
   // ── Desk (Inngest workflow engine — responsibility registry ships empty) ──
   'desk-approval', // At least one PENDING DeskApproval row exists on the
   // tenant — precondition for the approval claim/decide tests.
@@ -140,6 +141,7 @@ export const KNOWN_DATA_CAPABILITIES = [
   'inngest-configured', // `INNGEST_EVENT_KEY` AND `INNGEST_SIGNING_KEY` env
   // vars are set on the backend — precondition for manual responsibility
   // runs and the Inngest serve handler.
+  // feature:desk:end
 ] as const;
 
 export type DataCapability = (typeof KNOWN_DATA_CAPABILITIES)[number];

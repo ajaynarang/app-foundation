@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { ExternalAgentsPage } from '@/features/platform/oauth-clients/components/ExternalAgentsPage';
 import { FeatureGuard } from '@/features/platform/feature-flags';
+import { PageHeader } from '@/shared/components/page-chrome';
 import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
 import { Badge } from '@app/ui/components/ui/badge';
 import { Card, CardContent } from '@app/ui/components/ui/card';
@@ -19,12 +20,10 @@ export default function OAuthClientsSettingsPage() {
   return (
     <FeatureGuard featureKey="oauth_clients">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">OAuth Clients</h2>
-          <p className="text-sm text-muted-foreground">
-            Apps and AI agents that connect to the platform on behalf of your users
-          </p>
-        </div>
+        <PageHeader
+          title="OAuth Clients"
+          subtitle="Apps and AI agents that connect to the platform on behalf of your users"
+        />
 
         <Alert>
           <AlertCircle className="h-4 w-4" />

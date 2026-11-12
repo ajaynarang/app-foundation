@@ -12,9 +12,16 @@ import { DateTime } from 'luxon';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { InngestClientService } from '../inngest/inngest.client';
 
 import { ApprovalEnrichmentService, type EnrichedApprovalPayload } from './approval-enrichment.service';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 
 const SUPERVISOR_DEFAULT_SCOPE_ROLES: readonly UserRole[] = [UserRole.MEMBER];
 
@@ -63,6 +70,9 @@ export function resolveApprovalScope(scope: ApprovalScope | undefined, role: Use
  * the responsibility's Inngest workflow function awaits this event via
  * step.waitForEvent, matching on data.approvalId.
  */
+/** Oldest request first; the approval id is a UUID (never an Int key), so it is a safe tiebreak. */
+const PENDING_KEYSET = { field: 'requestedAt', idField: 'id', kind: 'date', direction: 'asc' } as const;
+
 @Injectable()
 export class ApprovalService {
   private static readonly DEFAULT_EXPIRY_DAYS = 7;
@@ -118,7 +128,7 @@ export class ApprovalService {
       if (existing.decision !== null) {
         throw new ConflictException('Approval already decided');
       }
-      throw new ConflictException(`Approval already claimed by user ${existing.claimedByUserId}`);
+      throw invalidState('Someone else has already claimed this approval');
     }
     return this.prisma.deskApproval.findUniqueOrThrow({
       where: { id: approvalId },
@@ -151,7 +161,7 @@ export class ApprovalService {
       throw new ConflictException('Approval already decided');
     }
     if (approval.claimedByUserId !== null && approval.claimedByUserId !== input.userId) {
-      throw new ForbiddenException(`Approval is claimed by another user (${approval.claimedByUserId})`);
+      throw new ForbiddenException('Someone else has claimed this approval');
     }
 
     // Enforce semantic rules
@@ -241,41 +251,52 @@ export class ApprovalService {
    * the detail endpoint (`GET /desk/episodes/:id`) so pagination payloads
    * stay ~300 bytes/row instead of ~2KB. See design spec §2.
    */
-  async listPending(tenantId: number, options: { limit?: number; scope?: ApprovalScope; currentUserId?: number } = {}) {
-    const limit = options.limit ?? 50;
+  /** The approval queue: pending decisions, oldest request first, as a cursor list. */
+  async listPending(
+    tenantId: number,
+    options: { limit?: number; cursor?: string; scope?: ApprovalScope; currentUserId?: number } = {},
+  ) {
+    const take = clampCursorLimit(options.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = options.cursor ? keysetWhere({ ...PENDING_KEYSET, cursor: options.cursor }) : undefined;
     const episodeWhere: Prisma.DeskEpisodeWhereInput = { tenantId };
     if (options.scope === 'mine') {
       if (!options.currentUserId) {
         // Defensive: mine-scope with no user → empty list rather than leaking.
-        return [];
+        return { items: [], nextCursor: null, total: 0 };
       }
       episodeWhere.ownerAgent = { supervisorUserId: options.currentUserId };
     }
-    const rows = await this.prisma.deskApproval.findMany({
-      where: { decision: null, episode: episodeWhere },
-      orderBy: { requestedAt: 'asc' },
-      take: limit,
-      select: {
-        id: true,
-        episodeId: true,
-        requestedAt: true,
-        expiresAt: true,
-        episode: {
-          select: {
-            id: true,
-            entityType: true,
-            entityId: true,
-            entityLabel: true,
-            priority: true,
-            status: true,
-            openedAt: true,
-            responsibility: { select: { key: true, title: true } },
-            ownerAgent: { select: { key: true, name: true } },
+    const where: Prisma.DeskApprovalWhereInput = { decision: null, episode: episodeWhere };
+    const [rows, total] = await Promise.all([
+      this.prisma.deskApproval.findMany({
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ requestedAt: 'asc' }, { id: 'asc' }],
+        take: take + 1,
+        select: {
+          id: true,
+          episodeId: true,
+          requestedAt: true,
+          expiresAt: true,
+          episode: {
+            select: {
+              id: true,
+              entityType: true,
+              entityId: true,
+              entityLabel: true,
+              priority: true,
+              status: true,
+              openedAt: true,
+              responsibility: { select: { key: true, title: true } },
+              ownerAgent: { select: { key: true, name: true } },
+            },
           },
         },
-      },
-    });
-    return rows.map(toSlimApprovalListItem);
+      }),
+      this.prisma.deskApproval.count({ where }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.requestedAt, row.id));
+    return { items: page.items.map(toSlimApprovalListItem), nextCursor: page.nextCursor, total };
   }
 
   async findById(id: string) {

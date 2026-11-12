@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,9 +10,9 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@appshore/db';
-import { APPROVAL_SCOPES, type ApprovalScope, type HandoffCounts } from '../types';
+import type { HandoffCounts } from '../types';
 
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
@@ -22,6 +21,9 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 
 import { ApprovalService, resolveApprovalScope } from './approval.service';
 import { DecideApprovalDto } from './dto/decide-approval.dto';
+import { ApprovalListQueryDto } from './dto/approval-list-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeskApprovalListResponse, DeskApprovalResponse, DeskHandoffCountsResponse } from '../../openapi.responses';
 
 /**
  * HTTP surface for Desk approvals. Consumed by the Desk UI's
@@ -45,19 +47,15 @@ export class ApprovalController extends BaseTenantController {
 
   @Get()
   @ApiOperation({
-    summary: 'List pending Desk approvals for the tenant (queue view)',
+    summary: 'List pending Desk approvals for the tenant, oldest first (queue view, cursor-paged)',
   })
-  @ApiQuery({ name: 'scope', required: false, enum: APPROVAL_SCOPES })
-  @ApiQuery({ name: 'limit', required: false })
-  async listPending(@CurrentUser() user: any, @Query('limit') limit?: string, @Query('scope') scope?: string) {
+  @ApiResult(DeskApprovalListResponse)
+  async listPending(@CurrentUser() user: any, @Query() query: ApprovalListQueryDto) {
     const tenantDbId = await this.getTenantDbId(user);
-    const parsedLimit = limit ? Math.min(Math.max(parseInt(limit, 10), 1), 100) : 50;
-    if (scope !== undefined && !APPROVAL_SCOPES.includes(scope as ApprovalScope)) {
-      throw new BadRequestException(`Invalid scope ${scope}. Expected one of: ${APPROVAL_SCOPES.join(', ')}`);
-    }
-    const resolvedScope = resolveApprovalScope(scope as ApprovalScope | undefined, user.role);
+    const resolvedScope = resolveApprovalScope(query.scope, user.role);
     return this.approvals.listPending(tenantDbId, {
-      limit: parsedLimit,
+      limit: query.limit,
+      cursor: query.cursor,
       scope: resolvedScope,
       currentUserId: user.dbId,
     });
@@ -75,6 +73,7 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Handoff counts (Mine/All × waiting/escalated) for the Handoffs tab segmented control',
   })
+  @ApiResult(DeskHandoffCountsResponse)
   async counts(@CurrentUser() user: any): Promise<HandoffCounts> {
     const tenantDbId = await this.getTenantDbId(user);
     return this.approvals.countPending(tenantDbId, user.dbId);
@@ -85,7 +84,8 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Claim an approval for the current operator. First-write-wins; returns 409 if already claimed.',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Approval id (uuid)' })
+  @ApiResult(DeskApprovalResponse)
   async claim(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);
     await this.assertApprovalInTenant(id, tenantDbId);
@@ -97,7 +97,8 @@ export class ApprovalController extends BaseTenantController {
   @ApiOperation({
     summary: 'Decide a pending approval: APPROVE / EDIT / REJECT (optionally terminate the episode)',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Approval id (uuid)' })
+  @ApiResult(DeskApprovalResponse)
   async decide(
     @CurrentUser() user: any,
     @Param('id', new ParseUUIDPipe()) id: string,

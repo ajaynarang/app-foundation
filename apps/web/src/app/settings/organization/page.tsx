@@ -9,6 +9,7 @@ import { mailto, CONTACTS } from '@appshore/web-core/shared/lib/contacts';
 import { useAuthStore } from '@/features/auth';
 import { useOrganization, useUpdateOrganization } from '@/features/platform/settings';
 import { OrganizationForm } from '@/features/platform/settings/components/organization-form';
+import { PageHeader } from '@/shared/components/page-chrome';
 
 // ---------------------------------------------------------------------------
 // Read-only field row (non-editable roles)
@@ -38,10 +39,7 @@ export default function OrganizationPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Organization</h1>
-        <p className="text-muted-foreground mt-1">Your company, kept current</p>
-      </div>
+      <PageHeader title="Organization" subtitle="Your company, kept current" />
 
       <Card>
         <CardHeader>

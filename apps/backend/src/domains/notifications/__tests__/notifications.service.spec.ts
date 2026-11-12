@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { InAppNotificationService } from '../notifications.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
@@ -68,7 +69,7 @@ describe('InAppNotificationService', () => {
 
       const result = await service.listForUser(1);
 
-      expect(result).toEqual({ data: [], total: 0 });
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
       expect(prisma.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -76,10 +77,11 @@ describe('InAppNotificationService', () => {
             channel: 'IN_APP',
             dismissedAt: null,
           }),
-          skip: 0,
-          take: 20,
+          orderBy: [{ createdAt: 'desc' }, { notificationId: 'desc' }],
+          take: 51,
         }),
       );
+      expect(prisma.notification.findMany.mock.calls[0][0].skip).toBeUndefined();
     });
 
     it('should filter by unread status', async () => {
@@ -121,19 +123,76 @@ describe('InAppNotificationService', () => {
       );
     });
 
-    it('should paginate correctly', async () => {
-      prisma.notification.findMany = jest.fn().mockResolvedValue([]);
-      prisma.notification.count = jest.fn().mockResolvedValue(50);
+    describe('walking pages over a fixture', () => {
+      // A fan-out writes several notifications in one millisecond. One is dismissed, one is another user's.
+      const stamps = tiedTimestamps(9);
+      const rows = stamps.map((createdAt, index) => ({
+        id: index + 1,
+        notificationId: `ntf_${(index * 5) % 9}`,
+        userId: index === 8 ? 2 : 1,
+        tenantId: 10,
+        channel: 'IN_APP',
+        type: 'USER_JOINED',
+        category: 'TEAM',
+        title: `Notification ${index}`,
+        message: 'Hello',
+        actionUrl: null,
+        actionLabel: null,
+        iconType: null,
+        readAt: index === 0 ? new Date('2026-03-02T00:00:00.000Z') : null,
+        dismissedAt: index === 7 ? new Date('2026-03-02T00:00:00.000Z') : null,
+        groupCount: 1,
+        metadata: null,
+        createdAt,
+      }));
 
-      const result = await service.listForUser(1, { page: 3, limit: 10 });
+      beforeEach(() => Object.assign(prisma.notification, fixtureModel(rows)));
 
-      expect(prisma.notification.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skip: 20,
-          take: 10,
-        }),
-      );
-      expect(result.total).toBe(50);
+      it('returns every notification of the inbox once, ties included, and the total ignores the cursor', async () => {
+        const totals: number[] = [];
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listForUser(1, { limit: 3, cursor });
+          totals.push(page.total);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([3, 3, 1]);
+        expect(new Set(items.map((item) => item.notificationId)).size).toBe(7);
+        const times = items.map((item) => item.createdAt.getTime());
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+        expect(totals).toEqual([7, 7, 7]);
+      });
+
+      it('names a notification by its public id: no Int key, user id or tenant id on the row', async () => {
+        const { items } = await service.listForUser(1, { limit: 1 });
+        expect(Object.keys(items[0]).sort()).toEqual(
+          [
+            'actionLabel',
+            'actionUrl',
+            'category',
+            'createdAt',
+            'groupCount',
+            'iconType',
+            'message',
+            'metadata',
+            'notificationId',
+            'readAt',
+            'title',
+            'type',
+          ].sort(),
+        );
+      });
+
+      it('filters unread in the page and the total', async () => {
+        const page = await service.listForUser(1, { status: 'unread', limit: 2 });
+        expect(page.total).toBe(6);
+        expect(page.items.every((item) => item.readAt === null)).toBe(true);
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(service.listForUser(1, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        expect(prisma.notification.findMany).not.toHaveBeenCalled();
+      });
     });
   });
 

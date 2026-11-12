@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { NotificationType } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import {
   WHATSAPP_TEMPLATES,
   WhatsAppTemplateRegistry,
@@ -10,14 +10,14 @@ import {
 } from '../whatsapp-template.registry';
 
 const templates: WhatsAppTemplateMap = {
-  [NotificationType.USER_INVITATION]: {
+  [PlatformNotificationType.USER_INVITATION]: {
     name: 'invite_v1',
     languageCode: 'en',
     category: 'UTILITY',
     body: 'You are invited: {{1}} — {{2}}.',
     bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
-  [NotificationType.TENANT_APPROVED]: {
+  [PlatformNotificationType.TENANT_APPROVED]: {
     name: 'promo_v1',
     languageCode: 'en',
     category: 'MARKETING',
@@ -31,7 +31,7 @@ describe('WhatsAppTemplateRegistry', () => {
   const ctx = { title: 't', message: 'Come play', tenantName: 'Acme Inc' };
 
   it('renders a registered template with its cleaned values', () => {
-    expect(registry.resolve(NotificationType.USER_INVITATION, ctx)).toEqual({
+    expect(registry.resolve(PlatformNotificationType.USER_INVITATION, ctx)).toEqual({
       templateName: 'invite_v1',
       languageCode: 'en',
       bodyValues: ['Come play', 'Acme Inc'],
@@ -39,18 +39,18 @@ describe('WhatsAppTemplateRegistry', () => {
   });
 
   it('resolves null for an unregistered type and reports has() false', () => {
-    expect(registry.resolve(NotificationType.USER_JOINED, ctx)).toBeNull();
-    expect(registry.has(NotificationType.USER_JOINED)).toBe(false);
+    expect(registry.resolve(PlatformNotificationType.USER_JOINED, ctx)).toBeNull();
+    expect(registry.has(PlatformNotificationType.USER_JOINED)).toBe(false);
   });
 
   it('resolves null when a required parameter is empty — never a half-filled send', () => {
-    expect(registry.resolve(NotificationType.USER_INVITATION, { ...ctx, tenantName: '  ' })).toBeNull();
+    expect(registry.resolve(PlatformNotificationType.USER_INVITATION, { ...ctx, tenantName: '  ' })).toBeNull();
   });
 
   it('consentKind is marketing only for MARKETING templates; unknown types are utility', () => {
-    expect(registry.consentKind(NotificationType.TENANT_APPROVED)).toBe('marketing');
-    expect(registry.consentKind(NotificationType.USER_INVITATION)).toBe('utility');
-    expect(registry.consentKind(NotificationType.USER_JOINED)).toBe('utility');
+    expect(registry.consentKind(PlatformNotificationType.TENANT_APPROVED)).toBe('marketing');
+    expect(registry.consentKind(PlatformNotificationType.USER_INVITATION)).toBe('utility');
+    expect(registry.consentKind(PlatformNotificationType.USER_JOINED)).toBe('utility');
   });
 
   it('cleans parameters Meta would reject — newlines, tabs, runs of spaces, length', () => {
@@ -60,13 +60,13 @@ describe('WhatsAppTemplateRegistry', () => {
   });
 
   it('boots with no map bound — nothing has a template', () => {
-    expect(new WhatsAppTemplateRegistry().has(NotificationType.USER_INVITATION)).toBe(false);
+    expect(new WhatsAppTemplateRegistry().has(PlatformNotificationType.USER_INVITATION)).toBe(false);
   });
 
   it('receives the app map through the WHATSAPP_TEMPLATES token under Nest DI', async () => {
     const module = await Test.createTestingModule({
       providers: [WhatsAppTemplateRegistry, { provide: WHATSAPP_TEMPLATES, useValue: templates }],
     }).compile();
-    expect(module.get(WhatsAppTemplateRegistry).has(NotificationType.USER_INVITATION)).toBe(true);
+    expect(module.get(WhatsAppTemplateRegistry).has(PlatformNotificationType.USER_INVITATION)).toBe(true);
   });
 });

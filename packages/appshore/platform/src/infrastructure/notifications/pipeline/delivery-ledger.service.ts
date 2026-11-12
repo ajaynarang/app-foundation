@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DeliveryChannel, DeliveryStatus, NotificationType, Prisma } from '@appshore/db';
+import { DeliveryChannel, DeliveryStatus, Prisma } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 import { PrismaService } from '../../database/prisma.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { DELIVERY_SKIP_REASONS, type ChannelOutcome, type DeliverySkipReason } from './delivery-outcome';

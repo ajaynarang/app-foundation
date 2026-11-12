@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { NotificationType, UserRole } from '@appshore/db';
+import { UserRole } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { NotificationTriggersService } from '../notification-triggers.service';
 import { NotificationDispatcherService } from '@appshore/platform/infrastructure/notifications/pipeline/notification-dispatcher.service';
 import { RecipientResolutionService } from '@appshore/platform/infrastructure/notifications/pipeline/recipient-resolution.service';
@@ -39,7 +40,7 @@ describe('NotificationTriggersService', () => {
     expect(dispatcher.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: 7,
-        type: NotificationType.USER_JOINED,
+        type: PlatformNotificationType.USER_JOINED,
         title: 'Priya Joined',
         recipients: staff,
       }),
@@ -50,23 +51,23 @@ describe('NotificationTriggersService', () => {
     await service.userRoleChanged(7, 2, 'Arun', 'MEMBER', 'ADMIN');
     expect(recipients.resolveByUserIds).toHaveBeenCalledWith(7, [2, 1], { scopeToMembership: true });
     const { recipients: sent, type } = dispatcher.dispatch.mock.calls[0][0];
-    expect(type).toBe(NotificationType.ROLE_CHANGED);
+    expect(type).toBe(PlatformNotificationType.ROLE_CHANGED);
     expect(sent.map((r: { id: number }) => r.id)).toEqual([2, 1]);
   });
 
   it.each([
-    ['integrationSyncCompleted', NotificationType.INTEGRATION_SYNC_COMPLETED, 'Sync Complete'],
-    ['integrationSyncFailed', NotificationType.INTEGRATION_SYNC_FAILED, 'Sync Failed'],
+    ['integrationSyncCompleted', PlatformNotificationType.INTEGRATION_SYNC_COMPLETED, 'Sync Complete'],
+    ['integrationSyncFailed', PlatformNotificationType.INTEGRATION_SYNC_FAILED, 'Sync Failed'],
   ] as const)('%s links staff to a web-app route, not the retired console', async (method, type, titleTail) => {
     await (service as any)[method](7, 'HubSpot', 'details');
     expect(dispatcher.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: '/settings' }),
+      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: '/settings/general' }),
     );
   });
 
   it('with neither roles nor ids there is nobody to resolve, and dispatch still runs the ledger path', async () => {
     recipients.resolveByRoles.mockResolvedValueOnce([]);
-    await service.trigger({ tenantId: 7, type: NotificationType.SETTINGS_UPDATED, title: 't', message: 'm' });
+    await service.trigger({ tenantId: 7, type: PlatformNotificationType.SETTINGS_UPDATED, title: 't', message: 'm' });
     expect(dispatcher.dispatch).toHaveBeenCalledWith(expect.objectContaining({ recipients: [] }));
   });
 });

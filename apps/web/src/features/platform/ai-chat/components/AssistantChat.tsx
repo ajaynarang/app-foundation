@@ -224,7 +224,7 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
                   className="flex justify-start"
                 >
                   <div className="pl-4 relative">
-                    <div className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full bg-gray-300 dark:bg-gray-700" />
+                    <div className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full bg-border" />
                     <div className="flex items-center gap-[3px] h-6">
                       {[0, 1, 2, 3, 4].map((i) => (
                         <motion.div

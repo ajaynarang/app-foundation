@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PaymentMethodService } from '../payment-method.service';
+import { PAYMENT_METHOD_LIST_CAP, PaymentMethodService } from '../payment-method.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../../adapters/payment-provider.factory';
 
@@ -48,6 +48,21 @@ describe('PaymentMethodService', () => {
     service = module.get<PaymentMethodService>(PaymentMethodService);
   });
 
+  describe('listPaymentMethods', () => {
+    it('reads the mirrored cards with a ceiling, the default first', async () => {
+      mockPrisma.paymentMethod.findMany.mockResolvedValue([{ id: 'pm_1', isDefault: true }]);
+
+      const result = await service.listPaymentMethods(1);
+
+      expect(result).toEqual([{ id: 'pm_1', isDefault: true }]);
+      expect(mockPrisma.paymentMethod.findMany).toHaveBeenLastCalledWith({
+        where: { tenantId: 1 },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: PAYMENT_METHOD_LIST_CAP,
+      });
+    });
+  });
+
   describe('addPaymentMethod', () => {
     it('should throw if no billing customer', async () => {
       mockPrisma.billingCustomer.findUnique.mockResolvedValue(null);
@@ -92,7 +107,7 @@ describe('PaymentMethodService', () => {
       await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw if removing only default method with active subscription', async () => {
+    it('answers 409 INVALID_STATE when removing the only method of an active subscription', async () => {
       mockPrisma.paymentMethod.findFirst.mockResolvedValue({
         id: 'pm-1',
         isDefault: true,
@@ -103,7 +118,10 @@ describe('PaymentMethodService', () => {
       });
       mockPrisma.paymentMethod.count.mockResolvedValue(1);
 
-      await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toThrow(BadRequestException);
+      await expect(service.removePaymentMethod(1, 'pm-1')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should allow removing non-default method', async () => {

@@ -7,11 +7,15 @@ import {
   UserRoleSchema,
   type UserRole,
 } from '../generated/prisma-enums';
+import { cursorListSchema } from '../infrastructure/cursor-list';
 
 export { LoginFailReasonSchema, LoginEventStatusSchema, UserRoleSchema };
 export type { LoginFailReason, LoginEventStatus, UserRole };
 
 export const LoginActivityEventSchema = z.object({
+  /** Public id (uuid): the list cursor tiebreak. */
+  publicId: z.string(),
+  /** Numeric id (listed in the id-boundary allowlist: the Notable panel's `eventId`); never in a cursor. */
   id: z.number(),
   createdAt: z.string(),
   status: LoginEventStatusSchema,
@@ -48,8 +52,10 @@ export const ListLoginActivityQuerySchema = z.object({
    * out real tenant signal. Ignored by the tenant endpoint.
    */
   excludeSuperAdmin: z.coerce.boolean().optional(),
-  limit: z.number().int().min(1).max(100).optional().default(50),
-  offset: z.number().int().min(0).optional().default(0),
+  /** Page size: clamped to 1…100 by the service; 50 when missing. */
+  limit: z.number().int().optional(),
+  /** `nextCursor` of the previous page. */
+  cursor: z.string().optional(),
 });
 export type ListLoginActivityQuery = z.infer<typeof ListLoginActivityQuerySchema>;
 
@@ -93,10 +99,6 @@ export const LoginActivitySummarySchema = z.object({
 });
 export type LoginActivitySummary = z.infer<typeof LoginActivitySummarySchema>;
 
-export const ListLoginActivityResponseSchema = z.object({
-  items: z.array(LoginActivityEventSchema),
-  total: z.number(),
-  limit: z.number(),
-  offset: z.number(),
-});
+/** `GET /admin/login-activity` and `/super-admin/login-activity`: a cursor list, newest first. */
+export const ListLoginActivityResponseSchema = cursorListSchema(LoginActivityEventSchema);
 export type ListLoginActivityResponse = z.infer<typeof ListLoginActivityResponseSchema>;

@@ -146,8 +146,8 @@ export function MaintenanceClient({ initialState }: { initialState: MaintenanceS
         {/* Pulsing dot indicator */}
         <div className="mx-auto mb-6 flex items-center justify-center gap-2">
           <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-info" />
           </span>
           <span className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Maintenance</span>
         </div>
@@ -171,7 +171,7 @@ export function MaintenanceClient({ initialState }: { initialState: MaintenanceS
                 </p>
               </>
             ) : (
-              <div className="flex items-center justify-center gap-2 text-sky-400">
+              <div className="flex items-center justify-center gap-2 text-info-text">
                 {checking ? (
                   <>
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">

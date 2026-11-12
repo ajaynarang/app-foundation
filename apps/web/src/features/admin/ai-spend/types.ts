@@ -1,4 +1,6 @@
 export type {
+  AiSpendSummary,
+  AiSpendTenantList,
   AiSpendTenantSummary,
   AiSpendSurfaceRow,
   AiSpendInvocationItem,

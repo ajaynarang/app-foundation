@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "format": "prettier --write --ignore-path ../.prettierignore \"config/**/*.ts\" \"fixtures/**/*.ts\" \"rbac/**/*.ts\" \"smoke/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
-    "format:check": "prettier --check --ignore-path ../.prettierignore \"config/**/*.ts\" \"fixtures/**/*.ts\" \"rbac/**/*.ts\" \"smoke/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
+    "format": "prettier --write --ignore-path ../.prettierignore \"api/**/*.ts\" \"config/**/*.ts\" \"fixtures/**/*.ts\" \"rbac/**/*.ts\" \"smoke/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
+    "format:check": "prettier --check --ignore-path ../.prettierignore \"api/**/*.ts\" \"config/**/*.ts\" \"fixtures/**/*.ts\" \"rbac/**/*.ts\" \"smoke/**/*.ts\" \"scripts/**/*.ts\" \"*.ts\"",
     "test": "playwright test",
     "test:smoke": "playwright test --grep @smoke --project=api",
     "test:rbac": "playwright test --grep @rbac --project=api",

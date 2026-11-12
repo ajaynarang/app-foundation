@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationService } from '../notification.service';
 import { PrismaService } from '../../database/prisma.service';
 import { EmailService } from '../services/email.service';
-import { NotificationType, NotificationStatus } from '@appshore/db';
+import { NotificationStatus } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 
 describe('NotificationService', () => {
   let service: NotificationService;
@@ -58,7 +59,7 @@ describe('NotificationService', () => {
       const mockNotification = {
         id: 1,
         notificationId: 'notif_123',
-        type: NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+        type: PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
         recipient: 'test@example.com',
         status: NotificationStatus.PENDING,
         tenantId: 1,
@@ -75,7 +76,7 @@ describe('NotificationService', () => {
 
       // Access private method via reflection for testing
       const result = await (service as any).createAndSendNotification(
-        NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+        PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
         'test@example.com',
         { companyName: 'Test Co', tenantId: 1 },
         async () => {
@@ -89,7 +90,7 @@ describe('NotificationService', () => {
 
       expect(mockPrismaService.notification.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          type: NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+          type: PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
           recipient: 'test@example.com',
           status: NotificationStatus.PENDING,
           channel: 'EMAIL',
@@ -112,7 +113,7 @@ describe('NotificationService', () => {
       const mockNotification = {
         id: 1,
         notificationId: 'notif_123',
-        type: NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+        type: PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
         recipient: 'test@example.com',
         status: NotificationStatus.PENDING,
         tenantId: 1,
@@ -127,7 +128,7 @@ describe('NotificationService', () => {
       mockEmailService.sendEmail.mockRejectedValue(new Error('Email service error'));
 
       const result = await (service as any).createAndSendNotification(
-        NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+        PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
         'test@example.com',
         { companyName: 'Test Co', tenantId: 1 },
         async () => {
@@ -157,7 +158,7 @@ describe('NotificationService', () => {
       const mockNotification = {
         id: 1,
         notificationId: 'notif_123',
-        type: NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+        type: PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
         recipient: 'owner@test.com',
         status: NotificationStatus.SENT,
         tenantId: 1,
@@ -198,7 +199,7 @@ describe('NotificationService', () => {
       const mockNotification = {
         id: 2,
         notificationId: 'notif_456',
-        type: NotificationType.TENANT_APPROVED,
+        type: PlatformNotificationType.TENANT_APPROVED,
         recipient: 'owner@test.com',
         status: NotificationStatus.SENT,
         tenantId: 1,
@@ -238,7 +239,7 @@ describe('NotificationService', () => {
       const mockNotification = {
         id: 3,
         notificationId: 'notif_789',
-        type: NotificationType.TENANT_REJECTED,
+        type: PlatformNotificationType.TENANT_REJECTED,
         recipient: 'owner@test.com',
         status: NotificationStatus.SENT,
         tenantId: 1,

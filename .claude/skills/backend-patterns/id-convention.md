@@ -1,12 +1,13 @@
 # ID Convention
 
-Five roles. Every column fits exactly one. Schema lives in `packages/appshore/db/prisma/schema/`.
+Six roles. Every column fits exactly one. The decision record is the ADR "ID boundary" (`docs/adr/`). Schema lives in `packages/appshore/db/prisma/schema/`.
 
 ## 1. Internal PK — operational entities
 
 - Type: `Int @id @default(autoincrement())`
 - Where: Project, Task, Invoice, User, Tenant — all transactional tables
-- Rule: All FKs reference these. Never expose to URLs or AI tool inputs directly.
+- Rule: All FKs reference these. Never crosses the API: not in a URL, a query, a body, a response, an event
+  payload, an AI tool input or a list cursor. See "The boundary" below.
 
 ## 2. Internal PK — audit / event / log entities
 
@@ -39,10 +40,46 @@ Five roles. Every column fits exactly one. Schema lives in `packages/appshore/db
   Never the row's PK. Never embedded on the operational entity row.
   Never embeds the business number into the token value.
 
+## 6. Public id (the row's address outside the database)
+
+- A separate unique column. Never the primary key. Never a duplicate of a sibling `*Number`.
+- A table that already has a human number (`ticketNumber`) or a string id (`userId`, `tenantId`,
+  `invitationId`, `clientId`) uses that column. Do not add a second one.
+- A **new** aggregate with no human number: `generateId(prefix)` in a `VarChar(30)` (for example `inv_k3j2…`).
+  The prefix says what it is.
+- An **existing** table that only needs an address or a list tiebreak: `public_id UUID`, unique, database default
+  `gen_random_uuid()`. In Prisma:
+  `publicId String @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid`.
+  Writers of an append-heavy table pass `generateUuidV7()` so the unique index fills in order.
+- Adding it to a table that has rows is one migration of five guarded steps: add the column nullable, backfill
+  where null, set the default, set `NOT NULL`, create the unique index (`IF NOT EXISTS` on each). Never add the
+  column with a volatile default in one statement: that rewrites the whole table under an exclusive lock.
+
+## The boundary (enforced by `apps/backend/src/architecture/id-boundary.spec.ts`)
+
+The boundary is HTTP controllers, MCP tools, SSE and webhook egress, event payloads that leave the process, and
+every schema in `@app/shared-types`. Inside it, `Int` keys are used freely.
+
+1. **Resolve on the way in.** A route param, query key, body field or tool parameter takes the public id (or
+   the human number). The service resolves it to the primary key; an unknown one is a 404.
+2. **Serialize on the way out.** No raw Prisma row leaves a service that a controller returns from. A
+   `toPublic…(row)` serializer beside the service emits the public id and omits `id` and every numeric
+   foreign key. People and tenants nested in a row are named by `userId` / `tenantId`.
+3. **Public ids in event payloads.** An event that can reach a webhook, the SSE bridge or the event log
+   carries public ids.
+
+A list cursor is opaque but not encrypted, so its tiebreak is a public id too, never an `Int` key.
+
+The numeric ids that already cross the API (the super-admin console, API keys, ticket routes) are listed in
+`apps/backend/src/architecture/id-boundary.allowlist.json`, each with a reason. The list may only shrink.
+
 ## Banned for new code
 
 - CUID anywhere.
-- UUIDv4 (random) on audit tables. Use UUIDv7.
+- UUIDv4 (random) as the **primary key** of an audit table. Use UUIDv7. (A `public_id` backfill and its
+  database default may use `gen_random_uuid()`.)
 - Storing tokens on the entity row itself.
 - A redundant string ID column that duplicates a sibling `*Number`.
 - FKs that target a non-`id` column (e.g. the tenant slug).
+- A numeric id in a URL, query, body, response, event payload or tool parameter (the boundary rules above).
+- An `Int` primary key as a cursor tiebreak.

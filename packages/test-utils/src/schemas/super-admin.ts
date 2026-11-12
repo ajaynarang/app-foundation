@@ -23,7 +23,7 @@
  * promote the stable ones to shared-types once admin UI stabilises.
  */
 import { z } from 'zod';
-import { isoDateString } from './helpers.js';
+import { apiErrorEnvelope, isoDateString, cursorListOf } from './helpers.js';
 
 // ── admin/cache ──────────────────────────────────────────────────────
 
@@ -140,21 +140,8 @@ export const AdminEventRowSchema = z
   })
   .strict();
 
-/**
- * `GET /admin/events` — admin-events.controller.ts:16-39.
- *
- * Pagination envelope: `{ items, total, limit, offset }`. `limit` is
- * clamped 1..100 (default 50). `total` is the unfiltered count after
- * any query filters but before pagination.
- */
-export const AdminEventListSchema = z
-  .object({
-    items: z.array(AdminEventRowSchema),
-    total: z.number().int().nonnegative(),
-    limit: z.number().int().positive(),
-    offset: z.number().int().nonnegative(),
-  })
-  .strict();
+/** `GET /admin/events`: a cursor list, newest first. `total` counts what matches the filters. */
+export const AdminEventListSchema = cursorListOf(AdminEventRowSchema);
 
 /**
  * `GET /admin/events/stats` — admin-events.controller.ts:41-45.
@@ -257,22 +244,7 @@ export const AdminScheduleListSchema = z.array(AdminScheduleRowSchema);
 // ── Common error envelope (shared across all 400 guards) ─────────────
 
 /**
- * The platform's standard error envelope thrown by NestJS exception filters
- * — verified shape from `POST /admin/cache/flush` (no `confirm`) and
- * `POST /admin/cache/flush/:invalid-namespace` (2026-05-15).
- *
- * `detail` and `message` are usually the same string; `detail` is the
- * structured field. Permissive enough to absorb upstream filter
- * tweaks without breaking unrelated tests.
+ * The platform's standard error envelope: `statusCode, code, detail, fieldErrors?, timestamp, path, method,
+ * debugDetail?`. The global exception filter emits these keys and no others.
  */
-export const AppErrorEnvelopeSchema = z
-  .object({
-    statusCode: z.number().int().positive(),
-    timestamp: isoDateString,
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    message: z.string(),
-    error: z.string(),
-  })
-  .strict();
+export const AppErrorEnvelopeSchema = apiErrorEnvelope();

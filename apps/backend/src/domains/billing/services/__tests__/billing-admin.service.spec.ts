@@ -23,6 +23,7 @@ const mockAdapter = {
 };
 
 const mockPrisma = {
+  $queryRaw: jest.fn(),
   planConfig: { findUnique: jest.fn() },
   billingCustomer: { findUnique: jest.fn(), create: jest.fn() },
   billingSubscription: {
@@ -76,13 +77,16 @@ describe('BillingAdminService', () => {
   });
 
   describe('extendTrial', () => {
-    it('should throw if tenant not on TRIAL or TRIAL_EXPIRED', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not on TRIAL or TRIAL_EXPIRED', async () => {
       mockPrisma.tenant.findUniqueOrThrow.mockResolvedValue({
         tenantId: 'TNT-1',
         plan: 'STARTER',
         trialEndsAt: new Date(),
       });
-      await expect(service.extendTrial(1, 30)).rejects.toThrow(BadRequestException);
+      await expect(service.extendTrial(1, 30)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should extend trial and restore TRIAL_EXPIRED to TRIAL', async () => {
@@ -125,12 +129,12 @@ describe('BillingAdminService', () => {
   });
 
   describe('reactivate', () => {
-    it('should throw if tenant not suspended', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not suspended', async () => {
       mockPrisma.tenant.findUniqueOrThrow.mockResolvedValue({
         tenantId: 'TNT-1',
         plan: 'ACTIVE',
       });
-      await expect(service.reactivate(1)).rejects.toThrow(BadRequestException);
+      await expect(service.reactivate(1)).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should restore to last subscription plan', async () => {
@@ -158,10 +162,8 @@ describe('BillingAdminService', () => {
 
   describe('getRevenueStats', () => {
     it('should calculate MRR, ARR, ARPU, and churn', async () => {
-      mockPrisma.billingSubscription.findMany.mockResolvedValue([
-        { unitPriceCents: 5000, quantity: 2 },
-        { unitPriceCents: 10000, quantity: 1 },
-      ]);
+      // Two active subscriptions, summed by the database: 5000*2 + 10000*1.
+      mockPrisma.$queryRaw.mockResolvedValue([{ mrr_cents: 20000n, active_count: 2n }]);
       mockPrisma.billingSubscription.count.mockResolvedValue(1); // 1 canceled this month
       mockPrisma.tenant.count.mockResolvedValue(10);
       mockPrisma.tenantAddOn.count.mockResolvedValue(3);
@@ -174,6 +176,23 @@ describe('BillingAdminService', () => {
       expect(result.activeSubscriptions).toBe(2);
       expect(result.canceledThisMonth).toBe(1);
       expect(result.totalTenants).toBe(10);
+      // No subscription row is loaded to add it up.
+      expect(mockPrisma.$queryRaw.mock.calls[0][0].join('?')).toContain('SUM(unit_price_cents::bigint * quantity)');
+    });
+
+    it('reports zeros, not NaN, when nothing is active', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ mrr_cents: 0n, active_count: 0n }]);
+      mockPrisma.billingSubscription.count.mockResolvedValue(0);
+      mockPrisma.tenant.count.mockResolvedValue(0);
+      mockPrisma.tenantAddOn.count.mockResolvedValue(0);
+
+      expect(await service.getRevenueStats()).toMatchObject({
+        mrrCents: 0,
+        arpuCents: 0,
+        activeSubscriptions: 0,
+        churnRate: 0,
+        addOnAdoptionRate: 0,
+      });
     });
   });
 
@@ -530,7 +549,7 @@ describe('BillingAdminService', () => {
       expect(result).toEqual({ action: 'created' });
     });
 
-    it('should throw if already on the same plan', async () => {
+    it('answers 409 INVALID_STATE if already on the same plan', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
         pricePerUnitCents: 5000,
@@ -545,7 +564,10 @@ describe('BillingAdminService', () => {
         tenantId: 'TNT-1',
       });
 
-      await expect(service.changeSubscriptionPlan(1, 'PROFESSIONAL' as any)).rejects.toThrow(BadRequestException);
+      await expect(service.changeSubscriptionPlan(1, 'PROFESSIONAL' as any)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should upgrade with proration', async () => {

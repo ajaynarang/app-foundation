@@ -1,13 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { IsString, MinLength } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { WorkspacesService } from './workspaces.service';
 import { setRefreshTokenCookie } from '../../auth/refresh-token-cookie';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { WorkspaceListResponseRef, WorkspaceSwitchResponseRef } from './openapi.responses';
 
 class SwitchWorkspaceDto {
+  @ApiProperty()
   @IsString()
   @MinLength(1)
   tenantId: string;
@@ -24,6 +27,7 @@ export class WorkspacesController {
 
   @Get()
   @ApiOperation({ summary: "List the current user's workspaces (memberships)" })
+  @ApiResult(WorkspaceListResponseRef)
   async list(@CurrentUser() user: any) {
     return { workspaces: await this.workspacesService.listForUser(user.dbId) };
   }
@@ -31,6 +35,7 @@ export class WorkspacesController {
   @Post('switch')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Switch the session to another workspace (reissues tokens)' })
+  @ApiResult(WorkspaceSwitchResponseRef)
   async switch(
     @CurrentUser() user: any,
     @Body() dto: SwitchWorkspaceDto,

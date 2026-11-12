@@ -1,8 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { AiSurface } from '@appshore/db';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Prisma, type AiSurface } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  decodeCursor,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { escapeLike } from '@appshore/kernel/shared/utils/list-query';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import type {
+  AiSpendSummary,
+  AiSpendTenantList,
   AiSpendTenantSummary,
   AiSpendSurfaceRow,
   AiSpendInvocationList,
@@ -11,6 +21,27 @@ import type {
   UpdateAiBudgetInput,
   AiCostVsQuota,
 } from '@app/shared-types';
+
+/** What `GET /admin/ai-spend/tenants` passes in, already parsed and validated at the controller. */
+export interface AiSpendTenantListQuery {
+  days: number;
+  limit?: number;
+  cursor?: string;
+  q?: string;
+}
+
+/** What `GET /admin/ai-spend/tenants/:tenant_id/invocations` passes in. */
+export interface AiSpendInvocationListQuery {
+  tenantId: number;
+  limit?: number;
+  cursor?: string;
+  surface?: AiSurface;
+}
+
+const INVOCATION_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+const INVALID_CURSOR = 'This list position is no longer valid — reload the list';
+/** A window total as Postgres prints a `numeric`: the only shape a cost cursor may carry. */
+const DECIMAL = /^\d{1,12}(\.\d{1,12})?$/;
 
 /**
  * Reads from the SQL views introduced by the AI Spend views migration:
@@ -34,77 +65,99 @@ export class AdminAiSpendService {
   // ───────────────────────────────────────────────────────────────────────
   // Home — one row per tenant, last N days
   // ───────────────────────────────────────────────────────────────────────
-  async listTenantSummaries(opts: { days: number }): Promise<AiSpendTenantSummary[]> {
+  /**
+   * One page of the tenants that spent in the window, highest spend first, the tenant's public id breaking
+   * ties. The window totals are a SQL aggregate, so the keyset is spelled out in SQL. The sparkline and last
+   * activity are read for the page's tenants only.
+   *
+   * The cursor is tagged with the window's first day (`2026-09-30.<cursor>`): a cursor from another `days`,
+   * or from a walk that crossed UTC midnight (the window moved and every total with it), is a 400 that asks
+   * for a reload, never a page that skips or repeats tenants. Within one window the totals stay live: today's
+   * slice can grow between pages, and a tenant whose total rises past the cursor during a walk shows on
+   * neither page of that walk. Accepted: the next load reads it.
+   */
+  async listTenants(query: AiSpendTenantListQuery): Promise<AiSpendTenantList> {
+    const take = clampCursorLimit(query.limit);
+    const since = startOfDayUtcDaysAgo(query.days);
+    const tag = `${formatIsoDate(since)}.`;
+    // Decoded before any query runs: a malformed (or other-window) cursor is a 400 and costs nothing.
+    const after = query.cursor ? tenantKeyset(tag, query.cursor) : Prisma.empty;
+    const search = query.q
+      ? Prisma.sql`AND (t.company_name ILIKE ${`%${escapeLike(query.q)}%`} OR t.tenant_id ILIKE ${`%${escapeLike(query.q)}%`})`
+      : Prisma.empty;
+    const totals = Prisma.sql`
+      WITH totals AS (
+        SELECT v.tenant_id,
+               SUM(v.total_cost_usd) AS cost,
+               SUM(v.call_count)     AS calls,
+               SUM(v.error_count)    AS errors
+        FROM vw_ai_cost_per_tenant v
+        WHERE v.day >= ${since}::date
+        GROUP BY v.tenant_id
+      )`;
+
+    const [rows, counted] = await Promise.all([
+      this.prisma.$queryRaw<TenantTotalsRaw[]>`
+        ${totals}
+        SELECT t.id AS tenant_id, t.tenant_id AS tenant_slug, t.company_name,
+               totals.cost::text AS total_cost_usd, totals.calls AS call_count, totals.errors AS error_count
+        FROM totals JOIN tenants t ON t.id = totals.tenant_id
+        WHERE TRUE ${search} ${after}
+        ORDER BY totals.cost DESC, t.tenant_id ASC
+        LIMIT ${take + 1}`,
+      this.prisma.$queryRaw<Array<{ total: bigint }>>`
+        ${totals}
+        SELECT COUNT(*) AS total FROM totals JOIN tenants t ON t.id = totals.tenant_id
+        WHERE TRUE ${search}`,
+    ]);
+    // The tiebreak is the tenant's public id: its numeric id may sit in the row, never in a cursor.
+    const page = buildCursorPage(rows, take, (row) => `${tag}${encodeCursor(row.total_cost_usd, row.tenant_slug)}`);
+    const items = await this.withTrend(page.items, since);
+    return { items, nextCursor: page.nextCursor, total: Number(counted[0]?.total ?? 0) };
+  }
+
+  /** The window in one figure: what every tenant together spent, and how many spent anything. */
+  async getSummary(opts: { days: number }): Promise<AiSpendSummary> {
     const since = startOfDayUtcDaysAgo(opts.days);
+    const [row] = await this.prisma.$queryRaw<Array<{ total_cost_usd: string | null; tenant_count: bigint | number }>>`
+      SELECT SUM(total_cost_usd)::text AS total_cost_usd, COUNT(DISTINCT tenant_id) AS tenant_count
+      FROM vw_ai_cost_per_tenant
+      WHERE day >= ${since}::date`;
+    return {
+      windowCostUsd: row?.total_cost_usd ?? (0).toFixed(6),
+      tenantCount: Number(row?.tenant_count ?? 0),
+    };
+  }
 
-    // Per-tenant totals + sparkline. We pull the daily slices for the
-    // window and aggregate in JS to keep the SQL simple and cacheable.
-    const dailyRows = await this.prisma.$queryRaw<DailySliceRaw[]>`
-      SELECT
-        t.id            AS tenant_id,
-        t.tenant_id     AS tenant_slug,
-        t.company_name  AS company_name,
-        v.day           AS day,
-        v.total_cost_usd::text AS total_cost_usd,
-        v.call_count    AS call_count,
-        v.error_count   AS error_count
-      FROM vw_ai_cost_per_tenant v
-      JOIN tenants t ON t.id = v.tenant_id
-      WHERE v.day >= ${since}::date
-      ORDER BY t.id ASC, v.day ASC
-    `;
-
-    // Last-activity per tenant — separate query, indexed read.
-    const lastActivityRows = await this.prisma.$queryRaw<LastActivityRaw[]>`
-      SELECT tenant_id, MAX(created_at) AS last_at
-      FROM ai_invocations
-      GROUP BY tenant_id
-    `;
-    const lastActivityByTenant = new Map<number, Date>();
-    for (const r of lastActivityRows) lastActivityByTenant.set(r.tenant_id, r.last_at);
-
-    // Group daily slices by tenant.
-    const byTenant = new Map<number, { slug: string; companyName: string; days: DailySliceRaw[] }>();
-    for (const row of dailyRows) {
-      const bucket = byTenant.get(row.tenant_id) ?? {
-        slug: row.tenant_slug,
-        companyName: row.company_name,
-        days: [],
-      };
-      bucket.days.push(row);
-      byTenant.set(row.tenant_id, bucket);
-    }
-
-    const result: AiSpendTenantSummary[] = [];
-    for (const [tenantId, bucket] of byTenant) {
-      let totalCost = 0;
-      let callCount = 0;
-      let errorCount = 0;
-      const sparkline: AiSpendTenantSummary['sparkline'] = [];
-      for (const d of bucket.days) {
-        totalCost += parseFloat(d.total_cost_usd);
-        callCount += Number(d.call_count);
-        errorCount += Number(d.error_count);
-        sparkline.push({
-          day: formatIsoDate(d.day),
-          costUsd: d.total_cost_usd,
-        });
-      }
-      result.push({
-        tenantId,
-        tenantSlug: bucket.slug,
-        companyName: bucket.companyName,
-        windowCostUsd: totalCost.toFixed(6),
-        windowCallCount: callCount,
-        windowErrorCount: errorCount,
-        sparkline,
-        lastActivityAt: lastActivityByTenant.get(tenantId)?.toISOString() ?? null,
-      });
-    }
-
-    // Highest spenders first — that's what super-admin wants to see.
-    result.sort((a, b) => parseFloat(b.windowCostUsd) - parseFloat(a.windowCostUsd));
-    return result;
+  /** Sparkline and last activity for the tenants on one page. */
+  private async withTrend(rows: TenantTotalsRaw[], since: Date): Promise<AiSpendTenantSummary[]> {
+    if (rows.length === 0) return [];
+    const ids = rows.map((row) => row.tenant_id);
+    const [daily, last] = await Promise.all([
+      this.prisma.$queryRaw<DailySliceRaw[]>`
+        SELECT tenant_id, day, total_cost_usd::text AS total_cost_usd
+        FROM vw_ai_cost_per_tenant
+        WHERE day >= ${since}::date AND tenant_id IN (${Prisma.join(ids)})
+        ORDER BY day ASC`,
+      this.prisma.$queryRaw<LastActivityRaw[]>`
+        SELECT tenant_id, MAX(created_at) AS last_at
+        FROM ai_invocations
+        WHERE tenant_id IN (${Prisma.join(ids)})
+        GROUP BY tenant_id`,
+    ]);
+    const lastByTenant = new Map(last.map((row) => [row.tenant_id, row.last_at]));
+    return rows.map((row) => ({
+      tenantId: row.tenant_id,
+      tenantSlug: row.tenant_slug,
+      companyName: row.company_name,
+      windowCostUsd: row.total_cost_usd,
+      windowCallCount: Number(row.call_count),
+      windowErrorCount: Number(row.error_count),
+      sparkline: daily
+        .filter((day) => day.tenant_id === row.tenant_id)
+        .map((day) => ({ day: formatIsoDate(day.day), costUsd: day.total_cost_usd })),
+      lastActivityAt: lastByTenant.get(row.tenant_id)?.toISOString() ?? null,
+    }));
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -138,34 +191,24 @@ export class AdminAiSpendService {
   // ───────────────────────────────────────────────────────────────────────
   // Invocation list — drill-in detail with keyset cursor
   // ───────────────────────────────────────────────────────────────────────
-  async listInvocations(opts: {
-    tenantId: number;
-    surface?: string;
-    limit: number;
-    cursor?: string;
-  }): Promise<AiSpendInvocationList> {
-    const limit = Math.min(Math.max(opts.limit, 1), 100);
-    const cursor = parseCursor(opts.cursor);
+  /** One tenant's invocations, newest first: keyset on (createdAt, id), with the total for the surface filter. */
+  async listInvocations(query: AiSpendInvocationListQuery): Promise<AiSpendInvocationList> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...INVOCATION_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.AiInvocationWhereInput = { tenantId: query.tenantId };
+    if (query.surface) scope.surface = query.surface;
 
-    const where: Record<string, unknown> = { tenantId: opts.tenantId };
-    if (opts.surface) where.surface = opts.surface;
-    if (cursor) {
-      // Keyset: older than the last seen createdAt OR same createdAt with
-      // a smaller id (UUIDv7 is monotonic so id ties break by time).
-      where.OR = [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }];
-    }
-
-    const rows = await this.prisma.aiInvocation.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1, // peek one extra to detect more
-    });
-
-    const hasMore = rows.length > limit;
-    const trimmed = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? encodeCursor(trimmed[trimmed.length - 1]) : null;
-
-    const items: AiSpendInvocationItem[] = trimmed.map((row) => ({
+    const [rows, total] = await Promise.all([
+      this.prisma.aiInvocation.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.aiInvocation.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    const items: AiSpendInvocationItem[] = page.items.map((row) => ({
       id: row.id,
       surface: row.surface,
       agentId: row.agentId,
@@ -183,7 +226,7 @@ export class AdminAiSpendService {
       createdAt: row.createdAt.toISOString(),
     }));
 
-    return { items, nextCursor };
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -278,14 +321,19 @@ export class AdminAiSpendService {
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
-interface DailySliceRaw {
+interface TenantTotalsRaw {
   tenant_id: number;
   tenant_slug: string;
   company_name: string;
-  day: Date;
   total_cost_usd: string;
   call_count: bigint | number;
   error_count: bigint | number;
+}
+
+interface DailySliceRaw {
+  tenant_id: number;
+  day: Date;
+  total_cost_usd: string;
 }
 
 interface SurfaceSliceRaw {
@@ -313,26 +361,15 @@ function formatIsoDate(d: Date | string): string {
   return date.toISOString().slice(0, 10);
 }
 
-interface ParsedCursor {
-  createdAt: Date;
-  id: string;
-}
-
-function parseCursor(raw?: string): ParsedCursor | null {
-  if (!raw) return null;
-  try {
-    const decoded = Buffer.from(raw, 'base64url').toString('utf8');
-    const sep = decoded.lastIndexOf('|');
-    if (sep < 0) return null;
-    const createdAt = new Date(decoded.slice(0, sep));
-    const id = decoded.slice(sep + 1);
-    if (Number.isNaN(createdAt.getTime()) || !id) return null;
-    return { createdAt, id };
-  } catch {
-    return null;
+/**
+ * The SQL keyset after a tagged cursor (`<window day>.<cursor>`). The tag must name the window in use, the id
+ * must be a tenant id and the cost must read as a decimal: anything else is a 400, never a query.
+ */
+function tenantKeyset(tag: string, tagged: string): Prisma.Sql {
+  if (typeof tagged !== 'string' || !tagged.startsWith(tag)) throw new BadRequestException(INVALID_CURSOR);
+  const { sortValue, id } = decodeCursor(tagged.slice(tag.length));
+  if (typeof id !== 'string' || id.length === 0 || typeof sortValue !== 'string' || !DECIMAL.test(sortValue)) {
+    throw new BadRequestException(INVALID_CURSOR);
   }
-}
-
-function encodeCursor(row: { createdAt: Date; id: string }): string {
-  return Buffer.from(`${row.createdAt.toISOString()}|${row.id}`, 'utf8').toString('base64url');
+  return Prisma.sql`AND (totals.cost < ${sortValue}::numeric OR (totals.cost = ${sortValue}::numeric AND t.tenant_id > ${id}))`;
 }

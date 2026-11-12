@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { fixtureModel, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { Test } from '@nestjs/testing';
 import { UserRole } from '@appshore/db';
 
@@ -302,14 +303,19 @@ describe('DeskAgentService', () => {
 
   // ─── listEligibleSupervisors ──────────────────────────────────────
 
-  describe('listEligibleSupervisors', () => {
-    it('returns active users sorted by last name', async () => {
+  describe('listEligibleSupervisors: a picker (cursor list with q), by last name', () => {
+    it('reads active users of the eligible roles, ordered by last name then the public user id', async () => {
       prisma.user.findMany.mockResolvedValue([
+        { id: 1, userId: 'usr_a', firstName: 'Ada', lastName: 'Aardvark', role: UserRole.OWNER },
+        { id: 2, userId: 'usr_b', firstName: 'Bob', lastName: 'Builder', role: UserRole.ADMIN },
+      ]);
+      prisma.user.count.mockResolvedValue(2);
+      const page = await service.listEligibleSupervisors(7);
+      expect(page.items).toEqual([
         { id: 1, firstName: 'Ada', lastName: 'Aardvark', role: UserRole.OWNER },
         { id: 2, firstName: 'Bob', lastName: 'Builder', role: UserRole.ADMIN },
       ]);
-      const rows = await service.listEligibleSupervisors(7);
-      expect(rows).toHaveLength(2);
+      expect(page).toMatchObject({ nextCursor: null, total: 2 });
       expect(prisma.user.findMany).toHaveBeenCalledWith({
         where: {
           tenantId: 7,
@@ -317,8 +323,79 @@ describe('DeskAgentService', () => {
           deletedAt: null,
           role: { in: [UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER] },
         },
-        select: { id: true, firstName: true, lastName: true, role: true },
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        select: { id: true, userId: true, firstName: true, lastName: true, role: true },
+        orderBy: [{ lastName: 'asc' }, { userId: 'asc' }],
+        take: 51,
+      });
+    });
+
+    describe('walking pages over a fixture', () => {
+      // Three people share the last name "Lee"; one user is inactive and one belongs to another tenant.
+      const lastNames = ['Adams', 'Lee', 'Lee', 'Lee', 'Moss', 'Nash', 'Owen', 'Park'];
+      const rows = lastNames.map((lastName, index) => ({
+        id: index + 1,
+        userId: `usr_${(index * 5) % 8}`,
+        tenantId: index === 7 ? 99 : 7,
+        isActive: index !== 6,
+        deletedAt: null,
+        role: UserRole.MEMBER,
+        email: `p${index}@example.com`,
+        firstName: index === 2 ? 'Ada' : 'Sam',
+        lastName,
+      }));
+
+      beforeEach(() => Object.assign(prisma.user, fixtureModel(rows)));
+
+      it('returns every eligible user once in name order, people who share a last name included', async () => {
+        const { pages, items } = await walkCursorList((cursor) =>
+          service.listEligibleSupervisors(7, { limit: 2, cursor }),
+        );
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 2]);
+        expect(items.map((user) => user.lastName)).toEqual(['Adams', 'Lee', 'Lee', 'Lee', 'Moss', 'Nash']);
+        expect(new Set(items.map((user) => user.id)).size).toBe(6);
+      });
+
+      it('searches the server by name or email, and counts every match beyond the page', async () => {
+        const page = await service.listEligibleSupervisors(7, { q: 'lee', limit: 2 });
+        expect(page.total).toBe(3);
+        expect(page.items).toHaveLength(2);
+        const byEmail = await service.listEligibleSupervisors(7, { q: 'p2@example' });
+        expect(byEmail.items.map((user) => user.firstName)).toEqual(['Ada']);
+      });
+
+      it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+        // Sam and Ada alternate, three to a last name: a page that dropped the search would hold an Ada.
+        const alternating = ['Adams', 'Adams', 'Adams', 'Lee', 'Lee', 'Lee', 'Moss', 'Moss', 'Moss'].map(
+          (lastName, index) => ({
+            id: index + 1,
+            userId: `usr_${(index * 4) % 9}`,
+            tenantId: 7,
+            isActive: true,
+            deletedAt: null,
+            role: UserRole.MEMBER,
+            email: `p${index}@example.com`,
+            firstName: index % 2 === 0 ? 'Sam' : 'Ada',
+            lastName,
+          }),
+        );
+        Object.assign(prisma.user, fixtureModel(alternating));
+
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listEligibleSupervisors(7, { q: 'sam', limit: 2, cursor });
+          expect(page.total).toBe(5);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 1]);
+        for (const page of pages) expect(page.every((user) => user.firstName === 'Sam')).toBe(true);
+        expect(items.map((user) => user.lastName)).toEqual(['Adams', 'Adams', 'Lee', 'Moss', 'Moss']);
+        expect(new Set(items.map((user) => user.id)).size).toBe(5);
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(service.listEligibleSupervisors(7, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        expect(prisma.user.findMany).not.toHaveBeenCalled();
       });
     });
   });

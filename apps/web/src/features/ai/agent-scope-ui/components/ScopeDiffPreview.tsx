@@ -12,8 +12,7 @@ interface ScopeDiffPreviewProps {
 /**
  * Inline scope-edit diff (not a modal).
  * Renders a plain-English list of added/removed scopes sourced from
- * SCOPE_DESCRIPTIONS, so the same copy feeds the developer portal in
- * Phase E.
+ * SCOPE_DESCRIPTIONS, the same copy the scope picker's reference shows.
  */
 export function ScopeDiffPreview({ current, next }: ScopeDiffPreviewProps) {
   const currentSet = new Set(current);

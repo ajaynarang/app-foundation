@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { AgentActivityWindowQueryDto } from '../dto/agent-activity-query.dto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
 
@@ -7,7 +10,7 @@ class FakeAgentService {
   listForTenant = jest.fn().mockResolvedValue([{ key: 'assistant' }]);
   getDetailForTenant = jest.fn().mockResolvedValue({ key: 'assistant' });
   getActivity = jest.fn().mockResolvedValue({ episodeCount: 1 });
-  listEligibleSupervisors = jest.fn().mockResolvedValue([{ id: 42 }]);
+  listEligibleSupervisors = jest.fn().mockResolvedValue({ items: [{ id: 42 }], nextCursor: null, total: 1 });
   updateAgent = jest.fn().mockResolvedValue({ updatedResponsibilityCount: 1, supervisorUpdated: true });
 }
 
@@ -38,26 +41,33 @@ describe('DeskAgentController', () => {
   });
 
   it('listEligibleSupervisors delegates to service', async () => {
-    await controller.listEligibleSupervisors({ role: UserRole.OWNER });
-    expect(agents.listEligibleSupervisors).toHaveBeenCalledWith(7);
+    const page = await controller.listEligibleSupervisors({ role: UserRole.OWNER }, { q: 'ada', limit: 10 });
+    expect(agents.listEligibleSupervisors).toHaveBeenCalledWith(7, { q: 'ada', limit: 10 });
+    expect(page).toEqual({ items: [{ id: 42 }], nextCursor: null, total: 1 });
   });
 
   describe('activity', () => {
     it('accepts a valid window', async () => {
-      const res = await controller.activity({ role: UserRole.OWNER }, 'assistant', '7d');
+      const res = await controller.activity(
+        { role: UserRole.OWNER },
+        'assistant',
+        await readQueryDto(AgentActivityWindowQueryDto, { window: '7d' }),
+      );
       expect(agents.getActivity).toHaveBeenCalledWith(7, 'assistant', '7d');
       expect(res.episodeCount).toBe(1);
     });
 
     it('defaults to 7d', async () => {
-      await controller.activity({ role: UserRole.OWNER }, 'assistant');
+      await controller.activity(
+        { role: UserRole.OWNER },
+        'assistant',
+        await readQueryDto(AgentActivityWindowQueryDto, {}),
+      );
       expect(agents.getActivity).toHaveBeenCalledWith(7, 'assistant', '7d');
     });
 
-    it('rejects an invalid window', async () => {
-      await expect(controller.activity({ role: UserRole.OWNER }, 'assistant', '1y')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+    it('answers 400 naming window for an unknown one', async () => {
+      expect(await fieldErrorsOf(readQueryDto(AgentActivityWindowQueryDto, { window: '1y' }))).toHaveProperty('window');
     });
   });
 

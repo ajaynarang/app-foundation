@@ -1,10 +1,9 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DESK_OUTCOMES } from '../../shared-steps/outcomes';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { SnoozeDuration } from '../types';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { closeStep } from '../../shared-steps/close.step';
 
@@ -43,12 +42,11 @@ const DURATION_MS: Record<SnoozeDuration, number | null> = {
  * operator who already said "hide for a month" from accidentally
  * shortening the window by clicking "1 day" the next morning.
  *
- * DomainEvents:
- *   • app.desk.episode.snoozed      — when snooze() completes
- *   • app.desk.suppression.cleared  — when unsnooze() completes
- * Both wrap `new DomainEvent(...)` so wildcard subscribers
- * (CacheInvalidationSubscriber, DomainEventSseBridge, WebhookDispatcher)
- * receive the canonical event envelope.
+ * DomainEvents (staged through the outbox with their write — ADR "Outbox and deadlines"):
+ *   • app.desk.episode-snoozed      — when snooze() writes the suppression
+ *   • app.desk.suppression-cleared  — when unsnooze() clears it
+ * Wildcard subscribers (CacheInvalidationSubscriber, DomainEventSseBridge,
+ * WebhookDispatcher) receive the canonical event envelope.
  */
 @Injectable()
 export class SuppressionService {
@@ -56,7 +54,7 @@ export class SuppressionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: EventEmitter2,
+    private readonly outbox: OutboxService,
   ) {}
 
   async snooze(input: {
@@ -104,35 +102,46 @@ export class SuppressionService {
 
     // 4. Extend existing to max(current, new) — never shorten.
     //    `null` (forever) beats any timestamp in both directions.
-    let suppression;
-    if (existing) {
-      const finalUntil =
-        existing.suppressUntil === null || requestedUntil === null
-          ? null
-          : new Date(Math.max(existing.suppressUntil.getTime(), requestedUntil.getTime()));
-      suppression = await this.prisma.deskEntitySuppression.update({
-        where: { id: existing.id },
-        data: {
-          suppressUntil: finalUntil,
-          // Only overwrite reason if caller supplied one — otherwise keep the
-          // prior operator note so audit stays meaningful across multiple snoozes.
-          reason: input.reason ?? existing.reason,
-        },
+    //    The DomainEvent is staged with the write (ADR "Outbox and deadlines") — it exists iff the suppression
+    //    committed. Wildcard subscribers pick it up for cache invalidation + SSE broadcast
+    //    (Desk UI re-renders without polling).
+    const suppression = await this.outbox.transaction(async (tx, emit) => {
+      let row;
+      if (existing) {
+        const finalUntil =
+          existing.suppressUntil === null || requestedUntil === null
+            ? null
+            : new Date(Math.max(existing.suppressUntil.getTime(), requestedUntil.getTime()));
+        row = await tx.deskEntitySuppression.update({
+          where: { id: existing.id },
+          data: {
+            suppressUntil: finalUntil,
+            // Only overwrite reason if caller supplied one — otherwise keep the
+            // prior operator note so audit stays meaningful across multiple snoozes.
+            reason: input.reason ?? existing.reason,
+          },
+        });
+      } else {
+        row = await tx.deskEntitySuppression.create({
+          data: {
+            tenantId: input.tenantId,
+            responsibilityKey: episode.responsibility.key,
+            entityType: episode.entityType ?? '',
+            entityId: episode.entityId ?? '',
+            suppressUntil: requestedUntil,
+            reason: input.reason ?? null,
+            setByUserId: input.userId,
+            sourceEpisodeId: episode.id,
+          },
+        });
+      }
+      await emit(DOMAIN_EVENTS.DESK_EPISODE_SNOOZED, input.tenantId, {
+        episodeId: episode.id,
+        suppressionId: row.id,
+        suppressUntil: row.suppressUntil ? row.suppressUntil.toISOString() : null,
       });
-    } else {
-      suppression = await this.prisma.deskEntitySuppression.create({
-        data: {
-          tenantId: input.tenantId,
-          responsibilityKey: episode.responsibility.key,
-          entityType: episode.entityType ?? '',
-          entityId: episode.entityId ?? '',
-          suppressUntil: requestedUntil,
-          reason: input.reason ?? null,
-          setByUserId: input.userId,
-          sourceEpisodeId: episode.id,
-        },
-      });
-    }
+      return row;
+    });
 
     // 5. Close the episode — snooze is a distinct operator decision (D14),
     //    not an approval reject, so we terminate directly rather than going
@@ -148,18 +157,7 @@ export class SuppressionService {
       transition: 'snooze',
     });
 
-    // 6. Emit the DomainEvent. Wildcard subscribers pick this up for cache
-    //    invalidation + SSE broadcast (Desk UI re-renders without polling).
-    this.events.emit(
-      DOMAIN_EVENTS.DESK_EPISODE_SNOOZED,
-      new DomainEvent(DOMAIN_EVENTS.DESK_EPISODE_SNOOZED, String(input.tenantId), {
-        episodeId: episode.id,
-        suppressionId: suppression.id,
-        suppressUntil: suppression.suppressUntil ? suppression.suppressUntil.toISOString() : null,
-      }),
-    );
-
-    // 7. Structured log for audit trail (grep by `desk-snooze`).
+    // 6. Structured log for audit trail (grep by `desk-snooze`).
     this.logger.log(
       `desk-snooze episodeId=${episode.id} suppressionId=${suppression.id} duration=${input.duration} until=${suppression.suppressUntil?.toISOString() ?? 'forever'} byUser=${input.userId}`,
     );
@@ -180,20 +178,17 @@ export class SuppressionService {
       throw new NotFoundException('Suppression not found or already cleared');
     }
 
-    const updated = await this.prisma.deskEntitySuppression.update({
-      where: { id: row.id },
-      data: {
-        unsuppressedAt: new Date(),
-        unsuppressedByUserId: userId,
-      },
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const cleared = await tx.deskEntitySuppression.update({
+        where: { id: row.id },
+        data: {
+          unsuppressedAt: new Date(),
+          unsuppressedByUserId: userId,
+        },
+      });
+      await emit(DOMAIN_EVENTS.DESK_SUPPRESSION_CLEARED, tenantId, { suppressionId: row.id });
+      return cleared;
     });
-
-    this.events.emit(
-      DOMAIN_EVENTS.DESK_SUPPRESSION_CLEARED,
-      new DomainEvent(DOMAIN_EVENTS.DESK_SUPPRESSION_CLEARED, String(tenantId), {
-        suppressionId: row.id,
-      }),
-    );
 
     this.logger.log(`desk-unsnooze suppressionId=${row.id} byUser=${userId}`);
     return updated;

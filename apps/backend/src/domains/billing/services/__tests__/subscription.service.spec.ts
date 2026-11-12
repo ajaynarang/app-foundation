@@ -78,7 +78,7 @@ describe('SubscriptionService', () => {
       );
     });
 
-    it('should throw if tenant already has active subscription', async () => {
+    it('answers 409 INVALID_STATE if the tenant already has an active subscription', async () => {
       mockPrisma.planConfig.findUnique.mockResolvedValue({
         providerPriceId: 'price_1',
       });
@@ -91,9 +91,10 @@ describe('SubscriptionService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(service.createSubscription('TNT-1', 1, 'STARTER' as any, 1, 'url', 'url')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.createSubscription('TNT-1', 1, 'STARTER' as any, 1, 'url', 'url')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should create billing customer if none exists', async () => {
@@ -119,9 +120,12 @@ describe('SubscriptionService', () => {
   });
 
   describe('upgradePlan', () => {
-    it('should throw if no active subscription', async () => {
+    it('answers 409 INVALID_STATE if there is no active subscription', async () => {
       mockPrisma.billingSubscription.findFirst.mockResolvedValue(null);
-      await expect(service.upgradePlan('TNT-1', 1, 'PROFESSIONAL' as any)).rejects.toThrow(BadRequestException);
+      await expect(service.upgradePlan('TNT-1', 1, 'PROFESSIONAL' as any)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should throw if downgrading via upgrade endpoint', async () => {

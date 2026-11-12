@@ -18,6 +18,10 @@
  *   - PROJECT_NAME / MULTI_TENANT / NEXT_PUBLIC_MULTI_TENANT in .env.example files
  *   - `@app/` workspace scope     → <scope>/          (only when --scope is not @app)
  *
+ * Optional features, removed BEFORE the rename rules so each manifest is matched against template text:
+ *   - `--desk no` (the default) strips Desk through tools/init-app/features/desk.json (apply-feature.mjs)
+ *   - `--mobile no` deletes apps/mobile
+ *
  * Never touched: .git, node_modules, pnpm-lock.yaml (run `pnpm install` after a scope rename),
  * docs/superpowers/ (historical design docs), tools/init-app/ (this tool).
  *
@@ -27,6 +31,8 @@
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { execSync } from 'node:child_process';
+import { loadManifest, removeFeature } from './apply-feature.mjs';
+import { walkRepo } from './repo-walk.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -46,6 +52,7 @@ const { values: flags } = parseArgs({
     db: { type: 'string' },
     tenancy: { type: 'string' }, // mt | st
     mobile: { type: 'string' }, // yes | no — keep the Flutter companion app?
+    desk: { type: 'string' }, // yes | no — include Desk (default no)?
     yes: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
@@ -62,6 +69,7 @@ if (flags.help) {
   --db <snake_case>        Postgres database name (default: name with dashes as underscores)
   --tenancy <mt|st|personal>  Tenancy mode written to .env.example files (default: mt)
   --mobile <yes|no>        Keep the Flutter mobile companion app at apps/mobile (default: yes)
+  --desk <yes|no>   Include Desk, the Inngest workflow engine for background AI agents (default: no)
   --yes                    Non-interactive; accept defaults for everything not passed
   --dry-run                Show per-file replacement counts; change nothing
   --force                  Skip the git-clean and already-initialized guards
@@ -81,7 +89,10 @@ function fail(msg) {
 }
 
 function titleCase(kebab) {
-  return kebab.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return kebab
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -92,16 +103,23 @@ const rootPkgPath = path.join(ROOT, 'package.json');
 const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
 
 if (!flags.force && rootPkg.name !== TEMPLATE_NAME) {
-  fail(`This repo is already initialized (package name is "${rootPkg.name}", not "${TEMPLATE_NAME}"). Re-run with --force only if you know what you're doing.`);
+  fail(
+    `This repo is already initialized (package name is "${rootPkg.name}", not "${TEMPLATE_NAME}"). Re-run with --force only if you know what you're doing.`,
+  );
 }
 
 if (!flags.force && !flags['dry-run']) {
   try {
     const dirty = execSync('git status --porcelain', { cwd: ROOT, encoding: 'utf8' }).trim();
-    if (dirty) fail('Working tree is not clean. Commit or stash first (or pass --force). init-app rewrites many files — you want a clean diff.');
+    if (dirty)
+      fail(
+        'Working tree is not clean. Commit or stash first (or pass --force). init-app rewrites many files — you want a clean diff.',
+      );
   } catch (e) {
     if (e.message && e.message.includes('not a git repository')) {
-      console.warn('  ⚠ Not a git repository — skipping the clean-tree guard. Consider `git init` first so you can review the diff.');
+      console.warn(
+        '  ⚠ Not a git repository — skipping the clean-tree guard. Consider `git init` first so you can review the diff.',
+      );
     } else if (!e.message?.includes('Working tree')) {
       console.warn('  ⚠ Could not run git — skipping the clean-tree guard.');
     } else {
@@ -122,6 +140,7 @@ async function gatherConfig() {
     db: flags.db,
     tenancy: flags.tenancy,
     mobile: flags.mobile,
+    desk: flags.desk,
   };
 
   if (flags.yes) {
@@ -136,8 +155,16 @@ async function gatherConfig() {
     cfg.displayName = cfg.displayName || (await ask('Display name', titleCase(cfg.name || '')));
     cfg.scope = cfg.scope || (await ask('Package scope (keep @app unless you have a reason)', '@app'));
     cfg.db = cfg.db || (await ask('Postgres database name', (cfg.name || '').replace(/-/g, '_')));
-    cfg.tenancy = cfg.tenancy || (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
+    cfg.tenancy =
+      cfg.tenancy ||
+      (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
     cfg.mobile = cfg.mobile || (await ask('Include the Flutter mobile companion app? (yes/no)', 'yes'));
+    cfg.desk =
+      cfg.desk ||
+      (await ask(
+        'Include Desk, the Inngest workflow engine for background AI agents? Timers and recurring jobs work without it. (yes/no)',
+        'no',
+      ));
     rl.close();
   }
 
@@ -146,13 +173,16 @@ async function gatherConfig() {
   cfg.db = cfg.db || cfg.name.replace(/-/g, '_');
   cfg.tenancy = cfg.tenancy || 'mt';
   cfg.mobile = cfg.mobile || 'yes';
+  cfg.desk = cfg.desk || 'no';
 
   if (!VALID.name.test(cfg.name)) fail(`Invalid --name "${cfg.name}" — must match ${VALID.name}`);
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
   if (!VALID.scope.test(cfg.scope)) fail(`Invalid --scope "${cfg.scope}" — must match ${VALID.scope}`);
   if (!VALID.db.test(cfg.db)) fail(`Invalid --db "${cfg.db}" — must match ${VALID.db}`);
-  if (!['mt', 'st', 'personal'].includes(cfg.tenancy)) fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
+  if (!['mt', 'st', 'personal'].includes(cfg.tenancy))
+    fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
   if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
+  if (!['yes', 'no'].includes(cfg.desk)) fail(`Invalid --desk "${cfg.desk}" — must be yes or no`);
   return cfg;
 }
 
@@ -222,7 +252,10 @@ function buildRules(cfg) {
     {
       id: `web .env.example NEXT_PUBLIC_MULTI_TENANT=${mt}`,
       files: ['apps/web/.env.example'],
-      apply: (s) => s.replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`).replace(/^NEXT_PUBLIC_TENANCY_MODE=.*$/m, `NEXT_PUBLIC_TENANCY_MODE=${mode}`),
+      apply: (s) =>
+        s
+          .replace(/^NEXT_PUBLIC_MULTI_TENANT=.*$/m, `NEXT_PUBLIC_MULTI_TENANT=${mt}`)
+          .replace(/^NEXT_PUBLIC_TENANCY_MODE=.*$/m, `NEXT_PUBLIC_TENANCY_MODE=${mode}`),
     },
   ];
   if (cfg.mobile === 'yes') {
@@ -245,28 +278,6 @@ function buildRules(cfg) {
 // File walk
 // ---------------------------------------------------------------------------
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.turbo', '.next', 'dist', 'build', 'coverage', '.screenshots', '.dart_tool', 'ephemeral', '.gradle', 'generated']);
-const SKIP_REL = ['docs/superpowers', 'tools/init-app'];
-const SKIP_FILES = new Set(['pnpm-lock.yaml']);
-const BINARY_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.gz', '.tar', '.mp4', '.mov', '.dump', '.jar']);
-
-function* walk(dir) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const abs = path.join(dir, entry.name);
-    const rel = path.relative(ROOT, abs);
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      if (SKIP_REL.some((p) => rel === p || rel.startsWith(p + path.sep))) continue;
-      yield* walk(abs);
-    } else if (entry.isFile()) {
-      if (SKIP_FILES.has(entry.name)) continue;
-      if (BINARY_EXT.has(path.extname(entry.name).toLowerCase())) continue;
-      if (SKIP_REL.some((p) => rel.startsWith(p + path.sep))) continue;
-      yield { abs, rel };
-    }
-  }
-}
-
 function countDiffs(before, after) {
   if (before === after) return 0;
   // cheap proxy: number of changed lines
@@ -285,12 +296,28 @@ const cfg = await gatherConfig();
 const rules = buildRules(cfg);
 const dryRun = flags['dry-run'];
 
-console.log(`\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy})\n`);
+console.log(
+  `\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy}, desk: ${cfg.desk})\n`,
+);
+
+// Optional features go first, so every manifest is matched against template text, before any rename.
+if (cfg.desk === 'no') {
+  let actions;
+  try {
+    actions = removeFeature(ROOT, loadManifest('desk'), { dryRun });
+  } catch (e) {
+    fail(`Could not remove Desk: ${e.message}`);
+  }
+  console.log(`  ${dryRun ? 'Would remove' : 'Removed'} Desk (--desk no):`);
+  for (const a of actions) console.log(`    ${a}`);
+  if (actions.length === 0) console.log('    nothing (already removed)');
+  console.log('');
+}
 
 const stats = new Map(rules.map((r) => [r.id, { files: 0, lines: 0 }]));
 let touched = 0;
 
-for (const { abs, rel } of walk(ROOT)) {
+for (const { abs, rel } of walkRepo(ROOT)) {
   let content;
   try {
     content = fs.readFileSync(abs, 'utf8');
@@ -334,6 +361,31 @@ if (cfg.mobile === 'no') {
   }
 }
 
+// The committed OpenAPI documents and the RBAC matrix list every route, so they go stale when a feature is removed.
+let regenerated = false;
+if (!dryRun && cfg.desk === 'no') {
+  const generators = ['pnpm --filter @app/backend openapi:generate', 'pnpm --filter @app/qa generate:rbac'];
+  if (
+    fs.existsSync(path.join(ROOT, 'node_modules')) &&
+    fs.existsSync(path.join(ROOT, 'packages/appshore/platform/dist'))
+  ) {
+    try {
+      for (const cmd of generators) execSync(cmd, { cwd: ROOT, stdio: 'inherit' });
+      regenerated = true;
+      console.log('  Regenerated apps/backend/openapi.json, public-openapi.json and the RBAC matrix.');
+    } catch {
+      console.warn('  ⚠ Could not regenerate the OpenAPI documents and the RBAC matrix; run the commands below.');
+    }
+  }
+  if (!regenerated) {
+    console.log(
+      `  Without Desk the committed OpenAPI documents and RBAC matrix are stale. After installing and building:\n${generators
+        .map((c) => `    ${c}`)
+        .join('\n')}`,
+    );
+  }
+}
+
 if (!dryRun) {
   console.log(`
   Next steps:
@@ -343,10 +395,21 @@ if (!dryRun) {
        Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend
     3. pnpm docker:up
     4. cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed
-    5. pnpm dev                           # web :3000, backend :8000${cfg.mobile === 'yes' ? `
-    5b. cd apps/mobile && flutter run     # mobile companion (needs a device/simulator)` : ''}
+    5. pnpm dev                           # web :3000, backend :8000${
+      cfg.mobile === 'yes'
+        ? `
+    5b. cd apps/mobile && flutter run     # mobile companion (needs a device/simulator)`
+        : ''
+    }${
+      cfg.desk === 'yes'
+        ? `
+    5c. pnpm inngest:dev                  # Desk: the local workflow dev server`
+        : `
+    Desk is not included: its tables stay in the schema, empty. tools/init-app/README.md says how to add it later.`
+    }
     6. Replace the landing page (apps/web/src/app/page.tsx) with your product's home,
        and update the Documentation link there to your repo.
-    7. Review the diff, commit, and optionally delete tools/init-app/.
+    7. Review the diff and commit. Keep tools/init-app/ if you plan to pull template updates:
+       apply-feature.mjs is how a returning file of a removed feature is removed again.
 `);
 }

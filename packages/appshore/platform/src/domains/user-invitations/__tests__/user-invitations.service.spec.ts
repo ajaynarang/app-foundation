@@ -6,7 +6,8 @@ import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
 import { TwilioVerifyService } from '../../../infrastructure/sms/twilio-verify.service';
 import { PinService } from '../../../auth/pin.service';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 
 describe('UserInvitationsService', () => {
   let service: UserInvitationsService;
@@ -19,6 +20,7 @@ describe('UserInvitationsService', () => {
     userInvitation: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -136,6 +138,48 @@ describe('UserInvitationsService', () => {
       expect(mockPrismaService.userInvitation.create).toHaveBeenCalled();
     });
 
+    it("answers the public invitation and its link: never the token, the Int key or the inviter's whole row", async () => {
+      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 1, tenantId: 'tenant_abc' });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
+      mockPrismaService.userInvitation.create.mockResolvedValue({
+        id: 7,
+        invitationId: 'inv_abc123',
+        tenantId: 1,
+        invitedBy: 1,
+        token: 'secret-token',
+        email: 'newuser@example.com',
+        phone: null,
+        inviteChannel: 'EMAIL',
+        firstName: 'John',
+        lastName: 'Doe',
+        role: 'MEMBER',
+        status: 'PENDING',
+        expiresAt: new Date(),
+        acceptedAt: null,
+        cancelledAt: null,
+        createdAt: new Date(),
+        invitedByUser: { userId: 'user_admin1', email: 'a@example.com', firstName: 'Admin', lastName: 'User' },
+        tenant: { companyName: 'Acme Co' },
+      });
+
+      const result = await service.inviteUser(
+        { email: 'newuser@example.com', firstName: 'John', lastName: 'Doe', role: 'MEMBER' as any },
+        defaultCurrentUser,
+      );
+
+      expect(result).toMatchObject({
+        invitationId: 'inv_abc123',
+        invitedBy: { userId: 'user_admin1' },
+        inviteLink: expect.stringContaining('/accept-invitation?token='),
+      });
+      for (const key of ['id', 'token', 'tenantId', 'tenant', 'invitedByUser']) expect(result).not.toHaveProperty(key);
+      // The inviter is read for the email and the response only: never the password or PIN hash.
+      const include = mockPrismaService.userInvitation.create.mock.calls[0][0].include;
+      expect(include.invitedByUser).toEqual({ select: expect.not.objectContaining({ passwordHash: true }) });
+    });
+
     it('should throw error if user already exists', async () => {
       const inviteDto = {
         email: 'existing@example.com',
@@ -194,33 +238,87 @@ describe('UserInvitationsService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw error if invitation expired', async () => {
+    it('answers 409 INVALID_STATE if the invitation expired', async () => {
       mockPrismaService.userInvitation.findUnique.mockResolvedValue({
         id: 1,
         status: 'PENDING',
         expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
 
-      await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toThrow(BadRequestException);
+      await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 
-  describe('getInvitations', () => {
-    it('should return invitations for tenant', async () => {
-      const mockInvitations = [
-        { id: 1, email: 'user1@example.com', status: 'PENDING' },
-        { id: 2, email: 'user2@example.com', status: 'ACCEPTED' },
-      ];
+  describe('listInvitations: a cursor list, newest first', () => {
+    // A bulk invite writes several rows in one millisecond.
+    const stamps = tiedTimestamps(7);
+    const rows = stamps.map((createdAt, index) => ({
+      id: index + 1,
+      invitationId: `inv_${(index * 3) % 7}`,
+      tenantId: index === 6 ? 99 : 1,
+      token: `secret-token-${index}`,
+      email: `user${index}@example.com`,
+      phone: null,
+      inviteChannel: 'EMAIL',
+      firstName: 'Sam',
+      lastName: 'Doe',
+      role: 'MEMBER',
+      status: index === 0 ? 'ACCEPTED' : 'PENDING',
+      expiresAt: new Date('2026-04-01T00:00:00.000Z'),
+      acceptedAt: null,
+      cancelledAt: null,
+      createdAt,
+      invitedByUser: { userId: 'usr_owner', email: 'owner@example.com', firstName: 'O', lastName: 'W' },
+    }));
 
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        id: 1,
-        tenantId: 'tenant_abc',
+    beforeEach(() => {
+      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 1, tenantId: 'tenant_abc' });
+      Object.assign(mockPrismaService.userInvitation, fixtureModel(rows));
+    });
+
+    it("returns each of the tenant's invitations once, ties included", async () => {
+      const { pages, items } = await walkCursorList((cursor) =>
+        service.listInvitations('tenant_abc', { limit: 2, cursor }),
+      );
+
+      expect(pages.map((page) => page.length)).toEqual([2, 2, 2]);
+      expect(new Set(items.map((invitation) => invitation.invitationId)).size).toBe(6);
+      const times = items.map((invitation) => invitation.createdAt.getTime());
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+    });
+
+    it('never returns the acceptance token or the Int key, and names the inviter by public id', async () => {
+      const { items } = await service.listInvitations('tenant_abc');
+
+      expect(mockPrismaService.userInvitation.findMany.mock.calls[0][0].select).not.toHaveProperty('token');
+      for (const item of items) {
+        expect(item).not.toHaveProperty('token');
+        expect(item).not.toHaveProperty('id');
+      }
+      expect(items[0].invitedBy).toEqual({
+        userId: 'usr_owner',
+        email: 'owner@example.com',
+        firstName: 'O',
+        lastName: 'W',
       });
-      mockPrismaService.userInvitation.findMany.mockResolvedValue(mockInvitations);
+    });
 
-      const result = await service.getInvitations('tenant_abc');
+    it('filters by status in the page and the total', async () => {
+      const page = await service.listInvitations('tenant_abc', { statuses: ['ACCEPTED'] as never });
+      expect(page).toMatchObject({ total: 1, nextCursor: null });
+      expect(page.items[0].status).toBe('ACCEPTED');
+      // Several statuses at once: what the invitations screen asks for (pending or expired).
+      const open = await service.listInvitations('tenant_abc', { statuses: ['PENDING', 'EXPIRED'] as never });
+      expect(open.total).toBe(5);
+    });
 
-      expect(result).toEqual(mockInvitations);
+    it('answers 404 for an unknown tenant and 400 for a cursor it did not issue', async () => {
+      await expect(service.listInvitations('tenant_abc', { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+      mockPrismaService.tenant.findUnique.mockResolvedValue(null);
+      await expect(service.listInvitations('ghost')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -248,7 +346,7 @@ describe('UserInvitationsService', () => {
       expect(result.status).toBe('CANCELLED');
     });
 
-    it('should throw error if invitation already accepted', async () => {
+    it('answers 409 INVALID_STATE if the invitation was already accepted', async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -259,7 +357,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.cancelInvitation('inv_abc', 'tenant_abc', 'reason')).rejects.toThrow(BadRequestException);
+      await expect(service.cancelInvitation('inv_abc', 'tenant_abc', 'reason')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
   });
 
@@ -289,7 +390,9 @@ describe('UserInvitationsService', () => {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
 
-      await service.resendInvitation('inv_abc', 'tenant_abc');
+      const resent = await service.resendInvitation('inv_abc', 'tenant_abc');
+      for (const key of ['id', 'token', 'tenantId']) expect(resent).not.toHaveProperty(key);
+      expect(resent.inviteLink).toContain('token=');
 
       expect(mockPrismaService.userInvitation.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -302,7 +405,7 @@ describe('UserInvitationsService', () => {
       );
     });
 
-    it('should throw error if invitation is not PENDING', async () => {
+    it('answers 409 INVALID_STATE if the invitation is not PENDING', async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -314,7 +417,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toThrow(BadRequestException);
+      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should throw error if invitation not found', async () => {
@@ -364,7 +470,7 @@ describe('UserInvitationsService', () => {
       await expect(service.resendInvitation('inv_abc', 'bad_tenant')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -377,7 +483,11 @@ describe('UserInvitationsService', () => {
         invitedByUser: { firstName: 'A', lastName: 'B' },
       });
 
-      await expect(service.resendInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.resendInvitation('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 
@@ -461,7 +571,10 @@ describe('UserInvitationsService', () => {
         status: 'ACCEPTED',
       });
 
-      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toThrow('Cannot get link');
+      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE', detail: 'An invitation that is accepted has no link to share' },
+      });
     });
   });
 
@@ -587,7 +700,7 @@ describe('UserInvitationsService', () => {
       await expect(service.cancelInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('already cancelled');
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -598,17 +711,24 @@ describe('UserInvitationsService', () => {
         status: 'PENDING',
       });
 
-      await expect(service.cancelInvitation('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.cancelInvitation('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 
   describe('getInvitations — super admin (no tenantId)', () => {
     it('should return all invitations when tenantIdString is undefined', async () => {
-      mockPrismaService.userInvitation.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      const row = (invitationId: string) => ({ invitationId, createdAt: new Date(), invitedByUser: null });
+      mockPrismaService.userInvitation.findMany.mockResolvedValue([row('inv_1'), row('inv_2')]);
+      mockPrismaService.userInvitation.count.mockResolvedValue(2);
 
-      const result = await service.getInvitations(undefined);
+      const result = await service.listInvitations(undefined);
 
-      expect(result).toHaveLength(2);
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(2);
       expect(mockPrismaService.tenant.findUnique).not.toHaveBeenCalled();
     });
 
@@ -618,12 +738,13 @@ describe('UserInvitationsService', () => {
         tenantId: 'tenant_abc',
       });
       mockPrismaService.userInvitation.findMany.mockResolvedValue([]);
+      mockPrismaService.userInvitation.count.mockResolvedValue(0);
 
-      await service.getInvitations('tenant_abc', 'PENDING');
+      await service.listInvitations('tenant_abc', { statuses: ['PENDING'] as never });
 
       expect(mockPrismaService.userInvitation.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ status: 'PENDING' }),
+          where: expect.objectContaining({ status: { in: ['PENDING'] } }),
         }),
       );
     });
@@ -692,7 +813,7 @@ describe('UserInvitationsService', () => {
       expect(mockPinService.hashPin).toHaveBeenCalledWith('1234');
     });
 
-    it('should throw for invalid or expired invitation', async () => {
+    it('answers 409 INVALID_STATE for an invalid or expired invitation', async () => {
       mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -702,7 +823,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when invitation status is not PENDING', async () => {
@@ -719,7 +840,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when invitation has expired', async () => {
@@ -736,7 +857,7 @@ describe('UserInvitationsService', () => {
           otp: '123456',
           pin: '1234',
         }),
-      ).rejects.toThrow('Invalid or expired invitation');
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
     });
 
     it('should throw when phone number does not match invitation', async () => {
@@ -913,7 +1034,7 @@ describe('UserInvitationsService', () => {
     it('should throw NotFoundException when tenant not found', async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue(null);
 
-      await expect(service.getInvitations('bad_tenant')).rejects.toThrow('Tenant not found');
+      await expect(service.listInvitations('bad_tenant')).rejects.toThrow('Tenant not found');
     });
   });
 
@@ -934,7 +1055,7 @@ describe('UserInvitationsService', () => {
       await expect(service.getInvitationLink('inv_nonexistent', 'tenant_abc')).rejects.toThrow('Invitation not found');
     });
 
-    it('should throw when invitation belongs to different tenant', async () => {
+    it("answers not found for another tenant's invitation, the same as one that does not exist", async () => {
       mockPrismaService.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'tenant_abc',
@@ -945,7 +1066,11 @@ describe('UserInvitationsService', () => {
         status: 'PENDING',
       });
 
-      await expect(service.getInvitationLink('inv_abc', 'tenant_abc')).rejects.toThrow('does not belong');
+      const error = await service.getInvitationLink('inv_abc', 'tenant_abc').catch((e) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect(error.message).toBe('Invitation not found');
+      expect(mockPrismaService.userInvitation.update).not.toHaveBeenCalled();
     });
   });
 });

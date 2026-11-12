@@ -7,17 +7,20 @@
  * with a **separate raw ioredis client** so it asserts what is actually in
  * Redis, not what the service thinks is in Redis.
  *
- * Requires docker-compose Redis (REDIS_URL or default redis://localhost:6379).
- * Skipped when Redis is unreachable so unit-test runs don't block on infra.
+ * Runs against the Redis that REDIS_URL names, and only that one: the spec
+ * writes and deletes keys, so it never guesses a port (6379 on a developer
+ * machine is often another project's Redis). Skipped when REDIS_URL is unset
+ * or unreachable so unit-test runs don't block on infra. Local compose Redis:
+ *   REDIS_URL=redis://localhost:6399 pnpm --filter @appshore/platform test
  */
 import Redis from 'ioredis';
 import { AppCacheService } from '../app-cache.service';
 
-const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL;
 const TEST_PREFIX = 'app:itest';
 
-async function isRedisReachable(): Promise<boolean> {
-  const probe = new Redis(REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 0, connectTimeout: 1000 });
+async function isRedisReachable(url: string): Promise<boolean> {
+  const probe = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 0, connectTimeout: 1000 });
   try {
     await probe.connect();
     await probe.ping();
@@ -36,7 +39,12 @@ describe('AppCacheService (integration, real Redis)', () => {
   let available: boolean;
 
   beforeAll(async () => {
-    available = await isRedisReachable();
+    if (!REDIS_URL) {
+      available = false;
+      console.warn('Skipping AppCacheService integration: REDIS_URL is not set');
+      return;
+    }
+    available = await isRedisReachable(REDIS_URL);
     if (!available) {
       console.warn(`Skipping AppCacheService integration: Redis at ${REDIS_URL} unreachable`);
     }
@@ -44,8 +52,8 @@ describe('AppCacheService (integration, real Redis)', () => {
 
   beforeEach(async () => {
     if (!available) return;
-    redis = new Redis(REDIS_URL);
-    probe = new Redis(REDIS_URL);
+    redis = new Redis(REDIS_URL as string);
+    probe = new Redis(REDIS_URL as string);
     // Inject the service-side client (matches what the Nest DI container produces).
     service = new AppCacheService(redis);
     service.onModuleInit();
@@ -186,6 +194,23 @@ describe('AppCacheService (integration, real Redis)', () => {
 
       expect(fromOther.totalHits).toBe(2);
     });
+  });
+
+  it('claim: the first caller wins, a second never overwrites, and the claim expires with its TTL', async () => {
+    if (!available) return;
+
+    const key = `${TEST_PREFIX}:claim`;
+    const otherReplica = new AppCacheService(redis);
+    const [one, two] = await Promise.all([
+      service.claim(key, { owner: 'a' }, 60_000),
+      otherReplica.claim(key, { owner: 'b' }, 60_000),
+    ]);
+    expect([one, two].sort()).toEqual([false, true]);
+    const winner = one ? 'a' : 'b';
+    expect(JSON.parse((await probe.get(key)) as string)).toEqual({ owner: winner });
+    const ttl = await probe.pttl(key);
+    expect(ttl).toBeGreaterThan(0);
+    expect(ttl).toBeLessThanOrEqual(60_000);
   });
 
   it('increment is atomic — INCRBY then first-touch EXPIRE', async () => {

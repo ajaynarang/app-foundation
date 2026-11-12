@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import type { NotificationType } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 import { bullJobIdFromDbId } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import type { PendingWhatsAppSend } from '../../pipeline/delivery.service';

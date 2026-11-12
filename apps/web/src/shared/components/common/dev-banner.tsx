@@ -24,7 +24,7 @@ function DevBannerInner() {
   return (
     <div
       data-dev-banner
-      className="fixed bottom-2 left-2 z-[60] flex items-center gap-2 rounded-full bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg dark:bg-white dark:text-gray-900"
+      className="fixed bottom-2 left-2 z-[60] flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs font-semibold text-background shadow-lg"
     >
       <span className="font-mono">{branch}</span>
       {port && (

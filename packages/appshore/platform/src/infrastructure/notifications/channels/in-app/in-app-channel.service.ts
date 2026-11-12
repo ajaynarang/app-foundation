@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NotificationChannel, type Notification, type NotificationType } from '@appshore/db';
+import { NotificationChannel, type Notification } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { isTestMarker } from '@appshore/kernel/shared/utils/test-marker.util';
 import { PrismaService } from '../../../database/prisma.service';

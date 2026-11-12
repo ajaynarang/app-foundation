@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { NotificationCategory, NotificationType } from '@appshore/db';
+import { NotificationCategory } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { InAppChannelService } from '../in-app-channel.service';
 import { PrismaService } from '../../../../database/prisma.service';
 import { AppCacheService } from '../../../../cache/app-cache.service';
@@ -12,7 +13,7 @@ describe('InAppChannelService', () => {
   const cache = { del: jest.fn().mockResolvedValue(undefined) };
   // One app-shaped policy so the group label comes from the registry, as it does in production.
   const appPolicies = {
-    [NotificationType.TENANT_REGISTRATION_CONFIRMATION]: policy(
+    [PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION]: policy(
       NotificationCategory.SYSTEM,
       NOTIFICATION_URGENCIES.TIMELY,
       {

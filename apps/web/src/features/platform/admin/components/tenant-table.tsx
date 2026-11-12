@@ -1,25 +1,24 @@
 'use client';
 
-import { Button } from '@app/ui/components/ui/button';
-import { Badge } from '@app/ui/components/ui/badge';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
+import { variantOf } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
-import { Alert, AlertDescription } from '@app/ui/components/ui/alert';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import type { TenantPlan } from '@/features/platform/plans';
-
-// Display names for plans
-const PLAN_DISPLAY_NAMES: Record<string, string> = {
-  STARTER: 'Starter',
-  PROFESSIONAL: 'Professional',
-  ENTERPRISE: 'Enterprise',
-  TRIAL: 'Trial',
-  TRIAL_EXPIRED: 'Trial Expired',
-  SUSPENDED: 'Suspended',
-};
+import { TENANT_PLAN_VARIANTS } from '@/features/billing/constants';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  RowActions,
+  type RowActionItem,
+  type RowActionPrimary,
+} from '@/shared/components/page-chrome';
+import { TENANT_STATUS_VARIANTS } from '../constants';
 
 interface Tenant {
-  id: number;
   tenantId: string;
   companyName: string;
   subdomain: string;
@@ -47,46 +46,94 @@ interface Tenant {
   };
 }
 
+/** The slice of a `useCursorList` result the table reads: rows, the four states, and the footer. */
+interface TenantList {
+  items: Tenant[];
+  total: number;
+  hasMore: boolean;
+  loadMore: () => void;
+  isLoadingMore: boolean;
+  isLoadMoreError: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => unknown;
+  isRefetching: boolean;
+}
+
 interface TenantTableProps {
-  tenants: Tenant[];
+  list: TenantList;
   status: 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED' | 'REJECTED';
   onApprove?: (tenant: Tenant) => void;
   onReject?: (tenant: Tenant) => void;
   onSuspend?: (tenant: Tenant) => void;
   onReactivate?: (tenant: Tenant) => void;
   onViewDetails?: (tenant: Tenant) => void;
-  isLoading?: boolean;
 }
 
 export function TenantTable({
-  tenants,
+  list,
   status,
   onApprove,
   onReject,
   onSuspend,
   onReactivate,
   onViewDetails,
-  isLoading = false,
 }: TenantTableProps) {
   const { formatDateTime } = useFormatters();
+  const tenants = list.items;
+  const statusLabel = TENANT_STATUS_VARIANTS[status].label.toLowerCase();
 
-  if (isLoading) {
+  if (list.isLoading) return <PageLoadingSkeleton variant="table" rows={6} />;
+
+  if (list.isError) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <ListErrorState
+        title={`Couldn't load ${statusLabel} tenants.`}
+        error={list.error}
+        onRetry={() => void list.refetch()}
+        isRetrying={list.isRefetching}
+      />
     );
   }
 
   if (tenants.length === 0) {
-    return (
-      <Alert>
-        <AlertDescription className="text-foreground">
-          No {status.toLowerCase().replace('_', ' ')} tenants
-        </AlertDescription>
-      </Alert>
-    );
+    return <PageEmptyState title={`No ${statusLabel} tenants`} />;
   }
+
+  /** The one visible action per state, and the rest behind ⋯. Destructive ones open their own confirm dialog. */
+  const actionsFor = (tenant: Tenant): { primary?: RowActionPrimary; items: RowActionItem[] } => {
+    const items: RowActionItem[] = [];
+    let primary: RowActionPrimary | undefined;
+    const name = tenant.companyName;
+    if (status === 'PENDING_APPROVAL') {
+      if (onApprove) primary = { label: 'Approve', ariaLabel: `Approve ${name}`, onClick: () => onApprove(tenant) };
+      if (onReject)
+        items.push({
+          label: 'Reject…',
+          ariaLabel: `Reject ${name}`,
+          destructive: true,
+          onSelect: () => onReject(tenant),
+        });
+    }
+    if (status === 'SUSPENDED' && onReactivate) {
+      primary = { label: 'Reactivate', ariaLabel: `Reactivate ${name}`, onClick: () => onReactivate(tenant) };
+    }
+    if (onViewDetails) {
+      const details = { label: 'Details', ariaLabel: `Open ${name}'s details` };
+      if (primary) items.unshift({ ...details, onSelect: () => onViewDetails(tenant) });
+      else primary = { ...details, onClick: () => onViewDetails(tenant) };
+    }
+    if (status === 'ACTIVE' && onSuspend) {
+      items.push({
+        label: 'Suspend…',
+        ariaLabel: `Suspend ${name}`,
+        destructive: true,
+        onSelect: () => onSuspend(tenant),
+      });
+    }
+    return { primary, items };
+  };
 
   const getStatusDate = (tenant: Tenant) => {
     switch (status) {
@@ -130,90 +177,67 @@ export function TenantTable({
             <TableHead className="hidden lg:table-cell">Admin User</TableHead>
             <TableHead className="hidden lg:table-cell">Contact</TableHead>
             <TableHead className="hidden md:table-cell">{getDateLabel()}</TableHead>
-            <TableHead>Actions</TableHead>
+            <TableHead className="w-[1%]">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tenants.map((tenant) => (
-            <TableRow key={tenant.id}>
-              <TableCell className="font-medium">{tenant.companyName}</TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
-              </TableCell>
-              <TableCell>
-                <Badge variant={tenant.status === 'ACTIVE' ? 'default' : 'muted'}>
-                  {tenant.status?.replace('_', ' ')}
-                </Badge>
-              </TableCell>
-              {/* Plan column */}
-              <TableCell className="hidden md:table-cell">
-                {tenant.plan ? (
-                  <div className="flex items-center gap-1">
-                    <Badge
-                      variant={
-                        tenant.plan === 'TRIAL_EXPIRED' || tenant.plan === 'SUSPENDED' ? 'destructive' : 'outline'
-                      }
-                    >
-                      {PLAN_DISPLAY_NAMES[tenant.plan] ?? tenant.plan}
-                    </Badge>
-                    {tenant.seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-caution shrink-0" />}
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground text-sm">—</span>
-                )}
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                {tenant.users?.[0] && (
-                  <>
-                    {tenant.users[0].firstName} {tenant.users[0].lastName}
-                    <br />
-                    <span className="text-sm text-muted-foreground">{tenant.users[0].email}</span>
-                  </>
-                )}
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                {tenant.contactEmail}
-                <br />
-                <span className="text-sm text-muted-foreground">{tenant.contactPhone}</span>
-              </TableCell>
-              <TableCell className="hidden md:table-cell">{getStatusDate(tenant)}</TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  {status === 'PENDING_APPROVAL' && (
+          {tenants.map((tenant) => {
+            const tenantStatus = variantOf(TENANT_STATUS_VARIANTS, tenant.status);
+            const plan = tenant.plan ? variantOf(TENANT_PLAN_VARIANTS, tenant.plan) : null;
+            const actions = actionsFor(tenant);
+            return (
+              <TableRow key={tenant.tenantId}>
+                <TableCell className="font-medium">{tenant.companyName}</TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <code className="text-sm bg-muted px-1 py-0.5 rounded">{tenant.subdomain}.app.example.com</code>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge tone={tenantStatus.tone}>{tenantStatus.label}</StatusBadge>
+                </TableCell>
+                {/* Plan column */}
+                <TableCell className="hidden md:table-cell">
+                  {plan ? (
+                    <div className="flex items-center gap-1">
+                      <StatusBadge tone={plan.tone}>{plan.label}</StatusBadge>
+                      {tenant.seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-caution-text shrink-0" />}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  {tenant.users?.[0] && (
                     <>
-                      {onApprove && (
-                        <Button size="sm" onClick={() => onApprove(tenant)}>
-                          Approve
-                        </Button>
-                      )}
-                      {onReject && (
-                        <Button size="sm" variant="destructive" onClick={() => onReject(tenant)}>
-                          Reject
-                        </Button>
-                      )}
+                      {tenant.users[0].firstName} {tenant.users[0].lastName}
+                      <br />
+                      <span className="text-sm text-muted-foreground">{tenant.users[0].email}</span>
                     </>
                   )}
-                  {status === 'ACTIVE' && onSuspend && (
-                    <Button size="sm" variant="outline" onClick={() => onSuspend(tenant)}>
-                      Suspend
-                    </Button>
-                  )}
-                  {status === 'SUSPENDED' && onReactivate && (
-                    <Button size="sm" variant="outline" onClick={() => onReactivate(tenant)}>
-                      Reactivate
-                    </Button>
-                  )}
-                  {onViewDetails && (
-                    <Button size="sm" variant="ghost" onClick={() => onViewDetails(tenant)}>
-                      Details
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  {tenant.contactEmail}
+                  <br />
+                  <span className="text-sm text-muted-foreground">{tenant.contactPhone}</span>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">{getStatusDate(tenant)}</TableCell>
+                <TableCell className="text-right">
+                  <RowActions primary={actions.primary} items={actions.items} />
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
+      <ListFooter
+        shown={tenants.length}
+        total={list.total}
+        hasMore={list.hasMore}
+        onLoadMore={list.loadMore}
+        isLoadingMore={list.isLoadingMore}
+        loadMoreFailed={list.isLoadMoreError}
+      />
     </div>
   );
 }

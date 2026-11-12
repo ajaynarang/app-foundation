@@ -43,7 +43,7 @@ export function PersonalRegisterForm() {
         body: JSON.stringify(form),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Registration failed');
+      if (!response.ok) throw new Error(data.detail || 'Registration failed');
       setTokens(data.accessToken);
       setUser(data.user);
       router.push('/');
@@ -93,7 +93,7 @@ export function PersonalRegisterForm() {
           />
           <PasswordStrengthMeter password={form.password} onScoreChange={setPasswordScore} />
         </div>
-        {error && <p className="text-sm text-critical text-center">{error}</p>}
+        {error && <p className="text-sm text-critical-text text-center">{error}</p>}
         <Button type="submit" disabled={!canSubmit || isSubmitting} loading={isSubmitting} className="w-full h-12">
           Create account
         </Button>

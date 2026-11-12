@@ -12,6 +12,12 @@ import { BullBoardAuthMiddleware } from '@appshore/platform/infrastructure/queue
 import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
 import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } from './placeholder.processors';
+import { buildJobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '@appshore/platform/infrastructure/queue/job-vocabulary.token';
+import { APP_JOB_VOCABULARY, APP_QUEUE_NAMES } from './job-names';
+
+/** The app's own queues (job-names.ts), registered beside the kernel's. */
+const APP_QUEUES: string[] = Object.values(APP_QUEUE_NAMES);
 
 @Global()
 @Module({
@@ -58,6 +64,7 @@ import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } f
       { name: QUEUE_NAMES.AI_INTERACTIVE },
       { name: QUEUE_NAMES.AI_BACKGROUND },
       { name: QUEUE_NAMES.BULK_OPS },
+      ...APP_QUEUES.map((name) => ({ name })),
     ),
     // Bull Board dashboard at /admin/queues — protected by BullBoardAuthMiddleware
     BullBoardModule.forRoot({
@@ -74,6 +81,7 @@ import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } f
       { name: QUEUE_NAMES.BULK_OPS, adapter: BullMQAdapter },
       // Registered by PlatformNotificationsModule; listed here so the ops UI shows it.
       { name: QUEUE_NAMES.WHATSAPP, adapter: BullMQAdapter },
+      ...APP_QUEUES.map((name) => ({ name, adapter: BullMQAdapter })),
     ),
     // JwtModule is re-registered here because AuthModule does not export it.
     // BullBoardAuthMiddleware needs JwtService to verify access tokens but
@@ -88,6 +96,8 @@ import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } f
     }),
   ],
   providers: [
+    // The kernel's job vocabulary merged with the app's (job-names.ts). Built here, so a key defined twice fails at boot.
+    { provide: JOB_VOCABULARY, useFactory: () => buildJobVocabulary(APP_JOB_VOCABULARY) },
     JobService,
     JobCleanupJob,
     BullBoardAuthMiddleware,
@@ -96,7 +106,7 @@ import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } f
     AiInteractivePlaceholderProcessor,
     AiBackgroundPlaceholderProcessor,
   ],
-  exports: [BullModule, JobService, JobCleanupJob, VendorCircuitBreakerService, DeadLetterService],
+  exports: [BullModule, JOB_VOCABULARY, JobService, JobCleanupJob, VendorCircuitBreakerService, DeadLetterService],
 })
 export class QueueModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

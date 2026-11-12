@@ -1,14 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@app/ui/components/ui/button';
 import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import type { AgentActivityFilter, AgentActivityRow, AgentPrincipalKind } from '@app/shared-types';
 import { useAgentActivity } from '@/features/ai/agent-activity';
-import { ScopeChip } from '@/features/ai/agent-scope-ui';
-import { DateRangeFilter, HISTORY_PRESETS } from '@/shared/components/ui/date-range-filter';
+import { HITL_TIER_VARIANTS, ScopeChip } from '@/features/ai/agent-scope-ui';
+import { DateRangeFilter, HISTORY_PRESETS } from '@app/ui/components/ui/date-range-filter';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  RelativeTime,
+  SegmentedControl,
+} from '@/shared/components/page-chrome';
 
 interface ActivityTabProps {
   principalKind: AgentPrincipalKind;
@@ -26,51 +33,24 @@ const FILTERS: Array<{ value: AgentActivityFilter; label: string }> = [
   { value: 'approvals', label: 'Approvals' },
 ];
 
-function formatRelative(iso: string): string {
-  const now = Date.now();
-  const then = new Date(iso).getTime();
-  const diffSec = Math.round((now - then) / 1000);
-  if (diffSec < 60) return `${diffSec}s ago`;
-  if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
-function tierBadgeVariant(tier: 'none' | 'standard' | 'sensitive'): 'muted' | 'info' | 'caution' {
-  if (tier === 'sensitive') return 'caution';
-  if (tier === 'standard') return 'info';
-  return 'muted';
-}
-
 export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
   const [filter, setFilter] = useState<AgentActivityFilter>('all');
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
   const [dateTo, setDateTo] = useState<string | undefined>(undefined);
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useAgentActivity({
+  const activity = useAgentActivity({
     principalKind,
     principalId,
     filter,
     dateFrom,
     dateTo,
   });
-
-  const rows: AgentActivityRow[] = data?.pages.flatMap((p) => p.rows) ?? [];
+  const { isLoading } = activity;
+  const rows: AgentActivityRow[] = activity.items;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-1" role="tablist" aria-label="Activity filter">
-          {FILTERS.map((f) => (
-            <Button
-              key={f.value}
-              size="sm"
-              variant={filter === f.value ? 'default' : 'outline'}
-              onClick={() => setFilter(f.value)}
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl label="Activity filter" options={FILTERS} value={filter} onChange={setFilter} />
         <DateRangeFilter
           dateFrom={dateFrom}
           dateTo={dateTo}
@@ -84,19 +64,23 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
-        </div>
+        <PageLoadingSkeleton variant="table" rows={6} />
+      ) : activity.isError ? (
+        <ListErrorState
+          title="Couldn't load this agent's activity."
+          error={activity.error}
+          onRetry={() => void activity.refetch()}
+          isRetrying={activity.isRefetching}
+        />
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            {dateFrom || dateTo
-              ? 'No activity in this date range. Try widening the window.'
-              : 'No activity yet. Invocations will appear here once this agent starts making calls.'}
-          </p>
-        </div>
+        <PageEmptyState
+          title={dateFrom || dateTo ? 'No activity in this date range' : 'No activity yet'}
+          description={
+            dateFrom || dateTo
+              ? 'Try widening the window.'
+              : 'Invocations will appear here once this agent starts making calls.'
+          }
+        />
       ) : (
         <div className="rounded-md border border-border overflow-x-auto">
           <Table>
@@ -112,21 +96,27 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="whitespace-nowrap" title={r.createdAt}>
-                    {formatRelative(r.createdAt)}
+                  <TableCell className="whitespace-nowrap">
+                    <RelativeTime iso={r.createdAt} />
                   </TableCell>
                   <TableCell className="font-mono text-xs">{r.toolName}</TableCell>
                   <TableCell>
                     <ScopeChip scope={r.scopeRequired} />
                   </TableCell>
                   <TableCell>
-                    <Badge variant={tierBadgeVariant(r.hitlTier)}>{r.hitlTier}</Badge>
+                    <StatusBadge tone={HITL_TIER_VARIANTS[r.hitlTier].tone}>
+                      {HITL_TIER_VARIANTS[r.hitlTier].label}
+                    </StatusBadge>
                   </TableCell>
                   <TableCell>
-                    {r.success ? <Badge variant="info">ok</Badge> : <Badge variant="critical">failed</Badge>}
+                    {r.success ? (
+                      <StatusBadge tone="success">Succeeded</StatusBadge>
+                    ) : (
+                      <StatusBadge tone="danger">Failed</StatusBadge>
+                    )}
                     {r.confirmationTokenId && (
-                      <Badge variant="muted" className="ml-1">
-                        approval
+                      <Badge variant="outline" className="ml-1">
+                        Approved by a person
                       </Badge>
                     )}
                   </TableCell>
@@ -137,12 +127,15 @@ export function ActivityTab({ principalKind, principalId }: ActivityTabProps) {
         </div>
       )}
 
-      {hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="ghost" onClick={() => fetchNextPage()} loading={isFetchingNextPage}>
-            Load more
-          </Button>
-        </div>
+      {rows.length > 0 && (
+        <ListFooter
+          shown={rows.length}
+          total={activity.total}
+          hasMore={activity.hasMore}
+          onLoadMore={activity.loadMore}
+          isLoadingMore={activity.isLoadingMore}
+          loadMoreFailed={activity.isLoadMoreError}
+        />
       )}
     </div>
   );

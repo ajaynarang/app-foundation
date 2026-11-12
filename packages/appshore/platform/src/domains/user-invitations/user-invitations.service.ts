@@ -8,6 +8,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { CursorList } from '@app/shared-types';
+import type { InvitationStatus, Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { INVITATION_LIST_SELECT, toPublicInvitation, type InvitationListItem } from './invitation.serializer';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
@@ -17,8 +26,19 @@ import { InviteUserDto, AcceptPhoneInvitationDto } from './dto/invite-user.dto';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
+import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+
+const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /invitations`. */
+export interface InvitationListQuery {
+  /** The statuses to show; omitted: every status. */
+  statuses?: InvitationStatus[];
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class UserInvitationsService {
@@ -150,9 +170,10 @@ export class UserInvitationsService {
         status: 'PENDING',
         expiresAt,
       },
+      // Only what the email and the public response need: never the inviter's whole row (password hash, PIN hash).
       include: {
-        tenant: true,
-        invitedByUser: true,
+        tenant: { select: { companyName: true } },
+        invitedByUser: INVITATION_LIST_SELECT.invitedByUser,
       },
     });
 
@@ -176,44 +197,43 @@ export class UserInvitationsService {
       );
     }
 
-    return { ...invitation, inviteLink };
+    return { ...toPublicInvitation(invitation), inviteLink };
   }
 
   /**
-   * Get all invitations for a tenant
-   * If tenantIdString is undefined, returns all invitations (for SUPER_ADMIN)
+   * A workspace's invitations (or, with no tenant, every tenant's), newest first, as a cursor list. The tiebreak
+   * is the public `invitationId`, never the Int key. The acceptance token is never read: it is a bearer secret.
    */
-  async getInvitations(tenantIdString?: string, status?: string) {
-    let tenantDbId: number | undefined;
+  async listInvitations(
+    tenantIdString?: string,
+    query: InvitationListQuery = {},
+  ): Promise<CursorList<InvitationListItem>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...INVITATION_KEYSET, cursor: query.cursor }) : undefined;
 
-    // If tenant ID string provided, look up database ID
+    let tenantDbId: number | undefined;
     if (tenantIdString) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { tenantId: tenantIdString },
-      });
-      if (!tenant) {
-        throw new NotFoundException('Tenant not found');
-      }
+      const tenant = await this.prisma.tenant.findUnique({ where: { tenantId: tenantIdString } });
+      if (!tenant) throw new NotFoundException('Tenant not found');
       tenantDbId = tenant.id;
     }
 
-    return this.prisma.userInvitation.findMany({
-      where: {
-        ...(tenantDbId && { tenantId: tenantDbId }),
-        ...(status && { status: status as any }),
-      },
-      include: {
-        invitedByUser: {
-          select: {
-            userId: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const scope: Prisma.UserInvitationWhereInput = {
+      ...(tenantDbId !== undefined && { tenantId: tenantDbId }),
+      ...(query.statuses && { status: { in: query.statuses } }),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.userInvitation.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        select: INVITATION_LIST_SELECT,
+        orderBy: [{ createdAt: 'desc' }, { invitationId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.userInvitation.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.invitationId));
+    return { items: page.items.map(toPublicInvitation), nextCursor: page.nextCursor, total };
   }
 
   /**
@@ -229,11 +249,11 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Invitation is no longer valid');
+      throw invalidState('This invitation is no longer valid');
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invitation has expired');
+      throw invalidState('This invitation has expired — ask for a new one');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -296,7 +316,7 @@ export class UserInvitationsService {
     });
 
     if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invalid or expired invitation');
+      throw invalidState('This invitation is invalid or has expired — ask for a new one');
     }
 
     // Validate that the phone number matches what the invitation was sent to
@@ -371,16 +391,17 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status === 'ACCEPTED') {
-      throw new BadRequestException('Cannot cancel accepted invitation');
+      throw invalidState('An accepted invitation cannot be cancelled');
     }
 
     if (invitation.status === 'CANCELLED') {
-      throw new BadRequestException('Invitation is already cancelled');
+      throw invalidState('This invitation is already cancelled');
     }
 
     return this.prisma.userInvitation.update({
@@ -417,12 +438,13 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(`Cannot resend invitation with status ${invitation.status}`);
+      throw invalidState(`An invitation that is ${stateLabel(invitation.status)} cannot be resent`);
     }
 
     const newToken = nanoid();
@@ -434,6 +456,7 @@ export class UserInvitationsService {
         token: newToken,
         expiresAt: newExpiry,
       },
+      select: INVITATION_LIST_SELECT,
     });
 
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
@@ -454,7 +477,7 @@ export class UserInvitationsService {
       );
     }
 
-    return { ...updatedInvitation, inviteLink };
+    return { ...toPublicInvitation(updatedInvitation), inviteLink };
   }
 
   /**
@@ -477,12 +500,13 @@ export class UserInvitationsService {
       throw new NotFoundException('Invitation not found');
     }
 
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
     if (invitation.tenantId !== tenant.id) {
-      throw new BadRequestException('Invitation does not belong to your organization');
+      throw new NotFoundException('Invitation not found');
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(`Cannot get link for invitation with status ${invitation.status}`);
+      throw invalidState(`An invitation that is ${stateLabel(invitation.status)} has no link to share`);
     }
 
     const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
@@ -520,11 +544,11 @@ export class UserInvitationsService {
     }
 
     if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Invitation is no longer valid');
+      throw invalidState('This invitation is no longer valid');
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new BadRequestException('Invitation has expired');
+      throw invalidState('This invitation has expired — ask for a new one');
     }
 
     return invitation;

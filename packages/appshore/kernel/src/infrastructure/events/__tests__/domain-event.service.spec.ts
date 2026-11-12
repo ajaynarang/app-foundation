@@ -3,6 +3,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DomainEventService } from '../domain-event.service';
 import { QUEUE_NAMES } from '../../queue/queue.constants';
+import { DomainEvent } from '../domain-event';
 
 describe('DomainEventService', () => {
   let service: DomainEventService;
@@ -160,5 +161,51 @@ describe('DomainEventService', () => {
     const opts = queue.add.mock.calls[0][2];
     const envelope = queue.add.mock.calls[0][1];
     expect(opts.jobId).toBe(`app.load.created-${envelope.payload.id}`);
+  });
+
+  describe('publish (an event that already exists — the outbox, ADR "Outbox and deadlines")', () => {
+    const recorded = () =>
+      DomainEvent.restore({
+        id: '01920000-0000-7000-8000-000000000001',
+        event: 'app.widget.created',
+        tenantId: '7',
+        data: { widgetId: 'w-1' },
+        actor: { id: 'u-1', type: 'user', label: 'Ana' },
+        correlationId: 'corr-1',
+        timestamp: new Date('2026-10-09T10:00:00.000Z'),
+      });
+
+    it('keeps the event id and timestamp on both paths', async () => {
+      const event = recorded();
+      await service.publish(event);
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('app.widget.created', event);
+      const [name, envelope, opts] = queue.add.mock.calls[0];
+      expect(name).toBe('app.widget.created');
+      expect(envelope.payload).toEqual(
+        expect.objectContaining({
+          id: event.id,
+          timestamp: '2026-10-09T10:00:00.000Z',
+          actor: { id: 'u-1', type: 'user', label: 'Ana' },
+          correlationId: 'corr-1',
+          causationId: null,
+        }),
+      );
+      expect(opts.jobId).toBe(`app.widget.created-${event.id}`);
+    });
+
+    it('throws when the durable enqueue fails, after the hot path delivered', async () => {
+      queue.add.mockRejectedValue(new Error('Redis down'));
+
+      await expect(service.publish(recorded())).rejects.toThrow('Redis down');
+      expect(eventEmitter.emit).toHaveBeenCalled();
+    });
+
+    it('sends a null label when the actor has none', async () => {
+      const event = DomainEvent.restore({ ...recorded(), actor: { id: 's', type: 'system' } });
+      await service.publish(event);
+
+      expect(queue.add.mock.calls[0][1].payload.actor).toEqual({ id: 's', type: 'system', label: null });
+    });
   });
 });

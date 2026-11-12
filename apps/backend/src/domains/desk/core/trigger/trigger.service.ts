@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@appshore/db';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
@@ -31,7 +31,7 @@ export class TriggerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inngest: InngestClientService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -120,42 +120,39 @@ export class TriggerService {
       return { id: existing.id, isNew: false };
     }
 
-    const created = await this.prisma.deskEpisode.create({
-      data: {
-        id: generateUuidV7(),
+    // A new episode opened — the Desk UI refreshes the Needs-you list + handoff counts live. The event
+    // commits with the episode (ADR "Outbox and deadlines"); publishing never fails the trigger.
+    const created = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.deskEpisode.create({
+        data: {
+          id: generateUuidV7(),
+          tenantId: input.tenantId,
+          responsibilityId: input.responsibilityId,
+          ownerAgentId: input.ownerAgentId,
+          trustLevelSnapshot: input.trustLevelSnapshot,
+          conditionsSnapshot: input.conditionsSnapshot,
+          triggerKind: input.trigger.kind,
+          triggerLabel: input.trigger.label,
+          triggerSource: input.trigger.source,
+          triggerFiredAt: input.trigger.firedAt,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          entityLabel: input.entityLabel,
+          status: EPISODE_STATUS.RUNNING,
+          dedupeKey: input.dedupeKey,
+          // Inngest owns the workflow_id field conceptually; we store the
+          // dedupe key for a stable cross-system reference the UI can deep-link to.
+          workflowId: `inngest:${input.dedupeKey}`,
+        },
+        select: { id: true },
+      });
+      await emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, input.tenantId, {
         tenantId: input.tenantId,
-        responsibilityId: input.responsibilityId,
-        ownerAgentId: input.ownerAgentId,
-        trustLevelSnapshot: input.trustLevelSnapshot,
-        conditionsSnapshot: input.conditionsSnapshot,
-        triggerKind: input.trigger.kind,
-        triggerLabel: input.trigger.label,
-        triggerSource: input.trigger.source,
-        triggerFiredAt: input.trigger.firedAt,
-        entityType: input.entityType,
-        entityId: input.entityId,
-        entityLabel: input.entityLabel,
+        episodeId: row.id,
         status: EPISODE_STATUS.RUNNING,
-        dedupeKey: input.dedupeKey,
-        // Inngest owns the workflow_id field conceptually; we store the
-        // dedupe key for a stable cross-system reference the UI can deep-link to.
-        workflowId: `inngest:${input.dedupeKey}`,
-      },
-      select: { id: true },
+      });
+      return row;
     });
-
-    // A new episode opened — tell the Desk UI to refresh the Needs-you list +
-    // handoff counts live. Best-effort — never fail the trigger on a dropped
-    // event.
-    await this.events
-      .emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, input.tenantId, {
-        tenantId: input.tenantId,
-        episodeId: created.id,
-        status: EPISODE_STATUS.RUNNING,
-      })
-      .catch((err) =>
-        this.logger.warn(`DESK_EPISODE_CHANGED emit failed for ${created.id}: ${(err as Error).message}`),
-      );
 
     return { id: created.id, isNew: true };
   }

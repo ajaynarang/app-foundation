@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, NotFoundException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
@@ -10,6 +10,9 @@ import { HitlChallengeService, parseHitlTokenOrNull } from '../agent-contract/hi
 import { PinService } from '@appshore/platform/auth/pin.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
+import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { HitlChallengeContextResponse, HitlStepUpResultResponse } from '../openapi.responses';
 
 @ApiTags('MCP HITL')
 @ApiBearerAuth()
@@ -29,6 +32,8 @@ export class HitlStepUpController {
     description:
       'Returns redacted args, the calling principal label, expiry, and whether the user has a PIN set. The PIN itself is never returned. Tenant-scoped.',
   })
+  @ApiParam({ name: 'token', description: 'HITL challenge token returned by the prior tools/call attempt' })
+  @ApiResult(HitlChallengeContextResponse)
   async getContext(
     @Param('token') token: string,
     @CurrentUser()
@@ -51,24 +56,7 @@ export class HitlStepUpController {
     });
     const hasPinSet = !!record?.pinHash;
 
-    let callerLabel = challenge.principalId;
-    if (challenge.principalKind === 'api_key') {
-      const apiKeyIdStr = challenge.principalId.replace(/^apikey:/, '');
-      const apiKeyIdNum = parseInt(apiKeyIdStr, 10);
-      if (Number.isFinite(apiKeyIdNum) && apiKeyIdNum > 0) {
-        const apiKey = await this.prisma.apiKey.findUnique({
-          where: { id: apiKeyIdNum },
-          select: { name: true },
-        });
-        if (apiKey) callerLabel = apiKey.name;
-      }
-    } else if (challenge.principalKind === 'oauth_client') {
-      const client = await this.prisma.oAuthClient.findUnique({
-        where: { clientId: challenge.principalId.replace(/^oauth:/, '') },
-        select: { name: true },
-      });
-      if (client) callerLabel = client.name;
-    }
+    const callerLabel = await this.challenges.callerLabelOf(challenge);
 
     const now = Date.now();
     const expired = challenge.expiresAt.getTime() < now;
@@ -91,6 +79,7 @@ export class HitlStepUpController {
   }
 
   @Post(':token/step-up')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Complete PIN step-up for a pending HITL challenge token',
@@ -101,6 +90,7 @@ export class HitlStepUpController {
     name: 'token',
     description: 'HITL challenge token returned by the prior tools/call attempt',
   })
+  @ApiResult(HitlStepUpResultResponse)
   async complete(@Param('token') token: string, @Body() dto: StepUpDto, @CurrentUser() user: { dbId: number }) {
     const record = await this.prisma.user.findUnique({
       where: { id: user.dbId },
@@ -108,14 +98,11 @@ export class HitlStepUpController {
     });
     if (!record) throw new NotFoundException('User not found');
     if (!record.pinHash) {
-      throw new BadRequestException({
-        code: 'no_pin',
-        message: 'No PIN set. Set one in your profile before using step-up.',
-      });
+      throw invalidState('No PIN set. Set one in your profile before using step-up.');
     }
 
     const ok = await this.pinService.verifyPin(dto.pin, record.pinHash);
-    if (!ok) throw new BadRequestException('Invalid PIN');
+    if (!ok) throw fieldError('pin', 'That PIN is not right');
 
     await this.challenges.markStepUpCompleted(token, user.dbId);
     return { status: 'step_up_verified' };

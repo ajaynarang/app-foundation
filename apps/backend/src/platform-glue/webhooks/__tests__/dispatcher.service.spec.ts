@@ -4,6 +4,7 @@ import { WebhookDispatcher } from '../dispatcher.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { Prisma } from '@appshore/db';
 
 const mockQueue = { add: jest.fn() };
 const mockPrisma = {
@@ -14,7 +15,10 @@ const mockPrisma = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
   },
-  webhookDeliveryLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
+  webhookDeliveryLog: {
+    create: jest.fn().mockResolvedValue({ id: 'log-1' }),
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
 };
 
 describe('WebhookDispatcher', () => {
@@ -24,6 +28,7 @@ describe('WebhookDispatcher', () => {
     jest.clearAllMocks();
     mockPrisma.tenant.findUnique.mockResolvedValue({ id: 1 });
     mockPrisma.webhookDeliveryLog.create.mockResolvedValue({ id: 'log-1' });
+    mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue(null);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -149,6 +154,85 @@ describe('WebhookDispatcher', () => {
     expect(mockQueue.add).not.toHaveBeenCalled();
   });
 
+  describe('a second delivery of the same event (the outbox and the durable queue are at least once)', () => {
+    const sub = { id: 'sub-1', tenantId: 1, url: 'https://a.com', events: ['*'], active: true };
+    const event = new DomainEvent('app.user.invited', 'tenant_x', { invitationId: 'inv-1' });
+
+    beforeEach(() => mockPrisma.webhookSubscription.findMany.mockResolvedValue([sub]));
+
+    it('keys the delivery job on the event id and the subscription', async () => {
+      await dispatcher.dispatchEvent(event);
+
+      // A keyed lookup on the (subscription_id, event_id) unique index, not a scan of the subscription's log rows.
+      expect(mockPrisma.webhookDeliveryLog.findUnique).toHaveBeenCalledWith({
+        where: { subscriptionId_eventId: { subscriptionId: 'sub-1', eventId: event.id } },
+        select: { id: true, deliveredAt: true, failedAt: true },
+      });
+      expect(mockPrisma.webhookDeliveryLog.create.mock.calls[0][0].data).toMatchObject({
+        subscriptionId: 'sub-1',
+        eventId: event.id,
+      });
+      expect(mockQueue.add.mock.calls[0][2]).toMatchObject({ jobId: `webhook-${event.id}-sub-1` });
+      expect(mockQueue.add.mock.calls[0][1].payload.payload.id).toBe(event.id);
+    });
+
+    it('writes no second log row and re-adds the same job id while the first delivery is pending', async () => {
+      mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue({
+        id: 'log-first',
+        deliveredAt: null,
+        failedAt: null,
+      });
+
+      await dispatcher.dispatchEvent(event);
+
+      expect(mockPrisma.webhookDeliveryLog.create).not.toHaveBeenCalled();
+      // BullMQ ignores an add whose job id it already holds; if the first add was lost, this one queues it.
+      expect(mockQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockQueue.add.mock.calls[0][1].payload.logId).toBe('log-first');
+      expect(mockQueue.add.mock.calls[0][2]).toMatchObject({ jobId: `webhook-${event.id}-sub-1` });
+    });
+
+    it.each([
+      ['delivered', { deliveredAt: new Date(), failedAt: null }],
+      ['given up on', { deliveredAt: null, failedAt: new Date() }],
+    ])('does nothing for a subscription whose delivery was already %s', async (_label, state) => {
+      mockPrisma.webhookDeliveryLog.findUnique.mockResolvedValue({ id: 'log-first', ...state });
+
+      await dispatcher.dispatchEvent(event);
+
+      expect(mockPrisma.webhookDeliveryLog.create).not.toHaveBeenCalled();
+      expect(mockQueue.add).not.toHaveBeenCalled();
+    });
+
+    const uniqueViolation = () =>
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' });
+
+    it('reuses the row a concurrent dispatch wrote first when the unique index refuses its own insert', async () => {
+      mockPrisma.webhookDeliveryLog.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'log-concurrent', deliveredAt: null, failedAt: null });
+      mockPrisma.webhookDeliveryLog.create.mockRejectedValueOnce(uniqueViolation());
+
+      await dispatcher.dispatchEvent(event);
+
+      expect(mockPrisma.webhookDeliveryLog.create).toHaveBeenCalledTimes(1);
+      expect(mockQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockQueue.add.mock.calls[0][1].payload.logId).toBe('log-concurrent');
+      expect(mockQueue.add.mock.calls[0][2]).toMatchObject({ jobId: `webhook-${event.id}-sub-1` });
+    });
+
+    it('does nothing when the concurrent dispatch that won the insert has already finished', async () => {
+      mockPrisma.webhookDeliveryLog.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'log-concurrent', deliveredAt: new Date(), failedAt: null });
+      mockPrisma.webhookDeliveryLog.create.mockRejectedValueOnce(uniqueViolation());
+
+      await dispatcher.dispatchEvent(event);
+
+      expect(mockQueue.add).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deliverToSubscription', () => {
     it('enqueues a single job for the specified subscription', async () => {
       const sub = {
@@ -163,9 +247,12 @@ describe('WebhookDispatcher', () => {
         id: 'log-test',
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {
+      const logId = await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {
         test: true,
       });
+
+      // The caller (the test route) answers 202 with this delivery, so the id must come back.
+      expect(logId).toBe('log-test');
 
       expect(mockPrisma.webhookSubscription.findUnique).toHaveBeenCalledWith({
         where: { id: 'sub-1' },
@@ -191,8 +278,9 @@ describe('WebhookDispatcher', () => {
         active: false,
       });
 
-      await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
+      const logId = await dispatcher.deliverToSubscription('sub-1', 'app.user.invited', {});
 
+      expect(logId).toBeNull();
       expect(mockQueue.add).not.toHaveBeenCalled();
     });
 

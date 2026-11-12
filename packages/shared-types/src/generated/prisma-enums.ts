@@ -159,11 +159,6 @@ export const NotificationStatusSchema = z.enum(['PENDING', 'SENT', 'FAILED'] as 
 export type NotificationStatus = z.infer<typeof NotificationStatusSchema>;
 export const NotificationStatus = NotificationStatusSchema.enum;
 
-// NotificationType
-export const NotificationTypeSchema = z.enum(['USER_INVITATION', 'TENANT_REGISTRATION_CONFIRMATION', 'TENANT_APPROVED', 'TENANT_REJECTED', 'INTEGRATION_SYNC_COMPLETED', 'INTEGRATION_SYNC_FAILED', 'SETTINGS_UPDATED', 'USER_JOINED', 'ROLE_CHANGED'] as const);
-export type NotificationType = z.infer<typeof NotificationTypeSchema>;
-export const NotificationType = NotificationTypeSchema.enum;
-
 // PaymentMethodType
 export const PaymentMethodTypeSchema = z.enum(['CARD', 'US_BANK_ACCOUNT'] as const);
 export type PaymentMethodType = z.infer<typeof PaymentMethodTypeSchema>;

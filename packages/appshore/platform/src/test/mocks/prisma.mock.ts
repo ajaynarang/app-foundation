@@ -76,6 +76,8 @@ const MODEL_NAMES = [
   'webhookDeliveryLog',
   'webhookSubscription',
   'domainEventLog',
+  'outboxEvent',
+  'deadline',
   'deadLetterLog',
   'agentInvocationLog',
   'deskAgent',

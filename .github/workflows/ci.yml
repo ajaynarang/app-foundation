@@ -105,6 +105,75 @@ jobs:
         run: pnpm --filter=shared-types build && pnpm --filter=backend build
 
   # ─────────────────────────────────────────────────────────────
+  # API QA: boots the built backend against service containers and runs the
+  # Playwright `api` project (smoke, RBAC matrix, tests/api). It calls the same
+  # script as `pnpm verify:api`, so a local run and this job check the same thing.
+  # Like every job in this file it runs only when the workflow is started by hand,
+  # or on push and pull request once the triggers above are uncommented.
+  # ─────────────────────────────────────────────────────────────
+  api-qa:
+    name: API QA — backend boot, smoke, RBAC, wire checks
+    runs-on: ubuntu-latest # runs-on: self-hosted
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app?schema=public
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @appshore/db prisma:generate
+
+      # Builds, migrates, seeds, starts the backend, runs the suite, stops the backend.
+      # No browser is installed: the `api` project only makes HTTP requests.
+      - name: API QA
+        run: pnpm verify:api
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-qa-report
+          path: tests/reports/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
   # Web CI
   # ─────────────────────────────────────────────────────────────
   web:
@@ -179,6 +248,65 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  # ─────────────────────────────────────────────────────────────
+  # Scaffold variants: scaffolds the repo with and without each optional feature
+  # (Desk) and proves each copy installs, type-checks and passes the backend specs,
+  # and that nothing outside the residue list still names Desk. It calls the same
+  # script as `pnpm verify:scaffold`. Like every job in this file it runs only when
+  # the workflow is started by hand, or on push and pull request once the triggers
+  # above are uncommented.
+  # ─────────────────────────────────────────────────────────────
+  scaffold-variants:
+    name: Scaffold variants — with and without Desk
+    runs-on: ubuntu-latest # runs-on: self-hosted
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_OPTIONS: --max-old-space-size=6144
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Fills the pnpm store, so each scaffolded copy installs from it.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Scaffold variants
+        run: pnpm verify:scaffold
 
   # ─────────────────────────────────────────────────────────────
   # Shared UI package CI

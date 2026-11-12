@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DevicePlatform, UserRole } from '@appshore/db';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -30,18 +30,21 @@ export class NotificationDevicesController extends BaseTenantController {
     super(prisma);
   }
 
+  // 204: the registry is keyed by the token the caller already holds, so there is nothing to send back.
   @Post()
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Register this device for mobile push (FCM token)' })
-  async register(@CurrentUser() user: any, @Body() dto: RegisterDeviceDto) {
+  @ApiNoContentResponse({ description: 'Registered' })
+  async register(@CurrentUser() user: any, @Body() dto: RegisterDeviceDto): Promise<void> {
     const tenantDbId = await this.getTenantDbId(user);
     await this.fcmService.registerDevice(user.dbId, tenantDbId, dto.token, PLATFORM_BY_INPUT[dto.platform]);
-    return { message: 'Device registered for push notifications' };
   }
 
   @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Deregister this device from mobile push' })
-  async remove(@CurrentUser() user: any, @Body() dto: RemoveDeviceDto) {
+  @ApiNoContentResponse({ description: 'Deregistered' })
+  async remove(@CurrentUser() user: any, @Body() dto: RemoveDeviceDto): Promise<void> {
     await this.fcmService.removeDevice(user.dbId, dto.token);
-    return { message: 'Device removed' };
   }
 }

@@ -8,6 +8,7 @@ import { Button } from '@app/ui/components/ui/button';
 import { SEMANTIC_COLORS } from '@appshore/web-core/shared/lib/colors';
 import type { ChatMessage } from '../engine/types';
 import { RichCardRenderer } from './cards/RichCardRenderer';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 function VoiceBadge() {
   return (
@@ -35,7 +36,7 @@ function CopyButton({ text }: { text: string }) {
       variant="ghost"
       size="icon"
       onClick={handleCopy}
-      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+      className="h-6 w-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
       aria-label="Copy message"
       title="Copy message"
     >
@@ -72,6 +73,7 @@ function CopyButton({ text }: { text: string }) {
 export function AssistantMessage({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const isVoice = message.inputMode === 'voice';
+  const { formatTime } = useFormatters();
 
   return (
     <motion.div
@@ -171,12 +173,9 @@ export function AssistantMessage({ message }: { message: ChatMessage }) {
 
         {/* Timestamp — visible on hover */}
         <p
-          className={`text-2xs px-1 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isUser ? 'text-right' : 'text-left'} ${!isUser ? 'pl-4' : ''}`}
+          className={`text-2xs px-1 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200 ${isUser ? 'text-right' : 'text-left'} ${!isUser ? 'pl-4' : ''}`}
         >
-          {message.timestamp.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {formatTime(message.timestamp)}
         </p>
       </div>
     </motion.div>

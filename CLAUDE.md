@@ -26,8 +26,15 @@ removed. Everything cross-cutting remains and works:
 - **AI** — a working streaming chat assistant (Mastra + AI SDK + Anthropic, Langfuse tracing,
   moderation, per-tenant AI budget, HITL) and an **empty MCP toolset** as your extension point.
 - **Billing** — Stripe subscriptions, wallet, plan entitlements, add-ons (generic).
-- **Infra** — Postgres (pgvector) + Redis, BullMQ queues, Inngest (Desk workflow engine,
-  empty), SSE realtime, S3 storage, email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+- **Infra** — Postgres (pgvector) + Redis, BullMQ queues, transactional outbox, timers, SSE realtime, S3 storage,
+  email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+
+<!-- feature:desk:start -->
+
+- **Desk** — Inngest durable workflow engine for background AI agents (empty responsibility registry). Optional:
+  chosen at scaffold time, off by default.
+
+<!-- feature:desk:end -->
 
 ---
 
@@ -89,11 +96,16 @@ tests/         — Playwright QA suite (@app/qa)
 | `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                            |
 | `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                             |
 | `support/`       | Ticketing                                                                                          |
-| `admin/`         | Super-admin infra console (jobs, events, cache, schedules, AI spend)                               |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                        |
 | `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
 | `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
-| `desk/`          | Inngest durable workflow engine (**empty responsibility registry**)                                |
 | `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
+
+<!-- feature:desk:start -->
+
+With Desk: `desk/` is the Inngest durable workflow engine (**empty responsibility registry**).
+
+<!-- feature:desk:end -->
 
 Tenants/users/plans/flags/api-keys/oauth-provider now live in `@appshore/platform`
 (`packages/appshore/platform/src/domains/`). `apps/backend/src/platform-glue/` holds the
@@ -109,13 +121,42 @@ bind to app implementations.
   `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma).
 - **Domain events:** add entries to `APP_EVENT_REGISTRY` in
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
-  automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events).
+  automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events). Raise an event
+  inside the write's transaction with `OutboxService.transaction((tx, emit) => …)` so it exists if and only if the
+  write committed; delivery is at least once, so every consumer keys on the event id (ADR "Outbox and deadlines",
+  held by `no-direct-emit.spec.ts` and `double-delivery.spec.ts`).
+- **Timers (deadlines):** declare a kind in `apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`, register
+  its handler with `DEADLINE_HANDLERS`, and call `DeadlineService.schedule(tx, …)` / `cancel(tx, …)` inside the
+  write's transaction. A timer is a row, fired by the `deadline-sweep` job on `bulk-ops`; never a delayed job or a
+  `setTimeout` (ADR "Outbox and deadlines"). Super-admins see every timer at `/admin/timers`.
+- **Background jobs:** declare your queues, job names, labels and categories in
+  `apps/backend/src/platform-glue/queue/job-names.ts` (`APP_QUEUE_NAMES`, `APP_JOB_NAMES`, `APP_JOB_DISPLAY_NAMES`,
+  `APP_JOB_CATEGORIES`, `APP_MANUAL_TYPES`); never in `@appshore/kernel`, whose lists are pinned by
+  `foundation-vocabulary.spec.ts`. A handler implements `QueueJobHandler`; a new queue gets its one dispatcher.
+  The API process consumes too unless `QUEUE_PROCESSORS_ENABLED=false` (Terraform `api_queue_processors_enabled`,
+  shipped `true`; turn it off only once a worker task runs).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
-- **Notification policies + WhatsApp templates:** bind `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES`
-  (and optionally `PLATFORM_TIMEZONE`) in `apps/backend/src/platform-glue/hooks.module.ts`; add your
+- **Notification types, policies + WhatsApp templates:** notification types are strings, not a Prisma enum. Declare
+  yours in `apps/backend/src/platform-glue/notifications/notification-types.ts` (`APP_NOTIFICATION_TYPES`) and their
+  policies and templates in `app-notification-policies.ts` beside it; `hooks.module.ts` binds them to
+  `NOTIFICATION_TYPES`, `NOTIFICATION_POLICIES` and `WHATSAPP_TEMPLATES` (and optionally `PLATFORM_TIMEZONE`). The
+  policy registry refuses to boot when a declared type has no policy. Add your
   named triggers to `apps/backend/src/domains/notifications/notification-triggers.service.ts`. The
   pipeline and every channel live in `@appshore/platform/infrastructure/notifications/`.
+- **Optional features:** a feature chosen at scaffold time (today: Desk) is wired only through
+  `apps/backend/src/platform-glue/features/` (`OPTIONAL_FEATURES`). Its manifest
+  (`tools/init-app/features/<name>.json`) names every file, marked block, JSON entry and allowlist entry that goes
+  with it; `node tools/init-app/apply-feature.mjs --remove <name>` strips it. A Desk-only line outside the Desk
+  folder sits between `feature:desk:start` / `feature:desk:end` comments and is registered there (ADR "Optional
+  features: Desk is opt-in at scaffold time", held by `optional-features.spec.ts`; `pnpm verify:scaffold` checks
+  both scaffolds).
+
+<!-- feature:desk:start -->
+
 - **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`.
+
+<!-- feature:desk:end -->
+
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
 - **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`.
 
@@ -144,7 +185,7 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 | Layer    | Tech                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------- |
-| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ, Inngest   |
+| Backend  | NestJS 11, TypeScript 5.9, Prisma 7.3, PostgreSQL 16 (pgvector), Redis 7, BullMQ            |
 | Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                    |
 | Auth     | First-party email+password, phone PIN/OTP (Twilio optional), Firebase optional, JWT+refresh |
 | AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                    |
@@ -157,8 +198,9 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 ### camelCase (NON-NEGOTIABLE)
 
 All API responses, request bodies, DTOs, service params, and frontend types use **camelCase**.
-Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, and
-the `@Query('snake_case')` decorator argument (the TS variable is still camelCase).
+Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, URL params
+(`:tenant_id`), and query keys on the wire: a query DTO declares `@QueryString({ name: 'tenant_id' }) tenantId`,
+so the property is still camelCase.
 
 ### Enums = Prisma (single source of truth)
 
@@ -167,10 +209,24 @@ the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); fro
 import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
 Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
 via the db package's `scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it.
+One decided exception: notification types are strings with an app registry (`PLATFORM_NOTIFICATION_TYPES` in
+`@app/shared-types` plus the app's `notification-types.ts`), so a product adds a type without editing
+`foundation.prisma`.
+
+### API errors (one envelope)
+
+Every error body is `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing
+else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
+code). There is no `message` key. Throw a NestJS exception or a factory from
+`@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
+writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. Every query
+string is a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
+(`docs/adr/`), held by `apps/backend/src/architecture/error-envelope.spec.ts` and `field-errors.spec.ts`.
 
 ### UI standards
 
-shadcn/ui components only (no raw `<button>`/`<input>`). Dark-theme tokens (`bg-background`,
+shadcn/ui components only (no raw `<button>`/`<input>`). They come from `@app/ui/components/ui/*`, the one
+component set; the web app keeps no copy. Dark-theme tokens (`bg-background`,
 `text-foreground`, `border-border`) — never standalone light-only colors. Sheet for 4+ field
 forms, Dialog for quick actions, AlertDialog for destructive confirmations. Every mutation shows
 success + error toasts; every loading state shows a Skeleton.
@@ -184,3 +240,40 @@ success + error toasts; every loading state shows a Skeleton.
   mocks, tenant/user factories) come from `@appshore/platform/test/*`.
 - **Mobile:** `cd apps/mobile && flutter analyze && flutter test`.
 - **E2E / smoke / RBAC:** `tests/` (`@app/qa`, Playwright). Run `pnpm test:qa`.
+
+### Gates (CI is manual-only, so these run locally)
+
+- **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
+  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`) and the
+  build, stops at the first failure, and ends with one line: `verify: PASS` or `verify: FAIL at "<step>"`. The
+  integration specs need Postgres and Redis (`docker compose up -d postgres redis`, or export `DATABASE_URL` and
+  `REDIS_URL`).
+- **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
+  or error body), and paste its last line too. It builds the backend, migrates, seeds, boots it and runs the
+  Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
+  third-party key. `API_QA_PORT` picks the port when 8000 is taken.
+- **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
+  `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
+  Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,
+  builds the foundation packages, regenerates OpenAPI and the RBAC matrix, type-checks the backend, web and
+  `tests/`, runs the backend specs, and checks that nothing names `inngest` or `domains/desk` in the `--desk no` copy
+  unless `tools/init-app/features/desk.residue.json` lists it. It takes minutes and needs Postgres and Redis.
+- **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
+  architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
+  conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
+  holds it. It then runs the web guards: `single-component-set.test.ts` (the shadcn components live in `@app/ui`
+  and `apps/web/src/shared/components/ui/` holds no copy), `theme-tokens.test.ts` (every text token clears WCAG AA)
+  and `ui-grammar-guard.test.ts` (theme tokens only, status tones, `RowActions`, `PageHeader` on every settings and
+  admin page, `ListErrorState` on every list). Dates go through `useFormatters()`: lint bans `toLocaleDateString`
+  and `toLocaleTimeString`.
+- **The API contract ratchet** (`apps/backend/src/architecture/api-contract.spec.ts`) — one rule per line of the
+  ADR "API contract": status by route shape, naming, inputs, errors, lists, docs, edge. The starter passes every
+  rule: `api-contract.baseline.json` is `{}` and a test keeps it empty. A decision that is not debt (a route whose
+  wire format a vendor or a standard sets, a list the domain bounds) sits in `api-contract.allowlist.json` with its
+  reason.
+- **The committed OpenAPI document** (`apps/backend/openapi.json`, `public-openapi.json`) — generated from the code
+  by `pnpm --filter @app/backend openapi:generate` and held to it by `swagger-completeness.spec.ts`, which also
+  refuses a route without a summary, a described path param or a documented success body (`@ApiResult` with a
+  response schema named in the controller group's `openapi.responses.ts`). Regenerate and commit both files with any
+  change to a route, a DTO or a response. Production serves the public subset at `/api/openapi.json`.
+- **Pre-commit hook** — Prettier on staged files.

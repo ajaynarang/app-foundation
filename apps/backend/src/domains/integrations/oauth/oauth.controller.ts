@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Param, Query, Req, Res, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Req,
+  Res,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -11,7 +24,19 @@ import { AuthTokenService } from './auth-token.service';
 import { OAuthTokenRefreshJob } from './oauth-token-refresh.job';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
 import { INTEGRATIONS_WEB_PATH } from '../../../shared/web-routes';
+import {
+  ApiBearerAuth,
+  ApiExcludeEndpoint,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { IntegrationOAuthConnectResponse } from '../openapi.responses';
 
+@ApiTags('Integrations')
+@ApiBearerAuth()
 @Controller('integrations/oauth')
 export class OAuthController extends BaseTenantController {
   private readonly logger = new Logger(OAuthController.name);
@@ -31,11 +56,17 @@ export class OAuthController extends BaseTenantController {
    */
   @Get(':vendor/connect')
   @Roles(UserRole.ADMIN, UserRole.OWNER)
+  @ApiOperation({ summary: 'Start an OAuth connect for a vendor (returns the authorization URL)' })
+  @ApiParam({
+    name: 'vendor',
+    description: 'Vendor id from the registry (e.g. JIRA, SLACK, QUICKBOOKS) — 404 when it has no OAuth method',
+  })
+  @ApiResult(IntegrationOAuthConnectResponse)
   async connect(@Param('vendor') vendor: string, @CurrentUser() user: any) {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     const oauthConfig = vendorMeta ? getVendorOAuth(vendorMeta) : undefined;
     if (!oauthConfig) {
-      throw new BadRequestException(`Vendor ${vendor} does not support OAuth`);
+      throw new NotFoundException('This integration does not connect with OAuth');
     }
 
     const tenantDbId = await this.getTenantDbId(user);
@@ -48,6 +79,8 @@ export class OAuthController extends BaseTenantController {
    * Public because the user's browser is redirected here from the vendor.
    */
   @Get('callback')
+  // A browser redirect whose query the vendor writes: not part of the published contract.
+  @ApiExcludeEndpoint()
   @Public()
   async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: any, @Res() res: Response) {
     // The browser returns to the web app: APP_URL is the origin every other web link uses.
@@ -109,16 +142,22 @@ export class OAuthController extends BaseTenantController {
    * Revokes OAuth tokens and clears credentials.
    */
   @Post(':vendor/disconnect')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(UserRole.ADMIN, UserRole.OWNER)
-  async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any) {
+  @ApiOperation({ summary: 'Revoke and clear a vendor OAuth connection' })
+  @ApiParam({
+    name: 'vendor',
+    description: 'Vendor id from the registry (e.g. JIRA, SLACK, QUICKBOOKS) — 404 when it has no OAuth method',
+  })
+  @ApiNoContentResponse({ description: 'Disconnected' })
+  async disconnect(@Param('vendor') vendor: string, @CurrentUser() user: any): Promise<void> {
     const vendorMeta = VENDOR_REGISTRY[vendor];
     if (!vendorMeta || !getVendorOAuth(vendorMeta)) {
-      throw new BadRequestException(`Vendor ${vendor} does not support OAuth`);
+      throw new NotFoundException('This integration does not connect with OAuth');
     }
 
     const tenantDbId = await this.getTenantDbId(user);
     await this.authTokenService.disconnect(vendor, tenantDbId);
     await this.tokenRefreshJob.removeForIntegration(vendor, tenantDbId);
-    return { success: true, message: `${vendor} disconnected` };
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, AgentInvocationLog } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AgentPrincipal, principalAuditLabel } from '@appshore/platform/auth/agent-principal';
@@ -41,7 +41,7 @@ export class AgentInvocationLoggerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async writePending(input: WritePendingInput): Promise<string | null> {
@@ -73,37 +73,29 @@ export class AgentInvocationLoggerService {
 
   async completeSuccess(input: CompleteSuccessInput): Promise<void> {
     if (!input.rowId) return;
-    const row = await this.prisma.agentInvocationLog.update({
-      where: { id: input.rowId },
-      data: {
-        success: true,
-        durationMs: input.durationMs,
-        outputSummary: input.outputSummary,
-        piiReadFlag: input.piiReadFlag ?? false,
-      },
+    await this.complete(input.rowId, input.tenantId, {
+      success: true,
+      durationMs: input.durationMs,
+      outputSummary: input.outputSummary,
+      piiReadFlag: input.piiReadFlag ?? false,
     });
-    await this.events.emit(
-      DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED,
-      String(input.tenantId),
-      this.toWebhookPayload(row),
-    );
   }
 
   async completeError(input: CompleteErrorInput): Promise<void> {
     if (!input.rowId) return;
-    const row = await this.prisma.agentInvocationLog.update({
-      where: { id: input.rowId },
-      data: {
-        success: false,
-        durationMs: input.durationMs,
-        error: input.error,
-      },
+    await this.complete(input.rowId, input.tenantId, {
+      success: false,
+      durationMs: input.durationMs,
+      error: input.error,
     });
-    await this.events.emit(
-      DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED,
-      String(input.tenantId),
-      this.toWebhookPayload(row),
-    );
+  }
+
+  /** The outcome write and its webhook-visible event commit together (ADR "Outbox and deadlines"). */
+  private async complete(rowId: string, tenantId: number, data: Prisma.AgentInvocationLogUpdateInput): Promise<void> {
+    await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.agentInvocationLog.update({ where: { id: rowId }, data });
+      await emit(DOMAIN_EVENTS.AGENT_INVOCATION_COMPLETED, String(tenantId), this.toWebhookPayload(row));
+    });
   }
 
   /**

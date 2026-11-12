@@ -25,6 +25,7 @@ pnpm init-app --name acme-crm --yes --dry-run
 | `--db`           | name with `-` → `_`       | Postgres database name                                                                                            |
 | `--tenancy`      | `mt`                      | `mt` (multi-tenant) or `st` (single-tenant) — sets the `MULTI_TENANT` defaults in `.env.example` files            |
 | `--mobile`       | `yes`                     | `yes` keeps the Flutter companion app (renames `app_mobile` → `<name>_mobile`); `no` deletes `apps/mobile`        |
+| `--desk`         | `no`                      | Include Desk, the Inngest workflow engine for background AI agents. `no` strips it (see "Optional features")      |
 | `--yes`          | off                       | Non-interactive; accept defaults for anything not passed                                                          |
 | `--dry-run`      | off                       | Print per-rule replacement counts; write nothing                                                                  |
 | `--force`        | off                       | Skip the git-clean and already-initialized guards                                                                 |
@@ -53,5 +54,79 @@ Never touched: `.git`, `node_modules`, `pnpm-lock.yaml` (regenerate with `pnpm i
 - Refuses to run twice (detects the root package name is no longer `app-foundation`).
 - `--dry-run` first if you're unsure.
 
-After it finishes, follow the printed next steps; once you're happy, you can delete
-`tools/init-app/` entirely.
+After it finishes, follow the printed next steps. Keep `tools/init-app/` if you plan to pull template updates:
+`apply-feature.mjs` is how a returning file of a feature you dropped is removed again.
+
+## Optional features
+
+A feature you choose at scaffold time. Today there is one, **Desk**: the durable workflow engine (Inngest) for
+background AI agents, with approvals and memory. It is off by default. Timers, recurring jobs and the event outbox
+work without it. The decision is the ADR "Optional features: Desk is opt-in at scaffold time" (`docs/adr/`).
+
+How a feature is cut out:
+
+- **The seam.** The backend reaches a feature's code only through `apps/backend/src/platform-glue/features/`:
+  `desk.feature.ts` imports Desk, and `OPTIONAL_FEATURES` in `index.ts` lists what you kept.
+- **The manifest.** [`features/desk.json`](features/desk.json) names everything else Desk brings: `paths` (deleted),
+  `markers` (files holding blocks between `feature:desk:start` and `feature:desk:end` comment lines, stripped),
+  `jsonEntries` (the package scripts and the `inngest` dependency), and `allowlistPrefixes` (allowlist
+  entries under the Desk folder).
+- **The residue list.** [`features/desk.residue.json`](features/desk.residue.json) names each file that still
+  mentions Inngest or the Desk folder after removal, and why it stays.
+
+```bash
+node tools/init-app/apply-feature.mjs --list desk              # everything the manifest covers, with each block's text
+node tools/init-app/apply-feature.mjs --remove desk --dry-run  # what removing would change
+node tools/init-app/apply-feature.mjs --remove desk            # remove it (safe to run twice)
+```
+
+`pnpm init-app --desk no` runs the same removal before its renames, so the manifest always matches template text.
+
+### What stays without Desk
+
+- **The tables.** The seven Desk models and their enums stay in `foundation.prisma`, the generated client and the
+  shared enum mirror, empty: no seed, no tenant hook and no route writes to them. Every product keeps the
+  template's one migration history. If you want them gone, write your own migration that drops them and remove the
+  models from `foundation.prisma`; expect a conflict on any later template change to those models. The template
+  never ships that migration.
+- `FEATURE_KEYS.DESK` in shared types (a key with no flag row and no plan entitlement), the Desk event names in the
+  kernel catalog, the `desk_responsibility` principal kind, the `DESK_MEMORY_EXTRACT` prompt key, and the
+  production check that refuses `INNGEST_DEV`. The residue list has the full set.
+
+### Pulling template updates without Desk
+
+A template change inside the Desk folder arrives as a modify-or-delete conflict. Run
+`node tools/init-app/apply-feature.mjs --remove desk` again: it deletes what came back and strips any new marked
+block. Then regenerate the OpenAPI documents and the RBAC matrix (below).
+
+### Adding Desk later
+
+Not scripted, and not covered by `pnpm verify:scaffold`. The tables never left, so no migration is needed.
+
+1. Add the template as a remote and fetch it: `git remote add template <template-url> && git fetch template`.
+2. Restore every path in `features/desk.json` `paths`:
+   `git checkout template/main -- apps/backend/src/domains/desk apps/backend/src/platform-glue/features/desk.feature.ts …`
+   (all of them).
+3. Put back what `node tools/init-app/apply-feature.mjs --list desk` prints, reading it on a checkout of the
+   template (`git worktree add ../template-ref template/main`): each marked block in its file, each JSON entry, and
+   each allowlist entry under `apps/backend/src/domains/desk/`. The block in
+   `apps/backend/src/platform-glue/features/index.ts` is what switches Desk on.
+4. Apply your own rename to the restored files: the package scope if you changed it, and container names
+   (`app-inngest` → `<name>-inngest`).
+5. `pnpm install`, then build the foundation packages and regenerate:
+   `pnpm --filter @app/backend openapi:generate` and `pnpm --filter @app/qa generate:rbac`.
+6. Seed (`pnpm --filter @appshore/db db:seed`) to add the `desk` feature flag and plan rows. Existing tenants get
+   Tenants approved from then on get their default Desk agents; for tenants that already exist, call
+   `DeskBootstrapService.bootstrapForTenant(tenantId)` once each.
+7. `pnpm verify` and `pnpm --filter @app/backend exec jest src/architecture/optional-features.spec.ts` confirm the
+   footprint is whole.
+
+### Checking both scaffolds
+
+`pnpm verify:scaffold` (`check-variants.mjs`) copies the repo twice, scaffolds it with `--desk no` and with
+`--desk yes`, installs, builds the foundation packages, regenerates OpenAPI and the RBAC matrix, type-checks the
+backend, web, `packages/test-utils` and `tests/`, and runs the backend specs. On the `--desk no` copy it then searches
+for `inngest` and `domains/desk` (any case): a hit not on the residue list fails, and so does an entry that no longer
+matches. It needs Postgres and Redis (`DATABASE_URL`, `REDIS_URL`) and takes minutes. Run it before a pull request
+that touches `tools/init-app/`, `platform-glue/features/`, a file a manifest names, or a Desk file outside the Desk
+folder, and paste its last line into the pull request.

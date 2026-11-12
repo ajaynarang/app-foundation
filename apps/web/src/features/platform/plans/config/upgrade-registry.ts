@@ -7,7 +7,9 @@ import {
   Shield,
   Users,
   ScrollText,
+  // feature:desk:start
   ListChecks,
+  // feature:desk:end
   type LucideIcon,
 } from 'lucide-react';
 import { FEATURE_KEYS } from '@app/shared-types';
@@ -40,6 +42,7 @@ export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
       'Tamper-evident event trail',
     ],
   },
+  // feature:desk:start
   [FEATURE_KEYS.DESK]: {
     displayName: 'Desk Automations',
     description: 'Background agents that handle recurring work on your behalf.',
@@ -55,6 +58,7 @@ export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
       'Full run history and audit trail',
     ],
   },
+  // feature:desk:end
 
   // ─── Entitlement features (plan tier upgrades) ─────────────────────────
   [FEATURE_KEYS.TEAM_MANAGEMENT]: {

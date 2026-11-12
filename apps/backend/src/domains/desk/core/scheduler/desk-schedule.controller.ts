@@ -9,6 +9,8 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 
 import { DeskScheduleService } from './desk-schedule.service';
 import { UpdateDeskScheduleDto } from './dto/update-desk-schedule.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeskScheduleStateResponse } from '../../openapi.responses';
 
 /**
  * HTTP surface for the tenant-wide Desk schedule master switch.
@@ -32,6 +34,7 @@ export class DeskScheduleController extends BaseTenantController {
   @Get()
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get the tenant-wide autonomous-run master switch state' })
+  @ApiResult(DeskScheduleStateResponse)
   async get(@CurrentUser() user: any) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.schedule.getState(tenantDbId);
@@ -40,6 +43,7 @@ export class DeskScheduleController extends BaseTenantController {
   @Patch()
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Arm or pause all autonomous Desk runs tenant-wide' })
+  @ApiResult(DeskScheduleStateResponse)
   async update(@CurrentUser() user: any, @Body() body: UpdateDeskScheduleDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.schedule.setState(tenantDbId, body.enabled);

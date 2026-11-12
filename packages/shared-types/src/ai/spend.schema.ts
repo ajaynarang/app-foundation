@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AiSurfaceSchema, AiInvocationStatusSchema } from '../generated/prisma-enums';
+import { cursorListSchema } from '../infrastructure/cursor-list';
 
 /**
  * Wire shapes for the super-admin AI Spend view.
@@ -32,6 +33,17 @@ export const AiSpendTenantSummarySchema = z.object({
   lastActivityAt: z.string().nullable(), // ISO 8601
 });
 export type AiSpendTenantSummary = z.infer<typeof AiSpendTenantSummarySchema>;
+
+/** `GET /admin/ai-spend/tenants`: a cursor list, highest spend first. */
+export const AiSpendTenantListSchema = cursorListSchema(AiSpendTenantSummarySchema);
+export type AiSpendTenantList = z.infer<typeof AiSpendTenantListSchema>;
+
+/** `GET /admin/ai-spend/summary`: the window across every tenant, so the header total never depends on the pages loaded. */
+export const AiSpendSummarySchema = z.object({
+  windowCostUsd: NumericString,
+  tenantCount: z.number().int().min(0),
+});
+export type AiSpendSummary = z.infer<typeof AiSpendSummarySchema>;
 
 /**
  * Drill-in: per-surface breakdown for one tenant within the chosen window.
@@ -78,6 +90,7 @@ export type AiSpendInvocationItem = z.infer<typeof AiSpendInvocationItemSchema>;
 export const AiSpendInvocationListSchema = z.object({
   items: z.array(AiSpendInvocationItemSchema),
   nextCursor: z.string().nullable(),
+  total: z.number().int().min(0),
 });
 export type AiSpendInvocationList = z.infer<typeof AiSpendInvocationListSchema>;
 

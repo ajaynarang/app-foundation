@@ -1,15 +1,19 @@
-import { Controller, Get, Post, Body, Query, Logger, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, Logger, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiExcludeController, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '@appshore/platform/shared/http/edge-throttle';
 import { DevService } from './dev.service';
 import { SwitchUserDto } from './dto/switch-user.dto';
+import { DevUsersQueryDto } from './dto/dev-users-query.dto';
 import { DevAuthGuard } from './guards/dev-auth.guard';
 
 // DevAuthGuard enforces DEV_AUTH_SECRET header presence and exactness with
 // constant-time comparison. When DEV_AUTH_SECRET is unset (prod), the guard
-// throws NotFoundException so the route behaves as if it doesn't exist.
+// throws NotFoundException so the route behaves as if it doesn't exist. A QA lever, not part of the contract:
+// it is left out of the published OpenAPI document.
+@ApiExcludeController()
 @ApiTags('Dev Tools')
 @Controller('dev')
 @UseGuards(DevAuthGuard)
@@ -20,16 +24,17 @@ export class DevController {
 
   @Public()
   @Get('users')
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @ApiOperation({
     summary: '[DEV ONLY] List all users grouped by tenant and role',
   })
-  async getUsers(@Query('tenantId') tenantId?: string) {
-    return this.devService.getUsers(tenantId);
+  async getUsers(@Query() query: DevUsersQueryDto) {
+    return this.devService.getUsers(query.tenantId);
   }
 
   @Public()
   @Post('switch')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({
     summary: '[DEV ONLY] Switch to any user — issues real JWT tokens',

@@ -19,13 +19,13 @@
  *   - SyncHistoryEntrySchema, SyncHistoryListResponseSchema,
  *     SyncHistoryArraySchema — unified list vs per-integration list.
  *   - SyncStatsSchema — per-integration stats.
- *   - TestConnectionResponseSchema, SyncTriggerResponseSchema,
- *     DeleteIntegrationResponseSchema — action endpoints.
- *   - OAuthConnectResponseSchema, OAuthDisconnectResponseSchema — consumer
- *     OAuth.
+ *   - TestConnectionResponseSchema, SyncTriggerResponseSchema — action endpoints.
+ *     `DELETE /integrations/:integration_id` answers 204 with no body.
+ *   - OAuthConnectResponseSchema — consumer OAuth. `POST /integrations/oauth/:vendor/disconnect`
+ *     answers 204 with no body.
  */
 import { z } from 'zod';
-import { isoDateString, stringId } from './helpers.js';
+import { isoDateString, stringId, cursorListOf } from './helpers.js';
 
 // ── INTEGRATION ROW (CRUD projections) ───────────────────────────────
 
@@ -101,13 +101,6 @@ export const IntegrationUpdateResponseSchema = z
     isEnabled: z.boolean(),
     status: z.string(),
     updatedAt: isoDateString,
-  })
-  .strict();
-
-/** DELETE /integrations/:id — `{success: true}` (200, not 204). */
-export const DeleteIntegrationResponseSchema = z
-  .object({
-    success: z.boolean(),
   })
   .strict();
 
@@ -275,25 +268,13 @@ export const SyncHistoryEntrySchema = z
   .strict();
 
 /**
- * GET /integrations/sync-history (UNIFIED — no :id) returns a paged
- * envelope `{items, total, limit, offset}` — integrations.service.ts
- * ::getUnifiedSyncHistory lines 532–542.
+ * `GET /integrations/sync-history` and `GET /integrations/:integration_id/sync-history`: cursor lists, newest
+ * first. A run is named by its job's public id (a uuid string).
  */
-export const SyncHistoryListResponseSchema = z
-  .object({
-    items: z.array(SyncHistoryEntrySchema),
-    total: z.number(),
-    limit: z.number(),
-    offset: z.number(),
-  })
-  .strict();
+export const SyncHistoryListResponseSchema = cursorListOf(SyncHistoryEntrySchema);
 
-/**
- * GET /integrations/:id/sync-history (PER-INTEGRATION) returns a FLAT
- * ARRAY (integrations.service.ts::getSyncHistory line 442 —
- * `return jobs.map(...)`).
- */
-export const SyncHistoryArraySchema = z.array(SyncHistoryEntrySchema);
+/** The per-integration history answers the same envelope (it used to be a bare array). */
+export const SyncHistoryArraySchema = SyncHistoryListResponseSchema;
 
 /**
  * GET /integrations/:id/sync-history/stats — integrations.service.ts
@@ -319,25 +300,14 @@ export const TestConnectionResponseSchema = z
   .strict();
 
 /**
- * POST /integrations/:id/sync. On the concurrent-sync guard branch the
- * response is `{success: false, message}` with NO jobIds. Model as a
- * discriminated union to cover both branches.
+ * POST /integrations/:integration_id/sync answers 202 with the record to poll: the queued job.
  */
-export const SyncTriggerResponseSchema = z.discriminatedUnion('success', [
-  z
-    .object({
-      success: z.literal(true),
-      message: z.string(),
-      jobIds: z.array(z.string()),
-    })
-    .strict(),
-  z
-    .object({
-      success: z.literal(false),
-      message: z.string(),
-    })
-    .strict(),
-]);
+export const SyncTriggerResponseSchema = z
+  .object({
+    jobId: z.number().int(),
+    status: z.literal('QUEUED'),
+  })
+  .strict();
 
 // ── OAUTH CONSUMER ────────────────────────────────────────────────────
 
@@ -348,16 +318,5 @@ export const SyncTriggerResponseSchema = z.discriminatedUnion('success', [
 export const OAuthConnectResponseSchema = z
   .object({
     authUrl: z.string(),
-  })
-  .strict();
-
-/**
- * POST /integrations/oauth/:vendor/disconnect — oauth.controller.ts
- * line 119 returns `{success: boolean, message: string}`.
- */
-export const OAuthDisconnectResponseSchema = z
-  .object({
-    success: z.boolean(),
-    message: z.string(),
   })
   .strict();

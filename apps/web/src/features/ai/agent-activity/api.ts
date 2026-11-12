@@ -11,16 +11,17 @@ export interface AgentActivityQueryParams {
   dateTo?: string;
 }
 
+// Query keys are snake_case on the wire; the params object stays camelCase.
 export const agentActivityApi = {
   list: (params: AgentActivityQueryParams): Promise<AgentActivityPage> => {
     const qs = new URLSearchParams({
-      principalKind: params.principalKind,
-      principalId: params.principalId,
+      principal_kind: params.principalKind,
+      principal_id: params.principalId,
       filter: params.filter,
       ...(params.cursor ? { cursor: params.cursor } : {}),
       ...(params.limit ? { limit: String(params.limit) } : {}),
-      ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
-      ...(params.dateTo ? { dateTo: params.dateTo } : {}),
+      ...(params.dateFrom ? { date_from: params.dateFrom } : {}),
+      ...(params.dateTo ? { date_to: params.dateTo } : {}),
     });
     return apiClient<AgentActivityPage>(`/agent-activity?${qs.toString()}`);
   },

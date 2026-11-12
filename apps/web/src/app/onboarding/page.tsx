@@ -9,6 +9,7 @@ import { MilestoneCard } from '@/features/platform/onboarding/components/Milesto
 import { AssistantAiCallout } from '@/features/platform/onboarding/components/AssistantAiCallout';
 import { useOnboardingStore } from '@/features/platform/onboarding';
 import { useAuth } from '@/features/auth';
+import { canRoleOpen, type UserRole } from '@appshore/web-core/shared/lib/navigation';
 
 /**
  * Setup Hub — milestone-driven workspace onboarding for OWNER/ADMIN.
@@ -20,14 +21,15 @@ export default function OnboardingPage() {
   const { user, isAuthenticated } = useAuth();
   const { status, loading, fetchStatus } = useOnboardingStore();
   const router = useRouter();
+  const canOpen = canRoleOpen('/onboarding', user?.role as UserRole | undefined);
 
   useEffect(() => {
-    if (isAuthenticated && (user?.role === 'OWNER' || user?.role === 'ADMIN')) {
+    if (isAuthenticated && canOpen) {
       fetchStatus();
     }
-  }, [isAuthenticated, user?.role, fetchStatus]);
+  }, [isAuthenticated, canOpen, fetchStatus]);
 
-  if (isAuthenticated && user && user.role !== 'OWNER' && user.role !== 'ADMIN') {
+  if (isAuthenticated && user && !canOpen) {
     router.push('/');
     return null;
   }

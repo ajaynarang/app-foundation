@@ -4,12 +4,13 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ## Layout
 
-| Folder      | Purpose                                             |
-| ----------- | --------------------------------------------------- |
-| `init-app/` | One-time template rename (see `init-app/README.md`) |
-| `db/`       | Database tunnel and migrations                      |
-| `dev/`      | Local dev environment helpers                       |
-| `.dumps/`   | Saved DB dumps (gitignored)                         |
+| Folder      | Purpose                                               |
+| ----------- | ----------------------------------------------------- |
+| `init-app/` | One-time template rename (see `init-app/README.md`)   |
+| `db/`       | Database tunnel and migrations                        |
+| `dev/`      | Local dev environment helpers                         |
+| `verify/`   | The local gates a branch passes before a pull request |
+| `.dumps/`   | Saved DB dumps (gitignored)                           |
 
 ## Scripts
 
@@ -33,6 +34,13 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 | `dev/app-dev.sh`   | Open iTerm2 tabs running backend + web with custom ports. |
 | `dev/install.sh`   | One-time project bootstrap (run from repo root).          |
 | `dev/kill-port.sh` | Kill the process holding a given port.                    |
+
+### `verify/`
+
+| Script             | What it does                                                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify/verify.sh` | `pnpm verify`: format check, lint, schema lint, type-check, unit tests, build. Ends with one result line.                                                            |
+| `verify/api-qa.sh` | `pnpm verify:api`: builds, migrates, seeds, boots the backend and runs the Playwright `api` project against it. For a change to the wire. Ends with one result line. |
 
 ## Common tasks
 

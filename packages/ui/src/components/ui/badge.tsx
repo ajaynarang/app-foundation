@@ -12,9 +12,9 @@ const badgeVariants = cva(
         destructive: 'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
         outline: 'text-foreground',
         muted: 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80',
-        info: 'border-transparent bg-info/15 text-info hover:bg-info/25',
-        caution: 'border-transparent bg-caution/15 text-caution hover:bg-caution/25',
-        critical: 'border-transparent bg-critical/15 text-critical hover:bg-critical/25',
+        info: 'border-transparent bg-info/15 text-info-text hover:bg-info/25',
+        caution: 'border-transparent bg-caution/15 text-caution-text hover:bg-caution/25',
+        critical: 'border-transparent bg-critical/15 text-critical-text hover:bg-critical/25',
       },
     },
     defaultVariants: {

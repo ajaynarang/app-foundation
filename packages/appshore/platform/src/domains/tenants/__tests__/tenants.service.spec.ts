@@ -5,6 +5,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS } from '../../platform-hooks';
+import { fixtureModel, walkCursorList } from '../../../test/helpers';
 
 const mockPrisma = {
   tenant: {
@@ -191,7 +192,7 @@ describe('TenantsService', () => {
       await expect(service.approveTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw if tenant is not PENDING_APPROVAL', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not PENDING_APPROVAL', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         tenantId: 'TNT-001',
@@ -199,7 +200,10 @@ describe('TenantsService', () => {
         users: [],
       });
 
-      await expect(service.approveTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
+      await expect(service.approveTenant('TNT-001', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should approve tenant and activate users', async () => {
@@ -253,16 +257,17 @@ describe('TenantsService', () => {
   });
 
   describe('suspendTenant', () => {
-    it('should throw if tenant is not ACTIVE', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not ACTIVE', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         status: 'PENDING_APPROVAL',
         users: [],
       });
 
-      await expect(service.suspendTenant('TNT-001', 'Violation of TOS - repeated', 'admin')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.suspendTenant('TNT-001', 'Violation of TOS - repeated', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should require reason of at least 10 characters', async () => {
@@ -297,14 +302,17 @@ describe('TenantsService', () => {
   });
 
   describe('reactivateTenant', () => {
-    it('should throw if tenant is not SUSPENDED', async () => {
+    it('answers 409 INVALID_STATE if the tenant is not SUSPENDED', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 1,
         status: 'ACTIVE',
         users: [],
       });
 
-      await expect(service.reactivateTenant('TNT-001', 'admin')).rejects.toThrow(BadRequestException);
+      await expect(service.reactivateTenant('TNT-001', 'admin')).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should reactivate and re-enable users', async () => {
@@ -440,32 +448,69 @@ describe('TenantsService', () => {
     });
   });
 
-  describe('getAllTenants', () => {
-    it('should return all tenants with admin users', async () => {
-      mockPrisma.tenant.findMany.mockResolvedValue([
-        {
-          id: 1,
-          companyName: 'Acme',
-          users: [],
-          _count: { users: 5 },
-        },
-      ]);
+  describe('listTenants: a cursor list by company name', () => {
+    // Two pairs share a company name: the public tenant id splits them.
+    const names = ['Acme', 'Acme', 'Bolt', 'Cargo', 'Cargo', 'Dune', 'Echo'];
+    const rows = names.map((companyName, index) => ({
+      id: 100 - index,
+      tenantId: `tnt_${String.fromCharCode(103 - index)}`,
+      companyName,
+      subdomain: companyName.toLowerCase(),
+      contactEmail: `ops@${companyName.toLowerCase()}.test`,
+      status: index === 6 ? 'SUSPENDED' : 'ACTIVE',
+      users: [],
+      _count: { users: 1 },
+    }));
 
-      const result = await service.getAllTenants();
+    beforeEach(() => Object.assign(mockPrisma.tenant, fixtureModel(rows)));
 
-      expect(result).toHaveLength(1);
+    it('walks every tenant once in name order, same-name tenants included', async () => {
+      const { pages, items } = await walkCursorList((cursor) => service.listTenants({ limit: 2, cursor }));
+
+      expect(pages.map((page) => page.length)).toEqual([2, 2, 2, 1]);
+      expect(items.map((tenant) => tenant.companyName)).toEqual(names);
+      expect(new Set(items.map((tenant) => tenant.tenantId)).size).toBe(7);
     });
 
-    it('should filter by status', async () => {
-      mockPrisma.tenant.findMany.mockResolvedValue([]);
+    it('orders by company name then the public tenant id, never the Int key', async () => {
+      await service.listTenants();
+      expect(mockPrisma.tenant.findMany.mock.calls[0][0]).toMatchObject({
+        orderBy: [{ companyName: 'asc' }, { tenantId: 'asc' }],
+        take: 51,
+      });
+    });
 
-      await service.getAllTenants('ACTIVE');
+    it('filters by status and search, and the total counts only what matches', async () => {
+      expect(await service.listTenants({ status: 'SUSPENDED' as never })).toMatchObject({ total: 1 });
+      const found = await service.listTenants({ q: 'carg', limit: 1 });
+      expect(found.total).toBe(2);
+      expect(found.items).toHaveLength(1);
+      expect(found.nextCursor).not.toBeNull();
+    });
 
-      expect(mockPrisma.tenant.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { status: 'ACTIVE' },
-        }),
-      );
+    it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+      // "c" matches Acme, Acme, Cargo, Cargo and Echo (not Bolt or Dune); a page boundary falls between the Cargos.
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listTenants({ q: 'c', limit: 3, cursor });
+        expect(page.total).toBe(5);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 2]);
+      expect(items.map((tenant) => tenant.companyName)).toEqual(['Acme', 'Acme', 'Cargo', 'Cargo', 'Echo']);
+      expect(new Set(items.map((tenant) => tenant.tenantId)).size).toBe(5);
+    });
+
+    it('escapes LIKE wildcards in the search, so "_" does not match every tenant', async () => {
+      await service.listTenants({ q: '_' });
+      expect(mockPrisma.tenant.findMany.mock.calls[0][0].where.OR[0]).toEqual({
+        companyName: { contains: '\\_', mode: 'insensitive' },
+      });
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listTenants({ cursor: 'nope' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockPrisma.tenant.findMany).not.toHaveBeenCalled();
     });
   });
 

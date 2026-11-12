@@ -30,7 +30,9 @@ const SEED_LIST = [
   '04-plan-entitlements',
   '05-vendor-configs',
   '06-add-ons',
+  // feature:desk:start
   '07-desk',
+  // feature:desk:end
   '08-model-pricing',
 ];
 

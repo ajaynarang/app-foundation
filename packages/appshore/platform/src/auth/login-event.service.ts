@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LoginFailReason } from '@appshore/db';
 import { createHash } from 'crypto';
+import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 
 const USER_AGENT_MAX_LENGTH = 5000;
@@ -31,6 +32,7 @@ export class LoginEventService {
   }): Promise<void> {
     await this.prisma.loginEvent.create({
       data: {
+        publicId: generateUuidV7(),
         userId: params.userId,
         tenantId: params.tenantId,
         status: 'SUCCESS',
@@ -51,6 +53,7 @@ export class LoginEventService {
   }): Promise<void> {
     await this.prisma.loginEvent.create({
       data: {
+        publicId: generateUuidV7(),
         userId: params.userId,
         tenantId: params.tenantId,
         status: 'FAILED',
@@ -65,6 +68,7 @@ export class LoginEventService {
   async recordLogout(params: { userId: number; tenantId: number | null; sessionId: string }): Promise<void> {
     await this.prisma.loginEvent.create({
       data: {
+        publicId: generateUuidV7(),
         userId: params.userId,
         tenantId: params.tenantId,
         status: 'LOGOUT',

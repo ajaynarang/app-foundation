@@ -12,12 +12,14 @@ import {
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '../../../../shared/http/edge-throttle';
 import { Public } from '../../../../auth/decorators/public.decorator';
 import type { Request, Response } from 'express';
 import { DeliveryLedgerService } from '../../pipeline/delivery-ledger.service';
 import { WhatsAppConsentService } from './whatsapp-consent.service';
 import { WHATSAPP_PORT, type WhatsAppPort } from './whatsapp.port';
+import { ApiOperation } from '@nestjs/swagger';
 
 /** Meta requires STOP to be honoured; "STOP." and "stop please" are still a stop. */
 const STOP_REQUEST = /^\s*(stop|unsubscribe)\b/i;
@@ -34,8 +36,9 @@ export class WhatsAppWebhookController {
 
   /** Meta's one-time subscription handshake: echo the challenge as plain text, or refuse. */
   @Public()
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @Get('whatsapp')
+  @ApiOperation({ summary: "Meta's webhook handshake: echoes the challenge as text, 403 on a token mismatch" })
   verify(@Query() query: Record<string, unknown>, @Res({ passthrough: true }) res: Response): string {
     const challenge = this.whatsapp.verifyChallenge?.(query) ?? null;
     if (challenge === null) throw new ForbiddenException('Verify token mismatch');
@@ -45,8 +48,9 @@ export class WhatsAppWebhookController {
 
   /** Always 200 once the signature checks out — a vendor that gets a 4xx retries forever. */
   @Public()
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @Post('whatsapp')
+  @ApiOperation({ summary: 'Receive a WhatsApp provider webhook: 200 once the signature checks, 401 otherwise' })
   @HttpCode(HttpStatus.OK)
   async receive(@Req() req: Request) {
     const presented = req.headers[this.whatsapp.signatureHeader];

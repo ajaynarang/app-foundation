@@ -155,9 +155,7 @@ export function ApiKeyMintSheet({ open, onOpenChange }: Props) {
               </p>
             )}
             {needsIpAllowlist && (
-              <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                Add at least one CIDR before creating the key.
-              </p>
+              <p className="text-xs text-caution-text">Add at least one CIDR before creating the key.</p>
             )}
           </div>
 

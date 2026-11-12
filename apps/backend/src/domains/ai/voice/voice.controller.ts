@@ -8,6 +8,8 @@ import {
   ServiceUnavailableException,
   ForbiddenException,
   Logger,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Throttle } from '@nestjs/throttler';
@@ -19,7 +21,12 @@ import { VoiceService } from './voice.service';
 import { VoiceTokenDto } from './dto/voice-token.dto';
 import { VoiceRespondDto } from './dto/voice-respond.dto';
 import type { Request, Response } from 'express';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { VoiceStatusResponse, VoiceTokenResponse } from '../openapi.responses';
 
+@ApiTags('Voice')
+@ApiBearerAuth()
 @Controller('voice')
 export class VoiceController {
   private readonly logger = new Logger(VoiceController.name);
@@ -29,6 +36,8 @@ export class VoiceController {
   /** Check if voice mode is available (all vendor keys configured). */
   @Get('status')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Whether voice mode is available (every vendor key configured)' })
+  @ApiResult(VoiceStatusResponse)
   async getStatus() {
     const status = await this.voiceService.getStatus();
     // Only expose availability flag — don't leak missing env var names
@@ -36,8 +45,13 @@ export class VoiceController {
   }
 
   @Post('token')
+  @HttpCode(HttpStatus.OK)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Issue a LiveKit room token for a conversation you own — 503 when voice mode is unavailable',
+  })
+  @ApiResult(VoiceTokenResponse)
   async getToken(@CurrentUser() user: any, @Body() dto: VoiceTokenDto) {
     const status = await this.voiceService.getStatus();
     if (!status.available) {
@@ -58,6 +72,10 @@ export class VoiceController {
   @Post('internal/respond')
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({
+    summary:
+      'Internal: stream the assistant reply for a voice transcript as NDJSON (voice agent only, X-Voice-Agent-Secret)',
+  })
   async internalRespond(@Req() req: Request, @Res() res: Response, @Body() dto: VoiceRespondDto) {
     // Validate shared secret — constant-time comparison to prevent timing attacks
     const secret = req.headers['x-voice-agent-secret'] as string;

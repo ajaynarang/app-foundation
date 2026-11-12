@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DeskEpisodeStatus, Prisma } from '@appshore/db';
 import {
   HANDLED_EPISODE_STATUSES,
@@ -22,9 +22,22 @@ import {
 import { DateTime } from 'luxon';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { ApprovalEnrichmentService } from '../approval/approval-enrichment.service';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { containsText, normalizeSearchTerm } from '@appshore/kernel/shared/utils/list-query';
+
+/** Most recently opened first; the episode id is a UUID (never an Int key), so it is a safe tiebreak. */
+const OPENED_KEYSET = { field: 'openedAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+/** Most recently closed first, for the Handled view. */
+const CLOSED_KEYSET = { field: 'closedAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
 
 /**
  * Statuses shown on the Handled tab. Sourced from the shared view set so the
@@ -57,7 +70,7 @@ export class DeskEpisodeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly approvalEnrichment: ApprovalEnrichmentService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -85,7 +98,7 @@ export class DeskEpisodeService {
     });
     if (!episode) throw new NotFoundException('Episode not found');
     if (episode.status !== EPISODE_STATUS.ESCALATED) {
-      throw new BadRequestException('Only an escalated episode can be resolved');
+      throw invalidState('Only an escalated episode can be resolved');
     }
 
     const trimmedNote = note?.trim();
@@ -95,18 +108,21 @@ export class DeskEpisodeService {
         : trimmedNote
       : episode.outcomeNote;
 
-    const updated = await this.prisma.deskEpisode.update({
-      where: { id: episode.id },
-      data: { status: EPISODE_STATUS.RESOLVED, outcomeNote },
-      select: { id: true, status: true },
+    // The event commits with the status (ADR "Outbox and deadlines").
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.deskEpisode.update({
+        where: { id: episode.id },
+        data: { status: EPISODE_STATUS.RESOLVED, outcomeNote },
+        select: { id: true, status: true },
+      });
+      await emit(
+        DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
+        tenantId,
+        { tenantId, episodeId: row.id, status: row.status },
+        { id: String(userId), type: 'user' },
+      );
+      return row;
     });
-
-    await this.events.emit(
-      DOMAIN_EVENTS.DESK_EPISODE_CHANGED,
-      tenantId,
-      { tenantId, episodeId: updated.id, status: updated.status },
-      { id: String(userId), type: 'user' },
-    );
 
     this.logger.log(`desk-episode-resolved episodeId=${updated.id} tenant=${tenantId} byUser=${userId}`);
     return updated;
@@ -117,8 +133,9 @@ export class DeskEpisodeService {
     query: ListDeskEpisodesQuery,
     context: { currentUserId?: number } = {},
   ): Promise<ListDeskEpisodesResponse> {
-    const limit = query.limit;
-    const cursor = parseCursor(query.cursor);
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...OPENED_KEYSET, cursor: query.cursor }) : undefined;
 
     // Mine-scope narrows by the owner-agent's supervisor. Missing user → empty.
     const scopeWhere =
@@ -128,38 +145,31 @@ export class DeskEpisodeService {
           : { id: '__no_match__' } // forces empty rows
         : {};
 
-    const rows = await this.prisma.deskEpisode.findMany({
-      where: {
-        tenantId,
-        // Explicit status filter (e.g. the "Escalated" chip passes
-        // status=ESCALATED) wins. With no filter, default to the Needs-you
-        // set so handled/terminal episodes never leak into the Needs-you list
-        // — the fix for an escalated episode showing on both tabs.
-        ...(query.status ? { status: query.status } : { status: { in: [...NEEDS_YOU_STATUSES] } }),
-        ...scopeWhere,
-        ...(cursor
-          ? {
-              OR: [{ openedAt: { lt: cursor.openedAt } }, { openedAt: cursor.openedAt, id: { lt: cursor.id } }],
-            }
-          : {}),
-      },
-      orderBy: [{ openedAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      include: {
-        responsibility: { select: { key: true } },
-        ownerAgent: { select: { key: true } },
-      },
-    });
-
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-    const last = page[page.length - 1];
-    const nextCursor = hasMore && last ? formatCursor(last.openedAt, last.id) : null;
-
-    return {
-      rows: page.map(toListItem),
-      nextCursor,
+    const where: Prisma.DeskEpisodeWhereInput = {
+      tenantId,
+      // Explicit status filter (e.g. the "Escalated" chip passes
+      // status=ESCALATED) wins. With no filter, default to the Needs-you
+      // set so handled/terminal episodes never leak into the Needs-you list
+      // — the fix for an escalated episode showing on both tabs.
+      ...(query.status ? { status: query.status } : { status: { in: [...NEEDS_YOU_STATUSES] } }),
+      ...scopeWhere,
     };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.deskEpisode.findMany({
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ openedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        include: {
+          responsibility: { select: { key: true } },
+          ownerAgent: { select: { key: true } },
+        },
+      }),
+      this.prisma.deskEpisode.count({ where }),
+    ]);
+
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.openedAt, row.id));
+    return { items: page.items.map(toListItem), nextCursor: page.nextCursor, total };
   }
 
   async getForTenant(tenantId: number, episodeId: string): Promise<DeskEpisodeDetail> {
@@ -251,8 +261,8 @@ export class DeskEpisodeService {
   /**
    * Handled tab list — terminal episodes in a tenant-local time window
    * with rich filters. Returns slim `HandledListItem` rows + a summary
-   * rollup (total, byOutcome, autonomousPct). Pagination via `${closedAt.toISOString()}|${id}`
-   * cursor.
+   * rollup (total, byOutcome, autonomousPct), as a cursor list keyed on
+   * (closedAt, id).
    *
    * Window boundaries are tenant-local (Luxon + tenantTimezone). The
    * wire contract uses camelCase; Prisma where/select/include stays
@@ -268,78 +278,76 @@ export class DeskEpisodeService {
     // Defensive: mine-scope with no user → empty rows, no DB round trip.
     // Keeps the list contract honest + prevents leaking tenant-wide rows.
     if (query.scope === 'mine' && !ctx.currentUserId) {
-      return { rows: [], nextCursor: null, summary: { total: 0, byOutcome: {}, autonomousPct: 0 } };
+      return { items: [], nextCursor: null, total: 0, summary: { total: 0, byOutcome: {}, autonomousPct: 0 } };
     }
 
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...CLOSED_KEYSET, cursor: query.cursor }) : undefined;
     const { from, to } = resolveWindow(query, ctx.tenantTimezone);
-    const cursor = parseCursor(query.cursor);
 
     const ownerAgentScope: Prisma.DeskAgentWhereInput =
       query.scope === 'mine' && ctx.currentUserId ? { supervisorUserId: ctx.currentUserId } : {};
     if (query.agent) ownerAgentScope.key = query.agent;
     const ownerAgentWhere = Object.keys(ownerAgentScope).length > 0 ? { ownerAgent: ownerAgentScope } : {};
 
+    // Control characters (a NUL byte) would fail inside the query: a 500, not a match.
+    const term = normalizeSearchTerm(query.q);
     const where: Prisma.DeskEpisodeWhereInput = {
       tenantId,
       status: { in: [...HANDLED_STATUSES] },
       closedAt: { gte: from, lte: to },
       ...ownerAgentWhere,
       ...(query.outcome ? { outcome: query.outcome } : {}),
-      ...(query.q
+      // The search and the cursor each need an OR: they are joined with AND below, never spread into one object
+      // (where the second OR replaced the first, and a searched list stopped filtering from page two on).
+      ...(term
         ? {
-            OR: [
-              { entityLabel: { contains: query.q, mode: 'insensitive' } },
-              { responsibility: { key: { contains: query.q, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
-      ...(cursor
-        ? {
-            OR: [{ closedAt: { lt: cursor.openedAt } }, { closedAt: cursor.openedAt, id: { lt: cursor.id } }],
+            OR: [{ entityLabel: containsText(term) }, { responsibility: { key: containsText(term) } }],
           }
         : {}),
     };
 
-    const rows = await this.prisma.deskEpisode.findMany({
-      where,
-      orderBy: [{ closedAt: 'desc' }, { id: 'desc' }],
-      take: query.limit + 1,
-      include: {
-        responsibility: { select: { key: true, title: true } },
-        ownerAgent: { select: { key: true, name: true } },
-        approvals: {
-          where: { decision: { not: null } },
-          orderBy: { decidedAt: 'desc' },
-          take: 1,
-          select: {
-            decision: true,
-            decidedByUserId: true,
-            decidedBy: { select: { firstName: true, lastName: true } },
+    // `closedAt` is nullable on the table, but every row in this view has one (the window bounds it).
+    const [rows, total] = await Promise.all([
+      this.prisma.deskEpisode.findMany({
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ closedAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
+        include: {
+          responsibility: { select: { key: true, title: true } },
+          ownerAgent: { select: { key: true, name: true } },
+          approvals: {
+            where: { decision: { not: null } },
+            orderBy: { decidedAt: 'desc' },
+            take: 1,
+            select: {
+              decision: true,
+              decidedByUserId: true,
+              decidedBy: { select: { firstName: true, lastName: true } },
+            },
+          },
+          // Active suppression via the `sourceEpisodeId` back-relation. See the
+          // TODO in getForTenant — same simplification applies here: only
+          // surfaces suppressions created FROM this episode. Acceptable because
+          // snoozing closes the source episode and blocks later ones on the
+          // same entity until the window elapses or the row is cleared.
+          entitySuppressions: {
+            where: {
+              unsuppressedAt: null,
+              OR: [{ suppressUntil: null }, { suppressUntil: { gt: new Date() } }],
+            },
+            select: { id: true, suppressUntil: true },
+            take: 1,
+            orderBy: { setAt: 'desc' },
           },
         },
-        // Active suppression via the `sourceEpisodeId` back-relation. See the
-        // TODO in getForTenant — same simplification applies here: only
-        // surfaces suppressions created FROM this episode. Acceptable because
-        // snoozing closes the source episode and blocks later ones on the
-        // same entity until the window elapses or the row is cleared.
-        entitySuppressions: {
-          where: {
-            unsuppressedAt: null,
-            OR: [{ suppressUntil: null }, { suppressUntil: { gt: new Date() } }],
-          },
-          select: { id: true, suppressUntil: true },
-          take: 1,
-          orderBy: { setAt: 'desc' },
-        },
-      },
-    });
+      }),
+      this.prisma.deskEpisode.count({ where }),
+    ]);
 
-    const hasMore = rows.length > query.limit;
-    const page = hasMore ? rows.slice(0, query.limit) : rows;
-    const last = page[page.length - 1];
-    const nextCursor = hasMore && last && last.closedAt ? formatCursor(last.closedAt, last.id) : null;
-
-    const mapped = page.map((row) => toHandledListItem(row as HandledRow));
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.closedAt ?? row.openedAt, row.id));
+    const mapped = page.items.map((row) => toHandledListItem(row as HandledRow));
     const byOutcome: Record<string, number> = {};
     let autonomousCount = 0;
     for (const row of mapped) {
@@ -353,8 +361,9 @@ export class DeskEpisodeService {
     );
 
     return {
-      rows: mapped,
-      nextCursor,
+      items: mapped,
+      nextCursor: page.nextCursor,
+      total,
       summary: {
         total: mapped.length,
         byOutcome,
@@ -518,20 +527,6 @@ export function pickMostRecentDecidedApproval(approvals: ApprovalRecord[]): Appr
 }
 
 // ─── Cursor ──────────────────────────────────────────────────────────────
-
-function formatCursor(openedAt: Date, id: string): string {
-  return `${openedAt.toISOString()}|${id}`;
-}
-
-function parseCursor(raw: string | undefined): { openedAt: Date; id: string } | null {
-  if (!raw) return null;
-  const sep = raw.indexOf('|');
-  if (sep === -1) return null;
-  const openedAt = new Date(raw.slice(0, sep));
-  const id = raw.slice(sep + 1);
-  if (Number.isNaN(openedAt.getTime()) || !id) return null;
-  return { openedAt, id };
-}
 
 // ─── Handled window + row mapper ─────────────────────────────────────────
 

@@ -6,6 +6,8 @@ import { Check } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './sheet';
 import { Button } from './button';
 import { cn } from '../../lib/utils';
+import { SheetSizeControls } from './sheet-size-controls';
+import { useSheetSizing, sizeModeToPixels } from '../../hooks/use-sheet-sizing';
 
 type SheetSize = 'sm' | 'md';
 type SheetMode = 'view' | 'edit';
@@ -14,7 +16,16 @@ interface FormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
+  /**
+   * Optional rich title content. When provided, renders inside the SheetTitle
+   * in place of the plain `title` string. The `title` prop is still required
+   * and used as the accessible label for screen readers (pass a descriptive
+   * plain string). Use this when you want an avatar, badge, or icon strip
+   * in the header bar.
+   */
+  titleNode?: React.ReactNode;
   description?: string;
+  /** Fixed width preset for sheets without entityType. Default: 'sm' */
   size?: SheetSize;
   mode?: SheetMode;
   children: React.ReactNode;
@@ -35,6 +46,10 @@ interface FormSheetProps {
   pinnable?: boolean;
   /** Enable drag-to-resize (desktop only). Default: false */
   resizable?: boolean;
+  /** Entity type key for sheet sizing controls. When provided, shows ◧ ◨ □ controls in header. */
+  entityType?: string;
+  /** Action buttons placed before pin/close in header */
+  headerActions?: React.ReactNode;
 }
 
 const sizeClasses: Record<SheetSize, string> = {
@@ -52,12 +67,12 @@ const mobileLayoutClass = 'flex flex-col h-full';
 export function SheetKeyboardHint({ showSave = true }: { showSave?: boolean }) {
   return (
     <p className="text-xs text-muted-foreground mt-2">
-      Press <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-[10px] font-mono">Esc</kbd> or{' '}
-      <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-[10px] font-mono">✕</kbd> to close
+      Press <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-2xs font-mono">Esc</kbd> or{' '}
+      <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-2xs font-mono">✕</kbd> to close
       {showSave && (
         <>
           {' '}
-          · <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-[10px] font-mono">⌘↵</kbd> to save
+          · <kbd className="px-1 py-0.5 rounded border border-border bg-muted text-2xs font-mono">⌘↵</kbd> to save
         </>
       )}
     </p>
@@ -68,6 +83,7 @@ export function FormSheet({
   open,
   onOpenChange,
   title,
+  titleNode,
   description,
   size = 'sm',
   mode = 'edit',
@@ -83,10 +99,17 @@ export function FormSheet({
   side = 'right',
   pinnable,
   resizable = false,
+  entityType,
+  headerActions,
 }: FormSheetProps) {
   // Default pinnable: true for edit mode, false for view
   const effectivePinnable = pinnable ?? mode === 'edit';
+  // When entityType is provided, default to resizable so size controls work
+  const effectiveResizable = resizable || !!entityType;
   const contentRef = React.useRef<HTMLDivElement>(null);
+
+  // Sheet sizing: when entityType is provided, use the persisted size preference
+  const sizing = useSheetSizing(entityType ?? '');
 
   // Auto-focus first input when sheet opens
   useEffect(() => {
@@ -127,15 +150,24 @@ export function FormSheet({
       <SheetContent
         ref={contentRef}
         side={side}
-        className={cn(resizable ? '' : sizeClasses[size], mobileLayoutClass, 'p-6')}
+        className={cn(effectiveResizable ? 'w-full' : sizeClasses[size], mobileLayoutClass, 'p-6')}
         onInteractOutside={mode === 'edit' ? (e) => e.preventDefault() : undefined}
         onKeyDown={handleKeyDown}
         pinnable={effectivePinnable}
-        resizable={resizable}
+        resizable={effectiveResizable}
         defaultPinned={mode === 'edit'}
+        {...(entityType ? { defaultWidth: sizeModeToPixels(sizing.effectiveSize) } : {})}
       >
-        <SheetHeader className="flex-shrink-0">
-          <SheetTitle>{title}</SheetTitle>
+        <SheetHeader
+          className="flex-shrink-0"
+          actions={
+            <div className="flex items-center gap-1">
+              {headerActions}
+              {entityType && sizing.showControls && <SheetSizeControls entityType={entityType} />}
+            </div>
+          }
+        >
+          <SheetTitle aria-label={title}>{titleNode ?? title}</SheetTitle>
           {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
         {mode === 'edit' && (
@@ -144,7 +176,7 @@ export function FormSheet({
           </div>
         )}
 
-        <div className="mt-6 flex-1 overflow-y-auto min-h-0">{children}</div>
+        <div className="mt-6 flex-1 overflow-y-auto min-h-0 px-0.5 -mx-0.5">{children}</div>
 
         {/* Sticky footer for edit mode */}
         {mode === 'edit' && onSubmit && (

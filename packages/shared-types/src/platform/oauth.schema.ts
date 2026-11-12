@@ -53,6 +53,16 @@ export const OAuthClientCreatedResponseSchema = OAuthClientResponseSchema.extend
   clientSecret: z.string(),
 });
 
+/** `POST /oauth/authorize/consent`: where the consent page sends the person's browser next (the code rides it). */
+export const OAuthConsentApprovedSchema = z.object({ redirectUrl: z.string() });
+export type OAuthConsentApproved = z.infer<typeof OAuthConsentApprovedSchema>;
+
+/** `POST /oauth/clients/:client_id/rotate-secret`: the new secret in plaintext, shown once. */
+export const OAuthClientSecretRotatedSchema = z.object({
+  clientSecret: z.string().describe('The new client secret; returned only on this response'),
+});
+export type OAuthClientSecretRotated = z.infer<typeof OAuthClientSecretRotatedSchema>;
+
 export type CreateOAuthClientInput = z.infer<typeof CreateOAuthClientSchema>;
 export type UpdateOAuthClientInput = z.infer<typeof UpdateOAuthClientSchema>;
 export type OAuthClientResponse = z.infer<typeof OAuthClientResponseSchema>;
@@ -101,6 +111,24 @@ export const TokenResponseSchema = z.object({
 });
 
 export type TokenResponse = z.infer<typeof TokenResponseSchema>;
+
+// ── Protocol wire shapes (RFC field names: the standards' snake_case, not the app's camelCase) ──
+/** RFC 6749 section 5.1: what `POST /oauth/token` answers. */
+export const OAuthTokenIssuedSchema = z.object({
+  access_token: z.string().describe('The bearer token for the MCP endpoints'),
+  token_type: z.literal('Bearer'),
+  expires_in: z.number().int().describe('Seconds until the access token expires'),
+  refresh_token: z.string().describe('Exchange it at the token endpoint (grant_type=refresh_token) for a new pair'),
+  scope: z.string().describe('The scopes granted, space-delimited'),
+});
+export type OAuthTokenIssued = z.infer<typeof OAuthTokenIssuedSchema>;
+
+/** RFC 6749 section 5.2 and RFC 7591 section 3.2.2: every error from an OAuth protocol endpoint. */
+export const OAuthErrorSchema = z.object({
+  error: z.string().describe('An RFC 6749 error code (invalid_request, invalid_grant, invalid_client, …)'),
+  error_description: z.string().describe('A sentence a developer can read'),
+});
+export type OAuthError = z.infer<typeof OAuthErrorSchema>;
 
 // ── Consent Challenge ───────────────────────────────────
 export const ConsentChallengeSchema = z.object({

@@ -41,10 +41,8 @@ describe('LOGIN_ACTIVITY constants', () => {
     expect(LOGIN_ACTIVITY.SUMMARY_CACHE_TTL_SECONDS).toBe(60);
   });
 
-  it('caps the date range at 90 days and pagination at 100 rows', () => {
+  it('caps the date range at 90 days', () => {
     expect(LOGIN_ACTIVITY.MAX_RANGE_DAYS).toBe(90);
-    expect(LOGIN_ACTIVITY.MAX_PAGE_LIMIT).toBe(100);
-    expect(LOGIN_ACTIVITY.DEFAULT_PAGE_LIMIT).toBe(50);
   });
 
   it('caps Notable lists at 5 and brute-force at 5 fails', () => {

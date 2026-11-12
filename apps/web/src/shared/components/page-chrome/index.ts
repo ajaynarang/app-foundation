@@ -1,29 +1,86 @@
 /**
- * Page Chrome — the canonical data-page layout system.
- *
- * Four zones: Identity (PageHeader) · Toolbar (PageToolbar + PageTabs) ·
- * Filter bar (FilterBar) · Data (page-owned). Composition wrappers over the local
- * @/shared/components/ui primitives — no new design primitives.
- *
- * See app-frontend-patterns §15.4 (Page Chrome) for the full pattern and rules.
+ * Page Chrome — re-exported for apps/web from the shared packages:
+ *   - components (PageHeader … ListRow, RowActions, Identifier, RelativeTime): `@app/ui/components/page-chrome`
+ *   - list state (useListParams, useCursorList, usePickerSearch, NameListFilterRow, list params): `@appshore/web-core/shared/list`
+ * Only SearchSelect (a form picker built on the web-only `useResultHighlight`) lives here.
+ * The app passes timezone, formatters and `next/link` once through `PageChromeBridge` (shared/providers).
  */
-export { PageShell, type PageShellProps } from './page-shell';
-export { PageHeader, type PageHeaderProps } from './page-header';
-export { PageTabs, PageTabsList, PageTabsTrigger, type PageTabsTriggerProps } from './page-tabs';
-export { PageToolbar, type PageToolbarProps } from './page-toolbar';
-export { PageActionsMenu, type ActionItem, type PageActionsMenuProps } from './page-actions-menu';
 export {
+  PageShell,
+  PageHeader,
+  PageTabs,
+  PageTabsList,
+  PageTabsTrigger,
+  PageToolbar,
+  PageActionsMenu,
   ViewSwitcher,
   GroupSwitcher,
+  FilterBar,
+  StatusPivot,
+  SegmentedControl,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  PageSection,
+  ListFilterRow,
+  ListSearch,
+  LIST_SEARCH_DEBOUNCE_MS,
+  FilterSelect,
+  FilterButton,
+  FilterChips,
+  appliedFilters,
+  describeFilter,
+  filterRowMode,
+  ListFooter,
+  ListRows,
+  ListRow,
+  ListCardGrid,
+  ListCard,
+  ListErrorState,
+  RowActions,
+  renderRowActions,
+  Identifier,
+  IDENTIFIER_CLASS,
+  RelativeTime,
+  type PageShellProps,
+  type PageHeaderProps,
+  type PageTabsTriggerProps,
+  type PageToolbarProps,
+  type ActionItem,
+  type PageActionsMenuProps,
   type SwitcherOption,
   type ViewSwitcherProps,
   type GroupSwitcherProps,
-} from './view-switcher';
-export { FilterBar, type FilterBarProps } from './filter-bar';
-export { StatusPivot, type StatusPivotSegment, type StatusPivotProps } from './status-pivot';
-export { SegmentedControl, type SegmentedOption, type SegmentedControlProps } from './segmented-control';
-export { PageEmptyState, type PageEmptyStateProps } from './page-empty-state';
-export { PageLoadingSkeleton, type PageLoadingSkeletonProps } from './page-loading-skeleton';
+  type FilterBarProps,
+  type StatusPivotSegment,
+  type StatusPivotProps,
+  type SegmentedOption,
+  type SegmentedControlProps,
+  type PageEmptyStateProps,
+  type PageLoadingSkeletonProps,
+  type PageSectionProps,
+  type ListFilterRowProps,
+  type ListSearchProps,
+  type FilterSelectOption,
+  type FilterSelectProps,
+  type FilterButtonProps,
+  type FilterChipsProps,
+  type FilterRowMode,
+  type ListFilterDeclaration,
+  type ListFooterProps,
+  type ListRowsProps,
+  type ListRowProps,
+  type ListCardGridProps,
+  type ListCardProps,
+  type ListErrorStateProps,
+  type RowActionItem,
+  type RowActionPrimary,
+  type RowActionsProps,
+  type RowActionsSlot,
+  type IdentifierProps,
+  type RelativeTimeProps,
+} from '@app/ui/components/page-chrome';
+export * from '@appshore/web-core/shared/list';
+export { SearchSelect, type SearchSelectOption, type SearchSelectProps } from './search-select';
 
-// Re-export TabsContent so pages get tab panels from one import alongside PageTabs.
-export { TabsContent } from '@/shared/components/ui/tabs';
+// TabsContent beside PageTabs, so a page gets its tab panels from the same import.
+export { TabsContent } from '@app/ui/components/ui/tabs';

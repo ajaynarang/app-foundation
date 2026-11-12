@@ -5,6 +5,7 @@ import { showMutationError } from '@app/ui';
 import { useState } from 'react';
 import { AuthProvider } from '@/shared/components/common/providers/auth-provider';
 import { PreferencesProvider } from '@/shared/providers/PreferencesProvider';
+import { PageChromeBridge } from '@/shared/providers/PageChromeBridge';
 import { SseProvider } from '@appshore/web-core/shared/realtime';
 import { TooltipProvider } from '@app/ui/components/ui/tooltip';
 
@@ -40,9 +41,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <PreferencesProvider>
-          <SseProvider>
-            <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
-          </SseProvider>
+          <PageChromeBridge>
+            <SseProvider>
+              <TooltipProvider delayDuration={0}>{children}</TooltipProvider>
+            </SseProvider>
+          </PageChromeBridge>
         </PreferencesProvider>
       </AuthProvider>
     </QueryClientProvider>

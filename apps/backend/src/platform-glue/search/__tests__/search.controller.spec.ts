@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { SearchQueryDto } from '../dto/search-query.dto';
 import { Test } from '@nestjs/testing';
 import { SearchController } from '../search.controller';
 import { SEARCH_PROVIDERS, SearchProvider, SearchResult } from '../search.provider';
@@ -24,10 +27,18 @@ async function buildController(providers?: SearchProvider[]): Promise<SearchCont
   return module.get(SearchController);
 }
 
+const query = (raw: Record<string, unknown>) => readQueryDto(SearchQueryDto, raw);
+
 describe('SearchController', () => {
+  it('reads limit as a number clamped to 1…25 (default 8) and answers 400 when it is not one', async () => {
+    expect((await query({ q: 'acme' })).limit).toBe(8);
+    expect((await query({ q: 'acme', limit: '500' })).limit).toBe(25);
+    expect(await fieldErrorsOf(query({ q: 'acme', limit: 'abc' }))).toHaveProperty('limit');
+  });
+
   it('returns empty results when no providers are registered', async () => {
     const controller = await buildController();
-    const result = await controller.search(mockUser, 'invoice');
+    const result = await controller.search(mockUser, await query({ q: 'invoice' }));
     expect(result).toEqual({ results: [] });
   });
 
@@ -35,9 +46,9 @@ describe('SearchController', () => {
     const provider: SearchProvider = { search: jest.fn() };
     const controller = await buildController([provider]);
 
-    expect(await controller.search(mockUser, '')).toEqual({ results: [] });
-    expect(await controller.search(mockUser, 'a')).toEqual({ results: [] });
-    expect(await controller.search(mockUser, undefined)).toEqual({ results: [] });
+    expect(await controller.search(mockUser, await query({ q: '' }))).toEqual({ results: [] });
+    expect(await controller.search(mockUser, await query({ q: 'a' }))).toEqual({ results: [] });
+    expect(await controller.search(mockUser, await query({}))).toEqual({ results: [] });
     expect(provider.search).not.toHaveBeenCalled();
   });
 
@@ -50,7 +61,7 @@ describe('SearchController', () => {
     };
     const controller = await buildController([providerA, providerB]);
 
-    const result = await controller.search(mockUser, 'acme');
+    const result = await controller.search(mockUser, await query({ q: ' acme ' }));
 
     expect(providerA.search).toHaveBeenCalledWith(42, 'acme');
     expect(providerB.search).toHaveBeenCalledWith(42, 'acme');
@@ -65,7 +76,7 @@ describe('SearchController', () => {
     };
     const controller = await buildController([provider]);
 
-    const result = await controller.search(mockUser, 'acme', '2');
+    const result = await controller.search(mockUser, await query({ q: 'acme', limit: '2' }));
     expect(result.results).toHaveLength(2);
   });
 
@@ -74,7 +85,7 @@ describe('SearchController', () => {
     const healthy: SearchProvider = { search: jest.fn().mockResolvedValue([buildResult({ id: 'ok' })]) };
     const controller = await buildController([failing, healthy]);
 
-    const result = await controller.search(mockUser, 'acme');
+    const result = await controller.search(mockUser, await query({ q: ' acme ' }));
     expect(result.results.map((r) => r.id)).toEqual(['ok']);
   });
 });

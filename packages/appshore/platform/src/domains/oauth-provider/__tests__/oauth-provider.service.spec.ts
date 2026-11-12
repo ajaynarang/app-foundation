@@ -48,6 +48,11 @@ const mockConfigService = {
   get: jest.fn().mockReturnValue('test-secret'),
 };
 
+/** RFC 6749 section 5.2: what a token-endpoint failure must carry, pinned per failure below. */
+const rfc = (error: string, status = 400) => ({ status, response: expect.objectContaining({ error }) });
+const INVALID_GRANT = rfc('invalid_grant');
+const INVALID_CLIENT = rfc('invalid_client', 401);
+
 describe('OAuthProviderService', () => {
   let service: OAuthProviderService;
 
@@ -99,7 +104,7 @@ describe('OAuthProviderService', () => {
         redirectUris: ['https://app.com/callback'],
         scopes: ['platform:read'], // missing platform:write
       });
-      await expect(service.authorize(params as any)).rejects.toThrow(BadRequestException);
+      await expect(service.authorize(params as any)).rejects.toMatchObject(rfc('invalid_scope'));
     });
 
     it('should return a consent challenge JWT for valid request', async () => {
@@ -255,7 +260,7 @@ describe('OAuthProviderService', () => {
     it('should throw for unknown refresh token', async () => {
       mockPrisma.oAuthRefreshToken.findUnique.mockResolvedValue(null);
 
-      await expect(service.refreshToken('bad-token', 'c-1', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('bad-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should detect replay and revoke all tokens', async () => {
@@ -267,7 +272,7 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthAccessToken.updateMany.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.updateMany.mockResolvedValue({});
 
-      await expect(service.refreshToken('reused-token', 'c-1', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('reused-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for revoked refresh token', async () => {
@@ -276,7 +281,7 @@ describe('OAuthProviderService', () => {
         revokedAt: new Date(),
       });
 
-      await expect(service.refreshToken('revoked-token', 'c-1', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('revoked-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for expired refresh token', async () => {
@@ -287,7 +292,7 @@ describe('OAuthProviderService', () => {
         client: { clientId: 'c-1' },
       });
 
-      await expect(service.refreshToken('expired-token', 'c-1', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('expired-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for client mismatch', async () => {
@@ -303,7 +308,7 @@ describe('OAuthProviderService', () => {
         clientId: 1,
       });
 
-      await expect(service.refreshToken('token', 'c-wrong', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('token', 'c-wrong', undefined)).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should issue new tokens and mark old as rotated for valid refresh', async () => {
@@ -351,9 +356,9 @@ describe('OAuthProviderService', () => {
       });
       mockPrisma.oAuthAuthorizationCode.findUnique.mockResolvedValue(null);
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should detect replay and revoke all tokens', async () => {
@@ -368,9 +373,9 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthAccessToken.updateMany.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.updateMany.mockResolvedValue({});
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for expired authorization code', async () => {
@@ -386,9 +391,9 @@ describe('OAuthProviderService', () => {
         codeChallenge: 'challenge',
       });
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for client_id mismatch', async () => {
@@ -404,9 +409,9 @@ describe('OAuthProviderService', () => {
         codeChallenge: 'challenge',
       });
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('should throw for redirect_uri mismatch', async () => {
@@ -422,9 +427,9 @@ describe('OAuthProviderService', () => {
         codeChallenge: 'challenge',
       });
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
   });
 
@@ -471,9 +476,9 @@ describe('OAuthProviderService', () => {
         scopes: ['platform:read'],
       });
 
-      await expect(service.exchangeCode('code', 'my-verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'my-verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
   });
 
@@ -500,9 +505,9 @@ describe('OAuthProviderService', () => {
         scopes: ['platform:read'],
       });
 
-      await expect(service.exchangeCode('code', verifier, 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        'client_secret required',
-      );
+      await expect(
+        service.exchangeCode('code', verifier, 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_CLIENT);
     });
 
     it('should throw for invalid client_secret on confidential client', async () => {
@@ -529,9 +534,9 @@ describe('OAuthProviderService', () => {
 
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.exchangeCode('code', verifier, 'c-1', 'wrong-secret', 'https://app.com/cb')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.exchangeCode('code', verifier, 'c-1', 'wrong-secret', 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_CLIENT);
     });
   });
 
@@ -577,9 +582,9 @@ describe('OAuthProviderService', () => {
       });
       mockPrisma.oAuthAuthorizationCode.findUnique.mockResolvedValue(null);
 
-      await expect(service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.exchangeCode('code', 'verifier', 'c-1', undefined, 'https://app.com/cb'),
+      ).rejects.toMatchObject(INVALID_GRANT);
     });
   });
 
@@ -598,7 +603,9 @@ describe('OAuthProviderService', () => {
         scopes: ['platform:read'],
       });
 
-      await expect(service.refreshToken('token', 'c', undefined)).rejects.toThrow(/chain expired/i);
+      const refresh = service.refreshToken('token', 'c', undefined);
+      await expect(refresh).rejects.toThrow(/chain expired/i);
+      await expect(refresh).rejects.toMatchObject(INVALID_GRANT);
     });
 
     it('accepts refresh when the chain is within 90 days', async () => {
@@ -651,7 +658,7 @@ describe('OAuthProviderService', () => {
         clientId: 1,
       });
 
-      await expect(service.refreshToken('valid-token', 'c-1', undefined)).rejects.toThrow('client_secret required');
+      await expect(service.refreshToken('valid-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_CLIENT);
     });
 
     it('should throw for invalid client_secret', async () => {
@@ -673,7 +680,7 @@ describe('OAuthProviderService', () => {
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.refreshToken('valid-token', 'c-1', 'wrong-secret')).rejects.toThrow('Invalid client_secret');
+      await expect(service.refreshToken('valid-token', 'c-1', 'wrong-secret')).rejects.toMatchObject(INVALID_CLIENT);
     });
   });
 });

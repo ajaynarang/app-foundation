@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { AdminCacheController } from '../admin-cache.controller';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { CACHE_NAMESPACES } from '@appshore/kernel/constants/cache.constants';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
 
 describe('AdminCacheController', () => {
   let controller: AdminCacheController;
@@ -94,8 +95,9 @@ describe('AdminCacheController', () => {
   // ─── flushAll ────────────────────────────────────────────────────────────
 
   describe('flushAll', () => {
-    it('should throw BadRequestException when confirm is not true', async () => {
-      await expect(controller.flushAll({})).rejects.toThrow(BadRequestException);
+    it('answers 400 naming confirm when it is not true', async () => {
+      expect(await fieldErrorsOf(controller.flushAll({}))).toHaveProperty('confirm');
+      expect(await fieldErrorsOf(controller.flushAll({ confirm: false }))).toHaveProperty('confirm');
     });
 
     it('should throw BadRequestException when body is empty', async () => {
@@ -113,8 +115,8 @@ describe('AdminCacheController', () => {
   // ─── flushNamespace ──────────────────────────────────────────────────────
 
   describe('flushNamespace', () => {
-    it('should throw BadRequestException for invalid namespace', async () => {
-      await expect(controller.flushNamespace('invalid-namespace')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming namespace for an unknown one', async () => {
+      expect(await fieldErrorsOf(controller.flushNamespace('invalid-namespace'))).toHaveProperty('namespace');
     });
 
     it('should flush a valid namespace', async () => {

@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { z } from 'zod';
 
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
@@ -66,12 +67,15 @@ describe('DeskResponsibilityService — autonomy switch', () => {
       expect(prisma.deskResponsibility.findUnique).not.toHaveBeenCalled();
     });
 
-    it('refuses to arm a COMING_SOON responsibility', async () => {
+    it('refuses to arm a COMING_SOON responsibility with 409 INVALID_STATE', async () => {
       const prisma = createMockPrisma();
       prisma.deskResponsibility.findUnique.mockResolvedValue({ id: 101, lifecycle: 'COMING_SOON' });
       const svc = new DeskResponsibilityService(prisma);
 
-      await expect(svc.setAutonomyEnabled(7, AVAILABLE_KEY, true)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(svc.setAutonomyEnabled(7, AVAILABLE_KEY, true)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
       expect(prisma.deskResponsibility.update).not.toHaveBeenCalled();
     });
   });
@@ -203,6 +207,32 @@ describe('DeskResponsibilityService — autonomy switch', () => {
       const svc = new DeskResponsibilityService(prisma);
 
       await expect(svc.canRunAutonomously(7, AVAILABLE_KEY)).resolves.toBe(false);
+    });
+  });
+
+  describe('updateForTenant: a bad condition is a 400 that names it', () => {
+    it('answers VALIDATION_FAILED with fieldErrors under `conditions.`, and never a raw `issues` list', async () => {
+      const prisma = createMockPrisma();
+      prisma.deskResponsibility.findUnique.mockResolvedValue({ id: 101, lifecycle: 'AVAILABLE' });
+      const svc = new DeskResponsibilityService(prisma);
+      jest.spyOn(svc as any, 'requireDefinition').mockReturnValue({
+        key: AVAILABLE_KEY,
+        conditionsSchema: z.object({ minAmount: z.number() }),
+      });
+
+      const error = await svc
+        .updateForTenant(7, AVAILABLE_KEY, { conditions: { minAmount: 'lots' } })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      const body = (error as BadRequestException).getResponse() as Record<string, unknown>;
+      expect(body).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        detail: 'Invalid conditions',
+        fieldErrors: { 'conditions.minAmount': expect.any(String) },
+      });
+      expect(body).not.toHaveProperty('issues');
+      expect(prisma.deskResponsibility.update).not.toHaveBeenCalled();
     });
   });
 });

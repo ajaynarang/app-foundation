@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components
 import { Separator } from '@app/ui/components/ui/separator';
 import { UrlRow } from '@app/ui/components/ui/url-row';
 import { getApiBaseUrl, getEnvironmentLabel, getMcpBaseUrl } from '@appshore/web-core/shared/lib/access-environments';
+import { PageHeader } from '@/shared/components/page-chrome';
 
 interface Platform {
   id: string;
@@ -17,7 +18,6 @@ interface Platform {
   description: string;
   icon: React.ElementType;
   tag: string;
-  color: string;
 }
 
 const platforms: Platform[] = [
@@ -27,7 +27,6 @@ const platforms: Platform[] = [
     description: 'Connect the platform as an MCP Connector in Claude.ai. Paste your URL and sign in.',
     icon: MessageSquare,
     tag: 'MCP Connector',
-    color: 'bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400',
   },
   {
     id: 'claude-desktop',
@@ -35,7 +34,6 @@ const platforms: Platform[] = [
     description: 'Add the platform as a connector in the Claude Desktop app. Same flow as Claude.ai.',
     icon: Monitor,
     tag: 'MCP Connector',
-    color: 'bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400',
   },
   {
     id: 'chatgpt',
@@ -43,7 +41,6 @@ const platforms: Platform[] = [
     description: 'Connect the platform as an MCP app in ChatGPT. Paste your server URL and sign in.',
     icon: Bot,
     tag: 'MCP App',
-    color: 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400',
   },
   {
     id: 'mcp-clients',
@@ -51,7 +48,6 @@ const platforms: Platform[] = [
     description: 'Connect any MCP-compatible client using the standard protocol.',
     icon: Globe,
     tag: 'Open Standard',
-    color: 'bg-gray-500/10 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400',
   },
 ];
 
@@ -77,12 +73,12 @@ function PlatformDetailSheet({
       <SheetContent side="right" className="w-full sm:max-w-lg p-6 overflow-y-auto" pinnable resizable>
         <SheetHeader className="pb-4">
           <div className="flex items-center gap-3">
-            <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${platform.color}`}>
+            <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-muted text-foreground`}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
               <SheetTitle>{platform.name}</SheetTitle>
-              <Badge variant="muted" className="text-2xs tracking-wider uppercase mt-1">
+              <Badge variant="outline" className="text-2xs tracking-wider uppercase mt-1">
                 {platform.tag}
               </Badge>
             </div>
@@ -204,10 +200,7 @@ export default function AiAssistantsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">AI Assistants</h2>
-        <p className="text-sm text-muted-foreground">Give AI assistants access to your workspace data via MCP</p>
-      </div>
+      <PageHeader title="AI Assistants" subtitle="Give AI assistants access to your workspace data via MCP" />
 
       <Alert>
         <BookOpen className="h-4 w-4" />
@@ -246,15 +239,13 @@ export default function AiAssistantsPage() {
             >
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <div
-                    className={`inline-flex items-center justify-center w-10 h-10 rounded-xl shrink-0 ${platform.color}`}
-                  >
+                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl shrink-0 bg-muted text-foreground">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-sm font-semibold text-foreground">{platform.name}</h3>
-                      <Badge variant="muted" className="text-[9px] tracking-wider uppercase">
+                      <Badge variant="outline" className="text-[9px] tracking-wider uppercase">
                         {platform.tag}
                       </Badge>
                     </div>

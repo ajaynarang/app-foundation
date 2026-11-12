@@ -8,11 +8,16 @@
  * from Redis.
  *
  * Worker/API contract: both main.ts and worker.ts boot the same AppModule,
- * so BOTH processes consume every BullMQ queue — there is no worker-mode
- * gate that disables processors in the API process. Running this worker is
- * optional extra capacity, not a required separation. Inngest (Desk)
- * functions are the exception: they execute over HTTP via /api/inngest and
- * therefore run in the API process only.
+ * so by default BOTH processes consume every BullMQ queue. The API can be
+ * made producer-only with QUEUE_PROCESSORS_ENABLED=false (the role switch in
+ * @appshore/kernel/infrastructure/queue/queue-processing-mode, called from
+ * main.ts only). This file never reads that key, so no value of it can stop
+ * the worker. The switch ships off: with it unset the API consumes too, and
+ * this worker is optional extra capacity. Turn it on only after a worker task
+ * runs (Terraform `api_queue_processors_enabled = false` refuses while
+ * `worker_desired_count` is 0). Desk workflow functions, in a product that
+ * kept Desk, are the exception: they execute over HTTP and run in the API
+ * process only.
  *
  * ECS task definition: command = ["node", "dist/worker.js"]
  */

@@ -1,11 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -21,6 +14,16 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
 import { RotateWebhookSecretDto } from './dto/rotate-webhook-secret.dto';
 import { generateWebhookSecret } from './standard-webhooks';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+
+/** Newest first. Both tables have string ids (never an Int key), so the row id is a safe tiebreak. */
+const WEBHOOK_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -79,14 +82,17 @@ export class WebhookSubscriptionService {
     };
   }
 
-  async findAll(tenantId: number, pagination: { limit: number; offset: number }) {
-    const where = { tenantId, active: true };
-    const [subscriptions, total] = await Promise.all([
+  /** A workspace's active subscriptions, newest first, as a cursor list. A secret is never selected. */
+  async findAll(tenantId: number, query: { limit?: number; cursor?: string } = {}) {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...WEBHOOK_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.WebhookSubscriptionWhereInput = { tenantId, active: true };
+    const [rows, total] = await Promise.all([
       this.prisma.webhookSubscription.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: pagination.limit,
-        skip: pagination.offset,
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
         select: {
           id: true,
           tenantId: true,
@@ -100,14 +106,15 @@ export class WebhookSubscriptionService {
           _count: { select: { deliveryLogs: true } },
         },
       }),
-      this.prisma.webhookSubscription.count({ where }),
+      this.prisma.webhookSubscription.count({ where: scope }),
     ]);
-    return { subscriptions, total };
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id)), total };
   }
 
+  /** Scoped by tenant in the read itself: another tenant's subscription is 404, the same as a missing one. */
   async findOne(tenantId: number, id: string) {
-    const sub = await this.prisma.webhookSubscription.findUnique({
-      where: { id },
+    const sub = await this.prisma.webhookSubscription.findFirst({
+      where: { id, tenantId },
       select: {
         id: true,
         tenantId: true,
@@ -122,7 +129,6 @@ export class WebhookSubscriptionService {
       },
     });
     if (!sub) throw new NotFoundException('Webhook subscription not found');
-    if (sub.tenantId !== tenantId) throw new ForbiddenException();
     return sub;
   }
 
@@ -202,34 +208,37 @@ export class WebhookSubscriptionService {
     return { ...subscription, signingSecret: secret }; // shown once: store securely
   }
 
+  /** One subscription's delivery log, newest first, as a cursor list. */
   async findLogs(
     tenantId: number,
     id: string,
-    pagination: {
-      limit: number;
-      offset: number;
+    query: {
+      limit?: number;
+      cursor?: string;
       dateFrom?: string | null;
       dateTo?: string | null;
-    },
+    } = {},
   ) {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...WEBHOOK_KEYSET, cursor: query.cursor }) : undefined;
     await this.findOne(tenantId, id);
     const createdAt: Record<string, Date> = {};
-    if (pagination.dateFrom) createdAt.gte = new Date(`${pagination.dateFrom}T00:00:00.000Z`);
-    if (pagination.dateTo) createdAt.lte = new Date(`${pagination.dateTo}T23:59:59.999Z`);
-    const where = {
+    if (query.dateFrom) createdAt.gte = new Date(`${query.dateFrom}T00:00:00.000Z`);
+    if (query.dateTo) createdAt.lte = new Date(`${query.dateTo}T23:59:59.999Z`);
+    const scope: Prisma.WebhookDeliveryLogWhereInput = {
       subscriptionId: id,
       ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
     };
-    const [logs, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.webhookDeliveryLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: pagination.limit,
-        skip: pagination.offset,
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
       }),
-      this.prisma.webhookDeliveryLog.count({ where }),
+      this.prisma.webhookDeliveryLog.count({ where: scope }),
     ]);
-    return { logs, total };
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id)), total };
   }
 
   getEventCatalog() {
@@ -246,8 +255,14 @@ export class WebhookSubscriptionService {
       throw new NotFoundException('Delivery log not found');
     }
     if (!log.failedAt) {
-      throw new BadRequestException('Only failed deliveries can be retried');
+      throw invalidState('Only failed deliveries can be retried');
     }
+
+    // Reset the failure first: a worker that fails it again (a refused target, say) must not be overwritten.
+    const pending = await this.prisma.webhookDeliveryLog.update({
+      where: { id: logId },
+      data: { failedAt: null },
+    });
 
     const innerPayload = log.payload as WebhookDeliveryPayload['payload'];
     const jobPayload: WebhookDeliveryPayload = {
@@ -256,27 +271,40 @@ export class WebhookSubscriptionService {
       payload: innerPayload,
     };
 
-    await this.deliveryQueue.add(
-      WEBHOOKS_JOB_NAMES.DELIVER,
-      buildJobEnvelope(jobPayload, {
-        // The original payload carries the wire-format tenant slug; reuse it
-        // so the worker (and dead-letter logger) sees the same identifier.
-        tenantId: String(innerPayload?.tenantId ?? tenantId),
-        source: 'replay',
-      }),
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 30_000 },
-      },
-    );
+    try {
+      await this.deliveryQueue.add(
+        WEBHOOKS_JOB_NAMES.DELIVER,
+        buildJobEnvelope(jobPayload, {
+          // The original payload carries the wire-format tenant slug; reuse it
+          // so the worker (and dead-letter logger) sees the same identifier.
+          tenantId: String(innerPayload?.tenantId ?? tenantId),
+          source: 'replay',
+        }),
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 30_000 },
+        },
+      );
+    } catch (error) {
+      // No job stands behind the row: put the failure back, or it reads as pending for ever and the next retry is
+      // refused as "not failed".
+      await this.prisma.webhookDeliveryLog
+        .update({ where: { id: logId }, data: { failedAt: log.failedAt } })
+        .catch(() => this.logger.error(`Could not restore the failed state of webhook delivery ${logId}`));
+      throw error;
+    }
 
-    // Reset failure state for retry
-    await this.prisma.webhookDeliveryLog.update({
-      where: { id: logId },
-      data: { failedAt: null },
+    // 202 with the record to poll: the delivery as it is now, pending again.
+    return pending;
+  }
+
+  /** One delivery of a subscription: the 202 body of queued work (`POST …/test`). */
+  async getDeliveryLog(tenantId: number, subscriptionId: string, logId: string) {
+    const log = await this.prisma.webhookDeliveryLog.findFirst({
+      where: { id: logId, subscriptionId, subscription: { tenantId } },
     });
-
-    return { message: 'Delivery queued for retry' };
+    if (!log) throw new NotFoundException('Delivery log not found');
+    return log;
   }
 
   async replayEvents(tenantId: number, subscriptionId: string, dto: ReplayWebhookDto) {
@@ -366,6 +394,7 @@ export class WebhookSubscriptionService {
       queued++;
     }
 
-    return { message: `${queued} events queued for replay` };
+    // 202: how many deliveries were queued, to follow in the log.
+    return { queued, since: since.toISOString() };
   }
 }

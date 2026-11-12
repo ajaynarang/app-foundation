@@ -2,6 +2,8 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AgentScopeSchema, SCOPE_DESCRIPTIONS, NEVER_EXTERNAL_SCOPES, type AgentScope } from '@app/shared-types';
 import { ScopeRegistryService } from './scope-registry.service';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeveloperScopeEntryResponse } from '../openapi.responses';
 
 export interface DeveloperScopeEntry {
   scope: AgentScope;
@@ -17,7 +19,7 @@ export interface DeveloperScopeEntry {
  * Not tenant-scoped — scope definitions are the same across the platform.
  * Authenticated (inherits the global JwtAuthGuard); any signed-in user
  * may read this list. Scopes in NEVER_EXTERNAL_SCOPES (e.g. platform:admin)
- * are filtered out so the developer portal never hints at internal-only grants.
+ * are filtered out so the scope picker's reference never hints at internal-only grants.
  */
 @ApiTags('Developer')
 @ApiBearerAuth()
@@ -29,6 +31,7 @@ export class DeveloperScopesController {
   @ApiOperation({
     summary: 'List scope vocabulary with descriptions, HITL tier, and live sample tools',
   })
+  @ApiResult([DeveloperScopeEntryResponse])
   list(): DeveloperScopeEntry[] {
     const never = new Set<string>(NEVER_EXTERNAL_SCOPES);
     return AgentScopeSchema.options

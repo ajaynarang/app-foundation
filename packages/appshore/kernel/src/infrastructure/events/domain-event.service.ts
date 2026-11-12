@@ -18,10 +18,15 @@ export class DomainEventService {
   ) {}
 
   /**
-   * Emit a domain event.
+   * Emit a domain event built here (new id, now, actor from EventContext when
+   * not given).
    *
    * Hot path (instant, in-process): EventEmitter2 → cache invalidation, SSE bridge
    * Durable path (crash-safe): BullMQ → persistence, webhooks
+   *
+   * A failed durable enqueue is logged, not thrown: nothing records the event,
+   * so a write that must not lose it emits through the platform OutboxService
+   * instead (ADR "Outbox and deadlines").
    */
   async emit<T = unknown>(
     eventName: string,
@@ -39,51 +44,70 @@ export class DomainEventService {
       options?.causationId,
     );
 
-    // HOT PATH — instant, in-process
-    // Cache invalidation + SSE bridge listen here
-    this.eventEmitter.emit(eventName, event);
-
-    // DURABLE PATH — crash-safe, cross-instance
-    // Persistence + webhook dispatch processed by DurableEventProcessor
+    this.publishHot(event);
     try {
-      const jobData: DurableEventJobData = {
-        id: event.id,
-        event: event.event,
-        tenantId: event.tenantId,
-        data: event.data,
-        actor: event.actor
-          ? {
-              id: event.actor.id,
-              type: event.actor.type,
-              label: event.actor.label ?? null,
-            }
-          : null,
-        correlationId: event.correlationId ?? null,
-        causationId: event.causationId ?? null,
-        version: event.version,
-        timestamp: event.timestamp.toISOString(),
-      };
-
-      await this.durableQueue.add(
-        eventName,
-        buildJobEnvelope(jobData, {
-          tenantId: String(jobData.tenantId),
-          source: 'event',
-          correlationId: jobData.correlationId ?? undefined,
-          causationId: jobData.causationId ?? undefined,
-        }),
-        {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5_000 },
-          removeOnComplete: { age: 86400 },
-          removeOnFail: { age: 604800 },
-          jobId: `${eventName}-${jobData.id}`,
-        },
-      );
+      await this.enqueueDurable(event);
     } catch (error) {
       // Hot path already delivered — log and move on
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to queue durable event ${eventName}: ${msg}`);
     }
+  }
+
+  /**
+   * Publish an event that already exists (an outbox row — ADR "Outbox and deadlines") through the
+   * same two paths, keeping its id and timestamp, so the durable job id, the
+   * `domain_event_log` row and webhook deliveries all carry the event's own id.
+   *
+   * Unlike `emit`, a failed durable enqueue THROWS: the caller still holds the
+   * event and must not mark it published. Re-publishing is safe — the durable
+   * job id is the event id, and every consumer is keyed on it.
+   */
+  async publish(event: DomainEvent): Promise<void> {
+    this.publishHot(event);
+    await this.enqueueDurable(event);
+  }
+
+  /** HOT PATH — instant, in-process. Cache invalidation + SSE bridge listen here. */
+  private publishHot(event: DomainEvent): void {
+    this.eventEmitter.emit(event.event, event);
+  }
+
+  /** DURABLE PATH — crash-safe, cross-instance. Persistence + webhook dispatch run in DurableEventProcessor. */
+  private async enqueueDurable(event: DomainEvent): Promise<void> {
+    const jobData: DurableEventJobData = {
+      id: event.id,
+      event: event.event,
+      tenantId: event.tenantId,
+      data: event.data,
+      actor: event.actor
+        ? {
+            id: event.actor.id,
+            type: event.actor.type,
+            label: event.actor.label ?? null,
+          }
+        : null,
+      correlationId: event.correlationId ?? null,
+      causationId: event.causationId ?? null,
+      version: event.version,
+      timestamp: event.timestamp.toISOString(),
+    };
+
+    await this.durableQueue.add(
+      event.event,
+      buildJobEnvelope(jobData, {
+        tenantId: String(jobData.tenantId),
+        source: 'event',
+        correlationId: jobData.correlationId ?? undefined,
+        causationId: jobData.causationId ?? undefined,
+      }),
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5_000 },
+        removeOnComplete: { age: 86400 },
+        removeOnFail: { age: 604800 },
+        jobId: `${event.event}-${jobData.id}`,
+      },
+    );
   }
 }

@@ -1,48 +1,62 @@
-import { validate } from 'class-validator';
-import { plainToInstance } from 'class-transformer';
 import { FeedbackStatusEnum } from '@app/shared-types';
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
 import { ListFeedbackQueryDto } from '../dto/list-feedback-query.dto';
 
 describe('ListFeedbackQueryDto', () => {
-  async function build(input: Partial<Record<string, unknown>>) {
-    return plainToInstance(ListFeedbackQueryDto, input, {
-      enableImplicitConversion: true,
-    });
-  }
+  const read = (raw: Record<string, unknown>) => readQueryDto(ListFeedbackQueryDto, raw);
 
   it('accepts an empty query', async () => {
-    const dto = await build({});
-    const errors = await validate(dto);
-    expect(errors).toHaveLength(0);
+    await expect(read({})).resolves.toBeInstanceOf(ListFeedbackQueryDto);
   });
 
   it.each(FeedbackStatusEnum.options)('accepts canonical uppercase status %s', async (status) => {
-    const dto = await build({ status });
-    const errors = await validate(dto);
-    expect(errors).toHaveLength(0);
+    expect((await read({ status })).status).toBe(status);
   });
 
   it('rejects a lowercase status (the casing bug)', async () => {
-    const dto = await build({ status: 'new' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+    expect(await fieldErrorsOf(read({ status: 'new' }))).toHaveProperty('status');
   });
 
   it('rejects an unknown status', async () => {
-    const dto = await build({ status: 'BOGUS' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+    expect(await fieldErrorsOf(read({ status: 'BOGUS' }))).toHaveProperty('status');
   });
 
   it.each(['bug', 'idea', 'general', 'uncategorized'])('accepts lowercase category %s', async (category) => {
-    const dto = await build({ category });
-    const errors = await validate(dto);
-    expect(errors).toHaveLength(0);
+    expect((await read({ category })).category).toBe(category);
   });
 
   it('rejects an unknown category', async () => {
-    const dto = await build({ category: 'BUG' });
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+    expect(await fieldErrorsOf(read({ category: 'BUG' }))).toHaveProperty('category');
+  });
+
+  it('reads the snake_case keys into camelCase properties as numbers', async () => {
+    expect(
+      await read({
+        tenant_id: '7',
+        sentiment_min: '2',
+        sentiment_max: '5',
+        cursor: 'abc',
+        limit: '500',
+        from: '2026-04-01',
+      }),
+    ).toMatchObject({ tenantId: 7, sentimentMin: 2, sentimentMax: 5, cursor: 'abc', limit: 100, from: '2026-04-01' });
+  });
+
+  it('refuses page paging: the list is a cursor list', async () => {
+    expect(await fieldErrorsOf(read({ page: '2' }))).toHaveProperty('page');
+  });
+
+  it('refuses the camelCase keys the route used to read', async () => {
+    expect(await fieldErrorsOf(read({ tenantId: '7' }))).toHaveProperty('tenantId');
+    expect(await fieldErrorsOf(read({ sentimentMin: '2' }))).toHaveProperty('sentimentMin');
+    expect(await fieldErrorsOf(read({ sentimentMax: '5' }))).toHaveProperty('sentimentMax');
+  });
+
+  it('answers 400 naming a sentiment out of 1…5, a number that is not one, or a date that is not one', async () => {
+    expect(await fieldErrorsOf(read({ sentiment_min: '0' }))).toHaveProperty('sentiment_min');
+    expect(await fieldErrorsOf(read({ sentiment_max: '6' }))).toHaveProperty('sentiment_max');
+    expect(await fieldErrorsOf(read({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
+    expect(await fieldErrorsOf(read({ to: 'later' }))).toHaveProperty('to');
   });
 });
