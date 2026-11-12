@@ -231,6 +231,8 @@ export class AiTelemetryService {
         linkRefType: context.linkRefType ?? null,
         linkRefId: context.linkRefId ?? null,
         langfuseTraceId: context.langfuseTraceId ?? null,
+        routeId: usage.routeId ?? null,
+        credentialType: usage.credentialType ?? null,
         idempotencyKey: context.idempotencyKey ?? null,
       },
     });

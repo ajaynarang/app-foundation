@@ -2371,6 +2371,14 @@ model AiInvocation {
   /// deep-link from a Postgres row back to the trace with prompt + response.
   langfuseTraceId String? @map("langfuse_trace_id") @db.VarChar(128)
 
+  /// Which resolved route served this call: `platform-openrouter`, `platform-cohere`, or (with bring-your-own-key) a
+  /// workspace credential's public id. An audit string, not a foreign key. Null on rows written before routing.
+  routeId String? @map("route_id") @db.VarChar(64)
+
+  /// The credential type behind the route: `PLATFORM_OPENROUTER`, `PLATFORM_COHERE`, or a workspace credential type.
+  /// The platform paid when this is null or starts with `PLATFORM_`.
+  credentialType String? @map("credential_type") @db.VarChar(40)
+
   /// Optional idempotency key. When present, duplicate writes (e.g. retried
   /// HTTP calls inside a parser) are no-ops.
   idempotencyKey String? @unique @map("idempotency_key") @db.VarChar(200)

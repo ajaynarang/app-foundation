@@ -61,6 +61,10 @@ export const AiUsageSchema = z.object({
   latencyMs: z.number().int().min(0).optional(),
   status: AiInvocationStatusSchema,
   errorCode: z.string().max(80).optional(),
+  /** The resolved route that served the call: `platform-*`, or (with bring-your-own-key) a credential's public id. */
+  routeId: z.string().max(64).optional(),
+  /** The credential type behind the route: `PLATFORM_*`, or (with bring-your-own-key) a workspace credential type. */
+  credentialType: z.string().max(40).optional(),
 });
 export type AiUsage = z.infer<typeof AiUsageSchema>;
 

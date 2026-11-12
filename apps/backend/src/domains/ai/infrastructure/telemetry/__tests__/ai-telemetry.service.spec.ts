@@ -399,6 +399,17 @@ describe('AiTelemetryService', () => {
       expect(call.data.errorCode).toBe('AnthropicRateLimit');
     });
 
+    it('records the route that served the call and the credential type behind it', async () => {
+      await service.record(
+        makeUsage({ routeId: 'platform-openrouter', credentialType: 'PLATFORM_OPENROUTER' }),
+        makeContext(),
+      );
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.routeId).toBe('platform-openrouter');
+      expect(call.data.credentialType).toBe('PLATFORM_OPENROUTER');
+    });
+
     it('coerces null-ish optional fields to explicit null', async () => {
       await service.record(makeUsage(), makeContext());
       const call = prisma.aiInvocation.create.mock.calls[0][0];
@@ -408,6 +419,8 @@ describe('AiTelemetryService', () => {
       expect(call.data.linkRefId).toBeNull();
       expect(call.data.langfuseTraceId).toBeNull();
       expect(call.data.idempotencyKey).toBeNull();
+      expect(call.data.routeId).toBeNull();
+      expect(call.data.credentialType).toBeNull();
     });
   });
 
