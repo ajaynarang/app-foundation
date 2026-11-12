@@ -23,7 +23,7 @@ describe('kb:eval command', () => {
       .mockResolvedValueOnce([{ sourcePath: 'knowledge-base/workspaces/members-and-roles.md' }])
       .mockResolvedValueOnce([{ sourcePath: null }, { sourcePath: 'knowledge-base/x.md' }]);
 
-    const report = await runKbEval({ hybridSearch } as never, QUESTIONS, 5);
+    const report = await runKbEval({ hybridSearch }, QUESTIONS, 5);
 
     expect(hybridSearch).toHaveBeenCalledWith('How do I invite a teammate?', {
       audiences: ['all'],
