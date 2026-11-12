@@ -48,6 +48,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.136",
+    "@ai-sdk/cohere": "^3.0.47",
     "@ai-sdk/openai": "^3.0.52",
     "@app/shared-types": "workspace:*",
     "@appshore/db": "workspace:*",
@@ -83,6 +84,7 @@
     "@nestjs/swagger": "11.2.5",
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^6.5.0",
+    "@openrouter/ai-sdk-provider": "^2.10.0",
     "@opentelemetry/auto-instrumentations-node": "^0.70.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
     "@opentelemetry/sdk-node": "^0.212.0",
