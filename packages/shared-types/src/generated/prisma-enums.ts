@@ -20,9 +20,14 @@ export type AiInvocationStatus = z.infer<typeof AiInvocationStatusSchema>;
 export const AiInvocationStatus = AiInvocationStatusSchema.enum;
 
 // AiSurface
-export const AiSurfaceSchema = z.enum(['CHAT', 'DESK_STEP', 'MEMORY_EXTRACT', 'EMBEDDING', 'KB_INGEST'] as const);
+export const AiSurfaceSchema = z.enum(['CHAT', 'DESK_STEP', 'MEMORY_EXTRACT', 'EMBEDDING', 'KB_INGEST', 'VOICE'] as const);
 export type AiSurface = z.infer<typeof AiSurfaceSchema>;
 export const AiSurface = AiSurfaceSchema.enum;
+
+// AiUsageUnit
+export const AiUsageUnitSchema = z.enum(['TOKEN', 'AUDIO_SECOND', 'CHARACTER', 'SESSION_SECOND'] as const);
+export type AiUsageUnit = z.infer<typeof AiUsageUnitSchema>;
+export const AiUsageUnit = AiUsageUnitSchema.enum;
 
 // AnnouncementPriority
 export const AnnouncementPrioritySchema = z.enum(['INFO', 'WARNING', 'CRITICAL'] as const);

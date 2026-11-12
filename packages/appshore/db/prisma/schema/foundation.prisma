@@ -2312,6 +2312,17 @@ enum AiSurface {
   MEMORY_EXTRACT
   EMBEDDING
   KB_INGEST
+  /// The speech half of a voice session (speech-to-text, text-to-speech, session time). Its language turns are CHAT.
+  VOICE
+}
+
+/// What `AiInvocation.usageQuantity` counts. Language and embedding calls are metered in tokens (the token columns);
+/// the voice vendors bill by audio second, spoken character or connected session second instead.
+enum AiUsageUnit {
+  TOKEN
+  AUDIO_SECOND
+  CHARACTER
+  SESSION_SECOND
 }
 
 /// Terminal status of an AI invocation as observed by the wrapper.
@@ -2346,6 +2357,11 @@ model AiInvocation {
   /// Prompt tokens written to the provider's prompt cache on this call (billed at the write rate). Included in
   /// `promptTokens`, like `cachedTokens`. Null when the provider reported nothing.
   cacheWriteTokens Int? @map("cache_write_tokens")
+
+  /// Non-token meters (voice). On these rows the token columns stay 0, so token totals are never mixed with seconds
+  /// or characters, and `usageQuantity` holds the count in `usageUnit`. Token rows keep `TOKEN` and a null quantity.
+  usageUnit     AiUsageUnit @default(TOKEN) @map("usage_unit")
+  usageQuantity Int?        @map("usage_quantity")
 
   /// Denormalized cost in USD computed at write time from `ModelPricing`. Null
   /// when no matching pricing row was found (the call still gets recorded —
@@ -2411,6 +2427,8 @@ model ModelPricing {
   cachedInputPerMtokUsd     Decimal?  @map("cached_input_per_mtok_usd") @db.Decimal(10, 6)
   /// The prompt-cache write rate. Null prices a cache write at the plain input rate.
   cacheWriteInputPerMtokUsd Decimal?  @map("cache_write_input_per_mtok_usd") @db.Decimal(10, 6)
+  /// USD per single unit for a non-token meter (one second of audio, one character). Null on token-priced rows.
+  unitPriceUsd              Decimal?  @map("unit_price_usd") @db.Decimal(12, 8)
   effectiveFromDate         DateTime  @map("effective_from_date") @db.Date
   effectiveUntilDate        DateTime? @map("effective_until_date") @db.Date
   notes                     String?   @db.Text

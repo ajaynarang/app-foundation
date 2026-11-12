@@ -1,11 +1,18 @@
 import { z } from 'zod';
-import { AiSurface, AiSurfaceSchema, AiInvocationStatus, AiInvocationStatusSchema } from '../generated/prisma-enums';
+import {
+  AiSurface,
+  AiSurfaceSchema,
+  AiInvocationStatus,
+  AiInvocationStatusSchema,
+  AiUsageUnit,
+  AiUsageUnitSchema,
+} from '../generated/prisma-enums';
 
 // Re-export the generated AI enums (both value + Zod schema) through the
 // package root so frontend code can `import { AiSurface } from
 // '@app/shared-types'` — same convention the other schema files use for
 // their Prisma enums. Without this, only the Schema leaks out, not the value.
-export { AiSurface, AiSurfaceSchema, AiInvocationStatus, AiInvocationStatusSchema };
+export { AiSurface, AiSurfaceSchema, AiInvocationStatus, AiInvocationStatusSchema, AiUsageUnit, AiUsageUnitSchema };
 
 /**
  * Identifying context for a single LLM or embedding call. Required by
@@ -61,6 +68,12 @@ export const AiUsageSchema = z.object({
   cachedTokens: z.number().int().min(0).optional(),
   /** Prompt tokens written to the provider's prompt cache. Inside `promptTokens`; billed at the write rate. */
   cacheWriteTokens: z.number().int().min(0).optional(),
+  /**
+   * Set for a non-token meter (voice: audio seconds, characters, session seconds). The token counts are then 0 and
+   * `usageQuantity` is priced at the pricing row's `unitPriceUsd`. Omitted means `TOKEN`.
+   */
+  usageUnit: AiUsageUnitSchema.optional(),
+  usageQuantity: z.number().int().min(0).optional(),
   latencyMs: z.number().int().min(0).optional(),
   status: AiInvocationStatusSchema,
   errorCode: z.string().max(80).optional(),
