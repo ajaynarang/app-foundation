@@ -13,7 +13,18 @@ jest.mock('../ingestion.service', () => ({ IngestionService: class MockIngestion
 
 import { NestFactory } from '@nestjs/core';
 import { bootstrap, formatIngestSummary } from '../ingestion.command';
+import type { IngestResult } from '../ingestion.service';
 import { IngestionCliModule } from '../ingestion-cli.module';
+
+const RESULT: IngestResult = {
+  added: ['knowledge-base/a.md'],
+  updated: [],
+  reembedded: [],
+  unchanged: 2,
+  removed: ['legacy:doc_1'],
+  chunkCount: 9,
+  embedded: true,
+};
 
 describe('seed:knowledge command', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -24,16 +35,38 @@ describe('seed:knowledge command', () => {
 
   it('boots the CLI module, ingests, prints the summary and closes the context', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation();
-    mockApp.get.mockReturnValue({
-      ingestAll: jest.fn().mockResolvedValue({ documentCount: 3, chunkCount: 9, embedded: true }),
-    });
+    const ingestAll = jest.fn().mockResolvedValue(RESULT);
+    mockApp.get.mockReturnValue({ ingestAll });
 
-    await expect(bootstrap()).resolves.toEqual({ documentCount: 3, chunkCount: 9, embedded: true });
+    await expect(bootstrap(['node', 'ingestion.command.ts'])).resolves.toEqual(RESULT);
 
     expect(NestFactory.createApplicationContext).toHaveBeenCalledWith(IngestionCliModule, expect.anything());
-    expect(log.mock.calls[0][0]).toContain('Chunks: 9');
+    expect(ingestAll).toHaveBeenCalledWith({ force: false });
+    expect(log.mock.calls[0][0]).toContain('(9 chunks written)');
     expect(mockApp.close).toHaveBeenCalled();
     log.mockRestore();
+  });
+
+  it('passes --force through, so every file is re-embedded', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation();
+    const ingestAll = jest.fn().mockResolvedValue(RESULT);
+    mockApp.get.mockReturnValue({ ingestAll });
+
+    await bootstrap(['node', 'ingestion.command.ts', '--force']);
+
+    expect(ingestAll).toHaveBeenCalledWith({ force: true });
+    log.mockRestore();
+  });
+
+  it('lists the changed files under the counts line', () => {
+    expect(formatIngestSummary(RESULT).split('\n')).toEqual([
+      'Knowledge base: 1 added, 0 updated, 0 re-embedded, 2 unchanged, 1 removed (9 chunks written)',
+      'Added:',
+      '  knowledge-base/a.md',
+      'Removed:',
+      '  legacy:doc_1',
+      'Embeddings: written on the platform embedding route',
+    ]);
   });
 
   it('closes the context when the ingest fails', async () => {
@@ -44,7 +77,7 @@ describe('seed:knowledge command', () => {
   });
 
   it('says when chunks were stored without vectors, and how to fix it', () => {
-    expect(formatIngestSummary({ documentCount: 1, chunkCount: 2, embedded: false })).toContain('COHERE_API_KEY');
-    expect(formatIngestSummary({ documentCount: 1, chunkCount: 2, embedded: true })).not.toContain('COHERE_API_KEY');
+    expect(formatIngestSummary({ ...RESULT, embedded: false })).toContain('COHERE_API_KEY');
+    expect(formatIngestSummary(RESULT)).not.toContain('COHERE_API_KEY');
   });
 });
