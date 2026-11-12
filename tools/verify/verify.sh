@@ -43,4 +43,6 @@ run "lint" pnpm lint
 run "schema lint" pnpm lint:schema
 run "type-check" pnpm type-check
 run "unit tests" pnpm exec turbo run test --filter=!@app/qa
+# The scaffold tools (init-app, apply-feature, check-variants) live outside every workspace package.
+run "init-app tool tests" pnpm test:init-app
 run "build" pnpm build

@@ -1,0 +1,70 @@
+{
+  "$comment": "Files that still mention `inngest` or `domains/desk` (any case) after `init-app --desk no`, and why each stays. tools/init-app/check-variants.mjs (pnpm verify:scaffold) fails on a hit that is not here and on an entry that no longer matches. `match` is always one of the two bare search strings. The search skips what the rename walker skips (tools/init-app/, docs/superpowers/).",
+  "entries": [
+    {
+      "file": "apps/backend/src/config/configuration.ts",
+      "match": "inngest",
+      "reason": "The production guard refuses INNGEST_DEV in every product: a deployment that sets it by mistake must not boot, Desk or not."
+    },
+    {
+      "file": "apps/backend/src/config/production-guard.ts",
+      "match": "inngest",
+      "reason": "isInngestDevMode(), which the production guard in configuration.ts calls."
+    },
+    {
+      "file": "apps/backend/src/config/__tests__/configuration.spec.ts",
+      "match": "inngest",
+      "reason": "The spec of the INNGEST_DEV production guard, which stays."
+    },
+    {
+      "file": "docs/doppler.md",
+      "match": "inngest",
+      "reason": "Documents the production checks, the INNGEST_DEV refusal among them."
+    },
+    {
+      "file": "apps/backend/src/domains/prompting/prompting.module.ts",
+      "match": "domains/desk",
+      "reason": "A comment saying where a feature registers its own prompts; the prompting module and the DESK_MEMORY_EXTRACT key stay (ADR \"Optional features: Desk is opt-in at scaffold time\")."
+    },
+    {
+      "file": "docs/adr/0001-api-contract.md",
+      "match": "inngest",
+      "reason": "A decision record: it lists the provider routes as decided, the Inngest serve handler among them. Records are not edited per product."
+    },
+    {
+      "file": "docs/adr/0003-outbox-and-deadlines.md",
+      "match": "inngest",
+      "reason": "A decision record: it says why a timer no longer needs a workflow engine, which is what made Desk optional."
+    },
+    {
+      "file": "docs/adr/0004-optional-features-desk-opt-in.md",
+      "match": "inngest",
+      "reason": "The decision record for Desk opt-in. It stays in every product, so a product without Desk knows what was removed and how to add it back."
+    },
+    {
+      "file": "docs/adr/0004-optional-features-desk-opt-in.md",
+      "match": "domains/desk",
+      "reason": "The decision record for Desk opt-in names the Desk folder the seam guards."
+    },
+    {
+      "file": "CLAUDE.md",
+      "match": "inngest",
+      "reason": "The pnpm verify:scaffold gate text names the residue search strings."
+    },
+    {
+      "file": "CLAUDE.md",
+      "match": "domains/desk",
+      "reason": "The pnpm verify:scaffold gate text names the residue search strings."
+    },
+    {
+      "file": ".claude/skills/backend-patterns/SKILL.md",
+      "match": "inngest",
+      "reason": "The optional-features rule (section 23a) names the residue search strings."
+    },
+    {
+      "file": ".claude/skills/backend-patterns/SKILL.md",
+      "match": "domains/desk",
+      "reason": "The optional-features rule (section 23a) names the Desk folder a Desk change stays in."
+    }
+  ]
+}
