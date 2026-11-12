@@ -69,6 +69,20 @@ export const MODEL_CATALOG: Record<ModelAlias, ModelCatalogEntry> = {
   },
 };
 
+/**
+ * The AWS regions a Bedrock route can call the catalog's `bedrockId` profiles from: the source regions of the US geo
+ * inference profiles on AWS's 5.5 model cards (the same six for all three models). A workspace role or a platform
+ * region elsewhere would need that geography's profile ids.
+ */
+export const BEDROCK_PROFILE_SOURCE_REGIONS: readonly string[] = [
+  'us-east-1',
+  'us-east-2',
+  'us-west-1',
+  'us-west-2',
+  'ca-central-1',
+  'ca-west-1',
+];
+
 /** The id columns a route reads. */
 export const ROUTE_ID_COLUMNS = ['anthropicId', 'openrouterId', 'bedrockId'] as const;
 export type RouteIdColumn = (typeof ROUTE_ID_COLUMNS)[number];

@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AiCredentialStatus, AiCredentialType } from '@appshore/db';
 import type { EventActor } from '@appshore/kernel/infrastructure/events/domain-event';
@@ -13,6 +19,10 @@ import { TEST_CREDENTIALS_KEY } from '../../__tests__/resolver-fixtures';
 const TENANT = 7;
 const ACTOR: EventActor = { id: '55', type: 'user' };
 const FAKE_KEY = 'sk-or-v1-fake-key-abcdef';
+const PLATFORM_ROLE = 'arn:aws:iam::999999999999:role/acme-ecs-task';
+const TENANT_ROLE = 'arn:aws:iam::123456789012:role/acme-bedrock-access';
+/** `PROJECT_NAME` "Acme Backend", slugged, then the workspace's public id. */
+const EXTERNAL_ID = 'acme-backend-tnt_test01';
 
 interface HarnessOptions {
   zdr?: boolean;
@@ -94,8 +104,16 @@ function makeHarness(opts: HarnessOptions = {}) {
 
   const outbox = createMockOutbox(prisma);
   const notifications = { aiCredentialFailing: jest.fn().mockResolvedValue(undefined) };
-  const probe = { probeKey: jest.fn().mockResolvedValue({ ok: true, latencyMs: 100, detail: 'OK' }) };
-  const config = new ConfigService({ aiCredentialsKey: TEST_CREDENTIALS_KEY, ...(opts.config ?? {}) });
+  const probe = {
+    probeKey: jest.fn().mockResolvedValue({ ok: true, latencyMs: 100, detail: 'OK' }),
+    probeBedrock: jest.fn().mockResolvedValue({ ok: true, latencyMs: 200, detail: 'OK' }),
+  };
+  const config = new ConfigService({
+    aiCredentialsKey: TEST_CREDENTIALS_KEY,
+    projectName: 'Acme Backend',
+    platformAssumeRoleArn: [PLATFORM_ROLE],
+    ...(opts.config ?? {}),
+  });
   const crypto = new CredentialCryptoService(config);
   const events = { emit: jest.fn().mockResolvedValue(undefined) };
   const resolver = new AiRouteResolver(prisma, cache, events as never, config, crypto);
@@ -109,6 +127,7 @@ function makeHarness(opts: HarnessOptions = {}) {
     crypto,
     probe,
     resolver,
+    config,
   );
   return { service, prisma, cache, cacheStore, outbox, notifications, probe, rows, tenant, resolver, crypto };
 }
@@ -281,6 +300,157 @@ describe('AiCredentialConnectService', () => {
         h.service.connectKey(TENANT, { type: 'OPENROUTER_KEY', secret: FAKE_KEY }, ACTOR, 55),
       ).rejects.toThrow(NotFoundException);
       expect(h.probe.probeKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the AWS Bedrock role flow', () => {
+    describe('begin', () => {
+      it('answers 503 when the deployment has no role to be trusted (PLATFORM_ASSUME_ROLE_ARN unset)', async () => {
+        const h = makeHarness({ config: { platformAssumeRoleArn: [] } });
+        await expect(h.service.beginBedrock(TENANT)).rejects.toThrow(ServiceUnavailableException);
+      });
+
+      it('pins the trust policy to the deployment role and the workspace external id', async () => {
+        const h = makeHarness();
+        const out = await h.service.beginBedrock(TENANT);
+        expect(out.externalId).toBe(EXTERNAL_ID);
+        expect(out.platformRoleArns).toEqual([PLATFORM_ROLE]);
+        expect(out.roleName).toBe('acme-backend-bedrock-access');
+        const policy = JSON.parse(out.trustPolicy);
+        expect(policy.Statement).toHaveLength(1);
+        expect(policy.Statement[0]).toMatchObject({
+          Effect: 'Allow',
+          Action: 'sts:AssumeRole',
+          Principal: { AWS: PLATFORM_ROLE },
+          Condition: { StringEquals: { 'sts:ExternalId': EXTERNAL_ID } },
+        });
+        expect(out.terraformSnippet).toContain('sts:ExternalId');
+        expect(out.terraformSnippet).toContain(EXTERNAL_ID);
+        expect(out.cfnQuickCreateUrl).toBeNull();
+      });
+
+      it('names every ARN of PLATFORM_ASSUME_ROLE_ARN in the trust policy and the Terraform snippet', async () => {
+        const worker = 'arn:aws:iam::999999999999:role/acme-ecs-worker';
+        const h = makeHarness({ config: { platformAssumeRoleArn: [PLATFORM_ROLE, worker] } });
+        const out = await h.service.beginBedrock(TENANT);
+        expect(out.platformRoleArns).toEqual([PLATFORM_ROLE, worker]);
+        expect(JSON.parse(out.trustPolicy).Statement[0].Principal.AWS).toEqual([PLATFORM_ROLE, worker]);
+        expect(out.terraformSnippet).toContain(PLATFORM_ROLE);
+        expect(out.terraformSnippet).toContain(worker);
+      });
+
+      it('limits the permissions policy to invoking the catalog models, and passes the CloudFormation link', async () => {
+        const h = makeHarness({ config: { platformBedrockCfnTemplateUrl: 'https://example.com/role.yaml' } });
+        const out = await h.service.beginBedrock(TENANT);
+        const statement = JSON.parse(out.permissionsPolicy).Statement[0];
+        expect(statement.Action).toEqual(['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream']);
+        expect(statement.Resource).toContain('arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-5-5');
+        expect(statement.Resource).toContain('arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-5-5');
+        expect(statement.Resource).toContain('arn:aws:bedrock:*::foundation-model/cohere.embed-v4:0');
+        expect(statement.Resource).not.toContain('*');
+        expect(out.cfnQuickCreateUrl).toBe('https://example.com/role.yaml');
+      });
+
+      it('is off (404) when AI_CREDENTIALS_KEY is unset', async () => {
+        const h = makeHarness({ config: { aiCredentialsKey: undefined } });
+        await expect(h.service.beginBedrock(TENANT)).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe('complete', () => {
+      const input = { roleArn: TENANT_ROLE, awsRegion: 'us-west-2' };
+
+      it('recomputes the external id on the server and stores nothing when the check fails', async () => {
+        const h = makeHarness();
+        h.probe.probeBedrock.mockResolvedValue({ ok: false, latencyMs: 10, detail: 'not pinned' });
+        await expect(
+          h.service.completeBedrock(TENANT, { ...input, externalId: 'attacker-chosen' } as never, ACTOR, 55),
+        ).rejects.toMatchObject({ response: { fieldErrors: { roleArn: expect.stringMatching(/not pinned/) } } });
+        expect(h.probe.probeBedrock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            roleArn: TENANT_ROLE,
+            externalId: EXTERNAL_ID,
+            awsRegion: 'us-west-2',
+            projectSlug: 'acme-backend',
+          }),
+        );
+        expect(h.rows).toHaveLength(0);
+        expect(h.outbox.emit).not.toHaveBeenCalled();
+      });
+
+      it('stores a secretless ACTIVE row with the role, region and server external id, and emits connected', async () => {
+        const h = makeHarness();
+        const result = await h.service.completeBedrock(TENANT, input, ACTOR, 55);
+        const saved = h.rows[0];
+        expect(saved).toMatchObject({
+          type: AiCredentialType.BEDROCK_ROLE,
+          status: AiCredentialStatus.ACTIVE,
+          encryptedSecret: null,
+          lastFour: null,
+          roleArn: TENANT_ROLE,
+          externalId: EXTERNAL_ID,
+          awsRegion: 'us-west-2',
+          createdBy: 55,
+        });
+        // The probe's session was named for the credential that was then stored.
+        expect(h.probe.probeBedrock.mock.calls[0][0].credentialPublicId).toBe(saved.publicId);
+        expect(result.credential).toMatchObject({ type: 'BEDROCK_ROLE', roleArn: TENANT_ROLE, awsRegion: 'us-west-2' });
+        expect(JSON.stringify(result)).not.toContain(EXTERNAL_ID);
+        expect(emitted(h)).toEqual(['app.ai.credential-connected', 'app.ai.credential-validated']);
+      });
+
+      it('is allowed under a zero-retention policy (a role is zero retention)', async () => {
+        const h = makeHarness({ zdr: true });
+        await expect(h.service.completeBedrock(TENANT, input, ACTOR, 55)).resolves.toBeDefined();
+      });
+
+      it('refuses a region the catalog profiles cannot be called from, before any AWS call', async () => {
+        const h = makeHarness();
+        await expect(
+          h.service.completeBedrock(TENANT, { ...input, awsRegion: 'eu-west-1' }, ACTOR, 55),
+        ).rejects.toMatchObject({ response: { fieldErrors: { awsRegion: expect.any(String) } } });
+        expect(h.probe.probeBedrock).not.toHaveBeenCalled();
+      });
+
+      it('refuses over the per-workspace cap (409) before any AWS call', async () => {
+        const h = makeHarness();
+        for (let i = 0; i < MAX_AI_CREDENTIALS_PER_WORKSPACE; i++) keyRow(h, { id: i + 1, publicId: `aicred_cap${i}` });
+        await expect(h.service.completeBedrock(TENANT, input, ACTOR, 55)).rejects.toThrow(ConflictException);
+        expect(h.probe.probeBedrock).not.toHaveBeenCalled();
+      });
+
+      it('answers 503 when PLATFORM_ASSUME_ROLE_ARN is unset, and 404 when AI_CREDENTIALS_KEY is unset', async () => {
+        await expect(
+          makeHarness({ config: { platformAssumeRoleArn: [] } }).service.completeBedrock(TENANT, input, ACTOR, 55),
+        ).rejects.toThrow(ServiceUnavailableException);
+        await expect(
+          makeHarness({ config: { aiCredentialsKey: undefined } }).service.completeBedrock(TENANT, input, ACTOR, 55),
+        ).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    it('Test again re-runs the two-direction check on a stored role, never a decrypt or a key probe', async () => {
+      const h = makeHarness();
+      keyRow(h, {
+        publicId: 'aicred_role00001',
+        type: AiCredentialType.BEDROCK_ROLE,
+        encryptedSecret: null,
+        lastFour: null,
+        roleArn: TENANT_ROLE,
+        externalId: EXTERNAL_ID,
+        awsRegion: 'us-west-2',
+      });
+      h.probe.probeBedrock.mockResolvedValue({ ok: false, latencyMs: 5, detail: 'role was deleted' });
+      const result = await h.service.validate(TENANT, 'aicred_role00001', ACTOR);
+      expect(h.probe.probeBedrock).toHaveBeenCalledWith({
+        roleArn: TENANT_ROLE,
+        externalId: EXTERNAL_ID,
+        awsRegion: 'us-west-2',
+        credentialPublicId: 'aicred_role00001',
+        projectSlug: 'acme-backend',
+      });
+      expect(h.probe.probeKey).not.toHaveBeenCalled();
+      expect(result.credential.status).toBe(AiCredentialStatus.FAILING);
     });
   });
 

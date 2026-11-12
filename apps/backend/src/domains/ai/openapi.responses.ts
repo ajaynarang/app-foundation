@@ -4,6 +4,7 @@ import {
   AiCredentialConnectResultSchema,
   AiSettingsSchema,
   AgentScopeSchema,
+  BedrockBeginResponseSchema,
   ConversationGreetingSchema,
   CreateConversationResponseSchema,
   GetMessagesResponseSchema,
@@ -119,3 +120,5 @@ export const AiCredentialConnectResultResponse = defineResponseSchema(
   'AiCredentialConnectResult',
   AiCredentialConnectResultSchema,
 );
+/** The Bedrock role flow's first step: the external id, the trust and permissions policies, the IaC snippets. */
+export const BedrockBeginResponse = defineResponseSchema('BedrockBegin', BedrockBeginResponseSchema);

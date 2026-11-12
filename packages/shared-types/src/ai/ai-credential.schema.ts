@@ -80,3 +80,33 @@ export const AiCredentialConnectResultSchema = z.object({
   probe: ProbeResultSchema,
 });
 export type AiCredentialConnectResult = z.infer<typeof AiCredentialConnectResultSchema>;
+
+/**
+ * `POST /ai-settings/credentials/bedrock/begin`: what a workspace owner needs to create a role in their own AWS account
+ * that this deployment may assume. Nothing here is secret; the protection is the pinned trust policy plus the
+ * two-direction check at `complete`.
+ */
+export const BedrockBeginResponseSchema = z.object({
+  /** The external id the trust policy must require. Fixed per workspace and recomputed by the server at `complete`. */
+  externalId: z.string(),
+  /** The roles this deployment runs as: the principals the trust policy must name. */
+  platformRoleArns: z.array(z.string()),
+  /** The suggested name for the role in the workspace's account. */
+  roleName: z.string(),
+  /** The trust policy, as JSON text, pinned to those principals and the external id. */
+  trustPolicy: z.string(),
+  /** The permissions policy, as JSON text: invoke the catalog's Bedrock models and nothing else. */
+  permissionsPolicy: z.string(),
+  /** The same role as a Terraform snippet. */
+  terraformSnippet: z.string(),
+  /** A CloudFormation quick-create link, when the operator configured one. */
+  cfnQuickCreateUrl: z.string().nullable(),
+});
+export type BedrockBeginResponse = z.infer<typeof BedrockBeginResponseSchema>;
+
+/** `POST /ai-settings/credentials/bedrock/complete`. The external id is never taken from the client. */
+export const BedrockCompleteInputSchema = z.object({
+  roleArn: z.string().regex(/^arn:aws:iam::\d{12}:role\/[\w+=,.@/-]+$/, 'Must be an IAM role ARN'),
+  awsRegion: z.string().regex(/^[a-z]{2}(-gov)?-[a-z]+-\d$/, 'Must be an AWS region such as us-east-1'),
+});
+export type BedrockCompleteInput = z.infer<typeof BedrockCompleteInputSchema>;

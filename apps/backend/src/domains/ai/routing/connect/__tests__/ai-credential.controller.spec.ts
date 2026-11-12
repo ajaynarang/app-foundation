@@ -2,7 +2,14 @@ import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
 import { AiCredentialController } from '../ai-credential.controller';
 
-const OWNER_ONLY = [['updatePolicy'], ['connectKey'], ['validate'], ['remove']] as const;
+const OWNER_ONLY = [
+  ['updatePolicy'],
+  ['connectKey'],
+  ['beginBedrock'],
+  ['completeBedrock'],
+  ['validate'],
+  ['remove'],
+] as const;
 
 describe('AiCredentialController', () => {
   let controller: AiCredentialController;
@@ -16,6 +23,8 @@ describe('AiCredentialController', () => {
       connectKey: jest.fn().mockResolvedValue({ credential: { publicId: 'aicred_x' }, probe: { ok: true } }),
       validate: jest.fn().mockResolvedValue({ credential: { publicId: 'aicred_x' }, probe: { ok: true } }),
       remove: jest.fn().mockResolvedValue(undefined),
+      beginBedrock: jest.fn().mockResolvedValue({ externalId: 'app-tnt_test01' }),
+      completeBedrock: jest.fn().mockResolvedValue({ credential: { publicId: 'aicred_r' }, probe: { ok: true } }),
     };
     controller = new AiCredentialController({} as never, connect);
     jest.spyOn(controller as any, 'getTenantDbId').mockResolvedValue(7);
@@ -55,5 +64,16 @@ describe('AiCredentialController', () => {
   it('remove resolves empty (204)', async () => {
     await expect(controller.remove(user, 'aicred_x')).resolves.toBeUndefined();
     expect(connect.remove).toHaveBeenCalledWith(7, 'aicred_x', { id: '55', type: 'user' });
+  });
+
+  it('beginBedrock answers for the caller’s workspace', async () => {
+    await controller.beginBedrock(user);
+    expect(connect.beginBedrock).toHaveBeenCalledWith(7);
+  });
+
+  it('completeBedrock acts as the signed-in person and records who connected the role', async () => {
+    const dto = { roleArn: 'arn:aws:iam::123456789012:role/app-bedrock-access', awsRegion: 'us-east-1' };
+    await controller.completeBedrock(user, dto);
+    expect(connect.completeBedrock).toHaveBeenCalledWith(7, dto, { id: '55', type: 'user' }, 55);
   });
 });

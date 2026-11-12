@@ -8,8 +8,9 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant.controller';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 
-import { AiCredentialConnectResultResponse, AiSettingsResponse } from '../../openapi.responses';
+import { AiCredentialConnectResultResponse, AiSettingsResponse, BedrockBeginResponse } from '../../openapi.responses';
 import { AiCredentialConnectService } from './ai-credential-connect.service';
+import { BedrockCompleteDto } from './dto/bedrock-complete.dto';
 import { ConnectKeyDto } from './dto/connect-key.dto';
 import { UpdateAiPolicyDto } from './dto/update-policy.dto';
 
@@ -54,6 +55,30 @@ export class AiCredentialController extends BaseTenantController {
   async connectKey(@CurrentUser() user: any, @Body() dto: ConnectKeyDto) {
     const userDbId = await this.getUserDbId(user.userId);
     return this.connect.connectKey(await this.getTenantDbId(user), dto, userActor(userDbId), userDbId);
+  }
+
+  @Post('credentials/bedrock/begin')
+  @Roles(UserRole.OWNER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Start connecting an AWS Bedrock role: the external id, trust policy and IaC to create it (nothing stored)',
+  })
+  @ApiResult(BedrockBeginResponse)
+  async beginBedrock(@CurrentUser() user: any) {
+    return this.connect.beginBedrock(await this.getTenantDbId(user));
+  }
+
+  @Post('credentials/bedrock/complete')
+  @Roles(UserRole.OWNER)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Connect an AWS Bedrock role: checked with and without the external id and one model call, then stored',
+  })
+  @ApiResult(AiCredentialConnectResultResponse, HttpStatus.CREATED)
+  async completeBedrock(@CurrentUser() user: any, @Body() dto: BedrockCompleteDto) {
+    const userDbId = await this.getUserDbId(user.userId);
+    return this.connect.completeBedrock(await this.getTenantDbId(user), dto, userActor(userDbId), userDbId);
   }
 
   @Post('credentials/:credential_id/validate')
