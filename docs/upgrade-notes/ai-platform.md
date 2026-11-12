@@ -509,6 +509,62 @@ follows the Bedrock sheet), tests one again or removes one. An admin sees it all
 
 **Rollback.** Revert the change. No data is involved.
 
+## 13. Chat stream frames, error paths, citations, conversation history and its cap
+
+**What changed.**
+
+- One frame table. The chat stream's codes live in `STREAM_FRAME` in `@app/shared-types`
+  (`ai/assistant-stream.schema.ts`): `0:` text, `8:` card, `9:` suspend, `a:` follow-ups, and three new ones: `c:` a
+  source the answer named, `t:` what the assistant is reading (transient), `x:` a terminal error `{ code, detail }`.
+  The web reads them in one place, `features/platform/ai-chat/lib/stream-frames.ts`, which skips any code it does
+  not know. The store's old fallback for AI SDK `data:` lines is gone; the backend never sent them.
+- Errors. Before the first byte a chat or resume request that fails answers the error envelope, as before. After it,
+  the stream now ends with one `x:` frame carrying the same `code` and `detail` the envelope would, and the web
+  shows the partial answer and then the reason. Before this change a failure after the first byte wrote nothing,
+  and a provider error in the middle of an answer was logged and the turn ended as if complete: it now raises and
+  ends with `x:`, and the partial answer is not stored as a message.
+- AI refusal codes. `AiNotConfigured`, `AiCredentialFailing`, `ZeroRetentionUnavailable` and the budget errors
+  (including a provider credit refusal) now carry their own `code` on the envelope and the `x:` frame:
+  `AI_NOT_CONFIGURED`, `AI_CREDENTIAL_FAILING`, `ZERO_RETENTION_UNAVAILABLE`, `AI_BUDGET_EXCEEDED` (constants in
+  `AI_ERROR_CODE`). Before, the envelope carried the generic code for the status (`SERVICE_UNAVAILABLE`,
+  `VALIDATION_FAILED`, `PAYMENT_REQUIRED`). Status codes and `detail` are unchanged.
+- Citations. The knowledge-base tools (`search-kb`, `get-product-info`) offer the documents they returned as
+  citation candidates on a side channel (`_citations`) that the chat strips before the model sees the result. After
+  the answer, each candidate whose title (two words or more) the answer names is sent as a `c:` frame and stored on
+  the assistant message, at most 8 (`MAX_CITATIONS_PER_MESSAGE`). A citation is `{ sourceType, sourceId, title,
+href? }`; knowledge-base documents have no page in the web app, so theirs carry no `href`. History
+  (`GET /conversations/:conversation_id/messages`) returns them. External MCP agents calling `search-kb` see the
+  `_citations` key in the tool result.
+- Conversation history. `DELETE /conversations/:conversation_id` (204) archives a conversation: `isActive = false`,
+  rows and messages kept. `GET /conversations` lists only active conversations that have at least one question,
+  newest first; `limit` now defaults to and is clamped at 30 (`MAX_ACTIVE_CONVERSATIONS`) instead of defaulting to
+  10 with a maximum of 100. Opening the assistant reuses the newest conversation nobody has spoken in instead of
+  creating another. After a new conversation is created, every active one past the newest 30 is archived. A missing
+  conversation, another person's and another workspace's all answer the same 404 (`This conversation was not
+found`). A new event, `CONVERSATION_ARCHIVED` (`app.conversation.archived`, internal), records each archive with
+  the reason `user` or `cap`.
+- The web shows a "Reading …" line while a source is read, a Sources list under an answer that named any, and a
+  searchable history (grouped by recency, each conversation removable after a confirmation) in place of the five
+  "Recent" rows.
+
+**Schema.** Migration `20261113001000_conversation_message_citations` adds the nullable JSONB column
+`conversation_messages.citations`. Additive; existing messages keep null.
+
+**Who notices.**
+
+- Anyone with more than 30 active conversations: the oldest are archived on their next new chat. They leave history;
+  nothing is deleted.
+- A client that branched on the envelope `code` of an AI refusal sees the new AI codes. A client that read only
+  `detail` (the web app does) sees no change.
+- An older web build against this backend shows the partial answer without the reason (it ignores `x:`, `c:` and
+  `t:`); a newer web build against an older backend never sees them. No deploy order is required.
+
+**What to do.** Run `prisma migrate deploy`. A product with its own stream reader skips unknown frame codes; a
+product that adds a frame adds it to `STREAM_FRAME` and to the reader in the same change.
+
+**Rollback.** Revert the change. The `citations` column is nullable and can stay; conversations archived by the cap
+stay archived (set `is_active = true` to bring them back).
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops

@@ -387,6 +387,21 @@ export const SSE_INVALIDATION_MAP = {
 
 **Custom SSE handlers (multi-key invalidation):** the static map handles most events. Write a custom handler (via `useSSEEvent`) when one event must invalidate 3+ unrelated query trees, when you need payload data to pick keys, or when you need side effects (sound, browser notification, optimistic patch). Otherwise, prefer the map — it's the source of truth and easier to audit.
 
+### 5.0.1 The assistant's chat stream (frames)
+
+The chat routes (`POST /conversations/:conversation_id/messages` and `.../resume`) stream one frame per line: a
+two-character code and its payload. The codes live once in `STREAM_FRAME` (`@app/shared-types`, `ai/assistant-stream.schema.ts`):
+`0:` text, `8:` card, `9:` suspend, `a:` follow-ups, `c:` citation, `t:` reading, `x:` terminal error `{ code, detail }`.
+
+- Read the stream only through `features/platform/ai-chat/lib/stream-frames.ts` (`readFrames` / `dispatchFrame`).
+  Never parse frames inline in a store or component.
+- **A frame whose code the reader does not know is skipped, and so is one whose payload does not parse.** The web
+  and the backend deploy separately, so either can be ahead; the reader never throws on a new code.
+- A refusal before the stream starts is the error envelope (`chatRequestError`); after it starts it is one `x:`
+  frame. Show the partial answer, then the `detail` (`failedTurnText`). Read `detail` only, never a `message`.
+- A new frame: add its code to `STREAM_FRAME`, a case in `dispatchFrame` and a handler, a backend case in
+  `streamFrameOf`, and a test that an older reader skips it.
+
 ---
 
 ## 5.1 URL State Lifecycle (Deep Links + Cleanup)
