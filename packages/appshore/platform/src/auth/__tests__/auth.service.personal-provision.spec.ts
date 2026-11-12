@@ -1,3 +1,6 @@
+// A real 12-round hash takes seconds under a parallel test run; the hook order is what this spec is about.
+jest.mock('bcrypt', () => ({ hash: jest.fn().mockResolvedValue('hashed'), compare: jest.fn() }));
+
 import { AuthService } from '../auth.service';
 import type { TenantProvisionHooks } from '../../domains/platform-hooks';
 
