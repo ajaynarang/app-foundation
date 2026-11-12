@@ -15,7 +15,8 @@ jest.mock('ai', () => ({
 }));
 
 // Import after mocks
-import { FeedbackService } from '../feedback.service';
+import { generateText } from 'ai';
+import { FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS, FeedbackService } from '../feedback.service';
 import { PromptingService } from '../../prompting';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { groupCountInMemory } from '@appshore/platform/test/helpers/prisma-where';
@@ -318,6 +319,11 @@ describe('FeedbackService', () => {
       const result = await service.categorizeWithAi(FEEDBACK_ID);
 
       expect(result.category).toBe('bug');
+      // One word back (plus the model's thinking), never the provider's whole output window.
+      expect(FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(1024);
+      expect((generateText as jest.Mock).mock.calls.at(-1)[0].maxOutputTokens).toBe(
+        FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS,
+      );
     });
   });
 

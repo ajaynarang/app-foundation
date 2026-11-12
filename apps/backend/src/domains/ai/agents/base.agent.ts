@@ -4,7 +4,9 @@ import { AiInvocationStatus, AiSurface } from '@appshore/db';
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
 import { MastraProvider } from '../assistant/mastra/mastra.provider';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
-import { MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from '../infrastructure/providers/ai-provider';
+import { LANGUAGE_PROVIDER_LABEL } from '../infrastructure/providers/ai-provider';
+import { ledgerModelIdFor } from '../routing/model-catalog';
+import { OUTPUT_CEILINGS } from '../routing/output-ceilings';
 import { AI_LINK_REF_TYPES } from '../infrastructure/telemetry/ai-telemetry.constants';
 import { buildLangfuseSession } from '../infrastructure/telemetry/langfuse-session';
 import { PromptingService } from '../../prompting';
@@ -16,6 +18,13 @@ import {
   ChatChunk,
   AssistantAgentContract,
 } from './agent.types';
+
+/**
+ * The output ceiling of each step of an agent run (a chat turn or a delegated execute): tool calls and notes, or one
+ * answer. Mastra applies it per model call, so a multi-step turn is bounded per step, never by the provider's whole
+ * output window.
+ */
+export const CHAT_STEP_MAX_OUTPUT_TOKENS = OUTPUT_CEILINGS.STEP;
 
 export abstract class AbstractBaseAgent implements AssistantAgentContract {
   protected readonly logger: Logger;
@@ -95,6 +104,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
         resource: `tenant-${ctx.tenantId}-user-${ctx.userId}`,
       },
       maxSteps: this.definition.maxToolSteps,
+      modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
       tracingOptions: { metadata: { sessionId, userId }, tags },
     });
 
@@ -200,8 +210,8 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
       const alias = this.definition.modelAlias;
       await this.aiTelemetry.record(
         {
-          provider: PROVIDER_BY_ALIAS[alias],
-          model: MODEL_ID_BY_ALIAS[alias],
+          provider: LANGUAGE_PROVIDER_LABEL,
+          model: ledgerModelIdFor(alias, undefined),
           promptTokens,
           completionTokens,
           totalTokens: promptTokens + completionTokens,
@@ -259,6 +269,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
         instructions: [domainContent, skillContent].filter(Boolean).join('\n\n'),
         toolsets,
         maxSteps: 3,
+        modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
         tracingOptions: { metadata: { sessionId, userId }, tags },
       },
     );

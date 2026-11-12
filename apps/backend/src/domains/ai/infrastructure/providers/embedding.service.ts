@@ -3,7 +3,8 @@ import { AiInvocationStatus } from '@appshore/db';
 import { embed, embedMany } from 'ai';
 import type { AiCallContext } from '@app/shared-types';
 
-import { aiEmbedding, EMBEDDING_MODEL_ID, EMBEDDING_PROVIDER_LABEL } from './ai-provider';
+import { aiEmbedding } from './ai-provider';
+import { LEGACY_EMBEDDING } from '../../routing/model-catalog';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
 import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
@@ -12,7 +13,7 @@ const EMBEDDING_DIMENSIONS = 1536;
 
 /**
  * EmbeddingService — single source of truth for vector embeddings across
- * the backend. 1 536-dim vectors via the AI gateway (text-embedding-3-small).
+ * the backend. 1 536-dim vectors via the AI gateway (the catalog's `LEGACY_EMBEDDING`).
  *
  * Consumers:
  *   • KnowledgeBaseService / IngestionService — KB RAG content embeddings
@@ -103,8 +104,8 @@ export class EmbeddingService {
     try {
       await this.aiTelemetry.record(
         {
-          provider: EMBEDDING_PROVIDER_LABEL,
-          model: EMBEDDING_MODEL_ID,
+          provider: LEGACY_EMBEDDING.provider,
+          model: LEGACY_EMBEDDING.modelId,
           promptTokens: tokens,
           completionTokens: 0,
           totalTokens: tokens,

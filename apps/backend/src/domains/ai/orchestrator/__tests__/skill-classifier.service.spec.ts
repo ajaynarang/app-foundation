@@ -36,6 +36,26 @@ describe('SkillClassifierService', () => {
     expect(result.taskSkill).toBeNull();
   });
 
+  it('leaves room for always-on thinking before the one-line JSON answer', async () => {
+    mockGenerateText.mockResolvedValue({ text: '{ "agentId": "assistant", "taskSkill": null }' });
+
+    await service.classify('show me my account');
+
+    // Thinking counts toward the output cap on the 5.5 models; 50 tokens could
+    // be spent thinking and leave no answer, silently routing to the default.
+    expect(mockGenerateText.mock.calls[0][0].maxOutputTokens).toBeGreaterThanOrEqual(1024);
+  });
+
+  it('logs an empty answer as its own warning before defaulting to assistant', async () => {
+    mockGenerateText.mockResolvedValue({ text: '', finishReason: 'length' });
+    const warn = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+    const result = await service.classify('show me my account');
+
+    expect(result.agentId).toBe('assistant');
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/empty answer/i));
+  });
+
   it('should handle JSON wrapped in markdown fences', async () => {
     mockGenerateText.mockResolvedValue({
       text: '```json\n{ "agentId": "assistant", "taskSkill": null }\n```',

@@ -18,7 +18,7 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { AbstractBaseAgent } from '../base.agent';
+import { AbstractBaseAgent, CHAT_STEP_MAX_OUTPUT_TOKENS } from '../base.agent';
 import { AgentDefinition } from '../agent.types';
 
 class TestAgent extends AbstractBaseAgent {
@@ -112,6 +112,11 @@ describe('AbstractBaseAgent', () => {
         ]),
       );
       expect(mockReader.releaseLock).toHaveBeenCalled();
+      // Every step of the chat stream names its output ceiling, never the provider's whole window.
+      expect(CHAT_STEP_MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(1024);
+      expect(mockAgent.stream.mock.calls[0][1].modelSettings).toEqual({
+        maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS,
+      });
     });
 
     it('yields card when card accumulator has data', async () => {
@@ -250,6 +255,9 @@ describe('AbstractBaseAgent', () => {
 
       expect(result.text).toBe('Result text');
       expect(mockAgent.generate).toHaveBeenCalled();
+      expect(mockAgent.generate.mock.calls[0][1].modelSettings).toEqual({
+        maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS,
+      });
     });
   });
 

@@ -206,6 +206,26 @@ describe('AiTelemetryService', () => {
     });
   });
 
+  describe('record() — long-prompt price tier', () => {
+    it('warns when a Haiku 5.5 prompt is above 100K tokens, because its one pricing row understates the cost', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(makeUsage({ model: 'claude-haiku-5-5', promptTokens: 100_001 }), makeContext());
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/understated/));
+      expect(prisma.aiInvocation.create).toHaveBeenCalled();
+    });
+
+    it('stays quiet at or below the threshold, and for a model with one rate', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(makeUsage({ model: 'claude-haiku-5-5', promptTokens: 100_000 }), makeContext());
+      await service.record(makeUsage({ model: 'claude-sonnet-5-5', promptTokens: 500_000 }), makeContext());
+
+      expect(logSpy).not.toHaveBeenCalledWith(expect.stringMatching(/understated/));
+    });
+  });
+
   describe('record() — idempotency', () => {
     it('returns the existing row and skips create when idempotencyKey matches', async () => {
       const existing = {

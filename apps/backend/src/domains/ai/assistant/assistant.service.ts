@@ -8,6 +8,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { PromptingService } from '../../prompting';
 import { AssistantRouterService } from '../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../agents/agent.registry';
+import { CHAT_STEP_MAX_OUTPUT_TOKENS } from '../agents/base.agent';
 import { AiTelemetryService } from '../infrastructure/telemetry/ai-telemetry.service';
 import { AiBudgetExceededError } from '../infrastructure/telemetry/ai-budget-exceeded.error';
 import { UserMode } from '../agents/agent.types';
@@ -448,6 +449,7 @@ export class AssistantAiService {
           },
           ...(toolCallId && { toolCallId }),
           ...(runId && { runId }),
+          modelSettings: { maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS },
         },
       );
 

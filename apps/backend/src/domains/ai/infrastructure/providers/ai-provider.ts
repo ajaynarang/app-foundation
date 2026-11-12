@@ -8,6 +8,8 @@ import {
 } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { ModelAlias } from '@app/shared-types';
+import { AI_PROVIDER_LABELS, LEGACY_EMBEDDING, MODEL_CATALOG, type AiProviderLabel } from '../../routing/model-catalog';
+import { modelTuningMiddleware } from './model-tuning.middleware';
 
 // Pin Anthropic-model traffic to the Anthropic provider only.
 // Without this, AI Gateway's default routing falls back to Bedrock/Vertex when
@@ -32,19 +34,23 @@ const anthropicOnlyMiddleware: LanguageModelMiddleware = {
 /**
  * AI Provider Registry
  *
- * Semantic model aliases that abstract away the underlying provider.
- * Switch providers via AI_PROVIDER env var:
- *   - "gateway" (default) → Vercel AI Gateway (needs AI_GATEWAY_API_KEY)
- *   - "anthropic"         → Direct Anthropic SDK (needs ANTHROPIC_API_KEY)
+ * Semantic model aliases that abstract away the underlying provider. Model ids live in the model catalog
+ * (`domains/ai/routing/model-catalog.ts`), never here. Switch providers via AI_PROVIDER env var:
+ *   - "gateway" (default) → Vercel AI Gateway (needs AI_GATEWAY_API_KEY), on the catalog's `openrouterId` slugs
+ *   - "anthropic"         → Direct Anthropic SDK (needs ANTHROPIC_API_KEY), on the catalog's `anthropicId` ids
  *
  * Available aliases:
  *   Language models:
- *   - "fast"      → Haiku 4.5  (chat, quick classifications)
- *   - "standard"  → Sonnet 4.6 (document parsing, structured extraction)
- *   - "powerful"  → Opus 4.6   (complex extraction, fallback for critical tasks)
+ *   - "fast"      → Haiku 5.5  (chat, quick classifications), effort low
+ *   - "standard"  → Sonnet 5.5 (document parsing, structured extraction), effort medium
+ *   - "powerful"  → Opus 5.5   (complex extraction, fallback for critical tasks), effort medium
  *
  *   Embedding models:
- *   - "embedding" → text-embedding-3-small via gateway (always uses gateway)
+ *   - "embedding" → the catalog's legacy embedding model via the gateway (always uses the gateway)
+ *
+ * The direct Anthropic models carry the tuning middleware (effort per alias, one retry one alias up on a refused
+ * generate call). The gateway mode gets the 5.5 slugs and no tuning; it is removed when routing moves to the
+ * per-tenant resolver, which applies the tuning per route.
  *
  * Telemetry:
  *   AI/LLM observability is handled by Mastra's @mastra/langfuse integration.
@@ -57,58 +63,52 @@ const anthropicOnlyMiddleware: LanguageModelMiddleware = {
  */
 
 /**
- * Coarse provider labels used for cost attribution in the AI ledger. These
- * are NOT the same as the `AI_PROVIDER` env switch (gateway vs anthropic) —
- * they identify which vendor ultimately billed the tokens, regardless of
- * whether the call went direct or through the gateway.
+ * Ledger provider label for every language alias on this provider: Anthropic billed the tokens whether the call
+ * went direct or through the gateway (pinned to Anthropic above), and the ledger records the catalog's `anthropicId`.
  */
-export const AI_PROVIDERS = {
-  ANTHROPIC: 'anthropic',
-  OPENAI: 'openai',
-} as const;
-export type AiProviderLabel = (typeof AI_PROVIDERS)[keyof typeof AI_PROVIDERS];
-
-/**
- * Canonical model id for each language alias. Single source of truth shared
- * by the routing layer (below) and the cost ledger (StructuredOutputService,
- * AlertBriefingService) so a model bump updates one place. The ledger stores
- * the resolved id at write time, preserving the alias→version snapshot for
- * historical cost reconciliation.
- */
-export const MODEL_ID_BY_ALIAS: Record<ModelAlias, string> = {
-  fast: 'claude-haiku-4-5',
-  standard: 'claude-sonnet-4-6',
-  powerful: 'claude-opus-4-6',
-};
-
-/** Provider label for each language alias — all Anthropic today. */
-export const PROVIDER_BY_ALIAS: Record<ModelAlias, AiProviderLabel> = {
-  fast: AI_PROVIDERS.ANTHROPIC,
-  standard: AI_PROVIDERS.ANTHROPIC,
-  powerful: AI_PROVIDERS.ANTHROPIC,
-};
-
-/** Canonical embedding model id + provider for the ledger. */
-export const EMBEDDING_MODEL_ID = 'text-embedding-3-small';
-export const EMBEDDING_PROVIDER_LABEL: AiProviderLabel = AI_PROVIDERS.OPENAI;
+export const LANGUAGE_PROVIDER_LABEL: AiProviderLabel = AI_PROVIDER_LABELS.ANTHROPIC;
 
 /**
  * Model tiers that have a verified zero-data-retention (ZDR) provider route.
  *
- * ⚠️ INTENTIONALLY EMPTY pending the provider decision (AI Cost Telemetry
- * plan, open question #3): which AI Gateway routes are ZDR-eligible? Anthropic
- * via Bedrock/Vertex offers ZDR; the direct API does not. Until that's
- * confirmed and the corresponding gateway route is wired, NO tier is
- * ZDR-eligible — so a tenant flagged `aiZeroRetention` is correctly BLOCKED
- * (fail-closed) rather than leaking to a retaining endpoint.
- *
- * To enable: confirm the ZDR gateway route, add the tier(s) here, and wire
- * the ZDR-specific model in `getProvider()` (likely a providerOptions flag or
- * a separate ZDR gateway instance).
+ * ⚠️ INTENTIONALLY EMPTY: neither route this provider offers (the Vercel AI Gateway, the direct Anthropic API) is
+ * a zero-retention route, so a tenant flagged `aiZeroRetention` is correctly BLOCKED (fail-closed) rather than
+ * leaking to a retaining endpoint. The per-tenant route resolver replaces this with the catalog's `zdrCapable` and a
+ * zero-retention route.
  */
-export const ZDR_ELIGIBLE_TIERS: ReadonlySet<ModelAlias> = new Set<ModelAlias>([
-  // e.g. 'standard', once an Anthropic-Bedrock ZDR route is configured.
-]);
+export const ZDR_ELIGIBLE_TIERS: ReadonlySet<ModelAlias> = new Set<ModelAlias>([]);
+
+type ProviderModel = Parameters<typeof wrapLanguageModel>[0]['model'];
+
+/**
+ * Build the three alias models over the direct Anthropic provider, each on its catalog `anthropicId` with its tuning.
+ * A refused generate call retries exactly once on the next alias up (fast → standard → powerful): the fallback is a
+ * tuned model with no fallback of its own, so a refusal never cascades. Exported for tests.
+ */
+export function buildAliasModels(base: (modelId: string) => ProviderModel): Record<ModelAlias, ProviderModel> {
+  const build = (alias: ModelAlias, fallback?: ProviderModel) =>
+    wrapLanguageModel({
+      model: base(anthropicIdFor(alias)),
+      middleware: modelTuningMiddleware({ alias, fallback }),
+    });
+  return {
+    fast: build('fast', build('standard')),
+    standard: build('standard', build('powerful')),
+    powerful: build('powerful'),
+  };
+}
+
+function anthropicIdFor(alias: ModelAlias): string {
+  const id = MODEL_CATALOG[alias].anthropicId;
+  if (!id) throw new Error(`Model alias "${alias}" has no Anthropic id in the model catalog`);
+  return id;
+}
+
+function gatewaySlugFor(alias: ModelAlias): string {
+  const id = MODEL_CATALOG[alias].openrouterId;
+  if (!id) throw new Error(`Model alias "${alias}" has no gateway slug in the model catalog`);
+  return id;
+}
 
 // Lazy initialization — env vars aren't available at module import time
 // because NestJS ConfigModule loads .env.local after imports resolve.
@@ -126,35 +126,22 @@ function getProvider() {
 
   function createLanguageModels() {
     if (aiProvider === 'anthropic') {
-      const anthropic = createAnthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
-      return {
-        fast: anthropic('claude-haiku-4-5'),
-        standard: anthropic('claude-sonnet-4-6'),
-        powerful: anthropic('claude-opus-4-6'),
-      };
+      const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      return buildAliasModels((id) => anthropic(id));
     }
 
+    const gatewayModel = (alias: ModelAlias) =>
+      wrapLanguageModel({ model: gateway(gatewaySlugFor(alias)), middleware: anthropicOnlyMiddleware });
     return {
-      fast: wrapLanguageModel({
-        model: gateway('anthropic/claude-haiku-4.5'),
-        middleware: anthropicOnlyMiddleware,
-      }),
-      standard: wrapLanguageModel({
-        model: gateway('anthropic/claude-sonnet-4.6'),
-        middleware: anthropicOnlyMiddleware,
-      }),
-      powerful: wrapLanguageModel({
-        model: gateway('anthropic/claude-opus-4.6'),
-        middleware: anthropicOnlyMiddleware,
-      }),
+      fast: gatewayModel('fast'),
+      standard: gatewayModel('standard'),
+      powerful: gatewayModel('powerful'),
     };
   }
 
   function createEmbeddingModels() {
     return {
-      embedding: gateway.embeddingModel('openai/text-embedding-3-small'),
+      embedding: gateway.embeddingModel(LEGACY_EMBEDDING.gatewaySlug),
     };
   }
 
@@ -183,11 +170,7 @@ export function aiDirect(alias: ModelAlias): LanguageModel {
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
     _directAnthropicProvider = customProvider({
-      languageModels: {
-        fast: anthropic('claude-haiku-4-5'),
-        standard: anthropic('claude-sonnet-4-6'),
-        powerful: anthropic('claude-opus-4-6'),
-      },
+      languageModels: buildAliasModels((id) => anthropic(id)),
     });
   }
   return _directAnthropicProvider.languageModel(alias);

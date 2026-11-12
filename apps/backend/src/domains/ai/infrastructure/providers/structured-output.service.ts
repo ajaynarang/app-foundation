@@ -3,7 +3,8 @@ import { AiInvocationStatus } from '@appshore/db';
 import { generateText, Output, type LanguageModel } from 'ai';
 import type { ZodSchema } from 'zod';
 import type { AiCallContext, ModelAlias } from '@app/shared-types';
-import { ai, MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from './ai-provider';
+import { ai, LANGUAGE_PROVIDER_LABEL } from './ai-provider';
+import { ledgerModelIdFor } from '../../routing/model-catalog';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { redactMessages } from '../redaction/pii-redactor';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
@@ -15,6 +16,12 @@ interface ExtractOptions {
   modelAlias: ModelAlias;
   systemPrompt: string;
   timeoutMs: number;
+  /**
+   * The ceiling on the answer's tokens. REQUIRED: unset, some routes reserve the model's whole output window, which a
+   * tight per-key credit limit refuses outright. Thinking counts toward it on the 5.5 models. Size it to the answer
+   * with `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`) and name it next to the call.
+   */
+  maxOutputTokens: number;
   /** Optional pre-built model — bypasses the alias lookup when provided */
   model?: LanguageModel;
   /**
@@ -78,7 +85,7 @@ export class StructuredOutputService {
     }
 
     const model = options.model ?? ai(options.modelAlias);
-    const provider = this.providerFor(options.modelAlias);
+    const provider = LANGUAGE_PROVIDER_LABEL;
     const startedAt = Date.now();
 
     // Redact allowlisted PII field names from the structured payload before
@@ -109,6 +116,7 @@ export class StructuredOutputService {
         messages,
         output,
         abortSignal: AbortSignal.timeout(options.timeoutMs),
+        maxOutputTokens: options.maxOutputTokens,
         ...(telemetryMetadata ? { experimental_telemetry: telemetryMetadata } : {}),
       });
 
@@ -120,6 +128,7 @@ export class StructuredOutputService {
         Date.now() - startedAt,
         outcome,
         errorCode,
+        result.response?.modelId,
       );
 
       const objectResult = (result.output as T) ?? null;
@@ -170,14 +179,6 @@ export class StructuredOutputService {
     return { promptTokens, completionTokens, cachedTokens };
   }
 
-  /**
-   * Coarse provider label for the ledger. Sourced from `ai-provider.ts` so
-   * a provider change updates one place.
-   */
-  private providerFor(modelAlias: ModelAlias): string {
-    return PROVIDER_BY_ALIAS[modelAlias];
-  }
-
   private async recordTelemetry(
     options: ExtractOptions,
     provider: string,
@@ -185,6 +186,7 @@ export class StructuredOutputService {
     latencyMs: number,
     status: AiInvocationStatus,
     errorCode: string | undefined,
+    answeredByModelId?: string,
   ): Promise<string | undefined> {
     if (!options.aiContext) return undefined;
     try {
@@ -193,7 +195,9 @@ export class StructuredOutputService {
       const row = await this.aiTelemetry.record(
         {
           provider,
-          model: this.modelStringFor(options.modelAlias),
+          // A refused call that fell back one alias up was answered (and billed)
+          // by the fallback model, so price it as that model.
+          model: ledgerModelIdFor(options.modelAlias, answeredByModelId),
           promptTokens,
           completionTokens,
           totalTokens: promptTokens + completionTokens,
@@ -241,15 +245,5 @@ export class StructuredOutputService {
       tracer,
       metadata: { sessionId, userId, tags },
     };
-  }
-
-  /**
-   * Map the alias to a stable model id for the ledger via the canonical
-   * `MODEL_ID_BY_ALIAS` map in `ai-provider.ts`. Aliases keep callers
-   * decoupled from specific model versions; the ledger preserves the
-   * alias→version snapshot so cost reconciliation survives a model bump.
-   */
-  private modelStringFor(modelAlias: ModelAlias): string {
-    return MODEL_ID_BY_ALIAS[modelAlias] ?? modelAlias;
   }
 }

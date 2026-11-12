@@ -11,8 +11,6 @@ jest.mock('ai', () => ({
 
 jest.mock('../ai-provider', () => ({
   aiEmbedding: jest.fn().mockReturnValue('mock-embedding-model'),
-  EMBEDDING_MODEL_ID: 'text-embedding-3-small',
-  EMBEDDING_PROVIDER_LABEL: 'openai',
 }));
 
 describe('EmbeddingService', () => {

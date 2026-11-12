@@ -14,6 +14,7 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
 import { ZeroRetentionUnavailable } from '../redaction/zero-retention-unavailable.error';
 import { ZDR_ELIGIBLE_TIERS } from '../providers/ai-provider';
+import { longPromptSurchargeAbove } from '../../routing/model-catalog';
 import type { ModelAlias } from '@app/shared-types';
 
 /**
@@ -74,6 +75,7 @@ export class AiTelemetryService {
       throw new Error('AiTelemetryService.record: surface is required');
     }
 
+    this.warnOnLongPromptSurcharge(usage);
     const costUsd = await this.computeCost(usage);
 
     const row = await this.persistRow(usage, context, costUsd);
@@ -83,6 +85,19 @@ export class AiTelemetryService {
     void this.invalidateSpentCache(row.tenantId).catch(() => {});
 
     return row;
+  }
+
+  /**
+   * A model with a long-prompt price tier (Haiku 5.5 above 100K prompt tokens) is priced by one row at its base
+   * rate, so a call above the threshold is understated in the ledger. Say so, once per such call.
+   */
+  private warnOnLongPromptSurcharge(usage: AiUsage): void {
+    const threshold = longPromptSurchargeAbove(usage.model);
+    if (threshold !== undefined && usage.promptTokens > threshold) {
+      this.logger.warn(
+        `${usage.provider}/${usage.model} call with ${usage.promptTokens} prompt tokens is above ${threshold}; the provider bills a higher rate there, so this row's cost is understated.`,
+      );
+    }
   }
 
   /**

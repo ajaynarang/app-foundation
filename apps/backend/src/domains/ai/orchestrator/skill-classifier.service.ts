@@ -2,9 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { generateText } from 'ai';
 
 import { ai } from '../infrastructure/providers/ai-provider';
+import { OUTPUT_CEILINGS } from '../routing/output-ceilings';
 import { AGENT_IDS, AgentId } from '../agents/agent.types';
 import { PromptingService, PROMPT_NAMES } from '../../prompting';
 import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
+
+/** A one-line JSON verdict, plus room for the model's always-on thinking, which counts toward the cap. */
+export const CLASSIFIER_MAX_OUTPUT_TOKENS = OUTPUT_CEILINGS.VERDICT;
 
 interface ClassificationResult {
   agentId: AgentId;
@@ -28,7 +32,7 @@ export class SkillClassifierService {
         model: ai('fast'),
         system: systemPrompt,
         prompt: message,
-        maxOutputTokens: 50,
+        maxOutputTokens: CLASSIFIER_MAX_OUTPUT_TOKENS,
         ...(tracer
           ? {
               experimental_telemetry: {
@@ -40,6 +44,12 @@ export class SkillClassifierService {
             }
           : {}),
       });
+      if (!result.text.trim()) {
+        this.logger.warn(
+          `Classifier returned an empty answer (finish: ${result.finishReason}); defaulting to assistant`,
+        );
+        return { agentId: 'assistant', taskSkill: null };
+      }
       // Strip markdown fences if LLM wraps JSON in ```json ... ```
       const jsonText = result.text
         .replace(/^```(?:json)?\s*/i, '')

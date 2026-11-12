@@ -12,11 +12,14 @@ import {
 import { FEEDBACK_ADMIN_INCLUDE, toPublicFeedback, type PublicFeedback } from './feedback.serializer';
 import { listTenantOptions, type TenantOption, type TenantOptionQuery } from '../../shared/lists/tenant-options';
 import { ai } from '../ai/infrastructure/providers/ai-provider';
+import { OUTPUT_CEILINGS } from '../ai/routing/output-ceilings';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PromptingService, PROMPT_NAMES } from '../prompting';
 import { CreateFeedbackDto, ResolveFeedbackDto, UpdateStatusDto, UpdateCategoryDto, ListFeedbackQueryDto } from './dto';
 
 const VALID_CATEGORIES = ['bug', 'idea', 'general'];
+/** One category word (plus the model's thinking). */
+export const FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS = OUTPUT_CEILINGS.WORD;
 const FEEDBACK_STATUS = FeedbackStatusEnum.enum;
 const FEEDBACK_STATUSES = FeedbackStatusEnum.options;
 
@@ -207,6 +210,7 @@ export class FeedbackService {
       model: ai('fast'),
       system: systemPrompt,
       prompt: message,
+      maxOutputTokens: FEEDBACK_CATEGORY_MAX_OUTPUT_TOKENS,
     });
 
     const parsed = text.trim().toLowerCase();
