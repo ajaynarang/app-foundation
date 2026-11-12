@@ -69,7 +69,7 @@ How a feature is cut out:
   `desk.feature.ts` imports Desk, and `OPTIONAL_FEATURES` in `index.ts` lists what you kept.
 - **The manifest.** [`features/desk.json`](features/desk.json) names everything else Desk brings: `paths` (deleted),
   `markers` (files holding blocks between `feature:desk:start` and `feature:desk:end` comment lines, stripped),
-  `jsonEntries` (package scripts, the `inngest` dependency, the QA capability), and `allowlistPrefixes` (allowlist
+  `jsonEntries` (the package scripts and the `inngest` dependency), and `allowlistPrefixes` (allowlist
   entries under the Desk folder).
 - **The residue list.** [`features/desk.residue.json`](features/desk.residue.json) names each file that still
   mentions Inngest or the Desk folder after removal, and why it stays.
