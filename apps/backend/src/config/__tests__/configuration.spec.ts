@@ -44,6 +44,9 @@ describe('configuration — production boot guard', () => {
     'THROTTLE_LIMIT',
     'THROTTLE_TTL_MS',
     'TRUST_PROXY',
+    'OPENROUTER_API_KEY',
+    'COHERE_API_KEY',
+    'OPENAI_API_KEY',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -384,6 +387,30 @@ describe('configuration — production boot guard', () => {
           LIVEKIT_URL: 'ws://localhost:7880',
         }),
       ).not.toThrow();
+    });
+  });
+
+  describe('platform AI route keys', () => {
+    const dev = { NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399' };
+
+    it('are optional: a keyless machine boots, in development and in production', () => {
+      const config = load({ ...dev, OPENROUTER_API_KEY: undefined, COHERE_API_KEY: undefined, OPENAI_API_KEY: '' });
+      expect(config.openRouterApiKey).toBeUndefined();
+      expect(config.cohereApiKey).toBeUndefined();
+      expect(config.openaiApiKey).toBeUndefined();
+      expect(() => load(validProduction())).not.toThrow();
+    });
+
+    it('carries each key under its own name', () => {
+      const config = load({
+        ...dev,
+        OPENROUTER_API_KEY: 'sk-or-v1-test',
+        COHERE_API_KEY: 'co-test',
+        OPENAI_API_KEY: 'sk-openai-test',
+      });
+      expect(config.openRouterApiKey).toBe('sk-or-v1-test');
+      expect(config.cohereApiKey).toBe('co-test');
+      expect(config.openaiApiKey).toBe('sk-openai-test');
     });
   });
 

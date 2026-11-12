@@ -68,6 +68,15 @@ const configSchema = z.object({
 
   anthropicApiKey: z.string().optional(),
 
+  // Platform AI routes (`domains/ai/routing/route-registry.ts`). Each is optional: a route is off until its key is
+  // set, and a keyless machine boots with AI answering "not configured".
+  /** Enables `platform-openrouter`, the platform's default language route. */
+  openRouterApiKey: z.string().optional(),
+  /** Enables `platform-cohere`, the platform's embedding route. */
+  cohereApiKey: z.string().optional(),
+  /** External moderation only (OpenAI `omni-moderation-latest`); never a language or embedding route. */
+  openaiApiKey: z.string().optional(),
+
   // Encrypts third-party integration credentials at rest (AES-256).
   credentialsEncryptionKey: z
     .string()
@@ -332,6 +341,9 @@ export default (): Configuration => {
         (process.env.MULTI_TENANT === 'false' ? 'single' : 'multi'),
     },
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    openRouterApiKey: env('OPENROUTER_API_KEY'),
+    cohereApiKey: env('COHERE_API_KEY'),
+    openaiApiKey: env('OPENAI_API_KEY'),
     oauthJwtSecret: env('OAUTH_JWT_SECRET'),
     oauthConsentSecret: env('OAUTH_CONSENT_SECRET'),
     credentialsEncryptionKey: env('CREDENTIALS_ENCRYPTION_KEY'),
