@@ -13,6 +13,7 @@ export const SURFACE_LABELS: Record<AiSurfaceType, string> = {
   [AiSurface.MEMORY_EXTRACT]: 'Memory Extract',
   [AiSurface.EMBEDDING]: 'Embedding',
   [AiSurface.KB_INGEST]: 'KB Ingest',
+  [AiSurface.VOICE]: 'Voice (speech)',
 };
 
 /** One tone per invocation outcome (ui-grammar-guard.test.ts): a call went through, or it was stopped. */

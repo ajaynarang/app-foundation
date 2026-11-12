@@ -12,7 +12,9 @@ import { PrismaClient } from '../../generated/client';
  * 2026-11-03, not the live page. OpenRouter passes Anthropic list prices
  * through with no token markup, so its rows mirror the Anthropic ones; they
  * are checked against the live slugs when the OpenRouter route lands. The
- * Cohere row is a copy of a sibling product's unverified row.
+ * Cohere row is a copy of a sibling product's unverified row. The three voice
+ * rows (Deepgram, Cartesia, LiveKit) are priced per unit, not per token, and
+ * were checked against each vendor's public price page on 2026-11-12.
  *
  * Old rows stay: the ledger prices history by model id, so a model bump adds
  * rows and never deletes the ones it replaces.
@@ -39,6 +41,8 @@ interface PricingRow {
    * the input rate.
    */
   cacheWriteInputPerMtokUsd?: string;
+  /** USD per unit for a non-token (voice) meter: one audio second, one character, one session second. */
+  unitPriceUsd?: string;
   notes: string;
   /** Defaults to `INITIAL_EFFECTIVE_FROM_DATE`; a row added later carries the date it was added. */
   effectiveFromDate?: Date;
@@ -56,6 +60,9 @@ const INITIAL_EFFECTIVE_FROM_DATE = new Date('2026-05-27T00:00:00.000Z');
 const CLAUDE_5_5_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
 const ANTHROPIC_5_5 = "From Anthropic's price table cached 2026-11-03; ⚠ verify against the live page before deploy";
 const VIA_OPENROUTER = `Anthropic list pricing via OpenRouter (no token markup). ${VERIFICATION_NEEDED}`;
+
+// The voice vendors, priced per unit (`AiUsageUnit`). Checked against each vendor's public price page.
+const VOICE_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
 
 const PRICING: PricingRow[] = [
   // ─── Anthropic ─────────────────────────────────────────────────────
@@ -163,6 +170,41 @@ const PRICING: PricingRow[] = [
     effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
   },
 
+  // ─── Voice (non-token meters, priced per unit; token rates are 0) ──
+  {
+    provider: 'deepgram',
+    model: 'nova-3',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00012833',
+    notes:
+      'Per AUDIO_SECOND: Nova-3 monolingual streaming at the $0.0077/min pay-as-you-go rate (no promo or volume rate assumed). Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'cartesia',
+    model: 'sonic-3',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00003920',
+    notes:
+      'Per CHARACTER: Sonic is 1 credit per character; the Startup plan is $49 for 1.25M credits. Other plans differ; set the rate of the plan you pay for. Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'livekit',
+    model: 'agent-session',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00016667',
+    notes:
+      'Per SESSION_SECOND: LiveKit Cloud agent session minutes at $0.01/min (the overage rate; included plan minutes are not netted). Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
+  },
+
   // ─── OpenAI ────────────────────────────────────────────────────────
   {
     provider: 'openai',
@@ -243,6 +285,7 @@ export const seed = {
           outputPerMtokUsd: row.outputPerMtokUsd,
           cachedInputPerMtokUsd: row.cachedInputPerMtokUsd,
           cacheWriteInputPerMtokUsd: row.cacheWriteInputPerMtokUsd ?? null,
+          unitPriceUsd: row.unitPriceUsd ?? null,
           effectiveFromDate,
           effectiveUntilDate: null,
           notes: row.notes,
