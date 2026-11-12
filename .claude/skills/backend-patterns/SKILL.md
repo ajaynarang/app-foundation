@@ -464,7 +464,8 @@ async listInvoices(tenantId: number, query: InvoiceListQuery = {}): Promise<Curs
   millisecond as a bucket. A name is `kind: 'text'`; a number or key is `kind: 'value'`.
 - **The tiebreak is a public identifier, never an Int primary key**: the table's string id (`userId`,
   `tenantId`, `invitationId`, a UUIDv7 row id), its human number (`ticketNumber`), or a `publicId` (§3.4). A
-  cursor is opaque but not encrypted.
+  cursor is opaque but not encrypted. The one exception is the two API key lists: the table has no public id and
+  a key is addressed by its numeric id, so the cursor carries nothing the URL does not show (ADR "ID boundary").
 - Join the scope and the keyset with `AND: [scope, keyset]`. Never spread both into one object: each may carry an
   `OR`, and the second replaces the first.
 - `total` counts the current view (search, filters, dates, status) and never the cursor. `counts` is for a status

@@ -258,8 +258,8 @@ export class DeskEpisodeService {
   /**
    * Handled tab list — terminal episodes in a tenant-local time window
    * with rich filters. Returns slim `HandledListItem` rows + a summary
-   * rollup (total, byOutcome, autonomousPct). Pagination via `${closedAt.toISOString()}|${id}`
-   * cursor.
+   * rollup (total, byOutcome, autonomousPct), as a cursor list keyed on
+   * (closedAt, id).
    *
    * Window boundaries are tenant-local (Luxon + tenantTimezone). The
    * wire contract uses camelCase; Prisma where/select/include stays
