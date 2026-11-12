@@ -25,6 +25,11 @@ export function redactArgs(input: unknown): unknown {
   return input;
 }
 
+/** The caller's own arguments: every `_`-prefixed key (server-injected or control, like `_confirmToken`) dropped. */
+export function withoutInternalKeys(args: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(args).filter(([key]) => !key.startsWith('_')));
+}
+
 /** Stable SHA-256 of canonicalized JSON (object keys sorted). */
 export function digestArgs(args: Record<string, unknown>): string {
   const stable = JSON.stringify(args, Object.keys(args).sort());
