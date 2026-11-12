@@ -198,7 +198,7 @@ export class IntegrationsController {
     );
 
     // 202 with the record to poll: the sync runs on the queue. Follow the job or the sync history.
-    return { jobId: job.id, status: JobStatusSchema.enum.QUEUED };
+    return { jobId: job.publicId, status: JobStatusSchema.enum.QUEUED };
   }
 
   @Get(':integration_id/sync-history')
