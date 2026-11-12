@@ -18,5 +18,6 @@ export function createMockEventEmitter() {
 export function createMockDomainEventService() {
   return {
     emit: jest.fn().mockResolvedValue(undefined),
+    publish: jest.fn().mockResolvedValue(undefined),
   };
 }

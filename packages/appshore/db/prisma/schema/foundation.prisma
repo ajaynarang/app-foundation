@@ -854,14 +854,14 @@ model NotificationDelivery {
   readAt      DateTime? @map("read_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  /// Webhook lookup; NULLs are distinct so channels without a provider id never collide.
+  @@unique([channel, providerMessageId])
   /// Support lookup by user, newest first — across every workspace they belong to.
   @@index([userId, createdAt])
   /// Support lookup by tenant, newest first.
   @@index([tenantId, createdAt])
   /// Retention sweep and per-day status counts.
   @@index([createdAt])
-  /// Webhook lookup; NULLs are distinct so channels without a provider id never collide.
-  @@unique([channel, providerMessageId])
   @@map("notification_deliveries")
 }
 
@@ -877,10 +877,10 @@ model WhatsAppConsent {
   id     Int @id @default(autoincrement())
   userId Int @unique @map("user_id")
 
-  optedInAt  DateTime? @map("opted_in_at") @db.Timestamptz
-  optedOutAt DateTime? @map("opted_out_at") @db.Timestamptz
+  optedInAt  DateTime?             @map("opted_in_at") @db.Timestamptz
+  optedOutAt DateTime?             @map("opted_out_at") @db.Timestamptz
   /// Where the LAST change came from — an inbound STOP outranks nothing, it just records.
-  source WhatsAppConsentSource
+  source     WhatsAppConsentSource
 
   /// Marketing is a separate yes: Meta prices and caps it separately.
   marketingOptedInAt  DateTime? @map("marketing_opted_in_at") @db.Timestamptz
@@ -1312,6 +1312,41 @@ model DomainEventLog {
   @@index([correlationId])
   @@index([createdAt, id]) // keyset: GET /admin/events
   @@map("domain_event_log")
+}
+
+/// Transactional outbox (ADR "Outbox and deadlines"). One row per domain event,
+/// written in the SAME transaction as the change it describes, so an event exists
+/// if and only if its change committed. `id` is the event's own UUIDv7: the durable
+/// job id, the `domain_event_log` row and webhook deliveries all carry it. Published
+/// right after commit by OutboxService; anything left unpublished (a crash, an
+/// unreachable Redis) is picked up by the relay tick. Published rows are purged
+/// after 7 days. `tenantId` is the event's tenant as `DomainEvent` carries it (a
+/// numeric id as text, a slug, or 'global'), so there is no FK.
+model OutboxEvent {
+  id             String    @id @db.Uuid
+  event          String    @map("event") @db.VarChar(100)
+  tenantId       String    @map("tenant_id") @db.VarChar(100)
+  data           Json      @db.JsonB
+  actorId        String?   @map("actor_id") @db.VarChar(100)
+  actorType      String?   @map("actor_type") @db.VarChar(20)
+  actorLabel     String?   @map("actor_label") @db.VarChar(255)
+  /// Reserved for the client behind an agent actor. Nullable and unused until
+  /// machine identity lands; kept now so that work needs no migration.
+  actorAgent     Json?     @map("actor_agent") @db.JsonB
+  correlationId  String?   @map("correlation_id") @db.VarChar(50)
+  causationId    String?   @map("causation_id") @db.VarChar(50)
+  occurredAt     DateTime  @map("occurred_at") @db.Timestamptz
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  /// Relay claims made on this row (the request-path publish is not counted).
+  attempts       Int       @default(0)
+  /// Relay lease: a claimed row is not claimed again until this passes.
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz
+  lastError      String?   @map("last_error") @db.VarChar(500)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  /// Serves the relay claim (published_at IS NULL, by occurred_at) and the purge (published_at < cutoff).
+  @@index([publishedAt, occurredAt])
+  @@map("outbox_events")
 }
 
 /// Permanent queue failures — when a BullMQ job exhausts its retries, the
