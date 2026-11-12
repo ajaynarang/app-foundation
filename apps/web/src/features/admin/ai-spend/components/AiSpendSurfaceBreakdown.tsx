@@ -47,14 +47,14 @@ export function AiSpendSurfaceBreakdown({ tenantId, days }: AiSpendSurfaceBreakd
       {data.map((row) => {
         const cost = parseFloat(row.windowCostUsd);
         const widthPct = maxCost > 0 ? Math.max((cost / maxCost) * 100, 2) : 0;
-        const meta = SURFACE_LABELS[row.surface as AiSurface];
+        const label = SURFACE_LABELS[row.surface as AiSurface];
         return (
           <div key={row.surface} className="space-y-1">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-foreground">{meta?.label ?? row.surface}</span>
+              <span className="text-foreground">{label ?? row.surface}</span>
               <span className="tabular-nums text-muted-foreground">
                 {formatUsdPrecise(cost, 4)} · {row.windowCallCount.toLocaleString()} calls
-                {row.windowErrorCount > 0 && <span className="text-red-500"> · {row.windowErrorCount} err</span>}
+                {row.windowErrorCount > 0 && <span className="text-critical-text"> · {row.windowErrorCount} err</span>}
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-muted">

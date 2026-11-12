@@ -2,14 +2,20 @@
 
 import { useState } from 'react';
 
-import { Badge } from '@app/ui/components/ui/badge';
-import { Button } from '@app/ui/components/ui/button';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 
-import { formatRelativeTime, formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
+import { formatUsdPrecise } from '@appshore/web-core/shared/lib/utils/formatters';
 
-import { ListFooter } from '@/shared/components/page-chrome';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageHeader,
+  PageLoadingSkeleton,
+  RelativeTime,
+  SegmentedControl,
+} from '@/shared/components/page-chrome';
 
 import { useAiSpendSummary, useAiSpendTenants } from '../hooks';
 import { WINDOW_OPTIONS } from '../constants';
@@ -24,6 +30,7 @@ export function AiSpendPage() {
 
   const tenants = useAiSpendTenants(days);
   const { items: data, isLoading, isError } = tenants;
+  const windowValue = String(days) as (typeof WINDOW_OPTIONS)[number]['value'];
   // The total comes from the server: summing the loaded page would under-report once there is a second page.
   const summary = useAiSpendSummary(days);
 
@@ -34,26 +41,18 @@ export function AiSpendPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">AI Spend</h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            What every account is costing us — across chat, desk, and document AI
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {WINDOW_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={days === opt.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDays(opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="AI Spend"
+        subtitle="What every account is costing us, across chat, desk, and document AI"
+        actions={
+          <SegmentedControl
+            label="Spend window"
+            options={[...WINDOW_OPTIONS]}
+            value={windowValue}
+            onChange={(value) => setDays(Number(value))}
+          />
+        }
+      />
 
       {summary.data && (
         <div className="rounded-lg border border-border bg-card p-4">
@@ -64,14 +63,15 @@ export function AiSpendPage() {
         </div>
       )}
 
-      {isError && <p className="text-sm text-red-500 py-6 text-center">Failed to load AI spend. Please retry.</p>}
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
+      {isError ? (
+        <ListErrorState
+          title="Couldn't load AI spend."
+          error={tenants.error}
+          onRetry={() => void tenants.refetch()}
+          isRetrying={tenants.isRefetching}
+        />
+      ) : isLoading ? (
+        <PageLoadingSkeleton variant="table" rows={8} />
       ) : data.length > 0 ? (
         <div className="space-y-3">
           <Table>
@@ -88,7 +88,7 @@ export function AiSpendPage() {
               {data.map((tenant) => (
                 <TableRow
                   key={tenant.tenantId}
-                  className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleOpen(tenant)}
                 >
                   <TableCell>
@@ -98,9 +98,9 @@ export function AiSpendPage() {
                   <TableCell className="text-right tabular-nums font-medium">
                     {formatUsdPrecise(tenant.windowCostUsd)}
                     {tenant.windowErrorCount > 0 && (
-                      <Badge variant="outline" className="ml-2 bg-red-500/10 text-red-500">
+                      <StatusBadge tone="danger" className="ml-2">
                         {tenant.windowErrorCount} err
-                      </Badge>
+                      </StatusBadge>
                     )}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-center">
@@ -112,7 +112,7 @@ export function AiSpendPage() {
                     {tenant.windowCallCount.toLocaleString()}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
-                    {tenant.lastActivityAt ? formatRelativeTime(tenant.lastActivityAt) : '—'}
+                    {tenant.lastActivityAt ? <RelativeTime iso={tenant.lastActivityAt} /> : '—'}
                   </TableCell>
                 </TableRow>
               ))}
@@ -128,9 +128,7 @@ export function AiSpendPage() {
           />
         </div>
       ) : (
-        !isError && (
-          <p className="text-muted-foreground text-sm py-10 text-center">No AI spend recorded yet in this window.</p>
-        )
+        <PageEmptyState title="No AI spend in this window" description="Spend shows here once a tenant uses AI." />
       )}
 
       <AiSpendDetailSheet tenant={selected} days={days} open={detailOpen} onOpenChange={setDetailOpen} />

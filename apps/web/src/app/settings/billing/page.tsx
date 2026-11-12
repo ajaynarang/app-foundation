@@ -2,14 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CreditCard, Plus, Trash2, Star, Wallet, RefreshCw } from 'lucide-react';
+import { CreditCard, Plus, Star, Wallet, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@app/ui/components/ui/card';
-import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import { Switch } from '@app/ui/components/ui/switch';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@app/ui/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { FormSheet } from '@app/ui/components/ui/form-sheet';
@@ -34,26 +32,17 @@ import {
   useSetupPaymentMethod,
 } from '@/features/billing/hooks/use-billing';
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
-import { formatTransactionType, getTransactionTypeVariant } from '@/features/billing/utils';
+import { TRANSACTION_TYPE_VARIANTS, variantOf } from '@/features/billing/constants';
 import { cn } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
-
-// ---------------------------------------------------------------------------
-// Skeleton
-// ---------------------------------------------------------------------------
-function BillingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Billing</h1>
-        <p className="text-sm text-muted-foreground mt-1">Wallet, payment methods, and invoices</p>
-      </div>
-      <Skeleton className="h-40 w-full rounded-lg" />
-      <Skeleton className="h-32 w-full rounded-lg" />
-      <Skeleton className="h-48 w-full rounded-lg" />
-    </div>
-  );
-}
+import {
+  ListErrorState,
+  PageEmptyState,
+  PageHeader,
+  PageLoadingSkeleton,
+  PageSection,
+  RowActions,
+} from '@/shared/components/page-chrome';
 
 // ---------------------------------------------------------------------------
 // Card brand icon helper
@@ -261,19 +250,25 @@ function AutoReloadSheet({
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 export default function BillingPage() {
   const { formatDate } = useFormatters();
-  const { data: walletData, isLoading: walletLoading } = useWalletBalance();
-  const { data: paymentMethods, isLoading: pmLoading } = usePaymentMethods();
-  const { data: upcomingInvoice, isLoading: invoiceLoading } = useUpcomingInvoice();
+  const walletQuery = useWalletBalance();
+  const paymentMethodsQuery = usePaymentMethods();
+  const invoiceQuery = useUpcomingInvoice();
+  const { data: walletData } = walletQuery;
+  const { data: paymentMethods } = paymentMethodsQuery;
+  const { data: upcomingInvoice } = invoiceQuery;
   const { mutate: setDefault, isPending: setDefaultPending } = useSetDefaultPaymentMethod();
   const { mutate: removePm, isPending: removePending } = useRemovePaymentMethod();
   const { mutate: setupPm, isPending: setupPending } = useSetupPaymentMethod();
 
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [autoReloadOpen, setAutoReloadOpen] = useState(false);
+  const [removing, setRemoving] = useState<{ id: string; brand: string; last4: string } | null>(null);
 
-  const isLoading = walletLoading || pmLoading || invoiceLoading;
+  const isLoading = walletQuery.isLoading || paymentMethodsQuery.isLoading || invoiceQuery.isLoading;
 
   const wallet = walletData?.wallet;
   const recentTransactions = walletData?.recentTransactions ?? [];
@@ -283,119 +278,121 @@ export default function BillingPage() {
     [paymentMethods],
   );
 
+  const addPaymentMethod = () => setupPm({ returnUrl: `${window.location.origin}/settings/billing` });
+
+  const header = <PageHeader title="Billing" subtitle="Wallet, payment methods, and invoices" />;
+
   if (isLoading) {
-    return <BillingSkeleton />;
+    return (
+      <div className="space-y-6">
+        {header}
+        <PageLoadingSkeleton variant="cards" rows={3} />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Billing</h1>
-        <p className="text-sm text-muted-foreground mt-1">Wallet, payment methods, and invoices</p>
-      </div>
+      {header}
 
-      {/* Section 1: Wallet */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Wallet</h2>
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Available Balance</p>
-                <p className="text-3xl font-bold text-foreground tracking-tight">
-                  {formatCents(wallet?.balanceCents ?? 0)}
-                </p>
+      <PageSection title="Wallet">
+        {walletQuery.isError ? (
+          <ListErrorState
+            title="Couldn't load your wallet."
+            error={walletQuery.error}
+            onRetry={() => void walletQuery.refetch()}
+            isRetrying={walletQuery.isRefetching}
+          />
+        ) : (
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Available Balance</p>
+                  <p className="text-3xl font-bold text-foreground tracking-tight">
+                    {formatCents(wallet?.balanceCents ?? 0)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => setTopUpOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add Funds
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setAutoReloadOpen(true)}>
+                    <RefreshCw className="h-4 w-4 mr-1.5" />
+                    Auto-Reload
+                    {wallet?.autoReloadEnabled && (
+                      <StatusBadge tone="info" className="ml-1.5">
+                        On
+                      </StatusBadge>
+                    )}
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" onClick={() => setTopUpOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Add Funds
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setAutoReloadOpen(true)}>
-                  <RefreshCw className="h-4 w-4 mr-1.5" />
-                  Auto-Reload
-                  {wallet?.autoReloadEnabled && (
-                    <Badge variant="default" className="ml-1.5 text-2xs">
-                      On
-                    </Badge>
-                  )}
-                </Button>
-              </div>
-            </div>
 
-            {/* Recent transactions */}
-            {recentTransactions.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent Activity</p>
-                {recentTransactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={getTransactionTypeVariant(tx.type)} className="text-2xs">
-                        {formatTransactionType(tx.type)}
-                      </Badge>
-                      <span className="text-muted-foreground truncate max-w-[200px]">{tx.description}</span>
-                    </div>
-                    <span
-                      className={cn(
-                        'font-medium tabular-nums',
-                        tx.amountCents >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
-                      )}
-                    >
-                      {tx.amountCents >= 0 ? '+' : ''}
-                      {formatCents(tx.amountCents)}
-                    </span>
-                  </div>
-                ))}
-                <Link
-                  href="/settings/usage"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-                >
-                  View all transactions
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+              {recentTransactions.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent Activity</p>
+                  {recentTransactions.slice(0, 5).map((tx) => {
+                    const type = variantOf(TRANSACTION_TYPE_VARIANTS, tx.type);
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <StatusBadge tone={type.tone}>{type.label}</StatusBadge>
+                          <span className="text-muted-foreground truncate max-w-[200px]">{tx.description}</span>
+                        </div>
+                        <span
+                          className={cn(
+                            'font-medium tabular-nums',
+                            tx.amountCents >= 0 ? 'text-success-text' : 'text-critical-text',
+                          )}
+                        >
+                          {tx.amountCents >= 0 ? '+' : ''}
+                          {formatCents(tx.amountCents)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <Link
+                    href="/settings/usage"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+                  >
+                    View all transactions
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </PageSection>
 
-      {/* Section 2: Payment Methods */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Payment Methods</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setupPm({
-                returnUrl: `${window.location.origin}/settings/billing`,
-              })
-            }
-            loading={setupPending}
-          >
+      <PageSection
+        title="Payment methods"
+        action={
+          <Button variant="outline" size="sm" onClick={addPaymentMethod} loading={setupPending}>
             <Plus className="h-4 w-4 mr-1.5" />
             Add Payment Method
           </Button>
-        </div>
-
-        {sortedMethods.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <CreditCard className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-foreground mb-1">No payment methods</h3>
-              <p className="text-sm text-muted-foreground mb-4">Add a payment method to get started with billing.</p>
-              <Button
-                size="sm"
-                onClick={() =>
-                  setupPm({
-                    returnUrl: `${window.location.origin}/settings/billing`,
-                  })
-                }
-                loading={setupPending}
-              >
+        }
+      >
+        {paymentMethodsQuery.isError ? (
+          <ListErrorState
+            title="Couldn't load your payment methods."
+            error={paymentMethodsQuery.error}
+            onRetry={() => void paymentMethodsQuery.refetch()}
+            isRetrying={paymentMethodsQuery.isRefetching}
+          />
+        ) : sortedMethods.length === 0 ? (
+          <PageEmptyState
+            icon={CreditCard}
+            title="No payment methods"
+            description="Add a payment method to get started with billing."
+            action={
+              <Button size="sm" onClick={addPaymentMethod} loading={setupPending}>
                 Add Payment Method
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
         ) : (
           <div className="space-y-2">
             {sortedMethods.map((pm) => (
@@ -412,10 +409,10 @@ export default function BillingPage() {
                             {cardBrandLabel(pm.brand)} ····{pm.last4}
                           </span>
                           {pm.isDefault && (
-                            <Badge variant="outline" className="text-2xs">
+                            <StatusBadge tone="neutral">
                               <Star className="h-3 w-3 mr-1" />
                               Default
-                            </Badge>
+                            </StatusBadge>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -423,62 +420,45 @@ export default function BillingPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {!pm.isDefault && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() => setDefault(pm.id)}
-                          disabled={setDefaultPending}
-                        >
-                          Set Default
-                        </Button>
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive"
-                            disabled={pm.isDefault}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Remove payment method?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will remove the {cardBrandLabel(pm.brand)} card ending in {pm.last4}.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Keep</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => removePm(pm.id)}
-                              disabled={removePending}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Remove
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                    <RowActions
+                      primary={
+                        pm.isDefault
+                          ? undefined
+                          : {
+                              label: 'Set default',
+                              ariaLabel: `Make the card ending in ${pm.last4} the default`,
+                              onClick: () => setDefault(pm.id),
+                              loading: setDefaultPending,
+                            }
+                      }
+                      items={[
+                        {
+                          label: 'Remove…',
+                          ariaLabel: `Remove the card ending in ${pm.last4}`,
+                          destructive: true,
+                          disabled: pm.isDefault,
+                          disabledReason: 'Make another card the default before removing this one.',
+                          onSelect: () => setRemoving({ id: pm.id, brand: pm.brand, last4: pm.last4 }),
+                        },
+                      ]}
+                    />
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
-      </section>
+      </PageSection>
 
-      {/* Section 3: Next Invoice Preview */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Next Invoice Preview</h2>
-
-        {upcomingInvoice ? (
+      <PageSection title="Next invoice preview">
+        {invoiceQuery.isError ? (
+          <ListErrorState
+            title="Couldn't load your next invoice."
+            error={invoiceQuery.error}
+            onRetry={() => void invoiceQuery.refetch()}
+            isRetrying={invoiceQuery.isRefetching}
+          />
+        ) : upcomingInvoice ? (
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -506,7 +486,6 @@ export default function BillingPage() {
                     </TableRow>
                   ))}
 
-                  {/* Subtotal */}
                   <TableRow>
                     <TableCell colSpan={3} className="text-sm text-muted-foreground text-right">
                       Subtotal
@@ -516,7 +495,6 @@ export default function BillingPage() {
                     </TableCell>
                   </TableRow>
 
-                  {/* Tax */}
                   {upcomingInvoice.taxCents > 0 && (
                     <TableRow>
                       <TableCell colSpan={3} className="text-sm text-muted-foreground text-right">
@@ -528,7 +506,6 @@ export default function BillingPage() {
                     </TableRow>
                   )}
 
-                  {/* Total */}
                   <TableRow className="bg-muted/50">
                     <TableCell colSpan={3} className="text-sm font-semibold text-foreground text-right">
                       Total due {upcomingInvoice.periodEnd ? `on ${formatDate(upcomingInvoice.periodEnd)}` : ''}
@@ -542,17 +519,37 @@ export default function BillingPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Wallet className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <h3 className="text-sm font-semibold text-foreground mb-1">No upcoming invoice</h3>
-              <p className="text-sm text-muted-foreground">Subscribe to a plan to see your next invoice preview.</p>
-            </CardContent>
-          </Card>
+          <PageEmptyState
+            icon={Wallet}
+            title="No upcoming invoice"
+            description="Subscribe to a plan to see your next invoice preview."
+          />
         )}
-      </section>
+      </PageSection>
 
-      {/* Sheets */}
+      <AlertDialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove payment method?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removing
+                ? `This will remove the ${cardBrandLabel(removing.brand)} card ending in ${removing.last4}.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removing && removePm(removing.id)}
+              disabled={removePending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <TopUpSheet open={topUpOpen} onOpenChange={setTopUpOpen} currentBalanceCents={wallet?.balanceCents ?? 0} />
       {wallet && (
         <AutoReloadSheet

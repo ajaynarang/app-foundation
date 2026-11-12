@@ -1,13 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, FileText } from 'lucide-react';
+import type { BillingInvoiceStatus, WalletTransactionType } from '@app/shared-types';
 import { Card, CardContent } from '@app/ui/components/ui/card';
-import { Badge } from '@app/ui/components/ui/badge';
-import { Button } from '@app/ui/components/ui/button';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@app/ui/components/ui/select';
 import {
   useBillingInvoices,
   useWalletTransactions,
@@ -15,38 +12,32 @@ import {
 } from '@/features/billing/hooks/use-billing';
 import { formatCents } from '@appshore/web-core/shared/lib/utils/formatters';
 import {
-  getInvoiceStatusVariant,
-  getTransactionTypeVariant,
-  formatTransactionType,
-  formatInvoiceStatus,
-} from '@/features/billing/utils';
+  INVOICE_STATUS_VARIANTS,
+  TRANSACTION_TYPE_VARIANTS,
+  variantOf,
+  variantOptions,
+} from '@/features/billing/constants';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { formatTimestampDate, DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils';
 import { cn } from '@app/ui';
-import { ListFooter } from '@/shared/components/page-chrome';
+import {
+  FilterSelect,
+  ListErrorState,
+  ListFilterRow,
+  ListFooter,
+  PageEmptyState,
+  PageHeader,
+  PageLoadingSkeleton,
+  PageSection,
+  RowActions,
+} from '@/shared/components/page-chrome';
 
-// ---------------------------------------------------------------------------
-// Skeleton
-// ---------------------------------------------------------------------------
-function UsageSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Usage & Invoices</h1>
-        <p className="text-sm text-muted-foreground mt-1">What you&apos;ve used and what it costs</p>
-      </div>
-      <Skeleton className="h-64 w-full rounded-lg" />
-      <Skeleton className="h-64 w-full rounded-lg" />
-    </div>
-  );
-}
+const INVOICE_STATUS_OPTIONS = variantOptions(INVOICE_STATUS_VARIANTS);
+const TRANSACTION_TYPE_OPTIONS = variantOptions(TRANSACTION_TYPE_VARIANTS);
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 export default function UsagePage() {
-  const [invoiceStatus, setInvoiceStatus] = useState<string | undefined>();
-  const [txType, setTxType] = useState<string | undefined>();
+  const [invoiceStatus, setInvoiceStatus] = useState<BillingInvoiceStatus | undefined>();
+  const [txType, setTxType] = useState<WalletTransactionType | undefined>();
 
   const invoices = useBillingInvoices({ status: invoiceStatus, limit: 10 });
   const transactions = useWalletTransactions({ type: txType, limit: 10 });
@@ -54,212 +45,189 @@ export default function UsagePage() {
 
   const { timezone } = useFormatters();
 
-  const isLoading = invoices.isLoading || transactions.isLoading;
-
-  if (isLoading) {
-    return <UsageSkeleton />;
-  }
-
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Usage & Invoices</h1>
-        <p className="text-sm text-muted-foreground mt-1">What you&apos;ve used and what it costs</p>
-      </div>
+      <PageHeader title="Usage & Invoices" subtitle="What you've used and what it costs" />
 
-      {/* Section 1: Invoice History */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Invoice History</h2>
-
-        {/* Status filter */}
-        <div className="flex items-center gap-2">
-          <Select
-            value={invoiceStatus ?? 'all'}
-            onValueChange={(v) => {
-              setInvoiceStatus(v === 'all' ? undefined : v);
-            }}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="OPEN">Open</SelectItem>
-              <SelectItem value="VOID">Void</SelectItem>
-              <SelectItem value="UNCOLLECTIBLE">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
-                      <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                      No invoices found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  invoices.items.map((inv) => (
-                    <TableRow key={inv.id}>
-                      <TableCell className="text-sm text-muted-foreground tabular-nums">
-                        {formatTimestampDate(inv.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
-                      </TableCell>
-                      <TableCell className="text-sm text-foreground font-mono">
-                        {inv.providerInvoiceId ? `#${inv.providerInvoiceId.slice(-8)}` : inv.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-medium text-foreground tabular-nums">
-                        {formatCents(inv.amountDueCents)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getInvoiceStatusVariant(inv.status)} className="text-2xs">
-                          {formatInvoiceStatus(inv.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {inv.pdfUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => downloadInvoice(inv.id)}
-                              disabled={downloadPending}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {inv.hostedInvoiceUrl && (
-                            <a href={inv.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="sm">
-                                View
-                              </Button>
-                            </a>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {invoices.items.length > 0 && (
-          <ListFooter
-            shown={invoices.items.length}
-            total={invoices.total}
-            hasMore={invoices.hasMore}
-            onLoadMore={invoices.loadMore}
-            isLoadingMore={invoices.isLoadingMore}
-            loadMoreFailed={invoices.isLoadMoreError}
+      <PageSection title="Invoice history">
+        <ListFilterRow>
+          <FilterSelect
+            label="Invoice status"
+            allLabel="All statuses"
+            options={INVOICE_STATUS_OPTIONS}
+            value={invoiceStatus}
+            onChange={setInvoiceStatus}
           />
-        )}
-      </section>
+        </ListFilterRow>
 
-      {/* Section 3: Wallet Transaction Log */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Wallet Transactions</h2>
-
-        {/* Type filter */}
-        <div className="flex items-center gap-2">
-          <Select
-            value={txType ?? 'all'}
-            onValueChange={(v) => {
-              setTxType(v === 'all' ? undefined : v);
-            }}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="TOP_UP">Top Up</SelectItem>
-              <SelectItem value="OVERAGE_DEDUCTION">Overage</SelectItem>
-              <SelectItem value="ADMIN_CREDIT">Credit</SelectItem>
-              <SelectItem value="REFUND">Refund</SelectItem>
-              <SelectItem value="AUTO_RELOAD">Auto-Reload</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
-                      No transactions found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  transactions.items.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="text-sm text-muted-foreground tabular-nums">
-                        {formatTimestampDate(tx.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getTransactionTypeVariant(tx.type)} className="text-2xs">
-                          {formatTransactionType(tx.type)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                        {tx.description}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'text-right text-sm font-medium tabular-nums',
-                          tx.amountCents >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
-                        )}
-                      >
-                        {tx.amountCents >= 0 ? '+' : ''}
-                        {formatCents(tx.amountCents)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        {formatCents(tx.balanceAfterCents)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {transactions.items.length > 0 && (
-          <ListFooter
-            shown={transactions.items.length}
-            total={transactions.total}
-            hasMore={transactions.hasMore}
-            onLoadMore={transactions.loadMore}
-            isLoadingMore={transactions.isLoadingMore}
-            loadMoreFailed={transactions.isLoadMoreError}
+        {invoices.isLoading ? (
+          <PageLoadingSkeleton variant="table" rows={5} />
+        ) : invoices.isError ? (
+          <ListErrorState
+            title="Couldn't load your invoices."
+            error={invoices.error}
+            onRetry={() => void invoices.refetch()}
+            isRetrying={invoices.isRefetching}
           />
+        ) : invoices.items.length === 0 ? (
+          <PageEmptyState title="No invoices yet" description="Invoices show here once you are billed." />
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[1%]">
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.items.map((inv) => {
+                      const status = variantOf(INVOICE_STATUS_VARIANTS, inv.status);
+                      const label = inv.providerInvoiceId ? `#${inv.providerInvoiceId.slice(-8)}` : inv.id.slice(0, 8);
+                      const hostedUrl = inv.hostedInvoiceUrl;
+                      return (
+                        <TableRow key={inv.id}>
+                          <TableCell className="text-sm text-muted-foreground tabular-nums">
+                            {formatTimestampDate(inv.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
+                          </TableCell>
+                          <TableCell className="text-sm text-foreground font-mono">{label}</TableCell>
+                          <TableCell className="text-right text-sm font-medium text-foreground tabular-nums">
+                            {formatCents(inv.amountDueCents)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <RowActions
+                              primary={
+                                inv.pdfUrl
+                                  ? {
+                                      label: 'Download',
+                                      ariaLabel: `Download invoice ${label}`,
+                                      onClick: () => downloadInvoice(inv.id),
+                                      loading: downloadPending,
+                                    }
+                                  : undefined
+                              }
+                              items={
+                                hostedUrl
+                                  ? [
+                                      {
+                                        label: 'View online',
+                                        ariaLabel: `View invoice ${label} online`,
+                                        onSelect: () => window.open(hostedUrl, '_blank', 'noopener,noreferrer'),
+                                      },
+                                    ]
+                                  : undefined
+                              }
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <ListFooter
+              shown={invoices.items.length}
+              total={invoices.total}
+              hasMore={invoices.hasMore}
+              onLoadMore={invoices.loadMore}
+              isLoadingMore={invoices.isLoadingMore}
+              loadMoreFailed={invoices.isLoadMoreError}
+            />
+          </>
         )}
-      </section>
+      </PageSection>
+
+      <PageSection title="Wallet transactions">
+        <ListFilterRow>
+          <FilterSelect
+            label="Transaction type"
+            allLabel="All types"
+            options={TRANSACTION_TYPE_OPTIONS}
+            value={txType}
+            onChange={setTxType}
+          />
+        </ListFilterRow>
+
+        {transactions.isLoading ? (
+          <PageLoadingSkeleton variant="table" rows={5} />
+        ) : transactions.isError ? (
+          <ListErrorState
+            title="Couldn't load your wallet transactions."
+            error={transactions.error}
+            onRetry={() => void transactions.refetch()}
+            isRetrying={transactions.isRefetching}
+          />
+        ) : transactions.items.length === 0 ? (
+          <PageEmptyState title="No transactions yet" description="Top-ups and charges to your wallet show here." />
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.items.map((tx) => {
+                      const type = variantOf(TRANSACTION_TYPE_VARIANTS, tx.type);
+                      return (
+                        <TableRow key={tx.id}>
+                          <TableCell className="text-sm text-muted-foreground tabular-nums">
+                            {formatTimestampDate(tx.createdAt, timezone, DISPLAY_FORMATS.FRIENDLY)}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge tone={type.tone}>{type.label}</StatusBadge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {tx.description}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right text-sm font-medium tabular-nums',
+                              tx.amountCents >= 0 ? 'text-success-text' : 'text-critical-text',
+                            )}
+                          >
+                            {tx.amountCents >= 0 ? '+' : ''}
+                            {formatCents(tx.amountCents)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                            {formatCents(tx.balanceAfterCents)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <ListFooter
+              shown={transactions.items.length}
+              total={transactions.total}
+              hasMore={transactions.hasMore}
+              onLoadMore={transactions.loadMore}
+              isLoadingMore={transactions.isLoadingMore}
+              loadMoreFailed={transactions.isLoadMoreError}
+            />
+          </>
+        )}
+      </PageSection>
     </div>
   );
 }

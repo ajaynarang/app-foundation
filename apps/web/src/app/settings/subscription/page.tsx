@@ -7,6 +7,7 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
 import { Progress } from '@app/ui/components/ui/progress';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Input } from '@app/ui/components/ui/input';
 import { Label } from '@app/ui/components/ui/label';
 import {
@@ -38,39 +39,12 @@ import type { PlanConfig, TenantPlan } from '@app/shared-types';
 import { cn } from '@app/ui';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
+import { PageHeader, PageLoadingSkeleton, PageSection } from '@/shared/components/page-chrome';
+import { SUBSCRIPTION_STATUS_VARIANTS, TENANT_PLAN_VARIANTS, variantOf } from '@/features/billing/constants';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-type BadgeVariant = 'destructive' | 'outline' | 'default' | 'muted';
-
-function planBadgeVariant(plan?: string): BadgeVariant {
-  if (!plan) return 'outline';
-  if (plan === 'TRIAL_EXPIRED' || plan === 'SUSPENDED') return 'destructive';
-  if (plan === 'TRIAL') return 'muted';
-  return 'default';
-}
-
-function subscriptionStatusBadge(status?: string): {
-  label: string;
-  variant: BadgeVariant;
-} {
-  switch (status) {
-    case 'ACTIVE':
-      return { label: 'Active', variant: 'default' };
-    case 'PAST_DUE':
-      return { label: 'Past Due', variant: 'destructive' };
-    case 'CANCELED':
-      return { label: 'Canceled', variant: 'outline' };
-    case 'TRIALING':
-      return { label: 'Trial', variant: 'muted' };
-    case 'SUSPENDED':
-      return { label: 'Suspended', variant: 'destructive' };
-    default:
-      return { label: status ?? 'Unknown', variant: 'outline' };
-  }
-}
-
 const SUBSCRIBABLE_PLANS: TenantPlan[] = ['STARTER', 'PROFESSIONAL', 'ENTERPRISE'];
 
 const PLAN_ORDER: Record<string, number> = {
@@ -99,16 +73,13 @@ function getPlanAction(
 // ---------------------------------------------------------------------------
 // Skeleton
 // ---------------------------------------------------------------------------
+const SUBSCRIPTION_HEADER = <PageHeader title="Subscription" subtitle="Your plan, your way" />;
+
 function SubscriptionSkeleton() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Subscription</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your plan and billing.</p>
-      </div>
-      <Skeleton className="h-48 w-full rounded-lg" />
-      <Skeleton className="h-28 w-full rounded-lg" />
-      <Skeleton className="h-64 w-full rounded-lg" />
+      {SUBSCRIPTION_HEADER}
+      <PageLoadingSkeleton variant="cards" rows={3} />
     </div>
   );
 }
@@ -238,7 +209,7 @@ function PlanSelectorSheet({
                       isCurrent && 'border-border bg-muted/50 opacity-60 cursor-not-allowed',
                       isSelected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                        : !isCurrent && 'border-border bg-card hover:bg-gray-50 dark:hover:bg-gray-900',
+                        : !isCurrent && 'border-border bg-card hover:bg-muted/50',
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -250,16 +221,8 @@ function PlanSelectorSheet({
                               Current Plan
                             </Badge>
                           )}
-                          {action === 'upgrade' && !isSelected && (
-                            <Badge variant="default" className="text-2xs bg-green-600">
-                              Upgrade
-                            </Badge>
-                          )}
-                          {action === 'downgrade' && !isSelected && (
-                            <Badge variant="outline" className="text-2xs text-yellow-600 border-yellow-600">
-                              Downgrade
-                            </Badge>
-                          )}
+                          {action === 'upgrade' && !isSelected && <StatusBadge tone="success">Upgrade</StatusBadge>}
+                          {action === 'downgrade' && !isSelected && <StatusBadge tone="warning">Downgrade</StatusBadge>}
                           {p.isPopular && !isCurrent && (
                             <Badge variant="default" className="text-2xs">
                               <Sparkles className="h-3 w-3 mr-1" />
@@ -394,11 +357,7 @@ export default function SubscriptionPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Subscription</h1>
-        <p className="text-sm text-muted-foreground mt-1">Your plan, your way</p>
-      </div>
+      {SUBSCRIPTION_HEADER}
 
       {/* Blocked banner */}
       {(isTrialExpired || plan === 'SUSPENDED') && (
@@ -424,20 +383,22 @@ export default function SubscriptionPage() {
         </Card>
       )}
 
-      {/* Section 1: Current Plan */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Current Plan</h2>
+      <PageSection title="Current plan">
         <Card>
           <CardContent className="p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-2xl font-bold text-foreground">{displayName ?? plan ?? 'Unknown'}</span>
-                  <Badge variant={planBadgeVariant(plan)}>{plan ?? 'Unknown'}</Badge>
+                  {plan && (
+                    <StatusBadge tone={variantOf(TENANT_PLAN_VARIANTS, plan).tone}>
+                      {variantOf(TENANT_PLAN_VARIANTS, plan).label}
+                    </StatusBadge>
+                  )}
                   {subscription && (
-                    <Badge variant={subscriptionStatusBadge(subscription.status).variant}>
-                      {subscriptionStatusBadge(subscription.status).label}
-                    </Badge>
+                    <StatusBadge tone={variantOf(SUBSCRIPTION_STATUS_VARIANTS, subscription.status).tone}>
+                      {variantOf(SUBSCRIPTION_STATUS_VARIANTS, subscription.status).label}
+                    </StatusBadge>
                   )}
                 </div>
 
@@ -494,7 +455,7 @@ export default function SubscriptionPage() {
 
             {/* Pending change notice */}
             {subscription?.cancelAtPeriodEnd && (
-              <div className="rounded-md bg-yellow-50 dark:bg-yellow-950 p-3 text-sm text-yellow-800 dark:text-yellow-200">
+              <div className="rounded-md bg-caution/15 p-3 text-sm text-caution-text">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {(subscription as any).pendingDowngradePlan ? (
                   <>
@@ -518,12 +479,10 @@ export default function SubscriptionPage() {
 
             {/* Subscription ended notice */}
             {plan === 'TRIAL_EXPIRED' && !hasActiveSubscription && (
-              <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-4 space-y-2">
+              <div className="rounded-md border border-caution/50 bg-caution/10 p-4 space-y-2">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                    Your subscription has ended
-                  </p>
+                  <AlertTriangle className="h-4 w-4 text-caution-text" />
+                  <p className="text-sm font-medium text-caution-text">Your subscription has ended</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Subscribe to a plan to restore access to your account features.
@@ -540,23 +499,17 @@ export default function SubscriptionPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
                     Seat Usage
-                    {seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400" />}
+                    {seatLimitWarning && <AlertTriangle className="h-3.5 w-3.5 text-caution-text" />}
                   </span>
                   <span
-                    className={
-                      seatLimitWarning
-                        ? 'font-semibold text-yellow-700 dark:text-yellow-400'
-                        : 'font-medium text-foreground'
-                    }
+                    className={seatLimitWarning ? 'font-semibold text-caution-text' : 'font-medium text-foreground'}
                   >
                     {seatCount} / {seatLimit} seats
                   </span>
                 </div>
-                <Progress value={usagePercent} className="h-2 bg-gray-200 dark:bg-gray-800" />
+                <Progress value={usagePercent} className="h-2 bg-muted" />
                 {seatLimitWarning && (
-                  <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                    Approaching seat limit. Contact sales to upgrade.
-                  </p>
+                  <p className="text-xs text-caution-text">Approaching seat limit. Contact sales to upgrade.</p>
                 )}
               </div>
             )}
@@ -575,9 +528,9 @@ export default function SubscriptionPage() {
                   (e: { feature: string; enabled: boolean; displayName: string }) => (
                     <div key={e.feature} className="flex items-center gap-2 text-sm py-1">
                       {e.enabled ? (
-                        <Check className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                        <Check className="h-4 w-4 shrink-0 text-success-text" />
                       ) : (
-                        <Lock className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" />
+                        <Lock className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                       )}
                       <span className={e.enabled ? 'text-foreground' : 'text-muted-foreground'}>{e.displayName}</span>
                     </div>
@@ -619,7 +572,7 @@ export default function SubscriptionPage() {
             </AlertDialog>
           </div>
         )}
-      </section>
+      </PageSection>
 
       {/* Plan Selector Sheet */}
       <PlanSelectorSheet

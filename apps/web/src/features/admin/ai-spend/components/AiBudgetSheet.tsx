@@ -161,7 +161,7 @@ export function AiBudgetSheet({ tenant, open, onOpenChange }: AiBudgetSheetProps
           <Textarea id="notes" rows={2} value={form.notes} onChange={set('notes')} placeholder="Why these caps?" />
         </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-critical-text">{error}</p>}
       </div>
     </FormSheet>
   );
