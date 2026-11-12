@@ -46,7 +46,8 @@
     "seed:langfuse": "tsx scripts/seed-langfuse-prompts.ts",
     "seed:model-pricing": "tsx scripts/seed-model-pricing.ts",
     "ai:live-check": "tsx scripts/ai-live-check.ts",
-    "ai:probe-check": "tsx scripts/ai-credential-probe-check.ts"
+    "ai:probe-check": "tsx scripts/ai-credential-probe-check.ts",
+    "ai:ab-gate": "tsx scripts/ai-embedding-ab-gate.ts"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.132",

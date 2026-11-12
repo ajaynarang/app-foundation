@@ -3,7 +3,8 @@
  * runs only when its key is set; a leg without its key prints "skipped". With no key at all it exits 0.
  *
  * Usage:
- *   ANTHROPIC_API_KEY=... OPENROUTER_API_KEY=... COHERE_API_KEY=... pnpm --filter @app/backend ai:live-check
+ *   ANTHROPIC_API_KEY=... OPENROUTER_API_KEY=... COHERE_API_KEY=... PLATFORM_BEDROCK_REGION=... \
+ *     pnpm --filter @app/backend ai:live-check
  *
  * Legs:
  * - anthropic (`ANTHROPIC_API_KEY`): per alias, on the catalog's `anthropicId` through the direct Anthropic provider,
@@ -15,6 +16,10 @@
  *   `reasoning.effort`. This is what confirms the three 5.5 slugs on OpenRouter.
  * - cohere (`COHERE_API_KEY`): one query embedding through the `platform-cohere` registry entry, which must come back
  *   at the catalog's 1536 dimensions.
+ * - bedrock (`PLATFORM_BEDROCK_REGION`, with AWS credentials in the default chain: a profile, SSO or env keys): per
+ *   alias, through the `platform-bedrock` registry entry (the catalog's `bedrockId` profile), one plain call and one
+ *   structured-output call with the alias's effort as Bedrock's `reasoningConfig.maxReasoningEffort`, then one query
+ *   embedding on Cohere Embed v4 at 1536. This is what proves the three Bedrock ids.
  *
  * Every language call runs at the smallest output ceiling (`OUTPUT_CEILINGS.WORD`). A call passes when it answers
  * (finish reason `stop`, non-empty text or a schema-valid object). Any failure exits 1. Paste the printed lines into
@@ -33,7 +38,7 @@ import { PLATFORM_ROUTES, type PlatformRoute } from '../src/domains/ai/routing/r
 export const CEILING = OUTPUT_CEILINGS.WORD;
 const TIMEOUT_MS = 60_000;
 
-type LegName = 'anthropic' | 'openrouter' | 'cohere';
+type LegName = 'anthropic' | 'openrouter' | 'cohere' | 'bedrock';
 
 export interface CheckLine {
   leg: LegName;
@@ -134,21 +139,30 @@ async function languageLeg(
   return lines;
 }
 
-async function cohereLeg(apiKey: string): Promise<CheckLine[]> {
-  const bundle = platformRoute('platform-cohere').buildProvider({ cohereApiKey: apiKey });
+/**
+ * How the Bedrock route family takes the alias's effort, from the same helper the resolver's tuning uses, so the live
+ * check proves the shape production sends.
+ */
+export function bedrockEffortOptions(alias: ModelAlias): ProviderOptions {
+  return effortProviderOptions('bedrock', alias) as ProviderOptions;
+}
+
+async function embeddingLeg(
+  leg: 'cohere' | 'bedrock',
+  bundle: ReturnType<PlatformRoute['buildProvider']>,
+): Promise<CheckLine[]> {
   const subject = bundle.embeddingModelId ?? 'embedding';
+  const options = { inputType: 'search_query', outputDimension: EMBEDDING_CATALOG.dimensions };
   try {
     const result = await embed({
       model: bundle.embeddingModel!(),
       value: 'ready',
-      providerOptions: {
-        cohere: { inputType: 'search_query', outputDimension: EMBEDDING_CATALOG.dimensions },
-      },
+      providerOptions: leg === 'cohere' ? { cohere: options } : { bedrock: options },
       abortSignal: AbortSignal.timeout(TIMEOUT_MS),
     });
     return [
       {
-        leg: 'cohere',
+        leg,
         subject,
         kind: 'embedding',
         ok: result.embedding.length === EMBEDDING_CATALOG.dimensions,
@@ -156,8 +170,20 @@ async function cohereLeg(apiKey: string): Promise<CheckLine[]> {
       },
     ];
   } catch (err) {
-    return [{ leg: 'cohere', subject, kind: 'embedding', ok: false, detail: String(err) }];
+    return [{ leg, subject, kind: 'embedding', ok: false, detail: String(err) }];
   }
+}
+
+async function cohereLeg(apiKey: string): Promise<CheckLine[]> {
+  return embeddingLeg('cohere', platformRoute('platform-cohere').buildProvider({ cohereApiKey: apiKey }));
+}
+
+async function bedrockLeg(region: string): Promise<CheckLine[]> {
+  const bundle = platformRoute('platform-bedrock').buildProvider({ platformBedrockRegion: region });
+  return [
+    ...(await languageLeg('bedrock', (alias) => bundle.languageModel!(alias), bedrockEffortOptions)),
+    ...(await embeddingLeg('bedrock', bundle)),
+  ];
 }
 
 /** Runs every leg whose key is set in `env`. Returns the result lines and the legs skipped for a missing key. */
@@ -187,13 +213,17 @@ export async function runLiveChecks(
   if (env.COHERE_API_KEY) lines.push(...(await cohereLeg(env.COHERE_API_KEY)));
   else skipped.push('cohere (COHERE_API_KEY is not set)');
 
+  if (env.PLATFORM_BEDROCK_REGION) lines.push(...(await bedrockLeg(env.PLATFORM_BEDROCK_REGION)));
+  else skipped.push('bedrock (PLATFORM_BEDROCK_REGION is not set)');
+
   return { lines, skipped };
 }
 
 function describe(line: CheckLine): string {
   if (line.kind === 'embedding') return `${line.leg} ${line.subject}`;
   const entry = MODEL_CATALOG[line.subject as ModelAlias];
-  const id = line.leg === 'openrouter' ? entry.openrouterId : entry.anthropicId;
+  const id =
+    line.leg === 'openrouter' ? entry.openrouterId : line.leg === 'bedrock' ? entry.bedrockId : entry.anthropicId;
   return `${line.leg} ${line.subject} (${id}, effort ${entry.effort}, ceiling ${CEILING})`;
 }
 

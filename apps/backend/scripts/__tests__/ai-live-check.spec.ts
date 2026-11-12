@@ -1,7 +1,7 @@
 import { embed as embedImport, generateText as generateTextImport } from 'ai';
 import { MODEL_ALIASES } from '@app/shared-types';
 import { EMBEDDING_CATALOG, MODEL_CATALOG } from '../../src/domains/ai/routing/model-catalog';
-import { CEILING, openRouterEffortOptions, runLiveChecks } from '../ai-live-check';
+import { CEILING, bedrockEffortOptions, openRouterEffortOptions, runLiveChecks } from '../ai-live-check';
 
 jest.mock('ai', () => ({ ...jest.requireActual('ai'), generateText: jest.fn(), embed: jest.fn() }));
 
@@ -22,7 +22,7 @@ describe('ai-live-check (offline)', () => {
   it('runs nothing and calls no provider when no key is set', async () => {
     const { lines, skipped } = await runLiveChecks({});
     expect(lines).toEqual([]);
-    expect(skipped).toHaveLength(3);
+    expect(skipped).toHaveLength(4);
     expect(generateText).not.toHaveBeenCalled();
     expect(embed).not.toHaveBeenCalled();
   });
@@ -37,7 +37,11 @@ describe('ai-live-check (offline)', () => {
     }));
     const { lines, skipped } = await runLiveChecks({ OPENROUTER_API_KEY: 'sk-or-test' });
 
-    expect(skipped).toEqual(['anthropic (ANTHROPIC_API_KEY is not set)', 'cohere (COHERE_API_KEY is not set)']);
+    expect(skipped).toEqual([
+      'anthropic (ANTHROPIC_API_KEY is not set)',
+      'cohere (COHERE_API_KEY is not set)',
+      'bedrock (PLATFORM_BEDROCK_REGION is not set)',
+    ]);
     expect(lines).toHaveLength(MODEL_ALIASES.length * 2);
     expect(lines.every((l) => l.ok && l.leg === 'openrouter')).toBe(true);
     for (const alias of MODEL_ALIASES) {
@@ -52,6 +56,38 @@ describe('ai-live-check (offline)', () => {
         });
       }
     }
+  });
+
+  it('bedrock leg: a plain and a structured call per alias on the bedrockId profile with effort, then one embedding', async () => {
+    generateText.mockImplementation(async (args: { output?: unknown; model: { modelId: string } }) => ({
+      finishReason: 'stop',
+      text: 'ready',
+      output: args.output ? { verdict: 'yes' } : undefined,
+      usage: { outputTokens: 12 },
+      response: { modelId: args.model.modelId },
+    }));
+    embed.mockResolvedValue({ embedding: new Array(EMBEDDING_CATALOG.dimensions).fill(0), usage: { tokens: 1 } });
+    const { lines } = await runLiveChecks({ PLATFORM_BEDROCK_REGION: 'us-east-1' });
+
+    expect(lines).toHaveLength(MODEL_ALIASES.length * 2 + 1);
+    expect(lines.every((l) => l.ok && l.leg === 'bedrock')).toBe(true);
+    for (const alias of MODEL_ALIASES) {
+      const calls = generateText.mock.calls
+        .map((c) => c[0])
+        .filter((a) => a.model.modelId === MODEL_CATALOG[alias].bedrockId);
+      expect(calls).toHaveLength(2);
+      for (const call of calls) {
+        expect(call.maxOutputTokens).toBe(CEILING);
+        expect(call.providerOptions).toEqual(bedrockEffortOptions(alias));
+        expect(call.providerOptions).toEqual({
+          bedrock: { reasoningConfig: { maxReasoningEffort: MODEL_CATALOG[alias].effort } },
+        });
+      }
+    }
+    expect(embed.mock.calls[0][0].model.modelId).toBe(EMBEDDING_CATALOG.bedrockId);
+    expect(embed.mock.calls[0][0].providerOptions).toEqual({
+      bedrock: { inputType: 'search_query', outputDimension: EMBEDDING_CATALOG.dimensions },
+    });
   });
 
   it("anthropic leg: a plain and a structured call per alias on the catalog's anthropicId, at the ceiling", async () => {
