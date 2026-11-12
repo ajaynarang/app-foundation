@@ -1,279 +1,165 @@
 import { z } from 'zod';
-import { McpToolService } from '../../mcp-tool.service';
+import { CardAccumulator, McpToolService } from '../../mcp-tool.service';
+import { RequiresScope } from '../../../agent-contract/requires-scope.decorator';
 
 /**
- * McpToolService unit tests.
- *
- * The service uses McpRegistryService to discover tools and ModuleRef to
- * resolve provider instances. We mock the registry and moduleRef to test tool
- * exposure and context injection in isolation.
+ * McpToolService unit tests: tool exposure, the result unwrap, cards, and the write set derived from scopes. Every
+ * call goes through the pipeline (mocked here); `mcp-tool.service.pipeline.spec.ts` covers the routing itself.
  */
+class HealthTool {
+  @RequiresScope('platform:read')
+  check() {}
+}
+class KnowledgeTool {
+  @RequiresScope('knowledge:read')
+  searchKB() {}
+  @RequiresScope('knowledge:read')
+  getProductInfo() {}
+}
+class ItemsTool {
+  @RequiresScope('platform:read')
+  queryItems() {}
+  @RequiresScope('platform:write')
+  createItem() {}
+}
+
 describe('McpToolService', () => {
   let mockRegistry: any;
-  let mockModuleRef: any;
-  let mockHealthInstance: any;
-  let mockKbInstance: any;
-  let mockItemsInstance: any;
+  let pipeline: { run: jest.Mock };
+  const CONTEXT = { tenantId: 1, userId: '10', userDbId: 10 };
 
-  function makeTool(
-    name: string,
-    description: string,
-    parameters: z.ZodType,
-    methodName: string,
-    providerClass: symbol,
-  ) {
-    return {
-      type: 'tool',
-      metadata: { name, description, parameters },
-      providerClass,
-      methodName,
-    };
+  function makeTool(name: string, parameters: z.ZodType, methodName: string, providerClass: unknown) {
+    return { type: 'tool', metadata: { name, description: name, parameters }, providerClass, methodName };
   }
 
-  const healthSymbol = Symbol('HealthTool');
-  const kbSymbol = Symbol('KnowledgeTool');
-  const itemsSymbol = Symbol('ItemsTool');
+  function toolsWith(...extra: ReturnType<typeof makeTool>[]) {
+    return [
+      makeTool('health-check', z.object({}), 'check', HealthTool),
+      makeTool('search-kb', z.object({ query: z.string() }), 'searchKB', KnowledgeTool),
+      makeTool('get-product-info', z.object({ topic: z.string() }), 'getProductInfo', KnowledgeTool),
+      makeTool('query-items', z.object({}), 'queryItems', ItemsTool),
+      ...extra,
+    ];
+  }
 
   beforeEach(() => {
-    mockHealthInstance = {
-      check: jest.fn().mockResolvedValue({ status: 'ok' }),
-    };
-    mockKbInstance = {
-      searchKB: jest.fn().mockResolvedValue({ results: [] }),
-      getProductInfo: jest.fn().mockResolvedValue({ documents: [] }),
-    };
-    mockItemsInstance = {
-      queryItems: jest.fn().mockResolvedValue({ items: [1, 2, 3] }),
-    };
-
-    const tools = [
-      makeTool('health-check', 'Check health', z.object({}), 'check', healthSymbol),
-      makeTool('search-kb', 'Search KB', z.object({ query: z.string() }), 'searchKB', kbSymbol),
-      makeTool('get-product-info', 'Get info', z.object({ topic: z.string() }), 'getProductInfo', kbSymbol),
-      makeTool('query-items', 'Query items', z.object({}), 'queryItems', itemsSymbol),
-    ];
-
     mockRegistry = {
       getMcpModuleIds: jest.fn().mockReturnValue(['test-module']),
-      getTools: jest.fn().mockReturnValue(tools),
+      getTools: jest.fn().mockReturnValue(toolsWith()),
     };
-
-    mockModuleRef = {
-      get: jest.fn().mockImplementation((token: any) => {
-        if (token === healthSymbol) return mockHealthInstance;
-        if (token === kbSymbol) return mockKbInstance;
-        if (token === itemsSymbol) return mockItemsInstance;
-        return null;
-      }),
-    };
+    pipeline = { run: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: '{"status":"ok"}' }] }) };
   });
 
   function createService(): McpToolService {
-    const service = new McpToolService(mockRegistry, mockModuleRef);
-    return service;
+    return new McpToolService(mockRegistry, pipeline as never);
   }
 
   describe('getToolsForPersona', () => {
-    it('should expose every discovered tool to all personas (no per-persona allowlist in the starter)', async () => {
+    it('exposes every discovered tool to all personas (no per-persona allowlist in the starter)', async () => {
       const service = createService();
       await service.onModuleInit();
 
       for (const persona of ['member', 'admin']) {
-        const tools = await service.getToolsForPersona(persona);
-        const toolNames = Object.keys(tools);
-        expect(toolNames).toContain('health-check');
-        expect(toolNames).toContain('search-kb');
-        expect(toolNames).toContain('get-product-info');
-        expect(toolNames).toContain('query-items');
-        expect(toolNames).toHaveLength(4);
+        const toolNames = Object.keys(await service.getToolsForPersona(persona, CONTEXT));
+        expect(toolNames.sort()).toEqual(['get-product-info', 'health-check', 'query-items', 'search-kb']);
       }
     });
 
-    it('should return tools with execute functions', async () => {
+    it('returns tools with execute functions that run through the pipeline', async () => {
       const service = createService();
       await service.onModuleInit();
-      const tools = await service.getToolsForPersona('member');
-
-      expect(tools['health-check']).toBeDefined();
-      expect(tools['health-check'].execute).toBeInstanceOf(Function);
-    });
-
-    it('should call provider method when tool is executed without context', async () => {
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('member');
+      const tools = await service.getToolsForPersona('member', CONTEXT);
 
       const result = await (tools['health-check'] as any).execute({});
 
-      expect(mockHealthInstance.check).toHaveBeenCalledWith({});
+      expect(pipeline.run).toHaveBeenCalledWith(expect.objectContaining({ kind: 'user' }), 'health-check', {});
       expect(result).toEqual({ status: 'ok' });
     });
 
-    it('should inject tenant context into tool arguments', async () => {
+    it('unwraps MCP content, and returns raw text when it is not JSON', async () => {
       const service = createService();
       await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', {
-        tenantId: 1,
-        userId: '10',
-        userDbId: 10,
-      });
+      const tools = await service.getToolsForPersona('admin', CONTEXT);
 
-      await (tools['health-check'] as any).execute({ foo: 'bar' });
+      pipeline.run.mockResolvedValueOnce({ content: [{ type: 'text', text: '{"items": [1, 2, 3]}' }] });
+      expect(await (tools['query-items'] as any).execute({})).toEqual({ items: [1, 2, 3] });
 
-      expect(mockHealthInstance.check).toHaveBeenCalledWith({
-        foo: 'bar',
-        _tenantId: 1,
-        _userId: '10',
-      });
+      pipeline.run.mockResolvedValueOnce({ content: [{ type: 'text', text: 'not-json' }] });
+      expect(await (tools['query-items'] as any).execute({})).toBe('not-json');
     });
 
-    it('calls the provider directly when context is provided, with no wrapper around the call', async () => {
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', {
-        tenantId: 1,
-        userId: '10',
-        userDbId: 10,
-      });
-
-      const result = await (tools['health-check'] as any).execute({});
-
-      expect(mockHealthInstance.check).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ status: 'ok' });
-    });
-
-    it('should unwrap MCP content format from tool results', async () => {
-      mockItemsInstance.queryItems.mockResolvedValue({
-        content: [{ type: 'text', text: '{"items": [1, 2, 3]}' }],
-      });
-
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', {
-        tenantId: 1,
-        userId: '1',
-        userDbId: 1,
-      });
-      const result = await (tools['query-items'] as any).execute({});
-
-      expect(result).toEqual({ items: [1, 2, 3] });
-    });
-
-    it('should return raw result when not MCP content format', async () => {
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('member');
-      const result = await (tools['health-check'] as any).execute({});
-
-      expect(result).toEqual({ status: 'ok' });
-    });
-
-    it('should capture card metadata via CardAccumulator', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { CardAccumulator } = require('../../mcp-tool.service');
-
-      mockItemsInstance.queryItems.mockResolvedValue({
+    it('captures card metadata via CardAccumulator', async () => {
+      pipeline.run.mockResolvedValue({
         content: [{ type: 'text', text: '{"items": [1]}' }],
         _card: { type: 'item_list', data: { items: [1] } },
       });
-
       const accumulator = new CardAccumulator();
       const service = createService();
       await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', { tenantId: 1, userId: '1', userDbId: 1 }, accumulator);
+      const tools = await service.getToolsForPersona('admin', CONTEXT, accumulator);
 
       await (tools['query-items'] as any).execute({});
 
-      expect(accumulator.card).toEqual({
-        type: 'item_list',
-        data: { items: [1] },
-      });
+      expect(accumulator.card).toEqual({ type: 'item_list', data: { items: [1] } });
     });
 
-    it('should return null card when nothing captured', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { CardAccumulator } = require('../../mcp-tool.service');
-      const accumulator = new CardAccumulator();
-      expect(accumulator.card).toBeNull();
+    it('returns a null card when nothing was captured', () => {
+      expect(new CardAccumulator().card).toBeNull();
     });
 
-    it('should re-discover tools if allTools is empty', async () => {
+    it('re-discovers tools if allTools is empty', async () => {
       const service = createService();
-      // Don't call onModuleInit — allTools will be empty
-      const tools = await service.getToolsForPersona('member');
-      // discoverTools should have been called automatically
+      const tools = await service.getToolsForPersona('member', CONTEXT);
       expect(Object.keys(tools).length).toBeGreaterThan(0);
     });
+  });
 
-    it('should handle MCP text content that is not valid JSON', async () => {
-      mockItemsInstance.queryItems.mockResolvedValue({
-        content: [{ type: 'text', text: 'not-json' }],
-      });
-
+  describe('the write set comes from scopes, not a list', () => {
+    it('a tool is a write exactly when its @RequiresScope is not read tier', async () => {
+      mockRegistry.getTools.mockReturnValue(toolsWith(makeTool('create-item', z.object({}), 'createItem', ItemsTool)));
       const service = createService();
       await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', {
-        tenantId: 1,
-        userId: '1',
-        userDbId: 1,
-      });
-      const result = await (tools['query-items'] as any).execute({});
 
-      // Should return raw text when JSON parse fails
-      expect(result).toBe('not-json');
-    });
-
-    it('should inject conversationId when provided in context', async () => {
-      const service = createService();
-      await service.onModuleInit();
-      const tools = await service.getToolsForPersona('admin', {
-        tenantId: 1,
-        userId: '10',
-        userDbId: 10,
-        conversationId: 'conv_123',
-      });
-
-      await (tools['health-check'] as any).execute({ foo: 'bar' });
-
-      expect(mockHealthInstance.check).toHaveBeenCalledWith({
-        foo: 'bar',
-        _tenantId: 1,
-        _userId: '10',
-        _conversationId: 'conv_123',
-      });
+      expect(service.isWriteTool('create-item')).toBe(true);
+      expect(service.isWriteTool('query-items')).toBe(false);
+      expect(service.isWriteTool('search-kb')).toBe(false);
+      expect(service.isWriteTool('nope')).toBe(false);
+      expect(service.getAllWriteTools()).toEqual(['create-item']);
+      expect(service.getToolMetadata('create-item')).toEqual({ description: 'create-item', kind: 'write' });
+      expect(service.getToolMetadata('query-items')?.kind).toBe('read');
     });
   });
 
   describe('getToolsetsForPersona', () => {
-    it('should return toolsets object with app-tools key', async () => {
+    it('returns a toolsets object with the app-tools key', async () => {
       const service = createService();
       await service.onModuleInit();
-      const toolsets = await service.getToolsetsForPersona('member');
-      expect(toolsets).toHaveProperty('app-tools');
+      const toolsets = await service.getToolsetsForPersona('member', CONTEXT);
       expect(toolsets['app-tools']).toBeDefined();
     });
 
-    it('should NOT include confirm-action while WRITE_TOOLS is empty (starter default)', async () => {
-      // The starter ships no write-class tools. Register write tool names in
-      // McpToolService.WRITE_TOOLS to have confirm-action injected for HITL.
+    it('offers no confirm-action when the toolset holds no write', async () => {
       const service = createService();
       await service.onModuleInit();
-      const toolsets = await service.getToolsetsForPersona('admin', {
-        tenantId: 1,
-        userId: '1',
-        userDbId: 1,
-      });
+      const toolsets = await service.getToolsetsForPersona('admin', CONTEXT);
       expect(toolsets['app-tools']).not.toHaveProperty('confirm-action');
     });
 
-    it('should pass cardAccumulator through to getToolsForPersona', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { CardAccumulator } = require('../../mcp-tool.service');
+    it('offers confirm-action as soon as one tool has a write scope', async () => {
+      mockRegistry.getTools.mockReturnValue(toolsWith(makeTool('create-item', z.object({}), 'createItem', ItemsTool)));
+      const service = createService();
+      await service.onModuleInit();
+      const toolsets = await service.getToolsetsForPersona('admin', CONTEXT);
+      expect(toolsets['app-tools']).toHaveProperty('confirm-action');
+    });
+
+    it('passes the cardAccumulator through to getToolsForPersona', async () => {
       const accumulator = new CardAccumulator();
       const service = createService();
       await service.onModuleInit();
-      const toolsets = await service.getToolsetsForPersona('member', undefined, accumulator);
-      expect(toolsets['app-tools']).toBeDefined();
+      const spy = jest.spyOn(service, 'getToolsForPersona');
+      await service.getToolsetsForPersona('member', CONTEXT, accumulator);
+      expect(spy).toHaveBeenCalledWith('member', CONTEXT, accumulator, undefined);
     });
   });
 });

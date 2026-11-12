@@ -8,8 +8,8 @@ import { CITATIONS_SIDE_CHANNEL, TurnEvidence } from '../../turn-evidence';
 const CITATION: Citation = { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' };
 const CONTEXT = { tenantId: 7, userId: 'user_1', userDbId: 1, conversationId: 'conv_1' };
 
+/** Every chat tool call goes through the pipeline; `directResult` is what the tool returned, as the pipeline wraps it. */
 function buildService(opts: { pipelineResult?: unknown; directResult?: unknown }) {
-  const provider = { search: jest.fn().mockResolvedValue(opts.directResult) };
   const registry = {
     getMcpModuleIds: () => ['mcp'],
     getTools: () => [
@@ -20,10 +20,11 @@ function buildService(opts: { pipelineResult?: unknown; directResult?: unknown }
       },
     ],
   };
-  const moduleRef = { get: () => provider };
-  const pipeline =
-    opts.pipelineResult === undefined ? undefined : { run: jest.fn().mockResolvedValue(opts.pipelineResult) };
-  return new McpToolService(registry as never, moduleRef as never, pipeline as never);
+  const pipelineResult = opts.pipelineResult ?? {
+    content: [{ type: 'text', text: JSON.stringify(opts.directResult) }],
+  };
+  const pipeline = { run: jest.fn().mockResolvedValue(pipelineResult) };
+  return new McpToolService(registry as never, pipeline as never);
 }
 
 async function runSearch(service: McpToolService, evidence?: TurnEvidence): Promise<unknown> {
@@ -47,7 +48,7 @@ describe('McpToolService: the citation side channel', () => {
     expect(result).toEqual({ results: [] });
   });
 
-  it('direct path: moves _citations into the evidence and hides them from the model', async () => {
+  it('a tool result unwrapped from the pipeline: moves _citations into the evidence and hides them from the model', async () => {
     const service = buildService({ directResult: { results: [], [CITATIONS_SIDE_CHANNEL]: [CITATION] } });
     const evidence = new TurnEvidence();
     const offer = jest.spyOn(evidence, 'offer');

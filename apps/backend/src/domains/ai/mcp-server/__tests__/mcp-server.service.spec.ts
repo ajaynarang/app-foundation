@@ -28,7 +28,9 @@ jest.mock('@modelcontextprotocol/sdk/types.js', () => ({
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { McpServerService } from '../mcp-server.service';
-import { InvocationPipelineService, PipelineError } from '../../agent-contract/invocation-pipeline.service';
+import { NotFoundException } from '@nestjs/common';
+import { InvocationPipelineService } from '../../agent-contract/invocation-pipeline.service';
+import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
 import { ScopeRegistryService } from '../../agent-contract/scope-registry.service';
 import { fromOAuthUser } from '@appshore/platform/auth/agent-principal';
 
@@ -212,20 +214,22 @@ describe('McpServerService — pipeline routing', () => {
     expect(res.content[0].text).toBe('{"count":0}');
   });
 
-  it('returns pipeline_error when pipeline throws PipelineError', async () => {
-    pipeline.run.mockRejectedValue(new PipelineError('scope_denied'));
+  it('answers a pipeline throw with the generic failure, never the raw message', async () => {
+    pipeline.run.mockRejectedValue(new Error('db is on fire at 10.0.0.5'));
 
     const res = await service.executeToolCall('query-items', {}, oauthUser);
 
     expect(pipeline.run).toHaveBeenCalled();
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toMatch(/pipeline_error/);
-    expect(res.content[0].text).toMatch(/scope_denied/);
+    expect(JSON.parse(res.content[0].text)).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
+    expect(res.content[0].text).not.toMatch(/db is on fire/);
   });
 
-  it('propagates non-PipelineError exceptions from the pipeline', async () => {
-    pipeline.run.mockRejectedValue(new Error('db is on fire'));
+  it('passes an HttpException message and code through', async () => {
+    pipeline.run.mockRejectedValue(new NotFoundException('That ticket was not found'));
 
-    await expect(service.executeToolCall('query-items', {}, oauthUser as any)).rejects.toThrow(/db is on fire/);
+    const res = await service.executeToolCall('query-items', {}, oauthUser);
+
+    expect(JSON.parse(res.content[0].text)).toEqual({ error: 'That ticket was not found', code: 'NOT_FOUND' });
   });
 });

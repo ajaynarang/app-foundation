@@ -12,20 +12,9 @@ import { z } from 'zod';
  *
  * This prevents the AI from executing write operations without explicit user consent.
  *
- * ## HITL bypass for the Desk (spec §7.3)
- *
- * The Desk runtime handles approval at the EPISODE level (human approve/reject
- * before Act runs). Per-tool-call confirmation would double-prompt the user
- * for the same thing, so Desk-origin invocations must bypass this tool.
- *
- * Defense in depth, three layers:
- *   1. `McpToolService.getToolsForNames` injects `_invocationSource:'desk'`
- *      into every tool call made during a Desk beat.
- *   2. (THIS TOOL) If `_invocationSource === 'desk'`, short-circuit to
- *      confirmed=true without suspending. Prevents a Desk beat from hanging
- *      on a user prompt that nobody will ever see.
- *   3. Desk responsibilities' `tools` allowlist does not include
- *      `confirm-action` in the first place.
+ * There is no bypass. The tool takes no server-side switch (it used to accept an `_invocationSource` that, set to
+ * `'desk'`, answered `confirmed: true` without asking anyone, and a model could send it). Desk never offers this
+ * tool: a Desk write is gated by Desk's own gate step before the pipeline runs it.
  */
 export const confirmActionTool = createTool({
   id: 'confirm-action',
@@ -36,17 +25,11 @@ export const confirmActionTool = createTool({
     description: z.string().describe('Human-readable description of what will happen'),
     entityId: z.string().describe('ID of the entity being acted upon (e.g., alert ID)'),
     entityType: z.string().describe('Type of entity (e.g., "alert", "route")'),
-    // Context field injected by McpToolService — marks Desk-origin calls so
-    // the tool bypasses suspension (the episode-level approval is the only
-    // HITL). Not surfaced to the model; it's set server-side per request.
-    _invocationSource: z.enum(['chat', 'desk']).optional(),
   }),
   outputSchema: z.object({
     confirmed: z.boolean(),
     action: z.string(),
     entityId: z.string(),
-    bypassed: z.boolean().optional(),
-    reason: z.string().optional(),
   }),
   suspendSchema: z.object({
     action: z.string(),
@@ -57,19 +40,7 @@ export const confirmActionTool = createTool({
   resumeSchema: z.object({
     confirmed: z.boolean(),
   }),
-  execute: async ({ action, description, entityId, entityType, _invocationSource }, context) => {
-    // Layer 2 of HITL bypass: Desk-origin calls short-circuit to confirmed
-    // without asking the user. Episode-level approval already happened.
-    if (_invocationSource === 'desk') {
-      return {
-        confirmed: true,
-        action,
-        entityId,
-        bypassed: true,
-        reason: 'desk-source-auto-confirm',
-      };
-    }
-
+  execute: async ({ action, description, entityId, entityType }, context) => {
     const { resumeData, suspend } = context?.agent ?? {};
 
     // If resumed with confirmation, return result

@@ -2,7 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
+import { InvocationPipelineService } from '../agent-contract/invocation-pipeline.service';
+import { toolFailure } from '../mcp/tools/tool-error';
 import { ScopeRegistryService } from '../agent-contract/scope-registry.service';
 import { fromOAuthUser } from '@appshore/platform/auth/agent-principal';
 import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
@@ -138,7 +139,8 @@ export class McpServerService implements OnModuleInit {
 
   /**
    * Execute a tool call for a typed AgentPrincipal.
-   * Always routes through InvocationPipelineService (scope + HITL + audit).
+   * Always routes through InvocationPipelineService (scope, arguments, role, plan, confirmation, audit). A throw from
+   * the pipeline itself reaches the agent as a safe failure (`toolFailure`), never as the raw error message.
    */
   async executeToolCallForPrincipal(
     toolName: string,
@@ -148,23 +150,10 @@ export class McpServerService implements OnModuleInit {
     try {
       return await this.pipeline.run(principal, toolName, args);
     } catch (err) {
-      if (err instanceof PipelineError) {
-        this.logger.warn(`external-mcp pipeline rejected (${err.message}) for tool=${toolName}`);
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({
-                error: 'pipeline_error',
-                tool: toolName,
-                reason: err.message,
-              }),
-            },
-          ],
-          isError: true,
-        };
-      }
-      throw err;
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(toolFailure(err, this.logger, toolName)) }],
+        isError: true,
+      };
     }
   }
 

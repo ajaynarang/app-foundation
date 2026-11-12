@@ -1,27 +1,24 @@
 import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
 import { jsonSchema, type ToolSet } from 'ai';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
+import { SCOPE_TIERS, scopeTier } from '@app/shared-types';
 import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
-import { InvocationPipelineService, PipelineError } from '../agent-contract/invocation-pipeline.service';
+import { InvocationPipelineService } from '../agent-contract/invocation-pipeline.service';
+import { getRequiredScope } from '../agent-contract/requires-scope.decorator';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';
 import { CITATIONS_SIDE_CHANNEL, type TurnEvidence } from './turn-evidence';
+import { toolFailure } from './tools/tool-error';
 
 /**
- * Accumulates `_card` metadata emitted by MCP tools during a single request.
- * The last emitted card wins — tools called later in multi-step flows override earlier ones.
- */
-/**
- * Context the AI (chat) path needs to invoke tools safely for a real user.
+ * Context the AI (chat) path needs to invoke tools for a real user. Required: there is no anonymous chat, and a
+ * tool never runs without the pipeline.
  *
- * - `userId` is the wire-format user id (e.g. JWT `sub` — `"user_demo_owner"`),
- *   injected into tool args as `_userId` for downstream lookups.
- * - `userDbId` is the numeric DB id (`User.id`), used for AgentPrincipal
- *   construction. Callers resolve it from `userId` via
- *   `BaseTenantController.getUserDbId` (or an equivalent helper) before
- *   reaching this service, so the resolution happens once per request.
+ * - `userId` is the wire-format user id (e.g. JWT `sub` — `"user_demo_owner"`).
+ * - `userDbId` is the numeric DB id (`User.id`), used for AgentPrincipal construction. Callers resolve it from
+ *   `userId` via `BaseTenantController.getUserDbId` (or an equivalent helper) before reaching this service, so the
+ *   resolution happens once per request.
  */
 export interface McpToolInvocationContext {
   tenantId: number;
@@ -30,6 +27,10 @@ export interface McpToolInvocationContext {
   conversationId?: string;
 }
 
+/**
+ * Accumulates `_card` metadata emitted by MCP tools during a single request.
+ * The last emitted card wins — tools called later in multi-step flows override earlier ones.
+ */
 export class CardAccumulator {
   private _card: Record<string, unknown> | null = null;
 
@@ -42,12 +43,15 @@ export class CardAccumulator {
   }
 }
 
+/** What a chat tool call answers when the pipeline is not wired: the call is refused, never run directly. */
+export const TOOL_PIPELINE_UNAVAILABLE = 'tool_pipeline_unavailable';
+
 /**
- * Bridges MCP-registered tools into AI SDK ToolSet format.
+ * Bridges MCP-registered tools into AI SDK ToolSet format for the chat assistant.
  *
- * Uses McpRegistryService to discover tools (avoids McpExecutorService which
- * is request-scoped and not exported by McpModule). Tool execution resolves
- * the provider via ModuleRef and calls the decorated method directly.
+ * Every call runs through `InvocationPipelineService` (scope, arguments, role, plan, confirmation, audit). There is
+ * no direct path to a tool method in this file: if the pipeline is missing, the call is refused with
+ * `tool_pipeline_unavailable`.
  */
 @Injectable()
 export class McpToolService implements OnModuleInit {
@@ -57,7 +61,6 @@ export class McpToolService implements OnModuleInit {
 
   constructor(
     private readonly registry: McpRegistryDiscoveryService,
-    private readonly moduleRef: ModuleRef,
     @Optional() private readonly pipeline?: InvocationPipelineService,
   ) {}
 
@@ -101,19 +104,15 @@ export class McpToolService implements OnModuleInit {
   /**
    * Get AI SDK-compatible tools for the generic assistant.
    *
-   * The starter exposes every discovered MCP tool to the single assistant
-   * persona. To gate tools per persona, reintroduce an allowlist lookup here.
-   *
-   * When `context` is provided, `_tenantId` and `_userId` are injected into
-   * every tool call's arguments, ensuring tenant isolation at the service boundary.
-   * The AI never controls these values — they come from the authenticated session.
-   * Tenant isolation is each tool's own `_tenantId` filter; no transaction or
-   * role switch is opened around a tool call.
+   * The starter exposes every discovered MCP tool to the single assistant persona. Each call goes through the
+   * pipeline, whose executor injects the session identity (`_tenantId`, `_userId`, `_userDbId`, `_role`); the
+   * pipeline drops every `_` key the model sends, so the model never controls them. Tenant isolation is each tool's
+   * own `_tenantId` filter; no transaction or role switch is opened around a tool call.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Promise<ToolSet> is part of the public API contract
   async getToolsForPersona(
     userMode: string,
-    context?: McpToolInvocationContext,
+    context: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
     evidence?: TurnEvidence,
   ): Promise<ToolSet> {
@@ -127,7 +126,7 @@ export class McpToolService implements OnModuleInit {
       const registeredTool = this.allTools.get(toolName);
       if (!registeredTool) continue;
 
-      const { providerClass, methodName, metadata } = registeredTool;
+      const { metadata } = registeredTool;
 
       let rawSchema: Record<string, unknown>;
       if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
@@ -141,50 +140,12 @@ export class McpToolService implements OnModuleInit {
         description: metadata.description ?? '',
         inputSchema,
         execute: async (args: any) => {
-          // Inject tenant context into tool arguments — this is the security boundary.
-          // Tools use _tenantId to scope all queries. The AI cannot override these.
-          const injectedArgs = context
-            ? {
-                ...args,
-                _tenantId: context.tenantId,
-                _userId: context.userId,
-                _conversationId: context.conversationId,
-              }
-            : args;
-
-          if (context && this.pipeline) {
-            const pipelineResult = await this.runViaPipeline(toolName, args, context, userMode, cardAccumulator);
-            if (pipelineResult !== undefined) return takeCitations(pipelineResult, evidence);
+          if (!this.pipeline) {
+            this.logger.error(`InvocationPipelineService unavailable — refusing ${toolName}`);
+            return { error: TOOL_PIPELINE_UNAVAILABLE, tool: toolName };
           }
-
-          const callTool = async () => {
-            // Resolve the provider instance and call the decorated method directly
-            const instance = this.moduleRef.get(providerClass, {
-              strict: false,
-            });
-            const result = await instance[methodName](injectedArgs);
-
-            // Capture _card metadata before unwrapping MCP content
-            if (cardAccumulator && result && typeof result === 'object' && result._card) {
-              cardAccumulator.capture(result._card);
-            }
-
-            // Unwrap MCP content format if the tool returns it
-            if (result && typeof result === 'object' && Array.isArray(result.content)) {
-              const textContent = result.content.find((c: any) => c.type === 'text');
-              if (textContent) {
-                try {
-                  return JSON.parse(textContent.text);
-                } catch {
-                  return textContent.text;
-                }
-              }
-            }
-
-            return result;
-          };
-
-          return takeCitations(await callTool(), evidence);
+          const result = await this.runViaPipeline(toolName, args ?? {}, context, userMode, cardAccumulator);
+          return takeCitations(result, evidence);
         },
       };
     }
@@ -193,10 +154,9 @@ export class McpToolService implements OnModuleInit {
   }
 
   /**
-   * Route a single tool invocation through InvocationPipelineService (unified
-   * scope + HITL + audit pipeline). Returns the AI-SDK-compatible unwrapped
-   * result, or `undefined` if the pipeline isn't wired in (Mastra boot-order
-   * edge case) or threw PipelineError.
+   * Route a single tool invocation through InvocationPipelineService and return the AI-SDK-compatible unwrapped
+   * result. A throw from the pipeline (its own audit write failing, say) reaches the model as a safe failure, never
+   * as the raw error message.
    */
   private async runViaPipeline(
     toolName: string,
@@ -205,8 +165,10 @@ export class McpToolService implements OnModuleInit {
     userMode: string,
     cardAccumulator?: CardAccumulator,
   ): Promise<unknown> {
-    if (!this.pipeline) return undefined;
+    if (!this.pipeline) return { error: TOOL_PIPELINE_UNAVAILABLE, tool: toolName };
 
+    // `role` here only selects the scope set (it mirrors the persona). A tool's `@RestrictToRoles` is checked in the
+    // pipeline against the user's current role in this workspace.
     const role = userMode.toUpperCase();
     const principal = fromUser({
       userId: context.userDbId,
@@ -230,138 +192,41 @@ export class McpToolService implements OnModuleInit {
       }
       return result;
     } catch (err) {
-      if (err instanceof PipelineError) return undefined;
-      throw err;
+      return toolFailure(err, this.logger, toolName);
     }
   }
 
   /**
-   * Build a ToolSet containing exactly the tools named in `toolNames`.
-   *
-   * Used by the Desk (non-chat invocation): the engine hands over an
-   * explicit allowlist from `responsibility.policy.<beat>.tools`. Tools not
-   * on the list are not included — no persona lookup. `confirm-action` is
-   * NOT auto-added; Desk runs with HITL bypass (the episode-level approval
-   * is the only HITL).
+   * A write is any tool whose `@RequiresScope` is not read tier: the same rule the pipeline uses
+   * (`ScopeRegistryService.isWriteTool`), so the confirm offer and server enforcement cannot disagree. There is no
+   * hand-kept write list.
    */
-  async getToolsForNames(
-    toolNames: string[],
-    context?: {
-      tenantId: number;
-      // `userId` here is the attribution string (JWT sub OR a synthetic
-      // `desk-scheduler`/`event:unknown` for non-user-initiated runs), not
-      // a DB id. See `deriveTriggeredBy` in desk-engine.service.ts.
-      userId: string;
-      // `userDbId` is only meaningful when the trigger is a real user
-      // (e.g. `triggeredBy = 'user:42'`). For scheduler/event triggers the
-      // caller passes null. When Desk joins the pipeline (Phase F) the
-      // principal factory will reject null and the caller will need to
-      // resolve or pass a system user.
-      userDbId: number | null;
-      conversationId?: string;
-      invocationSource?: 'desk' | 'chat';
-    },
-    cardAccumulator?: CardAccumulator,
-  ): Promise<ToolSet> {
-    if (this.allTools.size === 0) {
-      this.discoverTools();
-    }
-
-    const tools: ToolSet = {};
-
-    for (const toolName of toolNames) {
-      const registeredTool = this.allTools.get(toolName);
-      if (!registeredTool) continue;
-
-      const { providerClass, methodName, metadata } = registeredTool;
-
-      let rawSchema: Record<string, unknown>;
-      if (metadata.parameters && typeof metadata.parameters === 'object' && 'shape' in metadata.parameters) {
-        rawSchema = zodToJsonSchema(metadata.parameters);
-      } else {
-        rawSchema = { type: 'object', properties: {} };
-      }
-      const inputSchema = jsonSchema(rawSchema as any);
-
-      tools[toolName] = {
-        description: metadata.description ?? '',
-        inputSchema,
-        execute: async (args: any) => {
-          const injectedArgs = context
-            ? {
-                ...args,
-                _tenantId: context.tenantId,
-                _userId: context.userId,
-                _conversationId: context.conversationId,
-                _invocationSource: context.invocationSource ?? 'desk',
-              }
-            : args;
-
-          const callTool = async () => {
-            const instance = this.moduleRef.get(providerClass, {
-              strict: false,
-            });
-            const result = await instance[methodName](injectedArgs);
-
-            if (cardAccumulator && result && typeof result === 'object' && result._card) {
-              cardAccumulator.capture(result._card);
-            }
-
-            if (result && typeof result === 'object' && Array.isArray(result.content)) {
-              const textContent = result.content.find((c: any) => c.type === 'text');
-              if (textContent) {
-                try {
-                  return JSON.parse(textContent.text);
-                } catch {
-                  return textContent.text;
-                }
-              }
-            }
-
-            return result;
-          };
-
-          return takeCitations(await callTool());
-        },
-      };
-    }
-
-    return tools;
+  isWriteTool(toolName: string): boolean {
+    const registered = this.allTools.get(toolName);
+    if (!registered?.providerClass?.prototype) return false;
+    const scope = getRequiredScope(registered.providerClass.prototype, registered.methodName);
+    return scope !== undefined && scopeTier(scope) !== SCOPE_TIERS.READ;
   }
 
   /**
-   * Lookup metadata for a single tool by name. Returns `null` when the tool
-   * hasn't been discovered yet (registry cold) or doesn't exist. Callers
-   * outside the MCP subsystem (e.g. the Desk agent-detail) use this to
-   * surface tool descriptions and classify read/write intent without going
-   * through the per-persona toolset path.
+   * Lookup metadata for a single tool by name. Returns `null` when the tool hasn't been discovered yet (registry
+   * cold) or doesn't exist. Read or write comes from the tool's scope tier.
    */
   getToolMetadata(toolName: string): { description: string; kind: 'read' | 'write' } | null {
+    if (this.allTools.size === 0) this.discoverTools();
     const registered = this.allTools.get(toolName);
     if (!registered) return null;
     return {
       description: registered.metadata?.description ?? '',
-      kind: McpToolService.WRITE_TOOLS.has(toolName) ? 'write' : 'read',
+      kind: this.isWriteTool(toolName) ? 'write' : 'read',
     };
   }
 
-  /**
-   * All write-class tools currently known to the registry. Read-only tools
-   * are excluded — callers wanting them can enumerate via `allTools` once
-   * exposed, which isn't needed today.
-   */
+  /** Every write tool known to the registry, derived from scope tiers. */
   getAllWriteTools(): string[] {
-    return Array.from(McpToolService.WRITE_TOOLS).sort();
+    if (this.allTools.size === 0) this.discoverTools();
+    return [...this.allTools.keys()].filter((name) => this.isWriteTool(name)).sort();
   }
-
-  /**
-   * Write tools that require HITL confirmation before execution.
-   *
-   * Empty in the starter — register write-class tool names here as you add
-   * `@Tool` providers that mutate state, so the assistant prompts the user
-   * with `confirm-action` before invoking them.
-   */
-  private static readonly WRITE_TOOLS = new Set<string>([]);
 
   /**
    * Get tools in Mastra's `toolsets` format for dynamic injection.
@@ -369,18 +234,17 @@ export class McpToolService implements OnModuleInit {
    * Returns `{ 'app-tools': { ...mcpTools, 'confirm-action': ... } }`
    * which is passed to `agent.stream()` / `agent.generate()` via `toolsets`.
    *
-   * Includes confirm-action tool for personas with write tools.
+   * `confirm-action` is offered when the toolset holds a write.
    */
   async getToolsetsForPersona(
     userMode: string,
-    context?: McpToolInvocationContext,
+    context: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
     evidence?: TurnEvidence,
   ): Promise<Record<string, ToolSet>> {
     const tools = await this.getToolsForPersona(userMode, context, cardAccumulator, evidence);
 
-    // Include confirm-action tool if any exposed tool is write-class.
-    const hasWriteTools = Object.keys(tools).some((t) => McpToolService.WRITE_TOOLS.has(t));
+    const hasWriteTools = Object.keys(tools).some((t) => this.isWriteTool(t));
     if (hasWriteTools) {
       (tools as any)['confirm-action'] = confirmActionTool;
     }
@@ -391,7 +255,7 @@ export class McpToolService implements OnModuleInit {
 
 /**
  * Move a tool result's `_citations` side channel into the turn's evidence and strip it, so the model never sees it.
- * With no evidence collecting (a delegated execute, a Desk run) the key is still stripped.
+ * With no evidence collecting (a delegated execute) the key is still stripped.
  */
 export function takeCitations(result: unknown, evidence?: TurnEvidence): unknown {
   if (!result || typeof result !== 'object' || Array.isArray(result) || !(CITATIONS_SIDE_CHANNEL in result)) {

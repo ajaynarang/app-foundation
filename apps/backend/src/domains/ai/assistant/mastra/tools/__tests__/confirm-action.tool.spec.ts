@@ -84,56 +84,24 @@ describe('confirmActionTool', () => {
     consoleSpy.mockRestore();
   });
 
-  // Bug C4: Spec §7.3 — the Desk handles HITL at the episode level
-  // (human approve/reject before Act runs). Per-tool-call confirmations
-  // would double-prompt, so Desk invocations must bypass this tool.
-  describe('_invocationSource bypass (desk vs chat)', () => {
-    it('short-circuits to confirmed=true when _invocationSource is "desk" — without suspending', async () => {
-      const suspend = jest.fn();
-      const context = {
-        agent: {
-          resumeData: undefined,
-          suspend,
-        },
-      };
+  // The Desk branch is gone: a model-supplied `_invocationSource` used to auto-confirm a write.
+  describe('no server-side bypass', () => {
+    it('a model-supplied _invocationSource no longer auto-confirms: the card is still shown', async () => {
+      const suspend = jest.fn().mockResolvedValue(undefined);
+      const context = { agent: { resumeData: undefined, suspend } };
       const result = (await confirmActionTool.execute(
-        { ...baseArgs, _invocationSource: 'desk' },
+        { ...baseArgs, _invocationSource: 'desk' } as any,
         context as any,
       )) as any;
-      expect(result).toEqual({
-        confirmed: true,
-        action: baseArgs.action,
-        entityId: baseArgs.entityId,
-        bypassed: true,
-        reason: 'desk-source-auto-confirm',
-      });
-      // Critical: desk-origin calls must NOT suspend — nobody is watching
-      // to resume them.
-      expect(suspend).not.toHaveBeenCalled();
+      expect(suspend).toHaveBeenCalledTimes(1);
+      expect(result.confirmed).toBe(false);
+      expect(result).not.toHaveProperty('bypassed');
     });
 
-    it('suspends as normal when _invocationSource is "chat"', async () => {
-      const suspend = jest.fn().mockResolvedValue(undefined);
-      const context = {
-        agent: {
-          resumeData: undefined,
-          suspend,
-        },
-      };
-      await confirmActionTool.execute({ ...baseArgs, _invocationSource: 'chat' }, context as any);
-      expect(suspend).toHaveBeenCalledTimes(1);
-    });
-
-    it('suspends as normal when _invocationSource is absent (back-compat)', async () => {
-      const suspend = jest.fn().mockResolvedValue(undefined);
-      const context = {
-        agent: {
-          resumeData: undefined,
-          suspend,
-        },
-      };
-      await confirmActionTool.execute(baseArgs, context as any);
-      expect(suspend).toHaveBeenCalledTimes(1);
+    it('the input schema has no _invocationSource field and drops one a model sends', () => {
+      const schema = confirmActionTool.inputSchema as any;
+      expect(Object.keys(schema.shape)).not.toContain('_invocationSource');
+      expect(schema.parse({ ...baseArgs, _invocationSource: 'desk' })).not.toHaveProperty('_invocationSource');
     });
   });
 });
