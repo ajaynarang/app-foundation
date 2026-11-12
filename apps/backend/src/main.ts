@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { AppValidationPipe } from '@appshore/kernel/shared/utils/app-validation-pipe';
+import { applyQueueProcessingMode } from '@appshore/kernel/infrastructure/queue/queue-processing-mode';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from './config/configuration';
 import cookieParser from 'cookie-parser';
@@ -24,6 +25,10 @@ import {
 async function bootstrap() {
   // Initialize Firebase Admin SDK
   initializeFirebase();
+
+  // QUEUE_PROCESSORS_ENABLED=false keeps this API process from consuming BullMQ
+  // jobs (the worker task does that). Must run before the app is created.
+  const queueProcessingEnabled = applyQueueProcessingMode();
 
   // 10MB max upload + ~33% base64 inflation + JSON overhead = 15MB body limit
   const JSON_BODY_LIMIT = '15mb';
@@ -171,6 +176,7 @@ async function bootstrap() {
   console.log(`  ✅ App Backend ready on http://localhost:${port}`);
   console.log(`     API:     http://localhost:${port}/api/v1/`);
   if (swaggerUiMounted) console.log(`     Swagger: http://localhost:${port}/${SWAGGER_UI_PATH}`);
+  if (!queueProcessingEnabled) console.log('     Queues:  producer only (QUEUE_PROCESSORS_ENABLED=false)');
   console.log('');
 
   // Coordinate graceful shutdown: NestJS drains requests first, then we flush OTel spans.

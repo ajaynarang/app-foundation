@@ -47,7 +47,14 @@ resource "aws_ecs_task_definition" "api" {
     # it from appearing in plaintext in the ECS task definition.
     command = ["doppler", "run", "--fallback", "/tmp/.doppler-fallback.json", "--", "node", "dist/main"]
 
-    environment = []
+    # QUEUE_PROCESSORS_ENABLED=false stops the API from consuming BullMQ jobs so only
+    # the worker does. Emitted only when turned off: the backend defaults to consuming,
+    # and an empty list keeps the existing task definition byte-identical.
+    # NOTE: `doppler run` lets Doppler values override container env vars, so this
+    # key must NOT also be set in that environment's Doppler config.
+    environment = var.api_queue_processors_enabled ? [] : [
+      { name = "QUEUE_PROCESSORS_ENABLED", value = "false" },
+    ]
 
     secrets = [
       { name = "DOPPLER_TOKEN", valueFrom = aws_ssm_parameter.doppler_token.arn },
@@ -72,6 +79,15 @@ resource "aws_ecs_task_definition" "api" {
   }])
 
   tags = { Name = "${local.prefix}-ecs-taskdef-api" }
+
+  lifecycle {
+    # A producer-only API with no worker task stops every queue: the outbox relay,
+    # the deadline sweeper and every job. Start a worker first, then flip the switch.
+    precondition {
+      condition     = var.api_queue_processors_enabled || var.worker_desired_count > 0
+      error_message = "api_queue_processors_enabled = false needs worker_desired_count > 0: with no worker task nothing would consume the queues. Run at least one worker task first."
+    }
+  }
 }
 
 # --- Worker Task Definition ---
