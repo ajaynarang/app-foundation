@@ -53,6 +53,7 @@ export const TYPE_DISPLAY_NAMES: Record<string, string> = {
   [BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP]: 'Uploads Cleanup',
   [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: 'Login Events Cleanup',
   [BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]: 'Tokens Cleanup',
+  [BULK_OPS_JOB_NAMES.OUTBOX_RELAY]: 'Outbox Relay',
 };
 
 export const CATEGORY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(

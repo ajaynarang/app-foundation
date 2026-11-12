@@ -57,6 +57,8 @@ export const BULK_OPS_JOB_NAMES = {
   UPLOADS_CLEANUP: 'uploads-cleanup',
   LOGIN_EVENTS_CLEANUP: 'login-events-cleanup',
   TOKENS_CLEANUP: 'tokens-cleanup',
+  // The outbox relay tick (ADR "Outbox and deadlines"): publishes what a crash left unpublished.
+  OUTBOX_RELAY: 'outbox-relay',
 } as const;
 
 /**
