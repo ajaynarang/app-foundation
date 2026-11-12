@@ -88,17 +88,6 @@ export const AI_PROVIDER_LABELS = {
 export type AiProviderLabel = (typeof AI_PROVIDER_LABELS)[keyof typeof AI_PROVIDER_LABELS];
 
 /**
- * The embedding model the app still calls until embeddings move to the route resolver, which retires it for
- * `EMBEDDING_CATALOG` and clears the old vectors (OpenAI and Cohere vectors cannot be compared). Kept here so no
- * other file names a model id.
- */
-export const LEGACY_EMBEDDING = {
-  modelId: 'text-embedding-3-small',
-  gatewaySlug: 'openai/text-embedding-3-small',
-  provider: AI_PROVIDER_LABELS.OPENAI,
-} as const;
-
-/**
  * The model id the ledger records for a call through `alias` on a route that reads `column`. A refused call retries
  * once one alias up, and is then answered (and billed) by that model, so the id the provider reports wins when it is
  * one of ours (on any column): the ledger records that model's id on the route's column. Any other id (an unknown or

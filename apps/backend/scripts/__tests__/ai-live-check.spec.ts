@@ -54,6 +54,23 @@ describe('ai-live-check (offline)', () => {
     }
   });
 
+  it("anthropic leg: a plain and a structured call per alias on the catalog's anthropicId, at the ceiling", async () => {
+    generateText.mockImplementation(async (args: { output?: unknown; model: { modelId: string } }) => ({
+      finishReason: 'stop',
+      text: 'ready',
+      output: args.output ? { verdict: 'yes' } : undefined,
+      usage: { outputTokens: 12 },
+      response: { modelId: args.model.modelId },
+    }));
+    const { lines } = await runLiveChecks({ ANTHROPIC_API_KEY: 'sk-ant-test' });
+
+    expect(lines).toHaveLength(MODEL_ALIASES.length * 2);
+    expect(lines.every((l) => l.ok && l.leg === 'anthropic')).toBe(true);
+    const ids = generateText.mock.calls.map((c) => c[0].model.modelId);
+    expect(new Set(ids)).toEqual(new Set(MODEL_ALIASES.map((alias) => MODEL_CATALOG[alias].anthropicId)));
+    expect(generateText.mock.calls.every((c) => c[0].maxOutputTokens === CEILING)).toBe(true);
+  });
+
   it('a refused or empty answer is a FAIL line, not a crash', async () => {
     generateText.mockRejectedValueOnce(new Error('402 credit')).mockResolvedValue({
       finishReason: 'length',

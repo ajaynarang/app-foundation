@@ -6,8 +6,10 @@
  *   ANTHROPIC_API_KEY=... OPENROUTER_API_KEY=... COHERE_API_KEY=... pnpm --filter @app/backend ai:live-check
  *
  * Legs:
- * - anthropic (`ANTHROPIC_API_KEY`): per alias, through `aiDirect` (the tuned direct-Anthropic models, so effort is
- *   set from the catalog), one plain call and one structured-output call.
+ * - anthropic (`ANTHROPIC_API_KEY`): per alias, on the catalog's `anthropicId` through the direct Anthropic provider,
+ *   tuned exactly as the resolver tunes a route (`tunedLanguageModel`, so effort is set from the catalog), one plain
+ *   call and one structured-output call. Anthropic is not a platform route: this leg proves the ids a workspace's own
+ *   Anthropic key will call.
  * - openrouter (`OPENROUTER_API_KEY`): per alias, through the `platform-openrouter` registry entry (the catalog's
  *   `openrouterId` slug), one plain call and one structured-output call, with the alias's effort sent as OpenRouter's
  *   `reasoning.effort`. This is what confirms the three 5.5 slugs on OpenRouter.
@@ -18,14 +20,14 @@
  * (finish reason `stop`, non-empty text or a schema-valid object). Any failure exits 1. Paste the printed lines into
  * the pull request.
  */
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { embed, generateText, Output, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import { MODEL_ALIASES, type ModelAlias } from '@app/shared-types';
 
-import { aiDirect } from '../src/domains/ai/infrastructure/providers/ai-provider';
 import { EMBEDDING_CATALOG, MODEL_CATALOG } from '../src/domains/ai/routing/model-catalog';
 import { OUTPUT_CEILINGS } from '../src/domains/ai/routing/output-ceilings';
-import { effortProviderOptions } from '../src/domains/ai/routing/model-tuning.middleware';
+import { effortProviderOptions, tunedLanguageModel } from '../src/domains/ai/routing/model-tuning.middleware';
 import { PLATFORM_ROUTES, type PlatformRoute } from '../src/domains/ai/routing/route-registry';
 
 export const CEILING = OUTPUT_CEILINGS.WORD;
@@ -49,6 +51,12 @@ type ProviderOptions = Parameters<typeof generateText>[0]['providerOptions'];
  */
 export function openRouterEffortOptions(alias: ModelAlias): ProviderOptions {
   return effortProviderOptions('openrouter', alias) as ProviderOptions;
+}
+
+function anthropicIdFor(alias: ModelAlias): string {
+  const id = MODEL_CATALOG[alias].anthropicId;
+  if (!id) throw new Error(`alias ${alias} has no anthropicId in the model catalog`);
+  return id;
 }
 
 function platformRoute(id: PlatformRoute['routeId']): PlatformRoute {
@@ -160,8 +168,15 @@ export async function runLiveChecks(
   const skipped: string[] = [];
 
   if (env.ANTHROPIC_API_KEY) {
-    // `aiDirect` reads the key from the process environment (the old provider, retired once callers use the resolver).
-    lines.push(...(await languageLeg('anthropic', aiDirect, () => undefined)));
+    const anthropic = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const base = (alias: ModelAlias) => anthropic(anthropicIdFor(alias));
+    lines.push(
+      ...(await languageLeg(
+        'anthropic',
+        (alias) => tunedLanguageModel(base, alias, 'anthropic'),
+        () => undefined,
+      )),
+    );
   } else skipped.push('anthropic (ANTHROPIC_API_KEY is not set)');
 
   if (env.OPENROUTER_API_KEY) {

@@ -4,7 +4,6 @@ import { MODEL_ALIASES } from '@app/shared-types';
 import {
   AI_PROVIDER_LABELS,
   EMBEDDING_CATALOG,
-  LEGACY_EMBEDDING,
   MODEL_CATALOG,
   ROUTE_ID_COLUMNS,
   UNREGISTERED_ALIASES,
@@ -81,12 +80,8 @@ describe('MODEL_CATALOG', () => {
           missing.push(`${PROVIDER_FOR_COLUMN[column]}|${id}`);
       }
     }
-    for (const pair of [
-      `${AI_PROVIDER_LABELS.COHERE}|${EMBEDDING_CATALOG.cohereDirectId}`,
-      `${LEGACY_EMBEDDING.provider}|${LEGACY_EMBEDDING.modelId}`,
-    ]) {
-      if (!priced.has(pair)) missing.push(pair);
-    }
+    const embeddingPair = `${AI_PROVIDER_LABELS.COHERE}|${EMBEDDING_CATALOG.cohereDirectId}`;
+    if (!priced.has(embeddingPair)) missing.push(embeddingPair);
     expect(missing).toEqual([]);
   });
 });
