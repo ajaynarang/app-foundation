@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 
 import { AdminAiSpendService } from '../admin-ai-spend.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { isSeederOwned } from '../../ai/routing/provisioning/plan-ai-budgets';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 
 describe('AdminAiSpendService', () => {
@@ -372,6 +373,25 @@ describe('AdminAiSpendService', () => {
         notes: 'raised for enterprise pilot',
       });
     });
+
+    // The sheet pre-fills the stored note, so a save of a stamped row sends `plan:DEFAULT` straight back. Stored as
+    // typed, the row would stay the seeder's and the next plan change would overwrite the admin's caps.
+    it.each(['plan:DEFAULT', 'plan:PROFESSIONAL'])(
+      'never stores the seeder stamp %s, so the edit takes the row out of the seeder hands',
+      async (stamp) => {
+        await service.updateBudget(7, {
+          dailySoftUsd: 10,
+          dailyHardUsd: 40,
+          monthlySoftUsd: 100,
+          monthlyHardUsd: 400,
+          notes: stamp,
+        });
+        const call = prisma.tenantAiBudget.upsert.mock.calls[0][0];
+        expect(call.update.notes).toBeNull();
+        expect(call.create.notes).toBeNull();
+        expect(isSeederOwned(call.update.notes, true)).toBe(false);
+      },
+    );
   });
 
   describe('getCostVsQuota', () => {

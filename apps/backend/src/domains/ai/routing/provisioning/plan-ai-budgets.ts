@@ -32,6 +32,16 @@ export const BUDGET_SEED_NOTE_PREFIX = 'plan:';
  */
 export const BUDGET_SEED_NOTE_DEFAULT = `${BUDGET_SEED_NOTE_PREFIX}DEFAULT`;
 
+/**
+ * The note an admin edit stores. The seeder's stamp is never kept: the budget sheet pre-fills the stored note, so a
+ * save that changed only the caps sends `plan:…` back, and keeping it would leave the row the seeder's (the next plan
+ * change would overwrite the admin's caps). An admin edit always takes the row out of the seeder's hands.
+ */
+export function adminBudgetNote(notes: string | null | undefined): string | null {
+  if (!notes || notes.startsWith(BUDGET_SEED_NOTE_PREFIX)) return null;
+  return notes;
+}
+
 /** True when the plan seeder owns this budget row (or there is no row yet). */
 export function isSeederOwned(notes: string | null | undefined, rowExists: boolean): boolean {
   return !rowExists || (notes?.startsWith(BUDGET_SEED_NOTE_PREFIX) ?? false);

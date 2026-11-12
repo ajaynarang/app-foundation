@@ -10,7 +10,7 @@ import {
 import { escapeLike } from '@appshore/kernel/shared/utils/list-query';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { BUDGET_SEED_NOTE_DEFAULT } from '../ai/routing/provisioning/plan-ai-budgets';
+import { BUDGET_SEED_NOTE_DEFAULT, adminBudgetNote } from '../ai/routing/provisioning/plan-ai-budgets';
 import { PLATFORM_PAID_SQL, payerOf } from '../ai/infrastructure/telemetry/platform-paid';
 import type {
   AiSpendSummary,
@@ -269,13 +269,14 @@ export class AdminAiSpendService {
   /**
    * Update a tenant's budget caps. Validation (≥0, hard≥soft, monthly≥daily)
    * is enforced by the DTO (UpdateAiBudgetSchema) at the controller boundary;
-   * here we just persist. The note is the admin's own (or null), never a
-   * `plan:` stamp the admin did not type, so an edit takes the row out of the
-   * plan seeder's hands. Note: this does NOT bust AiTelemetryService's 60s
+   * here we just persist. The note is the admin's own (or null). A `plan:`
+   * stamp sent back (the sheet pre-fills the stored note) is dropped to null,
+   * so an edit always takes the row out of the plan seeder's hands. Note: this does NOT bust AiTelemetryService's 60s
    * budget cache directly — the next check picks up the new caps within a
    * minute, which is acceptable for an admin config change.
    */
   async updateBudget(tenantId: number, input: UpdateAiBudgetInput): Promise<AiBudget> {
+    const notes = adminBudgetNote(input.notes);
     const row = await this.prisma.tenantAiBudget.upsert({
       where: { tenantId },
       create: {
@@ -284,14 +285,14 @@ export class AdminAiSpendService {
         dailyHardUsd: input.dailyHardUsd,
         monthlySoftUsd: input.monthlySoftUsd,
         monthlyHardUsd: input.monthlyHardUsd,
-        notes: input.notes ?? null,
+        notes,
       },
       update: {
         dailySoftUsd: input.dailySoftUsd,
         dailyHardUsd: input.dailyHardUsd,
         monthlySoftUsd: input.monthlySoftUsd,
         monthlyHardUsd: input.monthlyHardUsd,
-        notes: input.notes ?? null,
+        notes,
       },
     });
     return this.toBudget(row);
