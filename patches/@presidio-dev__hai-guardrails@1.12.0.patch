@@ -1,0 +1,22 @@
+diff --git a/dist/index.js b/dist/index.js
+index 37871806dde0e6b94f7b42348ae16396a3376cd2..1850f9a4b4c6b89192974ebe3084d28430b67762 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -846,7 +846,7 @@ var require_abort = __commonJS((exports) => {
+ 
+ // node_modules/piscina/dist/index.js
+ var require_dist = __commonJS((exports) => {
+-  var __dirname = "/home/runner/work/hai-guardrails/hai-guardrails/node_modules/piscina/dist";
++  var __dirname = __require("path").dirname(__require.resolve("piscina"));
+   var __classPrivateFieldSet = exports && exports.__classPrivateFieldSet || function(receiver, state, value, kind, f) {
+     if (kind === "m")
+       throw new TypeError("Private method is not writable");
+@@ -1699,7 +1699,7 @@ import { cpus } from "os";
+ import { fileURLToPath } from "url";
+ var __filename2 = fileURLToPath(import.meta.url);
+ var __dirname2 = dirname(__filename2);
+-var workerPath = resolve(__dirname2, "../workers/heuristic.worker.mjs");
++var workerPath = resolve(__dirname2, "workers/heuristic.worker.js");
+ 
+ class Heuristic {
+   keywords;

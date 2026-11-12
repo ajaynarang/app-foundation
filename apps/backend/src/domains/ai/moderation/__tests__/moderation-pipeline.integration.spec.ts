@@ -1,15 +1,17 @@
-// Must mock ESM packages before any imports
-jest.mock('@presidio-dev/hai-guardrails', () => ({
-  GuardrailsEngine: jest.fn().mockImplementation(() => ({
-    run: jest.fn().mockResolvedValue({
-      messagesWithGuardResult: [{ messages: [{ passed: true }] }],
-    }),
-  })),
-  injectionGuard: jest.fn().mockReturnValue({}),
-  secretGuard: jest.fn().mockReturnValue({}),
-  piiGuard: jest.fn().mockReturnValue({}),
-  leakageGuard: jest.fn().mockReturnValue({}),
-  SelectionType: { Last: 'last' },
+// Must mock ESM packages before any imports. hai-guardrails is loaded through importEsm.
+jest.mock('../../../../shared/utils/esm-import', () => ({
+  importEsm: jest.fn().mockResolvedValue({
+    GuardrailsEngine: jest.fn().mockImplementation(() => ({
+      run: jest.fn().mockResolvedValue({
+        messagesWithGuardResult: [{ messages: [{ passed: true }] }],
+      }),
+    })),
+    injectionGuard: jest.fn().mockReturnValue({}),
+    secretGuard: jest.fn().mockReturnValue({}),
+    piiGuard: jest.fn().mockReturnValue({}),
+    leakageGuard: jest.fn().mockReturnValue({}),
+    SelectionType: { Last: 'last' },
+  }),
 }));
 jest.mock('redact-pii', () => ({
   SyncRedactor: jest.fn().mockImplementation(() => ({

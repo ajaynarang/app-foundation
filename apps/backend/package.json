@@ -86,7 +86,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
     "@opentelemetry/sdk-node": "^0.212.0",
     "@paralleldrive/cuid2": "^3.3.0",
-    "@presidio-dev/hai-guardrails": "^1.12.0",
+    "@presidio-dev/hai-guardrails": "1.12.0",
     "@prisma/adapter-pg": "7.3.0",
     "@rekog/mcp-nest": "^1.9.4",
     "@types/nodemailer": "7.0.9",

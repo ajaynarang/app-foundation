@@ -10,6 +10,8 @@ ARG CACHEBUST=1
 
 # Copy only package files (better layer caching)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# pnpm.patchedDependencies: the frozen install fails without the patch files.
+COPY patches ./patches
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/appshore/db/package.json ./packages/appshore/db/
@@ -32,6 +34,8 @@ COPY --from=deps /workspace ./
 
 # Copy source code (overwrites package.json-only dirs with full source)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# pnpm.patchedDependencies: the frozen install fails without the patch files.
+COPY patches ./patches
 COPY turbo.json* ./
 COPY packages ./packages
 COPY apps/backend ./apps/backend
