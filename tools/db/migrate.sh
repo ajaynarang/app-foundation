@@ -6,7 +6,7 @@
 # Staging: Opens an SSM tunnel to the staging RDS, runs migrations, tears down.
 #
 # Usage:
-#   ./db-migrate.sh --env local                # Local: migrate + seed + langfuse
+#   ./db-migrate.sh --env local                # Local: migrate + seed + knowledge base + langfuse
 #   ./db-migrate.sh --env staging              # Staging: tunnel + migrate + seed + langfuse
 #   ./db-migrate.sh --env staging --status     # Just show status
 #   ./db-migrate.sh --env local --migrate-only # Just migrations, no seeds
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
       echo "Options:"
       echo "  --container NAME  ECS container to use as tunnel jump host (default: worker)"
       echo "  --migrate-only    Apply Prisma migrations only (no seeds)"
-      echo "  --seed-only       Run DB seeds only (no migrations)"
+      echo "  --seed-only       Run DB seeds and the knowledge-base sync only (no migrations)"
       echo "  --seed-langfuse   Seed Langfuse prompts only (no DB changes)"
       echo "  --no-langfuse     Skip Langfuse seeding in full mode"
       echo "  --status          Show migration & seed status (read-only)"
@@ -354,6 +354,23 @@ run_seeds() {
   echo ""
 }
 
+# Sync the knowledge base from apps/backend/content (incremental: unchanged files are a no-op). It needs REDIS_URL as
+# well (the route resolver's cache) and embeds only when COHERE_API_KEY is set; without it the files are stored for
+# full-text search. A failure warns and never blocks the migration.
+run_seed_knowledge() {
+  echo "--- Syncing Knowledge Base ---"
+  local exit_code=0
+  (cd "$BACKEND_DIR" && DATABASE_URL="$DB_URL" pnpm seed:knowledge) 2>&1 \
+    | grep -v "^\[dotenv" || exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    echo ""
+    echo "  WARNING: knowledge-base sync failed (exit code: $exit_code). Run it again with:"
+    echo "    cd apps/backend && DATABASE_URL=... pnpm seed:knowledge"
+  fi
+  echo ""
+}
+
 run_seed_status() {
   echo "--- Seed Status ---"
   DATABASE_URL="$DB_URL" pnpm exec ts-node prisma/seeds/index.ts --status 2>&1 \
@@ -486,8 +503,9 @@ case "$MODE" in
     run_seed_status
     confirm_proceed
     run_seeds
+    run_seed_knowledge
     run_seed_status
-    echo "Done. Seeds applied to ${ENV}."
+    echo "Done. Seeds and knowledge base applied to ${ENV}."
     ;;
 
   seed-langfuse)
@@ -500,13 +518,14 @@ case "$MODE" in
     confirm_proceed
     run_migrate_deploy
     run_seeds
+    run_seed_knowledge
     if [[ "$SKIP_LANGFUSE" != true ]]; then
       run_seed_langfuse
     fi
     echo "--- Final Status ---"
     run_migrate_status
     run_seed_status
-    echo "Done. Migrations + seeds + Langfuse applied to ${ENV}."
+    echo "Done. Migrations + seeds + knowledge base + Langfuse applied to ${ENV}."
     ;;
 esac
 
