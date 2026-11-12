@@ -37,6 +37,19 @@ describe('listTenantOptions: the tenants behind a filter picker', () => {
     expect((await listTenantOptions(prisma as never, having, { q: 'echo' })).items).toEqual([]);
   });
 
+  it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+    // "c" matches Acme, Acme and Cargo; a page boundary falls between the two Acmes.
+    const { pages, items } = await walkCursorList(async (cursor) => {
+      const page = await listTenantOptions(prisma as never, having, { q: 'c', limit: 1, cursor });
+      expect(page.total).toBe(3);
+      return page;
+    });
+
+    expect(pages.map((page) => page.length)).toEqual([1, 1, 1]);
+    expect(items.map((tenant) => tenant.companyName)).toEqual(['Acme', 'Acme', 'Cargo']);
+    expect(new Set(items.map((tenant) => tenant.tenantId)).size).toBe(3);
+  });
+
   it('orders by company name then the public tenant id, never the Int key', async () => {
     await listTenantOptions(prisma as never, having);
     expect(prisma.tenant.findMany.mock.calls[0][0]).toMatchObject({

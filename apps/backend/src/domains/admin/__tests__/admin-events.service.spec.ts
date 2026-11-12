@@ -88,6 +88,31 @@ describe('AdminEventsService', () => {
       expect(searched.total).toBe(1);
     });
 
+    it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+      // Every other event matches; the tied groups put a page boundary inside a millisecond.
+      const rows = tiedTimestamps(12).map((createdAt, index) => ({
+        id: `01900000-0000-7000-8000-0000000000${String((index * 7) % 12).padStart(2, '0')}`,
+        event: index % 2 === 0 ? 'user.created' : 'tenant.updated',
+        aggregateType: 'tenant',
+        aggregateId: `agg-${index}`,
+        actorType: 'user',
+        actorLabel: null,
+        createdAt,
+        tenant: { tenantId: 't-1' },
+      }));
+      Object.assign(prisma.domainEventLog, fixtureModel(rows));
+
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listEvents({ search: 'user.', limit: 2, cursor });
+        expect(page.total).toBe(6);
+        return page;
+      });
+
+      expect(pages.length).toBeGreaterThan(1);
+      for (const page of pages) expect(page.every((item) => item.event === 'user.created')).toBe(true);
+      expect(new Set(items.map((item) => item.id)).size).toBe(6);
+    });
+
     it('answers 400 on a cursor it did not issue, before any query runs', async () => {
       await expect(service.listEvents({ cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
       expect(prisma.domainEventLog.findMany).not.toHaveBeenCalled();

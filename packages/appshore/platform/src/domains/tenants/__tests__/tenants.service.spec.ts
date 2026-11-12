@@ -488,6 +488,19 @@ describe('TenantsService', () => {
       expect(found.nextCursor).not.toBeNull();
     });
 
+    it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+      // "c" matches Acme, Acme, Cargo, Cargo and Echo (not Bolt or Dune); a page boundary falls between the Cargos.
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listTenants({ q: 'c', limit: 3, cursor });
+        expect(page.total).toBe(5);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([3, 2]);
+      expect(items.map((tenant) => tenant.companyName)).toEqual(['Acme', 'Acme', 'Cargo', 'Cargo', 'Echo']);
+      expect(new Set(items.map((tenant) => tenant.tenantId)).size).toBe(5);
+    });
+
     it('escapes LIKE wildcards in the search, so "_" does not match every tenant', async () => {
       await service.listTenants({ q: '_' });
       expect(mockPrisma.tenant.findMany.mock.calls[0][0].where.OR[0]).toEqual({

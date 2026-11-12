@@ -364,6 +364,35 @@ describe('DeskAgentService', () => {
         expect(byEmail.items.map((user) => user.firstName)).toEqual(['Ada']);
       });
 
+      it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+        // Sam and Ada alternate, three to a last name: a page that dropped the search would hold an Ada.
+        const alternating = ['Adams', 'Adams', 'Adams', 'Lee', 'Lee', 'Lee', 'Moss', 'Moss', 'Moss'].map(
+          (lastName, index) => ({
+            id: index + 1,
+            userId: `usr_${(index * 4) % 9}`,
+            tenantId: 7,
+            isActive: true,
+            deletedAt: null,
+            role: UserRole.MEMBER,
+            email: `p${index}@example.com`,
+            firstName: index % 2 === 0 ? 'Sam' : 'Ada',
+            lastName,
+          }),
+        );
+        Object.assign(prisma.user, fixtureModel(alternating));
+
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listEligibleSupervisors(7, { q: 'sam', limit: 2, cursor });
+          expect(page.total).toBe(5);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 1]);
+        for (const page of pages) expect(page.every((user) => user.firstName === 'Sam')).toBe(true);
+        expect(items.map((user) => user.lastName)).toEqual(['Adams', 'Adams', 'Lee', 'Moss', 'Moss']);
+        expect(new Set(items.map((user) => user.id)).size).toBe(5);
+      });
+
       it('answers 400 on a cursor it did not issue, before any query runs', async () => {
         await expect(service.listEligibleSupervisors(7, { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
         expect(prisma.user.findMany).not.toHaveBeenCalled();

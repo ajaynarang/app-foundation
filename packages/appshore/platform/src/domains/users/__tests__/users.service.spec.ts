@@ -127,6 +127,31 @@ describe('UsersService', () => {
         expect(page.total).toBe(1);
       });
 
+      it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+        // Sam and Ada alternate, three to a millisecond: a page that dropped the search would hold an Ada.
+        const alternating = tiedTimestamps(9).map((createdAt, index) => ({
+          id: index + 1,
+          userId: `user_${(index * 4) % 9}`,
+          tenantId: 1,
+          email: `person${index}@example.com`,
+          firstName: index % 2 === 0 ? 'Sam' : 'Ada',
+          lastName: 'Lovelace',
+          role: 'MEMBER',
+          createdAt,
+        }));
+        Object.assign(prisma.user, fixtureModel(alternating));
+
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listUsers('tenant_abc', { q: 'sam', limit: 2, cursor });
+          expect(page.total).toBe(5);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 1]);
+        for (const page of pages) expect(page.every((user) => user.firstName === 'Sam')).toBe(true);
+        expect(new Set(items.map((user) => user.userId)).size).toBe(5);
+      });
+
       it('answers 400 on a cursor it did not issue, before any query runs', async () => {
         await expect(service.listUsers('tenant_abc', { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
         expect(prisma.user.findMany).not.toHaveBeenCalled();
