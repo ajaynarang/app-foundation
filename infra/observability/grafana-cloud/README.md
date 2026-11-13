@@ -8,6 +8,18 @@ This is level 2 of the ladder in [`docs/observability.md`](../../../docs/observa
 boot, test or deploy. The local Loki, Tempo, Prometheus and Grafana profile (`infra/observability/` beside this
 folder) is separate and for laptops only.
 
+**Going live (level 1 to level 2), in this order.** The full steps, with the commands, are in "Going from level 1 to
+level 2" in [`docs/observability.md`](../../../docs/observability.md#going-from-level-1-to-level-2); this list is
+only the order.
+
+1. Telemetry keys set and log lines arriving with `env="production"` / `env="staging"`.
+2. Grafana's CloudWatch datasource added, and `catalog/constants.mjs` checked, then regenerated.
+3. The two IRM integrations and the `grafana-apply` secrets; run the workflow with `plan`, then `apply`.
+4. Test-fire: one IRM test page, and `worker-heartbeat-missing` on staging by disabling the heartbeat's schedule row.
+5. Each CloudWatch rule's query returns data in Grafana Explore.
+6. The outside-in uptime checks.
+7. Only then remove the level 1 alarms (`grafana_alerting_live = true`).
+
 ```
 catalog/                 SOURCE OF TRUTH. Edit here.
   constants.mjs          PROJECT, REPO_URL, HAS_WORKER and everything derived from them
