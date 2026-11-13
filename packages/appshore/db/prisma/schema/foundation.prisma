@@ -181,6 +181,7 @@ model Tenant {
 
   users                       User[]
   loginEvents                 LoginEvent[]
+  refreshTokens               RefreshToken[]
   integrationConfigs          IntegrationConfig[]
   invitations                 UserInvitation[]
   notifications               Notification[]
@@ -352,19 +353,37 @@ model SuperAdminPreferences {
   @@map("super_admin_preferences")
 }
 
+/// One refresh token. Every refresh issues a successor in the same family (the session), and the presented token is
+/// retired the first time its successor is presented. Presenting a retired token again revokes the whole family.
 model RefreshToken {
-  id        Int       @id @default(autoincrement())
-  tokenId   String    @unique @map("token_id") @db.VarChar(50)
-  userId    Int       @map("user_id")
-  token     String    @db.VarChar(500)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz
-  isRevoked Boolean   @default(false) @map("is_revoked")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  id              Int       @id @default(autoincrement())
+  tokenId         String    @unique @map("token_id") @db.VarChar(50)
+  userId          Int       @map("user_id")
+  /// SHA-256 of the signed token; the presented token must match it.
+  token           String    @db.VarChar(500)
+  /// The session id: the first token's id, constant across rotations. The access token's `sid` claim.
+  familyId        String    @map("family_id") @db.VarChar(50)
+  /// When the session began; the family's absolute lifetime (`jwt.sessionMaxAge`) is measured from here.
+  familyStartedAt DateTime  @map("family_started_at") @db.Timestamptz
+  /// The session's active workspace. Null for a super-admin, or for a session whose user had no tenant.
+  tenantId        Int?      @map("tenant_id")
+  /// The token this one replaced. Null for the first token of a family.
+  previousTokenId String?   @map("previous_token_id") @db.VarChar(50)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz
+  isRevoked       Boolean   @default(false) @map("is_revoked")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz
+  /// Set when a successor was presented and this token was retired. Presenting it again is reuse.
+  rotatedAt       DateTime? @map("rotated_at") @db.Timestamptz
+  /// When this token was last presented to refresh.
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([familyId])
+  @@index([tenantId])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
@@ -398,6 +417,8 @@ enum LoginFailReason {
   INVALID_TOKEN
   INVALID_CREDENTIALS
   USER_NOT_FOUND
+  /// A retired refresh token was presented again; its whole session was revoked.
+  REFRESH_REUSE
   OTHER
 
   @@map("login_fail_reason")
