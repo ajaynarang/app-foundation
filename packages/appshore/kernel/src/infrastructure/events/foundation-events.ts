@@ -304,7 +304,7 @@ export const FOUNDATION_EVENT_REGISTRY = [
     constantName: 'AGENT_ACTION_APPROVED',
     label: 'Agent Action Approved',
     description:
-      "A person approved an external agent's write in the app: the agent may run it once, with exactly the arguments shown. Carries the token, tool and caller name, never the arguments.",
+      "A person approved an external agent's write in the app: the agent may run it once, with exactly the arguments shown. Carries the token, tool and caller name, never the arguments The token is the request's row number, not a secret: only the agent it was issued to can spend it, for that tool and those arguments.",
     category: 'AI',
     visibility: 'external' as const,
     aggregateType: 'agent-invocation',
@@ -314,7 +314,7 @@ export const FOUNDATION_EVENT_REGISTRY = [
     constantName: 'AGENT_ACTION_DENIED',
     label: 'Agent Action Denied',
     description:
-      "A person denied an external agent's write in the app: the token can no longer run it. Carries the token, tool and caller name, never the arguments.",
+      "A person denied an external agent's write in the app: the token can no longer run it. Carries the token, tool and caller name, never the arguments The token is the request's row number, not a secret: only the agent it was issued to can spend it, for that tool and those arguments.",
     category: 'AI',
     visibility: 'external' as const,
     aggregateType: 'agent-invocation',
