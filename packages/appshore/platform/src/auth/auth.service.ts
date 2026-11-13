@@ -330,7 +330,10 @@ export class AuthService {
     meta: { ip: string | null; userAgent: string | null },
   ) {
     const email = dto.email.toLowerCase().trim();
-    const existing = await this.prisma.user.findFirst({ where: { email, deletedAt: null } });
+    // In any case: stored addresses are not all lowercase, and the database holds one live account per lower(email).
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' }, deletedAt: null },
+    });
     if (existing) throw new ConflictException('An account with this email already exists');
     const passwordHash = await bcrypt.hash(dto.password, AuthService.PASSWORD_SALT_ROUNDS);
 

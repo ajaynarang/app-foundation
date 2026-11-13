@@ -133,10 +133,14 @@ export class TenantsService {
       throw new BadRequestException('A password (or Firebase account) is required');
     }
 
-    // Check if email already registered (across all tenants)
+    // Check if email already registered (across all tenants), in any case: the database holds one live account per
+    // lower(email) (index users_email_live_key), so an exact-case lookup would miss it and the insert be refused.
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: dto.email }, ...(dto.firebaseUid ? [{ firebaseUid: dto.firebaseUid }] : [])],
+        OR: [
+          { email: { equals: dto.email, mode: 'insensitive' } },
+          ...(dto.firebaseUid ? [{ firebaseUid: dto.firebaseUid }] : []),
+        ],
       },
     });
 

@@ -119,8 +119,13 @@ deploy carries on. While the index is absent the backend logs one warning at boo
 
 - A product with no duplicate accounts: nobody. The index is created on deploy and no existing row changes. Code
   that creates a user on an address a live account already holds, in another tenant, now fails with a unique
-  violation (Prisma `P2002`) instead of writing a second account; the starter's own paths (personal signup,
-  invitations) already refuse or add a membership instead.
+  violation (Prisma `P2002`, answered as 409 `DUPLICATE`) instead of writing a second account. The starter's own
+  lookups ignore case to match the index: personal signup and workspace registration (`registerTenant`) refuse with
+  their own 409, an email invitation adds a membership to the existing account, and an SMS invitation that carries
+  the email of an existing account is refused with a 409 that points to the email link (the phone path signs the
+  caller in, so it never joins someone else's account). `POST /users` (`UsersService.createUser`, OWNER/ADMIN)
+  has no lookup and now answers the raw 409 `DUPLICATE` for an address a live account holds. Check your own code
+  that creates users the same way: a lookup by exact case misses `Jane@x.com` when given `jane@x.com`.
 - A product with duplicates: the deploy succeeds without the index and the boot warning appears. Nothing else
   changes until you enforce it.
 - A test of your own that writes two live accounts on one email now fails on a migrated database. The starter's
