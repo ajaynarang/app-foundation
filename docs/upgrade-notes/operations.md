@@ -345,3 +345,41 @@ sets `OUTBOUND_MODE`: remove any value but `live`.
 
 **How to turn it back.** `OUTBOUND_MODE=live` with `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true` sends to everyone, as
 before. The tables can stay; nothing reads them in `live` mode. The Resend change has no switch.
+
+## 2026-11-13: plan gates and the seat limit are enforced; SSE broadcasts go to broadcast roles only
+
+**What changes when you pull it.**
+
+- **Routes that were open are plan-gated.** `@RequireFeature` now sits on the API-key routes (`api_keys`), webhook
+  subscriptions (`webhooks`), OAuth clients (`oauth_clients`), the integrations routes and connecting one
+  (`integrations`; the vendor callback stays open), the voice token (`voice_mode`) and every Desk route (`desk`; the
+  Inngest endpoint stays open). A workspace whose plan lacks the feature gets a 403 with `code`
+  `PLAN_UPGRADE_REQUIRED` and a `detail` naming the cheapest plan that has it; an expired trial gets
+  `TRIAL_EXPIRED`, a suspended workspace `ACCOUNT_SUSPENDED`. The web turns `PLAN_UPGRADE_REQUIRED` and
+  `USER_LIMIT_REACHED` into an upgrade prompt. Super-admins and single-tenant mode are not gated. With the shipped
+  seed, Starter loses integrations, voice, API keys, webhooks and OAuth clients, and Professional loses API keys,
+  webhooks and OAuth clients.
+- **Seats are counted.** Creating a user, reactivating one and sending an invitation are refused with
+  `USER_LIMIT_REACHED` once the workspace's active members plus pending, unexpired invitations reach its plan's
+  `userLimit` (`plan_configs.user_limit`; null is unlimited). A workspace already over its limit keeps every member;
+  only adding is refused.
+- **One rule everywhere.** The route guard, the AI tool pipeline's plan step, the WhatsApp channel's entitlement and
+  any job that calls `TenantEntitlementsService.hasFeature` / `assertFeature` judge a plan the same way: kill switch
+  (feature flag), super-admin, single-tenant, plan status, plan entitlement. Plan errors carry `code` and `detail`
+  only (no `featureKey`, `requiredPlan` or `message`). `PlanGuard`'s constructor now takes the
+  `TenantEntitlementsService`; a product spec that builds it by hand passes one.
+- **Desk and the audit log are plan features, not add-ons.** `ADDON_FEATURE_KEYS` is empty. No entitlement row is
+  removed. `whatsapp_notifications` gains a row on every plan, enabled only on Enterprise, as it behaved before. In
+  single-tenant mode the WhatsApp channel no longer also needs the Enterprise plan (single-tenant mode passes every
+  plan check); it still needs the `whatsapp_channel` flag and a provider.
+- **SSE tenant broadcasts reach broadcast roles only.** Each role is classified in
+  `apps/backend/src/platform-glue/sse/sse-broadcast-roles.ts`; the starter's four roles are all `broadcast`, so
+  nothing changes until you add a role. A role you add fails `sse-role-fanout.spec.ts` until you classify it.
+  `SseService` now injects `SSE_TENANT_BROADCAST_ROLES` and `addClient` takes the connection's role.
+
+**What to set first.** A product with live tenants sets `PLAN_ENFORCEMENT=log` before it deploys: each would-be
+denial is then one warning with `event: plan.would_deny` (feature, plan, route, code) and the call goes through. Read
+a week of them, fix the plans or the seed, then remove the key. Check `plan_configs.user_limit` for each plan first.
+
+**How to turn it back.** `PLAN_ENFORCEMENT=log` lets every plan denial and the seat check through. Kill switches
+(feature flags) and the WhatsApp channel's entitlement hold in both modes, as they did before.
