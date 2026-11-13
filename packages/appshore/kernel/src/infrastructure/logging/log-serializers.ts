@@ -14,6 +14,8 @@ interface SerializedError {
   type?: string;
   message?: string;
   stack?: string;
+  /** pino-std-serializers' non-enumerable copy of the value that was logged. */
+  raw?: unknown;
 }
 
 /** Deep enough for Nodemailer's `envelope.to[]` and `rejectedErrors[].response`. */
@@ -39,7 +41,22 @@ export function serializeRequestForLog<T extends SerializedRequest>(req: T): T {
  */
 export function serializeErrorForLog<T extends SerializedError>(err: T): T {
   if (!err || typeof err !== 'object') return err;
-  return scrubEntries(err, 0, new WeakSet()) as T;
+  const out = scrubEntries(err, 0, new WeakSet()) as T;
+  const type = loggedType(err);
+  if (type && typeof out === 'object') out.type = type;
+  return out;
+}
+
+/**
+ * The std serializer names the type after the constructor, so a plain `toLoggableError(e)` value reads `Object` and
+ * the class name it carries in `type` is lost. Take it back from the value that was logged.
+ */
+function loggedType(err: SerializedError): string | undefined {
+  if (err.type !== 'Object') return undefined;
+  const raw = err.raw;
+  if (!raw || typeof raw !== 'object' || !isPlainObject(raw)) return undefined;
+  const type = (raw as { type?: unknown }).type;
+  return typeof type === 'string' && type ? type : undefined;
 }
 
 /**
