@@ -34,6 +34,7 @@ const SEED_LIST = [
   '07-desk',
   // feature:desk:end
   '08-model-pricing',
+  '09-job-schedules',
 ];
 
 // ---------------------------------------------------------------------------

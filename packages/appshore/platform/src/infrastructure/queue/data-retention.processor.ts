@@ -6,6 +6,7 @@ import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { JobCleanupJob } from './job-cleanup.job';
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -26,10 +27,20 @@ export class DataRetentionJobHandler implements QueueJobHandler {
   async run(job: Job<JobEnvelope<unknown>>): Promise<unknown> {
     switch (job.name) {
       case BULK_OPS_JOB_NAMES.JOB_CLEANUP:
-        return withJobContext(job, () => this.jobCleanupJob.cleanupOldJobs());
+        return withJobContext(job, async () => {
+          const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.JOB_CLEANUP);
+          const result = await this.jobCleanupJob.cleanupOldJobs();
+          cron.complete(result);
+          return result;
+        });
       case BULK_OPS_JOB_NAMES.DATA_RETENTION:
       default:
-        return withJobContext(job, () => this.runDataRetention());
+        return withJobContext(job, async () => {
+          const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.DATA_RETENTION);
+          const summary = await this.runDataRetention();
+          cron.complete(summary);
+          return summary;
+        });
     }
   }
 

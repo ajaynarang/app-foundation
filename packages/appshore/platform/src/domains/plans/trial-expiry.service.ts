@@ -6,21 +6,21 @@ import { TenantPlan, TenantStatus } from '@appshore/db';
 import { TenantAddOnStatusEnum } from '@app/shared-types';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 
 const TENANT_ADDON_STATUS = TenantAddOnStatusEnum.enum;
 
-/** BullMQ job name owned by this handler. */
-const TRIAL_EXPIRY_JOB_NAME = 'trial-expiry';
-
 /**
- * Owns the `trial-expiry` maintenance job. Trial expiry cancels gifted add-ons
- * and transitions plan state. A QueueJobHandler — the owning queue dispatcher
+ * Owns the `trial-expiry` maintenance cron on `bulk-ops`. Trial expiry cancels gifted add-ons
+ * and transitions plan state. A QueueJobHandler — the BulkOpsQueueProcessor dispatcher
  * routes by name. Keeps its service name because `expireTrials()` is also
- * callable directly.
+ * callable directly. Each run is one `CronRun`: a tenant that fails is counted and
+ * reported, and the run goes on to the next.
  */
 @Injectable()
 export class TrialExpiryService implements QueueJobHandler {
-  readonly jobNames = [TRIAL_EXPIRY_JOB_NAME];
+  readonly jobNames = [BULK_OPS_JOB_NAMES.TRIAL_EXPIRY];
   private readonly logger = new Logger(TrialExpiryService.name);
 
   constructor(private readonly prisma: PrismaService) {}
@@ -35,6 +35,7 @@ export class TrialExpiryService implements QueueJobHandler {
    */
   async expireTrials(): Promise<{ expired: number }> {
     this.logger.log('Running trial expiry check...');
+    const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.TRIAL_EXPIRY);
 
     const now = new Date();
 
@@ -48,13 +49,12 @@ export class TrialExpiryService implements QueueJobHandler {
       select: {
         id: true,
         tenantId: true,
-        companyName: true,
         plan: true,
       },
     });
 
     if (expiredTrialTenants.length === 0) {
-      this.logger.log('No expired trials found.');
+      cron.complete({ expired: 0 });
       return { expired: 0 };
     }
 
@@ -101,13 +101,14 @@ export class TrialExpiryService implements QueueJobHandler {
         });
 
         expired++;
-        this.logger.log(`Trial expired for tenant: ${tenant.tenantId} (${tenant.companyName})`);
+        cron.succeeded();
+        this.logger.log(`Trial expired for tenant: ${tenant.tenantId}`);
       } catch (err) {
-        this.logger.error(`Failed to expire trial for tenant ${tenant.tenantId}: ${err?.message}`, err?.stack);
+        cron.failed(tenant.id, err, tenant.tenantId);
       }
     }
 
-    this.logger.log(`Trial expiry complete. Expired ${expired}/${expiredTrialTenants.length} tenant(s).`);
+    cron.complete({ expired });
     return { expired };
   }
 }

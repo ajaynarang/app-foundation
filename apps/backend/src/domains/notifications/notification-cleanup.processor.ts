@@ -4,6 +4,7 @@ import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { NOTIFICATIONS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 import { NotificationTriggersService } from './notification-triggers.service';
 
 /**
@@ -28,8 +29,12 @@ export class NotificationJobsHandler implements QueueJobHandler {
 
   async run(job: Job<JobEnvelope<unknown>>): Promise<unknown> {
     switch (job.name) {
-      case NOTIFICATIONS_JOB_NAMES.CLEANUP:
-        return this.runCleanup();
+      case NOTIFICATIONS_JOB_NAMES.CLEANUP: {
+        const cron = new CronRun(this.logger, NOTIFICATIONS_JOB_NAMES.CLEANUP);
+        const result = await this.runCleanup();
+        cron.complete(result);
+        return result;
+      }
       case NOTIFICATIONS_JOB_NAMES.DIGEST:
         return this.runDigest();
       default:

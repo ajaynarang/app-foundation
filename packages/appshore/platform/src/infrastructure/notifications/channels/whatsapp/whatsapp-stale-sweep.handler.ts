@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 import { DeliveryLedgerService } from '../../pipeline/delivery-ledger.service';
 import {
   WHATSAPP_STALE_CLAIMED_AFTER_MS,
@@ -23,6 +24,7 @@ export class WhatsAppStaleSweepHandler implements QueueJobHandler {
   constructor(private readonly ledger: DeliveryLedgerService) {}
 
   async run(_job: Job<JobEnvelope<unknown>>): Promise<{ unclaimed: number; claimed: number }> {
+    const cron = new CronRun(this.logger, WHATSAPP_STALE_SWEEP_JOB_NAME);
     const now = Date.now();
     const unclaimed = await this.ledger.staleQueued({
       olderThan: new Date(now - WHATSAPP_STALE_UNCLAIMED_AFTER_MS),
@@ -39,6 +41,8 @@ export class WhatsAppStaleSweepHandler implements QueueJobHandler {
         `WhatsApp stale sweep: ${unclaimed.length} never sent, ${claimed.length} never acknowledged — closed as QUEUE_LOST`,
       );
     }
-    return { unclaimed: unclaimed.length, claimed: claimed.length };
+    const summary = { unclaimed: unclaimed.length, claimed: claimed.length };
+    cron.complete(summary);
+    return summary;
   }
 }

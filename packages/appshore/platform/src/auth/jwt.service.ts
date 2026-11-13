@@ -148,8 +148,13 @@ export class JwtTokenService {
     return presented.length === stored.length && crypto.timingSafeEqual(presented, stored);
   }
 
-  async cleanupExpiredTokens(): Promise<void> {
-    await this.prisma.refreshToken.deleteMany({
+  /**
+   * Delete refresh-token rows no session can use: expired ones, and ones revoked more than 30 days ago (past the
+   * session's absolute lifetime, so reuse detection no longer needs them). Run daily by the `tokens-cleanup` cron.
+   * Returns how many rows went.
+   */
+  async cleanupExpiredTokens(): Promise<number> {
+    const result = await this.prisma.refreshToken.deleteMany({
       where: {
         OR: [
           { expiresAt: { lt: new Date() } },
@@ -160,6 +165,7 @@ export class JwtTokenService {
         ],
       },
     });
+    return result.count;
   }
 
   private async issue(

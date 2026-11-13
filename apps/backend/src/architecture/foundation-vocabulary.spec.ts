@@ -37,9 +37,10 @@ const PINNED_JOB_NAMES: Record<string, Record<string, string>> = {
   BULK_OPS_JOB_NAMES: {
     JOB_CLEANUP: 'job-cleanup',
     DATA_RETENTION: 'data-retention',
-    UPLOADS_CLEANUP: 'uploads-cleanup',
     LOGIN_EVENTS_CLEANUP: 'login-events-cleanup',
     TOKENS_CLEANUP: 'tokens-cleanup',
+    TRIAL_EXPIRY: 'trial-expiry',
+    OPS_HEARTBEAT: 'ops-heartbeat',
     OUTBOX_RELAY: 'outbox-relay',
     DEADLINE_SWEEP: 'deadline-sweep',
   },
@@ -51,9 +52,10 @@ const PINNED_TYPE_DISPLAY_NAMES = {
   deliver: 'Webhook Delivery',
   'job-cleanup': 'Job Cleanup',
   'data-retention': 'Data Retention',
-  'uploads-cleanup': 'Uploads Cleanup',
   'login-events-cleanup': 'Login Events Cleanup',
   'tokens-cleanup': 'Tokens Cleanup',
+  'trial-expiry': 'Trial Expiry',
+  'ops-heartbeat': 'Ops Heartbeat',
   'outbox-relay': 'Outbox Relay',
   'deadline-sweep': 'Deadline Sweep',
 };
