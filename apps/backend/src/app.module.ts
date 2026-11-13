@@ -14,6 +14,7 @@ import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
 import { RolesGuard } from '@appshore/platform/auth/guards/roles.guard';
 import { RequestContextMiddleware } from '@appshore/kernel/infrastructure/logging/request-context.middleware';
 import { logContextMixin } from '@appshore/kernel/infrastructure/logging/log-context-mixin';
+import { RlsContextMiddleware } from '@appshore/kernel/infrastructure/rls/rls-context.middleware';
 import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
 import { shouldSkipRequestLog } from '@appshore/kernel/infrastructure/logging/log-filter';
 import { serializeErrorForLog, serializeRequestForLog } from '@appshore/kernel/infrastructure/logging/log-serializers';
@@ -51,6 +52,7 @@ import { DevModule } from './dev/dev.module';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { EventContextInterceptor } from '@appshore/kernel/infrastructure/events/event-context.interceptor';
 import { IdempotencyInterceptor } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
+import { RlsScopeInterceptor } from '@appshore/platform/infrastructure/rls/rls-scope.interceptor';
 import { PromptingModule } from './domains/prompting/prompting.module';
 
 @Module({
@@ -161,6 +163,12 @@ import { PromptingModule } from './domains/prompting/prompting.module';
       provide: APP_INTERCEPTOR,
       useClass: EventContextInterceptor,
     },
+    // Tenant context for `@SystemScope` / `@TargetTenant` routes. Registered before (so outside) the idempotency
+    // interceptor: a replayed response still runs in the route's context.
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RlsScopeInterceptor,
+    },
     // Idempotency-Key on every authenticated create (ADR "API contract", section 5): interceptors run after the
     // guards, so the tenant and user are known.
     {
@@ -171,6 +179,7 @@ import { PromptingModule } from './domains/prompting/prompting.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestContextMiddleware).forRoutes('*');
+    // The tenant-context holder opens before the guards run; JwtAuthGuard and the other auth guards pin it.
+    consumer.apply(RequestContextMiddleware, RlsContextMiddleware).forRoutes('*');
   }
 }
