@@ -14,6 +14,6 @@ Add your own product documentation here as you build.
   and the deploy order for the `ai_reader` role. [Operations](upgrade-notes/operations.md): sessions, logging,
   error tracking, telemetry, alerts, safety gates and deploy.
 - [`operations.md`](operations.md): running a product with real users. Today: listing and merging duplicate
-  accounts.
+  accounts, and enforcing one live account per email.
 - [`doppler.md`](doppler.md): secrets and environment configuration.
 - [`WHAT-YOU-GET.md`](WHAT-YOU-GET.md): what the starter ships.

@@ -101,3 +101,35 @@ the same email could not sign in at all, and the session landed in whichever wor
 email; it skips itself while duplicates remain.
 
 **How to turn it back.** Deploy the previous release; there is no schema change and no data step.
+
+## 2026-11-13: the database enforces one live account per email
+
+**What changed.** A new migration, `20261113230000_users_email_unique_live`, adds a partial unique index,
+`users_email_live_key`, on `lower(email)` over the `users` rows whose `deleted_at` is null. With it the database
+refuses a second live account on an address, in any case and in any workspace. A soft-deleted account frees its
+address. Accounts with no email are not affected. Once the index exists, the 409 `WORKSPACE_SELECTION_REQUIRED` of
+the previous entry can no longer happen.
+
+The migration skips itself when the database already holds duplicates: it raises a notice
+(`users_email_live_key not created: N email(s) are shared by more than one live account`), changes nothing and the
+deploy carries on. While the index is absent the backend logs one warning at boot, in each process
+(`event: auth.email_uniqueness_unenforced`).
+
+**Who notices.**
+
+- A product with no duplicate accounts: nobody. The index is created on deploy and no existing row changes. Code
+  that creates a user on an address a live account already holds, in another tenant, now fails with a unique
+  violation (Prisma `P2002`) instead of writing a second account; the starter's own paths (personal signup,
+  invitations) already refuse or add a membership instead.
+- A product with duplicates: the deploy succeeds without the index and the boot warning appears. Nothing else
+  changes until you enforce it.
+- A test of your own that writes two live accounts on one email now fails on a migrated database. The starter's
+  two such specs drop the index for their run under an advisory lock and recreate it afterwards.
+
+**What to set first.** Nothing. If you have duplicates: `DATABASE_URL=... pnpm accounts:duplicates`, merge them
+(`docs/operations.md`, "Duplicate accounts"), then `DATABASE_URL=... pnpm accounts:enforce-unique-email`. You can
+run the report before you pull, to know which case you are in.
+
+**How to turn it back.** Deploy the previous release; the old code works with the index in place. To allow
+duplicates again, drop it: `DROP INDEX IF EXISTS "users_email_live_key";`. Leave the migration in place: it does
+not run twice, and `pnpm accounts:enforce-unique-email` puts the index back.

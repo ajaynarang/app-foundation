@@ -8,8 +8,14 @@ The rule is one live account per email. A workspace is a membership of that one 
 second account. Personal signup refuses a second account for a live email, and an invitation adds a membership to
 the existing account.
 
-The `users` table is unique only on `(tenant_id, email)`, so a product that ran before this rule may still hold two
-or more live accounts behind one address. Sign-in copes with them:
+The database holds the rule with a partial unique index, `users_email_live_key`, on `lower(email)` over the rows
+that are not soft-deleted: a second live account on an address, in any case and any workspace, is refused. On a
+fresh database the index is there from the first migrate.
+
+A product that ran before this rule may still hold two or more live accounts behind one address. Then the migration
+that adds the index (`users_email_unique_live`) skips it with a notice instead of failing the deploy, and the backend
+logs one warning at boot while it is absent (`event: auth.email_uniqueness_unenforced`). Sign-in copes with the
+duplicates in the meantime:
 
 - The password is checked against every live account on the email. Exactly one match signs in.
 - When the password matches accounts in more than one workspace, `POST /auth/login` answers 409
@@ -19,7 +25,8 @@ or more live accounts behind one address. Sign-in copes with them:
   workspace count.
 - Forgot-password sends one link per account, and each email names its workspace.
 
-Merge them anyway: until every duplicate is gone, the database cannot enforce the rule.
+Merge them anyway: until every duplicate is gone, the database cannot enforce the rule, and a new duplicate can
+still be written.
 
 **List them.**
 
@@ -44,3 +51,16 @@ product adds its own, so which rows move is the product's decision. For each add
 5. Run `pnpm accounts:duplicates` again. The address should be gone from the list.
 
 Tell the person which workspace and password to use from now on: the survivor keeps its own password.
+
+**Enforce the rule.** Once the report lists nothing:
+
+```bash
+DATABASE_URL=postgresql://... pnpm accounts:enforce-unique-email
+```
+
+It creates `users_email_live_key`. It refuses and changes nothing while any duplicate remains (exit 1), and does
+nothing when the index is already there (exit 0), so it is safe to run twice. Building the index takes a short write
+lock on `users`; on a large table run it in a quiet hour. The boot warning stops on the next deploy or restart.
+
+To check by hand: `SELECT indexdef FROM pg_indexes WHERE indexname = 'users_email_live_key';` returns one row when
+the rule is enforced.
