@@ -6,6 +6,8 @@ import { DomainEvent, EventActor } from './domain-event';
 import { DurableEventJobData } from './durable-event.types';
 import { QUEUE_NAMES } from '../queue/queue.constants';
 import { buildJobEnvelope } from '../queue/job-envelope.helper';
+import { toLoggableError } from '../queue/job-events';
+import { ERROR_SOURCE, reportError } from '../error-tracking/sentry';
 
 @Injectable()
 export class DomainEventService {
@@ -24,7 +26,7 @@ export class DomainEventService {
    * Hot path (instant, in-process): EventEmitter2 → cache invalidation, SSE bridge
    * Durable path (crash-safe): BullMQ → persistence, webhooks
    *
-   * A failed durable enqueue is logged, not thrown: nothing records the event,
+   * A failed durable enqueue is logged and reported, not thrown: nothing records the event,
    * so a write that must not lose it emits through the platform OutboxService
    * instead (ADR "Outbox and deadlines").
    */
@@ -48,9 +50,15 @@ export class DomainEventService {
     try {
       await this.enqueueDurable(event);
     } catch (error) {
-      // Hot path already delivered — log and move on
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to queue durable event ${eventName}: ${msg}`);
+      // The hot path already delivered, so this is not thrown. But webhooks and the event log will never see the
+      // event: an incident, so it is reported as well as logged.
+      this.logger.warn({ msg: `Failed to queue durable event ${eventName}`, err: toLoggableError(error) });
+      reportError(error, {
+        tenantId: String(tenantId),
+        jobName: eventName,
+        queue: QUEUE_NAMES.EVENTS,
+        source: ERROR_SOURCE.EVENT,
+      });
     }
   }
 

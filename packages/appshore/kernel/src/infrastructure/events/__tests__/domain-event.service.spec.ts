@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DomainEventService } from '../domain-event.service';
 import { QUEUE_NAMES } from '../../queue/queue.constants';
 import { DomainEvent } from '../domain-event';
+import * as errorTracking from '../../error-tracking/sentry';
 
 describe('DomainEventService', () => {
   let service: DomainEventService;
@@ -125,6 +126,22 @@ describe('DomainEventService', () => {
     // Hot path should have been called before queue.add
     expect(eventEmitter.emit).toHaveBeenCalled();
     // Should not throw
+  });
+
+  it('reports a failed durable enqueue to the error tracker: webhooks and the event log never see the event', async () => {
+    const err = new Error('Redis down');
+    queue.add.mockRejectedValue(err);
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+
+    await service.emit('app.load.created', 'tenant-1', {});
+
+    expect(reportSpy).toHaveBeenCalledWith(err, {
+      tenantId: 'tenant-1',
+      jobName: 'app.load.created',
+      queue: QUEUE_NAMES.EVENTS,
+      source: 'event',
+    });
+    reportSpy.mockRestore();
   });
 
   it('generates unique event IDs', async () => {

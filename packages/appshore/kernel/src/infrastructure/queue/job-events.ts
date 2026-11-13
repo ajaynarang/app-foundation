@@ -1,6 +1,7 @@
 import type { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveJobTenant } from '../logging/job-log-context';
+import { ERROR_SOURCE, reportError } from '../error-tracking/sentry';
 
 /**
  * Structured `event` values that alert rules key on (docs/standards/observability.md, rule 6). Renaming one silently
@@ -58,7 +59,8 @@ export function isFinalFailure(job: Job, defaultAttempts = BULLMQ_DEFAULT_ATTEMP
 /**
  * One structured line per failed attempt, carrying the job identity explicitly: BullMQ's `failed` listener runs
  * outside the job's log context, so the pino mixin cannot add jobName/jobId/tenantId there (the one exception rule 2
- * allows). A retry BullMQ will run again is a warning; the final failure is an error. Returns whether it was final.
+ * allows). A retry BullMQ will run again is a warning; the final failure is an error and is reported to the error
+ * tracker. Returns whether it was final.
  */
 export function reportJobFailure(
   logger: Logger,
@@ -80,8 +82,13 @@ export function reportJobFailure(
     err: toLoggableError(err),
   };
   const msg = `Job ${job.name} (id=${jobId ?? 'unknown'}) on ${job.queueName ?? 'unknown'} failed${final ? ' permanently' : ''}`;
-  if (final) logger.error({ msg, ...fields });
-  else logger.warn({ msg, ...fields });
+  if (final) {
+    logger.error({ msg, ...fields });
+    // A retry BullMQ will run again is not an incident yet; the final failure is.
+    reportError(err, { tenantId, jobName: job.name, jobId, queue: job.queueName, source: ERROR_SOURCE.JOB });
+  } else {
+    logger.warn({ msg, ...fields });
+  }
   return final;
 }
 
@@ -89,7 +96,7 @@ export function reportJobFailure(
  * Tracks one scheduled run of a cron, or of a sweep over tenants. Count each tenant as it finishes, then call
  * `complete()` once at the end: the `cron.completed` line is what a "cron missed" rule waits for, and a non-zero
  * `tenantsFailed` is what a "cron partly failed" rule counts. A sweep keeps its warn-and-continue loop; `failed()`
- * writes the per-tenant line.
+ * writes the per-tenant line and reports the error to the tracker.
  */
 export class CronRun {
   private readonly startedAt = Date.now();
@@ -115,6 +122,7 @@ export class CronRun {
       ...(tenantId ? { tenantId } : {}),
       err: toLoggableError(err),
     });
+    reportError(err, { tenantId, tenantDbId, jobName: this.jobName, source: ERROR_SOURCE.CRON });
   }
 
   complete(extra: Record<string, unknown> = {}): { tenantsOk: number; tenantsFailed: number; durationMs: number } {

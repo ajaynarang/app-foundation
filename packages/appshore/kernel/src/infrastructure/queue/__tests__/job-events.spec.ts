@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { CronRun, JOB_EVENTS, isFinalFailure, reportJobFailure, toLoggableError } from '../job-events';
+import * as errorTracking from '../../error-tracking/sentry';
 
 function makeJob(overrides: Partial<Job> = {}): Job {
   return {
@@ -197,5 +198,53 @@ describe('toLoggableError', () => {
 
   it('describes a thrown non-Error value without throwing', () => {
     expect(toLoggableError('plain string')).toEqual({ type: 'string', message: 'plain string' });
+  });
+});
+
+describe('error tracking (docs/standards/observability.md, rule 10)', () => {
+  let reportSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('reports a final job failure once, tagged with the job identity and source job', () => {
+    const err = new Error('boom');
+
+    reportJobFailure(new Logger('X'), makeJob({ attemptsMade: 3 }), err);
+
+    expect(reportSpy).toHaveBeenCalledTimes(1);
+    expect(reportSpy).toHaveBeenCalledWith(err, {
+      tenantId: '4',
+      jobName: 'vendor-sync',
+      jobId: 'bull-9',
+      queue: 'bulk-ops',
+      source: 'job',
+    });
+  });
+
+  it('does not report an attempt BullMQ will retry', () => {
+    reportJobFailure(new Logger('X'), makeJob({ attemptsMade: 1 }), new Error('retry me'));
+
+    expect(reportSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports each failed cron tenant with source cron and both tenant ids', () => {
+    const err = new Error('tenant broke');
+    const run = new CronRun(new Logger('X'), 'data-retention');
+
+    run.failed(7, err, 'acme');
+
+    expect(reportSpy).toHaveBeenCalledWith(err, {
+      tenantId: 'acme',
+      tenantDbId: 7,
+      jobName: 'data-retention',
+      source: 'cron',
+    });
   });
 });
