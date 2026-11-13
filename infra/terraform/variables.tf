@@ -81,7 +81,7 @@ variable "worker_memory" {
 }
 
 variable "worker_desired_count" {
-  description = "Number of worker tasks to run"
+  description = "Number of worker tasks to run. 0 is allowed: the API then consumes every queue (keep api_queue_processors_enabled true) and its task gets OPS_GAUGES_FROM_API=true, so it reports the queue, cron, outbox and deadline gauges the worker would."
   type        = number
 }
 

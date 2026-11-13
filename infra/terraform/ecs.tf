@@ -28,6 +28,14 @@ locals {
   bedrock_tenant_role_env = var.bedrock_tenant_roles_enabled ? [
     { name = "PLATFORM_ASSUME_ROLE_ARN", value = aws_iam_role.ecs_task.arn },
   ] : []
+
+  # Exactly one process role reports the ops gauges (queue depth, cron intervals, outbox and deadline ages), so
+  # nothing is counted twice: the worker. With no worker task the API consumes every queue and reports them instead.
+  # Set only here, never in Doppler (Doppler values override the task environment). Emitted only with no worker, so
+  # an existing stack's API task definition stays byte-identical.
+  ops_gauges_from_api_env = var.worker_desired_count == 0 ? [
+    { name = "OPS_GAUGES_FROM_API", value = "true" },
+  ] : []
 }
 
 # --- API Task Definition ---
@@ -66,6 +74,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "QUEUE_PROCESSORS_ENABLED", value = "false" },
       ],
       local.bedrock_tenant_role_env,
+      local.ops_gauges_from_api_env,
     )
 
     secrets = [
