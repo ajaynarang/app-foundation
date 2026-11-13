@@ -15,6 +15,7 @@ import { RequiresScope } from '../../../agent-contract/requires-scope.decorator'
 import { RequiresPlanFeature } from '../../../agent-contract/tool-policy.decorator';
 import { SupportTicketTool } from '../support-ticket.tool';
 import { TOOL_FAILED_MESSAGE } from '../tool-error';
+import { IdempotencyStore } from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 
 /**
  * The example pair walked through every step of the pipeline, end to end: scope, arguments, role, plan,
@@ -74,6 +75,14 @@ describe('example tool pair through the whole pipeline', () => {
     consumeChatGrant: jest.fn(),
     tenantAllowsSelfConfirm: jest.fn(),
   };
+  // The real idempotency store over an in-memory cache.
+  const cacheData = new Map<string, unknown>();
+  const idempotency = new IdempotencyStore({
+    claim: async (k: string, v: unknown) => (cacheData.has(k) ? false : (cacheData.set(k, v), true)),
+    get: async (k: string) => cacheData.get(k),
+    set: async (k: string, v: unknown) => void cacheData.set(k, v),
+    del: async (k: string) => void cacheData.delete(k),
+  } as never);
   let pipeline: InvocationPipelineService;
 
   beforeAll(async () => {
@@ -93,7 +102,7 @@ describe('example tool pair through the whole pipeline', () => {
     pipeline = new InvocationPipelineService(
       registry,
       new HitlPolicyService(),
-      new ToolExecutorService(registry, moduleRef as never, prisma as never),
+      new ToolExecutorService(registry, moduleRef as never, prisma as never, idempotency),
       audit as never,
       challenges as never,
       new ToolAccessPolicyService(registry, prisma as never, planGuard),
@@ -103,6 +112,7 @@ describe('example tool pair through the whole pipeline', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    cacheData.clear();
     prisma.user.findUnique.mockResolvedValue({ userId: 'user_wire_5' });
     prisma.workspaceMember.findUnique.mockResolvedValue({ role: UserRole.MEMBER });
     prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'tenant_wire_7' });
@@ -231,6 +241,45 @@ describe('example tool pair through the whole pipeline', () => {
       category: 'GENERAL',
       priority: 'MEDIUM',
     });
+  });
+
+  it('retry-safe create: an agent that retries with the same idempotencyKey gets the first ticket, not a second', async () => {
+    // Self-confirm on, so each call is challenged and replays its own token.
+    challenges.tenantAllowsSelfConfirm.mockResolvedValue(true);
+    challenges.issue.mockResolvedValue({
+      token: 'tok-r',
+      ttlSeconds: 600,
+      stepUpRequired: false,
+      approvalRequired: false,
+    });
+    challenges.consume.mockResolvedValue({ ok: true, row: { id: 1 } });
+    const keyed = { ...createArgs, idempotencyKey: '0b9a6f1e-1c2d-4e3f-8a9b-0c1d2e3f4a5b' };
+
+    const first = await pipeline.run(agent(), 'create-support-ticket', { ...keyed, _confirmToken: 'tok-1' });
+    // The approval is bound to the key too: the digest is over the arguments the tool's schema parses, key included.
+    const retry = await pipeline.run(agent(), 'create-support-ticket', { ...keyed, _confirmToken: 'tok-2' });
+
+    expect(body(first)).toMatchObject({ created: true, ticket: { ticketNumber: 'ST-1001' } });
+    expect(retry).toEqual(first);
+    expect(support.createTicket).toHaveBeenCalledTimes(1);
+    // The service never sees the key.
+    expect(support.createTicket.mock.calls[0][2]).not.toHaveProperty('idempotencyKey');
+
+    // The same key on a different ticket is refused and creates nothing.
+    const reused = await pipeline.run(agent(), 'create-support-ticket', {
+      ...keyed,
+      subject: 'Another problem',
+      _confirmToken: 'tok-3',
+    });
+    expect(reused.isError).toBe(true);
+    expect(body(reused)).toMatchObject({ code: 'IDEMPOTENCY_KEY_REUSED' });
+    expect(support.createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('retry-safe create: a malformed idempotencyKey is VALIDATION_FAILED at step 2 and nothing runs', async () => {
+    const res = await pipeline.run(member(), 'create-support-ticket', { ...createArgs, idempotencyKey: 'has space' });
+    expect(body(res)).toMatchObject({ code: 'VALIDATION_FAILED', fieldErrors: { idempotencyKey: expect.any(String) } });
+    expect(support.createTicket).not.toHaveBeenCalled();
   });
 
   it('the read lists this workspace only, whatever _tenantId the caller sends', async () => {

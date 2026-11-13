@@ -7,6 +7,7 @@ import { SupportService } from '../../../support/support.service';
 import { RequiresScope } from '../../agent-contract/requires-scope.decorator';
 import { RestrictToRoles } from '../../agent-contract/tool-policy.decorator';
 import { ToolNames } from '../../agent-contract/tool-names.constants';
+import { idempotencyKeyArg } from '../../agent-contract/tool-idempotency';
 
 /**
  * Example tool pair: a read and a write over the existing support desk, showing every rule a product's own tools
@@ -16,6 +17,9 @@ import { ToolNames } from '../../agent-contract/tool-names.constants';
  *   offers `confirm-action` and runs it only against the person's confirmed card, an external agent is challenged,
  *   MCP clients see it as not read-only.
  * - The write declares `@RestrictToRoles` with the same roles as its REST twin (`POST /support/tickets`).
+ * - The write is a create with no natural key, so it declares `idempotencyKey: idempotencyKeyArg`: an agent that
+ *   retries with the same key and arguments gets the first ticket back instead of a second one. The executor takes
+ *   the key out before the method runs, so the method never sees it.
  * - Identity comes only from the server-injected `_tenantId` / `_userDbId`; the schemas take no tenant or user field,
  *   and the pipeline drops any `_` key a caller sends.
  * - Errors are thrown as `HttpException`s (from the service) or left to the pipeline, which never hands a raw
@@ -92,6 +96,7 @@ export class SupportTicketTool {
       description: z.string().trim().min(1).max(10_000).describe('What happened, in the user’s own words'),
       category: SupportCategorySchema.default('GENERAL').describe('What the ticket is about'),
       priority: SupportPrioritySchema.default('MEDIUM').describe('How urgent it is for the user'),
+      idempotencyKey: idempotencyKeyArg,
     }),
     annotations: {
       readOnlyHint: false,
