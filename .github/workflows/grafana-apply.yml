@@ -1,0 +1,94 @@
+# .github/workflows/grafana-apply.yml
+# Manual only, always: it changes a live Grafana stack, so it has no push or pull_request trigger, live or commented.
+# Run it from the Actions tab or `gh workflow run grafana-apply.yml -f action=plan`. Run "plan" first, read the
+# output, then "apply". "cardinality" is read-only: the metrics with the most active series.
+#
+# Pushes infra/observability/grafana-cloud/ (folders, the notification template, contact points, the policy tree,
+# alert rules, dashboards) through grafana-apply.mjs. The values it needs are apply-time secrets of this workflow and
+# live only here, never in app config or Doppler:
+#   vars.GRAFANA_URL                      the stack URL
+#   secrets.GRAFANA_SA_TOKEN              a service account token (Editor; Admin to replace the policy tree)
+#   secrets.IRM_ONCALL_WEBHOOK_URL        the IRM webhook that pages; apply of contact points, policies or rules
+#                                         refuses without it
+#   secrets.IRM_NOTIFY_WEBHOOK_URL        the IRM webhook that notifies (optional)
+#   vars.GRAFANA_LOKI_UID, GRAFANA_PROM_UID, GRAFANA_CLOUDWATCH_UID   datasource UIDs (optional; Grafana Cloud defaults)
+
+name: Grafana apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'plan = dry run, apply = push to Grafana, cardinality = top metrics by active series'
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - cardinality
+      only:
+        description: 'Optional comma-separated sections (folders,templates,contact-points,policies,rules,dashboards)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grafana-apply
+  cancel-in-progress: false
+
+jobs:
+  grafana:
+    name: Grafana ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+      GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+      GRAFANA_LOKI_UID: ${{ vars.GRAFANA_LOKI_UID }}
+      GRAFANA_PROM_UID: ${{ vars.GRAFANA_PROM_UID }}
+      GRAFANA_CLOUDWATCH_UID: ${{ vars.GRAFANA_CLOUDWATCH_UID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The scripts are plain Node with no installed package: no install step.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generated files match the catalog
+        if: inputs.action != 'cardinality'
+        run: node infra/observability/grafana-cloud/scripts/generate.mjs --check
+
+      - name: Catalog validates
+        if: inputs.action != 'cardinality'
+        run: node infra/observability/grafana-cloud/scripts/validate.mjs
+
+      - name: ${{ inputs.action }}
+        if: inputs.action != 'cardinality'
+        env:
+          ACTION: ${{ inputs.action }}
+          ONLY: ${{ inputs.only }}
+          IRM_ONCALL_WEBHOOK_URL: ${{ secrets.IRM_ONCALL_WEBHOOK_URL }}
+          IRM_NOTIFY_WEBHOOK_URL: ${{ secrets.IRM_NOTIFY_WEBHOOK_URL }}
+        run: |
+          args=()
+          [ "$ACTION" = "apply" ] && args+=(--apply)
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          node infra/observability/grafana-cloud/scripts/grafana-apply.mjs "${args[@]}"
+
+      - name: Top metrics by active series
+        if: inputs.action == 'cardinality'
+        run: |
+          prom_uid="${GRAFANA_PROM_UID:-grafanacloud-prom}"
+          api="$GRAFANA_URL/api/datasources/proxy/uid/$prom_uid/api/v1"
+          q() { curl -fsS -G -H "Authorization: Bearer $GRAFANA_SA_TOKEN" "$api/query" --data-urlencode "query=$1"; }
+          echo "## Active series by env"
+          q 'count by (env) ({__name__=~".+"})' | jq -r '.data.result[] | "\(.metric.env // "(no env)")\t\(.value[1])"'
+          echo
+          echo "## Top 25 metric names"
+          q 'topk(25, count by (__name__) ({__name__=~".+"}))' | jq -r '.data.result[] | "\(.value[1])\t\(.metric.__name__)"'
