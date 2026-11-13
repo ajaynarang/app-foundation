@@ -217,7 +217,7 @@ export const publicRoutes = ['/', '/login'] as const;
  * Keep in sync with PROTECTED_PREFIXES in src/middleware.ts — the two lists
  * must match exactly.
  */
-export const protectedRoutePatterns = ['/admin', '/ai', '/onboarding', '/settings'] as const;
+export const protectedRoutePatterns = ['/admin', '/agent-actions', '/ai', '/onboarding', '/settings'] as const;
 
 /**
  * Routes outside Settings that only some roles can open. `/admin` is also held

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { AI_SETTINGS_WEB_PATH, INTEGRATIONS_WEB_PATH } from '../web-routes';
+import { AI_SETTINGS_WEB_PATH, agentActionWebPath, INTEGRATIONS_WEB_PATH } from '../web-routes';
 
 const WEB_APP_DIR = join(__dirname, '../../../../web/src/app');
 
@@ -37,5 +37,13 @@ describe('INTEGRATIONS_WEB_PATH', () => {
 describe('AI_SETTINGS_WEB_PATH', () => {
   it('is a page of the web app', () => {
     expect(existsSync(join(WEB_APP_DIR, AI_SETTINGS_WEB_PATH, 'page.tsx'))).toBe(true);
+  });
+});
+
+/** An external agent's approval link: the page must exist, under the dynamic token segment. */
+describe('agentActionWebPath', () => {
+  it('is a page of the web app', () => {
+    expect(agentActionWebPath('42')).toBe('/agent-actions/42/approve');
+    expect(existsSync(join(WEB_APP_DIR, 'agent-actions', '[token]', 'approve', 'page.tsx'))).toBe(true);
   });
 });

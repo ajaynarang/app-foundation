@@ -99,6 +99,14 @@ export const queryKeys = {
     list: (tenantId?: number) =>
       tenantId === undefined ? (['oauth-clients', 'list'] as const) : (['oauth-clients', 'list', tenantId] as const),
   },
+  // ─── An external agent's write waiting for a person, and the workspace switch ──
+  agentActions: {
+    root: ['agent-actions'] as const,
+    detail: (token: string) => ['agent-actions', token] as const,
+  },
+  agentPolicy: {
+    root: ['agent-policy'] as const,
+  },
   agentActivity: {
     root: ['agent-activity'] as const,
     list: (params: { principalKind: string; principalId: string; filter: string }) =>

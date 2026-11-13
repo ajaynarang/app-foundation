@@ -31,6 +31,7 @@ import { INVOCATION_STATUS_VARIANTS } from '@/features/admin/ai-spend/constants'
 import { INVITATION_STATUS_VARIANTS, MEMBER_STATE_VARIANTS } from '@/features/platform/settings/constants';
 import { CREDENTIAL_STATUS_VARIANTS, HITL_TIER_VARIANTS } from '@/features/ai/agent-scope-ui/utils/scope-copy';
 import { AI_CREDENTIAL_STATUS_VARIANTS } from '@/features/platform/ai-settings/constants';
+import { AGENT_ACTION_STATUS_VARIANTS } from '@/features/platform/agent-actions/constants';
 
 const STATUS_MAPS: Record<string, Record<string, StatusVariant | null>> = {
   'billing.INVOICE_STATUS_VARIANTS': INVOICE_STATUS_VARIANTS,
@@ -46,6 +47,7 @@ const STATUS_MAPS: Record<string, Record<string, StatusVariant | null>> = {
   'agentScope.CREDENTIAL_STATUS_VARIANTS': CREDENTIAL_STATUS_VARIANTS,
   'agentScope.HITL_TIER_VARIANTS': HITL_TIER_VARIANTS,
   'aiSettings.AI_CREDENTIAL_STATUS_VARIANTS': AI_CREDENTIAL_STATUS_VARIANTS,
+  'agentActions.AGENT_ACTION_STATUS_VARIANTS': AGENT_ACTION_STATUS_VARIANTS,
 };
 
 /** The tone meanings of the status grammar: a status with one of these labels must wear this tone. */
@@ -146,6 +148,7 @@ const SETTINGS_ADMIN_DIRS = [
   'ai/agent-detail-sheet',
   'ai/agent-scope-ui',
   'platform/admin',
+  'platform/agent-actions',
   'platform/ai-settings',
   'platform/api-keys',
   'platform/billing',
