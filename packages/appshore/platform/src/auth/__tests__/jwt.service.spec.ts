@@ -45,7 +45,7 @@ describe('JwtTokenService', () => {
       userId: 'USR-001',
       email: 'test@example.com',
       role: 'MEMBER',
-      tenantId: 10,
+      tenantId: 'ten_10',
     };
 
     it('should generate an access token and refresh token', async () => {
@@ -71,7 +71,7 @@ describe('JwtTokenService', () => {
       expect(accessPayload.sub).toBe('USR-001');
       expect(accessPayload.email).toBe('test@example.com');
       expect(accessPayload.role).toBe('MEMBER');
-      expect(accessPayload.tenantId).toBe(10);
+      expect(accessPayload.tenantId).toBe('ten_10');
       expect(accessPayload.authMethod).toBe('email_password');
     });
 
