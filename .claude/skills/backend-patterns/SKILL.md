@@ -1912,6 +1912,17 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   (`GET /agent-actions/:token`, 404 across workspaces); `argsPreview` may hold personal data, so it is never logged
   or put in an event, and it is nulled when the request is spent or denied. These routes take a person's session
   (JWT and `@Roles`); never open them to an agent credential.
+- **Retry-safe creates.** A create tool with no natural key (nothing unique the caller sends, so a retry would make
+  a second record) declares `idempotencyKey: idempotencyKeyArg` from `agent-contract/tool-idempotency.ts` in its
+  `parameters`, and is listed in `IDEMPOTENT_CREATE_TOOLS` in `tool-idempotency.spec.ts` (a `create-*` write that
+  is on neither that list nor `NATURAL_KEY_CREATES` fails the spec). The executor does the rest with the one
+  `IdempotencyStore` the `Idempotency-Key` header uses: `claim(scope, key, requestFingerprint('tool:<name>',
+args))` with the scope `tdb:<tenantId>:u:<userDbId>`, per workspace and the person acted for; the same key and arguments
+  within 24 hours replay the first success; the same key on another call is `IDEMPOTENCY_KEY_REUSED`, a retry while
+  the first still runs is `IDEMPOTENCY_KEY_IN_USE`; a failure releases the key; an unreachable store runs the call
+  without it. The key is taken out before the method runs, so a tool never reads it, and it is part of the
+  confirmation digest like any other argument. Never build a second store or hand-roll a dedupe in a tool, and
+  never declare the key on a read.
 - `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
   `_confirmToken` documented. Never build a tool's input schema another way.
 - Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients

@@ -874,6 +874,38 @@ next retry, for up to an hour (`APPROVAL_TTL_SECONDS`).
 Agents whose requests were expired get `hitl_invalid_or_expired` and ask again on the old flow. The new columns have
 defaults or are nullable and can stay; old code ignores them.
 
+## 19. Retry-safe tool creates: `idempotencyKey`
+
+**What changed.**
+
+- A tool that declares `idempotencyKey` in its schema (`idempotencyKeyArg` in
+  `apps/backend/src/domains/ai/agent-contract/tool-idempotency.ts`) gets replay protection from the tool executor.
+  An agent that retries a create with the same key and the same arguments within 24 hours gets the first call's
+  result back, and nothing is created twice. It is the same Redis store the `Idempotency-Key` header uses, scoped to
+  the workspace and the person the call acts for. The same key on a different call answers
+  `IDEMPOTENCY_KEY_REUSED`; a retry while the first call still runs answers `IDEMPOTENCY_KEY_IN_USE`; a failed call
+  frees its key. If Redis cannot be reached the call runs without the key.
+- The example write `create-support-ticket` declares it. Its `tools/list` input schema gains an optional
+  `idempotencyKey` string (1 to 255 visible ASCII characters; a UUID is ideal).
+- The key is an argument like any other for confirmation: an approval or a chat card is bound to it. The chat card
+  leaves it out of its description.
+- `ScopeRegistryService.resolveProvider` also returns the tool's `parameters`.
+
+**Env.** None. **Schema.** None.
+
+**Who notices.**
+
+- An agent calling `create-support-ticket` sees one new optional argument. A call without it behaves as before.
+- A confirmed write still needs a confirmation per call: a retry after the token or grant was spent is challenged
+  again, and once confirmed it replays the first result instead of creating a second record.
+- A product that constructs `ToolExecutorService` by hand (in a spec): it takes an `IdempotencyStore` as a fourth
+  argument.
+
+**What to do.** For each of your own create tools that has no natural key, add `idempotencyKey: idempotencyKeyArg`
+to its parameters and list it in `IDEMPOTENT_CREATE_TOOLS` in `tool-idempotency.spec.ts`. Nothing else.
+
+**Rollback.** Revert the change. Remembered results live in Redis for 24 hours and are ignored by the old code.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
