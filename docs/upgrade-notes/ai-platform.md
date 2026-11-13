@@ -811,7 +811,9 @@ rewrites the table on its next run.
   `approval_denied`. Neither spends the token. Unknown, expired, used or mismatched tokens still answer
   `hitl_invalid_or_expired`.
 - A sensitive write still needs the PIN of the person the agent acts for, whatever the policy says. The same page
-  now serves it: the redacted arguments and a PIN field that posts to the unchanged `POST /mcp/hitl/:token/step-up`.
+  now serves it: the redacted arguments and a PIN field that posts to `POST /mcp/hitl/:token/step-up`. That route
+  now allows 5 attempts per signed-in user per 15 minutes (the PIN login's limit) instead of the global limit, so a
+  4-digit PIN cannot be guessed inside a request's window; a sixth attempt answers 429.
   A person with no PIN set is sent to Settings > Profile and brought back after saving one. The Approve button never
   unlocks a sensitive write; Deny works for both kinds. A retry before the PIN answers `approval_pending` (it was
   `hitl_invalid_or_expired`).
@@ -853,8 +855,24 @@ its other web links.
 **What to do.** Tell workspace owners about the new default. An owner who wants the old behaviour turns on "Let
 agents confirm their own changes" on Settings > AI Assistants. Set `APP_URL` in every environment that serves agents.
 
-**Rollback.** Revert the change. The new columns have defaults or are nullable and can stay; old code ignores them.
-Requests waiting for approval at the time of the rollback can no longer be approved; their agents ask again.
+**Rollback.** Expire the open requests first, then revert. The old code's token check knows nothing about approvals
+or denials: it lets an agent spend any open token for its own call by repeating it with `_confirmToken`. Without the
+step below, every request still waiting (nobody approved it) and every request a person denied runs on its agent's
+next retry, for up to an hour (`APPROVAL_TTL_SECONDS`).
+
+1. Just before the rollback, run:
+
+   ```sql
+   UPDATE hitl_challenges SET expires_at = now()
+   WHERE consumed_at IS NULL AND (approval_required OR denied_at IS NOT NULL);
+   ```
+
+2. Deploy the old code.
+3. Run the same statement again once only the old code is serving. Requests created by the new code between steps 1
+   and 2 are caught here; the old code never sets `approval_required`, so nothing it creates is touched.
+
+Agents whose requests were expired get `hitl_invalid_or_expired` and ask again on the old flow. The new columns have
+defaults or are nullable and can stay; old code ignores them.
 
 ## Deploy order for `ai_reader`
 
