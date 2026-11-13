@@ -26,7 +26,7 @@ const KNOWN_FEATURE_KEYS = new Set<string>(Object.values(FEATURE_KEYS));
 
 /**
  * Declares the plan feature a tool belongs to: the same key its REST twin passes to `@RequireFeature`. The pipeline
- * judges the workspace by `PlanGuard`'s own rule before the tool runs, so an agent cannot reach a feature the web app
+ * judges the workspace by the one plan rule `PlanGuard` also runs (`TenantEntitlementsService`) before the tool runs, so an agent cannot reach a feature the web app
  * or the API would refuse.
  */
 export function RequiresPlanFeature(feature: FeatureKey): MethodDecorator {

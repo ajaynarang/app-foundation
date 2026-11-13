@@ -1,8 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
-import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/feature-flags.module';
-import { PlansModule } from '@appshore/platform/domains/plans/plans.module';
-import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
+import { EntitlementsModule } from '@appshore/platform/domains/entitlements/entitlements.module';
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { ScopeRegistryService } from './scope-registry.service';
 import { HitlPolicyService } from './hitl-policy.service';
@@ -20,7 +18,8 @@ import { AgentActionsService } from './agent-actions.service';
 import { TOOL_AVAILABILITY_RULES, ToolAvailabilityService } from './tool-availability.service';
 
 @Module({
-  imports: [forwardRef(() => McpToolsModule), FeatureFlagsModule, PlansModule, CacheModule],
+  // EntitlementsModule: the tool side of the plan rule is the same service PlanGuard runs (ToolAccessPolicyService).
+  imports: [forwardRef(() => McpToolsModule), EntitlementsModule, CacheModule],
   controllers: [AgentActivityController, DeveloperScopesController, AgentActionsController],
   providers: [
     ScopeRegistryService,
@@ -32,8 +31,6 @@ import { TOOL_AVAILABILITY_RULES, ToolAvailabilityService } from './tool-availab
     RateLimitService,
     AgentActivityService,
     AgentActionsService,
-    // The tool side of the plan rule runs the real REST guard (see ToolAccessPolicyService.evaluateFeature).
-    PlanGuard,
     ToolAccessPolicyService,
     // Tool availability rules: the starter ships none. Replace with a factory that builds your rules (see
     // tool-availability.service.ts); an unavailable tool is left out of tools/list and every chat toolset.

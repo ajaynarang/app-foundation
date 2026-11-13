@@ -1,10 +1,9 @@
 import 'reflect-metadata';
 import { Injectable } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { MCP_TOOL_METADATA_KEY, Tool, type McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { z } from 'zod';
 import { TenantPlan, UserRole } from '@appshore/db';
-import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
+import { TenantEntitlementsService } from '@appshore/platform/domains/entitlements/tenant-entitlements.service';
 import { fromApiKey, fromOAuthUser, fromUser } from '@appshore/platform/auth/agent-principal';
 import { InvocationPipelineService } from '../../../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../../agent-contract/scope-registry.service';
@@ -19,7 +18,7 @@ import { IdempotencyStore } from '@appshore/platform/infrastructure/idempotency/
 
 /**
  * The example pair walked through every step of the pipeline, end to end: scope, arguments, role, plan,
- * confirmation, audit and execute, errors. Real registry, policy, PlanGuard, HITL tiers and executor; the database,
+ * confirmation, audit and execute, errors. Real registry, policy, plan rule (TenantEntitlementsService), HITL tiers and executor; the database,
  * the plan lookup, the audit log and the challenge store are mocked.
  *
  * The support REST twin has no plan feature, so the plan step is exercised by a spec-only fixture tool.
@@ -67,7 +66,7 @@ describe('example tool pair through the whole pipeline', () => {
     workspaceMember: { findUnique: jest.fn() },
     tenant: { findUnique: jest.fn() },
   };
-  const plans = { getTenantPlan: jest.fn(), isFeatureEnabled: jest.fn() };
+  const plans = { getTenantPlanByDbId: jest.fn(), isFeatureEnabled: jest.fn() };
   const audit = { writePending: jest.fn(), completeSuccess: jest.fn(), completeError: jest.fn() };
   const challenges = {
     issue: jest.fn(),
@@ -93,11 +92,11 @@ describe('example tool pair through the whole pipeline', () => {
       [PlanGatedFixtureTool, new PlanGatedFixtureTool()],
     ]);
     const moduleRef = { get: (token: unknown) => instances.get(token) };
-    const planGuard = new PlanGuard(
-      new Reflector(),
+    const entitlements = new TenantEntitlementsService(
+      prisma as never,
       plans as never,
       { isEnabled: jest.fn().mockResolvedValue(true) } as never,
-      { get: jest.fn().mockReturnValue({ enabled: true }) } as never,
+      { get: jest.fn((key: string) => (key === 'multiTenancy' ? { enabled: true } : undefined)) } as never,
     );
     pipeline = new InvocationPipelineService(
       registry,
@@ -105,7 +104,7 @@ describe('example tool pair through the whole pipeline', () => {
       new ToolExecutorService(registry, moduleRef as never, prisma as never, idempotency),
       audit as never,
       challenges as never,
-      new ToolAccessPolicyService(registry, prisma as never, planGuard),
+      new ToolAccessPolicyService(registry, prisma as never, entitlements),
       { get: () => undefined } as never,
     );
   });
@@ -161,13 +160,13 @@ describe('example tool pair through the whole pipeline', () => {
   });
 
   it('step 4, plan: the plan-gated fixture is refused on Starter and runs on Professional', async () => {
-    plans.getTenantPlan.mockResolvedValue(TenantPlan.STARTER);
+    plans.getTenantPlanByDbId.mockResolvedValue(TenantPlan.STARTER);
     plans.isFeatureEnabled.mockImplementation((plan: string) => Promise.resolve(plan !== TenantPlan.STARTER));
     const refused = await pipeline.run(member(), 'plan-gated-fixture', {});
     expect(body(refused)).toMatchObject({ status: 'not_on_plan', reason: 'PLAN_UPGRADE_REQUIRED' });
-    expect(plans.getTenantPlan).toHaveBeenCalledWith('tenant_wire_7');
+    expect(plans.getTenantPlanByDbId).toHaveBeenCalledWith(7);
 
-    plans.getTenantPlan.mockResolvedValue(TenantPlan.PROFESSIONAL);
+    plans.getTenantPlanByDbId.mockResolvedValue(TenantPlan.PROFESSIONAL);
     const ran = await pipeline.run(member(), 'plan-gated-fixture', {});
     expect(body(ran)).toEqual({ ran: true });
   });
