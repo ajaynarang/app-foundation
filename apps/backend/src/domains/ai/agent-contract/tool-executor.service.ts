@@ -12,6 +12,14 @@ import {
   withinStoreTimeout,
 } from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 import { IDEMPOTENCY_KEY_ARG, declaresIdempotencyKey } from './tool-idempotency';
+import {
+  RLS_SOURCE,
+  RlsContextError,
+  isRlsStrict,
+  isRlsTenantId,
+  runAsPublic,
+  runAsTenant,
+} from '@appshore/kernel/infrastructure/rls/rls-context';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -133,7 +141,7 @@ export class ToolExecutorService {
     };
 
     try {
-      const raw = await this.invoke(provider, injectedArgs);
+      const raw = await this.invokeAs(principal, toolName, provider, injectedArgs);
 
       if (raw && typeof raw === 'object' && Array.isArray(raw.content)) {
         return raw as ToolResult;
@@ -147,6 +155,9 @@ export class ToolExecutorService {
         ],
       };
     } catch (error: unknown) {
+      // A scope already pinned to another tenant (or to public) means the caller mixed up identities: the tool never
+      // ran. Strict mode (tests, CI) surfaces it; a deployed task answers the generic tool failure and logs it.
+      if (error instanceof RlsContextError && isRlsStrict()) throw error;
       return {
         content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
         isError: true,
@@ -155,10 +166,24 @@ export class ToolExecutorService {
   }
 
   /**
-   * The one place a tool method is called. Tenant isolation is the tool's own `_tenantId` filter;
-   * no transaction or role switch is opened around the call. Tenant-context plumbing, when it
-   * lands, wraps this call (and only this call).
+   * The tool call, and only it, runs as the principal's tenant (`tool:<name>`), or in the public scope for a principal
+   * with no tenant. No transaction is opened: the tool keeps one pooled connection however long it runs. Tenant
+   * isolation is still the tool's own `_tenantId` filter until row-level security is enforced.
    */
+  private invokeAs(
+    principal: AgentPrincipal,
+    toolName: string,
+    provider: { providerClass: unknown; methodName: string },
+    injectedArgs: Record<string, unknown>,
+  ): Promise<any> {
+    const source = `${RLS_SOURCE.TOOL}:${toolName}`;
+    const call = () => this.invoke(provider, injectedArgs);
+    return isRlsTenantId(principal.tenantId)
+      ? runAsTenant(principal.tenantId, source, call)
+      : runAsPublic(source, call);
+  }
+
+  /** The one place a tool method is called. */
   private async invoke(
     provider: { providerClass: unknown; methodName: string },
     injectedArgs: Record<string, unknown>,

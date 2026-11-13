@@ -1,4 +1,12 @@
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
+import {
+  RLS_STRICT_CONTEXT_ENV,
+  RLS_STRICT_THROW,
+  RlsContextError,
+  currentRls,
+  runAsPublic,
+  runAsTenant,
+} from '@appshore/kernel/infrastructure/rls/rls-context';
 import { Test } from '@nestjs/testing';
 import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
 import { ToolExecutorService } from '../tool-executor.service';
@@ -388,6 +396,109 @@ describe('ToolExecutorService', () => {
       expect('failure' in bad && bad.failure).toMatchObject({
         code: 'VALIDATION_FAILED',
         fieldErrors: { idempotencyKey: expect.any(String) },
+      });
+    });
+  });
+
+  describe('tenant context', () => {
+    const ToolClass = class {};
+
+    function registerTool(run: jest.Mock) {
+      mockScopeRegistry.resolveProvider.mockReturnValue({ providerClass: ToolClass, methodName: 'run' });
+      mockModuleRef.get.mockReturnValue({ run });
+    }
+
+    it('runs the tool as the principal tenant, sourced from the tool name', async () => {
+      let seen: unknown;
+      registerTool(
+        jest.fn(async () => {
+          await new Promise((resolve) => setImmediate(resolve));
+          seen = currentRls();
+          return 'ok';
+        }),
+      );
+
+      await svc.execute('query-records', {}, fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' }));
+
+      expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'tool:query-records' });
+    });
+
+    it('wraps only the tool call: the user lookup before it runs outside the tool scope', async () => {
+      let lookupScope: unknown = 'unset';
+      mockPrisma.user.findUnique.mockImplementation(async () => {
+        lookupScope = currentRls();
+        return { userId: 'user_demo_owner' };
+      });
+      registerTool(jest.fn().mockResolvedValue('ok'));
+
+      await svc.execute('query-records', {}, fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' }));
+
+      expect(lookupScope).toBeUndefined();
+    });
+
+    it('opens no transaction, so a tool call holds a single connection', async () => {
+      registerTool(jest.fn().mockResolvedValue('ok'));
+      await svc.execute('query-records', {}, fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' }));
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('runs inside an existing scope for the same tenant', async () => {
+      let seen: unknown;
+      registerTool(
+        jest.fn(async () => {
+          seen = currentRls();
+          return 'ok';
+        }),
+      );
+
+      const result = await runAsTenant(7, 'jwt', () =>
+        svc.execute('query-records', {}, fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' })),
+      );
+
+      expect(result.isError).toBeUndefined();
+      expect(seen).toEqual(expect.objectContaining({ kind: 'tenant', tenantId: 7 }));
+    });
+
+    describe('when the scope already belongs to someone else', () => {
+      const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
+      const otherTenant = <T>(fn: () => Promise<T>) => runAsTenant(8, 'jwt', fn);
+      const publicScope = <T>(fn: () => Promise<T>) => runAsPublic('anonymous', fn);
+      const originalStrict = process.env[RLS_STRICT_CONTEXT_ENV];
+
+      afterEach(() => {
+        if (originalStrict === undefined) delete process.env[RLS_STRICT_CONTEXT_ENV];
+        else process.env[RLS_STRICT_CONTEXT_ENV] = originalStrict;
+        jest.restoreAllMocks();
+      });
+
+      it.each([
+        ['another tenant', otherTenant],
+        ['the public scope', publicScope],
+      ])('strict mode: throws inside %s and never runs the tool', async (_label, scope) => {
+        process.env[RLS_STRICT_CONTEXT_ENV] = RLS_STRICT_THROW;
+        const run = jest.fn().mockResolvedValue('ok');
+        registerTool(run);
+
+        await expect(scope(() => svc.execute('query-records', {}, principal))).rejects.toBeInstanceOf(RlsContextError);
+        expect(run).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['another tenant', otherTenant],
+        ['the public scope', publicScope],
+      ])('non-strict mode: answers a generic tool failure inside %s, never running the tool', async (_label, scope) => {
+        delete process.env[RLS_STRICT_CONTEXT_ENV];
+        const errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+        const run = jest.fn().mockResolvedValue('ok');
+        registerTool(run);
+
+        const result = await scope(() => svc.execute('query-records', {}, principal));
+
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain(TOOL_FAILED_MESSAGE);
+        expect(result.content[0].text).not.toMatch(/tenant \d/);
+        expect(run).not.toHaveBeenCalled();
+        expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('query-records'), expect.anything());
       });
     });
   });
