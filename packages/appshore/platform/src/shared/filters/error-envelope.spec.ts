@@ -4,8 +4,15 @@ import { ThrottlerException } from '@nestjs/throttler';
 import { z } from 'zod';
 import { Prisma } from '@appshore/db';
 import { buildErrorEnvelope, errorShapeOf, writeErrorEnvelope } from './error-envelope';
+import { HttpExceptionFilter } from './http-exception.filter';
 
 const req = { url: '/api/v1/things', method: 'POST' };
+
+/** The Sentry SDK instance the kernel's error-tracking module loads (platform does not depend on it directly). */
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Sentry = require(
+  require.resolve('@sentry/nestjs', { paths: [require.resolve('@appshore/kernel/package.json')] }),
+) as typeof import('@sentry/nestjs');
 
 function fakeResponse(headersSent = false) {
   const res: any = { headersSent, removeHeader: jest.fn(), setHeader: jest.fn() };
@@ -20,6 +27,50 @@ describe('error-envelope', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => jest.restoreAllMocks());
+
+  describe('error tracking (rule 10: a 5xx is reported where its body is written)', () => {
+    let reportSpy: jest.SpyInstance;
+    beforeEach(() => {
+      jest.spyOn(Sentry, 'isInitialized').mockReturnValue(true);
+      reportSpy = jest.spyOn(Sentry, 'captureException').mockImplementation(() => '');
+    });
+
+    function hostFor(res: unknown) {
+      return {
+        switchToHttp: () => ({ getResponse: () => res, getRequest: () => req }),
+      } as any;
+    }
+
+    it('reports a 5xx through the global filter exactly once, tagged http', () => {
+      const err = new Error('boom');
+      new HttpExceptionFilter().catch(err, hostFor(fakeResponse()));
+      expect(reportSpy).toHaveBeenCalledTimes(1);
+      expect(reportSpy).toHaveBeenCalledWith(err, { tags: { source: 'http' } });
+    });
+
+    it('reports a 5xx written by writeErrorEnvelope on an @Res route exactly once', () => {
+      const err = new HttpException('upstream down', 503);
+      expect(writeErrorEnvelope(fakeResponse(), req, err)).toBe(true);
+      expect(reportSpy).toHaveBeenCalledTimes(1);
+      expect(reportSpy).toHaveBeenCalledWith(err, { tags: { source: 'http' } });
+    });
+
+    it('does not report a 4xx', () => {
+      writeErrorEnvelope(fakeResponse(), req, new ConflictException('x'));
+      new HttpExceptionFilter().catch(new UnauthorizedException(), hostFor(fakeResponse()));
+      expect(reportSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not report when nothing was written (headers already sent): the stream reports its own frame', () => {
+      expect(writeErrorEnvelope(fakeResponse(true), req, new Error('late'))).toBe(false);
+      expect(reportSpy).not.toHaveBeenCalled();
+    });
+
+    it('building an envelope without writing it reports nothing', () => {
+      buildErrorEnvelope(new Error('boom'), req);
+      expect(reportSpy).not.toHaveBeenCalled();
+    });
+  });
 
   it('writes the envelope before headers are sent', () => {
     const res = fakeResponse();

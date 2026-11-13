@@ -12,6 +12,7 @@ import { isZodError, zodFieldErrors } from '@appshore/kernel/shared/errors/api-e
 import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter';
 import { toLoggableError, type LoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { reportServerError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
 
 /**
  * The one error envelope (ADR "API contract", section 2). Every error body the API sends — from the global
@@ -251,8 +252,9 @@ export function buildErrorEnvelope(exception: unknown, request: Pick<Request, 'u
 
 /**
  * Answer an error with the envelope. The global filter writes through this, and so does a `@Res()` / streaming
- * route that fails before its headers are sent, so this is the one place an error body is written. Returns false —
- * and writes nothing — once headers are out; the caller then ends its stream itself.
+ * route that fails before its headers are sent, so this is the one place an error body is written, and the one place
+ * a 5xx is reported to the error tracker. Returns false — and writes and reports nothing — once headers are out; the
+ * caller then ends its stream itself.
  */
 export function writeErrorEnvelope(
   response: Response,
@@ -265,5 +267,8 @@ export function writeErrorEnvelope(
   response.removeHeader('Transfer-Encoding');
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.status(envelope.statusCode).json(envelope);
+  // The one place a 5xx reaches the error tracker (docs/standards/observability.md, rule 10): the global filter
+  // and every `@Res` route write through here, so each 5xx is reported once, whichever path wrote it.
+  reportServerError(exception, envelope.statusCode);
   return true;
 }
