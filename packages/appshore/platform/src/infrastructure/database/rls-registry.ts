@@ -13,7 +13,7 @@
  *   identity_system  credential and token tables, read before any tenant is known; never readable by tenant code.
  *                    A `tenantId` it carries (a refresh token's session workspace) is a value, not its scope.
  *   catalog          global reference data the app reads (plans, flags, prices)
- *   platform         platform-owned rows (allow-lists, broadcasts); super-admin only
+ *   platform         platform-owned rows (allow-lists, broadcasts, super-admin preferences); super-admin only
  *   root             `tenants` itself
  *
  * Tables outside Prisma (`_prisma_migrations`, `mastra_*`) are external and never listed: `EXTERNAL_TABLE_PATTERNS`.
@@ -126,7 +126,6 @@ export const FOUNDATION_RLS_REGISTRY: Readonly<Record<string, RlsTableEntry>> = 
   oauth_refresh_tokens: identitySystem,
   password_reset_tokens: identitySystem,
   refresh_tokens: identitySystem,
-  super_admin_preferences: identitySystem,
 
   // ── catalog ───────────────────────────────────────────────────────────────
   add_ons: catalog,
@@ -142,6 +141,7 @@ export const FOUNDATION_RLS_REGISTRY: Readonly<Record<string, RlsTableEntry>> = 
   announcements: platform,
   outbound_allow_entries: platform,
   processed_billing_events: platform,
+  super_admin_preferences: platform,
 };
 
 /** Tables in the database that Prisma does not manage. Never registered. */
