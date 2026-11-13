@@ -74,10 +74,12 @@ describe('HitlStepUpController', () => {
       NotFoundException,
     );
   });
+});
 
-  it('the context read never returns a chat grant row: it looks only at rows with no conversation', async () => {
-    prisma.hitlChallenge.findFirst.mockResolvedValue(null);
-    await expect(ctrl.getContext('5', { dbId: 42, tenantDbId: 7 })).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.hitlChallenge.findFirst).toHaveBeenCalledWith({ where: { id: 5, conversationId: null } });
+describe('HitlStepUpController routes', () => {
+  // `GET mcp/hitl/:token` was folded into `GET agent-actions/:token` (item 8c); only the PIN step stays here.
+  it('serves the PIN step only: the context read lives at GET agent-actions/:token', () => {
+    const methods = Object.getOwnPropertyNames(HitlStepUpController.prototype).filter((m) => m !== 'constructor');
+    expect(methods).toEqual(['complete']);
   });
 });

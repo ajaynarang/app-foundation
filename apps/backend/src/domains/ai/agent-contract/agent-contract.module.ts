@@ -15,10 +15,12 @@ import { ToolAccessPolicyService } from './tool-access-policy.service';
 import { AgentActivityService } from './agent-activity.service';
 import { AgentActivityController } from './agent-activity.controller';
 import { DeveloperScopesController } from './developer-scopes.controller';
+import { AgentActionsController } from './agent-actions.controller';
+import { AgentActionsService } from './agent-actions.service';
 
 @Module({
   imports: [forwardRef(() => McpToolsModule), FeatureFlagsModule, PlansModule, CacheModule],
-  controllers: [AgentActivityController, DeveloperScopesController],
+  controllers: [AgentActivityController, DeveloperScopesController, AgentActionsController],
   providers: [
     ScopeRegistryService,
     HitlPolicyService,
@@ -28,6 +30,7 @@ import { DeveloperScopesController } from './developer-scopes.controller';
     HitlChallengeService,
     RateLimitService,
     AgentActivityService,
+    AgentActionsService,
     // The tool side of the plan rule runs the real REST guard (see ToolAccessPolicyService.evaluateFeature).
     PlanGuard,
     ToolAccessPolicyService,

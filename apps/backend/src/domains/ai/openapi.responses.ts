@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
+  AgentActionSchema,
   AgentActivityPageSchema,
+  AgentPolicySchema,
   AiCredentialConnectResultSchema,
   AiSettingsSchema,
   AgentScopeSchema,
@@ -74,25 +76,10 @@ export const AssistantAgentStatusesResponse = defineResponseSchema(
 
 // ─── MCP human-in-the-loop step-up ─────────────────────────────────────────────
 
-export const HitlChallengeContextResponse = defineResponseSchema(
-  'HitlChallengeContext',
-  z.object({
-    token: z.string(),
-    tool: z.string(),
-    tier: z.string(),
-    scopeRequired: z.string(),
-    /** Who is calling — the OAuth client or API key label. */
-    callerLabel: z.string(),
-    callerKind: z.string(),
-    expiresAt: z.string(),
-    requiresStepUp: z.boolean(),
-    stepUpCompleted: z.boolean(),
-    consumed: z.boolean(),
-    expired: z.boolean(),
-    /** Whether the viewer has a PIN set (the PIN itself is never returned). */
-    hasPinSet: z.boolean(),
-  }),
-);
+/** `GET /agent-actions/:token` and each decision: an external agent's write waiting for a person. */
+export const AgentActionResponse = defineResponseSchema('AgentAction', AgentActionSchema);
+/** `GET` / `PUT /agent-policy`: whether external agents wait for a person on a standard write. */
+export const AgentPolicyResponse = defineResponseSchema('AgentPolicy', AgentPolicySchema);
 export const HitlStepUpResultResponse = defineResponseSchema(
   'HitlStepUpResult',
   z.object({ status: z.literal('step_up_verified') }),
