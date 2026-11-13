@@ -10,7 +10,8 @@
 //
 // Env (apply-time secrets of the grafana-apply workflow; never app config, never Doppler):
 //   GRAFANA_URL, GRAFANA_SA_TOKEN   required for --apply (a service account with the Editor or Admin role)
-//   IRM_ONCALL_WEBHOOK_URL          required for --apply: the contact point that pages
+//   IRM_ONCALL_WEBHOOK_URL          required for --apply of contact-points, policies or rules: the contact point
+//                                   that pages (not for --only folders, templates or dashboards)
 //   IRM_NOTIFY_WEBHOOK_URL          optional; unset leaves the notify contact point as it is in Grafana
 //   GRAFANA_LOKI_UID, GRAFANA_PROM_UID, GRAFANA_CLOUDWATCH_UID   datasource UIDs (default: the Grafana Cloud ones)
 //
@@ -46,6 +47,9 @@ export function parseArgs(argv) {
   };
 }
 
+/** The sections that can send an alert to the on-call contact point: applying any of them needs its URL. */
+export const PAGING_SECTIONS = ['contact-points', 'policies', 'rules'];
+
 /** Every reason this run must not start. Pure, so the refusals are tested without a network. */
 export function preflight({ opts, env, repoUrl = REPO_URL, stale = [] }) {
   const errors = [];
@@ -53,7 +57,7 @@ export function preflight({ opts, env, repoUrl = REPO_URL, stale = [] }) {
   if (unknown.length) errors.push(`Unknown section(s): ${unknown.join(', ')}. Use: ${SECTIONS.join(', ')}`);
   if (!opts.apply) return errors;
   if (!env.GRAFANA_URL || !env.GRAFANA_SA_TOKEN) errors.push('--apply needs GRAFANA_URL and GRAFANA_SA_TOKEN.');
-  if (!env.IRM_ONCALL_WEBHOOK_URL)
+  if (!env.IRM_ONCALL_WEBHOOK_URL && opts.only.some((s) => PAGING_SECTIONS.includes(s)))
     errors.push('--apply needs IRM_ONCALL_WEBHOOK_URL: without it a sev1 alert reaches nobody.');
   if (repoUrl === REPO_URL_PLACEHOLDER)
     errors.push(

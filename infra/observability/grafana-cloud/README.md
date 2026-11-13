@@ -94,12 +94,12 @@ this order: `folders, templates, contact-points, policies, rules, dashboards`; `
 A rule group is replaced whole, so a rule removed from the catalog is deleted from Grafana. Rules are provisioned
 (locked in the UI); `--editable` leaves them editable, at the cost of drift.
 
-| Key                                                              | Needed for                                                                           |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `GRAFANA_URL`, `GRAFANA_SA_TOKEN`                                | `--apply` (a service account with the Editor role, Admin to replace the policy tree) |
-| `IRM_ONCALL_WEBHOOK_URL`                                         | `--apply`: it refuses without it, since a `sev1` would reach nobody                  |
-| `IRM_NOTIFY_WEBHOOK_URL`                                         | optional: unset leaves that contact point as it is in Grafana                        |
-| `GRAFANA_LOKI_UID`, `GRAFANA_PROM_UID`, `GRAFANA_CLOUDWATCH_UID` | optional overrides of the defaults above                                             |
+| Key                                                              | Needed for                                                                                               |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `GRAFANA_URL`, `GRAFANA_SA_TOKEN`                                | `--apply` (a service account with the Editor role, Admin to replace the policy tree)                     |
+| `IRM_ONCALL_WEBHOOK_URL`                                         | `--apply` of contact points, policies or rules: it refuses without it, since a `sev1` would reach nobody |
+| `IRM_NOTIFY_WEBHOOK_URL`                                         | optional: unset leaves that contact point as it is in Grafana                                            |
+| `GRAFANA_LOKI_UID`, `GRAFANA_PROM_UID`, `GRAFANA_CLOUDWATCH_UID` | optional overrides of the defaults above                                                                 |
 
 These are apply-time secrets, never app config: no app process reads them, so they never go in Doppler.
 

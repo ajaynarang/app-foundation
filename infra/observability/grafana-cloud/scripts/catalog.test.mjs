@@ -378,6 +378,20 @@ test('--apply refuses without the on-call webhook URL, or without the Grafana cr
   assert.deepEqual(noToken, ['--apply needs GRAFANA_URL and GRAFANA_SA_TOKEN.']);
 });
 
+test('--apply of sections that never page needs no on-call webhook URL', () => {
+  const env = { ...READY, IRM_ONCALL_WEBHOOK_URL: '' };
+  for (const only of ['dashboards', 'folders', 'templates', 'folders,dashboards']) {
+    assert.deepEqual(preflight({ opts: parseArgs(['--apply', '--only', only]), env, repoUrl: REAL_REPO }), [], only);
+  }
+  for (const only of ['contact-points', 'policies', 'rules', 'dashboards,rules']) {
+    assert.deepEqual(
+      preflight({ opts: parseArgs(['--apply', '--only', only]), env, repoUrl: REAL_REPO }),
+      ['--apply needs IRM_ONCALL_WEBHOOK_URL: without it a sev1 alert reaches nobody.'],
+      only,
+    );
+  }
+});
+
 test('--apply refuses stale generated files, and an unknown section', () => {
   const stale = preflight({
     opts: parseArgs(['--apply']),
