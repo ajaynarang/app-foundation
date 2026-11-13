@@ -10,6 +10,10 @@ import { TenantIdResolver } from '@appshore/platform/infrastructure/events/tenan
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
+
+/** The events queue's own default when a job is added without `attempts`. */
+const EVENT_JOB_DEFAULT_ATTEMPTS = 3;
 
 @Processor(QUEUE_NAMES.EVENTS, { concurrency: 10 })
 export class DurableEventProcessor extends WorkerHost {
@@ -53,10 +57,13 @@ export class DurableEventProcessor extends WorkerHost {
     });
   }
 
+  /**
+   * One structured `job.failed` line per failed attempt (the line alert rules key on), and the dead-letter row once
+   * BullMQ has failed the job for good, including an `UnrecoverableError` before the attempts run out.
+   */
   @OnWorkerEvent('failed')
   async onFailed(job: Job, err: Error): Promise<void> {
-    const maxAttempts = job.opts.attempts ?? 3;
-    if (job.attemptsMade >= maxAttempts) {
+    if (reportJobFailure(this.logger, job, err, EVENT_JOB_DEFAULT_ATTEMPTS)) {
       await this.deadLetter.recordPermanentFailure(job, err);
     }
   }

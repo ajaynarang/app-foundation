@@ -15,6 +15,7 @@ import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
 import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -180,15 +181,15 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   }
 
   /**
-   * When a webhook delivery job has exhausted all its retry attempts, persist
-   * a row into `dead_letter_logs` so the failure survives Bull's 7-day
-   * `failed` set retention and can be inspected / replayed by an operator.
-   * Intermediate failures (where BullMQ will retry) are skipped.
+   * Log every failed attempt as one structured `job.failed` line (the line alert rules key on). When the job has
+   * failed for good, persist a row into `dead_letter_logs` so the failure survives Bull's 7-day `failed` set
+   * retention and can be inspected / replayed by an operator. A refusal throws `UnrecoverableError`, which is final
+   * at once.
    */
   @OnWorkerEvent('failed')
   async onFailed(job: Job<JobEnvelope<WebhookDeliveryPayload>>, err: Error): Promise<void> {
-    const maxAttempts = job.opts?.attempts ?? 3;
-    if (job.attemptsMade >= maxAttempts || err instanceof UnrecoverableError) {
+    const final = reportJobFailure(this.logger, job, err, 3) || err instanceof UnrecoverableError;
+    if (final) {
       await this.deadLetter.recordPermanentFailure(job, err);
     }
   }

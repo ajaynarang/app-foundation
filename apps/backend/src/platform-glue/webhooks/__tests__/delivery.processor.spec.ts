@@ -363,5 +363,21 @@ describe('WebhookDeliveryProcessor', () => {
 
       expect(mockDeadLetter.recordPermanentFailure).not.toHaveBeenCalled();
     });
+
+    it('writes one job.failed line per failed attempt: warn on a retry, error on the final one', async () => {
+      const logger = (processor as any).logger;
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const error = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+      await processor.onFailed(makeJob(jobPayload, 1, 3), new Error('transient'));
+      await processor.onFailed(makeJob(jobPayload, 3, 3), new Error('boom'));
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'job.failed', jobId: 'job-1', queue: 'webhooks', final: false }),
+      );
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'job.failed', jobId: 'job-1', queue: 'webhooks', final: true }),
+      );
+    });
   });
 });
