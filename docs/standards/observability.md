@@ -37,7 +37,9 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
    `apps/backend/src/config/production-guard.ts` decides what a deployed task exposes. _Spec-checked._
 2. **Context comes from the mixin.** Every line inside a request carries `requestId` and `traceId`, and `tenantId`,
    `tenantDbId`, `userId` and `role` once auth has run. Every line inside a job carries `jobName` and `jobId`.
-   `logContextMixin` (`packages/appshore/kernel/src/infrastructure/logging/log-context-mixin.ts`) adds them; code
+   Every line inside a request or job also carries the tenant context it runs in: `rls.kind` (`tenant`, `public`,
+   `system`, or `none` when nothing declared one), with `rls.tenant` and `rls.source`, or `rls.reason` for system
+   work (`packages/appshore/kernel/src/infrastructure/rls/`). `logContextMixin` (`packages/appshore/kernel/src/infrastructure/logging/log-context-mixin.ts`) adds them; code
    never passes them by hand, except in BullMQ `failed` listeners, which run outside the job context
    (`reportJobFailure` does this for you). `BaseQueueDispatcher` runs every job inside `withJobContext`; a
    processor that owns its own queue wraps itself.

@@ -390,3 +390,33 @@ a week of them, fix the plans or the seed, then remove the key. Check `plan_conf
 
 **How to turn it back.** `PLAN_ENFORCEMENT=log` lets every plan denial and the seat check through. Kill switches
 (feature flags) and the WhatsApp channel's entitlement hold in both modes, as they did before.
+
+## 2026-11-13: every request, job, tool call and timer runs in a declared tenant context (nothing enforced yet)
+
+**What changes when you pull it.**
+
+- **A tenant context exists.** `packages/appshore/kernel/src/infrastructure/rls/` holds a second AsyncLocalStorage,
+  apart from the log context: the tenant DB id a unit of work runs as (`tenant`), `public`, or declared cross-tenant
+  `system` work with a reason. Nothing in the database reads it yet; there is no policy, role or second pool. It is
+  set by the auth guards (`jwt`, `api-key`, `oauth`, `refresh` from the session's workspace), by `withJobContext`
+  (each job runs as the tenant its payload names, never its caller's), by the AI tool executor around the one tool
+  call (`tool:<name>`), by the outbox relay (system reason `outbox-relay`, then each event as its emitter's tenant)
+  and the deadline sweeper (`deadline-sweep`, then each handler as its row's tenant), and by the public invitation
+  routes once the token names a tenant. Super-admin routes opt in with `@SystemScope(reason)` or `@TargetTenant`.
+- **Every log line carries `rls.*` fields** inside a scope: `rls.kind` (`tenant`, `public`, `system` or `none`),
+  `rls.tenant`, `rls.source`, `rls.reason`. `rls.kind=none` marks a request or job nobody declared.
+- **Unit tests run in strict mode.** Each package's Jest setup sets `RLS_STRICT_CONTEXT=throw` (backend:
+  `apps/backend/test/jest-env-defaults.js`, kernel and platform: `jest.setup-env.js`). A context conflict then
+  throws: a second, different tenant in one scope, `runAsTenant` or `runAsPublic` inside another context, a system
+  scope entered from a tenant request, an event handled under another tenant than its emitter's. A unit test that
+  sets no context is not affected. A deployed task leaves the key unset: a conflict is logged and the first context
+  kept, so no live request fails on it.
+- **`OutboxRelay` takes a third constructor argument**, `TenantIdResolver`. A product spec that builds the relay by
+  hand passes one.
+
+**What to set first.** Nothing. A product job that runs across tenants should wrap its work in `systemScope(reason)`
+or `forEachTenant(reason, …)` with a reason it registers through `registerSystemReasons`; the coverage specs that
+require it arrive in the next change.
+
+**How to turn it back.** There is no switch, because nothing is enforced. To silence strict mode in a product's own
+tests, remove the `setupFiles` entry; deployed tasks never set it.

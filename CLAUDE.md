@@ -64,6 +64,12 @@ Tenant enforcement is a global guard chain (`Throttler → Jwt → Tenant → Ro
 manual `where: { tenantId }` in services. The `TenantGuard` short-circuits to the implicit tenant
 when `MULTI_TENANT=false`.
 
+Every request, job, AI tool call and deadline handler also runs in a declared tenant context
+(`packages/appshore/kernel/src/infrastructure/rls/`): the auth guards pin the request, `withJobContext` scopes each
+job, cross-tenant work declares `systemScope(reason)` / `forEachTenant` / `@SystemScope`, and every log line carries
+`rls.*`. Nothing in the database enforces it yet (no row-level security policy); unit tests run it strict
+(`RLS_STRICT_CONTEXT=throw`).
+
 ---
 
 ## Monorepo structure
