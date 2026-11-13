@@ -1,8 +1,8 @@
 # Local-only Prometheus for the `observability` compose profile. It scrapes nothing: the backend PUSHES metrics over
 # OTLP (the worker has no HTTP port), to http://localhost:9090/api/v1/otlp/v1/metrics, enabled by the
-# --web.enable-otlp-receiver flag in docker-compose.yml. Point the backend at it with
-#   OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:9090/api/v1/otlp/v1/metrics
-# while traces keep going to Tempo on localhost:4318 (docs/observability.md).
+# --web.enable-otlp-receiver flag in docker-compose.yml. With ENV_TYPE=development and no OTLP endpoint the backend
+# sends metrics here on its own, while traces go to Tempo on localhost:4318. With an explicit endpoint, point metrics
+# here with OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:9090/api/v1/otlp/v1/metrics (docs/observability.md).
 #
 # This is for trying metrics and PromQL on a laptop. It is not the production answer: a deployed product sends
 # metrics to a hosted, Prometheus-compatible backend (docs/observability.md, level 2).

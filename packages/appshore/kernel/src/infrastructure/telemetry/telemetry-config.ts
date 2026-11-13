@@ -7,6 +7,11 @@ import { isDevelopmentEnv, resolveObservabilityEnv } from '../../shared/utils/en
 
 /** The local collector (Tempo, or anything speaking OTLP over HTTP) a developer's machine falls back to. */
 export const DEV_OTLP_BASE = 'http://localhost:4318';
+/**
+ * Where development metrics go when no endpoint is set: the local Prometheus OTLP receiver (the `observability`
+ * compose profile). Tempo on :4318 takes traces only, so `${DEV_OTLP_BASE}/v1/metrics` would fail every export.
+ */
+export const DEV_PROMETHEUS_OTLP_METRICS_URL = 'http://localhost:9090/api/v1/otlp/v1/metrics';
 const DEFAULT_SAMPLE_RATIO = 1;
 
 export interface TraceExportConfig {
@@ -48,14 +53,16 @@ export const METRIC_EXPORT_INTERVAL_MS = 60_000;
  * Null when metrics must not be exported. They share `OTEL_EXPORTER_OTLP_ENDPOINT` and its auth header with traces,
  * so one key turns both on and an empty one turns both off. The standard `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`
  * overrides the metrics URL only (a full URL, used as given), so on a laptop metrics can go to Prometheus while
- * traces go to Tempo. The override never turns metrics on by itself: with traces off, metrics are off too.
+ * traces go to Tempo. The override never turns metrics on by itself: with traces off, metrics are off too. On the
+ * development fallback (no endpoint set) metrics default to the local Prometheus receiver, not Tempo.
  */
 export function resolveMetricExportConfig(env: NodeJS.ProcessEnv = process.env): MetricExportConfig | null {
   const base = resolveOtlpBase(env);
   if (!base) return null;
   const override = env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT?.trim();
+  const devFallback = !env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
   return {
-    url: override || `${base}/v1/metrics`,
+    url: override || (devFallback ? DEV_PROMETHEUS_OTLP_METRICS_URL : `${base}/v1/metrics`),
     headers: parseOtlpHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
     exportIntervalMillis: METRIC_EXPORT_INTERVAL_MS,
     envLabel: resolveObservabilityEnv(env.ENV_TYPE),

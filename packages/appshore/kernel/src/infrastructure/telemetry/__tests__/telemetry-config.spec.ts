@@ -1,4 +1,5 @@
 import {
+  DEV_PROMETHEUS_OTLP_METRICS_URL,
   METRIC_EXPORT_INTERVAL_MS,
   parseOtlpHeaders,
   resolveMetricExportConfig,
@@ -132,6 +133,25 @@ describe('resolveSampleRatio', () => {
 });
 
 describe('resolveMetricExportConfig', () => {
+  it('sends development metrics to the local Prometheus OTLP receiver when no endpoint is set (Tempo takes no metrics)', () => {
+    expect(resolveMetricExportConfig({ ENV_TYPE: 'development' })?.url).toBe(
+      'http://localhost:9090/api/v1/otlp/v1/metrics',
+    );
+    expect(DEV_PROMETHEUS_OTLP_METRICS_URL).toBe('http://localhost:9090/api/v1/otlp/v1/metrics');
+  });
+
+  it('keeps <endpoint>/v1/metrics in development when the endpoint is set, and the override wins over both', () => {
+    expect(
+      resolveMetricExportConfig({ ENV_TYPE: 'development', OTEL_EXPORTER_OTLP_ENDPOINT: 'http://collector:4318' })?.url,
+    ).toBe('http://collector:4318/v1/metrics');
+    expect(
+      resolveMetricExportConfig({
+        ENV_TYPE: 'development',
+        OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'http://localhost:9999/v1/metrics',
+      })?.url,
+    ).toBe('http://localhost:9999/v1/metrics');
+  });
+
   it('is off whenever traces are off (one endpoint switches both)', () => {
     expect(resolveMetricExportConfig({ ENV_TYPE: 'production', OTEL_EXPORTER_OTLP_ENDPOINT: '' })).toBeNull();
   });

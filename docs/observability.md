@@ -79,12 +79,15 @@ scraped: the worker has no HTTP port.
 
 With no endpoint and `ENV_TYPE` anything but `development`, the SDK starts with no exporter and no instrumentation:
 it only carries the trace context, so AI spans still nest in Langfuse, and every metric call is a no-op. Nothing
-retries into the void. With `ENV_TYPE=development` and no endpoint, traces and metrics go to `http://localhost:4318`
-(the local stack). Every exported span and point carries `deployment.environment` / `env` from `ENV_TYPE` (the same
+retries into the void. With `ENV_TYPE=development` and no endpoint, traces go to Tempo on `http://localhost:4318` and
+metrics to Prometheus's OTLP receiver on `http://localhost:9090/api/v1/otlp/v1/metrics` (the local stack; Tempo takes
+no metrics). Every exported span and point carries `deployment.environment` / `env` from `ENV_TYPE` (the same
 three values as logs and errors) and a stable `service.instance.id` (the ECS task id).
 
-AI calls traced to Langfuse (`LANGFUSE_SECRET_KEY`) go through their own provider, and phones and emails are masked
-in every string attribute before a span leaves the process.
+AI spans sent to Langfuse (`LANGFUSE_SECRET_KEY`) have phones and emails masked before they leave the process, on
+both paths: AI SDK calls go through their own provider, whose span processor masks every string attribute, event
+attribute and status message; Mastra agent spans (the chat assistant) go through Mastra's exporter, with a span
+output processor that masks input, output, attributes, metadata and error.
 
 Traces and metrics leave AWS when the endpoint is a hosted backend: list it as a subprocessor in your privacy terms.
 
@@ -151,7 +154,8 @@ For trying logs, traces, metrics and PromQL on a laptop, not for production:
 docker compose --profile observability up -d   # Loki :3100, Tempo :4318, Prometheus :9090, Grafana :3003
 ```
 
-Every port is bound to loopback. With `ENV_TYPE=development` the backend sends traces to Tempo on its own. To see
-metrics, also set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:9090/api/v1/otlp/v1/metrics` (Prometheus's
-OTLP receiver) and `LOG_TRANSPORT=loki` for logs. Grafana has the three datasources provisioned. A deployed product
+Every port is bound to loopback. With `ENV_TYPE=development` and no endpoint set, the backend sends traces to Tempo
+and metrics to Prometheus's OTLP receiver on its own. If you set `OTEL_EXPORTER_OTLP_ENDPOINT` to a local collector,
+also set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:9090/api/v1/otlp/v1/metrics` to keep metrics on
+Prometheus. Set `LOG_TRANSPORT=loki` for logs. Grafana has the three datasources provisioned. A deployed product
 sends to a hosted backend instead, switched on by the keys above.
