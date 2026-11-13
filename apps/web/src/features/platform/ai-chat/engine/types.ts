@@ -41,12 +41,21 @@ export interface TextCardData {
   body?: string;
 }
 
+/**
+ * The confirm card the server built for one exact write (the `9:` frame): never the model's own words. `tool` and
+ * `args` are what runs on Confirm; `toolCallId` names the card to the resume route.
+ */
 export interface ConfirmationCardData {
   action: string;
   description: string;
-  entityId?: string;
-  entityType?: string;
+  tool?: string;
+  args?: Record<string, unknown>;
+  toolCallId?: string;
+  runId?: string;
 }
+
+/** What became of a confirm card this session: confirmed, cancelled, or no longer waiting (a 409 on Confirm). */
+export type ConfirmationOutcome = 'confirmed' | 'cancelled' | 'expired';
 
 // ── Action Results ──
 export interface ActionResult {

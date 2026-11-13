@@ -1,8 +1,17 @@
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@appshore/web-core/shared/constants';
-import type { ChatMessage, OrbState, UserMode, InputMode, Intent, ChatLayout } from './engine/types';
+import type {
+  ChatMessage,
+  ConfirmationCardData,
+  ConfirmationOutcome,
+  OrbState,
+  UserMode,
+  InputMode,
+  Intent,
+  ChatLayout,
+} from './engine/types';
 import { DEFAULT_VOICE_PREFS, type VoicePreferences } from './voice/types';
-import { chatErrorCopy, chatRequestError } from './lib/chat-error';
+import { ChatRequestError, chatErrorCopy, chatRequestError } from './lib/chat-error';
 import {
   applyCitationFrame,
   applyReadingFrame,
@@ -21,15 +30,8 @@ import {
   getAuthHeaders,
 } from './api';
 
-/** Pending HITL confirmation from the agent. */
-interface PendingConfirmation {
-  action: string;
-  description: string;
-  entityId: string;
-  entityType: string;
-  runId?: string;
-  toolCallId?: string;
-}
+/** Pending HITL confirmation from the agent: the server-built card it is waiting on. */
+type PendingConfirmation = ConfirmationCardData;
 
 interface AssistantState {
   // Strip state
@@ -51,6 +53,8 @@ interface AssistantState {
 
   // HITL confirmation
   pendingConfirmation: PendingConfirmation | null;
+  /** What became of each answered card, by `toolCallId`, so each card shows its own state. */
+  confirmationOutcomes: Record<string, ConfirmationOutcome>;
 
   // Input draft (prefilled by Ask Assistant buttons)
   draftInput: string | null;
@@ -191,6 +195,15 @@ async function readTurn(
   return { assistantText, failure };
 }
 
+/** The outcomes with this card's recorded; a card with no `toolCallId` has nowhere to record one. */
+function withOutcome(
+  outcomes: Record<string, ConfirmationOutcome>,
+  toolCallId: string | undefined,
+  outcome: ConfirmationOutcome,
+): Record<string, ConfirmationOutcome> {
+  return toolCallId ? { ...outcomes, [toolCallId]: outcome } : outcomes;
+}
+
 /** Module-level abort controller for cancelling in-flight streaming requests */
 let activeAbortController: AbortController | null = null;
 
@@ -212,6 +225,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   hasUnreadAsync: false,
   openSource: null,
   pendingConfirmation: null,
+  confirmationOutcomes: {},
   isViewingHistory: false,
   viewedMessages: [],
   isLoadingHistory: false,
@@ -407,7 +421,11 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     if (!state.sessionId || !state.pendingConfirmation) return;
 
     const { runId, toolCallId } = state.pendingConfirmation;
-    set({ pendingConfirmation: null, orbState: 'thinking' as OrbState });
+    set((s) => ({
+      pendingConfirmation: null,
+      orbState: 'thinking' as OrbState,
+      confirmationOutcomes: withOutcome(s.confirmationOutcomes, toolCallId, 'confirmed'),
+    }));
 
     const resumeUrl = getResumeUrl(state.sessionId);
     const headers = getAuthHeaders();
@@ -446,12 +464,17 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
         set({ orbState: 'idle' as OrbState });
       })
       .catch((err) => {
+        // A 409: the card was already answered or expired, so nothing was confirmed and nothing ran.
+        const noLongerWaiting = err instanceof ChatRequestError && err.status === 409;
         set((s) => ({
           messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
             ...settleMessage(m),
             content: chatErrorCopy(err),
           })),
           orbState: 'idle' as OrbState,
+          ...(noLongerWaiting && {
+            confirmationOutcomes: withOutcome(s.confirmationOutcomes, toolCallId, 'expired'),
+          }),
         }));
       });
   },
@@ -461,7 +484,10 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     if (!state.sessionId || !state.pendingConfirmation) return;
 
     const { action, runId, toolCallId } = state.pendingConfirmation;
-    set({ pendingConfirmation: null });
+    set((s) => ({
+      pendingConfirmation: null,
+      confirmationOutcomes: withOutcome(s.confirmationOutcomes, toolCallId, 'cancelled'),
+    }));
 
     // Add cancellation message to chat
     set((s) => ({
@@ -504,6 +530,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       orbState: 'idle',
       activeTranscript: '',
       pendingConfirmation: null,
+      confirmationOutcomes: {},
       suggestedFollowUps: [],
       isViewingHistory: false,
       viewedMessages: [],
