@@ -10,6 +10,7 @@ import { fromUser, fromOAuthUser, fromDeskResponsibility, fromApiKey } from '@ap
 import { z } from 'zod';
 import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
 import { scopesForRole } from '../role-scopes';
+import { intentDigest } from '../intent-digest';
 
 const mockRegistry = {
   scopeForTool: jest.fn(),
@@ -463,6 +464,81 @@ describe('InvocationPipelineService', () => {
       expect(mockChallenges.consume).not.toHaveBeenCalled();
       expect(mockLogger.writePending).toHaveBeenCalledWith(expect.objectContaining({ hitlTier: tier }));
       mockHitl.resolveTier.mockReset();
+    });
+  });
+
+  describe('the challenge digest (item 8a): exact arguments, every depth', () => {
+    const writeSchema = z.object({
+      invoice: z.object({ amount: z.number() }),
+      to: z.string(),
+      memo: z.string().default(''),
+    });
+    const agent = () =>
+      fromOAuthUser({ onBehalfOfUserDbId: 5, tenantDbId: 1, role: 'ADMIN', scopes: ['platform:write'], clientId: 'c' });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
+      mockRegistry.parametersForTool.mockReturnValue(writeSchema);
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 600, stepUpRequired: false });
+    });
+
+    const issuedDigest = async (args: Record<string, unknown>) => {
+      mockChallenges.issue.mockClear();
+      await svc.run(agent(), 'send-invoice', args);
+      return mockChallenges.issue.mock.calls[0][0].argsDigest as string;
+    };
+
+    it('issues the challenge over the intent digest of the call', async () => {
+      const args = { invoice: { amount: 5 }, to: 'ap@example.com' };
+      expect(await issuedDigest(args)).toBe(intentDigest(writeSchema, args));
+    });
+
+    it('a change inside a nested object needs a new challenge', async () => {
+      const small = await issuedDigest({ invoice: { amount: 5 }, to: 'ap@example.com' });
+      const large = await issuedDigest({ invoice: { amount: 500 }, to: 'ap@example.com' });
+      expect(large).not.toBe(small);
+    });
+
+    it('a change inside a field the log redacts needs a new challenge', async () => {
+      const approved = await issuedDigest({ invoice: { amount: 5 }, to: 'ap@example.com' });
+      const swapped = await issuedDigest({ invoice: { amount: 5 }, to: 'attacker@example.com' });
+      expect(swapped).not.toBe(approved);
+    });
+
+    it('the replay is checked against the exact digest, so swapped arguments cannot spend an approval', async () => {
+      mockChallenges.consume.mockResolvedValue(null);
+      await svc.run(agent(), 'send-invoice', {
+        invoice: { amount: 500 },
+        to: 'attacker@example.com',
+        _confirmToken: 't',
+      });
+      expect(mockChallenges.consume).toHaveBeenCalledWith(
+        't',
+        expect.objectContaining({
+          argsDigest: intentDigest(writeSchema, { invoice: { amount: 500 }, to: 'attacker@example.com' }),
+        }),
+      );
+      expect(mockChallenges.consume.mock.calls[0][1].argsDigest).not.toBe(
+        intentDigest(writeSchema, { invoice: { amount: 5 }, to: 'ap@example.com' }),
+      );
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('a re-spelled replay of the same call (key order, explicit default) still matches', async () => {
+      const issued = await issuedDigest({ to: 'ap@example.com', invoice: { amount: 5 } });
+      mockChallenges.consume.mockResolvedValue({ id: 1 });
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      await svc.run(agent(), 'send-invoice', {
+        memo: '',
+        invoice: { amount: 5 },
+        to: 'ap@example.com',
+        _confirmToken: 't',
+      });
+      expect(mockChallenges.consume.mock.calls[0][1].argsDigest).toBe(issued);
+      expect(mockExecutor.execute).toHaveBeenCalled();
     });
   });
 

@@ -6,7 +6,8 @@ import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.const
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AgentPrincipal, principalAuditLabel } from '@appshore/platform/auth/agent-principal';
 import { HitlTier } from './hitl-policy.service';
-import { redactArgs, digestArgs } from './arg-redactor';
+import { redactArgs } from './arg-redactor';
+import { sha256Canonical } from './intent-digest';
 import type { AgentScope } from '@app/shared-types';
 
 export interface WritePendingInput {
@@ -46,7 +47,9 @@ export class AgentInvocationLoggerService {
 
   async writePending(input: WritePendingInput): Promise<string | null> {
     const redacted = redactArgs(input.args) as Record<string, unknown>;
-    const digest = digestArgs(redacted);
+    // A fingerprint of the logged (redacted) copy, keys sorted at every depth. It is for grouping log rows only and
+    // never authorises anything; confirmations use the exact intent digest.
+    const digest = sha256Canonical(redacted);
 
     const row = await this.prisma.agentInvocationLog.create({
       data: {

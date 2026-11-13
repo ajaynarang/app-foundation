@@ -5,7 +5,7 @@ import { HitlPolicyService } from './hitl-policy.service';
 import { ToolExecutorService, ToolResult } from './tool-executor.service';
 import { AgentInvocationLoggerService } from './agent-invocation-logger.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
-import { redactArgs, digestArgs } from './arg-redactor';
+import { intentDigest } from './intent-digest';
 import { HitlChallengeService } from './hitl-challenge.service';
 import { ToolAccessPolicyService } from './tool-access-policy.service';
 import { validateToolArgs } from './tool-args';
@@ -101,7 +101,9 @@ export class InvocationPipelineService {
     const confirmToken = challenged && typeof sentToken === 'string' ? sentToken : undefined;
 
     if (challenged) {
-      const argsDigest = digestArgs(redactArgs(toolArgs) as Record<string, unknown>);
+      // The digest binds the token to this exact call: parsed through the tool's schema, keys sorted at every
+      // depth, unredacted. A change inside a nested object or a redacted field is a different call.
+      const argsDigest = intentDigest(this.registry.parametersForTool(toolName), args);
 
       if (!confirmToken) {
         const issued = await this.challenges.issue({

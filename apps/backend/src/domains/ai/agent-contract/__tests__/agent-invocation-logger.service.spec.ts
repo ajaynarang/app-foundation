@@ -6,7 +6,7 @@ import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
-import { digestArgs } from '../arg-redactor';
+import { sha256Canonical } from '../intent-digest';
 
 describe('AgentInvocationLoggerService', () => {
   const prisma = createMockPrisma();
@@ -43,7 +43,23 @@ describe('AgentInvocationLoggerService', () => {
       email: '[redacted-email]',
     });
     expect(data.hitlTier).toBe('none');
-    expect(data.argsDigest).toBe(digestArgs({ status: 'active', email: '[redacted-email]' }));
+    expect(data.argsDigest).toBe(sha256Canonical({ status: 'active', email: '[redacted-email]' }));
+  });
+
+  it('writePending fingerprints nested arguments too (keys sorted at every depth)', async () => {
+    prisma.agentInvocationLog.create.mockResolvedValue({ id: 'row-2' });
+    const write = (args: Record<string, unknown>) =>
+      svc.writePending({
+        principal: fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' }),
+        toolName: 'query-records',
+        scopeRequired: 'platform:read',
+        hitlTier: 'none',
+        args,
+      });
+    await write({ filter: { amount: 5 } });
+    await write({ filter: { amount: 500 } });
+    const [first, second] = prisma.agentInvocationLog.create.mock.calls.map((call: any[]) => call[0].data.argsDigest);
+    expect(first).not.toBe(second);
   });
 
   it('completeSuccess updates the row and emits invocation-completed', async () => {
