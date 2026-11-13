@@ -17,6 +17,7 @@
  *                                                      metadata, login, PublicLayout, landing page)
  *   - PROJECT_NAME / MULTI_TENANT / NEXT_PUBLIC_MULTI_TENANT in .env.example files
  *   - `@app/` workspace scope     → <scope>/          (only when --scope is not @app)
+ *   - Grafana-as-code PROJECT / REPO_URL → <name> / <repo-url>, then the catalog is regenerated
  *
  * Optional features, removed BEFORE the rename rules so each manifest is matched against template text:
  *   - `--desk no` (the default) strips Desk through tools/init-app/features/desk.json (apply-feature.mjs)
@@ -30,8 +31,15 @@
 
 import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { loadManifest, removeFeature } from './apply-feature.mjs';
+import {
+  CONSTANTS_FILE as OBSERVABILITY_CONSTANTS,
+  GENERATE_SCRIPT as OBSERVABILITY_GENERATE,
+  isValidRepoUrl,
+  repoUrlFromRemote,
+  setObservabilityConstants,
+} from './observability-constants.mjs';
 import { walkRepo } from './repo-walk.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,6 +61,7 @@ const { values: flags } = parseArgs({
     tenancy: { type: 'string' }, // mt | st
     mobile: { type: 'string' }, // yes | no — keep the Flutter companion app?
     desk: { type: 'string' }, // yes | no — include Desk (default no)?
+    'repo-url': { type: 'string' }, // https://github.com/<org>/<repo> — runbook links in the alert catalog
     yes: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     force: { type: 'boolean', default: false },
@@ -70,6 +79,8 @@ if (flags.help) {
   --tenancy <mt|st|personal>  Tenancy mode written to .env.example files (default: mt)
   --mobile <yes|no>        Keep the Flutter mobile companion app at apps/mobile (default: yes)
   --desk <yes|no>   Include Desk, the Inngest workflow engine for background AI agents (default: no)
+  --repo-url <url>         Your repository, e.g. https://github.com/acme/acme-crm: alert runbook links point there
+                           (default: the git remote origin, unless it is the template's own)
   --yes                    Non-interactive; accept defaults for everything not passed
   --dry-run                Show per-file replacement counts; change nothing
   --force                  Skip the git-clean and already-initialized guards
@@ -141,7 +152,9 @@ async function gatherConfig() {
     tenancy: flags.tenancy,
     mobile: flags.mobile,
     desk: flags.desk,
+    repoUrl: flags['repo-url'],
   };
+  const remoteRepoUrl = detectRepoUrl();
 
   if (flags.yes) {
     if (!cfg.name) fail('--yes requires --name.');
@@ -165,6 +178,8 @@ async function gatherConfig() {
         'Include Desk, the Inngest workflow engine for background AI agents? Timers and recurring jobs work without it. (yes/no)',
         'no',
       ));
+    cfg.repoUrl =
+      cfg.repoUrl || (await ask('Repository URL, for alert runbook links (blank to set later)', remoteRepoUrl ?? ''));
     rl.close();
   }
 
@@ -174,6 +189,7 @@ async function gatherConfig() {
   cfg.tenancy = cfg.tenancy || 'mt';
   cfg.mobile = cfg.mobile || 'yes';
   cfg.desk = cfg.desk || 'no';
+  cfg.repoUrl = cfg.repoUrl || remoteRepoUrl || '';
 
   if (!VALID.name.test(cfg.name)) fail(`Invalid --name "${cfg.name}" — must match ${VALID.name}`);
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
@@ -183,7 +199,24 @@ async function gatherConfig() {
     fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
   if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
   if (!['yes', 'no'].includes(cfg.desk)) fail(`Invalid --desk "${cfg.desk}" — must be yes or no`);
+  if (cfg.repoUrl && !isValidRepoUrl(cfg.repoUrl))
+    fail(`Invalid --repo-url "${cfg.repoUrl}" — must look like https://github.com/<org>/<repo>`);
   return cfg;
+}
+
+/** The origin remote as a web URL, unless it is the template's own repository (a plain clone of it). */
+function detectRepoUrl() {
+  try {
+    const remote = execSync('git remote get-url origin', {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const url = repoUrlFromRemote(remote);
+    return url && !url.includes(TEMPLATE_NAME) ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +281,11 @@ function buildRules(cfg) {
           .replace(/^PROJECT_NAME=.*$/m, `PROJECT_NAME=${displayName} Backend`)
           .replace(/^MULTI_TENANT=.*$/m, `MULTI_TENANT=${mt}`)
           .replace(/^TENANCY_MODE=.*$/m, `TENANCY_MODE=${mode}`),
+    },
+    {
+      id: `grafana-as-code PROJECT=${name}${cfg.repoUrl ? ' + REPO_URL' : ''}`,
+      files: [OBSERVABILITY_CONSTANTS],
+      apply: (s) => setObservabilityConstants(s, { project: name, repoUrl: cfg.repoUrl }),
     },
     {
       id: `web .env.example NEXT_PUBLIC_MULTI_TENANT=${mt}`,
@@ -359,6 +397,22 @@ if (cfg.mobile === 'no') {
       console.log('  Deleted apps/mobile (--mobile no).');
     }
   }
+}
+
+// The alert and dashboard files are generated from the constants just set. generate.mjs is plain Node, so this runs
+// before `pnpm install`; if it cannot, the command is printed.
+if (!dryRun) {
+  const generate = `node ${OBSERVABILITY_GENERATE}`;
+  try {
+    execFileSync(process.execPath, [OBSERVABILITY_GENERATE], { cwd: ROOT, stdio: 'pipe' });
+    console.log('  Regenerated the Grafana-as-code alerting and dashboard files for the new name.');
+  } catch {
+    console.warn(`  ⚠ Could not regenerate the Grafana-as-code files. Run: ${generate}`);
+  }
+  if (!cfg.repoUrl)
+    console.log(
+      `  No repository URL: alert runbook links stay on the placeholder until you set REPO_URL in\n    ${OBSERVABILITY_CONSTANTS} and run ${generate}.`,
+    );
 }
 
 // The committed OpenAPI documents and the RBAC matrix list every route, so they go stale when a feature is removed.
