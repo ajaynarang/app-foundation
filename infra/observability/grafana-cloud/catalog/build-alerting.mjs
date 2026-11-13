@@ -88,7 +88,8 @@ function cloudwatchSteps(rule, envSpec) {
         datasource: EXPR_DS,
       },
     },
-    thresholdStep('C', 'B', rule.op, rule.threshold),
+    // A threshold may depend on the environment (rds-connections-high reads each environment's max_connections).
+    thresholdStep('C', 'B', rule.op, typeof rule.threshold === 'function' ? rule.threshold(envSpec) : rule.threshold),
   ];
 }
 
