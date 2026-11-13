@@ -12,13 +12,12 @@ import { AuthModule } from '@appshore/platform/auth/auth.module';
 import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
 import { RolesGuard } from '@appshore/platform/auth/guards/roles.guard';
-import {
-  RequestContextMiddleware,
-  requestContextStorage,
-} from '@appshore/kernel/infrastructure/logging/request-context.middleware';
+import { RequestContextMiddleware } from '@appshore/kernel/infrastructure/logging/request-context.middleware';
+import { logContextMixin } from '@appshore/kernel/infrastructure/logging/log-context-mixin';
 import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
-import { shouldSkipRequestLog, maskUrlSecrets } from '@appshore/kernel/infrastructure/logging/log-filter';
-import { getActiveTraceContext } from '@appshore/kernel/infrastructure/logging/trace-context';
+import { shouldSkipRequestLog } from '@appshore/kernel/infrastructure/logging/log-filter';
+import { serializeErrorForLog, serializeRequestForLog } from '@appshore/kernel/infrastructure/logging/log-serializers';
+import { scrubContactDetails, stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 import { buildPinoTransport } from '@appshore/kernel/infrastructure/logging/pino-transport';
 
 // Domain Modules
@@ -83,34 +82,14 @@ import { PromptingModule } from './domains/prompting/prompting.module';
           ],
           censor: '[REDACTED]',
         },
-        mixin() {
-          const ctx = requestContextStorage.getStore();
-          const traceCtx = getActiveTraceContext();
-          // Omit undefined/empty fields to avoid polluting log cardinality
-          // (e.g. SUPER_ADMIN sessions have no tenantId, logs outside a
-          // request/job have no traceId).
-          const fields: Record<string, string> = {};
-          if (ctx?.requestId) fields.requestId = ctx.requestId;
-          if (ctx?.tenantId) fields.tenantId = ctx.tenantId;
-          if (ctx?.userId) fields.userId = ctx.userId;
-          if (ctx?.jobName) fields.jobName = ctx.jobName;
-          if (ctx?.jobId) fields.jobId = ctx.jobId;
-          if (traceCtx.traceId) fields.traceId = traceCtx.traceId;
-          if (traceCtx.spanId) fields.spanId = traceCtx.spanId;
-          return fields;
-        },
+        mixin: logContextMixin,
         autoLogging: { ignore: shouldSkipRequestLog },
-        serializers: {
-          // Mask credential-bearing query params (e.g. the SSE ?token= access
-          // token) so they never reach the log pipeline.
-          req(req: any) {
-            if (req?.url) req.url = maskUrlSecrets(req.url);
-            return req;
-          },
-        },
-        customSuccessMessage: (req: any, res: any) => `${req.method} ${maskUrlSecrets(req.url)} ${res.statusCode}`,
+        // The SSE stream authenticates with `?token=`, and invite and OAuth links carry secrets under other names:
+        // the whole query string leaves `req`, and contact details a provider echoes leave `err`.
+        serializers: { req: serializeRequestForLog, err: serializeErrorForLog },
+        customSuccessMessage: (req: any, res: any) => `${req.method} ${stripQueryString(req.url)} ${res.statusCode}`,
         customErrorMessage: (req: any, res: any, err: any) =>
-          `${req.method} ${maskUrlSecrets(req.url)} ${res.statusCode} - ${err.message}`,
+          `${req.method} ${stripQueryString(req.url)} ${res.statusCode} - ${scrubContactDetails(String(err?.message ?? ''))}`,
       },
     }),
     SharedModule,
