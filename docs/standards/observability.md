@@ -65,6 +65,7 @@ repo; the rules hold from the day they do.
 ## What the spec does not catch
 
 `log-hygiene.spec.ts` reads source text. A value renamed before it is logged (`const to = user.phone`) is not
-caught, and neither is string concatenation (`'to ' + email`). `to` and `message` are not on its identifier list,
+caught, and neither is string concatenation (`'to ' + email`). A name is judged by its last word, so a sensitive
+word earlier in the name (`otpCode`, `emailTo`, `tokenHash`) is not caught either. `to` and `message` are not on its identifier list,
 because they would flag every `err.message`; the email and SMS senders have their own specs instead. Rules 2, 4, 5,
 6 and 8 are review rules.

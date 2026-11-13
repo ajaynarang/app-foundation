@@ -30,7 +30,9 @@ import {
  *
  * Known gaps: a value renamed before logging (`const to = user.phone`) is not caught; `to` and `message` are not on
  * the identifier list because they would flag every `err.message` (the email and SMS senders have their own specs
- * instead); string concatenation (`'to ' + email`) is not read. Rules 2, 4, 5, 6 and 8 are review rules.
+ * instead); string concatenation (`'to ' + email`) is not read; a name is judged by its last word, so a sensitive
+ * word earlier in the name (`otpCode`, `emailTo`, `tokenHash`) is not caught. Rules 2, 4, 5, 6 and 8 are review
+ * rules.
  */
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
