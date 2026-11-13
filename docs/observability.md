@@ -160,12 +160,12 @@ integrations.
   service name, AWS name and runbook link derives from them. `pnpm init-app` sets both and regenerates. A product
   with no worker task (`worker_desired_count = 0`) sets `HAS_WORKER = false` there and regenerates, so nothing
   selects on a service that sends no metric.
-- **Boards:** overview, queues and jobs, SLOs, per-tenant health. Each has an environment selector; the `env` values
-  are the same three the logs, metrics and errors carry.
+- **Boards:** overview, queues and jobs, SLOs, per-tenant health. Each has an environment selector offering the two
+  deployed environments, production and staging (the same `env` label the logs, metrics and errors carry).
 - **Routing:** a `sev1` in production pages through the `irm-oncall` contact point; everything else, a staging
   `sev1` included, notifies through `irm-notify`. Both are Grafana IRM webhooks.
-- **Applying** is a dry run unless `--apply` is passed. `--apply` needs `GRAFANA_URL`, `GRAFANA_SA_TOKEN` and
-  `IRM_ONCALL_WEBHOOK_URL` (apply-time secrets, never app config or Doppler), and refuses while `REPO_URL` is the
+- **Applying** is a dry run unless `--apply` is passed. `--apply` needs `GRAFANA_URL`, `GRAFANA_SA_TOKEN` and, for
+  contact points, policies or rules, `IRM_ONCALL_WEBHOOK_URL` (apply-time secrets, never app config or Doppler), and refuses while `REPO_URL` is the
   placeholder, while a generated file is stale, or (for rules) before Loki has seen logs from both environments.
 
 ## The local stack
