@@ -1,6 +1,7 @@
 import type { Inngest, InngestFunction } from 'inngest';
 
 import { nestApp } from '../inngest/nest-context';
+import { reportDeskFunctionFailure } from '../inngest/desk-function-failure';
 
 import { DeskSchedulerService } from './desk-scheduler.service';
 
@@ -37,6 +38,7 @@ export function createDeskSchedulerFunction(inngest: Inngest): InngestFunction.A
       id: 'desk-scheduler-heartbeat',
       name: 'Desk Scheduler Heartbeat',
       triggers: [{ cron: HEARTBEAT_CRON }],
+      onFailure: reportDeskFunctionFailure,
     },
     deskSchedulerHandler,
   );
