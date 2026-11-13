@@ -41,8 +41,9 @@ export class HitlStepUpController {
   ) {
     const id = parseHitlTokenOrNull(token);
     if (id === null) throw new NotFoundException('Challenge not found');
-    const challenge = await this.prisma.hitlChallenge.findUnique({
-      where: { id },
+    // A chat grant (it names a conversation) is not an agent challenge: it has no approval context to show here.
+    const challenge = await this.prisma.hitlChallenge.findFirst({
+      where: { id, conversationId: null },
     });
     if (!challenge) throw new NotFoundException('Challenge not found');
 

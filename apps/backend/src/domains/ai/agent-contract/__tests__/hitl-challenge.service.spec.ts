@@ -315,6 +315,7 @@ describe('HitlChallengeService', () => {
         stepUpCompleted: false,
         consumedAt: null,
         expiresAt: { gt: expect.any(Date) },
+        conversationId: null,
       },
       data: { stepUpCompleted: true },
     });
@@ -328,5 +329,112 @@ describe('HitlChallengeService', () => {
   it('markStepUpCompleted refuses a token that is not an id, without a query', async () => {
     expect(await svc.markStepUpCompleted('not-a-token', 42)).toBe(false);
     expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('consume never reads a chat grant row: the read is limited to rows with no conversation', async () => {
+    prisma.hitlChallenge.findFirst.mockResolvedValue(null);
+    await svc.consume('5', { tenantId: 7, principalId: 'user:4', toolName: 't', argsDigest: 'd' });
+    expect(prisma.hitlChallenge.findFirst.mock.calls[0][0].where).toMatchObject({ id: 5, conversationId: null });
+  });
+
+  describe('chat grants (item 8b)', () => {
+    const card = { tenantId: 7, userId: 4, conversationId: 'conv_a', toolCallId: 'call_1' };
+    const write = {
+      tenantId: 7,
+      userId: 4,
+      conversationId: 'conv_a',
+      toolName: 'create-thing',
+      argsDigest: 'd'.repeat(64),
+    };
+
+    it('recordChatIntent stores an unconfirmed row bound to the conversation, card, tool and digest', async () => {
+      prisma.hitlChallenge.create.mockResolvedValue({ id: 11 });
+      await svc.recordChatIntent({
+        ...card,
+        toolName: write.toolName,
+        argsDigest: write.argsDigest,
+        scopeRequired: 'platform:write',
+      });
+      const { data } = prisma.hitlChallenge.create.mock.calls[0][0];
+      expect(data).toMatchObject({
+        tenantId: 7,
+        principalKind: 'user',
+        principalId: 'user:4',
+        toolName: 'create-thing',
+        argsDigest: write.argsDigest,
+        scopeRequired: 'platform:write',
+        conversationId: 'conv_a',
+        toolCallId: 'call_1',
+        stepUpRequired: false,
+      });
+      expect(data).not.toHaveProperty('confirmedAt');
+      expect(data.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('confirmChatIntent confirms only an open, unconfirmed card of this person in this conversation, once', async () => {
+      prisma.hitlChallenge.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+      expect(await svc.confirmChatIntent(card)).toBe(true);
+      expect(await svc.confirmChatIntent(card)).toBe(false);
+      expect(prisma.hitlChallenge.updateMany.mock.calls[0][0]).toEqual({
+        where: {
+          tenantId: 7,
+          principalId: 'user:4',
+          conversationId: 'conv_a',
+          toolCallId: 'call_1',
+          confirmedAt: null,
+          consumedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        data: { confirmedAt: expect.any(Date) },
+      });
+    });
+
+    it('declineChatIntent voids the card, confirmed or not', async () => {
+      prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
+      await svc.declineChatIntent(card);
+      expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith({
+        where: { tenantId: 7, principalId: 'user:4', conversationId: 'conv_a', toolCallId: 'call_1', consumedAt: null },
+        data: { consumedAt: expect.any(Date) },
+      });
+    });
+
+    it('consumeChatGrant spends a confirmed grant for the same conversation, tool and digest with a conditional update', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValue({ id: 11 });
+      prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
+      expect(await svc.consumeChatGrant(write)).toBe('11');
+      expect(prisma.hitlChallenge.findFirst.mock.calls[0][0].where).toEqual({
+        tenantId: 7,
+        principalId: 'user:4',
+        conversationId: 'conv_a',
+        toolName: 'create-thing',
+        argsDigest: write.argsDigest,
+        confirmedAt: { not: null },
+        consumedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      });
+      expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith({
+        where: { id: 11, tenantId: 7, consumedAt: null },
+        data: { consumedAt: expect.any(Date) },
+      });
+    });
+
+    it('consumeChatGrant refuses when there is no confirmed grant, or another call spent it first', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValueOnce(null);
+      expect(await svc.consumeChatGrant(write)).toBeNull();
+      expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
+
+      prisma.hitlChallenge.findFirst.mockResolvedValueOnce({ id: 11 });
+      prisma.hitlChallenge.updateMany.mockResolvedValueOnce({ count: 0 });
+      expect(await svc.consumeChatGrant(write)).toBeNull();
+    });
+
+    it('revokeChatGrants voids confirmed grants only, or every open card with includePending', async () => {
+      prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 0 });
+      await svc.revokeChatGrants({ tenantId: 7, userId: 4, conversationId: 'conv_a' });
+      await svc.revokeChatGrants({ tenantId: 7, userId: 4, conversationId: 'conv_a', includePending: true });
+      const base = { tenantId: 7, principalId: 'user:4', conversationId: 'conv_a', consumedAt: null };
+      expect(prisma.hitlChallenge.updateMany.mock.calls[0][0].where).toEqual({ ...base, confirmedAt: { not: null } });
+      expect(prisma.hitlChallenge.updateMany.mock.calls[1][0].where).toEqual(base);
+    });
   });
 });

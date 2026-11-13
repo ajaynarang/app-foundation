@@ -26,6 +26,31 @@ export interface ConsumeInput {
   argsDigest: string;
 }
 
+/** Identifies one person's chat in one workspace. */
+export interface ChatConversationKey {
+  tenantId: number;
+  /** Numeric `User.id` of the person chatting. */
+  userId: number;
+  conversationId: string;
+}
+
+/** Identifies one confirm card: the suspended `confirm-action` call. */
+export interface ChatCardKey extends ChatConversationKey {
+  toolCallId: string;
+}
+
+/** The exact write a card proposes, or a pipeline call is about to run. */
+export interface ChatWriteKey extends ChatConversationKey {
+  toolName: string;
+  /** `intentDigest` of the write's arguments (the same function the challenge path uses). */
+  argsDigest: string;
+}
+
+/** Long enough to read the card and press Confirm, and for the resumed turn to reach the write. */
+export const CHAT_INTENT_TTL_SECONDS = 600;
+
+const chatPrincipalId = (userId: number) => `user:${userId}`;
+
 const TTL_BY_TIER: Record<HitlTier, number> = {
   none: 0,
   standard: 600,
@@ -102,6 +127,8 @@ export class HitlChallengeService {
         tenantId: input.tenantId,
         consumedAt: null,
         expiresAt: { gt: new Date() },
+        // A chat grant is spent only through consumeChatGrant, never as a challenge token.
+        conversationId: null,
       },
     });
     if (!row) return null;
@@ -143,10 +170,117 @@ export class HitlChallengeService {
         stepUpCompleted: false,
         consumedAt: null,
         expiresAt: { gt: new Date() },
+        // A chat grant is confirmed by the card's Confirm (confirmChatIntent), never by a PIN step-up.
+        conversationId: null,
       },
       data: { stepUpCompleted: true },
     });
     return count === 1;
+  }
+
+  /**
+   * In-app chat confirmation, bound to the exact write (item 8b).
+   *
+   * 1. `confirm-action` names a write tool and its exact arguments. `recordChatIntent` stores an unconfirmed row
+   *    for that card (`toolCallId`), bound to the conversation, the tool and the intent digest of the arguments.
+   * 2. The person presses Confirm: the resume route calls `confirmChatIntent` for that card, which succeeds once.
+   * 3. The pipeline, about to run a write for a chat principal, recomputes the digest from the arguments it was
+   *    actually given and spends a matching confirmed row (`consumeChatGrant`). A Confirm for one change cannot run
+   *    another, and a model that skips the card finds nothing to spend.
+   *
+   * Cancel voids the card; a new user message voids every open card; the end of a resumed turn voids unspent grants.
+   */
+  async recordChatIntent(input: ChatCardKey & ChatWriteKey & { scopeRequired: string }): Promise<void> {
+    await this.prisma.hitlChallenge.create({
+      data: {
+        tenantId: input.tenantId,
+        principalKind: 'user',
+        principalId: chatPrincipalId(input.userId),
+        toolName: input.toolName,
+        argsDigest: input.argsDigest,
+        scopeRequired: input.scopeRequired,
+        tier: 'standard',
+        stepUpRequired: false,
+        conversationId: input.conversationId,
+        toolCallId: input.toolCallId,
+        expiresAt: new Date(Date.now() + CHAT_INTENT_TTL_SECONDS * 1000),
+      },
+      select: { id: true },
+    });
+  }
+
+  /** The person pressed Confirm on this card. True once; false when unknown, expired, declined or already confirmed. */
+  async confirmChatIntent(input: ChatCardKey): Promise<boolean> {
+    const { count } = await this.prisma.hitlChallenge.updateMany({
+      where: {
+        tenantId: input.tenantId,
+        principalId: chatPrincipalId(input.userId),
+        conversationId: input.conversationId,
+        toolCallId: input.toolCallId,
+        confirmedAt: null,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { confirmedAt: new Date() },
+    });
+    return count === 1;
+  }
+
+  /** The person pressed Cancel on this card: it can no longer be confirmed or spent. */
+  async declineChatIntent(input: ChatCardKey): Promise<void> {
+    await this.prisma.hitlChallenge.updateMany({
+      where: {
+        tenantId: input.tenantId,
+        principalId: chatPrincipalId(input.userId),
+        conversationId: input.conversationId,
+        toolCallId: input.toolCallId,
+        consumedAt: null,
+      },
+      data: { consumedAt: new Date() },
+    });
+  }
+
+  /** Spend a confirmed grant for exactly this write, once. Returns the grant's id, or null. */
+  async consumeChatGrant(input: ChatWriteKey): Promise<string | null> {
+    const row = await this.prisma.hitlChallenge.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        principalId: chatPrincipalId(input.userId),
+        conversationId: input.conversationId,
+        toolName: input.toolName,
+        argsDigest: input.argsDigest,
+        confirmedAt: { not: null },
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
+    if (!row) return null;
+
+    // Conditional update (`consumed_at IS NULL`): two tool calls racing on one grant cannot both win.
+    const { count } = await this.prisma.hitlChallenge.updateMany({
+      where: { id: row.id, tenantId: input.tenantId, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    return count === 1 ? String(row.id) : null;
+  }
+
+  /**
+   * Void this conversation's confirmed but unspent grants (the end of a resumed turn) and, with `includePending`,
+   * the cards still waiting for a decision too (a new user message abandons them).
+   */
+  async revokeChatGrants(input: ChatConversationKey & { includePending?: boolean }): Promise<void> {
+    await this.prisma.hitlChallenge.updateMany({
+      where: {
+        tenantId: input.tenantId,
+        principalId: chatPrincipalId(input.userId),
+        conversationId: input.conversationId,
+        consumedAt: null,
+        ...(input.includePending ? {} : { confirmedAt: { not: null } }),
+      },
+      data: { consumedAt: new Date() },
+    });
   }
 
   /**

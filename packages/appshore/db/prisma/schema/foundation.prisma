@@ -2296,12 +2296,20 @@ model HitlChallenge {
   stepUpUserId    Int?    @map("step_up_user_id")
   stepUpCompleted Boolean @default(false) @map("step_up_completed")
 
+  // A chat grant (a signed-in user's confirmation in in-app chat) sets these three; a third-party agent challenge
+  // leaves them null. `toolCallId` is the confirm card (the suspended confirm-action call); `confirmedAt` is when the
+  // person pressed Confirm on it. The grant is spent once (`consumedAt`) on the same conversation, tool and digest.
+  conversationId String?   @map("conversation_id") @db.VarChar(80)
+  toolCallId     String?   @map("tool_call_id") @db.VarChar(128)
+  confirmedAt    DateTime? @map("confirmed_at") @db.Timestamptz
+
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([tenantId, expiresAt])
   @@index([tenantId, principalId, consumedAt])
+  @@index([tenantId, conversationId])
   @@map("hitl_challenges")
 }
 

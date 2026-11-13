@@ -74,4 +74,10 @@ describe('HitlStepUpController', () => {
       NotFoundException,
     );
   });
+
+  it('the context read never returns a chat grant row: it looks only at rows with no conversation', async () => {
+    prisma.hitlChallenge.findFirst.mockResolvedValue(null);
+    await expect(ctrl.getContext('5', { dbId: 42, tenantDbId: 7 })).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.hitlChallenge.findFirst).toHaveBeenCalledWith({ where: { id: 5, conversationId: null } });
+  });
 });
