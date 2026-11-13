@@ -1,0 +1,62 @@
+# Upgrade note: operations
+
+For a product that was scaffolded from this starter **before** the operations work (sessions, logging, error
+tracking, telemetry, alerts, safety gates, deploy), and now pulls it.
+
+One dated entry per change that alters behaviour, in the order the changes were made. Each says what changes when
+you pull it, what to set first, and how to turn it back.
+
+## 2026-11-13: refresh tokens rotate, with reuse detection
+
+**What changed.** A refresh used to mint a new access token and leave the refresh token as it was, valid for seven
+days whatever happened. Now every refresh issues a new refresh token (a successor) and sets it as the refresh
+cookie. The tokens of one sign-in form a family, which is the session.
+
+- The token a client presented is not cut short when its successor is issued. It is retired the first time the
+  successor is presented, which proves the client received it. A client whose refresh response was lost (dead zone,
+  app killed) still holds a working token.
+- The presented token must match the hash stored for it, not only name a stored row.
+- Presenting a retired token again is reuse: the whole session is revoked and the user signs in again. A
+  `LoginEvent` failure with reason `REFRESH_REUSE` is written and the backend logs one warning
+  (`event: auth.refresh_reuse`). Other sessions of that user are not touched. A retired token that arrives within
+  `JWT_REFRESH_REUSE_GRACE_SECONDS` (default 10) of its retirement only gets a 401: that is a request another tab
+  had in flight.
+- A session lasts at most `JWT_SESSION_MAX_AGE` (default `30d`) from sign-in, however often it refreshes. One refresh
+  token lives `JWT_REFRESH_EXPIRY` (default `7d`); the stored row used to ignore that key and always say seven days.
+- Each session keeps its own workspace. Refresh used to mint the access token from the user's current default
+  workspace, so a workspace switch in one browser moved every other session on its next refresh. Now the workspace
+  is stored on the session and refresh keeps it, with that workspace's membership role. A removed membership or an
+  inactive workspace ends the session on its next refresh. A workspace switch continues the same session.
+- The access token's `sid` is the session id. Logout revokes the whole session; "sign out other sessions" (change
+  password) revokes every other session.
+
+**Who notices.**
+
+- Browser users: nobody. The web client already sends one refresh at a time per tab and the cookie is replaced on
+  each refresh. Two tabs in one browser share one cookie, so they share one session and one workspace; two
+  workspaces at once need two sessions (two browsers or profiles).
+- A client that stores the refresh token itself (a mobile app, a script, an API test) must store the new value
+  from each refresh. The successor arrives as the `refreshToken` cookie of the `POST /auth/refresh` response; the
+  response body is unchanged. A client that keeps re-sending its first token keeps working until the successor is
+  first presented somewhere, then is signed out as reuse. The starter's `apps/mobile` has no refresh handling, so
+  nothing in it changes.
+- The refresh-token table gains one row per refresh. `JwtTokenService.cleanupExpiredTokens` deletes expired rows
+  and rows revoked more than 30 days ago, but nothing schedules it yet; a later entry in this file turns on the
+  `tokens-cleanup` job that calls it.
+
+**Schema.** Two forward migrations, which keep every row:
+
+- `20261113220000_refresh_token_rotation` adds `family_id`, `family_started_at`, `tenant_id`, `previous_token_id`,
+  `rotated_at` and `last_used_at` to `refresh_tokens`. Each existing token becomes the first token of its own
+  session, started when it was created, in the workspace its user is in today. Live sessions keep working and
+  rotate on their next refresh.
+- `20261113220100_login_fail_reason_refresh_reuse` adds `REFRESH_REUSE` to `login_fail_reason`. It is its own
+  migration because Postgres cannot use a new enum value in the transaction that adds it.
+
+**What to set first.** Nothing. Optionally `JWT_SESSION_MAX_AGE` and `JWT_REFRESH_REUSE_GRACE_SECONDS`
+(`docs/doppler.md`). If you set `JWT_REFRESH_EXPIRY` above `7d`, note that the refresh cookie still expires after
+seven days without a refresh.
+
+**How to turn it back.** Deploy the previous release; no data step is needed. A token retired by rotation is also
+marked revoked, which the old code honours, and every unretired token keeps working under the old code. The new
+columns are ignored by the old code. Leave the migrations in place.
