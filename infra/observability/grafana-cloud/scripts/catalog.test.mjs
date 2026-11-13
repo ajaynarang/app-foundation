@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { RULE_AREAS, STARTER_RULE_KEYS, rdsConnectionsThreshold } from '../catalog/alert-rules.mjs';
 import { buildPolicies, buildRuleFiles } from '../catalog/build-alerting.mjs';
 import { CONTACT_POINTS, ENVS, PROJECT, REPO_URL_PLACEHOLDER, RUNBOOK_BASE, SERVICE } from '../catalog/constants.mjs';
 import { DASHBOARDS } from '../catalog/dashboards/index.mjs';
@@ -104,6 +105,7 @@ test('the shipped catalog validates against this repository', () => {
   const { problems, counts } = validateCatalog(loadInputs());
   assert.deepEqual(problems, []);
   assert.equal(counts.dashboards, 4);
+  assert.equal(counts.rules, STARTER_RULE_KEYS.length * ENVS.length);
 });
 
 test('the four boards carry the product name and filter on its service', () => {
@@ -256,6 +258,137 @@ test('a paused rule, a rule missing in one environment, or a stray "$" fails', (
   assert.match(parity.join('\n'), /rule parity: production and staging differ on api-5xx-rate/);
   const stray = check([rule({ description: 'costs $HOME' })]);
   assert.match(stray.join('\n'), /stray "\$"/);
+});
+
+// ---- the starter catalog ----------------------------------------------------------
+
+/** The generated rule for one key in one environment, from the shipped catalog. */
+function shipped(key, { env = ENVS[0], hasWorker = true } = {}) {
+  for (const { doc } of buildRuleFiles(RULE_AREAS, { hasWorker })) {
+    for (const group of doc.groups) {
+      const found = group.rules.find((r) => r.uid === `${env.short}-${key}`);
+      if (found) return { rule: found, group };
+    }
+  }
+  return undefined;
+}
+const queryOf = (key, opts) => shipped(key, opts).rule.data.find((d) => d.refId === 'A').model.expr;
+const catalogRule = (key) =>
+  RULE_AREAS.flatMap((a) => a.groups ?? [{ rules: a.rules }])
+    .flatMap((g) => g.rules)
+    .find((r) => r.key === key);
+
+test('the starter catalog ships exactly the designed rules, live, in both environments', () => {
+  const keys = RULE_AREAS.flatMap((a) => a.groups ?? [{ rules: a.rules }])
+    .flatMap((g) => g.rules)
+    .map((r) => r.key);
+  assert.deepEqual([...keys].sort(), [...STARTER_RULE_KEYS].sort());
+  for (const env of ENVS) {
+    for (const key of STARTER_RULE_KEYS) {
+      const found = shipped(key, { env });
+      assert.ok(found, `${env.name} ${key}`);
+      assert.equal(found.rule.isPaused, false, key);
+      assert.match(found.rule.labels.severity, /^sev[12]$/, key);
+    }
+  }
+});
+
+test('outbox-backlog and deadline-sweep-late fire past three lane budgets, on max of their gauge', () => {
+  for (const [key, gauge] of [
+    ['outbox-backlog', 'app_outbox_oldest_unpublished_seconds'],
+    ['deadline-sweep-late', 'app_deadline_oldest_due_seconds'],
+  ]) {
+    const { rule } = shipped(key);
+    assert.equal(rule.labels.signal, 'prom', key);
+    assert.equal(rule.labels.severity, 'sev1', key);
+    assert.equal(
+      rule.data[0].model.expr,
+      `max(${gauge}{job="${SERVICE}", env="production"}) > 900`,
+      `${key}: fifteen minutes, three times the five-minute bulk-ops budget`,
+    );
+    assert.equal(rule.noDataState, 'OK', `${key}: no gauge means no reporting process, which the heartbeat covers`);
+    assert.match(rule.annotations.runbook_url, new RegExp(`/queues-jobs\\.md#${key}$`));
+  }
+});
+
+test('the heartbeat rule waits three beats and selects the line by message, not by process', () => {
+  const expr = queryOf('worker-heartbeat-missing');
+  assert.match(expr, /^absent_over_time\(.*event="ops\.heartbeat".*\[15m\]\)$/);
+  assert.doesNotMatch(expr, /worker|role/);
+  assert.equal(shipped('worker-heartbeat-missing').rule.data[0].relativeTimeRange.from, 900);
+  assert.match(queryOf('queue-stalled'), /^max by \(queue\) \(app_queue_oldest_waiting_seconds\{.*\}\) > 900$/);
+});
+
+test('cron-missed is one rule for every cron: last success older than twice its expected interval', () => {
+  const expr = queryOf('cron-missed');
+  assert.match(expr, /max by \(job_name\) \(last_over_time\(app_cron_last_success_timestamp_seconds\{/);
+  assert.match(expr, / > 2 \* max by \(job_name\) \(app_cron_expected_interval_seconds\{/);
+  assert.doesNotMatch(expr, /job_name="/, 'no per-cron window: the interval series decides');
+  assert.doesNotMatch(expr, /\bsum\b/);
+});
+
+test('every infra rule treats no data as alerting; the worker rule exists only with a worker', () => {
+  const infra = RULE_AREAS.find((a) => a.area === 'infra');
+  assert.ok(infra.rules.length >= 8);
+  for (const r of infra.rules) {
+    assert.equal(r.kind, 'cloudwatch', r.key);
+    assert.equal(shipped(r.key).rule.noDataState, 'Alerting', r.key);
+  }
+  assert.ok(shipped('ecs-service-gone-worker', { hasWorker: true }));
+  assert.equal(shipped('ecs-service-gone-worker', { hasWorker: false }), undefined);
+  assert.ok(shipped('ecs-service-gone-api', { hasWorker: false }));
+  assert.ok(shipped('worker-heartbeat-missing', { hasWorker: false }), 'the heartbeat rule works without a worker');
+});
+
+test("rds-connections-high alerts at 75% of each environment's max_connections", () => {
+  for (const env of ENVS) {
+    const { rule } = shipped('rds-connections-high', { env });
+    const threshold = rule.data.find((d) => d.refId === 'C').model.conditions[0].evaluator.params[0];
+    assert.equal(threshold, Math.floor(env.rdsMaxConnections * 0.75), env.name);
+    assert.equal(threshold, rdsConnectionsThreshold(env));
+  }
+  const doubled = { ...ENVS[0], rdsMaxConnections: ENVS[0].rdsMaxConnections * 2 };
+  assert.equal(rdsConnectionsThreshold(doubled), rdsConnectionsThreshold(ENVS[0]) * 2);
+});
+
+test('the AI error ratio ignores budget refusals and needs a minimum of calls', () => {
+  const expr = queryOf('ai-error-ratio');
+  assert.match(expr, /status=~"error\|timeout\|rate_limited"/);
+  assert.doesNotMatch(expr, /budget/i);
+  assert.match(expr, / and \(sum\(increase\(app_ai_invocation_total\{.*\}\[15m\]\)\) >= \d+\)$/);
+});
+
+test('every rule summary reads labels as .Labels, never $labels (file provisioning would expand it)', () => {
+  for (const key of STARTER_RULE_KEYS) {
+    const { rule } = shipped(key);
+    assert.doesNotMatch(`${rule.annotations.summary} ${rule.annotations.description}`, /\$/, key);
+  }
+  assert.ok(catalogRule('job-failed-final').summary.includes('{{ .Labels.jobName }}'));
+});
+
+// ---- the apply workflow ---------------------------------------------------------------
+
+const APPLY_WORKFLOW = readFileSync(
+  new URL('../../../../.github/workflows/grafana-apply.yml', import.meta.url),
+  'utf8',
+);
+
+test('grafana-apply.yml is manual only and carries no push or pull_request trigger, live or commented', () => {
+  const on = APPLY_WORKFLOW.slice(APPLY_WORKFLOW.indexOf('\non:'), APPLY_WORKFLOW.indexOf('\npermissions:'));
+  assert.match(on, /^\s+workflow_dispatch:/m);
+  assert.doesNotMatch(APPLY_WORKFLOW, /^\s*#?\s*(push|pull_request|pull_request_target|schedule)\s*:/m);
+});
+
+test('grafana-apply.yml checks the generated files, then runs the script with the apply-time secrets', () => {
+  assert.match(APPLY_WORKFLOW, /generate\.mjs --check/);
+  assert.match(APPLY_WORKFLOW, /grafana-apply\.mjs/);
+  for (const key of ['GRAFANA_SA_TOKEN', 'IRM_ONCALL_WEBHOOK_URL', 'IRM_NOTIFY_WEBHOOK_URL']) {
+    assert.match(APPLY_WORKFLOW, new RegExp(`${key}: \\$\\{\\{ secrets\\.${key} \\}\\}`), key);
+  }
+  assert.ok(
+    APPLY_WORKFLOW.indexOf('generate.mjs --check') < APPLY_WORKFLOW.indexOf('scripts/grafana-apply.mjs'),
+    'the stale check runs before the apply',
+  );
 });
 
 // ---- routing: a production sev1 pages, everything else notifies ------------------
