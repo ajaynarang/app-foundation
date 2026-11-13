@@ -344,6 +344,7 @@ describe('settings and admin pages wear the shared chrome', () => {
     const delegated: Record<string, string> = {
       '../app/admin/ai-spend/page.tsx': 'admin/ai-spend/components/AiSpendPage.tsx',
       '../app/admin/timers/page.tsx': 'admin/timers/components/TimersPage.tsx',
+      '../app/admin/outbound/page.tsx': 'admin/outbound/components/OutboundPage.tsx',
       '../app/settings/ai/page.tsx': 'platform/ai-settings/components/ai-settings-page.tsx',
     };
     const missing = pages
