@@ -106,6 +106,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 EXPOSE 8000
 
+# The git SHA the deploy workflow builds from (deploy-all.yml passes BUILD_SHA). It is the Sentry release, so every
+# backend error links to the release and deploy markers recorded for the same SHA. Declared last so it never busts
+# the layer cache. Empty on a local build, which leaves the release unset.
+ARG BUILD_SHA=""
+ENV SENTRY_RELEASE=${BUILD_SHA}
+
 # Start application via Doppler (DOPPLER_TOKEN env var required in ECS task definition)
 # Doppler injects all env vars (secrets + config) at container startup
 CMD ["doppler", "run", "--", "node", "dist/main"]

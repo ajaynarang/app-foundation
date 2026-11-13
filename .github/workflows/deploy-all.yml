@@ -11,6 +11,10 @@ name: Deploy All
 #   DOPPLER_TOKEN_STG, DOPPLER_TOKEN_PRD
 #   VERCEL_WEB_DEPLOY_HOOK_STAGING, VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
 #
+# Optional deploy markers (docs/observability.md, "Deploy markers"); each step is a no-op until its values exist:
+#   secrets.SENTRY_AUTH_TOKEN, secrets.SENTRY_ORG, vars.SENTRY_PROJECT_BACKEND   Sentry release + deploy record
+#   vars.GRAFANA_URL, secrets.GRAFANA_SA_TOKEN                                   Grafana deploy annotation
+#
 # Required GitHub Environments: staging, production (with Required Reviewers)
 
 on:
@@ -42,6 +46,13 @@ jobs:
     name: Validate branch
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Hermetic: curl and npx are stubbed, nothing is sent. Every deploy proves the marker script still works.
+      - name: Test the deploy-marker script
+        run: bash .github/scripts/observability-markers.test.sh
+
       - name: Enforce branch-environment mapping
         run: |
           ENV="${{ github.event.inputs.environment }}"
@@ -114,8 +125,10 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
+          # BUILD_SHA becomes SENTRY_RELEASE in the image, the same version the Sentry deploy marker records.
           docker build \
             -f apps/backend/Dockerfile \
+            --build-arg "BUILD_SHA=$IMAGE_TAG" \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
@@ -395,6 +408,29 @@ jobs:
           echo "Staging smoke test failed after 10 attempts"
           exit 1
 
+      # Deploy markers: a Sentry release and deploy whose version is the image's git SHA (the image carries it as
+      # SENTRY_RELEASE), and a Grafana annotation so the boards show the deploy line. Each is a no-op until its
+      # values exist, and a vendor error only warns.
+      - name: Sentry release and deploy marker
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_BACKEND: ${{ vars.SENTRY_PROJECT_BACKEND }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          .github/scripts/observability-markers.sh sentry-release "$SENTRY_PROJECT_BACKEND" "$IMAGE_TAG" staging
+
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy backend ${IMAGE_TAG:0:7} to staging by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:staging service:backend
+
   # ─────────────────────────────────────────────────────────────
   # 2.5. Run database migrations (Production)
   # ─────────────────────────────────────────────────────────────
@@ -652,6 +688,29 @@ jobs:
           echo "Production smoke test failed after 10 attempts"
           exit 1
 
+      # Deploy markers: a Sentry release and deploy whose version is the image's git SHA (the image carries it as
+      # SENTRY_RELEASE), and a Grafana annotation so the boards show the deploy line. Each is a no-op until its
+      # values exist, and a vendor error only warns.
+      - name: Sentry release and deploy marker
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_BACKEND: ${{ vars.SENTRY_PROJECT_BACKEND }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          .github/scripts/observability-markers.sh sentry-release "$SENTRY_PROJECT_BACKEND" "$IMAGE_TAG" production
+
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy backend ${IMAGE_TAG:0:7} to production by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:production service:backend
+
   # ─────────────────────────────────────────────────────────────
   # 4. Deploy the web app to Vercel (after backend succeeds)
   #    Fires the web deploy hook (fire-and-forget; check the
@@ -670,6 +729,20 @@ jobs:
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_STAGING }}" > /dev/null
           echo "✓ Vercel staging deployment triggered"
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hook only queues the Vercel build, so the line marks when the deploy was asked for, not when it went live.
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy web ${GITHUB_SHA:0:7} to staging by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:staging service:web
+
   deploy-frontend-production:
     name: Deploy Web to Production (Vercel)
     needs: migrate-production
@@ -682,3 +755,17 @@ jobs:
           echo "Triggering web deployment..."
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
           echo "✓ Vercel production deployment triggered"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hook only queues the Vercel build, so the line marks when the deploy was asked for, not when it went live.
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy web ${GITHUB_SHA:0:7} to production by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:production service:web
