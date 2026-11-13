@@ -4,7 +4,7 @@ import { writeErrorEnvelope } from './error-envelope';
 
 /**
  * The global exception filter: every error a route throws leaves as the one envelope
- * (`statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` — see `error-envelope.ts`).
+ * (`statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` — see `error-envelope.ts`).
  *
  * Services throw NestJS exceptions (or the code-carrying factories in `@appshore/kernel/shared/errors/api-errors`:
  * `fieldError`, `invalidState`, `stale`, `duplicate`); a `ZodError` becomes a 400 with `fieldErrors`;

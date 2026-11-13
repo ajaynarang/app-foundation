@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -83,6 +84,17 @@ class ThrowingController {
       feature: 'api_keys',
       message: 'This feature is currently unavailable.',
     });
+  }
+  @Get('workspace-selection') workspaceSelection() {
+    // The login's duplicate-account answer: its `workspaces` key is the one optional key a code may add.
+    throw new ConflictException({
+      code: ApiErrorCode.WORKSPACE_SELECTION_REQUIRED,
+      detail: 'Choose a workspace to sign in to.',
+      workspaces: [{ tenantId: 'ten_a', name: 'Acme', id: 1 }],
+    });
+  }
+  @Get('workspaces-elsewhere') workspacesElsewhere() {
+    throw new ConflictException({ detail: 'No', workspaces: [{ tenantId: 'ten_a', name: 'Acme' }] });
   }
   @Get('rfc-keys') rfcKeys() {
     throw new BadRequestException({ error: 'invalid_grant', error_description: 'Code expired' });
@@ -219,17 +231,27 @@ describe('the error envelope', () => {
     expect(planGuard.body).not.toHaveProperty('feature');
   });
 
-  it('the whitelist is exactly the eight keys of the contract', () => {
+  it('the whitelist is exactly the nine keys of the contract', () => {
     expect([...API_ERROR_ENVELOPE_KEYS]).toEqual([
       'statusCode',
       'code',
       'detail',
       'fieldErrors',
+      'workspaces',
       'timestamp',
       'path',
       'method',
       'debugDetail',
     ]);
+  });
+
+  it('workspaces rides only on WORKSPACE_SELECTION_REQUIRED, as { tenantId, name } pairs', async () => {
+    const selection = await call('workspace-selection');
+    expect(selection.status).toBe(409);
+    expect(selection.body).toMatchObject({ code: ApiErrorCode.WORKSPACE_SELECTION_REQUIRED });
+    expect(selection.body.workspaces).toEqual([{ tenantId: 'ten_a', name: 'Acme' }]);
+    const elsewhere = await call('workspaces-elsewhere');
+    expect(elsewhere.body).not.toHaveProperty('workspaces');
   });
 
   it('debugDetail appears only in development', async () => {

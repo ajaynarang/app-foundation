@@ -1,7 +1,13 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@appshore/db';
 import type { Request, Response } from 'express';
-import { ApiErrorCode, defaultApiErrorCode, type ApiErrorEnvelope, type FieldErrors } from '@app/shared-types';
+import {
+  ApiErrorCode,
+  defaultApiErrorCode,
+  type ApiErrorEnvelope,
+  type FieldErrors,
+  type WorkspaceChoice,
+} from '@app/shared-types';
 import { isZodError, zodFieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter';
 
@@ -9,8 +15,8 @@ import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter
  * The one error envelope (ADR "API contract", section 2). Every error body the API sends — from the global
  * filter, a scoped filter that extends it, or a `@Res` / streaming route before its headers are sent — is built
  * here, so the shape and the `code` cannot drift between endpoints. Only these keys are ever emitted:
- * `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?`. Anything else a thrower
- * attached is dropped. Held by `error-envelope.spec.ts` here and in the backend's architecture specs.
+ * `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?`. Anything else a
+ * thrower attached is dropped; `workspaces` passes only on `WORKSPACE_SELECTION_REQUIRED`. Held by `error-envelope.spec.ts` here and in the backend's architecture specs.
  */
 
 const logger = new Logger('HttpExceptionFilter');
@@ -34,6 +40,8 @@ export interface ErrorShape {
   code: string;
   detail: string;
   fieldErrors?: FieldErrors;
+  /** The workspaces a sign-in matched — only on `WORKSPACE_SELECTION_REQUIRED`. */
+  workspaces?: WorkspaceChoice[];
   /** Technical detail: logged, and sent as `debugDetail` in development only. */
   debugDetail?: string;
 }
@@ -46,6 +54,21 @@ function fieldErrorsOf(value: unknown): FieldErrors | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const entries = Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+/** Only `{ tenantId, name }` string pairs — ids, hashes or anything else a thrower attached never reach the wire. */
+function workspacesOf(value: unknown): WorkspaceChoice[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const choices = value
+    .filter(
+      (entry): entry is WorkspaceChoice =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as WorkspaceChoice).tenantId === 'string' &&
+        typeof (entry as WorkspaceChoice).name === 'string',
+    )
+    .map(({ tenantId, name }) => ({ tenantId, name }));
+  return choices.length > 0 ? choices : undefined;
 }
 
 /** A thrown non-Error, for the log — never itself a reason the filter fails (circular objects, BigInt). */
@@ -82,6 +105,10 @@ function fromHttpException(exception: HttpException): ErrorShape {
     // fieldErrors belong to a 400 only.
     ...(status === HttpStatus.BAD_REQUEST && fieldErrorsOf(body.fieldErrors)
       ? { fieldErrors: fieldErrorsOf(body.fieldErrors) }
+      : {}),
+    // workspaces belong to the login's workspace-selection answer only.
+    ...(code === ApiErrorCode.WORKSPACE_SELECTION_REQUIRED && workspacesOf(body.workspaces)
+      ? { workspaces: workspacesOf(body.workspaces) }
       : {}),
   };
 }
@@ -192,6 +219,7 @@ export function buildErrorEnvelope(exception: unknown, request: Pick<Request, 'u
     code: shape.code,
     detail: shape.detail,
     ...(shape.fieldErrors ? { fieldErrors: shape.fieldErrors } : {}),
+    ...(shape.workspaces ? { workspaces: shape.workspaces } : {}),
     timestamp: new Date().toISOString(),
     path: request.url,
     method: request.method,

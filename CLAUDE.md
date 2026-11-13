@@ -221,7 +221,7 @@ One decided exception: notification types are strings with an app registry (`PLA
 
 ### API errors (one envelope)
 
-Every error body is `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing
+Every error body is `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing
 else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
 code). There is no `message` key. Throw a NestJS exception or a factory from
 `@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that

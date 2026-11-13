@@ -1266,7 +1266,7 @@ text (`errors/no-internals-in-messages`): log it, and say what happened in plain
 `NOT_FOUND`, 409 → `INVALID_STATE`). Use a factory when the code is not the status default. The shared codes are
 `ApiErrorCode` in `@app/shared-types`: `VALIDATION_FAILED, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND,
 METHOD_NOT_ALLOWED, INVALID_STATE, STALE, DUPLICATE, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_KEY_IN_USE,
-PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL, UNAVAILABLE, INTERNAL` (the two idempotency codes: section 2.5). A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
+PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL, WORKSPACE_SELECTION_REQUIRED, UNAVAILABLE, INTERNAL` (the two idempotency codes: section 2.5). A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
 (`FEATURE_DISABLED`, `PASSWORD_NOT_SET`); it passes through unchanged. Add a code to `ApiErrorCode` only when every
 domain shares it.
 
@@ -1333,7 +1333,8 @@ Every error body is one shape, written in one place (`writeErrorEnvelope` in
 }
 ```
 
-- These eight keys and **no others**. `fieldErrors` only on a 400. `debugDetail` only in development. There is no
+- These eight keys and **no others**, plus one optional `workspaces` that only the login's 409
+  `WORKSPACE_SELECTION_REQUIRED` carries. `fieldErrors` only on a 400. `debugDetail` only in development. There is no
   `message` and no `error` key. Anything else a thrower attaches is dropped, so do not invent a key: put the fact
   in `code` or `detail`.
 - Prisma: P2002 → 409 `DUPLICATE`; P2025 → 404 `NOT_FOUND`; P2003 and P2014 → 409 `INVALID_STATE`; P2007 → 400.
