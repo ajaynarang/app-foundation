@@ -7,7 +7,9 @@
  * merging them (`pnpm accounts:duplicates`, then docs/operations.md, "Duplicate accounts"), run this. It refuses and
  * changes nothing while any duplicate remains, and does nothing when the index is already there. Safe to run twice.
  *
- * Exit codes: 0 enforced (created now or already), 1 duplicates remain or the build failed, 2 DATABASE_URL unset.
+ * Exit codes: 0 enforced (created now or already), non-zero otherwise. Run directly (`npx tsx
+ * scripts/enforce-unique-email.ts`), 1 means duplicates remain or the build failed and 2 means DATABASE_URL is unset;
+ * through `pnpm accounts:enforce-unique-email`, pnpm reports every failure as 1.
  * The build takes a short write lock on `users`; on a large table run it in a quiet hour.
  */
 import pg from 'pg';
