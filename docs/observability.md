@@ -7,17 +7,16 @@ metrics go, and which keys switch each one on. The rules every log line and erro
 Nothing here is required to boot, test or deploy. With no key set the app runs, writes JSON logs to stdout and sends
 nothing anywhere. Each vendor is switched on by its own key and is a no-op without it.
 
-> This page grows with the observability work. Today it covers the three levels and the order to climb them, error
-> tracking, traces, metrics, the crons and heartbeat behind them, the dashboards, alert rules, routing and runbooks
-> kept as code, and the local stack. The AWS fallback alarms (level 1), the read-only Grafana role and the deploy
-> markers are added to it as they land.
+> This page grows with the observability work. Today it covers the three levels and the order to climb them, the
+> AWS fallback alarms and budget (level 1), error tracking, traces, metrics, the crons and heartbeat behind them, the
+> dashboards, alert rules, routing and runbooks kept as code, the deploy markers, and the local stack.
 
 ## Three levels
 
 | Level | What is set                                     | What you get                                                                                                                                                        |
 | ----- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | nothing                                         | JSON logs on stdout (CloudWatch in ECS). No traces, metrics, errors or alerts. Boots clean.                                                                         |
-| 1     | `alarm_email` in tfvars                         | Level 0 plus a small set of CloudWatch alarms and an AWS budget email (the Terraform side of this work; not in the template yet).                                   |
+| 1     | `alarm_email` in tfvars                         | Level 0 plus ten CloudWatch alarms and an AWS budget email (below).                                                                                                 |
 | 2     | Grafana Cloud and Sentry keys, IRM webhook URLs | Logs, traces, metrics, alert rules, dashboards, error tracking and paging, plus an outside-in uptime check. The level 1 alarms are removed last, after a test-fire. |
 
 ### Going from level 1 to level 2
@@ -27,15 +26,19 @@ In this order. Each step is safe to stop after.
 1. **Telemetry.** Set the Loki keys (`LOG_TRANSPORT=loki`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_PASSWORD`), the OTLP keys
    and the Sentry keys (below) in each deployed environment. Deploy. Confirm log lines arrive in Grafana with
    `env="production"` and `env="staging"`, never `development`: every rule filters on it.
-2. **AWS read access and the catalog's constants.** Give Grafana's CloudWatch datasource read-only access to the
-   account (the Terraform role for it lands with level 1), and add the datasource in Grafana by hand with the UID the
-   catalog expects (`cloudwatch`, or set `GRAFANA_CLOUDWATCH_UID`). In `catalog/constants.mjs`, check `PROJECT` and
+2. **AWS read access and the catalog's constants.** In Grafana's CloudWatch datasource setup, read the AWS account
+   Grafana assumes roles from and the external id it presents. Set them as `grafana_cloud_aws_account_id` and
+   `grafana_cloud_external_id` in each environment's tfvars and apply: `grafana.tf` creates a read-only role
+   (`terraform output grafana_cloudwatch_role_arn`). Add the datasource in Grafana by hand with that role and the UID
+   the catalog expects (`cloudwatch`, or set `GRAFANA_CLOUDWATCH_UID`). In `catalog/constants.mjs`, check `PROJECT` and
    `REPO_URL` (`pnpm init-app` set both), set each environment's `rdsMaxConnections` to its instance class, and set
    `HAS_WORKER = false` if the product runs no worker task (`worker_desired_count = 0`). Regenerate and commit.
 3. **Paging.** Create two Grafana IRM integrations (one that pages, one that notifies) and set their webhook URLs as
    secrets of the `grafana-apply` workflow, with `GRAFANA_URL` and a service-account token. Run the workflow with
    `plan`, read it, then `apply`.
-4. **Test-fire.** One test page through IRM, and one real rule on staging: disable the heartbeat. It runs with no
+4. **Test-fire.** One test page through IRM, from a laptop with the on-call webhook URL in your shell:
+   `IRM_WEBHOOK_URL=<oncall url> .github/scripts/observability-markers.sh irm-alert test-fire "Test page" "Paging works" sev1`.
+   Then one real rule on staging: disable the heartbeat. It runs with no
    schedule row, so first create one (nothing ships it, and `PATCH` only edits a row that exists), enabled and with
    the default interval, so it changes nothing yet:
 
@@ -58,7 +61,43 @@ In this order. Each step is safe to stop after.
    would page for good once they are live. The dimension sets come from the AWS metric documentation, not a live
    account.
 6. **Uptime.** Add the outside-in checks (below).
-7. **Only then** remove the level 1 alarms (`grafana_alerting_live = true`, with the level 1 Terraform).
+7. **Only then** set `grafana_alerting_live = true` in tfvars and apply. That apply removes every level 1 alarm and
+   its SNS topic; the budget stays. Terraform refuses the flag in production while either `grafana_cloud_*` value is
+   empty, because Grafana could not then read the metrics the alarms watched.
+
+### Level 1: CloudWatch alarms and the budget
+
+The fallback for a product with no observability vendor, in `infra/terraform/alarms.tf` and `budget.tf`. Set
+`alarm_email` in an environment's tfvars and apply. AWS then emails a subscription confirmation; nothing is
+delivered until it is confirmed. Every alarm also emails when it recovers.
+
+| Alarm                              | Fires when                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `<prefix>-alb-target-5xx`          | the API answered more than 10 5xx in 5 minutes                                   |
+| `<prefix>-alb-elb-5xx`             | the load balancer itself answered more than 10 5xx (no healthy target, timeouts) |
+| `<prefix>-alb-unhealthy-hosts`     | an API target has been unhealthy for 5 minutes                                   |
+| `<prefix>-ecs-api-service-gone`    | no API task has reported CPU for 10 minutes                                      |
+| `<prefix>-ecs-worker-service-gone` | the same for the worker; only while `worker_desired_count > 0`                   |
+| `<prefix>-rds-cpu-high`            | RDS CPU above 80% for 10 minutes                                                 |
+| `<prefix>-rds-free-storage-low`    | RDS free storage below 5 GB                                                      |
+| `<prefix>-rds-freeable-memory-low` | RDS freeable memory below 40 MB for 15 minutes                                   |
+| `<prefix>-rds-connections-high`    | RDS connections above `rds_connections_alarm_threshold` (default 75) for 10 min  |
+| `<prefix>-redis-memory-high`       | Redis memory above 80% (with `noeviction`, writes fail at 100%)                  |
+
+`<prefix>` is `<project>-<env>`. The service-gone alarms read the free `AWS/ECS` `CPUUtilization` metric, which stops
+arriving when no task runs, and treat missing data as breaching. Set `rds_connections_alarm_threshold` to 75% of
+your instance class's `max_connections`, the same share the catalog's `rdsMaxConnections` uses. If you enable
+staging's night shutoff (`scheduler.tf`, shipped disabled), leave `alarm_email` empty for staging, or the
+service-gone alarms fire every night.
+
+The budget emails the same address at 80% of the month's actual cost and when the month is forecast to pass 100%
+of `monthly_budget_usd` (default 100). An AWS cost budget measures the whole account, not one stack: when staging
+and production share an account, set `monthly_budget_usd = 0` in one of them. The budget stays when
+`grafana_alerting_live` removes the alarms, because Grafana does not watch the bill.
+
+Container Insights is off by default (`container_insights = false`): nothing here needs it, and it is billed per
+metric. A CI apply runs as the deploy role, which may refresh and remove these alarms but not create the SNS topic
+or its subscription, so the first apply with `alarm_email` set runs with admin credentials.
 
 ### Uptime, outside-in
 
@@ -79,7 +118,7 @@ same Sentry organisation, and both name the environment with the same three valu
 | Key                                                 | Where            | What it does                                                                                                    |
 | --------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
 | `SENTRY_DSN`                                        | backend          | Switches backend error tracking on. Unset: `Sentry.init` never runs and every report returns at once.           |
-| `SENTRY_RELEASE`                                    | backend          | The release on every backend event: the deployed git SHA.                                                       |
+| `SENTRY_RELEASE`                                    | backend          | The release on every backend event: the image's git SHA (`BUILD_SHA`). Set by the image; never in Doppler.      |
 | `ENV_TYPE`                                          | backend          | Already required. `production` → `production`; `sandbox`, `preprod` → `staging`; `development` → `development`. |
 | `NEXT_PUBLIC_SENTRY_DSN`                            | web (build time) | Switches web error tracking on, and adds the DSN's origin to the CSP `connect-src`. Unset: the CSP names none.  |
 | `NEXT_PUBLIC_APP_ENV`                               | web (build time) | `production`, `staging` or `development` (default). With `staging` the web shows a caution stripe at the top.   |
@@ -234,6 +273,24 @@ integrations.
   placeholder, while a generated file is stale, or (for rules) before Loki has seen logs from both environments.
   The manual workflow `grafana-apply.yml` (`plan`, `apply`, `cardinality`) runs it with those secrets; it has no
   push trigger and never will.
+
+## Deploy markers
+
+`.github/scripts/observability-markers.sh` records each deploy where people look when something changes:
+
+| Command              | What it does                                                                      | Needs                                                                   |
+| -------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `sentry-release`     | a Sentry release named by the git SHA, its commits, and a deploy record for `env` | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` secrets; `SENTRY_PROJECT_BACKEND` var |
+| `grafana-annotation` | a deploy line on the Grafana boards, tagged `deploy`, `env:<env>`, `service:<x>`  | `GRAFANA_URL` var, `GRAFANA_SA_TOKEN` secret                            |
+| `irm-alert`          | one alert through a Grafana IRM webhook (the level 2 test page)                   | `IRM_WEBHOOK_URL`                                                       |
+
+`deploy-all.yml` runs `sentry-release` and a backend annotation after each backend deploy is healthy, and a web
+annotation when it triggers the web build; `deploy-frontend.yml` adds the web annotation. Each command is a clean
+no-op while its values are unset, and a vendor error is a warning, never a failed deploy. The GitHub values are
+repository secrets and variables, not Doppler keys. The backend image is built with `--build-arg BUILD_SHA=<sha>`,
+which the Dockerfile turns into `SENTRY_RELEASE`, so a backend error names the same release the marker created. The
+web's release comes from its own build (`next.config.ts`). The script's hermetic test runs in `pnpm check:ops` and in
+the deploy workflow's first job, so every deploy proves it works.
 
 ## The local stack
 

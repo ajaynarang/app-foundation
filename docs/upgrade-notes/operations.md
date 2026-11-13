@@ -274,3 +274,43 @@ that relied on the old localhost fallback to reach a sidecar collector must now 
 
 **How to turn it back.** Disable a cron on the Schedules screen (or set `is_enabled = false` on its row); the next
 boot removes its repeatable. Unset `OTEL_EXPORTER_OTLP_ENDPOINT` to stop traces and metrics.
+
+## 2026-11-13: AWS fallback alarms and budget, Grafana read role, Container Insights off, deploy markers
+
+**What changes when you pull it.**
+
+- **Container Insights turns off.** `ecs.tf` used to hard-code it on. It now follows `container_insights`, default
+  `false`, so the next Terraform apply turns it off on an existing cluster and its per-metric charges stop. Nothing
+  in the template reads its metrics.
+- **Level 1 alarms and a budget, only when asked for.** Setting `alarm_email` in an environment's tfvars creates an
+  SNS topic with an email subscription, ten CloudWatch alarms (load balancer 5xx, unhealthy hosts, RDS CPU, storage,
+  memory and connections, Redis memory, and a service-gone alarm each for the API and the worker) and a monthly AWS
+  budget (`monthly_budget_usd`, default 100; it measures the whole account, so set 0 in one environment when two share
+  an account). With `alarm_email` unset, nothing is created.
+- **No worker task.** A stack with `worker_desired_count = 0` gets no worker service-gone alarm, because a service
+  with no task sends no metric and the alarm would fire for good. Its API task already carries
+  `OPS_GAUGES_FROM_API=true` (the telemetry entry above). In the alert catalog, set `HAS_WORKER = false` in
+  `infra/observability/grafana-cloud/catalog/constants.mjs` and regenerate before you apply the Grafana rules, for
+  the same reason.
+- **A read-only role for Grafana.** Setting both `grafana_cloud_aws_account_id` and `grafana_cloud_external_id`
+  creates `<project>-<env>-iam-role-grafana-cloudwatch`, which Grafana's CloudWatch datasource assumes. The deploy
+  role gains permission to manage that one role, to refresh and remove the level 1 alarms (when `alarm_email` is
+  set) and to read the budget.
+- **`grafana_alerting_live`.** Setting it `true` removes every level 1 alarm and the topic in one apply (the budget
+  stays). Production refuses it while either Grafana value is empty.
+- **Deploy markers.** The deploy workflows now record a Sentry release and deploy and a Grafana annotation after each
+  deploy, through `.github/scripts/observability-markers.sh`. Each step is a no-op until its GitHub secrets and
+  variables exist, and a vendor error only warns. The deploy workflow's first job now checks out the repo and runs
+  the script's hermetic test.
+- **`SENTRY_RELEASE` comes from the image.** The backend Dockerfile takes a `BUILD_SHA` build argument (the workflow
+  passes the git SHA) and sets `SENTRY_RELEASE` from it. A local build leaves it empty, as before.
+
+**What to set first.** Nothing is required. To keep Container Insights, set `container_insights = true` before the
+next apply. If you set `SENTRY_RELEASE` in Doppler, remove it: a Doppler value overrides the image's. The first apply
+with `alarm_email` set must run with admin credentials, because the deploy role may not create the SNS topic. For
+the deploy markers, set the repository secrets `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `GRAFANA_SA_TOKEN` and the
+variables `SENTRY_PROJECT_BACKEND`, `GRAFANA_URL` when you want them.
+
+**How to turn it back.** `container_insights = true` restores Container Insights. Clear `alarm_email` (or set
+`grafana_alerting_live = true`) to remove the alarms; clear `alarm_email` or set `monthly_budget_usd = 0` to remove the
+budget. Clear either Grafana value to delete the read role. Leave the marker secrets unset to keep the markers off.

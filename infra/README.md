@@ -35,11 +35,15 @@ infra/
     ├── iam.tf                   ← Permissions (who can do what)
     ├── alb.tf                   ← Load balancer + HTTPS + DNS
     ├── cloudwatch.tf            ← Logs
+    ├── alarms.tf                ← Level 1 alarms (only with alarm_email)
+    ├── budget.tf                ← Monthly cost budget email (only with alarm_email)
+    ├── grafana.tf               ← Read-only role for Grafana's CloudWatch datasource (level 2)
     ├── s3.tf                    ← Document storage bucket (user uploads)
     ├── cdn.tf                   ← S3 + CloudFront for public static assets
     ├── doppler.tf               ← Doppler service token in SSM Parameter Store
     ├── ecs.tf                   ← Where your app actually runs (containers)
-    └── scheduler.tf             ← Auto-shutoff for staging at night (saves money)
+    ├── scheduler.tf             ← Auto-shutoff for staging at night (saves money)
+    └── tests/                   ← Offline `terraform test` files (AWS provider mocked; run by pnpm check:ops)
 ```
 
 ---
@@ -286,6 +290,23 @@ Staging logs kept 7 days, production 30 days. View them in AWS Console → Cloud
 ```bash
 aws logs tail /app/staging/api --follow
 ```
+
+---
+
+### `terraform/alarms.tf`, `budget.tf`, `grafana.tf` — Alerts Without a Vendor, and Grafana's Read Role
+
+Level 1 of [`docs/observability.md`](../docs/observability.md). Nothing here exists until you ask for it:
+
+- `alarm_email` set → an SNS topic emailing that address, ten CloudWatch alarms (load balancer 5xx, unhealthy hosts,
+  RDS CPU/storage/memory/connections, Redis memory, and "service gone" for the API and, while one runs, the worker),
+  and a monthly AWS budget (`monthly_budget_usd`; it measures the whole account).
+- `grafana_cloud_aws_account_id` and `grafana_cloud_external_id` set → a read-only role Grafana Cloud assumes to read
+  CloudWatch metrics (`terraform output grafana_cloudwatch_role_arn`).
+- `grafana_alerting_live = true` → the alarms and their topic are removed once Grafana's rules are live. The budget
+  stays. Production refuses it until the Grafana role exists.
+
+Container Insights is off unless `container_insights = true`. The checks are offline: `terraform test` runs the files
+in `tests/` against a mocked AWS provider, and `pnpm check:ops` runs fmt, validate and test.
 
 ---
 
