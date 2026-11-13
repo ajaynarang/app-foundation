@@ -49,6 +49,6 @@ describe('Desk routes are plan-gated by desk', () => {
   it('leaves the Inngest serve endpoint ungated', () => {
     const inngest = all.find((c) => c.name === 'InngestController');
     expect(inngest).toBeDefined();
-    expect(inngest!.text).not.toContain('@RequireFeature(');
+    expect(inngest.text).not.toContain('@RequireFeature(');
   });
 });
