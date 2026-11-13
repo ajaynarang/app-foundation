@@ -42,6 +42,10 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
       throw new Error(`Vendor circuit open for ${vendor} — deferring OAuth refresh`);
     }
 
+    // Every run, skipped or not, completes a CronRun: the repeatable stays registered (re-enabling needs no restart),
+    // so the expected-interval series stays, and a deliberate skip must not read as a missed cron.
+    const cron = new CronRun(this.logger, OAUTH_REFRESH_JOB_NAME);
+
     // Tenant pause guard
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -49,6 +53,7 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
     });
     if (tenant?.jobsPaused) {
       this.logger.log(`Skipping OAuth refresh — tenant ${tenantId} is paused`);
+      cron.complete({ vendor, skipped: 'tenant jobs paused' });
       return;
     }
 
@@ -60,15 +65,16 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
 
     if (!config) {
       this.logger.warn(`Integration ${integrationId} not found, skipping refresh`);
+      cron.complete({ vendor, skipped: 'integration not found' });
       return;
     }
 
     if (!config.isEnabled || config.status === 'NOT_CONFIGURED') {
       this.logger.log(`Integration ${integrationId} is disabled/unconfigured, skipping refresh`);
+      cron.complete({ vendor, skipped: 'integration disabled or not configured' });
       return;
     }
 
-    const cron = new CronRun(this.logger, OAUTH_REFRESH_JOB_NAME);
     try {
       await this.authTokenService.refreshTokens(config.id);
       await this.circuitBreaker.recordSuccess(vendor);
