@@ -908,6 +908,38 @@ to its parameters and list it in `IDEMPOTENT_CREATE_TOOLS` in `tool-idempotency.
 
 **Rollback.** Revert the change. Remembered results live in Redis for 24 hours and are ignored by the old code.
 
+## 20. MCP prompts and tool availability
+
+**What changed.**
+
+- The external MCP server declares the `prompts` capability and answers `prompts/list` and `prompts/get`. Prompts
+  come from `PROMPT_LIBRARY` in `apps/backend/src/domains/ai/assistant/prompts/prompt-registry.data.ts`, which ships
+  empty, so a connected client sees an empty list until a product adds prompts. Each prompt lists the workspace
+  roles that may see it; the role is the acting person's current membership role in the workspace (the same lookup
+  as the tool pipeline's role step), and a person with no membership sees none. `prompts/get` fills `{{name}}`
+  placeholders and strips the `<tools>` tags. A prompt the caller may not see, an unknown prompt, an undeclared
+  argument and a missing required argument all answer MCP's invalid-params error (`-32602`) with a short message.
+- New `ToolAvailabilityService` (`agent-contract/tool-availability.service.ts`) with an empty rule set
+  (`TOOL_AVAILABILITY_RULES`, bound in `AgentContractModule`). A tool a rule withholds is left out of `tools/list`,
+  out of every chat toolset, and cannot be proposed through `confirm-action`. It hides a tool; it does not refuse a
+  call by name, and it is not a permission check.
+- New zod schemas `AssistantPromptSchema` and `AssistantPromptArgumentSchema` in `@app/shared-types`.
+
+**Env.** None. **Schema.** None.
+
+**Who notices.**
+
+- MCP clients: the server now advertises `prompts`. With the empty library they see no prompts; nothing about tools
+  changes.
+- A product that constructs `McpServerService` by hand (in a spec): it now also takes `ToolAccessPolicyService`,
+  `ToolAvailabilityService` and `PromptRegistryService`. `AgentContractModule` exports the first two.
+
+**What to do.** Nothing. To add prompts, add entries to `PROMPT_LIBRARY` following the rules in its header; the data
+spec checks them. To hide a tool whose channel may be unconfigured, replace the `TOOL_AVAILABILITY_RULES` binding
+with a factory that builds your rules.
+
+**Rollback.** Revert the change. No data is involved.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops

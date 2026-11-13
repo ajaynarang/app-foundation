@@ -1931,6 +1931,19 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   and API keys also share one per-workspace ceiling (`AGENT_TENANT_CEILING_PER_MINUTE`, default 600).
 - The example pair (`mcp/tools/support-ticket.tool.ts`) shows each rule, and
   `support-ticket.pipeline.spec.ts` walks it through every step. Copy its shape for a new tool.
+- **Tool availability hides, it never permits.** A tool whose channel or vendor may be unconfigured (an SMS tool
+  with no sending number) gets a rule in `TOOL_AVAILABILITY_RULES` (`agent-contract/tool-availability.service.ts`,
+  bound in `AgentContractModule`; the starter binds none). An unavailable tool is left out of `tools/list`, every
+  chat toolset and `confirm-action`, so the model never promises it. Never use a rule for who may run a tool: that
+  is scope, role and plan in the pipeline.
+- **MCP prompts.** Curated prompts live in `PROMPT_LIBRARY` (`assistant/prompts/prompt-registry.data.ts`, empty in
+  the starter) and are served by `prompts/list` and `prompts/get`, filtered by the acting person's current
+  `WorkspaceMember` role (`ToolAccessPolicyService.actingRole`, the pipeline's lookup), never the token's role. The
+  authoring rules are in that file's header and held by `prompt-registry.data.spec.ts`: kebab-case names, human
+  references not ids, every placeholder declared, tools named only inside one `<tools>` block and listed in
+  `suggestedTools`. An undeclared or missing required argument is a 400 that names it, sent to the client as MCP
+  invalid-params. A prompt is a suggestion, never a permission: the tools it leads to still run through the
+  pipeline.
 
 ## 23a. Optional features (Desk)
 
