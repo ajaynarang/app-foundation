@@ -1,3 +1,4 @@
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
 import { CancelInvitationDto } from '../dto/cancel-invitation.dto';
@@ -21,6 +22,7 @@ describe('UserInvitationsController', () => {
       getInvitationLink: jest.fn().mockResolvedValue({ link: 'http://test.com/accept?token=abc' }),
       resendInvitation: jest.fn().mockResolvedValue({ status: 'sent' }),
       acceptPhoneInvitation: jest.fn().mockResolvedValue({ id: 1, userId: 'user_1' }),
+      tenantDbIdForToken: jest.fn().mockResolvedValue(null),
     };
 
     authService = {
@@ -90,5 +92,36 @@ describe('UserInvitationsController', () => {
     expect(invitationsService.acceptPhoneInvitation).toHaveBeenCalledWith(dto);
     expect(authService.generateTokensForUser).toHaveBeenCalled();
     expect(result.accessToken).toBe('jwt_abc');
+  });
+
+  describe('tenant context of the public routes', () => {
+    const seenIn = (method: string) => {
+      const seen: unknown[] = [];
+      invitationsService[method].mockImplementation(async () => {
+        seen.push(currentRls());
+        return { id: 1, userId: 'user_1' };
+      });
+      return seen;
+    };
+
+    it.each([
+      ['getInvitationByToken', () => controller.getInvitationByToken('tok')],
+      ['acceptInvitation', () => controller.acceptInvitation({ token: 'tok', firebaseUid: 'fb' } as any)],
+      ['acceptPhoneInvitation', () => controller.acceptPhoneInvitation({ token: 'tok' } as any)],
+    ])("%s runs as the invitation's tenant", async (method, call) => {
+      invitationsService.tenantDbIdForToken.mockResolvedValue(5);
+      const seen = seenIn(method);
+
+      await call();
+
+      expect(invitationsService.tenantDbIdForToken).toHaveBeenCalledWith('tok');
+      expect(seen).toEqual([{ kind: 'tenant', tenantId: 5, source: 'invitation' }]);
+    });
+
+    it('leaves an unknown token with no context, so the service answers its own not-found', async () => {
+      const seen = seenIn('getInvitationByToken');
+      await controller.getInvitationByToken('nope');
+      expect(seen).toEqual([undefined]);
+    });
   });
 });

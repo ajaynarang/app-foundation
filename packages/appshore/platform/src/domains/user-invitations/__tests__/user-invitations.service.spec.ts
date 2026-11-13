@@ -516,6 +516,23 @@ describe('UserInvitationsService', () => {
     });
   });
 
+  describe('tenantDbIdForToken', () => {
+    it("answers the invitation's tenant DB id, selecting nothing else", async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue({ tenantId: 5 });
+      await expect(service.tenantDbIdForToken('tok')).resolves.toBe(5);
+      expect(mockPrismaService.userInvitation.findUnique).toHaveBeenCalledWith({
+        where: { token: 'tok' },
+        select: { tenantId: true },
+      });
+    });
+
+    it('answers null for an unknown or empty token', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
+      await expect(service.tenantDbIdForToken('nope')).resolves.toBeNull();
+      await expect(service.tenantDbIdForToken('')).resolves.toBeNull();
+    });
+  });
+
   describe('getInvitationByToken', () => {
     it('should return invitation with tenant and inviter details', async () => {
       const invitation = {

@@ -249,6 +249,16 @@ export class UserInvitationsService {
   }
 
   /**
+   * The tenant DB id an acceptance token belongs to, or null for an unknown token. Read before the public routes enter
+   * the invitation's tenant context; the token is matched, never returned or logged.
+   */
+  async tenantDbIdForToken(token: string): Promise<number | null> {
+    if (!token) return null;
+    const row = await this.prisma.userInvitation.findUnique({ where: { token }, select: { tenantId: true } });
+    return row?.tenantId ?? null;
+  }
+
+  /**
    * Accept invitation and create user
    */
   async acceptInvitation(token: string, firebaseUid: string) {
