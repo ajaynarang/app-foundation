@@ -64,9 +64,9 @@ export function initSentry(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * Which kind of code path threw: the `source` tag on every event. `workflow` is the durable workflow engine (Sally
- * calls it `inngest`; renamed because this file survives a scaffold without Desk). `ai` is a handled provider refusal
- * that no other path would report.
+ * Which kind of code path threw: the `source` tag on every event. `workflow` is the durable workflow engine, named
+ * generically because this file survives a scaffold without Desk. `ai` is a handled provider refusal that no other
+ * path would report.
  */
 export const ERROR_SOURCE = {
   HTTP: 'http',
