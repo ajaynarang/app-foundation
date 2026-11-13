@@ -105,7 +105,16 @@ describe('One live account per email (Postgres)', () => {
   it('personal signup in another case on a live account is refused as already registered, not a raw DUPLICATE', async () => {
     if (!ready) return;
     await makeUser('personal', await makeTenant('p'), `Personal-${suffix}@Example.com`);
-    const auth = new AuthService(prisma as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const auth = new AuthService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
 
     const err = await auth
       .registerPersonal(
