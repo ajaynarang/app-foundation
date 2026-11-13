@@ -6,3 +6,4 @@ export * from './telemetry.schema';
 export * from './spend.schema';
 export * from './ai-credential.schema';
 export * from './assistant-stream.schema';
+export * from './agent-actions.schema';

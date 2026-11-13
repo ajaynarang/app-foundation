@@ -299,6 +299,36 @@ export const FOUNDATION_EVENT_REGISTRY = [
     visibility: 'external' as const,
     aggregateType: 'agent-invocation',
   },
+  {
+    key: 'app.agent.action-approved',
+    constantName: 'AGENT_ACTION_APPROVED',
+    label: 'Agent Action Approved',
+    description:
+      "A person approved an external agent's write in the app: the agent may run it once, with exactly the arguments shown. Carries the token, tool and caller name, never the arguments.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'agent-invocation',
+  },
+  {
+    key: 'app.agent.action-denied',
+    constantName: 'AGENT_ACTION_DENIED',
+    label: 'Agent Action Denied',
+    description:
+      "A person denied an external agent's write in the app: the token can no longer run it. Carries the token, tool and caller name, never the arguments.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'agent-invocation',
+  },
+  {
+    key: 'app.agent.policy-changed',
+    constantName: 'WORKSPACE_AGENT_POLICY_CHANGED',
+    label: 'Workspace Agent Policy Changed',
+    description:
+      'A workspace owner let external agents confirm their own standard writes, or put human approval back. Takes effect on the next agent call; a sensitive write always needs the PIN.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'tenant',
+  },
 
   // ─── API Keys ──────────────────────────────────────────────────────
   {
