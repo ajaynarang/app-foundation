@@ -119,6 +119,9 @@ describe('AssistantAiService', () => {
     mockMcpTools = {
       getToolsForPersona: jest.fn().mockResolvedValue({}),
       getToolsetsForPersona: jest.fn().mockResolvedValue({ 'app-tools': {} }),
+      confirmChatCard: jest.fn().mockResolvedValue(true),
+      declineChatCard: jest.fn().mockResolvedValue(undefined),
+      revokeChatGrants: jest.fn().mockResolvedValue(undefined),
     };
 
     mockMastra = {
@@ -923,6 +926,120 @@ describe('AssistantAiService', () => {
       // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
       expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
+    });
+  });
+
+  describe('resumeAgent: the card is confirmed exactly once (item 8b)', () => {
+    const conversation = {
+      id: 1,
+      conversationId: 'conv_test',
+      userId: 1,
+      tenantId: 1,
+      userMode: 'member',
+      title: 'Test',
+      isActive: true,
+    };
+    let resumeStream: jest.Mock;
+    const req = () => ({ on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' }) as any;
+    const res = () =>
+      ({
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        headersSent: false,
+      }) as any;
+
+    beforeEach(() => {
+      mockPrisma.conversation.findUnique.mockResolvedValue(conversation);
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      resumeStream = jest.fn().mockRejectedValue(new Error('stop after resume starts'));
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+    });
+
+    it('Confirm turns that one card into a grant, then resumes the run', async () => {
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.confirmChatCard).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        toolCallId: 'tc_1',
+      });
+      expect(resumeStream).toHaveBeenCalledWith({ confirmed: true }, expect.objectContaining({ toolCallId: 'tc_1' }));
+    });
+
+    it('a second press (the card is no longer waiting) answers 409 and never resumes the run again', async () => {
+      mockMcpTools.confirmChatCard.mockResolvedValue(false);
+      const response = res();
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), response);
+
+      expect(response.status).toHaveBeenCalledWith(409);
+      expect(response.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, code: 'INVALID_STATE' }));
+      expect(resumeStream).not.toHaveBeenCalled();
+    });
+
+    it('a Confirm that names no card is a 400 on toolCallId, and nothing is granted or resumed', async () => {
+      const response = res();
+
+      await service.resumeAgent('conv_test', true, undefined, 'run_1', 'user_1', 1, req(), response);
+
+      expect(response.status).toHaveBeenCalledWith(400);
+      expect(response.json.mock.calls[0][0].fieldErrors).toHaveProperty('toolCallId');
+      expect(mockMcpTools.confirmChatCard).not.toHaveBeenCalled();
+      expect(resumeStream).not.toHaveBeenCalled();
+    });
+
+    it('Cancel voids the card and resumes with confirmed false', async () => {
+      await service.resumeAgent('conv_test', false, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.declineChatCard).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        toolCallId: 'tc_1',
+      });
+      expect(mockMcpTools.confirmChatCard).not.toHaveBeenCalled();
+      expect(resumeStream).toHaveBeenCalledWith({ confirmed: false }, expect.anything());
+    });
+
+    it('the end of the resumed turn voids unspent grants (not the cards it just raised), even when it failed', async () => {
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.revokeChatGrants).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+      });
+    });
+  });
+
+  describe('a new message voids every open confirmation in the conversation (item 8b)', () => {
+    it('revokes grants and waiting cards before the turn runs', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Hi',
+        isActive: true,
+      });
+      mockModeration.moderate.mockResolvedValue({ blocked: true, events: [] });
+
+      for await (const _ of service.generateResponse('conv_test', 'something else', 'text', 'user_1', 1)) {
+        // consume
+      }
+
+      expect(mockMcpTools.revokeChatGrants).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        includePending: true,
+      });
     });
   });
 

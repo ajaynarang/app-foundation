@@ -66,12 +66,14 @@ export function buildSendMessage(
  *   - `toolCallId`: string, optional.
  *   - `runId`: string, optional.
  *
- * Default `confirmed: false` is the "declined confirmation" branch —
- * semantically identical shape to `confirmed: true` at the HTTP level
- * (both enter `resumeStream`). `toolCallId` / `runId` defaults are
- * bogus QA placeholders that make Mastra's `resumeStream` throw when
- * no live suspended run matches — the test asserts the error-path
- * shape (500 envelope OR streamed error frame; see spec test 3 doc).
+ * Default `confirmed: false` is the "declined confirmation" branch: it
+ * voids the named card and enters `resumeStream`. `confirmed: true`
+ * confirms the named card once; a card that is not waiting (unknown,
+ * already answered, expired) answers 409 INVALID_STATE before any
+ * resume, and a Confirm with no `toolCallId` answers 400 on that field.
+ * `toolCallId` / `runId` defaults are bogus QA placeholders that make
+ * Mastra's `resumeStream` throw when no live suspended run matches; the
+ * test asserts the error-path shape (500 envelope OR streamed error frame).
  */
 export function buildResumeAgent(
   overrides: {

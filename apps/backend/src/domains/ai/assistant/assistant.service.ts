@@ -8,7 +8,7 @@ import {
   type Citation,
 } from '@app/shared-types';
 import { writeErrorEnvelope } from '@appshore/platform/shared/filters/error-envelope';
-import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
@@ -217,6 +217,10 @@ export class AssistantAiService {
     const conversation = activeConversation(
       ownedConversation(await this.prisma.conversation.findUnique({ where: { conversationId } }), userDbId, tenantId),
     );
+
+    // A new message is a new request: a confirmation given for an earlier change must not authorise whatever the
+    // agent writes next, and a card still waiting for a decision is abandoned.
+    await this.mcpToolService.revokeChatGrants({ tenantId, userDbId, conversationId, includePending: true });
 
     // 2. Store user message
     const userMessageId = generateId('msg');
@@ -496,6 +500,28 @@ export class AssistantAiService {
     if (!conversation) return;
 
     const userDbId = await this.getUserDbId(userId);
+
+    // The person's press on THIS card is the confirmation. Confirm turns the write recorded for the card
+    // (`toolCallId`) into a single-use grant, once: a second press or a retry finds it already answered and gets a
+    // 409 without resuming the run again. Cancel voids the card, so a model that ignores the "no" still cannot write.
+    if (confirmed) {
+      if (!toolCallId) {
+        writeErrorEnvelope(res, req, fieldError('toolCallId', 'Say which confirmation card you are confirming.'));
+        return;
+      }
+      const card = { tenantId, userDbId, conversationId, toolCallId };
+      if (!(await this.mcpToolService.confirmChatCard(card))) {
+        writeErrorEnvelope(
+          res,
+          req,
+          invalidState('This confirmation is no longer waiting: it was already answered, or it expired.'),
+        );
+        return;
+      }
+    } else if (toolCallId) {
+      await this.mcpToolService.declineChatCard({ tenantId, userDbId, conversationId, toolCallId });
+    }
+
     const cardAccumulator = new CardAccumulator();
     const toolsets = await this.mcpToolService.getToolsetsForPersona(
       conversation.userMode,
@@ -551,6 +577,16 @@ export class AssistantAiService {
         `Resume error for conversation ${conversationId}`,
       );
       if (!res.writableEnded) res.end();
+    } finally {
+      // The resumed turn is over: a confirmed grant the agent did not spend must not linger for a later turn. Cards
+      // this turn just raised stay waiting for the person.
+      await this.mcpToolService
+        .revokeChatGrants({ tenantId, userDbId, conversationId })
+        .catch((err: unknown) =>
+          this.logger.warn(
+            `Failed to revoke unspent confirmations: ${err instanceof Error ? err.message : 'unknown error'}`,
+          ),
+        );
     }
   }
 

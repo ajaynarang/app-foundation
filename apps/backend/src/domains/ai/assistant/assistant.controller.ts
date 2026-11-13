@@ -88,6 +88,11 @@ export class AssistantAiController {
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Resume a suspended assistant agent (HITL confirmation)',
+    description:
+      'Confirm or cancel the confirm card named by `toolCallId`. Confirm turns that one card into a single-use grant ' +
+      'for the exact write it shows, then resumes the run; a card that is no longer waiting (already answered, ' +
+      'expired, unknown) answers 409 INVALID_STATE and resumes nothing. A Confirm with no `toolCallId` is a 400. ' +
+      'Cancel voids the card. Unspent grants are voided when the resumed turn ends.',
   })
   @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
   async resumeAgent(

@@ -10831,12 +10831,15 @@
       "ResumeAgentDto": {
         "properties": {
           "confirmed": {
+            "description": "Confirm (true) or Cancel (false) on the card",
             "type": "boolean"
           },
           "runId": {
+            "description": "The suspended run id from the `9:` frame",
             "type": "string"
           },
           "toolCallId": {
+            "description": "The card's `toolCallId` from the `9:` frame. Required to confirm; a Cancel with it voids that card.",
             "type": "string"
           }
         },
@@ -20751,6 +20754,7 @@
     },
     "/api/v1/conversations/{conversation_id}/resume": {
       "post": {
+        "description": "Confirm or cancel the confirm card named by `toolCallId`. Confirm turns that one card into a single-use grant for the exact write it shows, then resumes the run; a card that is no longer waiting (already answered, expired, unknown) answers 409 INVALID_STATE and resumes nothing. A Confirm with no `toolCallId` is a 400. Cancel voids the card. Unspent grants are voided when the resumed turn ends.",
         "operationId": "AssistantAiController_resumeAgent",
         "parameters": [
           {
