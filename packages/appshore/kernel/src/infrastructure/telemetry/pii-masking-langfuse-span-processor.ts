@@ -25,7 +25,8 @@ export function maskSpanAttributesInPlace(attributes: Attributes): void {
  *
  * Langfuse's own `mask` hook only sees the `langfuse.*` attributes, but AI SDK spans carry the prompt and completion
  * in `ai.prompt*`, `ai.response.*` and `gen_ai.*` attributes, which Langfuse maps to input and output server-side.
- * So every string attribute is masked before the span reaches the exporter (docs/standards/observability.md,
+ * So every string attribute, every event attribute (`exception.message`) and the status message are masked before
+ * the span reaches the exporter (docs/standards/observability.md,
  * rule 12). It lives beside `telemetry.ts` because that is where the isolated Langfuse provider is built.
  */
 export class PiiMaskingLangfuseSpanProcessor extends LangfuseSpanProcessor {
@@ -35,6 +36,14 @@ export class PiiMaskingLangfuseSpanProcessor extends LangfuseSpanProcessor {
 
   override onEnd(span: ReadableSpan): void {
     maskSpanAttributesInPlace(span.attributes);
+    // A provider error that echoes the prompt lands in an event (`recordException`) or the status message.
+    for (const event of span.events) {
+      if (event.attributes) maskSpanAttributesInPlace(event.attributes);
+    }
+    if (span.status.message) {
+      // ReadableSpan types the status readonly; the SDK span holds it as a plain field, read at export.
+      (span.status as { message?: string }).message = maskPii(span.status.message);
+    }
     super.onEnd(span);
   }
 }

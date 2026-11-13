@@ -1,3 +1,4 @@
+import { SpanStatusCode } from '@opentelemetry/api';
 import { BasicTracerProvider, InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import type { LangfuseSpanProcessorParams } from '@langfuse/otel';
 import {
@@ -76,6 +77,29 @@ describe('PiiMaskingLangfuseSpanProcessor', () => {
     const exported = await exportOneSpan({ 'langfuse.observation.input': SAMPLE_PROMPT });
 
     expect(exported['langfuse.observation.input']).toBe(MASKED_PROMPT);
+  });
+
+  it('masks span event attributes and the status message, where a provider error that echoes the prompt lands', async () => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({
+      spanProcessors: [
+        new PiiMaskingLangfuseSpanProcessor({ exporter, exportMode: 'immediate', shouldExportSpan: () => true }),
+      ],
+    });
+    const span = provider.getTracer('ai').startSpan('ai.generateText');
+    span.recordException(new Error(`Provider rejected: ${SAMPLE_PROMPT}`));
+    span.addEvent('ai.retry', { reason: 'mail jose@example.com bounced', attempt: 2 });
+    span.setStatus({ code: SpanStatusCode.ERROR, message: `Failed for +15551234567` });
+    span.end();
+    await provider.forceFlush();
+    const [exported] = exporter.getFinishedSpans();
+    await provider.shutdown();
+
+    const [exception, retry] = exported.events;
+    expect(exception.attributes?.['exception.message']).toBe(`Provider rejected: ${MASKED_PROMPT}`);
+    expect(exception.attributes?.['exception.stacktrace']).not.toContain('jose@example.com');
+    expect(retry.attributes).toEqual({ reason: 'mail <EMAIL> bounced', attempt: 2 });
+    expect(exported.status).toEqual({ code: SpanStatusCode.ERROR, message: 'Failed for <PHONE>' });
   });
 
   it('keeps a caller-supplied mask hook', async () => {
