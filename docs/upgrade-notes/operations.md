@@ -352,13 +352,20 @@ before. The tables can stay; nothing reads them in `live` mode. The Resend chang
 
 - **Routes that were open are plan-gated.** `@RequireFeature` now sits on the API-key routes (`api_keys`), webhook
   subscriptions (`webhooks`), OAuth clients (`oauth_clients`), the integrations routes and connecting one
-  (`integrations`; the vendor callback stays open), the voice token (`voice_mode`) and every Desk route (`desk`; the
-  Inngest endpoint stays open). A workspace whose plan lacks the feature gets a 403 with `code`
-  `PLAN_UPGRADE_REQUIRED` and a `detail` naming the cheapest plan that has it; an expired trial gets
-  `TRIAL_EXPIRED`, a suspended workspace `ACCOUNT_SUSPENDED`. The web turns `PLAN_UPGRADE_REQUIRED` and
-  `USER_LIMIT_REACHED` into an upgrade prompt. Super-admins and single-tenant mode are not gated. With the shipped
-  seed, Starter loses integrations, voice, API keys, webhooks and OAuth clients, and Professional loses API keys,
-  webhooks and OAuth clients.
+  (`integrations`; the vendor callback stays open) and the voice token (`voice_mode`). A workspace whose plan lacks
+  the feature gets a 403 with `code` `PLAN_UPGRADE_REQUIRED` and a `detail` naming the cheapest plan that has it; an
+  expired trial gets `TRIAL_EXPIRED`, a suspended workspace `ACCOUNT_SUSPENDED`. The web turns
+  `PLAN_UPGRADE_REQUIRED` and `USER_LIMIT_REACHED` into an upgrade prompt. Super-admins and single-tenant mode are
+  not gated. With the shipped seed, Starter loses integrations, voice, API keys, webhooks and OAuth clients, and
+  Professional loses API keys, webhooks and OAuth clients.
+
+<!-- feature:desk:start -->
+
+- **Desk routes are plan-gated** by `desk`, every one a person calls; the workflow engine's own signed callback stays
+  open.
+
+<!-- feature:desk:end -->
+
 - **Seats are counted.** Creating a user, reactivating one and sending an invitation are refused with
   `USER_LIMIT_REACHED` once the workspace's active members plus pending, unexpired invitations reach its plan's
   `userLimit` (`plan_configs.user_limit`; null is unlimited). A workspace already over its limit keeps every member;
