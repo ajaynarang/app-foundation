@@ -13,6 +13,10 @@ export const ApiErrorCode = {
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   /** 403 — signed in but not allowed (role, scope, plan). */
   FORBIDDEN: 'FORBIDDEN',
+  /** 403 — the workspace's plan does not include this feature; the web shows an upgrade prompt with `detail`. */
+  PLAN_UPGRADE_REQUIRED: 'PLAN_UPGRADE_REQUIRED',
+  /** 403 — every seat the plan includes is in use (members plus pending invitations); the web shows an upgrade prompt. */
+  USER_LIMIT_REACHED: 'USER_LIMIT_REACHED',
   /** 404 — missing, or in another tenant (existence is never confirmed across tenants). */
   NOT_FOUND: 'NOT_FOUND',
   /** 405 — the route exists but not for this method. */

@@ -55,6 +55,7 @@ describe('configuration — production boot guard', () => {
     'PLATFORM_BEDROCK_CFN_TEMPLATE_URL',
     'OUTBOUND_MODE',
     'OUTBOUND_LIVE_OUTSIDE_PRODUCTION',
+    'PLAN_ENFORCEMENT',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -219,6 +220,22 @@ describe('configuration — production boot guard', () => {
 
     it('boots a developer machine with nothing set (allowlist)', () => {
       expect(() => load({ REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development' })).not.toThrow();
+    });
+  });
+
+  describe('PLAN_ENFORCEMENT (plan gates)', () => {
+    const dev = { REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development' };
+
+    it('enforces when unset', () => {
+      expect(load(dev).planEnforcement).toBe('enforce');
+    });
+
+    it('accepts log, the way in for a product with live tenants', () => {
+      expect(load({ ...dev, PLAN_ENFORCEMENT: 'log' }).planEnforcement).toBe('log');
+    });
+
+    it('refuses any other value instead of guessing', () => {
+      expect(() => load({ ...dev, PLAN_ENFORCEMENT: 'off' })).toThrow();
     });
   });
 

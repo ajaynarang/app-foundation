@@ -57,6 +57,11 @@ const configSchema = z.object({
     mode: z.enum(['multi', 'single', 'personal']).default('multi'),
   }),
 
+  // Plan gates (design item 17): `enforce` refuses a plan denial with a 403; `log` writes one `plan.would_deny`
+  // warning and lets it through, so a product with live tenants can watch before it enforces. Kill switches hold in
+  // both modes.
+  planEnforcement: z.enum(['enforce', 'log']).default('enforce'),
+
   // JWT Configuration
   jwt: z.object({
     accessSecret: z.string().default(DEV_JWT_ACCESS_SECRET_DEFAULT),
@@ -407,6 +412,7 @@ export default (): Configuration => {
     apiV1Prefix: process.env.API_V1_PREFIX,
     projectName: process.env.PROJECT_NAME,
     secretKey: env('SECRET_KEY'),
+    planEnforcement: env('PLAN_ENFORCEMENT'),
     jwt: {
       accessSecret: env('JWT_ACCESS_SECRET'),
       refreshSecret: env('JWT_REFRESH_SECRET'),

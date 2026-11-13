@@ -3,7 +3,11 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TenantPlan } from '@appshore/db';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_WARM_5M, CACHE_TTL_COLD_10M } from '@appshore/kernel/constants/cache.constants';
+import {
+  CACHE_TTL_WARM_5M,
+  CACHE_TTL_COLD_10M,
+  CACHE_TTL_FROZEN_24H,
+} from '@appshore/kernel/constants/cache.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
 
@@ -57,6 +61,24 @@ export class PlansService {
       },
       CACHE_TTL_WARM_5M,
     );
+  }
+
+  /**
+   * The plan of a tenant known by its numeric key (jobs, the tool pipeline, seat checks), or null when no such tenant
+   * exists. Goes through {@link getTenantPlan}, so it shares that cache and its invalidation; the key-to-id mapping
+   * never changes and is cached on its own.
+   */
+  async getTenantPlanByDbId(tenantDbId: number): Promise<TenantPlan | null> {
+    const key = buildKey('app:plans', 'tenant-wire-id', String(tenantDbId));
+    let tenantId = await this.cache.get<string>(key);
+    if (typeof tenantId !== 'string') {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantDbId }, select: { tenantId: true } });
+      // A miss is not cached: a tenant created after the lookup must not read as missing for a day.
+      if (!tenant) return null;
+      tenantId = tenant.tenantId;
+      await this.cache.set(key, tenantId, CACHE_TTL_FROZEN_24H);
+    }
+    return tenantId ? this.getTenantPlan(tenantId) : null;
   }
 
   async isFeatureEnabled(plan: TenantPlan, feature: string): Promise<boolean> {
