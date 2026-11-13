@@ -82,6 +82,28 @@ describe('ConfirmationCard', () => {
     expect(messages[messages.length - 1].content).toBe(detail);
   });
 
+  it.each([
+    ['a 500 refusal', () => jest.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({}) })],
+    [
+      'a 400 refusal',
+      () =>
+        jest.fn().mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ detail: 'Bad frame' }) }),
+    ],
+    ['a network error', () => jest.fn().mockRejectedValue(new TypeError('Failed to fetch'))],
+  ])('%s on Confirm does not leave the card saying Confirmed, and offers Confirm again', async (_label, makeFetch) => {
+    (global as { fetch?: unknown }).fetch = makeFetch();
+    render(<ConfirmationCard data={card} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+    expect(await screen.findByRole('button', { name: /confirm/i })).toBeTruthy();
+    expect(screen.queryByText('Confirmed')).toBeNull();
+    const state = useAssistantStore.getState();
+    expect(state.confirmationOutcomes.call_1).toBeUndefined();
+    expect(state.pendingConfirmation).toEqual(card);
+    expect(state.orbState).toBe('idle');
+  });
+
   it('Cancel voids that card and says so', async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     (global as { fetch?: unknown }).fetch = fetchMock;

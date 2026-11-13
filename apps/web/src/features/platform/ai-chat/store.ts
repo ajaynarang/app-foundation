@@ -204,6 +204,16 @@ function withOutcome(
   return toolCallId ? { ...outcomes, [toolCallId]: outcome } : outcomes;
 }
 
+/** The outcomes with this card's removed, so it reads as waiting again. */
+function withoutOutcome(
+  outcomes: Record<string, ConfirmationOutcome>,
+  toolCallId: string | undefined,
+): Record<string, ConfirmationOutcome> {
+  if (!toolCallId || !(toolCallId in outcomes)) return outcomes;
+  const { [toolCallId]: _removed, ...rest } = outcomes;
+  return rest;
+}
+
 /** Module-level abort controller for cancelling in-flight streaming requests */
 let activeAbortController: AbortController | null = null;
 
@@ -420,7 +430,9 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     const state = get();
     if (!state.sessionId || !state.pendingConfirmation) return;
 
-    const { runId, toolCallId } = state.pendingConfirmation;
+    const card = state.pendingConfirmation;
+    const { runId, toolCallId } = card;
+    // Shown as confirmed while the request is out; undone below if the server never accepts it.
     set((s) => ({
       pendingConfirmation: null,
       orbState: 'thinking' as OrbState,
@@ -442,6 +454,8 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
 
     set((s) => ({ messages: [...s.messages, assistantPlaceholder] }));
 
+    // True once the server accepted the confirmation (an OK response); from then on the write may have run.
+    let accepted = false;
     fetch(resumeUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
@@ -450,6 +464,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     })
       .then(async (response) => {
         if (!response.ok) throw await chatRequestError(response);
+        accepted = true;
         if (!response.body) throw new Error('No response body');
 
         const { assistantText, failure } = await readTurn(response.body, assistantPlaceholderId, set);
@@ -466,6 +481,9 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       .catch((err) => {
         // A 409: the card was already answered or expired, so nothing was confirmed and nothing ran.
         const noLongerWaiting = err instanceof ChatRequestError && err.status === 409;
+        // Any other refusal, or a request that never got an answer: nothing was confirmed, so the card waits again
+        // and the person can retry (a grant is single-use, so a retry after an unseen success gets the 409 above).
+        const notConfirmed = !accepted && !noLongerWaiting;
         set((s) => ({
           messages: updatePlaceholder(s.messages, assistantPlaceholderId, (m) => ({
             ...settleMessage(m),
@@ -474,6 +492,10 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
           orbState: 'idle' as OrbState,
           ...(noLongerWaiting && {
             confirmationOutcomes: withOutcome(s.confirmationOutcomes, toolCallId, 'expired'),
+          }),
+          ...(notConfirmed && {
+            pendingConfirmation: s.pendingConfirmation ?? card,
+            confirmationOutcomes: withoutOutcome(s.confirmationOutcomes, toolCallId),
           }),
         }));
       });
