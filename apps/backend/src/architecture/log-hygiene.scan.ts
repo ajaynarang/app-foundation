@@ -157,7 +157,7 @@ export function isSensitiveName(name: string): boolean {
  */
 export function sensitiveIdentifiers(expr: string): string[] {
   const bare = withoutMaskedParts(expr).replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''");
-  const chains = bare.match(/[A-Za-z_$][\w$]*(?:\s*\??\.\s*[A-Za-z_$][\w$]*)*/g) ?? [];
+  const chains: string[] = bare.match(/[A-Za-z_$][\w$]*(?:\s*\??\.\s*[A-Za-z_$][\w$]*)*/g) ?? [];
   return chains.filter((chain) => {
     const segments = chain.split(/\s*\??\.\s*/);
     while (segments.length > 1 && SAME_VALUE_METHODS.has(segments[segments.length - 1])) segments.pop();
