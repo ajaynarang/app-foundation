@@ -26,14 +26,12 @@ export interface UpgradeFeatureConfig {
 }
 
 export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
-  // ─── Add-on features (purchasable separately) ──────────────────────────
+  // ─── Plan features (Desk and the audit log are plan entitlements: the template sells no add-on for them) ──
   [FEATURE_KEYS.AUDIT_LOG]: {
     displayName: 'Audit Log',
     description: 'A searchable, exportable record of every action taken across your workspace.',
-    requiredPlan: null,
-    isAddOn: true,
-    addOnPrice: '$9/mo',
-    addOnSlug: 'audit_log',
+    requiredPlan: 'Professional',
+    isAddOn: false,
     icon: ScrollText,
     benefits: [
       'Full activity history across the workspace',
@@ -46,10 +44,8 @@ export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
   [FEATURE_KEYS.DESK]: {
     displayName: 'Desk Automations',
     description: 'Background agents that handle recurring work on your behalf.',
-    requiredPlan: null,
-    isAddOn: true,
-    addOnPrice: '$19/mo',
-    addOnSlug: 'desk',
+    requiredPlan: 'Starter',
+    isAddOn: false,
     icon: ListChecks,
     benefits: [
       'Automate recurring multi-step tasks',
@@ -60,7 +56,6 @@ export const upgradeRegistry: Record<string, UpgradeFeatureConfig> = {
   },
   // feature:desk:end
 
-  // ─── Entitlement features (plan tier upgrades) ─────────────────────────
   [FEATURE_KEYS.TEAM_MANAGEMENT]: {
     displayName: 'Team Management',
     description: 'Invite teammates, assign roles, and manage access across your workspace.',
