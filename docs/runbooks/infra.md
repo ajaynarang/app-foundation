@@ -151,7 +151,8 @@ queue and every enqueue.
 
 - A backed-up queue: fix its consumer ([queue-stalled](queues-jobs.md#queue-stalled)), then let it drain.
 - Old failed or completed jobs: clean them from the board.
-- Cache: `POST /admin/cache/flush` (safe; it refills from the database).
+- Cache: `POST /admin/cache/flush` with body `{"confirm": true}` (safe; it refills from the database), or
+  `POST /admin/cache/flush/:namespace` to flush one namespace when `GET /admin/cache/stats` shows which one is large.
 - Real growth: a larger node type through Terraform.
 
 ### Escalation
