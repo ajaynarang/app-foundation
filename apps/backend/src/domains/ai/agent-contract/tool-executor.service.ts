@@ -1,13 +1,15 @@
-import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ScopeRegistryService } from './scope-registry.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { toolFailure } from '../mcp/tools/tool-error';
 import {
+  claimOrSkip,
   type IdempotencyClaim,
   IdempotencyStore,
   requestFingerprint,
+  withinStoreTimeout,
 } from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 import { IDEMPOTENCY_KEY_ARG, declaresIdempotencyKey } from './tool-idempotency';
 
@@ -62,38 +64,46 @@ export class ToolExecutorService {
     const { [IDEMPOTENCY_KEY_ARG]: idempotencyKey, ...toolArgs } = args;
     if (typeof idempotencyKey !== 'string') return this.run(toolName, provider, toolArgs, principal, userDbId, context);
 
-    let claim: IdempotencyClaim | null = null;
+    let claim: IdempotencyClaim | null;
     try {
       // Per workspace AND per the person the call acts for: a replay never answers someone else, and never crosses
       // workspaces. The fingerprint names the tool, so the same key on another tool is a reuse, not a replay.
-      claim = await this.idempotency.claim(
+      // Fail open: a store that fails or does not answer within 2 s runs the call without the key.
+      claim = await claimOrSkip(
+        this.idempotency,
         `tdb:${principal.tenantId}:u:${userDbId}`,
         idempotencyKey,
         requestFingerprint(`tool:${toolName}`, toolArgs),
+        this.logger,
       );
     } catch (error: unknown) {
       // The key was used for a different call, or the first call is still running (409), or it is unusable (400).
-      if (error instanceof HttpException) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
-          isError: true,
-        };
-      }
-      // Fail open: an unreachable store runs the call without the key, never a failed create.
-      this.logger.warn(`Idempotency store unavailable for ${toolName}, running without the key`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
+        isError: true,
+      };
     }
     if (claim?.kind === 'replay') return claim.result.body as ToolResult;
 
-    const result = await this.run(toolName, provider, toolArgs, principal, userDbId, context);
+    let result: ToolResult;
+    try {
+      result = await this.run(toolName, provider, toolArgs, principal, userDbId, context);
+    } catch (error) {
+      // Thrown before the tool answered (the user lookup): free the key so a retry is not IN_USE for 10 minutes.
+      if (claim?.kind === 'run') await this.settle(claim, { content: [], isError: true });
+      throw error;
+    }
     if (claim?.kind === 'run') await this.settle(claim, result);
     return result;
   }
 
-  /** Only a success is remembered: a failed call frees the key, and a store error never fails a call that ran. */
+  /**
+   * Only a success is remembered: a failed call frees the key. A store error, or a store that does not answer within
+   * 2 s, never fails or stalls a call that ran.
+   */
   private async settle(claim: Extract<IdempotencyClaim, { kind: 'run' }>, result: ToolResult): Promise<void> {
     try {
-      if (result.isError) await claim.release();
-      else await claim.complete({ status: 200, body: result });
+      await withinStoreTimeout(result.isError ? claim.release() : claim.complete({ status: 200, body: result }));
     } catch (error) {
       this.logger.warn(`Idempotency: could not settle a tool call: ${(error as Error).message}`);
     }

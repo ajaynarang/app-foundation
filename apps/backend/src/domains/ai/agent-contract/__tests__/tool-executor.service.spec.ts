@@ -322,6 +322,47 @@ describe('ToolExecutorService', () => {
       claim.mockRestore();
     });
 
+    it('fails open on a store that never answers: the claim gives up after 2 s and the tool runs', async () => {
+      jest.useFakeTimers();
+      const claim = jest.spyOn(idempotency, 'claim').mockImplementationOnce(() => new Promise(() => undefined));
+      try {
+        const result = svc.execute('create-thing', { title: 'A', idempotencyKey: 'k-10' }, principal);
+        await jest.advanceTimersByTimeAsync(2500);
+        expect((await result).isError).toBeUndefined();
+        expect(run).toHaveBeenCalledTimes(1);
+      } finally {
+        claim.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
+    it('a store that hangs after the tool ran never stalls the answer', async () => {
+      jest.useFakeTimers();
+      const claim = jest.spyOn(idempotency, 'claim').mockResolvedValueOnce({
+        kind: 'run',
+        complete: jest.fn(() => new Promise<void>(() => undefined)),
+        release: jest.fn(),
+      });
+      try {
+        const result = svc.execute('create-thing', { title: 'A', idempotencyKey: 'k-11' }, principal);
+        await jest.advanceTimersByTimeAsync(2500);
+        expect((await result).isError).toBeUndefined();
+      } finally {
+        claim.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
+    it('a call that throws before the tool runs releases its key, so the retry runs instead of IN_USE', async () => {
+      mockPrisma.user.findUnique.mockRejectedValueOnce(new Error('db down'));
+      await expect(svc.execute('create-thing', { title: 'A', idempotencyKey: 'k-12' }, principal)).rejects.toThrow(
+        'db down',
+      );
+      const retry = await svc.execute('create-thing', { title: 'A', idempotencyKey: 'k-12' }, principal);
+      expect(retry.isError).toBeUndefined();
+      expect(run).toHaveBeenCalledTimes(1);
+    });
+
     it('without a key every call runs and the store is never asked', async () => {
       const claim = jest.spyOn(idempotency, 'claim');
       await svc.execute('create-thing', { title: 'A' }, principal);
