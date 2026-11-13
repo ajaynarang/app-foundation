@@ -27,7 +27,8 @@ removed. Everything cross-cutting remains and works:
   moderation, per-tenant AI budget, HITL) and an **empty MCP toolset** as your extension point.
 - **Billing** — Stripe subscriptions, wallet, plan entitlements, add-ons (generic).
 - **Infra** — Postgres (pgvector) + Redis, BullMQ queues, transactional outbox, timers, SSE realtime, S3 storage,
-  email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+  email/SMS/push, OTel traces and metrics + pino logs + Sentry errors (each off until its key is set;
+  `docs/observability.md`), a local-only Loki/Tempo/Prometheus/Grafana compose profile, Terraform.
 
 <!-- feature:desk:start -->
 
@@ -89,7 +90,7 @@ packages/
   test-utils/    — auth fixtures, Playwright API client (@app/test-utils)
 infra/
   terraform/     — AWS (ECS, RDS, ElastiCache, S3, ALB, CloudWatch) — var.project parameterized
-  observability/ — Loki + Tempo + Grafana
+  observability/ — local-only Loki + Tempo + Prometheus + Grafana (compose profile; not the production stack)
 tests/         — Playwright QA suite (@app/qa)
 ```
 
@@ -199,7 +200,7 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 | Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                    |
 | Auth     | First-party email+password, phone PIN/OTP (Twilio optional), Firebase optional, JWT+refresh |
 | AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                    |
-| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), Loki + Tempo + Grafana                    |
+| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), OTLP + Sentry (off until keys are set)    |
 
 ---
 

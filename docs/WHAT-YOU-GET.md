@@ -98,7 +98,8 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 - **Search endpoint** with a provider extension point (returns empty until you register
   your domain searchers).
 - **Support tickets** + in-app **feedback** (AI-summarized) + announcements/banners.
-- OpenTelemetry traces, structured pino logs, Loki/Tempo/Grafana docker profile, health
+- OpenTelemetry traces and metrics (exported only once an OTLP endpoint is set; docs/observability.md), structured
+  pino logs, a local-only Loki/Tempo/Prometheus/Grafana docker profile (not the production answer), health
   endpoints (`/api/v1/health/live`, `/health/ready`).
 
 **Three apps**

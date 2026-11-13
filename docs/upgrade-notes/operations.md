@@ -221,3 +221,54 @@ call.
 web build.
 
 **How to turn it back.** Unset `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (rebuild the web). Nothing is stored.
+
+## 2026-11-13: telemetry off when unset, metrics, foundation crons start running, heartbeat
+
+**What changes when you pull it.**
+
+- **Six foundation crons start running.** A database built from the squashed init migration had no `job_schedules`
+  rows, so these jobs were never scheduled. Migration `20261113233000_foundation_job_schedules` inserts one row each
+  (daily, UTC), `ON CONFLICT DO NOTHING`, and every boot applies the rows to BullMQ:
+  - `trial-expiry` (00:15): tenants on `TRIAL` whose `trialEndsAt` has passed move to `TRIAL_EXPIRED` and lose their
+    gifted add-ons. This is the change most likely to be visible to your customers.
+  - `job-cleanup` (03:00), `data-retention` (04:00), `login-events-cleanup` (04:30): old job records, login events,
+    webhook logs, event logs and HITL challenges are deleted (90 or 30 days, as the handlers say).
+  - `tokens-cleanup` (05:00): refresh tokens that expired, or were revoked more than 30 days ago, are deleted. It has
+    a handler for the first time.
+  - `cleanup` on the notifications queue (05:30): read in-app notifications older than 30 days and dismissed ones
+    older than 7 days are deleted.
+- **The ops heartbeat.** `ops-heartbeat` runs every five minutes on `bulk-ops` and logs one `ops.heartbeat` line.
+- **oauth-refresh runs.** Its handler was never wired to the `bulk-ops` dispatcher, so a product with an OAuth vendor
+  had its refresh jobs completed as unknown. It is wired now, and named in `APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH`.
+- **`uploads-cleanup` is gone** from `BULK_OPS_JOB_NAMES`: it never had a handler. `trial-expiry` and `ops-heartbeat`
+  join the list. Code that imported `BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP` no longer compiles: delete the reference.
+- **Scheduling moved.** `AuthModule` and `DataRetentionModule` no longer schedule their own crons at boot; one
+  registrar applies every foundation row (`FoundationSchedulesRegistrar`). A schedule saved on the Schedules screen
+  now carries a system job envelope.
+- **Traces are off when no endpoint is set.** The backend used to fall back to `http://localhost:4318` in every
+  environment, so an ECS task exported traces into nothing. Now an unset `OTEL_EXPORTER_OTLP_ENDPOINT` exports
+  nothing, except with `ENV_TYPE=development`, where it still uses the local collector. `apps/backend/.env.example`
+  no longer sets the endpoint.
+- **Metrics.** With the endpoint set, metrics are pushed to `<endpoint>/v1/metrics` every 60 s (the instruments in
+  `docs/observability.md`). New sampling key `OTEL_TRACES_SAMPLER_ARG` (default 1) and auth key
+  `OTEL_EXPORTER_OTLP_HEADERS`.
+- **Langfuse spans are masked.** Phones and emails in AI spans sent to Langfuse are replaced with `<PHONE>` and
+  `<EMAIL>`.
+- **No worker task.** With `worker_desired_count = 0`, the next Terraform apply adds `OPS_GAUGES_FROM_API=true` to the
+  API task definition (a new revision), so the API reports the queue, cron, outbox and deadline gauges. With a
+  worker, the task definitions do not change.
+
+**What to set first.** To keep a cron from starting, give it a disabled row before you deploy this release (the
+migration then leaves your row alone):
+
+```sql
+INSERT INTO job_schedules (category, job_type, schedule_type, pattern, is_enabled, updated_at)
+VALUES ('maintenance', 'trial-expiry', 'cron', '15 0 * * *', false, NOW())
+ON CONFLICT (category, job_type) DO UPDATE SET is_enabled = false;
+```
+
+Use `('notifications', 'cleanup', …)` for the notification cleanup. Nothing else is required. A deployed environment
+that relied on the old localhost fallback to reach a sidecar collector must now set `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+**How to turn it back.** Disable a cron on the Schedules screen (or set `is_enabled = false` on its row); the next
+boot removes its repeatable. Unset `OTEL_EXPORTER_OTLP_ENDPOINT` to stop traces and metrics.

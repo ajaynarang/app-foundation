@@ -7,8 +7,9 @@ metrics go, and which keys switch each one on. The rules every log line and erro
 Nothing here is required to boot, test or deploy. With no key set the app runs, writes JSON logs to stdout and sends
 nothing anywhere. Each vendor is switched on by its own key and is a no-op without it.
 
-> This page grows with the observability work. Today it covers error tracking and logs. Traces, metrics, alert
-> rules, dashboards and the AWS fallback alarms are added to it as they land.
+> This page grows with the observability work. Today it covers error tracking, traces, metrics, the crons and
+> heartbeat behind them, and the local stack. Alert rules, dashboards and the AWS fallback alarms are added to it as
+> they land.
 
 ## Error tracking (Sentry)
 
@@ -58,3 +59,99 @@ The web drops a 4xx `ApiError`, chunk-load failures after a deploy, aborted requ
    build. Deploy.
 3. Check: a deliberate 500 on staging appears in Sentry with `environment: staging` and a `requestId` tag that finds
    the request's log lines.
+
+## Traces and metrics (OTLP)
+
+Both go out over OTLP/HTTP to one endpoint with one auth header, so one pair of keys turns both on. Pushed, not
+scraped: the worker has no HTTP port.
+
+### Keys
+
+| Key                                   | Where   | What it does                                                                                                                                                   |
+| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`         | backend | The OTLP base URL; traces go to `<url>/v1/traces`, metrics to `<url>/v1/metrics`. Unset: nothing is exported, except with `ENV_TYPE=development` (below).      |
+| `OTEL_EXPORTER_OTLP_HEADERS`          | backend | `key=value` pairs, values URL-encoded. A hosted backend's auth: `Authorization=Basic%20<base64>`.                                                              |
+| `OTEL_TRACES_SAMPLER_ARG`             | backend | Root-span sampling ratio, 0 to 1. Default 1 (every trace). Parent-based: a request that arrives sampled stays sampled.                                         |
+| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | backend | A full metrics URL that replaces `<url>/v1/metrics`. Used locally to send metrics to Prometheus while traces go to Tempo. It never turns metrics on by itself. |
+| `OTEL_SERVICE_NAME`                   | backend | The `service` label (default `app-backend`). Products sharing one backend are told apart by it.                                                                |
+| `METRICS_TENANT_LABEL_MAX`            | backend | Distinct tenants one process gives their own `tenant` label before the rest read `other` (default 200).                                                        |
+| `OPS_GAUGES_FROM_API`                 | API     | Set by Terraform only, when `worker_desired_count = 0` (below). Never set it in Doppler: Doppler values override the task environment.                         |
+
+With no endpoint and `ENV_TYPE` anything but `development`, the SDK starts with no exporter and no instrumentation:
+it only carries the trace context, so AI spans still nest in Langfuse, and every metric call is a no-op. Nothing
+retries into the void. With `ENV_TYPE=development` and no endpoint, traces and metrics go to `http://localhost:4318`
+(the local stack). Every exported span and point carries `deployment.environment` / `env` from `ENV_TYPE` (the same
+three values as logs and errors) and a stable `service.instance.id` (the ECS task id).
+
+AI calls traced to Langfuse (`LANGFUSE_SECRET_KEY`) go through their own provider, and phones and emails are masked
+in every string attribute before a span leaves the process.
+
+Traces and metrics leave AWS when the endpoint is a hosted backend: list it as a subprocessor in your privacy terms.
+
+### What is measured
+
+Every instrument is created in one file, `packages/appshore/kernel/src/infrastructure/telemetry/metrics.ts`, which
+holds the label budget. Prometheus names gain `_total` on counters and `_seconds` on second-valued instruments.
+
+| Metric                                                                           | Labels                                    | Recorded by                                                                    |
+| -------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| `app_job_failed`                                                                 | `queue`, `job_name`, `final`, `tenant`    | Every failed job attempt (`reportJobFailure`).                                 |
+| `app_cron_last_success_timestamp_seconds`                                        | `job_name`                                | `CronRun.complete()`, unless every tenant failed.                              |
+| `app_cron_expected_interval_seconds`                                             | `job_name`                                | The queue reporter, from the repeatables BullMQ holds (a minute or more only). |
+| `app_queue_waiting`, `_active`, `_failed`, `_delayed`, `_oldest_waiting_seconds` | `queue`                                   | The queue reporter, every export.                                              |
+| `app_outbox_oldest_unpublished_seconds`                                          | none                                      | Every 30 s: the oldest committed, unpublished outbox event; 0 when none waits. |
+| `app_deadline_oldest_due_seconds`                                                | none                                      | Every 30 s: how far past due the oldest pending deadline is; 0 when none is.   |
+| `app_otp_failed`                                                                 | `reason`                                  | A sign-in code send or check failing (`provider`, `invalid`, `rate_limited`).  |
+| `app_outbound_failed`                                                            | `channel`                                 | A failed email, SMS, push, WhatsApp or webhook send.                           |
+| `app_ai_invocation`, `app_ai_invocation_cost_usd`                                | `surface`, `status` / `surface`, `tenant` | The AI cost ledger write, once per new row.                                    |
+| `app_ai_invocation_duration`                                                     | `surface`, `status`                       | The same write.                                                                |
+| `http.server.request.duration`                                                   | route, method, status                     | The HTTP auto-instrumentation (stable semantic conventions).                   |
+
+`tenant` is the tenant's public id, the same `tenantId` a log line carries. No metric carries a user, request or job
+id, a phone, an email, an amount, or an AI provider, route or model. Three auto-instrumented histograms nobody reads
+(`http.client.request.duration`, `db.client.operation.duration`, `v8js.gc.duration`) are dropped at the source.
+
+### Which process reports the ops gauges
+
+The queue depths, the cron intervals and the outbox and deadline ages are read from Redis and Postgres, so exactly
+one process role reports them: the worker. With no worker task (`worker_desired_count = 0`) the API consumes every
+queue, and Terraform sets `OPS_GAUGES_FROM_API=true` on the API task so the gauges still exist. Several reporting
+tasks report the same readings, so every rule and panel on these gauges uses `max`, never `sum`.
+
+## Crons and the heartbeat
+
+The foundation's crons run on the `bulk-ops` queue, one job at a time, from rows in `job_schedules` an admin can
+retune or disable on the Schedules screen. Defaults (UTC, daily, staggered):
+
+| Job                             | When  | What it does                                                                      |
+| ------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| `trial-expiry`                  | 00:15 | Moves tenants whose trial ended to `TRIAL_EXPIRED`.                               |
+| `job-cleanup`                   | 03:00 | Deletes finished job records older than 90 days.                                  |
+| `data-retention`                | 04:00 | Deletes old login events, webhook logs, job rows, event logs and HITL challenges. |
+| `login-events-cleanup`          | 04:30 | Deletes login events older than 90 days.                                          |
+| `tokens-cleanup`                | 05:00 | Deletes expired refresh tokens and ones revoked over 30 days ago.                 |
+| `cleanup` (notifications queue) | 05:30 | Deletes old read and dismissed in-app notifications.                              |
+
+Every repeatable of a minute or more runs inside `CronRun`, which writes one `cron.completed` line with its duration
+and tenant counts and stamps `app_cron_last_success_timestamp_seconds` (`cron-run-coverage.spec.ts` holds this). The
+queue reporter publishes each one's expected interval from what BullMQ holds, so a disabled schedule has no series
+and the one missed-run rule stays silent for it. The outbox relay (every 10 s) and the deadline sweeper (every 30 s)
+are left out on purpose; their two age gauges cover them.
+
+`ops-heartbeat` runs every five minutes on `bulk-ops` and writes one `ops.heartbeat` line. The line exists only if
+Redis, the scheduler and a consumer all work, so its absence is the signal. It needs no schedule row; a disabled
+row `('maintenance', 'ops-heartbeat')` removes it, which is how a test-fire proves the missing-heartbeat alert pages
+on a stack with no worker to stop.
+
+## The local stack
+
+For trying logs, traces, metrics and PromQL on a laptop, not for production:
+
+```bash
+docker compose --profile observability up -d   # Loki :3100, Tempo :4318, Prometheus :9090, Grafana :3003
+```
+
+Every port is bound to loopback. With `ENV_TYPE=development` the backend sends traces to Tempo on its own. To see
+metrics, also set `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:9090/api/v1/otlp/v1/metrics` (Prometheus's
+OTLP receiver) and `LOG_TRANSPORT=loki` for logs. Grafana has the three datasources provisioned. A deployed product
+sends to a hosted backend instead, switched on by the keys above.
