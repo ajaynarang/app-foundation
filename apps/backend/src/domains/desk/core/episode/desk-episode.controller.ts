@@ -19,6 +19,8 @@ import {
   DeskEpisodeResolveResultResponse,
   DeskHandledEpisodeListResponse,
 } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for Desk episode reads. Writes (close/retry/approve)
@@ -27,6 +29,7 @@ import {
  */
 @ApiTags('Desk — Episodes')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/episodes')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskEpisodeController extends BaseTenantController {

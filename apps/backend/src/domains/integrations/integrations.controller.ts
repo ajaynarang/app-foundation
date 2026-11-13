@@ -27,7 +27,7 @@ import { IntegrationSyncHistoryQueryDto, SyncHistoryQueryDto } from './dto/sync-
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
-import { JobStatusSchema } from '@app/shared-types';
+import { FEATURE_KEYS, JobStatusSchema } from '@app/shared-types';
 import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import {
@@ -41,12 +41,14 @@ import {
   IntegrationUpdatedResponse,
   IntegrationVendorEntryResponse,
 } from './openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
 
 /** BullMQ job name for a manually-triggered integration sync. */
 const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';
 
 @ApiTags('Integrations')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.INTEGRATIONS)
 @Controller('integrations')
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.ADMIN, UserRole.OWNER)

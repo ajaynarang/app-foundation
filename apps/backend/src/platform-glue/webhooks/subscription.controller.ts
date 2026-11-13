@@ -35,6 +35,8 @@ import {
   WebhookSubscriptionResponse,
   WebhookSubscriptionWithSecretResponse,
 } from './openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 const SUBSCRIPTION_ID_PARAM = { name: 'id', description: 'Webhook subscription id' } as const;
 const LOG_ID_PARAM = { name: 'log_id', description: 'Delivery log id (uuid)' } as const;
@@ -42,6 +44,7 @@ const LOG_ID_PARAM = { name: 'log_id', description: 'Delivery log id (uuid)' } a
 @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER)
 @ApiTags('Webhooks')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.WEBHOOKS)
 @Controller('webhooks')
 export class SubscriptionController {
   constructor(
