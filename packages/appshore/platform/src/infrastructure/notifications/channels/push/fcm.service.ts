@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { initializeFirebase, admin } from '../../../../config/firebase.config';
 import { DevicePlatform } from '@appshore/db';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
 
 export interface FcmPushPayload {
   title: string;
@@ -87,15 +88,19 @@ export class FcmService {
       });
 
       const deadDeviceIds: number[] = [];
+      let deliveryFailures = 0;
       result.responses.forEach((response, index) => {
         if (response.success) return;
         const code = response.error?.code ?? 'unknown';
         if (DEAD_TOKEN_ERROR_CODES.has(code)) {
           deadDeviceIds.push(devices[index].id);
         } else {
+          deliveryFailures += 1;
           this.logger.warn(`FCM send failed for user ${userDbId}: ${code}`);
         }
       });
+      // A pruned dead token is housekeeping, not a failed send.
+      recordOutboundFailed(OUTBOUND_CHANNEL.PUSH, deliveryFailures);
 
       if (deadDeviceIds.length > 0) {
         await this.prisma.notificationDevice.deleteMany({ where: { id: { in: deadDeviceIds } } });
@@ -104,6 +109,7 @@ export class FcmService {
 
       return result.successCount;
     } catch (error: any) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.PUSH, devices.length);
       this.logger.error(`FCM multicast failed for user ${userDbId}: ${error.message}`);
       return 0;
     }

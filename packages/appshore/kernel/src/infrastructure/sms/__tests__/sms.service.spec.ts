@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SmsService } from '../sms.service';
 import { ConfigService } from '@nestjs/config';
+import { InMemoryMetrics } from '../../telemetry/testing/in-memory-metrics';
 
 describe('SmsService', () => {
   let service: SmsService;
@@ -112,5 +113,57 @@ describe('SmsService with Twilio', () => {
     expect(text).toContain('***6543');
     expect(text).not.toContain('+15559876543');
     jest.restoreAllMocks();
+  });
+});
+
+describe('SmsService failures count in app_outbound_failed', () => {
+  let harness: InMemoryMetrics;
+  const originalEnvType = process.env.ENV_TYPE;
+
+  beforeEach(() => {
+    harness = InMemoryMetrics.install();
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await harness.uninstall();
+    if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+    else process.env.ENV_TYPE = originalEnvType;
+  });
+
+  const unconfigured = () => new SmsService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+
+  it('counts an unsent SMS outside development (no provider)', async () => {
+    process.env.ENV_TYPE = 'preprod';
+
+    await expect(unconfigured().sendSms('+15559876543', 'hi')).resolves.toBe(false);
+
+    expect(await harness.points('app_outbound_failed')).toEqual([
+      expect.objectContaining({ attributes: { channel: 'sms' }, value: 1 }),
+    ]);
+  });
+
+  it('counts a provider refusal', async () => {
+    process.env.ENV_TYPE = 'production';
+    const service = unconfigured();
+    Object.assign(service as unknown as Record<string, unknown>, {
+      isConfiguredFlag: true,
+      twilioClient: { messages: { create: jest.fn().mockRejectedValue(new Error('refused')) } },
+    });
+
+    await expect(service.sendSms('+15559876543', 'hi')).resolves.toBe(false);
+
+    expect((await harness.points('app_outbound_failed'))[0]).toMatchObject({ value: 1 });
+  });
+
+  it('counts nothing on a developer machine, where the message is printed', async () => {
+    process.env.ENV_TYPE = 'development';
+
+    await unconfigured().sendSms('+15559876543', 'hi');
+
+    expect(await harness.points('app_outbound_failed')).toEqual([]);
   });
 });

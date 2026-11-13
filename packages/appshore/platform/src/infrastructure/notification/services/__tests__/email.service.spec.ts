@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import { InMemoryMetrics } from '@appshore/kernel/infrastructure/telemetry/testing/in-memory-metrics';
 import { EmailNotConfiguredError, EmailService } from '../email.service';
 
 // Mock resend and nodemailer
@@ -189,5 +190,46 @@ describe('EmailService', () => {
       const html = sendSpy.mock.calls[0][0].html;
       expect(html).toContain('acme.app.appshore.in');
     });
+  });
+});
+
+describe('EmailService failures count in app_outbound_failed', () => {
+  let harness: InMemoryMetrics;
+  const originalEnvType = process.env.ENV_TYPE;
+
+  beforeEach(() => {
+    harness = InMemoryMetrics.install();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await harness.uninstall();
+    if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+    else process.env.ENV_TYPE = originalEnvType;
+  });
+
+  it('counts a send with no provider outside development as one failed email', async () => {
+    process.env.ENV_TYPE = 'sandbox';
+    const service = new EmailService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+
+    await expect(service.sendEmail({ to: 'a@example.com', subject: 's', html: '<p/>' })).rejects.toThrow(
+      EmailNotConfiguredError,
+    );
+
+    expect(await harness.points('app_outbound_failed')).toEqual([
+      expect.objectContaining({ attributes: { channel: 'email' }, value: 1 }),
+    ]);
+  });
+
+  it('counts nothing for the development console path', async () => {
+    process.env.ENV_TYPE = 'development';
+    const service = new EmailService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+
+    await service.sendEmail({ to: 'a@example.com', subject: 's', html: '<p/>' });
+
+    expect(await harness.points('app_outbound_failed')).toEqual([]);
   });
 });

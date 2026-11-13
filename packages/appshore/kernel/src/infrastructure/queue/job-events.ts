@@ -2,6 +2,7 @@ import type { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveJobTenant } from '../logging/job-log-context';
 import { ERROR_SOURCE, reportError } from '../error-tracking/sentry';
+import { recordCronSuccess, recordJobFailed } from '../telemetry/metrics';
 
 /**
  * Structured `event` values that alert rules key on (docs/standards/observability.md, rule 6). Renaming one silently
@@ -82,6 +83,7 @@ export function reportJobFailure(
     err: toLoggableError(err),
   };
   const msg = `Job ${job.name} (id=${jobId ?? 'unknown'}) on ${job.queueName ?? 'unknown'} failed${final ? ' permanently' : ''}`;
+  recordJobFailed({ queue: job.queueName, jobName: job.name, final, tenantId });
   if (final) {
     logger.error({ msg, ...fields });
     // A retry BullMQ will run again is not an incident yet; the final failure is.
@@ -96,7 +98,8 @@ export function reportJobFailure(
  * Tracks one scheduled run of a cron, or of a sweep over tenants. Count each tenant as it finishes, then call
  * `complete()` once at the end: the `cron.completed` line is what a "cron missed" rule waits for, and a non-zero
  * `tenantsFailed` is what a "cron partly failed" rule counts. A sweep keeps its warn-and-continue loop; `failed()`
- * writes the per-tenant line and reports the error to the tracker.
+ * writes the per-tenant line and reports the error to the tracker. `complete()` also stamps
+ * `app_cron_last_success_timestamp_seconds`, which the cron-missed rule compares with the expected interval.
  */
 export class CronRun {
   private readonly startedAt = Date.now();
@@ -131,6 +134,9 @@ export class CronRun {
       tenantsFailed: this.tenantsFailed,
       durationMs: Date.now() - this.startedAt,
     };
+    // A sweep where every tenant failed is not a success: leaving the stamp alone lets the cron-missed rule fire.
+    // Partial success stamps (the cron-tenants-failed rule covers it), as does a run with no tenants.
+    if (summary.tenantsFailed === 0 || summary.tenantsOk > 0) recordCronSuccess(this.jobName);
     this.logger.log({
       msg: `Cron ${this.jobName} completed: ${summary.tenantsOk} ok, ${summary.tenantsFailed} failed in ${summary.durationMs}ms`,
       event: JOB_EVENTS.CRON_COMPLETED,

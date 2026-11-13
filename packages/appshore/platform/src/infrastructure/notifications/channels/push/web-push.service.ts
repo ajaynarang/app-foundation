@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import * as webpush from 'web-push';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
 
 interface PushSubscriptionInput {
   endpoint: string;
@@ -111,6 +112,7 @@ export class PushService {
           await this.prisma.pushSubscription.delete({ where: { id: sub.id } });
           this.logger.log(`Removed expired push subscription for user ${userId}`);
         } else {
+          recordOutboundFailed(OUTBOUND_CHANNEL.PUSH);
           this.logger.error(`Push send failed for user ${userId}: ${error.message}`);
         }
       }

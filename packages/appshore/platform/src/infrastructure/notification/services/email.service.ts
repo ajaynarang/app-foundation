@@ -5,6 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { isDevelopmentEnv } from '@appshore/kernel/shared/utils/env-label';
 import { maskEmail } from '@appshore/kernel/shared/utils/log-redaction';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
 
 /**
  * Thrown by `sendEmail` when no provider (Resend or SMTP) is configured outside `ENV_TYPE=development`. A message
@@ -102,6 +103,7 @@ export class EmailService {
 
       this.logger.log(`Email sent to ${maskEmail(options.to)} via ${this.emailProvider}`);
     } catch (error) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.EMAIL);
       this.logger.error({ msg: `Failed to send email to ${maskEmail(options.to)}`, err: toLoggableError(error) });
       throw error;
     }

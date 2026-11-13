@@ -15,6 +15,8 @@ import { AiBudgetExceededError } from './ai-budget-exceeded.error';
 import { longPromptSurchargeAbove } from '../../routing/model-catalog';
 import { BUDGET_SEED_NOTE_DEFAULT } from '../../routing/provisioning/plan-ai-budgets';
 import { PLATFORM_PAID_SQL } from './platform-paid';
+import { recordAiInvocation } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { requestContextStorage } from '@appshore/kernel/infrastructure/logging/request-context.middleware';
 
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
@@ -80,13 +82,49 @@ export class AiTelemetryService {
     this.warnOnLongPromptSurcharge(usage);
     const costUsd = await this.computeCost(usage);
 
-    const row = await this.persistRow(usage, context, costUsd);
+    const { row, created } = await this.persistRow(usage, context, costUsd);
+    // One metric point per ledger row: an idempotent replay wrote nothing and counts nothing.
+    if (created) void this.recordMetric(row);
 
     // Drop this tenant's spent-so-far cache so the next budget check sees the new spend.
     // Best-effort; a stale 60s window is acceptable.
     void this.invalidateSpentCache(row.tenantId).catch(() => {});
 
     return row;
+  }
+
+  /**
+   * `app_ai_invocation*` for a new ledger row, the one place they are recorded. Never throws and is not awaited: a
+   * metric must not fail or slow an AI call.
+   */
+  private async recordMetric(row: AiInvocation): Promise<void> {
+    try {
+      recordAiInvocation({
+        surface: row.surface,
+        status: row.status,
+        tenantId: await this.tenantLabelId(row.tenantId),
+        latencyMs: row.latencyMs,
+        costUsd: row.costUsd === null ? null : Number(row.costUsd),
+      });
+    } catch (err) {
+      this.logger.warn(`AI invocation metric not recorded: ${(err as Error)?.message ?? String(err)}`);
+    }
+  }
+
+  /**
+   * The tenant's public string id for the metric's `tenant` label, the same `tenantId` the log line carries: read
+   * from the log context when it names this tenant, else looked up (cached) by the numeric id. Null when unknown.
+   */
+  private async tenantLabelId(tenantDbId: number): Promise<string | null> {
+    const logContext = requestContextStorage.getStore();
+    if (logContext?.tenantId && logContext.tenantDbId === String(tenantDbId)) return logContext.tenantId;
+    return this.cache.getOrSet(
+      buildKey('app:ai-telemetry', 'tenant-public-id', String(tenantDbId)),
+      async () =>
+        (await this.prisma.tenant.findUnique({ where: { id: tenantDbId }, select: { tenantId: true } }))?.tenantId ??
+        null,
+      CACHE_TTL_COLD_30M,
+    );
   }
 
   /**
@@ -197,10 +235,10 @@ export class AiTelemetryService {
     usage: AiUsage,
     context: AiCallContext,
     costUsd: Prisma.Decimal | null,
-  ): Promise<AiInvocation> {
-    const { row, staged } = await this.prisma.$transaction(async (tx) => {
+  ): Promise<{ row: AiInvocation; created: boolean }> {
+    const { row, created, staged } = await this.prisma.$transaction(async (tx) => {
       const found = await this.findOrCreateRow(tx, usage, context, costUsd);
-      if (!found.created) return { row: found.row, staged: [] };
+      if (!found.created) return { row: found.row, created: false, staged: [] };
       const event = await this.outbox.stage(tx, DOMAIN_EVENTS.AI_INVOCATION_RECORDED, found.row.tenantId, {
         invocationId: found.row.id,
         surface: found.row.surface,
@@ -209,10 +247,10 @@ export class AiTelemetryService {
         costUsd: costUsd?.toString() ?? null,
         totalTokens: found.row.totalTokens,
       });
-      return { row: found.row, staged: [event] };
+      return { row: found.row, created: true, staged: [event] };
     });
     if (staged.length > 0) void this.outbox.publishStaged(staged);
-    return row;
+    return { row, created };
   }
 
   /**

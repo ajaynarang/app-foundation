@@ -16,6 +16,7 @@ import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-
 import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
 import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 import { reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -190,6 +191,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   async onFailed(job: Job<JobEnvelope<WebhookDeliveryPayload>>, err: Error): Promise<void> {
     const final = reportJobFailure(this.logger, job, err, 3) || err instanceof UnrecoverableError;
     if (final) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.WEBHOOK);
       await this.deadLetter.recordPermanentFailure(job, err);
     }
   }

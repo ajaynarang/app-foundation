@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { isDevelopmentEnv } from '../../shared/utils/env-label';
 import { maskPhone } from '../../shared/utils/log-redaction';
 import { toLoggableError } from '../queue/job-events';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '../telemetry/metrics';
 
 @Injectable()
 export class SmsService {
@@ -46,6 +47,7 @@ export class SmsService {
           `SMS not sent to ${maskPhone(to)} (Twilio not configured, ENV_TYPE=development). Message: ${message}`,
         );
       } else {
+        recordOutboundFailed(OUTBOUND_CHANNEL.SMS);
         this.logger.warn(`SMS not sent to ${maskPhone(to)}: Twilio not configured`);
       }
       return false;
@@ -60,6 +62,7 @@ export class SmsService {
       this.logger.log(`SMS sent to ${maskPhone(to)}`);
       return true;
     } catch (error: unknown) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.SMS);
       // Twilio's errors echo the number they refused; the err serializer masks it.
       this.logger.error({ msg: `SMS send failed to ${maskPhone(to)}`, err: toLoggableError(error) });
       return false;

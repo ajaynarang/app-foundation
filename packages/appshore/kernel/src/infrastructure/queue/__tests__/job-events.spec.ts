@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { CronRun, JOB_EVENTS, isFinalFailure, reportJobFailure, toLoggableError } from '../job-events';
 import * as errorTracking from '../../error-tracking/sentry';
+import { resetTenantLabelsForTesting } from '../../telemetry/metrics';
+import { InMemoryMetrics } from '../../telemetry/testing/in-memory-metrics';
 
 function makeJob(overrides: Partial<Job> = {}): Job {
   return {
@@ -246,5 +248,59 @@ describe('error tracking (docs/standards/observability.md, rule 10)', () => {
       jobName: 'data-retention',
       source: 'cron',
     });
+  });
+});
+
+describe('metrics (docs/standards/observability.md, rule 9)', () => {
+  let harness: InMemoryMetrics;
+
+  beforeEach(() => {
+    resetTenantLabelsForTesting();
+    harness = InMemoryMetrics.install();
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await harness.uninstall();
+  });
+
+  it('counts every failed attempt in app_job_failed, retries and the final one apart', async () => {
+    reportJobFailure(new Logger('X'), makeJob({ attemptsMade: 1 }), new Error('retry me'));
+    reportJobFailure(new Logger('X'), makeJob({ attemptsMade: 3 }), new Error('gone'));
+
+    const points = await harness.points('app_job_failed');
+    expect(points.map((p) => p.attributes).sort((a, b) => String(a.final).localeCompare(String(b.final)))).toEqual([
+      { queue: 'bulk-ops', job_name: 'vendor-sync', final: 'false', tenant: '4' },
+      { queue: 'bulk-ops', job_name: 'vendor-sync', final: 'true', tenant: '4' },
+    ]);
+  });
+
+  it('stamps the cron success time when the run completes', async () => {
+    const run = new CronRun(new Logger('X'), 'data-retention');
+    run.succeeded();
+
+    run.complete();
+
+    const [point] = await harness.points('app_cron_last_success_timestamp_seconds');
+    expect(point.attributes).toEqual({ job_name: 'data-retention' });
+    expect(point.value).toBeGreaterThan(Date.now() / 1000 - 60);
+  });
+
+  it('stamps a run with no tenants and a partly failed run, but not one where every tenant failed', async () => {
+    new CronRun(new Logger('X'), 'job-cleanup').complete();
+    const partly = new CronRun(new Logger('X'), 'trial-expiry');
+    partly.succeeded();
+    partly.failed(1, new Error('x'));
+    partly.complete();
+    const allFailed = new CronRun(new Logger('X'), 'ai-credential-revalidate');
+    allFailed.failed(1, new Error('x'));
+    allFailed.complete();
+
+    const stamped = (await harness.points('app_cron_last_success_timestamp_seconds')).map((p) => p.attributes.job_name);
+    expect(stamped.sort()).toEqual(['job-cleanup', 'trial-expiry']);
   });
 });
