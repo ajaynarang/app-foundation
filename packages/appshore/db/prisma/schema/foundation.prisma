@@ -158,6 +158,11 @@ model Tenant {
   // flips it at PATCH /ai-settings/policy. For compliance-sensitive customers.
   aiZeroRetention Boolean @default(false) @map("ai_zero_retention")
 
+  // External agents (OAuth clients, API keys) wait for a person to approve a standard write in the app by default.
+  // When the owner sets this, they confirm their own standard writes by echoing the token instead. A sensitive write
+  // always needs the acting person's PIN, whatever this says. The owner flips it at PUT /agent-policy.
+  agentSelfConfirm Boolean @default(false) @map("agent_self_confirm")
+
   isActive  Boolean  @default(false) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -2302,6 +2307,18 @@ model HitlChallenge {
   conversationId String?   @map("conversation_id") @db.VarChar(80)
   toolCallId     String?   @map("tool_call_id") @db.VarChar(128)
   confirmedAt    DateTime? @map("confirmed_at") @db.Timestamptz
+
+  // An external agent's write waiting for a person (GET agent-actions/:token). `approvalRequired`: a standard write
+  // that a person approves or denies in the app. `argsPreview`: the exact arguments, internal keys stripped, kept only
+  // on an approval row so the approver sees what will run; it may hold personal data, is never logged, and is set to
+  // null once the row is spent or denied. `argsRedacted`: the redacted arguments shown on a PIN step-up row.
+  // `approvedAt` / `deniedAt` / `decidedById`: the decision and who made it.
+  approvalRequired Boolean   @default(false) @map("approval_required")
+  argsPreview      Json?     @map("args_preview")
+  argsRedacted     Json?     @map("args_redacted")
+  approvedAt       DateTime? @map("approved_at") @db.Timestamptz
+  deniedAt         DateTime? @map("denied_at") @db.Timestamptz
+  decidedById      Int?      @map("decided_by_id")
 
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz
