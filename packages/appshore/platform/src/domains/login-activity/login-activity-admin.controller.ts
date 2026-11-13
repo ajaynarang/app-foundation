@@ -7,6 +7,7 @@ import { ListLoginActivityQueryDto } from './dto/list-login-activity.query.dto';
 import { LoginActivitySummaryQueryDto } from './dto/login-activity-summary.query.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { LoginActivityListResponse, LoginActivitySummaryResponse } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @ApiTags('Login Activity (Super Admin)')
 @ApiBearerAuth()
@@ -15,6 +16,7 @@ export class LoginActivityAdminController {
   constructor(private readonly loginActivity: LoginActivityService) {}
 
   @Get()
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List login events across all tenants (optionally filtered by tenantId)' })
   @ApiResult(LoginActivityListResponse)
@@ -23,6 +25,7 @@ export class LoginActivityAdminController {
   }
 
   @Get('summary')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'KPIs + Notable across all tenants (optionally filtered by tenantId)' })
   @ApiResult(LoginActivitySummaryResponse)

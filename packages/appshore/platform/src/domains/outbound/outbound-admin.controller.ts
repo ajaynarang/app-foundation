@@ -13,6 +13,7 @@ import {
   OutboundStatusResponse,
   OutboundSuppressionListResponse,
 } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const ENTRY_ID_PARAM = { name: 'entry_id', description: 'The allow-list entry id (uuid)' };
 
@@ -31,6 +32,7 @@ const ENTRY_ID_PARAM = { name: 'entry_id', description: 'The allow-list entry id
 @ApiBearerAuth()
 @Controller('super-admin/outbound')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class OutboundAdminController {
   constructor(private readonly service: OutboundAdminService) {}
 
