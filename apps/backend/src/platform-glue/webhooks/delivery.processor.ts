@@ -12,7 +12,7 @@ import {
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
 
 /**
@@ -68,9 +68,9 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   }
 
   async process(job: Job<JobEnvelope<WebhookDeliveryPayload>>): Promise<void> {
-    // `withJobLogContext` reads `tenantId` straight off `job.data`, which
+    // `withJobContext` reads `tenantId` straight off `job.data`, which
     // matches the envelope shape (envelope.tenantId is the wire-format slug).
-    return withJobLogContext(job, async () => this.handle(job));
+    return withJobContext(job, async () => this.handle(job));
   }
 
   private async handle(job: Job<JobEnvelope<WebhookDeliveryPayload>>): Promise<void> {

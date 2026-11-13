@@ -2,7 +2,8 @@ import { Test } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
-import { DeadLetterService } from '../dead-letter.service';
+import { DEAD_LETTER_UNPERSISTED, DeadLetterService } from '../dead-letter.service';
+import { JOB_EVENTS } from '@appshore/kernel/infrastructure/queue/job-events';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantIdResolver } from '../../events/tenant-id-resolver.service';
 
@@ -94,7 +95,28 @@ describe('DeadLetterService', () => {
     await service.recordPermanentFailure(job, new Error('boom'));
 
     expect(mockPrisma.deadLetterLog.create).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: JOB_EVENTS.JOB_DEAD_LETTER,
+        jobName: 'sync-records',
+        jobId: 'bull-job-99',
+        reason: DEAD_LETTER_UNPERSISTED.SYSTEM_JOB,
+        err: expect.objectContaining({ type: 'Error', message: 'boom' }),
+      }),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('logs a system job (tenantId "system") as job.dead_letter without a row or its payload', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const job = makeJob({ data: { tenantId: 'system', payload: { email: 'ops@example.com' } } });
+
+    await service.recordPermanentFailure(job, new Error('boom'));
+
+    expect(mockTenantResolver.resolveToDbId).not.toHaveBeenCalled();
+    expect(mockPrisma.deadLetterLog.create).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.objectContaining({ event: JOB_EVENTS.JOB_DEAD_LETTER }));
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('ops@example.com');
     warnSpy.mockRestore();
   });
 
@@ -105,7 +127,13 @@ describe('DeadLetterService', () => {
     await service.recordPermanentFailure(makeJob(), new Error('boom'));
 
     expect(mockPrisma.deadLetterLog.create).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: JOB_EVENTS.JOB_DEAD_LETTER,
+        reason: DEAD_LETTER_UNPERSISTED.UNRESOLVED_TENANT,
+        tenantId: 'demo-acme-2026',
+      }),
+    );
     warnSpy.mockRestore();
   });
 
@@ -115,7 +143,12 @@ describe('DeadLetterService', () => {
 
     await expect(service.recordPermanentFailure(makeJob(), new Error('original failure'))).resolves.toBeUndefined();
 
-    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.objectContaining({ message: 'db down' }),
+        jobErr: expect.objectContaining({ message: 'original failure' }),
+      }),
+    );
     errorSpy.mockRestore();
   });
 });

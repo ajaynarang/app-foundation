@@ -9,7 +9,7 @@ import { WebhookDispatcher } from '../webhooks/dispatcher.service';
 import { TenantIdResolver } from '@appshore/platform/infrastructure/events/tenant-id-resolver.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 
 @Processor(QUEUE_NAMES.EVENTS, { concurrency: 10 })
 export class DurableEventProcessor extends WorkerHost {
@@ -25,7 +25,7 @@ export class DurableEventProcessor extends WorkerHost {
   }
 
   async process(job: Job<JobEnvelope<DurableEventJobData>>): Promise<void> {
-    return withJobLogContext(job, async () => {
+    return withJobContext(job, async () => {
       const raw = DomainEvent.fromSerialized(job.data.payload);
 
       // Normalize the tenantId once for every downstream subscriber. Domain

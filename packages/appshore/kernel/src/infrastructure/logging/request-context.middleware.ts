@@ -5,8 +5,13 @@ import { randomUUID } from 'crypto';
 
 export interface RequestContext {
   requestId: string;
+  /** The tenant's public string id, the same value the API returns. */
   tenantId?: string;
+  /** Numeric tenant DB id (stringified), set after auth. */
+  tenantDbId?: string;
   userId?: string;
+  /** The caller's role in the session's workspace, set after auth. */
+  role?: string;
   jobName?: string;
   jobId?: string;
 }

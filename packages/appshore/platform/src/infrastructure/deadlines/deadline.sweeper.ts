@@ -3,7 +3,7 @@ import type { Job } from 'bullmq';
 import type { Deadline, Prisma } from '@appshore/db';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { PrismaService } from '../database/prisma.service';
 import { DeadlineHandlerRegistry } from './deadline-handler.registry';
 import { DEADLINE_HANDLERS, PENDING_DEADLINE, type DeadlineOutcome } from './deadline.types';
@@ -72,7 +72,7 @@ export class DeadlineSweeper implements QueueJobHandler {
   ) {}
 
   run(job: Job): Promise<DeadlineSweepSummary> {
-    return withJobLogContext(job, () => this.sweep());
+    return withJobContext(job, () => this.sweep());
   }
 
   async sweep(): Promise<DeadlineSweepSummary> {

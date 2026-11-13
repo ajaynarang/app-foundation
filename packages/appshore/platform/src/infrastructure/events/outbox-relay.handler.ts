@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { OutboxRelay, type OutboxRelayResult } from './outbox-relay.service';
 
 /** Owns `outbox-relay` on the `bulk-ops` queue — the single BulkOpsQueueProcessor routes by name. */
@@ -13,6 +13,6 @@ export class OutboxRelayJobHandler implements QueueJobHandler {
   constructor(private readonly relay: OutboxRelay) {}
 
   run(job: Job): Promise<OutboxRelayResult> {
-    return withJobLogContext(job, () => this.relay.tick());
+    return withJobContext(job, () => this.relay.tick());
   }
 }

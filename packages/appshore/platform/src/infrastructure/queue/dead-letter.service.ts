@@ -5,6 +5,14 @@ import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../database/prisma.service';
 import { TenantIdResolver } from '../events/tenant-id-resolver.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { SYSTEM_JOB_TENANT } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { JOB_EVENTS, toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+
+/** Why a dead letter went to the log instead of `dead_letter_logs`. */
+export const DEAD_LETTER_UNPERSISTED = {
+  SYSTEM_JOB: 'system-job',
+  UNRESOLVED_TENANT: 'unresolved-tenant',
+} as const;
 
 /**
  * Persists permanent BullMQ job failures (those that have exhausted all
@@ -16,11 +24,13 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
  *   - Resilient by design — the database write is wrapped in try/catch and
  *     a persistence failure is logged but never re-thrown. A flaky logging
  *     write must NEVER take down a BullMQ worker.
- *   - Skip-and-warn when input is malformed (no envelope, missing tenant,
- *     unresolvable tenant slug). Crashing the worker on bad job data would
- *     cascade.
+ *   - A job with no tenant (a system cron) or an unresolvable tenant cannot
+ *     get a row: `dead_letter_logs.tenant_id` is a required foreign key. Such a
+ *     failure is recorded as one structured `job.dead_letter` log line instead
+ *     (no payload: it may carry personal data), so it is still findable.
+ *     Crashing the worker on bad job data would cascade.
  *
- * Wired into queue processors in Phase 3.
+ * Called by `BaseQueueDispatcher.onFailed` on a job's final failure.
  */
 @Injectable()
 export class DeadLetterService {
@@ -33,18 +43,14 @@ export class DeadLetterService {
 
   async recordPermanentFailure(job: Job, error: Error): Promise<void> {
     const envelope = this.extractEnvelope(job);
-    if (!envelope || !envelope.tenantId) {
-      this.logger.warn(
-        `Cannot record dead-letter for job ${job?.id ?? 'unknown'} (${job?.name ?? 'unknown'}) — envelope missing tenantId`,
-      );
+    if (!envelope || !envelope.tenantId || envelope.tenantId === SYSTEM_JOB_TENANT) {
+      this.logUnpersistedDeadLetter(job, error, DEAD_LETTER_UNPERSISTED.SYSTEM_JOB);
       return;
     }
 
     const tenantDbId = await this.tenantResolver.resolveToDbId(envelope.tenantId);
     if (tenantDbId == null) {
-      this.logger.warn(
-        `Cannot record dead-letter for job ${job.id} (${job.name}) — tenant "${envelope.tenantId}" not resolvable to DB id`,
-      );
+      this.logUnpersistedDeadLetter(job, error, DEAD_LETTER_UNPERSISTED.UNRESOLVED_TENANT, envelope.tenantId);
       return;
     }
 
@@ -65,11 +71,31 @@ export class DeadLetterService {
         },
       });
     } catch (persistErr) {
-      const msg = persistErr instanceof Error ? persistErr.message : String(persistErr);
-      this.logger.error(
-        `Failed to persist dead-letter row for job ${job.id} (${job.name}) on queue ${job.queueName}: ${msg}. Original error: ${error?.message ?? String(error)}`,
-      );
+      this.logger.error({
+        msg: `Failed to persist dead-letter row for job ${job.id} (${job.name}) on queue ${job.queueName}`,
+        jobName: job.name,
+        jobId: String(job.id ?? 'unknown'),
+        queue: job.queueName,
+        err: toLoggableError(persistErr),
+        jobErr: toLoggableError(error),
+      });
     }
+  }
+
+  private logUnpersistedDeadLetter(job: Job, error: Error, reason: string, tenantId?: string): void {
+    const jobName = job?.name ?? 'unknown';
+    const jobId = String(job?.id ?? 'unknown');
+    this.logger.warn({
+      msg: `Dead-lettered job ${jobId} (${jobName}) has no tenant row to record against (${reason}); logged only`,
+      event: JOB_EVENTS.JOB_DEAD_LETTER,
+      jobName,
+      jobId,
+      queue: job?.queueName,
+      tenantId,
+      attempt: job?.attemptsMade ?? 0,
+      reason,
+      err: toLoggableError(error),
+    });
   }
 
   private extractEnvelope(job: Job): JobEnvelope | null {

@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import { WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { resolveJobTenant, withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { JOB_EVENTS, reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
 import { DeadLetterService } from './dead-letter.service';
 
 /**
@@ -28,24 +30,32 @@ export abstract class BaseQueueDispatcher extends WorkerHost {
   async process(job: Job): Promise<unknown> {
     const handler = this.handlers.find((h) => h.jobNames.includes(job.name));
     if (!handler) {
-      // Unknown name is not an error — it's a job for a sibling queue that was
-      // mis-routed, or a stale job from before a rename. Log and no-op so the
-      // job completes without a spurious failure/retry storm.
-      this.logger.warn(`No handler registered for job "${job.name}" (id=${job.id}); skipping.`);
+      // A mis-routed job or a stale one from before a rename. It still
+      // completes (no retry storm), but loudly: work someone scheduled is
+      // not being done.
+      this.logger.error({
+        msg: `No handler registered for job "${job.name}" (id=${job.id}) on ${job.queueName}; skipping.`,
+        event: JOB_EVENTS.JOB_UNKNOWN,
+        jobName: job.name,
+        jobId: job.id != null ? String(job.id) : undefined,
+        queue: job.queueName,
+        tenantId: resolveJobTenant(job).logTenantId,
+      });
       return undefined;
     }
-    return handler.run(job);
+    // Every job runs inside the log context its payload names, so each line
+    // it writes carries jobName, jobId and its tenant.
+    return withJobContext(job, () => handler.run(job));
   }
 
   /**
-   * Persist permanent failures to the dead-letter log so they survive Bull's
-   * 7-day `failed` set retention. BullMQ emits `failed` after every failed
-   * attempt; we only record once retries are exhausted.
+   * Log every failed attempt as one structured `job.failed` line, and persist
+   * permanent failures to the dead-letter log so they survive Bull's 7-day
+   * `failed` set retention. BullMQ emits `failed` after every failed attempt.
    */
   @OnWorkerEvent('failed')
   async onFailed(job: Job, error: Error): Promise<void> {
-    const maxAttempts = job.opts?.attempts ?? 1;
-    if ((job.attemptsMade ?? 0) >= maxAttempts) {
+    if (reportJobFailure(this.logger, job, error)) {
       await this.deadLetter.recordPermanentFailure(job, error);
     }
   }

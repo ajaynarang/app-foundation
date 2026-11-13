@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { JobCleanupJob } from './job-cleanup.job';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -26,10 +26,10 @@ export class DataRetentionJobHandler implements QueueJobHandler {
   async run(job: Job<JobEnvelope<unknown>>): Promise<unknown> {
     switch (job.name) {
       case BULK_OPS_JOB_NAMES.JOB_CLEANUP:
-        return withJobLogContext(job, () => this.jobCleanupJob.cleanupOldJobs());
+        return withJobContext(job, () => this.jobCleanupJob.cleanupOldJobs());
       case BULK_OPS_JOB_NAMES.DATA_RETENTION:
       default:
-        return withJobLogContext(job, () => this.runDataRetention());
+        return withJobContext(job, () => this.runDataRetention());
     }
   }
 
