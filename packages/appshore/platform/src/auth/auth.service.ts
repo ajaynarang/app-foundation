@@ -24,6 +24,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
+import { toUserProfile } from './user-profile';
 
 @Injectable()
 export class AuthService {
@@ -43,30 +44,13 @@ export class AuthService {
   private static readonly PASSWORD_SALT_ROUNDS = 12;
   private static readonly RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-  async refreshAccessToken(userId: string, tokenId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { userId },
-      include: { tenant: true },
-    });
-    if (!user || !user.isActive) throw new UnauthorizedException('User not found or inactive');
-    const accessToken = this.jwtTokenService.generateAccessTokenOnly({
-      userId: user.userId,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenant?.tenantId,
-      // Keep the new access token tied to the same refresh-token session
-      // so logout can revoke it.
-      sid: tokenId,
-    });
-    return { accessToken, user: this.toUserProfile(user) };
-  }
-
-  async logout(tokenId: string, userId: number, tenantId: number | null): Promise<void> {
-    await this.jwtTokenService.revokeRefreshToken(tokenId);
+  /** Sign out one session: `sessionId` is the access token's `sid`, the refresh-token family. */
+  async logout(sessionId: string, userId: number, tenantId: number | null): Promise<void> {
+    await this.jwtTokenService.revokeFamily(sessionId);
     await this.loginEventService.recordLogout({
       userId,
       tenantId,
-      sessionId: tokenId,
+      sessionId,
     });
   }
 
@@ -99,9 +83,10 @@ export class AuthService {
     }
   }
 
+  /** `currentSessionId` is the access token's `sid` (the refresh-token family); other sessions are other families. */
   async recordPasswordChange(
     userId: string,
-    currentTokenId: string | null,
+    currentSessionId: string | null,
     revokeOtherSessions: boolean,
     passwords?: { currentPassword?: string; newPassword?: string },
   ): Promise<{ sessionsRevoked: number }> {
@@ -137,7 +122,7 @@ export class AuthService {
         where: {
           userId: user.id,
           isRevoked: false,
-          ...(currentTokenId ? { tokenId: { not: currentTokenId } } : {}),
+          ...(currentSessionId ? { familyId: { not: currentSessionId } } : {}),
         },
         data: {
           isRevoked: true,
@@ -210,6 +195,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
       },
       'email_password' satisfies AuthMethod,
     );
@@ -343,7 +329,14 @@ export class AuthService {
     }
 
     const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
-      { id: user.id, userId: user.userId, email: user.email, role: user.role, tenantId: user.tenant?.tenantId },
+      {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
+      },
       'email_password' satisfies AuthMethod,
     );
     await this.loginEventService.recordSuccess({
@@ -394,6 +387,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
       },
       'email_password' satisfies AuthMethod,
     );
@@ -439,6 +433,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
       },
       'phone_pin' satisfies AuthMethod,
     );
@@ -484,6 +479,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
       },
       'phone_otp' satisfies AuthMethod,
     );
@@ -549,6 +545,7 @@ export class AuthService {
       email: fullUser.email,
       role: fullUser.role,
       tenantId: fullUser.tenant?.tenantId,
+      tenantDbId: fullUser.tenant?.id ?? null,
     });
     return {
       accessToken: tokens.accessToken,
@@ -558,24 +555,6 @@ export class AuthService {
   }
 
   private toUserProfile(user: any): UserProfileDto {
-    return {
-      dbId: user.id,
-      userId: user.userId,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      tenantId: user.tenant?.tenantId,
-      tenantName: user.tenant?.companyName,
-      tenantTimezone: user.tenant?.timezone ?? undefined,
-      subdomain: user.tenant?.subdomain ?? undefined,
-      isActive: user.isActive,
-      phone: user.phone,
-      phoneVerified: user.phoneVerified,
-      hasPinSet: !!user.pinHash,
-      createdAt: user.createdAt?.toISOString(),
-      lastLoginAt: user.lastLoginAt?.toISOString(),
-    };
+    return toUserProfile(user);
   }
 }

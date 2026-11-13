@@ -19891,7 +19891,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Refresh access token using refresh token",
+        "summary": "Refresh access token using refresh token (rotates the refresh cookie)",
         "tags": [
           "Authentication"
         ]

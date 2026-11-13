@@ -14,6 +14,9 @@ const mockPrisma = {
   user: {
     update: jest.fn(),
   },
+  refreshToken: {
+    findFirst: jest.fn(),
+  },
   $transaction: jest.fn().mockResolvedValue([]),
 };
 
@@ -22,6 +25,13 @@ const mockJwt = {
     accessToken: 'at',
     refreshToken: 'rt',
     refreshTokenId: 'rt_1',
+    familyId: 'rt_1',
+  }),
+  rotateRefreshToken: jest.fn().mockResolvedValue({
+    accessToken: 'at',
+    refreshToken: 'rt',
+    refreshTokenId: 'rt_9',
+    familyId: 'rt_family',
   }),
 };
 
@@ -90,18 +100,32 @@ describe('WorkspacesService', () => {
       user: { id: 1, userId: 'user_1', email: 'owner@example.com' },
     };
 
-    it('issues tokens carrying the target workspace + membership role', async () => {
+    const sessionUser = {
+      id: 1,
+      userId: 'user_1',
+      email: 'owner@example.com',
+      role: 'ADMIN',
+      tenantId: 'demo-two',
+      tenantDbId: 2,
+    };
+
+    it("issues a successor in the session's family, carrying the target workspace + membership role", async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+      const familyStartedAt = new Date('2026-11-01T00:00:00Z');
+      mockPrisma.refreshToken.findFirst.mockResolvedValue({ tokenId: 'rt_8', familyId: 'rt_family', familyStartedAt });
 
-      const result = await service.switch(1, 'demo-two');
+      const result = await service.switch(1, 'demo-two', { familyId: 'rt_family', authMethod: 'email_password' });
 
-      expect(mockJwt.generateTokenPair).toHaveBeenCalledWith({
-        id: 1,
-        userId: 'user_1',
-        email: 'owner@example.com',
-        role: 'ADMIN',
-        tenantId: 'demo-two',
+      expect(mockPrisma.refreshToken.findFirst).toHaveBeenCalledWith({
+        where: { familyId: 'rt_family', userId: 1, isRevoked: false },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
+      expect(mockJwt.rotateRefreshToken).toHaveBeenCalledWith(
+        sessionUser,
+        { tokenId: 'rt_8', familyId: 'rt_family', familyStartedAt },
+        'email_password',
+      );
+      expect(mockJwt.generateTokenPair).not.toHaveBeenCalled();
       expect(result.workspace).toEqual({
         tenantId: 'demo-two',
         name: 'Second Workspace',
@@ -111,9 +135,19 @@ describe('WorkspacesService', () => {
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
+    it('starts a new session when the family has no live token (an access token from before rotation)', async () => {
+      mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+      mockPrisma.refreshToken.findFirst.mockResolvedValue(null);
+
+      await service.switch(1, 'demo-two', { familyId: 'rt_old' });
+
+      expect(mockJwt.generateTokenPair).toHaveBeenCalledWith(sessionUser, undefined);
+      expect(mockJwt.rotateRefreshToken).not.toHaveBeenCalled();
+    });
+
     it('404s when the user has no membership in the target workspace', async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(null);
-      await expect(service.switch(1, 'not-mine')).rejects.toThrow(NotFoundException);
+      await expect(service.switch(1, 'not-mine', {})).rejects.toThrow(NotFoundException);
     });
 
     it('rejects switching into an inactive workspace', async () => {
@@ -121,7 +155,7 @@ describe('WorkspacesService', () => {
         ...membership,
         tenant: { ...membership.tenant, status: 'SUSPENDED' },
       });
-      await expect(service.switch(1, 'demo-two')).rejects.toThrow(UnauthorizedException);
+      await expect(service.switch(1, 'demo-two', {})).rejects.toThrow(UnauthorizedException);
     });
   });
 });

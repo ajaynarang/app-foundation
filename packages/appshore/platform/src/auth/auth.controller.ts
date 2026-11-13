@@ -16,6 +16,7 @@ import { Response, Request as ExpressRequest } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiNoContentResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { RefreshSessionService, type RefreshSession } from './refresh-session.service';
 import { LoginResponseDto, UserProfileDto } from './dto/login.dto';
 import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto, PersonalRegisterDto } from './dto/password-login.dto';
 import { FirebaseExchangeDto } from './dto/firebase-exchange.dto';
@@ -43,6 +44,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private refreshSessions: RefreshSessionService,
   ) {
     this.isProduction = this.configService.get<string>('environment') === 'production';
   }
@@ -155,11 +157,14 @@ export class AuthController {
   @UseGuards(RefreshJwtAuthGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiOperation({ summary: 'Refresh access token using refresh token (rotates the refresh cookie)' })
   @ApiResponse({ status: 200, type: LoginResponseDto })
   @ApiResponse({ status: 401 })
-  async refreshToken(@CurrentUser() user: any) {
-    const result = await this.authService.refreshAccessToken(user.userId, user.tokenId);
+  async refreshToken(@CurrentUser() session: RefreshSession, @Res({ passthrough: true }) response: Response) {
+    const result = await this.refreshSessions.refresh(session);
+    // Every refresh rotates: the cookie now holds the successor. The token it replaced stays valid until the
+    // successor is first presented, so a lost response does not log the client out.
+    this.setRefreshTokenCookie(response, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
   }
 

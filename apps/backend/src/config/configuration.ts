@@ -61,7 +61,15 @@ const configSchema = z.object({
     accessSecret: z.string().default(DEV_JWT_ACCESS_SECRET_DEFAULT),
     refreshSecret: z.string().default(DEV_JWT_REFRESH_SECRET_DEFAULT),
     accessExpiry: z.string().default('15m'),
+    /** Lifetime of one refresh token. Every refresh rotates, so this is how long a session may sit idle. */
     refreshExpiry: z.string().default('7d'),
+    /** Absolute lifetime of a session (a refresh-token family) from sign-in, however often it refreshes. */
+    sessionMaxAge: z.string().default('30d'),
+    /**
+     * A refresh token retired this recently and presented again is a request already in flight (another tab
+     * refreshed first): a plain 401. Later, it is reuse and the whole session is revoked.
+     */
+    refreshReuseGraceSeconds: z.number().int().min(0).default(10),
   }),
 
   // Auth Configuration
@@ -394,6 +402,10 @@ export default (): Configuration => {
       refreshSecret: env('JWT_REFRESH_SECRET'),
       accessExpiry: process.env.JWT_ACCESS_EXPIRY,
       refreshExpiry: process.env.JWT_REFRESH_EXPIRY,
+      sessionMaxAge: process.env.JWT_SESSION_MAX_AGE,
+      refreshReuseGraceSeconds: process.env.JWT_REFRESH_REUSE_GRACE_SECONDS
+        ? Number(process.env.JWT_REFRESH_REUSE_GRACE_SECONDS)
+        : undefined,
     },
     auth: {
       bcryptRounds: process.env.BCRYPT_ROUNDS ? Number(process.env.BCRYPT_ROUNDS) : undefined,

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { JwtTokenService } from '../../auth/jwt.service';
+import { JwtTokenService, type AuthMethod } from '../../auth/jwt.service';
 import { UserRole } from '@appshore/db';
 
 export interface WorkspaceSummary {
@@ -46,10 +46,22 @@ export class WorkspacesService {
 
   /**
    * Switch the session to another workspace the user belongs to. Issues a
-   * fresh token pair whose claims carry the target workspace + membership
-   * role, and records the target as the login default.
+   * token pair whose claims carry the target workspace + membership role, and
+   * records the target as the login default (which no other session reads:
+   * each refreshes into the workspace stored on its own refresh-token row).
+   *
+   * `session.familyId` is the access token's `sid`. The new refresh token is a
+   * successor in that family, replacing its newest live token: the refresh
+   * cookie is not sent to this route, so the newest row stands for what the
+   * client holds. Its predecessor is retired when the new token is first
+   * presented, as on any refresh. With no live token in the family (a token
+   * from before rotation), the switch starts a new session.
    */
-  async switch(userDbId: number, targetTenantId: string) {
+  async switch(
+    userDbId: number,
+    targetTenantId: string,
+    session: { familyId?: string | null; authMethod?: AuthMethod },
+  ) {
     const membership = await this.prisma.workspaceMember.findFirst({
       where: { userId: userDbId, tenant: { tenantId: targetTenantId } },
       include: { tenant: true, user: true },
@@ -75,13 +87,27 @@ export class WorkspacesService {
       }),
     ]);
 
-    const tokens = await this.jwtTokenService.generateTokenPair({
+    const sessionUser = {
       id: membership.user.id,
       userId: membership.user.userId,
       email: membership.user.email,
       role: membership.role,
       tenantId: membership.tenant.tenantId,
-    });
+      tenantDbId: membership.tenantId,
+    };
+    const current = session.familyId
+      ? await this.prisma.refreshToken.findFirst({
+          where: { familyId: session.familyId, userId: userDbId, isRevoked: false },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        })
+      : null;
+    const tokens = current
+      ? await this.jwtTokenService.rotateRefreshToken(
+          sessionUser,
+          { tokenId: current.tokenId, familyId: current.familyId, familyStartedAt: current.familyStartedAt },
+          session.authMethod,
+        )
+      : await this.jwtTokenService.generateTokenPair(sessionUser, session.authMethod);
 
     return {
       accessToken: tokens.accessToken,
