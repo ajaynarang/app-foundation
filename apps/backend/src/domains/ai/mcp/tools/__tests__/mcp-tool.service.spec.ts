@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CardAccumulator, McpToolService } from '../../mcp-tool.service';
 import { RequiresScope } from '../../../agent-contract/requires-scope.decorator';
+import { intentDigest } from '../../../agent-contract/intent-digest';
 
 /**
  * McpToolService unit tests: tool exposure, the result unwrap, cards, and the write set derived from scopes. Every
@@ -159,7 +160,115 @@ describe('McpToolService', () => {
       await service.onModuleInit();
       const spy = jest.spyOn(service, 'getToolsForPersona');
       await service.getToolsetsForPersona('member', CONTEXT, accumulator);
-      expect(spy).toHaveBeenCalledWith('member', CONTEXT, accumulator, undefined);
+      expect(spy).toHaveBeenCalledWith('member', CONTEXT, accumulator, undefined, {});
+    });
+
+    it('a read-only toolset (a delegated sub-agent) holds no write and no confirm-action', async () => {
+      mockRegistry.getTools.mockReturnValue(toolsWith(makeTool('create-item', z.object({}), 'createItem', ItemsTool)));
+      const service = createService();
+      await service.onModuleInit();
+      const toolsets = await service.getToolsetsForPersona('admin', CONTEXT, undefined, undefined, { readOnly: true });
+      expect(toolsets['app-tools']).not.toHaveProperty('create-item');
+      expect(toolsets['app-tools']).not.toHaveProperty('confirm-action');
+      expect(toolsets['app-tools']).toHaveProperty('query-items');
+    });
+  });
+
+  describe('confirm-action records the exact write for this person in this conversation', () => {
+    const itemSchema = z.object({ name: z.string(), size: z.enum(['S', 'L']).default('S') });
+    const CHAT = { ...CONTEXT, conversationId: 'conv_a' };
+    let challenges: { recordChatIntent: jest.Mock; confirmChatIntent: jest.Mock; declineChatIntent: jest.Mock };
+    let preflight: jest.Mock;
+
+    function chatService() {
+      mockRegistry.getTools.mockReturnValue(toolsWith(makeTool('create-item', itemSchema, 'createItem', ItemsTool)));
+      challenges = {
+        recordChatIntent: jest.fn().mockResolvedValue(undefined),
+        confirmChatIntent: jest.fn().mockResolvedValue(true),
+        declineChatIntent: jest.fn().mockResolvedValue(undefined),
+      };
+      preflight = jest.fn().mockResolvedValue(null);
+      return new McpToolService(mockRegistry, { ...pipeline, preflight } as never, challenges as never);
+    }
+
+    async function propose(service: McpToolService, context: typeof CONTEXT, tool: string, args: object) {
+      const toolsets = await service.getToolsetsForPersona('admin', context);
+      const confirm = toolsets['app-tools']['confirm-action'] as any;
+      const suspend = jest.fn().mockResolvedValue(undefined);
+      const result = await confirm.execute({ tool, args }, { agent: { suspend, toolCallId: 'call_1' } });
+      return { suspend, result };
+    }
+
+    it('records the intent over the intent digest and raises the card built from the parsed arguments', async () => {
+      const service = chatService();
+      await service.onModuleInit();
+
+      const { suspend } = await propose(service, CHAT, 'create-item', { name: 'Desk', _tenantId: 999 });
+
+      expect(preflight).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'user', userId: 10, tenantId: 1, conversationId: 'conv_a' }),
+        'create-item',
+        { name: 'Desk', _tenantId: 999 },
+      );
+      expect(challenges.recordChatIntent).toHaveBeenCalledWith({
+        tenantId: 1,
+        userId: 10,
+        conversationId: 'conv_a',
+        toolCallId: 'call_1',
+        toolName: 'create-item',
+        argsDigest: intentDigest(itemSchema, { name: 'Desk' }),
+        scopeRequired: 'platform:write',
+      });
+      expect(suspend.mock.calls[0][0]).toEqual({
+        action: 'Create Item',
+        description: 'Create Item: name: "Desk", size: "S"',
+        tool: 'create-item',
+        args: { name: 'Desk', size: 'S' },
+        toolCallId: 'call_1',
+      });
+    });
+
+    it('refuses a read, an unknown tool, bad arguments, a write the pipeline would refuse, and a chat with no conversation', async () => {
+      const service = chatService();
+      await service.onModuleInit();
+
+      for (const [context, tool, args] of [
+        [CHAT, 'query-items', {}],
+        [CHAT, 'no-such-tool', {}],
+        [CHAT, 'create-item', { name: 7 }],
+        [CONTEXT, 'create-item', { name: 'Desk' }],
+      ] as const) {
+        const { suspend, result } = await propose(service, context, tool, args);
+        expect(suspend).not.toHaveBeenCalled();
+        expect(result.confirmed).toBe(false);
+        expect(result.reason).toEqual(expect.any(String));
+      }
+
+      preflight.mockResolvedValue({ content: [{ type: 'text', text: '{"status":"role_not_permitted"}' }] });
+      const refused = await propose(service, CHAT, 'create-item', { name: 'Desk' });
+      expect(refused.suspend).not.toHaveBeenCalled();
+      expect(refused.result.reason).toContain('role_not_permitted');
+      expect(challenges.recordChatIntent).not.toHaveBeenCalled();
+    });
+
+    it('confirms and declines a card through the challenge service, keyed by the numeric user id', async () => {
+      const service = chatService();
+      const card = { tenantId: 1, userDbId: 10, conversationId: 'conv_a', toolCallId: 'call_1' };
+      const key = { tenantId: 1, userId: 10, conversationId: 'conv_a', toolCallId: 'call_1' };
+
+      expect(await service.confirmChatCard(card)).toBe(true);
+      await service.declineChatCard(card);
+
+      expect(challenges.confirmChatIntent).toHaveBeenCalledWith(key);
+      expect(challenges.declineChatIntent).toHaveBeenCalledWith(key);
+    });
+
+    it('a call through the pipeline carries the conversation on its principal', async () => {
+      const service = chatService();
+      await service.onModuleInit();
+      const tools = await service.getToolsForPersona('admin', CHAT);
+      await (tools['create-item'] as any).execute({ name: 'Desk' });
+      expect(pipeline.run.mock.calls[0][0]).toMatchObject({ kind: 'user', conversationId: 'conv_a' });
     });
   });
 });

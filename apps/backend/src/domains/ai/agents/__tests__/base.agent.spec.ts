@@ -380,6 +380,41 @@ describe('AbstractBaseAgent', () => {
       expect(payload.runId).toBe('run_123');
     });
 
+    it("the suspend chunk is the server-built card from Mastra's envelope, never the model's own confirm-action input", async () => {
+      const card = { action: 'Create Item', description: 'Create Item: name: "Desk"', tool: 'create-item', args: {} };
+      const mockAgent = {
+        getInstructions: jest.fn().mockResolvedValue('instructions'),
+        stream: jest.fn().mockResolvedValue({
+          textStream: {
+            getReader: () => ({ read: jest.fn().mockResolvedValueOnce({ done: true }), releaseLock: jest.fn() }),
+          },
+          suspendPayload: {
+            toolCallId: 'call_1',
+            toolName: 'confirm-action',
+            suspendPayload: card,
+            args: { description: 'model prose' },
+          },
+          runId: 'run_9',
+        }),
+      };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      const chunks: any[] = [];
+      for await (const chunk of agent.chat('make one', {
+        userMode: 'member',
+        tenantId: 1,
+        userId: 'user_1',
+        userDbId: 1,
+        conversationId: 'conv_1',
+        inputMode: 'text',
+      })) {
+        chunks.push(chunk);
+      }
+
+      const frame = JSON.parse(chunks.find((c) => c.type === 'suspend').data);
+      expect(frame).toEqual({ ...card, toolCallId: 'call_1', runId: 'run_9' });
+    });
+
     it('injects voice instructions when inputMode is voice', async () => {
       const mockReader = {
         read: jest.fn().mockResolvedValueOnce({ done: true }),
@@ -443,6 +478,29 @@ describe('AbstractBaseAgent', () => {
       expect(mockAgent.generate.mock.calls[0][1].modelSettings).toEqual({
         maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS,
       });
+    });
+
+    it('a delegated sub-agent gets a read-only toolset: no write, no confirm-action', async () => {
+      const mockAgent = { generate: jest.fn().mockResolvedValue({ text: 'ok' }) };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+      const ctx = {
+        userMode: 'member' as const,
+        tenantId: 1,
+        userId: 'user_1',
+        userDbId: 1,
+        conversationId: 'conv_1',
+        inputMode: 'text' as const,
+      };
+
+      await agent.execute('summarize', {}, ctx);
+
+      expect(mockMcpToolService.getToolsetsForPersona).toHaveBeenCalledWith(
+        'member',
+        { tenantId: 1, userId: 'user_1', userDbId: 1, conversationId: 'conv_1' },
+        undefined,
+        undefined,
+        { readOnly: true },
+      );
     });
   });
 

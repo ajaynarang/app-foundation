@@ -3,10 +3,16 @@ import { jsonSchema, type ToolSet } from 'ai';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
 import { SCOPE_TIERS, scopeTier } from '@app/shared-types';
-import { confirmActionTool } from '../assistant/mastra/tools/confirm-action.tool';
+import {
+  createConfirmActionTool,
+  describeIntent,
+  type ConfirmIntentRecorder,
+} from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService } from '../agent-contract/invocation-pipeline.service';
+import { HitlChallengeService } from '../agent-contract/hitl-challenge.service';
 import { getRequiredScope } from '../agent-contract/requires-scope.decorator';
-import { fromUser } from '@appshore/platform/auth/agent-principal';
+import { intentDigest, prepareIntentArgs } from '../agent-contract/intent-digest';
+import { fromUser, type UserPrincipal } from '@appshore/platform/auth/agent-principal';
 import { scopesForRole } from '../agent-contract/role-scopes';
 import { CITATIONS_SIDE_CHANNEL, type TurnEvidence } from './turn-evidence';
 import { toolFailure } from './tools/tool-error';
@@ -25,6 +31,20 @@ export interface McpToolInvocationContext {
   userId: string;
   userDbId: number;
   conversationId?: string;
+}
+
+/** One confirm card in one conversation: what the resume route confirms or cancels. */
+export interface ChatCardInput {
+  tenantId: number;
+  userDbId: number;
+  conversationId: string;
+  /** The suspended confirm-action call (from the `9:` frame). */
+  toolCallId: string;
+}
+
+/** Options for a toolset. `readOnly` (a delegated sub-agent) leaves out every write and confirm-action. */
+export interface ToolsetOptions {
+  readOnly?: boolean;
 }
 
 /**
@@ -62,6 +82,7 @@ export class McpToolService implements OnModuleInit {
   constructor(
     private readonly registry: McpRegistryDiscoveryService,
     @Optional() private readonly pipeline?: InvocationPipelineService,
+    @Optional() private readonly challenges?: HitlChallengeService,
   ) {}
 
   // eslint-disable-next-line @typescript-eslint/require-await -- satisfies OnModuleInit contract
@@ -105,9 +126,10 @@ export class McpToolService implements OnModuleInit {
    * Get AI SDK-compatible tools for the generic assistant.
    *
    * The starter exposes every discovered MCP tool to the single assistant persona. Each call goes through the
-   * pipeline, whose executor injects the session identity (`_tenantId`, `_userId`, `_userDbId`, `_role`); the
-   * pipeline drops every `_` key the model sends, so the model never controls them. Tenant isolation is each tool's
-   * own `_tenantId` filter; no transaction or role switch is opened around a tool call.
+   * pipeline, whose executor injects the session identity (`_tenantId`, `_userId`, `_userDbId`, `_role`,
+   * `_conversationId`); the pipeline drops every `_` key the model sends, so the model never controls them. Tenant
+   * isolation is each tool's own `_tenantId` filter; no transaction or role switch is opened around a tool call. A
+   * write runs only against the person's confirmation of that exact call in this conversation.
    */
   // eslint-disable-next-line @typescript-eslint/require-await -- Promise<ToolSet> is part of the public API contract
   async getToolsForPersona(
@@ -115,6 +137,7 @@ export class McpToolService implements OnModuleInit {
     context: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
     evidence?: TurnEvidence,
+    options: ToolsetOptions = {},
   ): Promise<ToolSet> {
     if (this.allTools.size === 0) {
       this.discoverTools();
@@ -125,6 +148,8 @@ export class McpToolService implements OnModuleInit {
     for (const toolName of this.allTools.keys()) {
       const registeredTool = this.allTools.get(toolName);
       if (!registeredTool) continue;
+      // A delegated sub-agent gets reads only, so it can neither raise a card nor spend the person's confirmation.
+      if (options.readOnly && this.isWriteTool(toolName)) continue;
 
       const { metadata } = registeredTool;
 
@@ -167,15 +192,7 @@ export class McpToolService implements OnModuleInit {
   ): Promise<unknown> {
     if (!this.pipeline) return { error: TOOL_PIPELINE_UNAVAILABLE, tool: toolName };
 
-    // `role` here only selects the persona's scope set. The pipeline caps it at the scopes of the user's current
-    // role in this workspace and checks `@RestrictToRoles` against that role, so a persona never widens access.
-    const role = userMode.toUpperCase();
-    const principal = fromUser({
-      userId: context.userDbId,
-      tenantId: context.tenantId,
-      role,
-      scopes: scopesForRole(role),
-    });
+    const principal = chatPrincipal(userMode, context);
 
     try {
       const result = await this.pipeline.run(principal, toolName, args);
@@ -234,23 +251,116 @@ export class McpToolService implements OnModuleInit {
    * Returns `{ 'app-tools': { ...mcpTools, 'confirm-action': ... } }`
    * which is passed to `agent.stream()` / `agent.generate()` via `toolsets`.
    *
-   * `confirm-action` is offered when the toolset holds a write.
+   * `confirm-action` is offered when the toolset holds a write. It is built for this request: it records the exact
+   * write it proposes for this person in this conversation. A read-only toolset never offers it.
    */
   async getToolsetsForPersona(
     userMode: string,
     context: McpToolInvocationContext,
     cardAccumulator?: CardAccumulator,
     evidence?: TurnEvidence,
+    options: ToolsetOptions = {},
   ): Promise<Record<string, ToolSet>> {
-    const tools = await this.getToolsForPersona(userMode, context, cardAccumulator, evidence);
+    const tools = await this.getToolsForPersona(userMode, context, cardAccumulator, evidence, options);
 
     const hasWriteTools = Object.keys(tools).some((t) => this.isWriteTool(t));
-    if (hasWriteTools) {
-      (tools as any)['confirm-action'] = confirmActionTool;
+    if (hasWriteTools && !options.readOnly) {
+      (tools as any)['confirm-action'] = createConfirmActionTool(this.intentRecorder(userMode, context));
     }
 
     return { 'app-tools': tools };
   }
+
+  /** The person pressed Confirm on this card. True once; false when it is no longer waiting. */
+  async confirmChatCard(input: ChatCardInput): Promise<boolean> {
+    if (!this.challenges) return false;
+    return this.challenges.confirmChatIntent(chatCardKey(input));
+  }
+
+  /** The person pressed Cancel on this card. */
+  async declineChatCard(input: ChatCardInput): Promise<void> {
+    await this.challenges?.declineChatIntent(chatCardKey(input));
+  }
+
+  /**
+   * Void this conversation's confirmed but unspent grants (the end of a resumed turn) and, with `includePending`,
+   * the cards still waiting for a decision (a new user message).
+   */
+  async revokeChatGrants(input: Omit<ChatCardInput, 'toolCallId'> & { includePending?: boolean }): Promise<void> {
+    await this.challenges?.revokeChatGrants({
+      tenantId: input.tenantId,
+      userId: input.userDbId,
+      conversationId: input.conversationId,
+      ...(input.includePending && { includePending: true }),
+    });
+  }
+
+  /**
+   * Records the write a confirm card proposes and builds the card from it. Only a write tool this person could run
+   * here (the pipeline's steps 1 to 4 pass), with arguments the tool accepts, can be proposed, so nobody is asked to
+   * confirm a change the pipeline would refuse.
+   */
+  private intentRecorder(userMode: string, context: McpToolInvocationContext): ConfirmIntentRecorder {
+    return async ({ tool, args, toolCallId }) => {
+      if (!context.conversationId || !this.challenges || !this.pipeline) {
+        return { ok: false, error: 'Confirmation is not available in this session.' };
+      }
+      const registered = this.allTools.get(tool);
+      if (!registered || !this.isWriteTool(tool)) {
+        return {
+          ok: false,
+          error: `"${tool}" is not a change you can ask the person to confirm. Name the write tool you will call.`,
+        };
+      }
+      const schema = registered.metadata?.parameters;
+      const prepared = prepareIntentArgs(schema, args);
+      if ('error' in prepared) {
+        return { ok: false, error: `Those arguments are not valid for ${tool}: ${prepared.error}` };
+      }
+      const refusal = await this.pipeline.preflight(chatPrincipal(userMode, context), tool, args);
+      if (refusal) {
+        return { ok: false, error: refusal.content.find((c) => c.type === 'text')?.text ?? 'This cannot run here.' };
+      }
+
+      await this.challenges.recordChatIntent({
+        tenantId: context.tenantId,
+        userId: context.userDbId,
+        conversationId: context.conversationId,
+        toolCallId,
+        toolName: tool,
+        argsDigest: intentDigest(schema, args),
+        scopeRequired: getRequiredScope(registered.providerClass.prototype, registered.methodName) ?? '',
+      });
+
+      const { action, description } = describeIntent(tool, prepared.data);
+      return { ok: true, card: { action, description, tool, args: prepared.data, toolCallId } };
+    };
+  }
+}
+
+/**
+ * The principal a chat tool call runs as. `role` here only selects the persona's scope set: the pipeline caps it at
+ * the scopes of the person's current role in this workspace and checks `@RestrictToRoles` against that role, so a
+ * persona never widens access. The conversation binds every confirmation to this chat.
+ */
+function chatPrincipal(userMode: string, context: McpToolInvocationContext): UserPrincipal {
+  const role = userMode.toUpperCase();
+  return fromUser({
+    userId: context.userDbId,
+    tenantId: context.tenantId,
+    role,
+    scopes: scopesForRole(role),
+    conversationId: context.conversationId,
+  });
+}
+
+function chatCardKey(input: ChatCardInput) {
+  return {
+    tenantId: input.tenantId,
+    userId: input.userDbId,
+    conversationId: input.conversationId,
+    toolCallId: input.toolCallId,
+  };
 }
 
 /**

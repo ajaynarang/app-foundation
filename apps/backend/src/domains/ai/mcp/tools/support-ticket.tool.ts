@@ -13,7 +13,8 @@ import { ToolNames } from '../../agent-contract/tool-names.constants';
  * follow. Both call `SupportService`; neither adds a model.
  *
  * - Each method declares `@RequiresScope`; the write's scope (`platform:write`) makes it a write everywhere: chat
- *   offers `confirm-action`, an external agent is challenged, MCP clients see it as not read-only.
+ *   offers `confirm-action` and runs it only against the person's confirmed card, an external agent is challenged,
+ *   MCP clients see it as not read-only.
  * - The write declares `@RestrictToRoles` with the same roles as its REST twin (`POST /support/tickets`).
  * - Identity comes only from the server-injected `_tenantId` / `_userDbId`; the schemas take no tenant or user field,
  *   and the pipeline drops any `_` key a caller sends.

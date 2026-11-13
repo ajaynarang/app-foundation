@@ -9,6 +9,7 @@ import { parseFollowups } from './parse-followups';
 import { endStreamWithError } from './end-stream-with-error';
 import { readStreamError } from '../../agents/read-stream-error';
 import type { Request, Response } from 'express';
+import { buildConfirmFrame } from './confirm-frame';
 
 /**
  * Pipe a Mastra agent response to the HTTP response as stream frames (`STREAM_FRAME` in `@app/shared-types`).
@@ -115,13 +116,8 @@ export async function pipeAgentResponse(
   try {
     const suspendPayload = await Promise.resolve(response.suspendPayload);
     if (suspendPayload && !clientDisconnected) {
-      // Custom 9: protocol line signals HITL suspension to the frontend.
-      // Include runId so the client can pass it back when resuming.
-      const payload =
-        typeof suspendPayload === 'object' && suspendPayload !== null
-          ? { ...suspendPayload, runId: response.runId }
-          : { data: suspendPayload, runId: response.runId };
-      res.write(`${STREAM_FRAME.SUSPEND}${JSON.stringify(payload)}\n`);
+      // The 9: frame is the server-built confirm card plus the resume keys (runId, toolCallId), never model prose.
+      res.write(`${STREAM_FRAME.SUSPEND}${JSON.stringify(buildConfirmFrame(suspendPayload, response.runId))}\n`);
     }
   } catch {
     // suspendPayload not available — no suspension

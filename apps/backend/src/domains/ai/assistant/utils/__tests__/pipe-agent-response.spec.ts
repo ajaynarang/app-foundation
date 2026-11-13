@@ -305,6 +305,27 @@ describe('pipeAgentResponse', () => {
     expect(payload.runId).toBe('run_123');
   });
 
+  it("writes the resumed turn's next card as the server-built card, unwrapped from Mastra's envelope", async () => {
+    const card = { action: 'Create Item', description: 'Create Item: name: "Desk"', tool: 'create-item', args: {} };
+    const response = {
+      textStream: createReadableStream(['One more']),
+      suspendPayload: { toolCallId: 'call_2', suspendPayload: card, args: { description: 'model prose' } },
+      runId: 'run_2',
+    };
+
+    await pipeAgentResponse(response, {
+      conversationDbId: 1,
+      conversationId: 'conv_1',
+      req: mockReq,
+      res: mockRes,
+      prisma: mockPrisma,
+      logger: mockLogger,
+    });
+
+    const suspendWrite = mockRes.write.mock.calls.find((c: any[]) => c[0].startsWith('9:'));
+    expect(JSON.parse(suspendWrite[0].slice(2).trim())).toEqual({ ...card, toolCallId: 'call_2', runId: 'run_2' });
+  });
+
   it('applies output moderation when moderationService is provided', async () => {
     const response = {
       textStream: createReadableStream(['Some PII text']),

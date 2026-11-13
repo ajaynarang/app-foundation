@@ -26,6 +26,7 @@ import {
   ChatChunk,
   AssistantAgentContract,
 } from './agent.types';
+import { buildConfirmFrame } from '../assistant/utils/confirm-frame';
 
 /**
  * The output ceiling of each step of an agent run (a chat turn or a delegated execute): tool calls and notes, or one
@@ -252,11 +253,7 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     try {
       const suspendPayload = await Promise.resolve(response.suspendPayload);
       if (!suspendPayload) return null;
-      const payload =
-        typeof suspendPayload === 'object' && suspendPayload !== null
-          ? { ...suspendPayload, runId: response.runId }
-          : { data: suspendPayload, runId: response.runId };
-      return { type: 'suspend' as const, data: JSON.stringify(payload) };
+      return { type: 'suspend' as const, data: JSON.stringify(buildConfirmFrame(suspendPayload, response.runId)) };
     } catch {
       return null;
     }
@@ -331,16 +328,20 @@ export abstract class AbstractBaseAgent implements AssistantAgentContract {
     const skillContent = await this.skillLoader.getSkill(action);
     const domainContent = await this.skillLoader.getSkills(this.domainSkills);
 
-    // Build READ-ONLY toolset — remove confirm-action so sub-agents can't trigger HITL
-    const toolsets = await this.mcpToolService.getToolsetsForPersona(ctx.userMode, {
-      tenantId: ctx.tenantId,
-      userId: ctx.userId,
-      userDbId: ctx.userDbId,
-      conversationId: ctx.conversationId,
-    });
-    if (toolsets['app-tools']) {
-      delete toolsets['app-tools']['confirm-action'];
-    }
+    // READ-ONLY toolset: no write tool and no confirm-action, so a delegated sub-agent can neither raise a card nor
+    // spend the person's confirmation.
+    const toolsets = await this.mcpToolService.getToolsetsForPersona(
+      ctx.userMode,
+      {
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+        userDbId: ctx.userDbId,
+        conversationId: ctx.conversationId,
+      },
+      undefined,
+      undefined,
+      { readOnly: true },
+    );
 
     const { sessionId, userId, tags } = buildLangfuseSession({
       tenantId: ctx.tenantId,
