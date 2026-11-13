@@ -94,12 +94,16 @@ export class TenantsService {
   /**
    * Get public branding info for a tenant by subdomain.
    * Returns only non-sensitive data safe for the login page.
-   * Returns null if the tenant doesn't exist or isn't active.
+   * Returns null if the tenant doesn't exist or isn't active. `tenantId` is the tenant's public id: the login form
+   * sends it back as the workspace hint, so sign-in on a subdomain only considers accounts in that workspace.
    */
-  async getTenantBranding(subdomain: string): Promise<{ companyName: string; logoUrl: string | null } | null> {
+  async getTenantBranding(
+    subdomain: string,
+  ): Promise<{ tenantId: string; companyName: string; logoUrl: string | null } | null> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { subdomain: subdomain.toLowerCase() },
       select: {
+        tenantId: true,
         companyName: true,
         status: true,
       },
@@ -108,6 +112,7 @@ export class TenantsService {
     if (!tenant || tenant.status !== 'ACTIVE') return null;
 
     return {
+      tenantId: tenant.tenantId,
       companyName: tenant.companyName,
       logoUrl: null,
     };
