@@ -208,7 +208,13 @@ describe('AuthController', () => {
       });
 
       expect(result).toBeUndefined();
-      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234');
+      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234', undefined);
+    });
+
+    it('passes the workspace hint through', async () => {
+      mockAuthService.sendPhoneOtp.mockResolvedValue(undefined);
+      await controller.sendPhoneOtp({ phone: '+12025551234', tenantId: 'ten_a' });
+      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234', 'ten_a');
     });
   });
 

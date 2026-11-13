@@ -20,11 +20,13 @@ import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto } from './dto/pas
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { EmailService } from '../infrastructure/notification/services/email.service';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyOtpLoginDto } from './dto/verify-otp.dto';
 import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
 import { toUserProfile } from './user-profile';
+import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
+import { ApiErrorCode, type WorkspaceChoice } from '@app/shared-types';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +40,7 @@ export class AuthService {
     private twilioVerifyService: TwilioVerifyService,
     private loginEventService: LoginEventService,
     private emailService: EmailService,
+    private identityResolver: IdentityResolverService,
     @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
@@ -139,16 +142,19 @@ export class AuthService {
    * First-party email + password login. Works with zero external services —
    * this is the starter's primary credential. Firebase exchange and phone
    * OTP/PIN remain as optional alternatives.
+   *
+   * Tenant-aware: one email can still have several live accounts (rows from before one-account-per-email), so the
+   * password is checked against every one that passes the hint (`dto.tenantId`, the tenant's public id). Exactly one
+   * match signs in. Several matches answer 409 `WORKSPACE_SELECTION_REQUIRED` with the workspaces, and the client
+   * retries with one `tenantId`; the list is shown only after the password matched, so it reveals nothing. The
+   * session runs in the hinted workspace, else the account's login default.
    */
   async loginWithPassword(dto: PasswordLoginDto, meta: { ip: string | null; userAgent: string | null }) {
     const email = dto.email.toLowerCase().trim();
-    const user = await this.prisma.user.findFirst({
-      where: { email, deletedAt: null },
-      include: { tenant: true },
-      orderBy: { id: 'asc' },
-    });
-    if (!user) throw new UnauthorizedException('Invalid email or password');
-    if (!user.passwordHash) {
+    const candidates = await this.identityResolver.findEmailAccounts(email, dto.tenantId);
+    if (candidates.length === 0) throw new UnauthorizedException('Invalid email or password');
+    const withPassword = candidates.filter((candidate) => candidate.user.passwordHash);
+    if (withPassword.length === 0) {
       // Account exists but authenticates via Firebase/phone. The web client
       // uses this code to fall back to the Firebase flow when configured.
       throw new UnauthorizedException({
@@ -156,31 +162,40 @@ export class AuthService {
         code: 'PASSWORD_NOT_SET',
       });
     }
-    const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordOk) {
-      await this.loginEventService.recordFailure({
-        userId: user.id,
-        tenantId: user.tenant?.id ?? null,
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        failReason: 'invalid_credentials' as const,
-      });
+
+    const matched: LoginAccount[] = [];
+    for (const candidate of withPassword) {
+      if (await bcrypt.compare(dto.password, candidate.user.passwordHash!)) matched.push(candidate);
+    }
+    if (matched.length === 0) {
+      for (const candidate of withPassword) {
+        await this.loginEventService.recordFailure({
+          userId: candidate.user.id,
+          tenantId: candidate.tenant?.id ?? null,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          failReason: 'invalid_credentials' as const,
+        });
+      }
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    const account = this.pickMatchedAccount(matched, Boolean(dto.tenantId));
+    const { user, tenant, role } = account;
     if (!user.isActive) {
       await this.loginEventService.recordFailure({
         userId: user.id,
-        tenantId: user.tenant?.id ?? null,
+        tenantId: tenant?.id ?? null,
         ip: meta.ip,
         userAgent: meta.userAgent,
         failReason: 'account_disabled' as const,
       });
       throw new UnauthorizedException('Account is deactivated. Please contact support.');
     }
-    if (user.tenant && (user.tenant.status !== 'ACTIVE' || !user.tenant.isActive)) {
+    if (tenant && (tenant.status !== 'ACTIVE' || !tenant.isActive)) {
       await this.loginEventService.recordFailure({
         userId: user.id,
-        tenantId: user.tenant?.id ?? null,
+        tenantId: tenant.id,
         ip: meta.ip,
         userAgent: meta.userAgent,
         failReason: 'tenant_inactive' as const,
@@ -189,38 +204,72 @@ export class AuthService {
     }
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
-      {
-        id: user.id,
-        userId: user.userId,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenant?.tenantId,
-        tenantDbId: user.tenant?.id ?? null,
-      },
+      this.sessionUserOf(account),
       'email_password' satisfies AuthMethod,
     );
     await this.loginEventService.recordSuccess({
       userId: user.id,
-      tenantId: user.tenant?.id ?? null,
+      tenantId: tenant?.id ?? null,
       ip: meta.ip,
       userAgent: meta.userAgent,
       sessionId: refreshTokenId,
     });
-    return { accessToken, refreshToken, user: this.toUserProfile(user) };
+    return { accessToken, refreshToken, user: this.toUserProfile({ ...user, role, tenant }) };
+  }
+
+  /**
+   * One account out of several password matches. With a hint every match is already in the hinted workspace, so
+   * the account whose own workspace it is wins, else the oldest; there is nothing left for the client to choose.
+   * Without a hint, matches in more than one workspace are the client's choice (409).
+   */
+  private pickMatchedAccount(matched: LoginAccount[], hinted: boolean): LoginAccount {
+    if (matched.length === 1) return matched[0];
+    if (hinted) return matched.find((m) => m.user.tenantId === m.tenant?.id) ?? matched[0];
+
+    const workspaces: WorkspaceChoice[] = [];
+    for (const { tenant } of matched) {
+      if (tenant && !workspaces.some((w) => w.tenantId === tenant.tenantId)) {
+        workspaces.push({ tenantId: tenant.tenantId, name: tenant.companyName });
+      }
+    }
+    if (workspaces.length < 2) return matched.find((m) => m.tenant) ?? matched[0];
+    throw new ConflictException({
+      code: ApiErrorCode.WORKSPACE_SELECTION_REQUIRED,
+      detail: 'This email signs in to more than one workspace. Choose the one you want.',
+      workspaces,
+    });
+  }
+
+  /** The claims a new session carries: the account, in the workspace and role it resolved to. */
+  private sessionUserOf({ user, tenant, role }: LoginAccount) {
+    return {
+      id: user.id,
+      userId: user.userId,
+      email: user.email,
+      role,
+      tenantId: tenant?.tenantId,
+      tenantDbId: tenant?.id ?? null,
+    };
   }
 
   /**
    * Forgot-password: always resolves 200 (no account enumeration). Stores a
    * SHA-256 hash of a one-time token; the raw token goes into the emailed
    * link. Without SMTP configured (local dev) the link is logged instead.
+   *
+   * One token and one email for each live, active account behind the address (after the hint). With more than one,
+   * each email names its workspace so the reader knows which account the link resets.
    */
   async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
     const email = dto.email.toLowerCase().trim();
-    const user = await this.prisma.user.findFirst({
-      where: { email, isActive: true, deletedAt: null },
-      orderBy: { id: 'asc' },
-    });
-    if (!user) return; // do not reveal whether the email exists
+    const accounts = await this.identityResolver.findEmailAccounts(email, dto.tenantId, { activeOnly: true });
+    const nameWorkspace = accounts.length > 1;
+    for (const { user, tenant } of accounts) {
+      await this.sendPasswordReset(user, email, nameWorkspace ? tenant?.companyName : undefined);
+    }
+  }
+
+  private async sendPasswordReset(user: { id: number; firstName: string }, email: string, workspace?: string) {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     await this.prisma.passwordResetToken.create({
@@ -232,12 +281,13 @@ export class AuthService {
     });
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+    const forAccount = workspace ? ` in the ${workspace} workspace` : '';
     try {
       await this.emailService.sendEmail({
         to: email,
-        subject: 'Reset your password',
-        html: `<p>Hi ${user.firstName},</p><p>Someone requested a password reset for your account. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
-        text: `Hi ${user.firstName},\n\nReset your password (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
+        subject: workspace ? `Reset your password for ${workspace}` : 'Reset your password',
+        html: `<p>Hi ${user.firstName},</p><p>Someone requested a password reset for your account${forAccount}. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
+        text: `Hi ${user.firstName},\n\nReset your password for your account${forAccount} (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
       });
     } catch (err) {
       // No SMTP in local dev — surface the link in the server log so the
@@ -415,26 +465,18 @@ export class AuthService {
     };
   }
 
+  /** PIN sign-in. A phone number is unique, so at most one account; the hint only picks the session's workspace. */
   async loginWithPhone(dto: PhoneLoginDto): Promise<any> {
-    const user = await this.prisma.user.findFirst({
-      where: { phone: dto.phone, isActive: true },
-      include: { tenant: true },
-    });
-    if (!user || !user.phoneVerified) throw new UnauthorizedException('Invalid phone or PIN');
-    // Null-safe: tenant-less users (single-tenant mode) have user.tenant = null
-    if (user.tenant && !user.tenant.isActive) throw new UnauthorizedException('Account is not active');
+    const account = await this.identityResolver.findPhoneAccount(dto.phone, dto.tenantId);
+    if (!account || !account.user.phoneVerified) throw new UnauthorizedException('Invalid phone or PIN');
+    const { user, tenant, role } = account;
+    // Null-safe: tenant-less users (single-tenant mode) have no tenant
+    if (tenant && !tenant.isActive) throw new UnauthorizedException('Account is not active');
     if (!user.pinHash) throw new UnauthorizedException('Invalid phone or PIN');
     const isPinValid = await this.pinService.verifyPin(dto.pin, user.pinHash);
     if (!isPinValid) throw new UnauthorizedException('Invalid phone or PIN');
     const tokens = await this.jwtTokenService.generateTokenPair(
-      {
-        id: user.id,
-        userId: user.userId,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenant?.tenantId,
-        tenantDbId: user.tenant?.id ?? null,
-      },
+      this.sessionUserOf(account),
       'phone_pin' satisfies AuthMethod,
     );
     await this.prisma.user.update({
@@ -444,27 +486,24 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: this.toUserProfile(user),
+      user: this.toUserProfile({ ...user, role, tenant }),
     };
   }
 
-  async sendPhoneOtp(phone: string): Promise<void> {
-    const user = await this.prisma.user.findFirst({
-      where: { phone, isActive: true },
-    });
-    if (!user) return; // Don't reveal if phone exists
+  /** Sends nothing (and says nothing) when no account on the number passes the hint. */
+  async sendPhoneOtp(phone: string, tenantId?: string): Promise<void> {
+    const account = await this.identityResolver.findPhoneAccount(phone, tenantId);
+    if (!account) return; // Don't reveal if phone exists
     await this.twilioVerifyService.sendVerification(phone);
   }
 
-  async loginWithOtp(dto: VerifyOtpDto): Promise<any> {
+  async loginWithOtp(dto: VerifyOtpLoginDto): Promise<any> {
     const isValid = await this.twilioVerifyService.checkVerification(dto.phone, dto.code);
     if (!isValid) throw new UnauthorizedException('Invalid or expired verification code');
-    const user = await this.prisma.user.findFirst({
-      where: { phone: dto.phone, isActive: true },
-      include: { tenant: true },
-    });
-    if (!user) throw new UnauthorizedException('User not found');
-    if (user.tenant && (user.tenant.status !== 'ACTIVE' || !user.tenant.isActive)) {
+    const account = await this.identityResolver.findPhoneAccount(dto.phone, dto.tenantId);
+    if (!account) throw new UnauthorizedException('User not found');
+    const { user, tenant, role } = account;
+    if (tenant && (tenant.status !== 'ACTIVE' || !tenant.isActive)) {
       throw new UnauthorizedException('Your organization account is pending approval. Please check back later.');
     }
     if (!user.phoneVerified)
@@ -473,14 +512,7 @@ export class AuthService {
         data: { phoneVerified: true },
       });
     const tokens = await this.jwtTokenService.generateTokenPair(
-      {
-        id: user.id,
-        userId: user.userId,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenant?.tenantId,
-        tenantDbId: user.tenant?.id ?? null,
-      },
+      this.sessionUserOf(account),
       'phone_otp' satisfies AuthMethod,
     );
     await this.prisma.user.update({
@@ -490,7 +522,7 @@ export class AuthService {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: this.toUserProfile(user),
+      user: this.toUserProfile({ ...user, role, tenant }),
       requiresPinSetup: !user.pinHash,
     };
   }

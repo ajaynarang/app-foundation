@@ -8,6 +8,8 @@ import { PinService } from '../pin.service';
 import { TwilioVerifyService } from '../../infrastructure/sms/twilio-verify.service';
 import { LoginEventService } from '../login-event.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
+import { ConfigService } from '@nestjs/config';
+import { IdentityResolverService } from '../identity-resolver.service';
 
 const mockLoginEventService = {
   recordLoginEvent: jest.fn(),
@@ -73,6 +75,8 @@ describe('AuthService - Phone Auth', () => {
         { provide: TwilioVerifyService, useValue: mockTwilioVerifyService },
         { provide: LoginEventService, useValue: mockLoginEventService },
         { provide: EmailService, useValue: { sendEmail: jest.fn() } },
+        IdentityResolverService,
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile();
 
