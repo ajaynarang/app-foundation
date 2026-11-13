@@ -7,7 +7,8 @@ const logger = new Logger('RlsContext');
 /**
  * Strict mode (`RLS_STRICT_CONTEXT=throw`): a context conflict throws instead of being logged. On in unit tests (each
  * package's Jest setup) and so in every CI run of them; off in deployed tasks while nothing enforces row-level
- * security, so a conflict can never fail a live request. Read per call so a test can toggle it.
+ * security, so a conflict never fails a live request: it is logged and the first context kept (`setRlsTenant`,
+ * `runAsTenant`, `runAsPublic`). Read per call so a test can toggle it.
  */
 export const RLS_STRICT_CONTEXT_ENV = 'RLS_STRICT_CONTEXT';
 export const RLS_STRICT_THROW = 'throw';
@@ -139,26 +140,37 @@ export function setRlsTenant(id: number, source: string): boolean {
 }
 
 /**
- * Run `fn` as tenant `id` in a fresh scope (which also clears `inTx`). Throws inside a different tenant or a public
- * scope. Narrowing a `system` scope to one tenant is allowed: that is how `forEachTenant`, the outbox relay and the
- * deadline sweeper reach each tenant.
+ * Run `fn` as tenant `id` in a fresh scope (which also clears `inTx`). Narrowing a `system` scope to one tenant is
+ * allowed: that is how `forEachTenant`, the outbox relay and the deadline sweeper reach each tenant. Inside a
+ * different tenant or a public scope it is a conflict: thrown in strict mode; otherwise logged, and `fn` runs in the
+ * first context.
  */
 export async function runAsTenant<T>(id: number, source: string, fn: () => Promise<T> | T): Promise<T> {
   assertTenantId(id);
   const existing = currentRls();
   if (existing && existing.kind !== 'system' && !(existing.kind === 'tenant' && existing.tenantId === id)) {
-    throw new RlsContextError(`Cannot run as tenant ${id} (${source}) inside ${describeCtx(existing)}`);
+    return keepFirstContext(`Cannot run as tenant ${id} (${source}) inside ${describeCtx(existing)}`, fn);
   }
   return runInRlsHolder({ ctx: { kind: 'tenant', tenantId: id, source } }, fn);
 }
 
-/** Run `fn` in the `public` scope (no tenant). Throws inside a tenant scope. */
+/**
+ * Run `fn` in the `public` scope (no tenant). Inside a tenant scope it is a conflict: thrown in strict mode;
+ * otherwise logged, and `fn` runs in that tenant scope.
+ */
 export async function runAsPublic<T>(source: string, fn: () => Promise<T> | T): Promise<T> {
   const existing = currentRls();
   if (existing?.kind === 'tenant') {
-    throw new RlsContextError(`Cannot run as public (${source}) inside ${describeCtx(existing)}`);
+    return keepFirstContext(`Cannot run as public (${source}) inside ${describeCtx(existing)}`, fn);
   }
   return runInRlsHolder({ ctx: { kind: 'public', source } }, fn);
+}
+
+/** A conflicting `runAs*`: thrown in strict mode, else logged and `fn` awaited in the scope already open. */
+async function keepFirstContext<T>(message: string, fn: () => Promise<T> | T): Promise<T> {
+  if (isRlsStrict()) throw new RlsContextError(message);
+  logger.error(`${message}; keeping the first context`);
+  return await fn();
 }
 
 /**

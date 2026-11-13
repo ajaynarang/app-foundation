@@ -484,22 +484,28 @@ describe('ToolExecutorService', () => {
       });
 
       it.each([
-        ['another tenant', otherTenant],
-        ['the public scope', publicScope],
-      ])('non-strict mode: answers a generic tool failure inside %s, never running the tool', async (_label, scope) => {
-        delete process.env[RLS_STRICT_CONTEXT_ENV];
-        const errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-        const run = jest.fn().mockResolvedValue('ok');
-        registerTool(run);
+        ['another tenant', otherTenant, { kind: 'tenant', tenantId: 8, source: 'jwt' }],
+        ['the public scope', publicScope, { kind: 'public', source: 'anonymous' }],
+      ])(
+        'non-strict mode: logs the conflict inside %s and runs the tool in the first context',
+        async (_label, scope, firstContext) => {
+          delete process.env[RLS_STRICT_CONTEXT_ENV];
+          const errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+          let seen: unknown;
+          registerTool(
+            jest.fn(async () => {
+              seen = currentRls();
+              return 'ok';
+            }),
+          );
 
-        const result = await scope(() => svc.execute('query-records', {}, principal));
+          const result = await scope(() => svc.execute('query-records', {}, principal));
 
-        expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain(TOOL_FAILED_MESSAGE);
-        expect(result.content[0].text).not.toMatch(/tenant \d/);
-        expect(run).not.toHaveBeenCalled();
-        expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('query-records'), expect.anything());
-      });
+          expect(result.isError).toBeUndefined();
+          expect(seen).toEqual(firstContext);
+          expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('tool:query-records'));
+        },
+      );
     });
   });
 });

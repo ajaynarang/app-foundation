@@ -410,7 +410,7 @@ a week of them, fix the plans or the seed, then remove the key. Check `plan_conf
   throws: a second, different tenant in one scope, `runAsTenant` or `runAsPublic` inside another context, a system
   scope entered from a tenant request, an event handled under another tenant than its emitter's. A unit test that
   sets no context is not affected. A deployed task leaves the key unset: a conflict is logged and the first context
-  kept, so no live request fails on it.
+  kept (a system scope entered from a tenant request is logged and runs as system), so no live request fails on it.
 - **`OutboxRelay` takes a third constructor argument**, `TenantIdResolver`. A product spec that builds the relay by
   hand passes one.
 

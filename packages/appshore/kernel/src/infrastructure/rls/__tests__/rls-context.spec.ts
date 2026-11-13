@@ -178,6 +178,58 @@ describe('rls-context', () => {
     });
   });
 
+  describe('runAsTenant and runAsPublic outside strict mode', () => {
+    let strict: string | undefined;
+    beforeEach(() => {
+      strict = process.env.RLS_STRICT_CONTEXT;
+      delete process.env.RLS_STRICT_CONTEXT;
+    });
+    afterEach(() => {
+      process.env.RLS_STRICT_CONTEXT = strict;
+      jest.restoreAllMocks();
+    });
+
+    it('runAsTenant inside a different tenant logs the conflict and runs in the first context', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const seen = await runAsTenant(7, 'outer', () => runAsTenant(8, 'inner', async () => currentRls()));
+      expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'outer' });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('Cannot run as tenant 8 (inner) inside tenant 7'));
+    });
+
+    it('runAsTenant inside a public scope logs the conflict and stays public', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const seen = await runAsPublic('anonymous', () => runAsTenant(8, 'inner', async () => currentRls()));
+      expect(seen).toEqual({ kind: 'public', source: 'anonymous' });
+      expect(error).toHaveBeenCalledTimes(1);
+    });
+
+    it('runAsPublic inside a tenant scope logs the conflict and stays in the tenant', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const seen = await runAsTenant(7, 'jwt', () => runAsPublic('anonymous', async () => currentRls()));
+      expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'jwt' });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('Cannot run as public (anonymous) inside tenant 7'));
+    });
+
+    it('still awaits a lazy result inside the kept scope', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const seen: unknown[] = [];
+      const lazy: PromiseLike<string> = {
+        then(onFulfilled, onRejected) {
+          seen.push(currentRls());
+          return Promise.resolve('rows').then(onFulfilled, onRejected);
+        },
+      };
+      await runAsTenant(7, 'outer', async () => {
+        expect(await runAsTenant(8, 'inner', () => lazy as Promise<string>)).toBe('rows');
+      });
+      expect(seen).toEqual([{ kind: 'tenant', tenantId: 7, source: 'outer' }]);
+    });
+
+    it('still rejects an invalid tenant id', async () => {
+      await expect(runAsTenant(0, 'x', async () => 'never')).rejects.toThrow(RlsContextError);
+    });
+  });
+
   describe('runInJobScope', () => {
     it('replaces an outer tenant with the job tenant', async () => {
       await runAsTenant(7, 'jwt', async () => {

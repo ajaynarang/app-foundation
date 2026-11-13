@@ -155,8 +155,9 @@ export class ToolExecutorService {
         ],
       };
     } catch (error: unknown) {
-      // A scope already pinned to another tenant (or to public) means the caller mixed up identities: the tool never
-      // ran. Strict mode (tests, CI) surfaces it; a deployed task answers the generic tool failure and logs it.
+      // A scope already pinned to another tenant (or to public) means the caller mixed up identities. Strict mode
+      // (tests, CI) throws before the tool runs, and that surfaces here; a deployed task logs it and runs the tool in
+      // the first context (rls-context.ts), so it never reaches this catch.
       if (error instanceof RlsContextError && isRlsStrict()) throw error;
       return {
         content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
