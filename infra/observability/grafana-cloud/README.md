@@ -20,6 +20,7 @@ alerting/                GENERATED (Grafana file-provisioning format, the same a
   notification-policies.yaml
   templates.yaml         the notification template (title, and a message with the runbook link)
 dashboards/*.json        GENERATED
+docs/runbooks/            (repo root) one file per alert family, one `## <rule key>` section per rule
 scripts/
   generate.mjs           catalog -> alerting/ and dashboards/   (--check fails when a file is stale)
   validate.mjs           structure, runbook links, label hygiene, names checked against the code
@@ -53,8 +54,54 @@ Every product-specific name comes from three constants in `catalog/constants.mjs
 
 ## What is in it
 
-**Rules.** None yet in this part: the starter catalog and its runbooks come with the next part of this work. The
-routing, the contact points and the template are already here.
+**Rules** (folder "`<PROJECT>` alerts · `<env>`", one per environment). Every rule ships live, reads one signal
+(logs, metrics or CloudWatch, never a paired copy), and links to its section in [`docs/runbooks/`](../../../docs/runbooks/README.md).
+
+| Area       | Rule                         | Sev  | Fires when                                                                               |
+| ---------- | ---------------------------- | ---- | ---------------------------------------------------------------------------------------- |
+| `api`      | `api-5xx-rate`               | sev1 | 5 or more 5xx lines from `HttpExceptionFilter` in 5 min                                  |
+|            | `api-availability-burn-fast` | sev1 | 5xx share of non-4xx requests above 14.4x the 0.5% budget over 1 h and 5 min             |
+|            | `api-availability-burn-slow` | sev2 | the same above 6x over 6 h and 30 min                                                    |
+|            | `api-latency-p95`            | sev2 | p95 above 1 s for 10 min                                                                 |
+| `jobs`     | `job-failed-final`           | sev1 | a `job.failed` line with `final=true` (per job name, queue and tenant)                   |
+|            | `job-unknown`                | sev2 | a `job.unknown` line                                                                     |
+|            | `worker-heartbeat-missing`   | sev1 | no `ops.heartbeat` line for 15 min (three beats), whichever process consumes `bulk-ops`  |
+|            | `queue-stalled`              | sev1 | a queue's oldest waiting job older than 15 min                                           |
+|            | `outbox-backlog`             | sev1 | the oldest unpublished outbox event older than 15 min                                    |
+|            | `deadline-sweep-late`        | sev1 | the oldest pending deadline more than 15 min past due                                    |
+| `crons`    | `cron-missed`                | sev1 | any cron's last success older than twice its expected interval (one rule for every cron) |
+|            | `cron-tenants-failed`        | sev2 | a `cron.completed` line with `tenantsFailed` above zero in 25 h                          |
+| `outbound` | `otp-provider-failures`      | sev1 | 5 or more sign-in code provider failures in 10 min                                       |
+|            | `outbound-failures`          | sev2 | 3 or more failed sends on one channel in 10 min                                          |
+| `ai`       | `ai-error-ratio`             | sev2 | more than 20% of AI invocations failed in 15 min, with at least 5 in the window          |
+| `infra`    | `rds-storage-low`            | sev1 | RDS free storage below 5 GB                                                              |
+|            | `rds-connections-high`       | sev1 | RDS connections above 75% of `rdsMaxConnections` for 10 min                              |
+|            | `rds-cpu-high`               | sev2 | RDS CPU above 80% for 10 min                                                             |
+|            | `rds-freeable-memory-low`    | sev2 | RDS freeable memory below 40 MB for 15 min                                               |
+|            | `rds-swap-high`              | sev2 | RDS swap above 256 MB for 15 min                                                         |
+|            | `redis-memory-high`          | sev1 | Redis memory above 80%                                                                   |
+|            | `ecs-service-gone-api`       | sev1 | no `AWS/ECS` CPU data from the API service for 10 min                                    |
+|            | `ecs-service-gone-worker`    | sev1 | the same for the worker; generated only while `HAS_WORKER` is `true`                     |
+
+Why some numbers are what they are:
+
+- **The `bulk-ops` lane.** It runs one job at a time and carries the outbox relay, the deadline sweep, the heartbeat
+  and the foundation crons, and no job may hold it for more than five minutes. The four rules a long job there could
+  trip (heartbeat, queue stalled, outbox, deadlines) wait three budgets, fifteen minutes. A product that outgrows the
+  budget gives the relay and the sweep their own queue; it does not raise these windows.
+- **Ops gauges use `max`.** Queue ages, outbox and deadline ages and cron intervals come from the one reporting
+  process, or from every API task when there is no worker.
+- **`cron-missed`** reads the interval from the repeatables BullMQ holds, so a disabled schedule has no series and no
+  alert, and no cron needs its own window. A cron that has never succeeded within the look-back (eight days) has no
+  stamp and is left to `job-failed-final`.
+- **Infra rules treat no data as alerting**: the database, Redis and the API service always exist, so silence means
+  something is gone, or `PROJECT` does not match the Terraform `project`.
+- **`outbound-failures` is sev2**: outside development a send with no provider key fails and counts by design, and a
+  product may run without email at first. Sign-in codes, which block people, page on their own rule.
+- Thresholds are starting values. Tune them in the catalog, regenerate, and keep the runbook in step.
+
+The outside-in uptime check (the API's `/api/v1/health/live` and the web root, from outside AWS) is not a Grafana
+rule: it is a level 2 step in [`docs/observability.md`](../../../docs/observability.md).
 
 **Routing.** Two contact points, both Grafana IRM webhooks: `irm-oncall` (pages) and `irm-notify` (notifies). A
 rule labelled `env=production, severity=sev1` goes to `irm-oncall`; everything else, a staging `sev1` included, goes
@@ -112,6 +159,12 @@ node infra/observability/grafana-cloud/scripts/grafana-apply.mjs --apply   # app
 Loki has seen logs with both `env=production` and `env=staging` in the last 24 hours. The rules assume `env` comes
 from `ENV_TYPE`; a stack that labelled logs from `NODE_ENV` would count staging errors as production ones.
 `--skip-env-check` overrides that last check, only once you have confirmed the labels another way.
+
+From GitHub, run the manual workflow `.github/workflows/grafana-apply.yml` (Actions tab, or
+`gh workflow run grafana-apply.yml -f action=plan`): `plan` is the dry run, `apply` applies, `cardinality` lists the
+metrics with the most active series. It checks the generated files and validates the catalog before it applies. It
+reads `vars.GRAFANA_URL` and the secrets `GRAFANA_SA_TOKEN`, `IRM_ONCALL_WEBHOOK_URL` and `IRM_NOTIFY_WEBHOOK_URL`
+(plus the optional datasource UID variables), and it never runs on a push: it changes a live stack.
 
 ## Validation
 

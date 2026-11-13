@@ -290,5 +290,7 @@ success + error toasts; every loading state shows a Skeleton.
 - **`pnpm check:ops`** — the operations files that are not Jest specs: the Grafana-as-code catalog under
   `infra/observability/grafana-cloud/` (generated files fresh, `validate.mjs`, its specs), the ops shell tests and
   Terraform fmt / validate / test. It runs inside `pnpm verify`, and the pre-push hook runs it when a push touches
-  `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files.
+  `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files. A new alert
+  rule needs its `## <rule key>` section in `docs/runbooks/`; applying to Grafana is the manual `grafana-apply`
+  workflow.
 - **Pre-commit hook** — Prettier on staged files.

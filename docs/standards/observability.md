@@ -63,7 +63,9 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
     through `reportError` with a `source` tag. Nothing else calls the Sentry SDK, and `@sentry/` is imported only
     under an `error-tracking/` folder. Logging at error level reports nothing: the tracker does not read logs.
     _The import is spec-checked._
-11. **No alert rule without a runbook file and anchor. No runbook anchor without a rule.**
+11. **No alert rule without a runbook file and anchor. No runbook anchor without a rule.** Runbooks are
+    `docs/runbooks/<family>.md`, one `## <rule key>` section per rule. _Checked by `validate.mjs` in
+    `pnpm check:ops`._
 12. **Error-tracker and trace data collection stays off** for bodies, headers, cookies, query strings and model
     inputs.
 

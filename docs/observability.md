@@ -7,9 +7,48 @@ metrics go, and which keys switch each one on. The rules every log line and erro
 Nothing here is required to boot, test or deploy. With no key set the app runs, writes JSON logs to stdout and sends
 nothing anywhere. Each vendor is switched on by its own key and is a no-op without it.
 
-> This page grows with the observability work. Today it covers error tracking, traces, metrics, the crons and
-> heartbeat behind them, the dashboards and alert routing kept as code, and the local stack. The alert rules, their
-> runbooks and the AWS fallback alarms are added to it as they land.
+> This page grows with the observability work. Today it covers the three levels and the order to climb them, error
+> tracking, traces, metrics, the crons and heartbeat behind them, the dashboards, alert rules, routing and runbooks
+> kept as code, and the local stack. The AWS fallback alarms (level 1), the read-only Grafana role and the deploy
+> markers are added to it as they land.
+
+## Three levels
+
+| Level | What is set                                     | What you get                                                                                                                                                        |
+| ----- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | nothing                                         | JSON logs on stdout (CloudWatch in ECS). No traces, metrics, errors or alerts. Boots clean.                                                                         |
+| 1     | `alarm_email` in tfvars                         | Level 0 plus a small set of CloudWatch alarms and an AWS budget email (the Terraform side of this work; not in the template yet).                                   |
+| 2     | Grafana Cloud and Sentry keys, IRM webhook URLs | Logs, traces, metrics, alert rules, dashboards, error tracking and paging, plus an outside-in uptime check. The level 1 alarms are removed last, after a test-fire. |
+
+### Going from level 1 to level 2
+
+In this order. Each step is safe to stop after.
+
+1. **Telemetry.** Set the Loki keys (`LOG_TRANSPORT=loki`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_PASSWORD`), the OTLP keys
+   and the Sentry keys (below) in each deployed environment. Deploy. Confirm log lines arrive in Grafana with
+   `env="production"` and `env="staging"`, never `development`: every rule filters on it.
+2. **AWS read access and the catalog's constants.** Give Grafana's CloudWatch datasource read-only access to the
+   account (the Terraform role for it lands with level 1), and add the datasource in Grafana by hand with the UID the
+   catalog expects (`cloudwatch`, or set `GRAFANA_CLOUDWATCH_UID`). In `catalog/constants.mjs`, check `PROJECT` and
+   `REPO_URL` (`pnpm init-app` set both), set each environment's `rdsMaxConnections` to its instance class, and set
+   `HAS_WORKER = false` if the product runs no worker task (`worker_desired_count = 0`). Regenerate and commit.
+3. **Paging.** Create two Grafana IRM integrations (one that pages, one that notifies) and set their webhook URLs as
+   secrets of the `grafana-apply` workflow, with `GRAFANA_URL` and a service-account token. Run the workflow with
+   `plan`, read it, then `apply`.
+4. **Test-fire.** One test page through IRM, and one real rule on staging: stop the worker service (or, with no worker
+   task, disable the heartbeat's schedule row `('maintenance', 'ops-heartbeat')`) and wait for
+   `worker-heartbeat-missing` to notify. Turn it back on. The rules are untested against real traffic until this
+   step: they are written from the code, not tuned on a live stack.
+5. **Uptime.** Add the outside-in checks (below).
+6. **Only then** remove the level 1 alarms (`grafana_alerting_live = true`, with the level 1 Terraform).
+
+### Uptime, outside-in
+
+The Grafana rules see what the backend writes and measures. They cannot see "no healthy target" or a load balancer
+answering 502, 503 or 504. Level 2 therefore includes two HTTP checks from outside AWS, paging the on-call IRM
+integration: `GET <api>/api/v1/health/live` and `GET <web>/`. Grafana Synthetic Monitoring does this in the same
+stack; a separate uptime service (Better Stack and others) works too and sends its pages to the same IRM integration.
+Neither is kept as code here.
 
 ## Error tracking (Sentry)
 
@@ -146,9 +185,9 @@ Redis, the scheduler and a consumer all work, so its absence is the signal. It n
 row `('maintenance', 'ops-heartbeat')` removes it, which is how a test-fire proves the missing-heartbeat alert pages
 on a stack with no worker to stop.
 
-## Dashboards and alert routing (Grafana as code)
+## Dashboards, alert rules and routing (Grafana as code)
 
-Dashboards, alert routing and (as they land) alert rules live in the repo, under
+Dashboards, alert rules, routing and runbooks live in the repo, the first three under
 [`infra/observability/grafana-cloud/`](../infra/observability/grafana-cloud/README.md), and are applied to a hosted
 Grafana stack by `grafana-apply.mjs`. Nothing is created in Grafana by hand except the datasources and the IRM
 integrations.
@@ -162,11 +201,21 @@ integrations.
   selects on a service that sends no metric.
 - **Boards:** overview, queues and jobs, SLOs, per-tenant health. Each has an environment selector offering the two
   deployed environments, production and staging (the same `env` label the logs, metrics and errors carry).
+- **Rules:** a starter catalog of 23, one signal each, live from the first apply, the same in both environments:
+  API errors, availability burn and latency; final job failures, unknown jobs, the heartbeat, stalled queues, the
+  outbox backlog, late deadlines, missed crons and crons with failed tenants; outbound and sign-in code failures; the
+  AI error ratio; and the AWS side (RDS, Redis, ECS services). The full list, with thresholds and the reasons for
+  them, is in the catalog's README.
+- **Runbooks:** [`docs/runbooks/`](runbooks/README.md), one file per family and one section per rule (what it means,
+  the first three checks, mitigation, escalation). Every notification links to its section. `check:ops` fails on a
+  rule with no section and on a section with no rule.
 - **Routing:** a `sev1` in production pages through the `irm-oncall` contact point; everything else, a staging
   `sev1` included, notifies through `irm-notify`. Both are Grafana IRM webhooks.
 - **Applying** is a dry run unless `--apply` is passed. `--apply` needs `GRAFANA_URL`, `GRAFANA_SA_TOKEN` and, for
   contact points, policies or rules, `IRM_ONCALL_WEBHOOK_URL` (apply-time secrets, never app config or Doppler), and refuses while `REPO_URL` is the
   placeholder, while a generated file is stale, or (for rules) before Loki has seen logs from both environments.
+  The manual workflow `grafana-apply.yml` (`plan`, `apply`, `cardinality`) runs it with those secrets; it has no
+  push trigger and never will.
 
 ## The local stack
 
