@@ -122,16 +122,16 @@ export class PlansService {
       select: { id: true, plan: true },
     });
 
-    const result = await this.prisma.$transaction([
-      this.prisma.tenant.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.tenant.update({
         where: { tenantId },
         data: {
           plan: newPlan,
           planAssignedAt: new Date(),
           planAssignedBy: assignedBy,
         },
-      }),
-      this.prisma.tenantPlanEvent.create({
+      });
+      await tx.tenantPlanEvent.create({
         data: {
           id: generateUuidV7(),
           tenantId: tenant.id,
@@ -140,8 +140,9 @@ export class PlansService {
           changedBy: assignedBy,
           reason: reason ?? null,
         },
-      }),
-    ]);
+      });
+      return row;
+    });
 
     await this.cache.del(buildKey('app:plans', 'tenant-plan', tenantId));
 
@@ -153,7 +154,7 @@ export class PlansService {
       this.logger.warn(`planAssigned hook failed for tenant ${tenant.id}: ${(err as Error).message}`);
     }
 
-    return result[0];
+    return updated;
   }
 
   async updateProviderPriceId(plan: TenantPlan, providerPriceId: string | null) {

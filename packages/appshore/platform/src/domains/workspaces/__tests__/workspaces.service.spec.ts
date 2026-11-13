@@ -17,7 +17,10 @@ const mockPrisma = {
   refreshToken: {
     findFirst: jest.fn(),
   },
-  $transaction: jest.fn().mockResolvedValue([]),
+  $transaction: jest.fn((fn: unknown) => {
+    if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+    return (fn as (tx: unknown) => unknown)(mockPrisma);
+  }),
 };
 
 const mockJwt = {
@@ -133,6 +136,22 @@ describe('WorkspacesService', () => {
         role: 'ADMIN',
       });
       expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('records the login default on the transaction client, never the root client', async () => {
+      const tx = { user: { update: jest.fn() }, workspaceMember: { updateMany: jest.fn(), update: jest.fn() } };
+      mockPrisma.$transaction.mockImplementationOnce((fn: unknown) => (fn as (client: typeof tx) => unknown)(tx));
+      mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+      mockPrisma.refreshToken.findFirst.mockResolvedValue(null);
+
+      await service.switch(1, 'demo-two', { familyId: 'rt_old' });
+
+      expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { tenantId: 2, role: 'ADMIN' } });
+      expect(tx.workspaceMember.updateMany).toHaveBeenCalledWith({ where: { userId: 1 }, data: { isDefault: false } });
+      expect(tx.workspaceMember.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { isDefault: true } });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.workspaceMember.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.workspaceMember.update).not.toHaveBeenCalled();
     });
 
     it('starts a new session when the family has no live token (an access token from before rotation)', async () => {

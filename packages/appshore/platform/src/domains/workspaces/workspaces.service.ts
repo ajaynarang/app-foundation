@@ -71,21 +71,21 @@ export class WorkspacesService {
       throw new UnauthorizedException('Workspace is not active');
     }
 
-    await this.prisma.$transaction([
+    await this.prisma.$transaction(async (tx) => {
       // login-default cache on the user row
-      this.prisma.user.update({
+      await tx.user.update({
         where: { id: userDbId },
         data: { tenantId: membership.tenantId, role: membership.role },
-      }),
-      this.prisma.workspaceMember.updateMany({
+      });
+      await tx.workspaceMember.updateMany({
         where: { userId: userDbId },
         data: { isDefault: false },
-      }),
-      this.prisma.workspaceMember.update({
+      });
+      await tx.workspaceMember.update({
         where: { id: membership.id },
         data: { isDefault: true },
-      }),
-    ]);
+      });
+    });
 
     const sessionUser = {
       id: membership.user.id,

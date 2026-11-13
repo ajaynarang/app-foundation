@@ -44,6 +44,23 @@ describe('LoginActivityService', () => {
   // SCOPE / ISOLATION
   // ──────────────────────────────────────────────────────────────────────
 
+  describe('list — one interactive transaction', () => {
+    it('reads the page and the total on the transaction client', async () => {
+      const tx = {
+        loginEvent: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(3) },
+      };
+      prisma.$transaction.mockImplementationOnce((fn: (client: typeof tx) => unknown) => fn(tx));
+
+      const result = await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE });
+
+      expect(result.total).toBe(3);
+      expect(tx.loginEvent.findMany).toHaveBeenCalledTimes(1);
+      expect(tx.loginEvent.count).toHaveBeenCalledTimes(1);
+      expect(prisma.loginEvent.findMany).not.toHaveBeenCalled();
+      expect(prisma.loginEvent.count).not.toHaveBeenCalled();
+    });
+  });
+
   describe('list — tenant scope / isolation', () => {
     it('refuses tenant-scoped call when tenantId is missing on scope', async () => {
       await expect(service.list({ isSuperAdmin: false } as any, { ...RANGE })).rejects.toBeInstanceOf(

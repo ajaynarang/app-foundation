@@ -306,20 +306,20 @@ export class AuthService {
       throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
     }
     const passwordHash = await bcrypt.hash(dto.newPassword, AuthService.PASSWORD_SALT_ROUNDS);
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: record.userId },
         data: { passwordHash, passwordChangedAt: new Date() },
-      }),
-      this.prisma.passwordResetToken.update({
+      });
+      await tx.passwordResetToken.update({
         where: { id: record.id },
         data: { usedAt: new Date() },
-      }),
-      this.prisma.refreshToken.updateMany({
+      });
+      await tx.refreshToken.updateMany({
         where: { userId: record.userId, isRevoked: false },
         data: { isRevoked: true, revokedAt: new Date() },
-      }),
-    ]);
+      });
+    });
   }
 
   /**

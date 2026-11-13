@@ -57,7 +57,10 @@ describe('PlansService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       user: { count: jest.fn().mockResolvedValue(5) },
-      $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
+      $transaction: jest.fn().mockImplementation((fn: unknown) => {
+        if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+        return fn(prisma);
+      }),
     };
 
     cache = {
@@ -128,6 +131,22 @@ describe('PlansService', () => {
       await service.assignPlan('tenant_abc', 'PROFESSIONAL', 'admin@test.com', 'Upgrade');
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(cache.del).toHaveBeenCalled();
+    });
+
+    it('writes the plan and its event on the transaction client and returns the updated tenant', async () => {
+      const updated = { tenantId: 'tenant_abc', plan: 'PROFESSIONAL' };
+      const tx = { tenant: { update: jest.fn().mockResolvedValue(updated) }, tenantPlanEvent: { create: jest.fn() } };
+      prisma.$transaction.mockImplementationOnce((fn: (client: typeof tx) => unknown) => fn(tx));
+
+      const result = await service.assignPlan('tenant_abc', 'PROFESSIONAL', 'admin@test.com', 'Upgrade');
+
+      expect(result).toBe(updated);
+      expect(tx.tenant.update).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 'tenant_abc' } }));
+      expect(tx.tenantPlanEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ toPlan: 'PROFESSIONAL', changedBy: 'admin@test.com', reason: 'Upgrade' }),
+      });
+      expect(prisma.tenant.update).not.toHaveBeenCalled();
+      expect(prisma.tenantPlanEvent.create).not.toHaveBeenCalled();
     });
   });
 
