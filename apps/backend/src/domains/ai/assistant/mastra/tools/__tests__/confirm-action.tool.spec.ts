@@ -95,6 +95,12 @@ describe('describeIntent (card copy from the recorded tool and arguments)', () =
     });
   });
 
+  it('leaves the retry key off the card: it is not something the person decides', () => {
+    expect(
+      describeIntent('create-support-ticket', { subject: 'Printer', idempotencyKey: '0b9a6f1e-1c2d' }).description,
+    ).toBe('Create Support Ticket: subject: "Printer"');
+  });
+
   it('leaves out empty values and caps a long description', () => {
     expect(describeIntent('do-it', { a: '', b: null }).description).toBe('Do It');
     expect(describeIntent('do-it', { note: 'x'.repeat(1000) }).description.length).toBe(400);

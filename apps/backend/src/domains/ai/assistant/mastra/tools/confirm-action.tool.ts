@@ -1,5 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { IDEMPOTENCY_KEY_ARG } from '../../../agent-contract/tool-idempotency';
 
 /** The card the person sees, built from what the server recorded for it. */
 export interface ConfirmCard {
@@ -114,7 +115,8 @@ export function describeIntent(
     .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
     .join(' ');
   const parts = Object.entries(data)
-    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    // The retry key is for the executor, not a choice the person makes, so it stays off the card.
+    .filter(([key, value]) => key !== IDEMPOTENCY_KEY_ARG && value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${humanizeKey(key)}: ${typeof value === 'string' ? `"${value}"` : JSON.stringify(value)}`);
   let description = parts.length ? `${action}: ${parts.join(', ')}` : action;
   if (description.length > MAX_DESCRIPTION) description = `${description.slice(0, MAX_DESCRIPTION - 1)}…`;
