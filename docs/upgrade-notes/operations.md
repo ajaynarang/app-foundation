@@ -314,3 +314,34 @@ variables `SENTRY_PROJECT_BACKEND`, `GRAFANA_URL` when you want them.
 **How to turn it back.** `container_insights = true` restores Container Insights. Clear `alarm_email` (or set
 `grafana_alerting_live = true`) to remove the alarms; clear `alarm_email` or set `monthly_budget_usd = 0` to remove the
 budget. Clear either Grafana value to delete the read role. Leave the marker secrets unset to keep the markers off.
+
+## 2026-11-13: outbound gate; non-production environments send only to an allow-list
+
+**What changes when you pull it.**
+
+- **Outside production, only allow-listed recipients are messaged.** `OUTBOUND_MODE` unset now means `allowlist` for
+  `ENV_TYPE=sandbox`, `preprod` and `development` (and `live` for `production`). Every email, SMS, sign-in code,
+  push, WhatsApp message and customer webhook to someone not on the list is held back. Notification-pipeline sends
+  are ledgered `SKIPPED` with reason `GATED`; the others are listed at `/admin/outbound` (new super-admin page, kept 30
+  days). What is sent is marked `[STAGING]`, `STG:` or `[STG]`.
+- **Boot refuses two settings.** `OUTBOUND_MODE=allowlist` with `ENV_TYPE=production`, and `OUTBOUND_MODE=live`
+  outside production without `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true`.
+- **A refused Resend email now throws.** Resend reports a refusal (sender domain, quota, validation) in a returned
+  `error` instead of throwing; it used to be logged and ledgered as sent. It now fails the send, counts in
+  `app_outbound_failed{channel="email"}` and is ledgered `FAILED`. A caller that awaits `EmailService.sendEmail` sees a
+  `ResendRefusedError`.
+- **Two new tables**, `outbound_allow_entries` and `outbound_suppressions`, and the enum `OutboundAllowKind`. The
+  migration only adds; no existing row changes.
+- **Constructors.** `EmailService`, `SmsService`, `TwilioVerifyService`, `PushService`, `FcmService`,
+  `WhatsAppSendHandler`, `NotificationDeliveryService` and `WebhookDeliveryProcessor` inject `OUTBOUND_GATE`. The app
+  module imports the global `OutboundModule`, which binds it. A product spec that builds one of these by hand passes
+  `allowAllOutboundGate()` from `@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing`.
+
+**What to set first.** For a non-production environment that serves real people, before you deploy: set
+`OUTBOUND_MODE=live` and `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true`, or put them on the list (deploy, then add them at
+`/admin/outbound`, or set `OUTBOUND_ALLOWLIST_BOOTSTRAP` first). A staging whose super-admins sign in by phone OTP
+needs their numbers in `OUTBOUND_ALLOWLIST_BOOTSTRAP`, or no code reaches them. Production needs nothing, unless it
+sets `OUTBOUND_MODE`: remove any value but `live`.
+
+**How to turn it back.** `OUTBOUND_MODE=live` with `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true` sends to everyone, as
+before. The tables can stay; nothing reads them in `live` mode. The Resend change has no switch.

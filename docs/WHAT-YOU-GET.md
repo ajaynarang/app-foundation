@@ -142,19 +142,20 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 
 ## ⚙️ Works when you add a key (all optional)
 
-| Capability        | Env keys (see `apps/backend/.env.example`) | Without it                         |
-| ----------------- | ------------------------------------------ | ---------------------------------- |
-| Real SMS / OTP    | `TWILIO_*`                                 | mock OTP `123456` (non-prod only)  |
-| Email delivery    | `SMTP_*` or `RESEND_API_KEY`               | emails logged to server console    |
-| AI assistant      | `OPENROUTER_API_KEY`                       | chat UI loads, replies unavailable |
-| KB vector search  | `COHERE_API_KEY`                           | knowledge-base search is full-text |
-| Firebase login    | `FIREBASE_*` (backend + web)               | email/password + phone still work  |
-| Stripe billing    | `STRIPE_*`                                 | plans/entitlements still enforced  |
-| File uploads      | `AWS_*` / S3 bucket                        | uploads unavailable                |
-| Voice assistant   | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`    | text chat only                     |
-| LLM observability | `LANGFUSE_*`                               | local prompt fallback used         |
-| Bot protection    | `TURNSTILE_SECRET_KEY`                     | registration unprotected           |
-| Error tracking    | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`     | errors in logs only, nothing sent  |
+| Capability                               | Env keys (see `apps/backend/.env.example`)                                            | Without it                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Real SMS / OTP                           | `TWILIO_*`                                                                            | mock OTP `123456` (non-prod only)                             |
+| Email delivery                           | `SMTP_*` or `RESEND_API_KEY`                                                          | emails logged to server console                               |
+| AI assistant                             | `OPENROUTER_API_KEY`                                                                  | chat UI loads, replies unavailable                            |
+| KB vector search                         | `COHERE_API_KEY`                                                                      | knowledge-base search is full-text                            |
+| Firebase login                           | `FIREBASE_*` (backend + web)                                                          | email/password + phone still work                             |
+| Stripe billing                           | `STRIPE_*`                                                                            | plans/entitlements still enforced                             |
+| File uploads                             | `AWS_*` / S3 bucket                                                                   | uploads unavailable                                           |
+| Voice assistant                          | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`                                               | text chat only                                                |
+| LLM observability                        | `LANGFUSE_*`                                                                          | local prompt fallback used                                    |
+| Bot protection                           | `TURNSTILE_SECRET_KEY`                                                                | registration unprotected                                      |
+| Error tracking                           | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`                                                | errors in logs only, nothing sent                             |
+| Messaging real people outside production | `OUTBOUND_MODE=live` + `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true`, or allow-list entries | only allow-listed recipients are messaged (`/admin/outbound`) |
 
 ---
 

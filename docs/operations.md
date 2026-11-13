@@ -64,3 +64,41 @@ lock on `users`; on a large table run it in a quiet hour. The boot warning stops
 
 To check by hand: `SELECT indexdef FROM pg_indexes WHERE indexname = 'users_email_live_key';` returns one row when
 the rule is enforced.
+
+## Outbound gate
+
+Every email, text, push notification, WhatsApp message and customer webhook passes one check, the outbound gate,
+just before its provider is called (ADR "Outbound gate"). Outside production it stops a test environment from
+messaging real people.
+
+**Modes.** `OUTBOUND_MODE` is `live` (send to everyone) or `allowlist` (send only to the allow-list). Unset means
+`live` when `ENV_TYPE=production` and `allowlist` for `sandbox`, `preprod` and `development`. The backend refuses to
+boot in production with `allowlist`, and outside production with `live` unless `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true`
+is set too. Set that pair only on an environment that really serves people (a staging about to become production),
+and remove it after.
+
+**The allow-list.** Super-admins edit it at `/admin/outbound`: an exact email, an email domain (with its subdomains;
+public mail domains such as `gmail.com` are refused), a phone number in E.164 form, or a web host for webhooks. Push
+reaches a user whose email or phone is on the list. An edit applies within 30 seconds on every task. An empty list
+sends nothing.
+
+`OUTBOUND_ALLOWLIST_BOOTSTRAP` adds entries from the environment, a comma list such as
+`ops@example.com,@example.com,+919812345678,hooks.example.com`. Use it for the first super-admin of a new staging
+environment who signs in by phone OTP, before anyone can sign in to edit the list. If the allow-list table cannot be
+read, only these entries pass.
+
+**What happens to a held-back send.**
+
+- Sent through the notification pipeline (in-app triggers, reminders, WhatsApp): the delivery ledger
+  (`notification_deliveries`) records it `SKIPPED` with `failure_reason = 'GATED'`.
+- Sent directly (sign-in codes, invitations, password resets, customer webhooks): the gate records it in
+  `outbound_suppressions`, shown under Held back on `/admin/outbound`, with the recipient masked and codes and links
+  removed from the preview. The data-retention job deletes these rows after 30 days. A held-back webhook also closes
+  its delivery log entry with "Held back by the outbound gate".
+
+What is sent in `allowlist` mode is marked: `[STAGING]` before an email subject, `STG:` before a text, `[STG]` before
+a push title. WhatsApp templates are pre-approved and go unchanged.
+
+**On a laptop.** With `ENV_TYPE=development` and no email or SMS provider, messages are printed to the log as before;
+that path is never gated. Set a provider key locally and the gate applies: allow-list your own address, or set
+`OUTBOUND_ALLOWLIST_BOOTSTRAP`.
