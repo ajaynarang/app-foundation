@@ -401,6 +401,11 @@ two-character code and its payload. The codes live once in `STREAM_FRAME` (`@app
   frame. Show the partial answer, then the `detail` (`failedTurnText`). Read `detail` only, never a `message`.
 - A new frame: add its code to `STREAM_FRAME`, a case in `dispatchFrame` and a handler, a backend case in
   `streamFrameOf`, and a test that an older reader skips it.
+- **The confirm card (`9:`) is the server's card.** `ConfirmationCard` shows only what the frame carries (`action`,
+  `description`, and the exact `args` of `tool` that run on Confirm), never text the model wrote. Confirm and Cancel
+  appear only on the card the agent is waiting on (`pendingConfirmation.toolCallId` equals the card's) and send
+  that card's `toolCallId` and `runId` to `.../resume`. A 409 there means the card was already answered or expired:
+  nothing ran, so mark the card no longer waiting and show the envelope's `detail`.
 
 ---
 

@@ -1882,11 +1882,23 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
 - **One intent digest, single use.** A confirmation is bound to the tool and `intentDigest(schema, args)`
   (`agent-contract/intent-digest.ts`): top-level `_` keys dropped, parsed through the tool's schema, canonical JSON
   with keys sorted at every depth, SHA-256 over the exact values. Every path that records or checks a confirmation
-  (the challenge token now, the chat grant next) calls that one function; never hash the redacted copy
+  (the challenge token and the chat grant) calls that one function; never hash the redacted copy
   (`redactArgs` is for the invocation log only) and never `JSON.stringify` with a key list. A token or grant is
   spent with a conditional update (`updateMany` where `consumedAt: null`, then check `count`), never a read then an
   unconditional `update`, so two racing retries cannot both run. A step-up is marked only on an open row (unused,
   unexpired). `hitl_challenges` rows are deleted 24 hours after `expiresAt` by the data-retention job.
+- **Chat grants (a signed-in user).** A chat write runs only against the card the person confirmed for that exact
+  call in that conversation. `confirm-action` names the write tool and its exact `args`; the server
+  (`McpToolService`'s intent recorder) checks it is a write the person could run (`pipeline.preflight`, steps 1 to 4) with arguments the tool accepts, records the intent (`HitlChallengeService.recordChatIntent`, explicit
+  `conversationId` and `toolCallId` columns on `hitl_challenges`) and builds the card from the recorded tool and
+  args, never from model prose (`buildConfirmFrame` unwraps Mastra's envelope). `POST .../resume` confirms exactly
+  that card, once (a second press is 409, and a Confirm with no `toolCallId` is 400); Cancel voids it. The
+  pipeline spends a confirmed grant only for the same conversation, tool and `intentDigest`
+  (`consumeChatGrant`); with none it answers `confirmation_required` and changes nothing. A new user message voids
+  every open card in the conversation, and the end of a resumed turn voids unspent grants. A user principal
+  without a `conversationId` can never write. A chat grant is never a challenge token: `consume` and
+  `markStepUpCompleted` read only rows with no conversation. A delegated sub-agent gets a read-only toolset
+  (`{ readOnly: true }`: no write, no `confirm-action`).
 - `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
   `_confirmToken` documented. Never build a tool's input schema another way.
 - Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients

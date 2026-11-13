@@ -750,6 +750,53 @@ rewrites the table on its next run.
 
 **Rollback.** Revert the change. Nothing is stored differently; rows the retention job already deleted stay deleted.
 
+## 17. Chat writes need the person's confirmation of that exact call
+
+**What changed.**
+
+- Server-side confirmation in chat. A signed-in user's write through the assistant runs only against a grant: the
+  card the person confirmed for that tool and those exact arguments (`intentDigest`) in that conversation. With no
+  grant the tool answers `{ status: 'confirmation_required' }` and changes nothing. Before, the pipeline skipped
+  confirmation for every chat call, and the only gate was the model choosing to call `confirm-action`.
+- `confirm-action` takes `{ tool, args }`: the write tool and its exact arguments. The server checks it is a write
+  the person could run (scope, arguments, role, plan), records the intent and builds the card from the recorded
+  tool and arguments, never from model prose. The old inputs (`action`, `description`, `entityId`, `entityType`)
+  are gone; the `confirmActionTool` export is replaced by `createConfirmActionTool(recorder)`, built per request.
+- The `9:` frame is the server card: `action`, `description`, `tool`, `args`, `toolCallId`, `runId`. Mastra's
+  suspend envelope is unwrapped (`buildConfirmFrame`), so the model's own confirm-action input never reaches the
+  card. `entityId` and `entityType` are no longer in the frame.
+- `POST /conversations/:conversation_id/resume` confirms exactly the card named by `toolCallId`, once. A second
+  press, an expired card or an unknown one answers 409 `INVALID_STATE` and resumes nothing; a Confirm with no
+  `toolCallId` answers 400 naming `toolCallId`. Cancel voids the card. When the resumed turn ends, unspent grants
+  are voided; a new user message voids every open card in the conversation.
+- The user principal gains an optional `conversationId` (`fromUser({ ..., conversationId })`), and the executor
+  injects `_conversationId` (null outside chat) last in the spread, with the other server identity params.
+- A delegated sub-agent (`execute`) gets a read-only toolset: no write tool and no `confirm-action`.
+- A chat grant is never a challenge token: `consume`, `POST /mcp/hitl/:token/step-up` and `GET /mcp/hitl/:token`
+  read only rows with no conversation.
+- The web `ConfirmationCard` shows the exact arguments, offers Confirm and Cancel only on the card the agent is
+  waiting on, and marks a card "no longer waiting" on a 409.
+
+**Env.** None.
+
+**Schema.** Migration `hitl_chat_grants`: three nullable columns on `hitl_challenges` (`conversation_id`,
+`tool_call_id`, `confirmed_at`) and an index on `(tenant_id, conversation_id)`. Additive; existing rows keep null.
+
+**Who notices.**
+
+- A product with its own write tools: chat writes now need the card. A product prompt that told the model to call
+  `confirm-action` with `action` / `description` / `entityId` / `entityType` must name `tool` and `args` instead
+  (the shipped fallback prompt does). A model that skips the card gets `confirmation_required`.
+- A client other than the shipped web app that resumes a run: send the card's `toolCallId` on Confirm, and expect
+  409 on a second press. A mobile or custom client that read `entityId` / `entityType` from the `9:` frame reads
+  `tool` and `args` instead.
+- A tool that read a caller-sent `_conversationId`: the pipeline already dropped it; it now gets the server's.
+- A conversation suspended on a card raised before the deploy: that card has no recorded intent, so Confirm answers 409. Ask again.
+
+**What to do.** Update product prompts that describe `confirm-action`'s inputs. Nothing else.
+
+**Rollback.** Revert the change. The three columns are nullable and can stay; old code ignores them.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
