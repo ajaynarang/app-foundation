@@ -1,4 +1,5 @@
 import { Controller, Post, Param, Body, NotFoundException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
@@ -8,6 +9,7 @@ import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.dec
 import { UserRole } from '@appshore/db';
 import { HitlChallengeService } from '../agent-contract/hitl-challenge.service';
 import { PinService } from '@appshore/platform/auth/pin.service';
+import { AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_TTL_MS } from '@appshore/platform/constants/auth.constants';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
 import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
@@ -27,6 +29,8 @@ export class HitlStepUpController {
 
   @Post(':token/step-up')
   @HttpCode(HttpStatus.OK)
+  // A PIN is 4 digits: hold guesses to the PIN login's limit (counted per signed-in user), not the global one.
+  @Throttle({ default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT } })
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Complete PIN step-up for a pending HITL challenge token',
