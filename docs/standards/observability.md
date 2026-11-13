@@ -68,9 +68,11 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
     inputs.
 
 Rule 10 and the error-tracker half of rule 12 hold now: `error-envelope.spec.ts` checks a 5xx is reported once on
-either write path and a 4xx never, and `sentry.spec.ts` pins every data-collection category off. Rule 11 and the
-trace half of rule 12 describe the alert catalog and trace export, which arrive in later changes to this repo; the
-rules hold from the day they do.
+either write path and a 4xx never, and `sentry.spec.ts` pins every data-collection category off. For traces, rule 12
+holds through what is never instrumented (no body, header or cookie capture is switched on) and through the Langfuse
+processor, which masks phones and emails in every string attribute of an AI span before it is exported
+(`pii-masking-langfuse-span-processor.spec.ts`). Rule 11 describes the alert catalog, which arrives in a later
+change to this repo; it holds from the day it does.
 
 ## What the spec does not catch
 
