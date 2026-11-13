@@ -45,9 +45,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (authenticatedUser && context.getType() === 'http') {
       const request = context.switchToHttp().getRequest();
       if (request?.setLogContext) {
+        const tenantDbId = authenticatedUser.tenantDbId;
         request.setLogContext({
           tenantId: String(authenticatedUser.tenantId ?? ''),
           userId: String(authenticatedUser.id ?? authenticatedUser.userId ?? ''),
+          ...(authenticatedUser.role ? { role: String(authenticatedUser.role) } : {}),
+          // SUPER_ADMIN has no tenant, so it carries no tenantDbId.
+          ...(Number.isSafeInteger(tenantDbId) && tenantDbId > 0 ? { tenantDbId: String(tenantDbId) } : {}),
         });
       }
     }

@@ -107,6 +107,33 @@ describe('JwtAuthGuard', () => {
       });
     });
 
+    it('adds role and the numeric tenantDbId to the log context once auth has run', () => {
+      const setLogContext = jest.fn();
+      const user = { dbId: 3, userId: 'usr_1', tenantId: 'tnt-1', tenantDbId: 7, role: 'OWNER' } as any;
+      const ctx = createMockContext({ request: { setLogContext, url: '/test' } });
+
+      mockSuperHandleRequest.mockReturnValue(user);
+      guard.handleRequest(null, user, null, ctx);
+
+      expect(setLogContext).toHaveBeenCalledWith({
+        tenantId: 'tnt-1',
+        userId: 'usr_1',
+        role: 'OWNER',
+        tenantDbId: '7',
+      });
+    });
+
+    it('leaves tenantDbId out for a session with no tenant (SUPER_ADMIN)', () => {
+      const setLogContext = jest.fn();
+      const user = { userId: 'usr_admin', role: 'SUPER_ADMIN' } as any;
+      const ctx = createMockContext({ request: { setLogContext, url: '/test' } });
+
+      mockSuperHandleRequest.mockReturnValue(user);
+      guard.handleRequest(null, user, null, ctx);
+
+      expect(setLogContext).toHaveBeenCalledWith({ tenantId: '', userId: 'usr_admin', role: 'SUPER_ADMIN' });
+    });
+
     it('should not set log context when super returns falsy user', () => {
       const setLogContext = jest.fn();
       const ctx = createMockContext({
