@@ -9374,6 +9374,7 @@
                     "INVALID_TOKEN",
                     "INVALID_CREDENTIALS",
                     "USER_NOT_FOUND",
+                    "REFRESH_REUSE",
                     "OTHER"
                   ],
                   "nullable": true,
