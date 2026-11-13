@@ -38,6 +38,7 @@ import { SharedModule } from './shared/shared.module';
 import { NotificationModule } from '@appshore/platform/infrastructure/notification/notification.module';
 import { SseModule } from './platform-glue/sse/sse.module';
 import { SmsModule } from '@appshore/platform/infrastructure/sms/sms.module';
+import { OutboundModule } from '@appshore/platform/infrastructure/outbound/outbound.module';
 import { QueueModule } from './platform-glue/queue/queue.module';
 import { NotificationsQueueModule } from './platform-glue/queue/dispatchers/notifications-queue.module';
 import { BulkOpsQueueModule } from './platform-glue/queue/dispatchers/bulk-ops-queue.module';
@@ -101,6 +102,8 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     }),
     // ScheduleModule removed — all scheduling now uses BullMQ repeatable jobs
     PrismaModule,
+    // The outbound gate (ADR "Outbound gate"), global: every email, SMS, push, WhatsApp and webhook sender injects it.
+    OutboundModule,
     AuthModule,
     NotificationModule,
     // NotificationModule sends the templated tenant-lifecycle emails; InAppNotificationsModule is the app's

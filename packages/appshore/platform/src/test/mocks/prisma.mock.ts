@@ -52,6 +52,8 @@ const MODEL_NAMES = [
   'oAuthAuthorizationCode',
   'oAuthClient',
   'oAuthRefreshToken',
+  'outboundAllowEntry',
+  'outboundSuppression',
   'paymentMethod',
   'planConfig',
   'planEntitlement',

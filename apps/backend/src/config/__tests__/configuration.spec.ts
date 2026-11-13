@@ -53,6 +53,8 @@ describe('configuration — production boot guard', () => {
     'PLATFORM_BEDROCK_REGION',
     'PLATFORM_ASSUME_ROLE_ARN',
     'PLATFORM_BEDROCK_CFN_TEMPLATE_URL',
+    'OUTBOUND_MODE',
+    'OUTBOUND_LIVE_OUTSIDE_PRODUCTION',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -176,6 +178,48 @@ describe('configuration — production boot guard', () => {
     ]) {
       expect(message).toContain(envVar);
     }
+  });
+
+  describe('outbound gate (ADR "Outbound gate")', () => {
+    it('refuses ENV_TYPE=production in allowlist mode, which would hold back every customer message', () => {
+      expect(() => load({ ...validProduction(), ENV_TYPE: 'production', OUTBOUND_MODE: 'allowlist' })).toThrow(
+        /production must run with OUTBOUND_MODE=live/,
+      );
+    });
+
+    it('boots ENV_TYPE=production with the mode unset (live)', () => {
+      expect(() => load({ ...validProduction(), ENV_TYPE: 'production' })).not.toThrow();
+    });
+
+    it('refuses live outside production without the acknowledgement', () => {
+      expect(() => load({ ...validProduction(), ENV_TYPE: 'sandbox', OUTBOUND_MODE: 'live' })).toThrow(
+        /OUTBOUND_MODE=live outside production/,
+      );
+      expect(() =>
+        load({ REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development', OUTBOUND_MODE: 'live' }),
+      ).toThrow(/outside production/);
+    });
+
+    it('boots live outside production with OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true', () => {
+      expect(() =>
+        load({
+          ...validProduction(),
+          ENV_TYPE: 'sandbox',
+          OUTBOUND_MODE: 'live',
+          OUTBOUND_LIVE_OUTSIDE_PRODUCTION: 'true',
+        }),
+      ).not.toThrow();
+    });
+
+    it('refuses an unknown mode', () => {
+      expect(() =>
+        load({ REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development', OUTBOUND_MODE: 'block' }),
+      ).toThrow(/must be one of/);
+    });
+
+    it('boots a developer machine with nothing set (allowlist)', () => {
+      expect(() => load({ REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development' })).not.toThrow();
+    });
   });
 
   describe('VOICE_AGENT_SECRET', () => {

@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { resetTenantLabelsForTesting } from '@appshore/kernel/infrastructure/telemetry/metrics';
 import { InMemoryMetrics } from '@appshore/kernel/infrastructure/telemetry/testing/in-memory-metrics';
 import { Logger } from '@nestjs/common';
+import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import {
+  allowAllOutboundGate,
+  holdAllOutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 import { classifyTwilioOtpError, TwilioVerifyService } from '../twilio-verify.service';
 
 beforeAll(() => {
@@ -17,6 +22,7 @@ describe('TwilioVerifyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TwilioVerifyService,
+        { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
         {
           provide: ConfigService,
           useValue: {
@@ -115,6 +121,39 @@ describe('TwilioVerifyService', () => {
       expect(classifyTwilioOtpError({ code: 20404 }, 'check')).toBe('invalid');
       expect(classifyTwilioOtpError({ code: 20404 }, 'send')).toBe('provider');
       expect(classifyTwilioOtpError(new Error('ECONNRESET'), 'check')).toBe('provider');
+    });
+  });
+
+  describe('behind the outbound gate', () => {
+    const verifications = { create: jest.fn() };
+
+    beforeEach(() => {
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      jest.spyOn(configService, 'get').mockReturnValue(undefined);
+      Object.assign(service as unknown as Record<string, unknown>, {
+        twilioClient: { verify: { v2: { services: () => ({ verifications }) } } },
+        verifyServiceSid: 'VA123',
+      });
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('does not ask Twilio to text a held-back number', async () => {
+      const gate = holdAllOutboundGate();
+      (service as unknown as { outboundGate: unknown }).outboundGate = gate;
+
+      await expect(service.sendVerification('+12025551234')).resolves.toBeUndefined();
+
+      expect(verifications.create).not.toHaveBeenCalled();
+      expect(gate.held).toEqual([{ method: 'allowPhone', recipient: '+12025551234' }]);
+    });
+
+    it('texts an allowed number', async () => {
+      verifications.create.mockResolvedValueOnce({});
+
+      await service.sendVerification('+12025551234');
+
+      expect(verifications.create).toHaveBeenCalledWith({ to: '+12025551234', channel: 'sms' });
     });
   });
 });

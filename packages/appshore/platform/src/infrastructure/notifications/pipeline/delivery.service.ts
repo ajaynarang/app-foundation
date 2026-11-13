@@ -24,6 +24,11 @@ import {
 } from './delivery-outcome';
 import { WHATSAPP_PORT, type WhatsAppPort } from '../channels/whatsapp/whatsapp.port';
 import {
+  OUTBOUND_GATE,
+  type OutboundGate,
+  type OutboundTarget,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import {
   WhatsAppTemplateRegistry,
   type WhatsAppTemplateSendSpec,
 } from '../channels/whatsapp/whatsapp-template.registry';
@@ -101,7 +106,20 @@ export class NotificationDeliveryService {
     private readonly emailService: EmailService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     private readonly templates: WhatsAppTemplateRegistry,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {}
+
+  /**
+   * Asked before a send that would reach a provider, so a recipient the outbound gate holds back is ledgered
+   * SKIPPED / GATED instead of as a provider failure or a send. No side effect: the sender's own gate stays the
+   * backstop and records nothing here, because the ledger row is the record.
+   */
+  private async gated(channel: DeliveryChannel, target: OutboundTarget, run: DeliveryRun): Promise<boolean> {
+    if (await this.outboundGate.wouldAllow(target)) return false;
+    run.results[channel] = false;
+    run.outcomes.push(skipped(channel, DELIVERY_SKIP_REASONS.GATED));
+    return true;
+  }
 
   async deliver(params: DeliveryParams): Promise<DeliveryReport> {
     const run: DeliveryRun = { params, results: {}, outcomes: [], pendingSends: [] };
@@ -221,6 +239,12 @@ export class NotificationDeliveryService {
       run.outcomes.push(skipped(DeliveryChannel.EMAIL, DELIVERY_SKIP_REASONS.NO_ADDRESS));
       return;
     }
+    if (
+      this.emailService.usesProvider() &&
+      (await this.gated(DeliveryChannel.EMAIL, { channel: 'email', address: params.recipientEmail }, run))
+    ) {
+      return;
+    }
     try {
       await this.emailService.sendEmail({
         to: params.recipientEmail,
@@ -244,6 +268,12 @@ export class NotificationDeliveryService {
   /** Web push (VAPID) + mobile push (FCM). Each transport no-ops when unconfigured; one failing must not block the other. */
   private async sendPush(run: DeliveryRun): Promise<void> {
     const { params } = run;
+    if (
+      (this.pushService.canSend() || this.fcmService.canSend()) &&
+      (await this.gated(DeliveryChannel.PUSH, { channel: 'push', userId: params.recipientDbId }, run))
+    ) {
+      return;
+    }
     const [webResult, fcmResult] = await Promise.allSettled([
       this.pushService.sendPushToUser(params.recipientDbId, {
         title: params.title,
@@ -292,6 +322,7 @@ export class NotificationDeliveryService {
       run.outcomes.push(skipped(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.NOT_CONFIGURED));
       return;
     }
+    if (await this.gated(DeliveryChannel.SMS, { channel: 'sms', phone: params.recipientPhone }, run)) return;
     try {
       const wasSent = await this.smsService.sendSms(params.recipientPhone, `${params.title}: ${params.message}`);
       run.results[DeliveryChannel.SMS] = wasSent;

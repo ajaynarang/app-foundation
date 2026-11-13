@@ -53,6 +53,7 @@ export class DataRetentionJobHandler implements QueueJobHandler {
       const completedJobsDeleted = await this.cleanupCompletedJobs();
       const domainEventLogsDeleted = await this.cleanupDomainEventLogs();
       const hitlChallengesDeleted = await this.cleanupHitlChallenges();
+      const outboundSuppressionsDeleted = await this.cleanupOutboundSuppressions();
 
       const summary = {
         loginEventsDeleted,
@@ -60,6 +61,7 @@ export class DataRetentionJobHandler implements QueueJobHandler {
         completedJobsDeleted,
         domainEventLogsDeleted,
         hitlChallengesDeleted,
+        outboundSuppressionsDeleted,
       };
 
       this.logger.log(`Data retention cleanup complete: ${JSON.stringify(summary)}`);
@@ -131,6 +133,22 @@ export class DataRetentionJobHandler implements QueueJobHandler {
     });
 
     this.logger.log(`Domain event logs: deleted ${result.count} records older than 90 days`);
+
+    return result.count;
+  }
+
+  /**
+   * Delete sends the outbound gate held back (`outbound_suppressions`) after 30 days. They are a test environment's
+   * record of who it did not message; a month is enough to notice and allow-list someone.
+   */
+  private async cleanupOutboundSuppressions(): Promise<number> {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const result = await this.prisma.outboundSuppression.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+
+    this.logger.log(`Held-back outbound sends: deleted ${result.count} records older than 30 days`);
 
     return result.count;
   }

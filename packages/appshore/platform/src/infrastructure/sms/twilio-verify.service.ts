@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { ConfigService } from '@nestjs/config';
 import { maskPhone } from '@appshore/kernel/shared/utils/log-redaction';
@@ -8,6 +8,11 @@ import {
   recordOtpFailed,
   type OtpFailureReason,
 } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 /** Twilio's per-number limits (max check attempts, max send attempts) and its HTTP 429. */
 const TWILIO_RATE_LIMIT_CODES = new Set([60202, 60203, 20429]);
@@ -31,7 +36,10 @@ export class TwilioVerifyService {
   private twilioClient: any = null;
   private readonly verifyServiceSid: string | undefined;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
     this.verifyServiceSid = this.configService.get<string>('TWILIO_VERIFY_SERVICE_SID');
@@ -64,6 +72,13 @@ export class TwilioVerifyService {
       if (!this.mockOtp) {
         this.logger.warn('Twilio Verify not configured — skipping OTP send');
       }
+      return;
+    }
+
+    // In allowlist mode a number not on the list gets no code (the gate records it). TWILIO_MOCK_OTP, which works
+    // outside production, still signs in.
+    if (!(await this.outboundGate.allowPhone(phone, { source: OUTBOUND_SOURCE.SIGN_IN_CODE }))) {
+      this.logger.log(`Sign-in code to ${maskPhone(phone)} held back by the outbound gate`);
       return;
     }
 

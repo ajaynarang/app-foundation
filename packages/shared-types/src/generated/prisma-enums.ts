@@ -174,6 +174,11 @@ export const NotificationStatusSchema = z.enum(['PENDING', 'SENT', 'FAILED'] as 
 export type NotificationStatus = z.infer<typeof NotificationStatusSchema>;
 export const NotificationStatus = NotificationStatusSchema.enum;
 
+// OutboundAllowKind
+export const OutboundAllowKindSchema = z.enum(['EMAIL', 'EMAIL_DOMAIN', 'PHONE', 'HOST'] as const);
+export type OutboundAllowKind = z.infer<typeof OutboundAllowKindSchema>;
+export const OutboundAllowKind = OutboundAllowKindSchema.enum;
+
 // PaymentMethodType
 export const PaymentMethodTypeSchema = z.enum(['CARD', 'US_BANK_ACCOUNT'] as const);
 export type PaymentMethodType = z.infer<typeof PaymentMethodTypeSchema>;

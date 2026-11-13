@@ -9,6 +9,7 @@ import { AppCacheService } from '../../../../cache/app-cache.service';
 import { DeliveryLedgerService } from '../../../pipeline/delivery-ledger.service';
 import { WhatsAppSendHandler, dailySendCounterKey, type WhatsAppSendJobPayload } from '../whatsapp-send.handler';
 import { WHATSAPP_PORT, WhatsAppSendError } from '../whatsapp.port';
+import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 describe('WhatsAppSendHandler', () => {
   let handler: WhatsAppSendHandler;
@@ -27,6 +28,7 @@ describe('WhatsAppSendHandler', () => {
   const featureFlags = { isEnabled: jest.fn().mockResolvedValue(true) };
   const cache = { increment: jest.fn().mockResolvedValue(1) };
   const config = { get: jest.fn().mockReturnValue(undefined) };
+  const gate = { wouldAllow: jest.fn().mockResolvedValue(true) };
 
   const payload: WhatsAppSendJobPayload = {
     deliveryId: 'd1',
@@ -53,6 +55,7 @@ describe('WhatsAppSendHandler', () => {
         { provide: FeatureFlagsService, useValue: featureFlags },
         { provide: AppCacheService, useValue: cache },
         { provide: ConfigService, useValue: config },
+        { provide: OUTBOUND_GATE, useValue: gate },
       ],
     }).compile();
     handler = module.get(WhatsAppSendHandler);
@@ -61,6 +64,7 @@ describe('WhatsAppSendHandler', () => {
     ledger.claimSend.mockResolvedValue(true);
     cache.increment.mockResolvedValue(1);
     config.get.mockReturnValue(undefined);
+    gate.wouldAllow.mockResolvedValue(true);
     prisma.notificationDelivery.findUnique.mockResolvedValue({ status: 'QUEUED', attemptCount: 1 });
     prisma.user.findUnique.mockResolvedValue({ phone: '+919876543210' });
   });
@@ -101,6 +105,18 @@ describe('WhatsAppSendHandler', () => {
     featureFlags.isEnabled.mockResolvedValue(false);
     await handler.run(job());
     expect(ledger.markSkipped).toHaveBeenCalledWith('d1', 'FLAG_OFF');
+    expect(whatsapp.sendTemplate).not.toHaveBeenCalled();
+  });
+
+  it('a number the outbound gate holds back → SKIPPED/GATED, before the daily ceiling is charged', async () => {
+    gate.wouldAllow.mockResolvedValue(false);
+
+    await handler.run(job());
+
+    expect(gate.wouldAllow).toHaveBeenCalledWith({ channel: 'whatsapp', phone: '+919876543210' });
+    expect(ledger.markSkipped).toHaveBeenCalledWith('d1', 'GATED');
+    expect(cache.increment).not.toHaveBeenCalled();
+    expect(ledger.claimSend).not.toHaveBeenCalled();
     expect(whatsapp.sendTemplate).not.toHaveBeenCalled();
   });
 

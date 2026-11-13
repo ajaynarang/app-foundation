@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, UnrecoverableError } from 'bullmq';
 import axios from 'axios';
@@ -17,6 +17,11 @@ import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
 import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 import { reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -64,6 +69,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly deadLetter: DeadLetterService,
     config: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {
     super();
     this.allowPrivate = config.get<boolean>('webhooks.allowPrivateTargets') === true;
@@ -83,6 +89,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     // Tenant pause guard. payload.tenantId is the wire-format slug
     // (normalized in DurableEventProcessor), but defend against legacy jobs
     // that may have been queued before the resolver landed (numeric form).
+    let tenantDbId: number | null = null;
     if (payload.tenantId) {
       const where =
         typeof payload.tenantId === 'string' && isNaN(Number(payload.tenantId))
@@ -90,8 +97,9 @@ export class WebhookDeliveryProcessor extends WorkerHost {
           : { id: Number(payload.tenantId) };
       const tenant = await this.prisma.tenant.findUnique({
         where,
-        select: { jobsPaused: true },
+        select: { id: true, jobsPaused: true },
       });
+      tenantDbId = tenant?.id ?? null;
       if (tenant?.jobsPaused) {
         this.logger.log(`Skipping webhook delivery — tenant ${payload.tenantId} is paused`);
         return;
@@ -104,6 +112,23 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
     if (!subscription || !subscription.active) {
       this.logger.warn(`Skipping delivery for inactive/missing subscription ${subscriptionId}`);
+      return;
+    }
+
+    // Outside production only allow-listed hosts receive a webhook (ADR "Outbound gate"). A held-back delivery is
+    // recorded by the gate and closed on the delivery log; retrying would hold it back again.
+    const allowed = await this.outboundGate.allowUrl(subscription.url, {
+      source: OUTBOUND_SOURCE.OUTBOUND_WEBHOOK,
+      tenantId: tenantDbId,
+      subject: payload.event,
+    });
+    if (!allowed) {
+      this.logger.log(`Held back ${payload.event} to ${stripQueryString(subscription.url)}: outbound gate`);
+      await this.recordAttempt(
+        logId,
+        { responseStatus: null, responseBody: 'Held back by the outbound gate: the host is not on the allow-list' },
+        true,
+      );
       return;
     }
 

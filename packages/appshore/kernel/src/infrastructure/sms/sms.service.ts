@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isDevelopmentEnv } from '../../shared/utils/env-label';
 import { maskPhone } from '../../shared/utils/log-redaction';
 import { toLoggableError } from '../queue/job-events';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '../telemetry/metrics';
+import { OUTBOUND_GATE, OUTBOUND_SOURCE, type OutboundGate } from '../outbound/outbound-gate.port';
 
 @Injectable()
 export class SmsService {
@@ -12,7 +13,10 @@ export class SmsService {
   private fromNumber: string;
   private isConfiguredFlag: boolean;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
     this.fromNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER') || '';
@@ -53,9 +57,16 @@ export class SmsService {
       return false;
     }
 
+    // The outbound gate sits in front of the provider only: the console path above is never gated (ADR "Outbound
+    // gate"). A held-back number is recorded by the gate and reported here as not sent.
+    if (!(await this.outboundGate.allowPhone(to, { source: OUTBOUND_SOURCE.SMS, subject: message }))) {
+      this.logger.log(`SMS to ${maskPhone(to)} held back by the outbound gate`);
+      return false;
+    }
+
     try {
       await this.twilioClient.messages.create({
-        body: message,
+        body: this.outboundGate.markSms(message),
         from: this.fromNumber,
         to,
       });

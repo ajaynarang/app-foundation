@@ -10,6 +10,7 @@ import { EmailService } from '../../../notification/services/email.service';
 import { FcmService } from '../../channels/push/fcm.service';
 import { DeliveryChannel } from '@appshore/db';
 import { WHATSAPP_PORT } from '../../channels/whatsapp/whatsapp.port';
+import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 import {
   WhatsAppTemplateRegistry,
   allParams,
@@ -47,13 +48,14 @@ describe('NotificationDeliveryService', () => {
     tenant: { findUnique: jest.fn() },
   };
   const mockEventEmitter = { emit: jest.fn() };
-  const mockPush = { sendPushToUser: jest.fn() };
-  const mockFcm = { sendToUser: jest.fn() };
+  const mockPush = { sendPushToUser: jest.fn(), canSend: jest.fn().mockReturnValue(true) };
+  const mockFcm = { sendToUser: jest.fn(), canSend: jest.fn().mockReturnValue(true) };
   const mockSms = {
     sendSms: jest.fn(),
     getIsConfigured: jest.fn().mockReturnValue(false),
   };
-  const mockEmail = { sendEmail: jest.fn() };
+  const mockEmail = { sendEmail: jest.fn(), usesProvider: jest.fn().mockReturnValue(true) };
+  const mockGate = { wouldAllow: jest.fn().mockResolvedValue(true) };
   const mockWhatsApp = { isConfigured: true };
 
   beforeEach(async () => {
@@ -69,11 +71,16 @@ describe('NotificationDeliveryService', () => {
         { provide: SmsService, useValue: mockSms },
         { provide: EmailService, useValue: mockEmail },
         { provide: WHATSAPP_PORT, useValue: mockWhatsApp },
+        { provide: OUTBOUND_GATE, useValue: mockGate },
       ],
     }).compile();
 
     service = module.get<NotificationDeliveryService>(NotificationDeliveryService);
     jest.clearAllMocks();
+    mockGate.wouldAllow.mockResolvedValue(true);
+    mockEmail.usesProvider.mockReturnValue(true);
+    mockPush.canSend.mockReturnValue(true);
+    mockFcm.canSend.mockReturnValue(true);
   });
 
   describe('deliver', () => {
@@ -597,6 +604,76 @@ describe('NotificationDeliveryService', () => {
       expect(outcomes).toEqual([{ channel: 'SMS', status: 'FAILED', failureReason: 'PROVIDER_ERROR' }]);
     });
   });
+  describe('outbound gate (ADR "Outbound gate")', () => {
+    const base = {
+      recipientDbId: 100,
+      tenantId: 1,
+      type: 'USER_INVITATION',
+      category: 'OPERATIONS',
+      title: 'Room 3',
+      message: 'x',
+    };
+
+    beforeEach(() => mockGate.wouldAllow.mockResolvedValue(false));
+
+    it('records a gated email as SKIPPED / GATED, not as a send, and never calls the sender', async () => {
+      const { outcomes } = await service.deliver({
+        ...base,
+        channels: plan(DeliveryChannel.EMAIL),
+        recipientEmail: 'buyer@customer.test',
+      });
+
+      expect(mockGate.wouldAllow).toHaveBeenCalledWith({ channel: 'email', address: 'buyer@customer.test' });
+      expect(mockEmail.sendEmail).not.toHaveBeenCalled();
+      expect(outcomes).toEqual([{ channel: 'EMAIL', status: 'SKIPPED', failureReason: 'GATED' }]);
+    });
+
+    it('records a gated SMS as SKIPPED / GATED, not as a provider failure', async () => {
+      mockSms.getIsConfigured.mockReturnValueOnce(true);
+
+      const { outcomes } = await service.deliver({
+        ...base,
+        channels: plan(DeliveryChannel.SMS),
+        recipientPhone: '+919876543210',
+      });
+
+      expect(mockGate.wouldAllow).toHaveBeenCalledWith({ channel: 'sms', phone: '+919876543210' });
+      expect(mockSms.sendSms).not.toHaveBeenCalled();
+      expect(outcomes).toEqual([{ channel: 'SMS', status: 'SKIPPED', failureReason: 'GATED' }]);
+    });
+
+    it('records a gated push as SKIPPED / GATED, not as NO_DEVICE', async () => {
+      const { outcomes, results } = await service.deliver({ ...base, channels: plan(DeliveryChannel.PUSH) });
+
+      expect(mockGate.wouldAllow).toHaveBeenCalledWith({ channel: 'push', userId: 100 });
+      expect(mockPush.sendPushToUser).not.toHaveBeenCalled();
+      expect(mockFcm.sendToUser).not.toHaveBeenCalled();
+      expect(results.PUSH).toBe(false);
+      expect(outcomes).toEqual([{ channel: 'PUSH', status: 'SKIPPED', failureReason: 'GATED' }]);
+    });
+
+    it('does not ask the gate where nothing would reach a provider (console email, no push keys)', async () => {
+      mockEmail.usesProvider.mockReturnValue(false);
+      mockPush.canSend.mockReturnValue(false);
+      mockFcm.canSend.mockReturnValue(false);
+      mockPush.sendPushToUser.mockResolvedValue(0);
+      mockFcm.sendToUser.mockResolvedValue(0);
+
+      const { outcomes } = await service.deliver({
+        ...base,
+        channels: plan(DeliveryChannel.EMAIL, DeliveryChannel.PUSH),
+        recipientEmail: 'buyer@customer.test',
+      });
+
+      expect(mockGate.wouldAllow).not.toHaveBeenCalled();
+      expect(mockEmail.sendEmail).toHaveBeenCalled();
+      expect(outcomes).toEqual([
+        { channel: 'EMAIL', status: 'SENT' },
+        { channel: 'PUSH', status: 'FAILED', failureReason: 'NO_DEVICE' },
+      ]);
+    });
+  });
+
   describe('whatsapp', () => {
     const base = {
       recipientDbId: 100,

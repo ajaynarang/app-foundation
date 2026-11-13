@@ -4,6 +4,7 @@ import * as dns from 'node:dns';
 import { Job, UnrecoverableError } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { WebhookDeliveryProcessor, WebhookDeliveryPayload } from '../delivery.processor';
+import { allowAllOutboundGate } from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 
 jest.mock('node:dns', () => ({ ...jest.requireActual('node:dns'), lookup: jest.fn() }));
 
@@ -29,6 +30,7 @@ describe('WebhookDeliveryProcessor egress (real HTTP)', () => {
       {
         get: () => allowPrivateTargets,
       } as never,
+      allowAllOutboundGate(),
     );
 
   const job = () =>

@@ -2,7 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { InMemoryMetrics } from '@appshore/kernel/infrastructure/telemetry/testing/in-memory-metrics';
+import { OUTBOUND_GATE, type OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import {
+  allowAllOutboundGate,
+  holdAllOutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 import { EmailNotConfiguredError, EmailService } from '../email.service';
+import { ResendRefusedError } from '../resend-delivery';
 
 // Mock resend and nodemailer
 jest.mock('resend', () => ({
@@ -35,6 +41,7 @@ describe('EmailService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           EmailService,
+          { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
           {
             provide: ConfigService,
             useValue: {
@@ -95,6 +102,7 @@ describe('EmailService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           EmailService,
+          { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
           {
             provide: ConfigService,
             useValue: {
@@ -129,6 +137,7 @@ describe('EmailService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           EmailService,
+          { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
           {
             provide: ConfigService,
             useValue: {
@@ -168,6 +177,7 @@ describe('EmailService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           EmailService,
+          { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
           {
             provide: ConfigService,
             useValue: {
@@ -213,7 +223,10 @@ describe('EmailService failures count in app_outbound_failed', () => {
 
   it('counts a send with no provider outside development as one failed email', async () => {
     process.env.ENV_TYPE = 'sandbox';
-    const service = new EmailService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+    const service = new EmailService(
+      { get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService,
+      allowAllOutboundGate(),
+    );
 
     await expect(service.sendEmail({ to: 'a@example.com', subject: 's', html: '<p/>' })).rejects.toThrow(
       EmailNotConfiguredError,
@@ -226,10 +239,94 @@ describe('EmailService failures count in app_outbound_failed', () => {
 
   it('counts nothing for the development console path', async () => {
     process.env.ENV_TYPE = 'development';
-    const service = new EmailService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+    const service = new EmailService(
+      { get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService,
+      allowAllOutboundGate(),
+    );
 
     await service.sendEmail({ to: 'a@example.com', subject: 's', html: '<p/>' });
 
     expect(await harness.points('app_outbound_failed')).toEqual([]);
+  });
+});
+
+describe('EmailService behind the outbound gate', () => {
+  const originalEnvType = process.env.ENV_TYPE;
+  let harness: InMemoryMetrics;
+  let send: jest.Mock;
+
+  const resendConfig = {
+    get: jest.fn((key: string) => (key === 'RESEND_API_KEY' ? 'test-api-key' : undefined)),
+  } as unknown as ConfigService;
+
+  function withResend(gate: OutboundGate) {
+    const service = new EmailService(resendConfig, gate);
+    send = jest.fn().mockResolvedValue({ data: { id: 'e1' }, error: null });
+    (service as unknown as { resendClient: unknown }).resendClient = { emails: { send } };
+    return service;
+  }
+
+  beforeEach(() => {
+    harness = InMemoryMetrics.install();
+    (['log', 'warn', 'error'] as const).forEach((level) =>
+      jest.spyOn(Logger.prototype, level).mockImplementation(() => undefined),
+    );
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await harness.uninstall();
+    if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+    else process.env.ENV_TYPE = originalEnvType;
+  });
+
+  it('does not call the provider for a held-back recipient, and does not fail the send', async () => {
+    const gate = holdAllOutboundGate();
+    const service = withResend(gate);
+
+    await expect(service.sendEmail({ to: 'a@customer.test', subject: 's', html: '<p/>' })).resolves.toBeUndefined();
+
+    expect(send).not.toHaveBeenCalled();
+    expect(gate.held).toEqual([{ method: 'gateEmail', recipient: 'a@customer.test' }]);
+    expect(await harness.points('app_outbound_failed')).toEqual([]);
+  });
+
+  it('sends the message the gate returns (staging subject, recipients dropped)', async () => {
+    const gate: OutboundGate = {
+      ...allowAllOutboundGate(),
+      gateEmail: async (message) => ({ ...message, cc: [], subject: `[STAGING] ${message.subject}` }),
+    };
+    const service = withResend(gate);
+
+    await service.sendEmail({ to: 'qa@example.com', cc: ['buyer@customer.test'], subject: 'Hello', html: '<p/>' });
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: 'qa@example.com', subject: '[STAGING] Hello' }));
+    expect(send.mock.calls[0][0].cc).toBeUndefined();
+  });
+
+  it('never asks the gate on the development console path', async () => {
+    process.env.ENV_TYPE = 'development';
+    const gate = holdAllOutboundGate();
+    const service = new EmailService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService, gate);
+
+    await service.sendEmail({ to: 'a@customer.test', subject: 's', html: '<p/>' });
+
+    expect(gate.held).toEqual([]);
+  });
+
+  it('throws on a Resend refusal and counts it once, so the ledger records FAILED, not SENT', async () => {
+    const service = withResend(allowAllOutboundGate());
+    send.mockResolvedValue({
+      data: null,
+      error: { name: 'validation_error', message: 'bad a@x.test', statusCode: 422 },
+    });
+
+    await expect(service.sendEmail({ to: 'a@x.test', subject: 's', html: '<p/>' })).rejects.toBeInstanceOf(
+      ResendRefusedError,
+    );
+
+    expect(await harness.points('app_outbound_failed')).toEqual([
+      expect.objectContaining({ attributes: { channel: 'email' }, value: 1 }),
+    ]);
   });
 });

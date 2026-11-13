@@ -8,6 +8,7 @@ import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-
 import { signLegacyWebhook, signStandardWebhook } from '../standard-webhooks';
 import axios from 'axios';
 import { UnsafeWebhookTargetError } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
+import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -25,6 +26,8 @@ const mockPrisma = {
     findUnique: jest.fn().mockResolvedValue({ jobsPaused: false }),
   },
 };
+
+const mockGate = { allowUrl: jest.fn().mockResolvedValue(true) };
 
 const mockDeadLetter = {
   recordPermanentFailure: jest.fn().mockResolvedValue(undefined),
@@ -68,10 +71,12 @@ describe('WebhookDeliveryProcessor', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DeadLetterService, useValue: mockDeadLetter },
         { provide: ConfigService, useValue: { get: () => false } },
+        { provide: OUTBOUND_GATE, useValue: mockGate },
       ],
     }).compile();
 
     processor = module.get(WebhookDeliveryProcessor);
+    mockGate.allowUrl.mockResolvedValue(true);
   });
 
   describe('process', () => {
@@ -95,6 +100,29 @@ describe('WebhookDeliveryProcessor', () => {
         data: {},
       },
     };
+
+    it('does not POST to a host the outbound gate holds back, records why, and does not retry', async () => {
+      mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscription);
+      mockPrisma.tenant.findUnique.mockResolvedValueOnce({ id: 9, jobsPaused: false });
+      mockGate.allowUrl.mockResolvedValue(false);
+
+      await expect(processor.process(makeJob(jobPayload, 0))).resolves.toBeUndefined();
+
+      expect(mockGate.allowUrl).toHaveBeenCalledWith(subscription.url, {
+        source: 'outbound-webhook',
+        tenantId: 9,
+        subject: 'app.notification.created',
+      });
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(mockPrisma.webhookDeliveryLog.update).toHaveBeenCalledWith({
+        where: { id: 'log-1' },
+        data: expect.objectContaining({
+          responseStatus: null,
+          responseBody: expect.stringContaining('outbound gate'),
+          failedAt: expect.any(Date),
+        }),
+      });
+    });
 
     it('marks delivery as successful and updates log on 2xx response', async () => {
       mockPrisma.webhookSubscription.findUnique.mockResolvedValue(subscription);

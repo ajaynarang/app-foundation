@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as nodemailer from 'nodemailer';
@@ -6,6 +6,12 @@ import { isDevelopmentEnv } from '@appshore/kernel/shared/utils/env-label';
 import { maskEmail } from '@appshore/kernel/shared/utils/log-redaction';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import { observeResendResult } from './resend-delivery';
 
 /**
  * Thrown by `sendEmail` when no provider (Resend or SMTP) is configured outside `ENV_TYPE=development`. A message
@@ -39,7 +45,10 @@ export class EmailService {
   private nodemailerTransport: nodemailer.Transporter | null = null;
   private emailProvider: 'resend' | 'nodemailer' | 'console' = 'console';
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     this.initializeEmailProvider();
   }
 
@@ -83,21 +92,40 @@ export class EmailService {
     );
   }
 
+  /** True when a send reaches a real provider (Resend or SMTP); false on the console path. */
+  usesProvider(): boolean {
+    return this.emailProvider !== 'console';
+  }
+
   async sendEmail(options: SendEmailOptions): Promise<void> {
     const fromEmail =
       options.from || this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || 'noreply@example.com';
 
+    let message: SendEmailOptions = { ...options, from: fromEmail };
+
+    // The outbound gate sits in front of a real provider only (ADR "Outbound gate"): the development console path is
+    // never gated, so a fresh clone with no keys behaves as before. A held-back email is recorded by the gate and is
+    // not a failure.
+    if (this.emailProvider !== 'console') {
+      const gated = await this.outboundGate.gateEmail(message, { source: OUTBOUND_SOURCE.EMAIL });
+      if (!gated) {
+        this.logger.log(`Email to ${maskEmail(options.to)} held back by the outbound gate`);
+        return;
+      }
+      message = gated;
+    }
+
     try {
       switch (this.emailProvider) {
         case 'resend':
-          await this.sendWithResend({ ...options, from: fromEmail });
+          await this.sendWithResend(message);
           break;
         case 'nodemailer':
-          await this.sendWithNodemailer({ ...options, from: fromEmail });
+          await this.sendWithNodemailer(message);
           break;
         case 'console':
           if (!isDevelopmentEnv()) throw new EmailNotConfiguredError();
-          this.logToConsole({ ...options, from: fromEmail });
+          this.logToConsole(message);
           break;
       }
 
@@ -114,7 +142,9 @@ export class EmailService {
       throw new InternalServerErrorException('Email service is not available');
     }
 
-    await this.resendClient.emails.send({
+    // Resend reports a refused email in `error` and does not throw; observeResendResult throws it, so it is counted
+    // and ledgered as a failure.
+    const result = await this.resendClient.emails.send({
       from: options.from,
       to: options.to,
       ...(options.cc && options.cc.length > 0 ? { cc: options.cc } : {}),
@@ -123,6 +153,7 @@ export class EmailService {
       html: options.html,
       text: options.text,
     });
+    observeResendResult(result);
   }
 
   private async sendWithNodemailer(options: SendEmailOptions): Promise<void> {

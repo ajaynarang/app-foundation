@@ -13,6 +13,7 @@ describe('DataRetentionJobHandler', () => {
     job: { deleteMany: jest.Mock };
     domainEventLog: { deleteMany: jest.Mock };
     hitlChallenge: { deleteMany: jest.Mock };
+    outboundSuppression: { deleteMany: jest.Mock };
   };
   let jobCleanupJob: { cleanupOldJobs: jest.Mock };
 
@@ -23,6 +24,7 @@ describe('DataRetentionJobHandler', () => {
       job: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
       domainEventLog: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
       hitlChallenge: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
+      outboundSuppression: { deleteMany: jest.fn().mockResolvedValue({ count: 6 }) },
     };
     jobCleanupJob = { cleanupOldJobs: jest.fn().mockResolvedValue({ deletedCount: 7 }) };
 
@@ -56,6 +58,25 @@ describe('DataRetentionJobHandler', () => {
       completedJobsDeleted: 3,
       domainEventLogsDeleted: 4,
       hitlChallengesDeleted: 5,
+      outboundSuppressionsDeleted: 6,
+    });
+  });
+
+  it('deletes held-back outbound rows after 30 days', async () => {
+    const now = Date.parse('2026-11-13T12:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await processor.run({
+        id: 'j4',
+        name: BULK_OPS_JOB_NAMES.DATA_RETENTION,
+        data: { tenantId: 'system', payload: {}, metadata: { source: 'cron', enqueuedAt: '', version: 1 } },
+      } as any);
+    } finally {
+      jest.restoreAllMocks();
+    }
+
+    expect(prisma.outboundSuppression.deleteMany).toHaveBeenCalledWith({
+      where: { createdAt: { lt: new Date(now - 30 * 24 * 60 * 60 * 1000) } },
     });
   });
 

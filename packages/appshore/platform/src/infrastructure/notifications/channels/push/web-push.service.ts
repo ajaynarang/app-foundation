@@ -1,8 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import * as webpush from 'web-push';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 interface PushSubscriptionInput {
   endpoint: string;
@@ -18,6 +23,7 @@ export class PushService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {
     const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
     const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
@@ -36,6 +42,11 @@ export class PushService {
       this.isConfigured = false;
       this.logger.warn('Web Push not configured — VAPID keys missing');
     }
+  }
+
+  /** True when VAPID keys are set, so a send can reach a browser. */
+  canSend(): boolean {
+    return this.isConfigured;
   }
 
   async saveSubscription(userId: number, tenantId: number, subscription: PushSubscriptionInput) {
@@ -93,8 +104,13 @@ export class PushService {
       this.logger.warn('Push not sent — VAPID not configured');
       return 0;
     }
+    // Outside production only allow-listed users get a push; the gate records the rest (ADR "Outbound gate").
+    if (!(await this.outboundGate.allowUser(userId, { source: OUTBOUND_SOURCE.PUSH_WEB, subject: payload.title }))) {
+      return 0;
+    }
 
     const subscriptions = await this.getSubscriptionsForUser(userId);
+    const body = JSON.stringify({ ...payload, title: this.outboundGate.markPushTitle(payload.title) });
     let delivered = 0;
 
     for (const sub of subscriptions) {
@@ -104,7 +120,7 @@ export class PushService {
             endpoint: sub.endpoint,
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
-          JSON.stringify(payload),
+          body,
         );
         delivered += 1;
       } catch (error: any) {

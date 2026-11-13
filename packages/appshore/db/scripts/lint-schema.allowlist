@@ -6,7 +6,8 @@
 #
 # tenant-scoping-missing entries are tables scoped through a parent row (a user,
 # a subscription, a conversation) or platform-wide by design. PasswordResetToken
-# and WhatsAppConsent belong to a person, not a tenant.
+# and WhatsAppConsent belong to a person, not a tenant. OutboundAllowEntry is the platform's outbound
+# allow-list (ADR "Outbound gate"), one list for the whole environment.
 #
 # WebhookSubscription.previousSecret sits on the row beside the signing secret it
 # replaced, and is cleared from use when the rotation overlap ends.
@@ -33,6 +34,7 @@ OAuthAccessToken:tenant-scoping-missing
 OAuthAuthorizationCode:tenant-scoping-missing
 OAuthClient.clientSecret:no-embedded-token
 OAuthRefreshToken:tenant-scoping-missing
+OutboundAllowEntry:tenant-scoping-missing
 PasswordResetToken:tenant-scoping-missing
 PaymentMethod.id:no-cuid
 ProcessedBillingEvent.id:no-cuid

@@ -6,6 +6,7 @@ import {
   isPlaceholderSecret,
   isProductionEnv,
 } from './production-guard';
+import { assertOutboundSafety } from '@appshore/kernel/infrastructure/outbound/outbound-mode';
 
 // Config ownership rule:
 // - App-owned config lives HERE, in the typed zod schema below — validated at
@@ -229,9 +230,18 @@ const configSchema = z.object({
 // sets when NODE_ENV or ENV_TYPE says production (see isProductionEnv).
 // Nothing below runs in development or test.
 const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
-  if (config.environment !== 'production') return;
-
   const fail = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+
+  // The outbound gate (ADR "Outbound gate") is checked in every environment: production must send (`live`), and
+  // anything else must not message real people unless someone said so. It reads ENV_TYPE, not `environment`: every
+  // deployed task is `environment === 'production'`, staging included.
+  try {
+    assertOutboundSafety(process.env);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+
+  if (config.environment !== 'production') return;
 
   const voiceEnabled = !!config.voice.livekitUrl;
 

@@ -202,6 +202,7 @@ model Tenant {
   members                     WorkspaceMember[]
   feedback                    Feedback[]
   deadlines                   Deadline[]
+  outboundSuppressions        OutboundSuppression[]
 
   // Billing & wallet
   billingCustomer      BillingCustomer?
@@ -300,6 +301,7 @@ model User {
   deskSuppressionsUnset   DeskEntitySuppression[]  @relation("DeskSuppressionUnset")
   deskMemoriesAuthored    DeskMemory[]             @relation("DeskMemoryAuthoredBy")
   aiInvocations           AiInvocation[]
+  outboundAllowEntries    OutboundAllowEntry[]     @relation("OutboundAllowEntryCreatedBy")
 
   @@unique([tenantId, email])
   // NOTE: one live account per email is enforced by the partial unique index users_email_live_key on
@@ -881,6 +883,57 @@ model NotificationDelivery {
   /// Retention sweep and per-day status counts.
   @@index([createdAt])
   @@map("notification_deliveries")
+}
+
+/// What an outbound allow-list entry matches (ADR "Outbound gate"). The kernel mirrors these values as
+/// OUTBOUND_ALLOW_KIND; a parity spec in platform holds the two together.
+enum OutboundAllowKind {
+  EMAIL
+  EMAIL_DOMAIN
+  PHONE
+  HOST
+}
+
+/// A recipient a non-production environment may still message (ADR "Outbound gate"). With OUTBOUND_MODE=allowlist
+/// every other recipient is held back; an empty list (and no OUTBOUND_ALLOWLIST_BOOTSTRAP) sends nothing.
+/// Platform-level, not tenant-scoped; managed by super-admins at /admin/outbound.
+model OutboundAllowEntry {
+  /// App-generated UUIDv7 via generateUuidV7(): the entry's public id. No Prisma @default.
+  id          String            @id @db.Uuid
+  kind        OutboundAllowKind
+  /// Normalized: lowercased email, domain or host; a phone as + and digits.
+  value       String            @db.VarChar(255)
+  note        String?           @db.VarChar(200)
+  createdById Int?              @map("created_by_id")
+  createdBy   User?             @relation("OutboundAllowEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([kind, value])
+  @@index([createdById])
+  @@map("outbound_allow_entries")
+}
+
+/// A send the outbound gate held back that has no delivery-ledger row (sign-in codes, invitations, password resets,
+/// customer webhooks). Pipeline sends are in notification_deliveries as SKIPPED with reason GATED instead. The
+/// recipient is masked (an email as its first letter and domain, a phone as its last four digits, a URL as its host)
+/// and the subject is a redacted preview: codes and links removed. Deleted after 30 days by data-retention.
+model OutboundSuppression {
+  /// App-generated UUIDv7 via generateUuidV7(): time-sortable, safe in a list cursor. No Prisma @default.
+  id        String   @id @db.Uuid
+  /// An OUTBOUND_CHANNEL value (kernel constant): a string, like the ledger's reason column, because the Prisma
+  /// schema cannot import the kernel vocabulary.
+  channel   String   @db.VarChar(20)
+  recipient String   @db.VarChar(255)
+  subject   String?  @db.VarChar(200)
+  source    String   @db.VarChar(80)
+  tenantId  Int?     @map("tenant_id")
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  /// The held-back list (newest first) and the retention sweep.
+  @@index([createdAt])
+  @@index([tenantId])
+  @@map("outbound_suppressions")
 }
 
 enum WhatsAppConsentSource {

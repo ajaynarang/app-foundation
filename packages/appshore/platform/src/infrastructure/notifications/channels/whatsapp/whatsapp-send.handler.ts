@@ -19,6 +19,7 @@ import {
 } from './whatsapp.constants';
 import type { WhatsAppSendJobPayload } from './whatsapp-dispatch.service';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { OUTBOUND_GATE, type OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 export type { WhatsAppSendJobPayload } from './whatsapp-dispatch.service';
 
@@ -46,6 +47,7 @@ export class WhatsAppSendHandler implements QueueJobHandler {
     private readonly featureFlags: FeatureFlagsService,
     private readonly cache: AppCacheService,
     private readonly config: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
     @Optional() @Inject(PLATFORM_TIMEZONE) private readonly platformTimezone: string = DEFAULT_PLATFORM_TIMEZONE,
   ) {}
 
@@ -76,6 +78,14 @@ export class WhatsAppSendHandler implements QueueJobHandler {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { phone: true } });
     if (!user?.phone) {
       await this.ledger.markSkipped(deliveryId, DELIVERY_SKIP_REASONS.NO_ADDRESS);
+      return;
+    }
+
+    // The outbound gate, before the ceiling is charged: a held-back number spends nothing. The ledger row is the
+    // record, so the gate is asked without side effect. The adapters are the send primitive and are called only
+    // here. Templates are pre-approved, so an allowed send carries no staging prefix (ADR "Outbound gate").
+    if (!(await this.outboundGate.wouldAllow({ channel: 'whatsapp', phone: user.phone }))) {
+      await this.ledger.markSkipped(deliveryId, DELIVERY_SKIP_REASONS.GATED);
       return;
     }
 

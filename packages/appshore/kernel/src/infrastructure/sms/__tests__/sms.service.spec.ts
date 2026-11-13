@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SmsService } from '../sms.service';
 import { ConfigService } from '@nestjs/config';
 import { InMemoryMetrics } from '../../telemetry/testing/in-memory-metrics';
+import { OUTBOUND_GATE, STAGING_SMS_PREFIX, type OutboundGate } from '../../outbound/outbound-gate.port';
+import { allowAllOutboundGate, holdAllOutboundGate } from '../../outbound/testing/outbound-gate.testing';
 
 describe('SmsService', () => {
   let service: SmsService;
@@ -20,7 +22,11 @@ describe('SmsService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SmsService, { provide: ConfigService, useValue: mockConfig }],
+      providers: [
+        SmsService,
+        { provide: ConfigService, useValue: mockConfig },
+        { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
+      ],
     }).compile();
 
     service = module.get<SmsService>(SmsService);
@@ -46,7 +52,11 @@ describe('SmsService without Twilio', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SmsService, { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } }],
+      providers: [
+        SmsService,
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
+        { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
+      ],
     }).compile();
     service = module.get<SmsService>(SmsService);
     const spies = (['log', 'warn', 'error', 'debug', 'verbose'] as const).map((level) =>
@@ -98,7 +108,7 @@ describe('SmsService with Twilio', () => {
           ({ TWILIO_ACCOUNT_SID: 'AC0', TWILIO_AUTH_TOKEN: 'secret', TWILIO_PHONE_NUMBER: '+15551234567' })[key],
       ),
     };
-    const service = new SmsService(config as unknown as ConfigService);
+    const service = new SmsService(config as unknown as ConfigService, allowAllOutboundGate());
     // Swap the real client for a stub: no network.
     (service as unknown as { twilioClient: unknown }).twilioClient = { messages: { create } };
     const spies = (['log', 'warn', 'error'] as const).map((level) =>
@@ -134,7 +144,8 @@ describe('SmsService failures count in app_outbound_failed', () => {
     else process.env.ENV_TYPE = originalEnvType;
   });
 
-  const unconfigured = () => new SmsService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService);
+  const unconfigured = () =>
+    new SmsService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService, allowAllOutboundGate());
 
   it('counts an unsent SMS outside development (no provider)', async () => {
     process.env.ENV_TYPE = 'preprod';
@@ -165,5 +176,63 @@ describe('SmsService failures count in app_outbound_failed', () => {
     await unconfigured().sendSms('+15559876543', 'hi');
 
     expect(await harness.points('app_outbound_failed')).toEqual([]);
+  });
+});
+
+describe('SmsService behind the outbound gate', () => {
+  const originalEnvType = process.env.ENV_TYPE;
+  const config = {
+    get: jest.fn(
+      (key: string) =>
+        ({ TWILIO_ACCOUNT_SID: 'AC0', TWILIO_AUTH_TOKEN: 'secret', TWILIO_PHONE_NUMBER: '+15551234567' })[key],
+    ),
+  } as unknown as ConfigService;
+
+  function configured(gate: OutboundGate) {
+    const create = jest.fn().mockResolvedValue({});
+    const service = new SmsService(config, gate);
+    (service as unknown as { twilioClient: unknown }).twilioClient = { messages: { create } };
+    return { service, create };
+  }
+
+  beforeEach(() => {
+    (['log', 'warn', 'error'] as const).forEach((level) =>
+      jest.spyOn(Logger.prototype, level).mockImplementation(() => undefined),
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+    else process.env.ENV_TYPE = originalEnvType;
+  });
+
+  it('does not call Twilio for a held-back number, and reports it as not sent', async () => {
+    const gate = holdAllOutboundGate();
+    const { service, create } = configured(gate);
+
+    await expect(service.sendSms('+15559876543', 'hello')).resolves.toBe(false);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(gate.held).toEqual([{ method: 'allowPhone', recipient: '+15559876543' }]);
+  });
+
+  it('sends an allowed number with the text the gate marks', async () => {
+    const gate: OutboundGate = { ...allowAllOutboundGate(), markSms: (text) => `${STAGING_SMS_PREFIX}${text}` };
+    const { service, create } = configured(gate);
+
+    await expect(service.sendSms('+15559876543', 'hello')).resolves.toBe(true);
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: 'STG: hello', to: '+15559876543' }));
+  });
+
+  it('never asks the gate on the console path (no Twilio, ENV_TYPE=development)', async () => {
+    process.env.ENV_TYPE = 'development';
+    const gate = holdAllOutboundGate();
+    const service = new SmsService({ get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService, gate);
+
+    await service.sendSms('+15559876543', 'hello');
+
+    expect(gate.held).toEqual([]);
   });
 });
