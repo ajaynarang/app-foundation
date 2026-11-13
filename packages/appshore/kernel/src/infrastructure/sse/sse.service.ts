@@ -1,9 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Subject } from 'rxjs';
+
+/**
+ * The roles that receive tenant-wide broadcasts (`emitToTenant`). Bound by the app (kernel cannot import the Prisma
+ * `UserRole` enum): `apps/backend/src/platform-glue/sse/sse-broadcast-roles.ts`. A connection whose role is not in
+ * the set gets only the events addressed to it (`emitToUser`). Nothing bound means no broadcasts reach anyone.
+ */
+export const SSE_TENANT_BROADCAST_ROLES = Symbol('SSE_TENANT_BROADCAST_ROLES');
 
 interface SseClient {
   userId: string;
   tenantId: number;
+  role: string;
   subject: Subject<MessageEvent>;
 }
 
@@ -19,10 +27,16 @@ interface SseClient {
 export class SseService {
   private readonly logger = new Logger(SseService.name);
   private readonly clients = new Map<string, Set<SseClient>>();
+  private readonly broadcastRoles: ReadonlySet<string>;
 
-  addClient(userId: string, tenantId: number, subject: Subject<MessageEvent>): void {
+  constructor(@Inject(SSE_TENANT_BROADCAST_ROLES) broadcastRoles: Iterable<string>) {
+    this.broadcastRoles = new Set(broadcastRoles);
+  }
+
+  /** `role` is the connection's role in this workspace (the access token's), and decides tenant broadcasts. */
+  addClient(userId: string, tenantId: number, subject: Subject<MessageEvent>, role: string): void {
     const set = this.clients.get(userId) ?? new Set<SseClient>();
-    set.add({ userId, tenantId, subject });
+    set.add({ userId, tenantId, role, subject });
     this.clients.set(userId, set);
     this.logger.log(
       `SSE client connected: ${userId} (tenant: ${tenantId}). Tabs for user: ${set.size}. Total users: ${this.clients.size}`,
@@ -55,7 +69,7 @@ export class SseService {
    * @internal
    * Bridge-only. Domain code MUST emit a DomainEvent and let
    * DomainEventSseBridge route it. Direct calls outside infrastructure/sse/
-   * are blocked by the no-restricted-imports ESLint rule.
+   * are blocked by the no-restricted-imports ESLint rule. Reaches only connections whose role is a broadcast role.
    */
   emitToTenant(tenantId: number, eventType: string, data: unknown): void {
     const event = {
@@ -64,7 +78,7 @@ export class SseService {
     } as MessageEvent;
     for (const set of this.clients.values()) {
       for (const client of set) {
-        if (client.tenantId === tenantId) {
+        if (client.tenantId === tenantId && this.broadcastRoles.has(client.role)) {
           client.subject.next(event);
         }
       }

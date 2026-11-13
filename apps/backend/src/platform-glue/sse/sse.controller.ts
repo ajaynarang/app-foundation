@@ -22,7 +22,8 @@ export class SseController {
     const subject = new Subject<MessageEvent>();
     const disconnect$ = new Subject<void>();
 
-    this.sseService.addClient(user.userId, user.tenantDbId, subject);
+    // The role decides tenant broadcasts: a direct-only role gets only the events addressed to it.
+    this.sseService.addClient(user.userId, user.tenantDbId, subject, user.role);
 
     // Send initial heartbeat
     subject.next({
