@@ -191,3 +191,33 @@ alias goes.
 
 **How to turn it back.** Deploy the previous release; nothing is stored differently. There is no switch to print
 email bodies outside development, on purpose: set a provider instead.
+
+## 2026-11-13: error tracking, backend and web
+
+**What changes when you pull it.**
+
+- **Backend Sentry.** `@sentry/nestjs` is initialised from `main.ts` and `worker.ts` when `SENTRY_DSN` is set. With
+  it unset, nothing changes: nothing is initialised and nothing is sent. Once set, every 5xx answer, final job
+  failure, failed cron tenant, lost domain event, failed workflow function, platform AI credit refusal and reused
+  refresh token is reported, tagged with ids only.
+- **Web Sentry.** `@sentry/nextjs` wraps `next.config.ts` and is initialised from `src/instrumentation.ts` and
+  `src/instrumentation-client.ts` when `NEXT_PUBLIC_SENTRY_DSN` is set. `captureError()` used to only log to the
+  console even with the DSN set; it now reports when the DSN is set. `initSentry()` is removed from
+  `@appshore/web-core/shared/lib/sentry` (it only printed a line). The global error page reports what it catches.
+- **CSP.** With `NEXT_PUBLIC_SENTRY_DSN` set, its origin is added to `connect-src`. Unset, the CSP is unchanged.
+- **Staging marker.** A web build with `NEXT_PUBLIC_APP_ENV=staging` shows a thin caution stripe across the top of
+  every page. Unset means `development`: no stripe.
+- **Request id.** The API now exposes `X-Request-Id` to browsers (CORS `exposedHeaders`), and `ApiError` carries it
+  as `requestId`.
+- **Log lines.** A failed durable-event enqueue or event-log write logs its error as an `err` field, not in the
+  message text.
+
+**Who notices.** A product that already set `NEXT_PUBLIC_SENTRY_DSN` (it used to do nothing) starts sending web
+errors on its next build. Code of your own that called `initSentry()` from web-core no longer compiles: delete the
+call.
+
+**What to set first.** Nothing is required. To turn error tracking on, follow "Error tracking" in
+`docs/observability.md`: `SENTRY_DSN` per backend environment, `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_APP_ENV` per
+web build.
+
+**How to turn it back.** Unset `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (rebuild the web). Nothing is stored.

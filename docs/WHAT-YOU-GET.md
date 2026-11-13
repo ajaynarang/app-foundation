@@ -153,7 +153,7 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 | Voice assistant   | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`    | text chat only                     |
 | LLM observability | `LANGFUSE_*`                               | local prompt fallback used         |
 | Bot protection    | `TURNSTILE_SECRET_KEY`                     | registration unprotected           |
-| Error tracking    | Sentry (scaffold in web-core)              | console logging                    |
+| Error tracking    | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`     | errors in logs only, nothing sent  |
 
 ---
 

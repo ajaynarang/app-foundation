@@ -12,11 +12,18 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
   pretty-printed.
 - **The environment name.** `ENV_TYPE` (`production | sandbox | preprod | development`) maps to one observability
   name, `production | staging | development` (`packages/appshore/kernel/src/shared/utils/env-label.ts`). The Loki
-  `env` label uses it, and so will the trace, error-tracker and web-marker environment. An unset or unknown
-  `ENV_TYPE` reads `unknown`; the resolver never throws.
+  `env` label uses it, the backend error tracker reports it as its `environment` (an unknown value reports
+  `development`), and the web reads the same three names from `NEXT_PUBLIC_APP_ENV`; trace export will too. An unset
+  or unknown `ENV_TYPE` reads `unknown`; the resolver never throws.
 - **Masking.** `maskEmail`, `maskPhone`, `stripQueryString` and `scrubContactDetails`
   (`packages/appshore/kernel/src/shared/utils/log-redaction.ts`). The pino `req` serializer drops the whole query
   string; the `err` serializer masks emails and phones a provider echoes in any field of an error.
+- **Errors.** Sentry, off until `SENTRY_DSN` (backend) or `NEXT_PUBLIC_SENTRY_DSN` (web) is set
+  (`packages/appshore/kernel/src/infrastructure/error-tracking/`, `packages/appshore/web-core/src/shared/lib/sentry*.ts`).
+  An event carries a `source` tag (`http | job | cron | event | workflow | ai`) and ids only: `tenantId` (public id),
+  `tenantDbId`, `role`, `jobName`, `jobId`, `queue`, `requestId`, `traceId`. Never a user id, name, email or phone.
+  The web drops expected errors (a 4xx `ApiError`, chunk-load failures, aborts) and console breadcrumbs, and tags an
+  API failure with the backend's `requestId`, so the event leads to its log lines.
 - **Email and SMS with no provider.** With `ENV_TYPE=development` the message is printed (masked recipient,
   subject, body), so the zero-config flows work. Anywhere else nothing is printed: `EmailService.sendEmail` throws
   `EmailNotConfiguredError`, and `SmsService.sendSms` returns `false` and logs one line with a masked number and no
@@ -59,8 +66,10 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
 12. **Error-tracker and trace data collection stays off** for bodies, headers, cookies, query strings and model
     inputs.
 
-Rules 10 to 12 describe the error tracker, the alert catalog and trace export, which arrive in later changes to this
-repo; the rules hold from the day they do.
+Rule 10 and the error-tracker half of rule 12 hold now: `error-envelope.spec.ts` checks a 5xx is reported once on
+either write path and a 4xx never, and `sentry.spec.ts` pins every data-collection category off. Rule 11 and the
+trace half of rule 12 describe the alert catalog and trace export, which arrive in later changes to this repo; the
+rules hold from the day they do.
 
 ## What the spec does not catch
 
