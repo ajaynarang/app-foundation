@@ -16,7 +16,7 @@ import { listSourceFiles, stripComments } from './source-text.scan';
  * Known gaps: a listener registered through a variable not named like an emitter (`x.on(…)`) is not detected; a
  * `@Roles` built from a constant array (`@Roles(...ROLES)`) is read as no roles.
  *
- * The Desk workflow rule (every per-tenant Inngest function uses `deskStep`) lives inside the Desk folder, so a
+ * The Desk workflow rule (every per-tenant workflow function uses `deskStep`) lives inside the Desk folder, so a
  * product scaffolded without Desk loses it with the folder.
  */
 
