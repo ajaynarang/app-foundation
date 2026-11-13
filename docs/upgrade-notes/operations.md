@@ -60,3 +60,44 @@ seven days without a refresh.
 **How to turn it back.** Deploy the previous release; no data step is needed. A token retired by rotation is also
 marked revoked, which the old code honours, and every unretired token keeps working under the old code. The new
 columns are ignored by the old code. Leave the migrations in place.
+
+## 2026-11-13: tenant-aware login; login may answer 409 for duplicate accounts
+
+**What changed.** `users` is unique only on `(tenant_id, email)`, so one email can have several live accounts.
+Password login used to take the oldest of them and check the password only there: the owner of a newer account with
+the same email could not sign in at all, and the session landed in whichever workspace the oldest row named.
+
+- `POST /auth/login` checks the password against every live account on the email. Exactly one match signs in. No
+  match is the same 401 as before, with a failure login event on each account it checked.
+- When the password matches accounts in more than one workspace the answer is 409 `WORKSPACE_SELECTION_REQUIRED`,
+  with the workspaces in a new optional envelope key, `workspaces` (`[{ tenantId, name }]`). The client signs in
+  again with one `tenantId`. Only that code carries the key. This happens only for leftover duplicate accounts that
+  share a password.
+- Login, forgot-password and the three phone routes (`/auth/phone/login`, `/auth/phone/send-otp`,
+  `/auth/phone/verify-otp`) take an optional `tenantId`: the tenant's public id. With it, only accounts in that
+  workspace count (their own tenant, or a membership there), and the session runs in that workspace with that
+  membership's role. An unknown `tenantId`, or one the account has no membership in, answers like a wrong password
+  (401; `send-otp` still answers 204 and sends nothing). Single-tenant mode ignores it. Without it the session runs
+  in the account's default workspace, as before.
+- `GET /tenants/branding/:subdomain` now also returns the tenant's `tenantId`. The web login form sends it with every
+  sign-in on a tenant subdomain, and shows a workspace picker on the 409.
+- Forgot-password sends one link per live, active account behind the address (after the hint), and when there is
+  more than one each email names its workspace.
+- `ApiErrorCode` gains `WORKSPACE_SELECTION_REQUIRED`; the envelope type and `ApiErrorEnvelopeSchema` gain
+  `workspaces?`.
+
+**Who notices.**
+
+- A product with no duplicate accounts: nobody. Run `DATABASE_URL=... pnpm accounts:duplicates` to find out.
+- A product with duplicates: their owners can now sign in to each account, and those that share one password see
+  the workspace picker. A client of your own that calls `POST /auth/login` must handle the 409 (show the
+  `workspaces`, retry with `tenantId`) or it shows the `detail` text as an error. A test or schema that holds the
+  error envelope to exactly eight keys must allow `workspaces`.
+- A super-admin account that shares an email and a password with a tenant account cannot be told apart by the
+  workspace list (it has no workspace) and so cannot sign in until the two are merged.
+
+**What to set first.** Nothing. List any duplicates and merge them by the procedure in `docs/operations.md`
+("Duplicate accounts"). The next operations change adds the database index that enforces one live account per
+email; it skips itself while duplicates remain.
+
+**How to turn it back.** Deploy the previous release; there is no schema change and no data step.

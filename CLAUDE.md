@@ -50,7 +50,9 @@ a private workspace per user at signup (`POST /auth/register`) and hides org chr
 Modes in detail:
 
 - **Multi-tenant** (default): `MULTI_TENANT=true` (backend) + `NEXT_PUBLIC_MULTI_TENANT=true` (web).
-  Tenants resolve from subdomain; tenant-scoped login; self-registration enabled.
+  Tenants resolve from subdomain; tenant-scoped login (the form sends the subdomain's `tenantId`, and a password
+  that matches accounts in several workspaces gets a 409 picker; `pnpm accounts:duplicates` lists them, merge per
+  `docs/operations.md`); self-registration enabled.
 - **Single-tenant**: `MULTI_TENANT=false` + `IMPLICIT_TENANT_ID=1`. One seeded tenant, no subdomain
   parsing, no tenant UI, registration hidden. Tenant scoping still works (every query resolves to
   the implicit tenant) — no query rewrites needed.

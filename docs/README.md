@@ -13,5 +13,7 @@ Add your own product documentation here as you build.
   change and pulling it now. [AI platform](upgrade-notes/ai-platform.md): AI behaviour, env and schema changes,
   and the deploy order for the `ai_reader` role. [Operations](upgrade-notes/operations.md): sessions, logging,
   error tracking, telemetry, alerts, safety gates and deploy.
+- [`operations.md`](operations.md): running a product with real users. Today: listing and merging duplicate
+  accounts.
 - [`doppler.md`](doppler.md): secrets and environment configuration.
 - [`WHAT-YOU-GET.md`](WHAT-YOU-GET.md): what the starter ships.
