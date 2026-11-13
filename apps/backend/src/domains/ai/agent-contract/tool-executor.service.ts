@@ -1,9 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { ScopeRegistryService } from './scope-registry.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { toolFailure } from '../mcp/tools/tool-error';
+import {
+  type IdempotencyClaim,
+  IdempotencyStore,
+  requestFingerprint,
+} from '@appshore/platform/infrastructure/idempotency/idempotency.store';
+import { IDEMPOTENCY_KEY_ARG, declaresIdempotencyKey } from './tool-idempotency';
 
 export interface ToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -29,6 +35,7 @@ export class ToolExecutorService {
     private readonly registry: ScopeRegistryService,
     private readonly moduleRef: ModuleRef,
     private readonly prisma: PrismaService,
+    private readonly idempotency: IdempotencyStore,
   ) {}
 
   async execute(
@@ -47,6 +54,59 @@ export class ToolExecutorService {
 
     const userDbId = this.resolveUserDbId(principal);
 
+    // A tool that declares `idempotencyKey` is retry-safe. The key is the executor's, never the tool's: it is taken
+    // out here and the tool runs on the rest. A tool that does not declare it gets no replay.
+    if (!declaresIdempotencyKey(provider.parameters)) {
+      return this.run(toolName, provider, args, principal, userDbId, context);
+    }
+    const { [IDEMPOTENCY_KEY_ARG]: idempotencyKey, ...toolArgs } = args;
+    if (typeof idempotencyKey !== 'string') return this.run(toolName, provider, toolArgs, principal, userDbId, context);
+
+    let claim: IdempotencyClaim | null = null;
+    try {
+      // Per workspace AND per the person the call acts for: a replay never answers someone else, and never crosses
+      // workspaces. The fingerprint names the tool, so the same key on another tool is a reuse, not a replay.
+      claim = await this.idempotency.claim(
+        `tdb:${principal.tenantId}:u:${userDbId}`,
+        idempotencyKey,
+        requestFingerprint(`tool:${toolName}`, toolArgs),
+      );
+    } catch (error: unknown) {
+      // The key was used for a different call, or the first call is still running (409), or it is unusable (400).
+      if (error instanceof HttpException) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify(toolFailure(error, this.logger, toolName)) }],
+          isError: true,
+        };
+      }
+      // Fail open: an unreachable store runs the call without the key, never a failed create.
+      this.logger.warn(`Idempotency store unavailable for ${toolName}, running without the key`);
+    }
+    if (claim?.kind === 'replay') return claim.result.body as ToolResult;
+
+    const result = await this.run(toolName, provider, toolArgs, principal, userDbId, context);
+    if (claim?.kind === 'run') await this.settle(claim, result);
+    return result;
+  }
+
+  /** Only a success is remembered: a failed call frees the key, and a store error never fails a call that ran. */
+  private async settle(claim: Extract<IdempotencyClaim, { kind: 'run' }>, result: ToolResult): Promise<void> {
+    try {
+      if (result.isError) await claim.release();
+      else await claim.complete({ status: 200, body: result });
+    } catch (error) {
+      this.logger.warn(`Idempotency: could not settle a tool call: ${(error as Error).message}`);
+    }
+  }
+
+  private async run(
+    toolName: string,
+    provider: { providerClass: unknown; methodName: string },
+    args: Record<string, unknown>,
+    principal: AgentPrincipal,
+    userDbId: number,
+    context: ToolExecutionContext,
+  ): Promise<ToolResult> {
     // Tools expect `_userId` to be the *wire-format* string user id (what the `User.userId` column stores, e.g.
     // "user_demo_owner"); `_userDbId` carries the numeric DB id for foreign keys.
     const userIdString = await this.resolveUserIdString(principal, userDbId);

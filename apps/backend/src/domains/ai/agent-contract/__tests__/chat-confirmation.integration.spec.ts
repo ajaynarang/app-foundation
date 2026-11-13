@@ -123,6 +123,8 @@ describe('chat confirmation is bound to the exact write (Postgres)', () => {
       registry,
       { get: (cls: unknown) => instances.get(cls) } as never,
       { user: { findUnique: async () => ({ userId: 'user_fixture' }) } } as never,
+      // No tool here declares idempotencyKey, so the store is never asked.
+      {} as never,
     );
     const audit = {
       writePending: async () => 'row',

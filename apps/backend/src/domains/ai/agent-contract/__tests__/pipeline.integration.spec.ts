@@ -119,7 +119,8 @@ describe('Phase A pipeline integration', () => {
     await scopeRegistry.onApplicationBootstrap();
 
     const hitl = new HitlPolicyService();
-    const executor = new ToolExecutorService(scopeRegistry, moduleRef, prisma as any);
+    // No tool here declares idempotencyKey, so the store is never asked.
+    const executor = new ToolExecutorService(scopeRegistry, moduleRef, prisma as any, {} as never);
     const logger = new AgentInvocationLoggerService(prisma as any, outbox);
     const challenges = {
       issue: async () => ({

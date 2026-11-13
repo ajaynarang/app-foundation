@@ -156,9 +156,13 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
     return scope !== undefined && scopeTier(scope) !== SCOPE_TIERS.READ;
   }
 
-  resolveProvider(toolName: string): { providerClass: ToolRecord['providerClass']; methodName: string } | undefined {
+  resolveProvider(
+    toolName: string,
+  ): { providerClass: ToolRecord['providerClass']; methodName: string; parameters: unknown } | undefined {
     const rec = this.toolByName.get(toolName);
-    return rec ? { providerClass: rec.providerClass, methodName: rec.methodName } : undefined;
+    return rec
+      ? { providerClass: rec.providerClass, methodName: rec.methodName, parameters: rec.parameters }
+      : undefined;
   }
 
   /**
