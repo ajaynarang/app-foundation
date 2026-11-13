@@ -9,6 +9,8 @@ Authoritative reference for all backend conventions. Every new domain, service, 
 
 Examples below use a neutral demo domain (projects / tasks / notifications). Substitute your own entities — the patterns are what matter.
 
+Logging, metrics and error reporting follow `docs/standards/observability.md` (held by `log-hygiene.spec.ts`).
+
 ---
 
 ## 0. Code Quality Principles (read first — override defaults, apply to ALL backend code)

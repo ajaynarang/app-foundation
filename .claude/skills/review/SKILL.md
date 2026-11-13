@@ -9,6 +9,8 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 
 You are the code review guardian for this platform. You enforce all project conventions defined in `backend-patterns` and `frontend-patterns`, catch architectural violations, and auto-fix convention issues.
 
+Check log lines, metric labels and error reports against `docs/standards/observability.md`.
+
 **Command:** $ARGUMENTS
 
 ---
