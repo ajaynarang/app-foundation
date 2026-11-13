@@ -40,7 +40,8 @@ async function main(): Promise<void> {
     }
   }
   const descriptor = Object.getOwnPropertyDescriptor(ProbeListener.prototype, 'handle') as PropertyDescriptor;
-  const patched = OnEvent('auto.capture.probe')(ProbeListener.prototype, 'handle', descriptor) ?? descriptor;
+  const patched: PropertyDescriptor =
+    OnEvent('auto.capture.probe')(ProbeListener.prototype, 'handle', descriptor) || descriptor;
   Object.defineProperty(ProbeListener.prototype, 'handle', patched);
 
   await new ProbeProcessor().process().catch(() => undefined);
