@@ -10,6 +10,8 @@ import {
 } from '@app/shared-types';
 import { isZodError, zodFieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter';
+import { toLoggableError, type LoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 /**
  * The one error envelope (ADR "API contract", section 2). Every error body the API sends — from the global
@@ -72,6 +74,13 @@ function workspacesOf(value: unknown): WorkspaceChoice[] | undefined {
 }
 
 /** A thrown non-Error, for the log — never itself a reason the filter fails (circular objects, BigInt). */
+/** `toLoggableError`, with a thrown non-Error described as JSON rather than `[object Object]`. */
+function loggableErrorOf(exception: unknown): LoggableError {
+  return exception instanceof Error
+    ? toLoggableError(exception)
+    : { type: typeof exception, message: describe(exception) };
+}
+
 function describe(value: unknown): string {
   try {
     return JSON.stringify(value) ?? String(value);
@@ -226,14 +235,16 @@ export function buildErrorEnvelope(exception: unknown, request: Pick<Request, 'u
   };
   if (process.env.NODE_ENV === 'development' && shape.debugDetail) envelope.debugDetail = shape.debugDetail;
 
-  const line = `${request.method} ${request.url} - Status: ${shape.status} ${shape.code} - ${shape.detail}`;
+  // The path only: the SSE stream, invite and reset links carry their token in the query string (rule 3). The
+  // body keeps `path` as sent, since the client already holds it.
+  const path = stripQueryString(request.url);
+  const line = `${request.method} ${path} - Status: ${shape.status} ${shape.code} - ${shape.detail}`;
+  // The raw exception rides as an `err` field, never flattened into the message (rule 4); the err serializer masks
+  // any email or phone a provider error echoes.
   if (shape.status >= 500) {
-    logger.error(
-      shape.debugDetail ? `${line} (${shape.debugDetail})` : line,
-      exception instanceof Error ? exception.stack : describe(exception),
-    );
-  } else if (!isSilentPath(request.url ?? '')) {
-    logger.warn(shape.debugDetail ? `${line} (${shape.debugDetail})` : line);
+    logger.error({ msg: line, err: loggableErrorOf(exception) });
+  } else if (!isSilentPath(path)) {
+    logger.warn(shape.debugDetail ? { msg: line, err: loggableErrorOf(exception) } : line);
   }
   return envelope;
 }

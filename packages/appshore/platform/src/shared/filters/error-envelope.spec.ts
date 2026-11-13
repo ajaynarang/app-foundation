@@ -60,6 +60,64 @@ describe('error-envelope', () => {
     expect(Logger.prototype.warn).toHaveBeenCalledTimes(1);
   });
 
+  describe('the log line (rule 3: no query string; rule 4: the error as an err field)', () => {
+    const logged = (spy: unknown) => JSON.stringify((spy as jest.Mock).mock.calls);
+
+    it('drops the query string from a 4xx line, whatever the parameter is called', () => {
+      buildErrorEnvelope(new ConflictException('x'), {
+        url: '/api/v1/invites/accept?token=abc&code=123',
+        method: 'GET',
+      });
+      const line = logged(Logger.prototype.warn);
+      expect(line).toContain('/api/v1/invites/accept');
+      expect(line).not.toContain('token=');
+      expect(line).not.toContain('code=123');
+    });
+
+    it('drops the query string from a 5xx line', () => {
+      buildErrorEnvelope(new Error('boom'), { url: '/api/v1/sse/stream?token=abc', method: 'GET' });
+      expect(logged(Logger.prototype.error)).not.toContain('token=');
+    });
+
+    it('keeps the path the client sent in the response body', () => {
+      const env = buildErrorEnvelope(new ConflictException('x'), { url: '/api/v1/things?cursor=c1', method: 'GET' });
+      expect(env.path).toBe('/api/v1/things?cursor=c1');
+    });
+
+    it('logs a 5xx error as an err field, not flattened into the message', () => {
+      buildErrorEnvelope(new Error('Provider rejected ops@example.com'), req);
+      const [entry] = (Logger.prototype.error as jest.Mock).mock.calls[0];
+      expect(entry.msg).toBe('POST /api/v1/things - Status: 500 INTERNAL - ' + errorShapeOf(new Error('x')).detail);
+      expect(entry.err).toMatchObject({ type: 'Error', message: 'Provider rejected ops@example.com' });
+      expect(entry.msg).not.toContain('ops@example.com');
+    });
+
+    it('describes a non-Error 5xx throw in the err field', () => {
+      buildErrorEnvelope({ weird: true }, req);
+      const [entry] = (Logger.prototype.error as jest.Mock).mock.calls[0];
+      expect(entry.err).toEqual({ type: 'object', message: '{"weird":true}' });
+    });
+
+    it('on a deployed task (NODE_ENV=production) a 401 on the SSE stream logs no token', () => {
+      const previous = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        jest.isolateModules(() => {
+          // A fresh module registry, so log-filter reads NODE_ENV=production and does not silence /sse/.
+          const { Logger: IsolatedLogger, UnauthorizedException: Unauthorized } = require('@nestjs/common');
+          const warn = jest.spyOn(IsolatedLogger.prototype, 'warn').mockImplementation(() => undefined);
+          const { buildErrorEnvelope: build } = require('./error-envelope');
+          build(new Unauthorized(), { url: '/api/v1/sse/stream?token=abc', method: 'GET' });
+          expect(warn).toHaveBeenCalledTimes(1);
+          expect(JSON.stringify(warn.mock.calls)).toContain('/api/v1/sse/stream');
+          expect(JSON.stringify(warn.mock.calls)).not.toContain('token=');
+        });
+      } finally {
+        process.env.NODE_ENV = previous;
+      }
+    });
+  });
+
   it("maps the body parser's over-limit error to 413 PAYLOAD_TOO_LARGE, logged as a warning", () => {
     // What body-parser raises (an http-errors error, not a Nest HttpException) when a body passes the limit.
     const tooLarge = Object.assign(new Error('request entity too large'), {
