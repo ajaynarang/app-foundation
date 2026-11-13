@@ -33,6 +33,7 @@
     "prisma:studio": "prisma studio",
     "lint:schema": "tsx scripts/lint-schema.ts",
     "accounts:duplicates": "tsx scripts/duplicate-accounts.ts",
+    "accounts:enforce-unique-email": "tsx scripts/enforce-unique-email.ts",
     "// — Database (seed, reset, push)": "",
     "db:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
