@@ -253,7 +253,9 @@ web build.
   `docs/observability.md`). New sampling key `OTEL_TRACES_SAMPLER_ARG` (default 1) and auth key
   `OTEL_EXPORTER_OTLP_HEADERS`.
 - **Langfuse spans are masked.** Phones and emails in AI spans sent to Langfuse are replaced with `<PHONE>` and
-  `<EMAIL>`.
+  `<EMAIL>`, on both paths: AI SDK calls through the isolated Langfuse tracer, and Mastra agent spans (the chat
+  assistant) through a span output processor in `mastra.provider.ts`. A product that adds its own Mastra
+  `Observability` config adds `PiiMaskingSpanOutputProcessor` to it.
 - **No worker task.** With `worker_desired_count = 0`, the next Terraform apply adds `OPS_GAUGES_FROM_API=true` to the
   API task definition (a new revision), so the API reports the queue, cron, outbox and deadline gauges. With a
   worker, the task definitions do not change.

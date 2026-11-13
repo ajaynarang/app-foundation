@@ -29,7 +29,9 @@ jest.mock('@mastra/langfuse', () => ({
 import { InternalServerErrorException } from '@nestjs/common';
 import { RequestContext } from '@mastra/core/request-context';
 import { Agent } from '@mastra/core/agent';
+import { Observability } from '@mastra/observability';
 import { MastraProvider } from '../mastra.provider';
+import { PiiMaskingSpanOutputProcessor } from '../../../infrastructure/telemetry/pii-masking-span-output-processor';
 import { REQUEST_MODEL_KEY } from '../../../routing/request-model-key';
 
 describe('MastraProvider', () => {
@@ -81,6 +83,17 @@ describe('MastraProvider', () => {
       const providerWithLF = new MastraProvider();
       await providerWithLF.onModuleInit();
       expect(providerWithLF.getMastra()).toBeDefined();
+    });
+
+    it('masks phones and emails in every agent span before the Langfuse exporter sees it', async () => {
+      process.env.LANGFUSE_SECRET_KEY = 'sk_test';
+      process.env.LANGFUSE_PUBLIC_KEY = 'pk_test';
+      (Observability as unknown as jest.Mock).mockClear();
+
+      await new MastraProvider().onModuleInit();
+
+      const [[{ configs }]] = (Observability as unknown as jest.Mock).mock.calls;
+      expect(configs.langfuse.spanOutputProcessors).toEqual([expect.any(PiiMaskingSpanOutputProcessor)]);
     });
   });
 

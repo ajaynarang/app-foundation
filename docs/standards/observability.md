@@ -69,9 +69,13 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
 
 Rule 10 and the error-tracker half of rule 12 hold now: `error-envelope.spec.ts` checks a 5xx is reported once on
 either write path and a 4xx never, and `sentry.spec.ts` pins every data-collection category off. For traces, rule 12
-holds through what is never instrumented (no body, header or cookie capture is switched on) and through the Langfuse
-processor, which masks phones and emails in every string attribute of an AI span before it is exported
-(`pii-masking-langfuse-span-processor.spec.ts`). Rule 11 describes the alert catalog, which arrives in a later
+holds through what is never instrumented (no body, header or cookie capture is switched on) and through two masks
+on the two paths AI spans take to Langfuse. AI SDK calls traced with `getAiLangfuseTracer()` pass through
+`PiiMaskingLangfuseSpanProcessor`, which masks phones and emails in every string attribute, event attribute and status
+message (`pii-masking-langfuse-span-processor.spec.ts`). Mastra agent spans (the chat assistant) go through Mastra's
+own Langfuse exporter, and `PiiMaskingSpanOutputProcessor` masks their input, output, attributes, metadata and error
+before export (`pii-masking-span-output-processor.spec.ts`; `mastra.provider.spec.ts` checks it is wired). A new path
+to Langfuse needs its own mask. Rule 11 describes the alert catalog, which arrives in a later
 change to this repo; it holds from the day it does.
 
 ## What the spec does not catch
