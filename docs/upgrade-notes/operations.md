@@ -449,3 +449,20 @@ in the database.
 **What to set first.** Nothing. Run `pnpm test` after the pull and add a declaration for each name the specs print.
 
 **How to turn it back.** Revert the change. There is no switch, because nothing is enforced.
+
+## 2026-11-14: array-form `$transaction` is banned
+
+**What changes when you pull it.** `rls-no-array-transaction.spec.ts` (in `apps/backend/src/architecture/`) fails
+`pnpm test` for any `prisma.$transaction([...])`, any `$transaction(ops)` whose argument is not an inline function,
+and a bare `$transaction()`, in the backend, the foundation packages and their specs. Once a tenant setting is applied
+per transaction, two array transactions started in the same tick by different tenants run under the first tenant's
+context, and a one-element array is not a transaction at all on Prisma 7.3; the interactive form has neither problem.
+The foundation's six array transactions (password reset, default payment method, workspace switch, plan assignment,
+OAuth chain revocation, the login-activity page and total) are now interactive, with the same writes in the same
+order. The shared `createMockPrisma()` no longer accepts an array: a unit test that passes one gets a `TypeError`.
+
+**What to set first.** Nothing. Rewrite each call the spec prints as
+`$transaction(async (tx) => { await tx.a.update(…); await tx.b.update(…); })`, using `tx`, never the root client,
+inside the callback. A spec with its own `$transaction` mock that still has an array branch can drop it.
+
+**How to turn it back.** Revert the change. Nothing at run time depends on it.

@@ -69,8 +69,9 @@ Every request, job, AI tool call and deadline handler also runs in a declared te
 job, cross-tenant work declares `systemScope(reason)` / `forEachTenant` / `@SystemScope`, and every log line carries
 `rls.*`. Every job name, Prisma table, `@OnEvent` handler and super-admin route declares its context, held by the
 `rls-*` specs in `apps/backend/src/architecture/` (app declarations: `platform-glue/queue/job-context.ts`,
-`platform-glue/database/app-rls-registry.ts`). Nothing in the database enforces it yet (no row-level security policy); unit tests run it strict
-(`RLS_STRICT_CONTEXT=throw`).
+`platform-glue/database/app-rls-registry.ts`). Nothing in the database enforces the context yet (no row-level
+security policy); unit tests run it strict (`RLS_STRICT_CONTEXT=throw`). Every transaction is interactive,
+`$transaction(async (tx) => …)`; the array form is banned (`rls-no-array-transaction.spec.ts`).
 
 ---
 

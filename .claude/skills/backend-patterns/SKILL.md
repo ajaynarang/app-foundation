@@ -856,13 +856,18 @@ Creating a parent with children (a project with tasks and members) follows three
 
 **Deleting:** children first, parent last. Order matters because of FK constraints.
 
+**Interactive transactions only.** Always `$transaction(async (tx) => …)` with the callback written inline, and every
+query inside it on `tx`, never `this.prisma`. The array form `$transaction([...])` is banned: once the tenant setting
+is applied per transaction, two tenants' array transactions in the same tick share the first one's context
+(`apps/backend/src/architecture/rls-no-array-transaction.spec.ts` fails `pnpm test` on one).
+
 ```typescript
 // FK-safe delete — leaf tables before referenced tables
-await this.prisma.$transaction([
-  this.prisma.taskComment.deleteMany({ where: { projectId, tenantId } }),
-  this.prisma.task.deleteMany({ where: { projectId, tenantId } }),
-  this.prisma.project.delete({ where: { id: projectId } }),
-]);
+await this.prisma.$transaction(async (tx) => {
+  await tx.taskComment.deleteMany({ where: { projectId, tenantId } });
+  await tx.task.deleteMany({ where: { projectId, tenantId } });
+  await tx.project.delete({ where: { id: projectId } });
+});
 ```
 
 **Don't put external API calls inside `$transaction`.** They hold row locks, can hang on network, and rollback doesn't undo the external side effect. Sequence:
