@@ -1,6 +1,8 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { ConfigService } from '@nestjs/config';
+import { maskPhone } from '@appshore/kernel/shared/utils/log-redaction';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 
 @Injectable()
 export class TwilioVerifyService {
@@ -33,7 +35,7 @@ export class TwilioVerifyService {
 
     if (this.mockOtp) {
       this.logger.debug(
-        `[MOCK] OTP for ${phone}: ${this.mockOtp} (mock active — also sending real OTP if Twilio configured)`,
+        `[MOCK] TWILIO_MOCK_OTP is active for ${maskPhone(phone)} (also sending a real OTP if Twilio is configured)`,
       );
     }
 
@@ -49,7 +51,7 @@ export class TwilioVerifyService {
         .services(this.verifyServiceSid)
         .verifications.create({ to: phone, channel: 'sms' });
     } catch (err: any) {
-      this.logger.error(`Failed to send OTP to ${phone}`, err);
+      this.logger.error({ msg: `Failed to send OTP to ${maskPhone(phone)}`, err: toLoggableError(err) });
       throw new BadRequestException('Failed to send verification code. Please try again.');
     }
   }
@@ -60,7 +62,7 @@ export class TwilioVerifyService {
     // If mock OTP matches, allow immediately (dev shortcut). NEVER in
     // production — a leaked TWILIO_MOCK_OTP would be a universal login code.
     if (this.mockOtp && code === this.mockOtp && getEnvType() !== 'production') {
-      this.logger.debug(`[MOCK] OTP matched for ${phone}`);
+      this.logger.debug(`[MOCK] OTP matched for ${maskPhone(phone)}`);
       return true;
     }
 
@@ -76,7 +78,7 @@ export class TwilioVerifyService {
         .verificationChecks.create({ to: phone, code });
       return result.status === 'approved';
     } catch (err: any) {
-      this.logger.error(`OTP check failed for ${phone}`, err);
+      this.logger.error({ msg: `OTP check failed for ${maskPhone(phone)}`, err: toLoggableError(err) });
       return false;
     }
   }

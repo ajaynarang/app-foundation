@@ -3,6 +3,7 @@ import type { Observable } from 'rxjs';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -25,7 +26,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Only log for MCP/OAuth routes to avoid noise
     if (request?.url === '/' || request?.url?.includes('/mcp')) {
       this.logger.log(
-        `JwtAuthGuard — url=${request.url}, handler=${handler}, controller=${controller}, isPublic=${isPublic}`,
+        `JwtAuthGuard — url=${stripQueryString(request.url)}, handler=${handler}, controller=${controller}, isPublic=${isPublic}`,
       );
     }
 

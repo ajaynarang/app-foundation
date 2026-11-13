@@ -14,6 +14,7 @@ import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constan
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -134,7 +135,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
         where: { id: logId },
         data: { responseStatus: response.status, responseBody, attempts: { increment: 1 }, deliveredAt: new Date() },
       });
-      this.logger.log(`Delivered ${payload.event} to ${subscription.url} → ${response.status}`);
+      this.logger.log(`Delivered ${payload.event} to ${stripQueryString(subscription.url)} → ${response.status}`);
       return;
     }
     // Non-2xx, a 3xx included (redirects are never followed): record it and throw so BullMQ retries.
@@ -173,7 +174,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   /** The target is not (or is no longer) a public address. Retrying cannot help, so fail it now, visibly. */
   private async refuse(logId: string, url: string, error: unknown): Promise<never> {
     const reason = `Refused: ${error instanceof Error ? error.message : 'the webhook URL is not a public address'}`;
-    this.logger.warn(`Refused delivery ${logId} to ${url}: ${reason}`);
+    this.logger.warn(`Refused delivery ${logId} to ${stripQueryString(url)}: ${reason}`);
     await this.recordAttempt(logId, { responseStatus: null, responseBody: reason.slice(0, 1000) }, true);
     throw new UnrecoverableError(reason);
   }

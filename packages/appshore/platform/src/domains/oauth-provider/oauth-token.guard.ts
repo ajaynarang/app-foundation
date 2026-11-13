@@ -3,6 +3,7 @@ import { OAuthProviderService } from './oauth-provider.service';
 import { fromOAuthUser } from '../../auth/agent-principal';
 import type { AgentPrincipal } from '../../auth/agent-principal';
 import type { AgentScope } from '@app/shared-types';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 export interface OAuthUser {
   userId: string;
@@ -22,7 +23,9 @@ export class OAuthTokenGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    this.logger.log(`OAuthTokenGuard invoked — method=${request.method}, url=${request.url}, hasAuth=${!!authHeader}`);
+    this.logger.log(
+      `OAuthTokenGuard invoked — method=${request.method}, url=${stripQueryString(request.url)}, hasAuth=${!!authHeader}`,
+    );
 
     if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException({
@@ -35,7 +38,7 @@ export class OAuthTokenGuard implements CanActivate {
     const payload = await this.oauthService.validateAccessToken(token);
 
     if (!payload) {
-      this.logger.warn(`Token validation failed — method=${request.method}, url=${request.url}`);
+      this.logger.warn(`Token validation failed — method=${request.method}, url=${stripQueryString(request.url)}`);
       throw new UnauthorizedException({
         error: 'invalid_token',
         error_description: 'Token is invalid or expired',
