@@ -42,6 +42,7 @@ function buildRes(): { res: Response; status: jest.Mock; json: jest.Mock } {
 describe('BullBoardAuthMiddleware', () => {
   let middleware: BullBoardAuthMiddleware;
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalEnvType = process.env.ENV_TYPE;
   const originalBullBoardAuth = process.env.BULL_BOARD_AUTH;
 
   beforeEach(async () => {
@@ -60,6 +61,8 @@ describe('BullBoardAuthMiddleware', () => {
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+    else process.env.ENV_TYPE = originalEnvType;
     if (originalBullBoardAuth === undefined) {
       delete process.env.BULL_BOARD_AUTH;
     } else {
@@ -68,8 +71,8 @@ describe('BullBoardAuthMiddleware', () => {
   });
 
   describe('dev bypass', () => {
-    it('calls next() when BULL_BOARD_AUTH=false in non-production', () => {
-      process.env.NODE_ENV = 'development';
+    it('calls next() when BULL_BOARD_AUTH=false with ENV_TYPE=development', () => {
+      process.env.ENV_TYPE = 'development';
       process.env.BULL_BOARD_AUTH = 'false';
 
       const req = buildReq();
@@ -82,25 +85,43 @@ describe('BullBoardAuthMiddleware', () => {
       expect(res.status).not.toHaveBeenCalled();
     });
 
-    it('does NOT bypass when NODE_ENV=production even if BULL_BOARD_AUTH=false', () => {
-      process.env.NODE_ENV = 'production';
+    it.each(['production', 'sandbox', 'preprod'])(
+      'does NOT bypass when ENV_TYPE=%s even if BULL_BOARD_AUTH=false',
+      (envType) => {
+        process.env.ENV_TYPE = envType;
+        process.env.NODE_ENV = 'development';
+        process.env.BULL_BOARD_AUTH = 'false';
+
+        const req = buildReq(); // no token
+        const { res, status, json } = buildRes();
+        const next = jest.fn();
+
+        middleware.use(req, res, next);
+
+        expect(next).not.toHaveBeenCalled();
+        expect(status).toHaveBeenCalledWith(401);
+        expect(json).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+        );
+      },
+    );
+
+    it('does NOT bypass when ENV_TYPE is unset, whatever NODE_ENV says', () => {
+      delete process.env.ENV_TYPE;
+      process.env.NODE_ENV = 'development';
       process.env.BULL_BOARD_AUTH = 'false';
 
       const req = buildReq(); // no token
-      const { res, status, json } = buildRes();
+      const { res } = buildRes();
       const next = jest.fn();
 
       middleware.use(req, res, next);
 
       expect(next).not.toHaveBeenCalled();
-      expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith(
-        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
-      );
     });
 
     it('does NOT bypass when BULL_BOARD_AUTH is not set', () => {
-      process.env.NODE_ENV = 'development';
+      process.env.ENV_TYPE = 'development';
       delete process.env.BULL_BOARD_AUTH;
 
       const req = buildReq(); // no token
