@@ -115,6 +115,7 @@ describe('HitlChallengeService', () => {
     });
     expect(r).toBeNull();
     expect(prisma.hitlChallenge.update).not.toHaveBeenCalled();
+    expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
   });
 
   it('consume rejects when principal mismatch', async () => {
@@ -218,7 +219,7 @@ describe('HitlChallengeService', () => {
       consumedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    prisma.hitlChallenge.update.mockResolvedValue({});
+    prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
     const r = await svc.consume('1', {
       tenantId: 7,
       principalId: 'oauth:c',
@@ -226,12 +227,14 @@ describe('HitlChallengeService', () => {
       argsDigest: 'abc',
     });
     expect(r?.id).toBe(1);
-    expect(prisma.hitlChallenge.update).toHaveBeenCalledWith(
+    // Spent with a conditional update: only a row still unconsumed is marked.
+    expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 1 },
+        where: { id: 1, consumedAt: null },
         data: expect.objectContaining({ consumedAt: expect.any(Date) }),
       }),
     );
+    expect(prisma.hitlChallenge.update).not.toHaveBeenCalled();
     expect(events.emit).toHaveBeenCalledWith(
       expect.stringMatching(/hitl-challenge-completed/),
       '7',
@@ -252,7 +255,7 @@ describe('HitlChallengeService', () => {
       consumedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
     });
-    prisma.hitlChallenge.update.mockResolvedValue({});
+    prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
     const r = await svc.consume('1', {
       tenantId: 7,
       principalId: 'oauth:c',
@@ -262,14 +265,68 @@ describe('HitlChallengeService', () => {
     expect(r?.id).toBe(1);
   });
 
-  it('markStepUpCompleted sets stepUpCompleted=true for the right user+token combo', async () => {
-    prisma.hitlChallenge.update.mockResolvedValue({ id: 1 });
-    await svc.markStepUpCompleted('1', 42);
-    expect(prisma.hitlChallenge.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 1, stepUpUserId: 42, stepUpCompleted: false },
-        data: { stepUpCompleted: true },
-      }),
-    );
+  const openRow = () => ({
+    id: 1,
+    tenantId: 7,
+    principalId: 'oauth:c',
+    toolName: 'void-invoice',
+    argsDigest: 'abc',
+    tier: 'standard',
+    stepUpRequired: false,
+    stepUpCompleted: false,
+    consumedAt: null,
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  const consumeInput = { tenantId: 7, principalId: 'oauth:c', toolName: 'void-invoice', argsDigest: 'abc' };
+
+  it('consume refuses, and emits nothing, when another call spent the token between the read and the write', async () => {
+    prisma.hitlChallenge.findFirst.mockResolvedValue(openRow());
+    prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 0 });
+    expect(await svc.consume('1', consumeInput)).toBeNull();
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it('two concurrent consumes of one token: exactly one wins (single use)', async () => {
+    // Both reads see the open row (the race window); the conditional update lets only the first write through.
+    prisma.hitlChallenge.findFirst.mockImplementation(async () => openRow());
+    let consumedAt: Date | null = null;
+    prisma.hitlChallenge.updateMany.mockImplementation(async ({ where, data }: any) => {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (where.consumedAt === null && consumedAt === null) {
+        consumedAt = data.consumedAt;
+        return { count: 1 };
+      }
+      return { count: 0 };
+    });
+
+    const results = await Promise.all([svc.consume('1', consumeInput), svc.consume('1', consumeInput)]);
+
+    expect(results.filter((r) => r !== null)).toHaveLength(1);
+    expect(events.emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('markStepUpCompleted marks an open challenge for the person it names, and says so', async () => {
+    prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
+    expect(await svc.markStepUpCompleted('1', 42)).toBe(true);
+    expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 1,
+        stepUpUserId: 42,
+        stepUpCompleted: false,
+        consumedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: { stepUpCompleted: true },
+    });
+  });
+
+  it('markStepUpCompleted refuses a used, expired, already-completed or other-person challenge', async () => {
+    prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 0 });
+    expect(await svc.markStepUpCompleted('1', 42)).toBe(false);
+  });
+
+  it('markStepUpCompleted refuses a token that is not an id, without a query', async () => {
+    expect(await svc.markStepUpCompleted('not-a-token', 42)).toBe(false);
+    expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
   });
 });

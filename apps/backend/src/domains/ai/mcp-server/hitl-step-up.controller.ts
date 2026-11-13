@@ -104,7 +104,9 @@ export class HitlStepUpController {
     const ok = await this.pinService.verifyPin(dto.pin, record.pinHash);
     if (!ok) throw fieldError('pin', 'That PIN is not right');
 
-    await this.challenges.markStepUpCompleted(token, user.dbId);
+    if (!(await this.challenges.markStepUpCompleted(token, user.dbId))) {
+      throw new NotFoundException('Challenge not found, already used or expired');
+    }
     return { status: 'step_up_verified' };
   }
 }

@@ -110,31 +110,43 @@ export class HitlChallengeService {
     if (row.argsDigest !== input.argsDigest) return null;
     if (row.stepUpRequired && !row.stepUpCompleted) return null;
 
-    await this.outbox.transaction(async (tx, emit) => {
-      await tx.hitlChallenge.update({
-        where: { id },
+    // Spend it with a conditional update (`consumed_at IS NULL`), so two racing retries of one token cannot both
+    // pass the read above and both run the write: the second update matches no row and is refused.
+    const spent = await this.outbox.transaction(async (tx, emit) => {
+      const { count } = await tx.hitlChallenge.updateMany({
+        where: { id, consumedAt: null },
         data: { consumedAt: new Date() },
       });
+      if (count === 0) return false;
       await emit(DOMAIN_EVENTS.AGENT_HITL_CHALLENGE_COMPLETED, String(row.tenantId), {
         token,
         toolName: row.toolName,
       });
+      return true;
     });
+    if (!spent) return null;
 
     return row;
   }
 
-  async markStepUpCompleted(token: string, authenticatedUserId: number): Promise<void> {
+  /**
+   * Mark a challenge's PIN step-up done, for the person it names. Only an open challenge: never one already used,
+   * expired or already stepped up. Returns whether a challenge was marked.
+   */
+  async markStepUpCompleted(token: string, authenticatedUserId: number): Promise<boolean> {
     const id = parseHitlTokenOrNull(token);
-    if (id === null) return;
-    await this.prisma.hitlChallenge.update({
+    if (id === null) return false;
+    const { count } = await this.prisma.hitlChallenge.updateMany({
       where: {
         id,
         stepUpUserId: authenticatedUserId,
         stepUpCompleted: false,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
       },
       data: { stepUpCompleted: true },
     });
+    return count === 1;
   }
 
   /**
