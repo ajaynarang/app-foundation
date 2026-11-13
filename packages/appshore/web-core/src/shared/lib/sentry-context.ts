@@ -1,8 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 
-/** Tag keys searchable in Sentry. Values are identifiers only, never names, emails or phones. */
+/**
+ * Tag keys searchable in Sentry. Values are identifiers only, never names, emails or phones. The keys match the
+ * backend's (`tenantId` is the public id there too), so one search finds a tenant's events on both surfaces.
+ */
 export const SENTRY_TAG = {
-  tenant: 'tenant',
+  tenantId: 'tenantId',
   role: 'role',
   requestId: 'requestId',
 } as const;
@@ -19,7 +22,7 @@ export interface SentryAuthIdentity {
  */
 export function syncSentryAuthTags(identity: SentryAuthIdentity | null): void {
   Sentry.setTags({
-    [SENTRY_TAG.tenant]: identity?.tenantId || undefined,
+    [SENTRY_TAG.tenantId]: identity?.tenantId || undefined,
     [SENTRY_TAG.role]: identity?.role || undefined,
   });
 }
