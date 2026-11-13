@@ -9,6 +9,7 @@ import { redactArgs, digestArgs } from './arg-redactor';
 import { HitlChallengeService } from './hitl-challenge.service';
 import { ToolAccessPolicyService } from './tool-access-policy.service';
 import { validateToolArgs } from './tool-args';
+import { scopesForRole } from './role-scopes';
 import { CONFIRM_TOKEN_PARAM } from './tool-input-schema';
 import { toolFailure } from '../mcp/tools/tool-error';
 
@@ -18,7 +19,8 @@ import { toolFailure } from '../mcp/tools/tool-error';
  *
  * 1. The tool exists; its scope is not never-external for this principal; the principal holds the scope.
  * 2. The arguments parse against the tool's own zod schema; every `_`-prefixed key the caller sent is dropped.
- * 3. Role: `@RestrictToRoles` against the acting person's current role in this workspace.
+ * 3. Role: the acting person must be a member of this workspace (Desk exempt); `@RestrictToRoles` against their
+ *    current role; a chat principal's scopes are capped at that role's scopes.
  * 4. Plan: `@RequiresPlanFeature` judged by the same rule as the REST guard.
  * 5. Confirmation for any tier above read (third-party agents answer a challenge; Desk is gated inside Desk).
  * 6. Audit row, execute, audit result.
@@ -80,6 +82,13 @@ export class InvocationPipelineService {
     const role = await this.policy.actingRole(principal);
     const roleDenial = this.policy.checkRole(principal, toolName, role);
     if (roleDenial) return roleDenial;
+    // A chat principal's scopes come from the conversation's persona, which the client picked when it opened the
+    // conversation (and which outlives a demotion). Cap them at the scopes of the person's CURRENT role here, so a
+    // MEMBER in an "owner" or "super_admin" conversation is judged as a MEMBER. `role` is non-null past checkRole.
+    if (principal.kind === 'user' && role && !scopesForRole(role).includes(scope)) {
+      this.logger.warn(`scope_denied (acting role): ${principal.auditId} is ${role}, lacks ${scope} for ${toolName}`);
+      return this.scopeDenied(scope, scopesForRole(role));
+    }
     const planDenial = await this.policy.checkPlan(principal, toolName, role);
     if (planDenial) return planDenial;
 

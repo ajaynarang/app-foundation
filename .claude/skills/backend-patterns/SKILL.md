@@ -1867,8 +1867,9 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   `confirm-action` and an external agent is challenged from the scope alone.
 - **Role.** A tool whose REST twin has `@Roles(...)` declares `@RestrictToRoles([...])` with the same roles. The
   pipeline reads the acting person's current `WorkspaceMember` role in the principal's workspace (the OAuth
-  client's person, the API key's owner), never the persona or the home tenant. No membership row is a refusal.
-  Desk is exempt.
+  client's person, the API key's owner), never the persona or the home tenant. No membership row is a refusal on
+  every tool, restricted or not. A chat principal's persona scopes are capped at the current role's scopes. Desk is
+  exempt.
 - **Plan.** A tool whose REST twin has `@RequireFeature(key)` declares `@RequiresPlanFeature(key)`. The pipeline
   runs the real `PlanGuard` against a synthetic request (`ToolAccessPolicyService.evaluateFeature`), for every
   principal kind including Desk. Never copy the plan rule.

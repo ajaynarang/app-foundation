@@ -9,6 +9,7 @@ import { ToolAccessPolicyService } from '../tool-access-policy.service';
 import { fromUser, fromOAuthUser, fromDeskResponsibility, fromApiKey } from '@appshore/platform/auth/agent-principal';
 import { z } from 'zod';
 import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
+import { scopesForRole } from '../role-scopes';
 
 const mockRegistry = {
   scopeForTool: jest.fn(),
@@ -363,6 +364,81 @@ describe('InvocationPipelineService', () => {
       const res = await svc.run(p, 'w', {});
       expect(res.content[0].text).toMatch(/hitl_required/);
       expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('membership and the acting role (step 3, the real policy)', () => {
+    const prisma = { workspaceMember: { findUnique: jest.fn() }, tenant: { findUnique: jest.fn() } };
+    const registry = { ...mockRegistry, roleRestrictionForTool: jest.fn(), planFeatureForTool: jest.fn() };
+    let real: InvocationPipelineService;
+
+    beforeEach(() => {
+      prisma.workspaceMember.findUnique.mockReset();
+      registry.roleRestrictionForTool.mockReturnValue(undefined);
+      registry.planFeatureForTool.mockReturnValue(undefined);
+      const policy = new ToolAccessPolicyService(registry as any, prisma as any, { canActivate: jest.fn() } as any);
+      real = new InvocationPipelineService(
+        registry as any,
+        mockHitl,
+        mockExecutor as any,
+        mockLogger as any,
+        mockChallenges as any,
+        policy,
+      );
+    });
+
+    it('refuses an API key whose owner has no membership, on an unrestricted read', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['list-support-tickets']));
+      mockHitl.resolveTier.mockReturnValue('none');
+      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      const key = fromApiKey({ apiKeyId: 2, tenantId: 3, userId: 12, scopes: ['platform:read'] });
+
+      const res = await real.run(key, 'list-support-tickets', {});
+
+      expect(res.isError).toBeFalsy();
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        status: 'role_not_permitted',
+        tool: 'list-support-tickets',
+      });
+      expect(prisma.workspaceMember.findUnique).toHaveBeenCalledWith({
+        where: { userId_tenantId: { userId: 12, tenantId: 3 } },
+        select: { role: true },
+      });
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it("caps a chat persona's scopes at the user's current role: a MEMBER in a super_admin conversation", async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['void-invoice']));
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+      // The persona picked by the client says SUPER_ADMIN; its scope set holds the sensitive write.
+      const chat = fromUser({ userId: 4, tenantId: 9, role: 'SUPER_ADMIN', scopes: scopesForRole('SUPER_ADMIN') });
+
+      const res = await real.run(chat, 'void-invoice', { id: 1 });
+
+      expect(res.isError).toBe(true);
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        error: 'scope_denied',
+        required_scope: 'platform:write:sensitive',
+      });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('lets the same persona through when the current role holds the scope', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['void-invoice']));
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      mockLogger.writePending.mockResolvedValue('row-o');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'voided' }] });
+      prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'OWNER' });
+      const chat = fromUser({ userId: 4, tenantId: 9, role: 'OWNER', scopes: scopesForRole('OWNER') });
+
+      const res = await real.run(chat, 'void-invoice', { id: 1 });
+
+      expect(res.content[0].text).toBe('voided');
     });
   });
 

@@ -167,8 +167,8 @@ export class McpToolService implements OnModuleInit {
   ): Promise<unknown> {
     if (!this.pipeline) return { error: TOOL_PIPELINE_UNAVAILABLE, tool: toolName };
 
-    // `role` here only selects the scope set (it mirrors the persona). A tool's `@RestrictToRoles` is checked in the
-    // pipeline against the user's current role in this workspace.
+    // `role` here only selects the persona's scope set. The pipeline caps it at the scopes of the user's current
+    // role in this workspace and checks `@RestrictToRoles` against that role, so a persona never widens access.
     const role = userMode.toUpperCase();
     const principal = fromUser({
       userId: context.userDbId,

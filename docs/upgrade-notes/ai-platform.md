@@ -654,7 +654,10 @@ rewrites the table on its next run.
   null for Desk), spread last.
 - Role. `@RestrictToRoles([...])` on a tool limits it to those workspace roles, read from `WorkspaceMember` for the
   acting person (the chat user, the person an OAuth client acts for, an API key's owner) in the principal's
-  workspace. A person with no membership row there is refused. Desk is exempt.
+  workspace. A person with no membership row there is refused on every tool, restricted or not, so an API key or
+  OAuth grant whose owner left the workspace stops working through the agent surface. Desk is exempt. A chat
+  principal's scopes (chosen by the conversation's persona) are capped at the scopes of the user's current role, so
+  a persona above the user's role no longer widens what chat can run.
 - Plan. `@RequiresPlanFeature(key)` runs the real `PlanGuard` for the workspace, for every principal kind.
 - Role and plan refusals are plain results (`status: 'role_not_permitted'` / `'not_on_plan'` with a `message`), not
   errors, and they come before any confirmation.
@@ -698,6 +701,8 @@ rewrites the table on its next run.
 - An external agent holding a challenge token from before the deploy: the challenge digest is now taken over the
   parsed arguments (defaults applied, unknown keys dropped), so a replay of such a token may no longer match. It
   fails closed (`hitl_invalid_or_expired`); call again for a new token. Tokens expire within minutes anyway.
+- An API key or OAuth grant whose owner has no `WorkspaceMember` row in the key's workspace: every tool call now
+  answers `role_not_permitted`. Re-add the person or issue a new key from a current member.
 - Heavy users of one OAuth connector: each person now has their own 120-a-minute budget, under the workspace's
   ceiling of 600.
 
