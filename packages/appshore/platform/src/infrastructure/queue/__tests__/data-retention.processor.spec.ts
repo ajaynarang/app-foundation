@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { getQueueToken } from '@nestjs/bullmq';
 import { DataRetentionJobHandler } from '../data-retention.processor';
 import { PrismaService } from '../../database/prisma.service';
@@ -108,5 +109,24 @@ describe('DataRetentionJobHandler', () => {
 
     expect(jobCleanupJob.cleanupOldJobs).toHaveBeenCalled();
     expect(result).toEqual({ deletedCount: 7 });
+  });
+
+  it('runs data retention and job cleanup as declared cross-tenant work, each under its own reason', async () => {
+    const seen: unknown[] = [];
+    prisma.loginEvent.deleteMany.mockImplementation(async () => {
+      seen.push(currentRls());
+      return { count: 0 };
+    });
+    jobCleanupJob.cleanupOldJobs.mockImplementation(async () => {
+      seen.push(currentRls());
+      return { deletedCount: 0 };
+    });
+    const envelope = { tenantId: 'system', payload: {}, metadata: { source: 'cron', enqueuedAt: '', version: 1 } };
+    await processor.run({ id: 'r1', name: BULK_OPS_JOB_NAMES.DATA_RETENTION, data: envelope } as any);
+    await processor.run({ id: 'r2', name: BULK_OPS_JOB_NAMES.JOB_CLEANUP, data: envelope } as any);
+    expect(seen).toEqual([
+      { kind: 'system', reason: 'sweep.data-retention' },
+      { kind: 'system', reason: 'sweep.job-cleanup' },
+    ]);
   });
 });

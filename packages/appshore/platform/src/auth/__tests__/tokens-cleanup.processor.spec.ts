@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import type { Job } from 'bullmq';
 import { JOB_EVENTS } from '@appshore/kernel/infrastructure/queue/job-events';
 import { TokensCleanupJobHandler } from '../tokens-cleanup.processor';
@@ -30,5 +31,18 @@ describe('TokensCleanupJobHandler', () => {
       new TokensCleanupJobHandler(jwtTokens as unknown as JwtTokenService).run({ name: 'tokens-cleanup' } as Job),
     ).rejects.toThrow('db down');
     expect(logSpy).not.toHaveBeenCalledWith(expect.objectContaining({ event: JOB_EVENTS.CRON_COMPLETED }));
+  });
+
+  it('runs the sweep as declared cross-tenant work (sweep.tokens-cleanup)', async () => {
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    let seen: unknown;
+    const jwtTokens = {
+      cleanupExpiredTokens: jest.fn(async () => {
+        seen = currentRls();
+        return 0;
+      }),
+    };
+    await new TokensCleanupJobHandler(jwtTokens as unknown as JwtTokenService).run({ name: 'tokens-cleanup' } as Job);
+    expect(seen).toEqual({ kind: 'system', reason: 'sweep.tokens-cleanup' });
   });
 });

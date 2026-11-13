@@ -9,6 +9,7 @@ import {
   WHATSAPP_STALE_SWEEP_JOB_NAME,
   WHATSAPP_STALE_UNCLAIMED_AFTER_MS,
 } from './whatsapp.constants';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 /**
  * Rows a deploy window strands. An old worker completes an unknown job name
@@ -24,6 +25,11 @@ export class WhatsAppStaleSweepHandler implements QueueJobHandler {
   constructor(private readonly ledger: DeliveryLedgerService) {}
 
   async run(_job: Job<JobEnvelope<unknown>>): Promise<{ unclaimed: number; claimed: number }> {
+    // Ledger rows of every tenant: declared cross-tenant work.
+    return systemScope('sweep.whatsapp-stale', () => this.sweep());
+  }
+
+  private async sweep(): Promise<{ unclaimed: number; claimed: number }> {
     const cron = new CronRun(this.logger, WHATSAPP_STALE_SWEEP_JOB_NAME);
     const now = Date.now();
     const unclaimed = await this.ledger.staleQueued({

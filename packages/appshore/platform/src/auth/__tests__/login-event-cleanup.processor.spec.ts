@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { LoginEventCleanupJobHandler } from '../login-event-cleanup.processor';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -75,5 +76,15 @@ describe('LoginEventCleanupJobHandler', () => {
     const eventAt91Days = new Date();
     eventAt91Days.setDate(eventAt91Days.getDate() - 91);
     expect(cutoff.getTime()).toBeGreaterThan(eventAt91Days.getTime());
+  });
+
+  it('runs the sweep as declared cross-tenant work (sweep.login-events-cleanup)', async () => {
+    let seen: unknown;
+    mockPrisma.loginEvent.deleteMany.mockImplementation(async () => {
+      seen = currentRls();
+      return { count: 0 };
+    });
+    await processor.run({ name: BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP } as any);
+    expect(seen).toEqual({ kind: 'system', reason: 'sweep.login-events-cleanup' });
   });
 });

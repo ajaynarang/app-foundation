@@ -9,7 +9,10 @@ import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constan
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { RLS_SOURCE, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 import { APP_JOB_NAMES } from '../../../../platform-glue/queue/job-names';
+import { APP_SYSTEM_REASONS } from '../../../../platform-glue/queue/job-context';
 import { AiCredentialConnectService } from './ai-credential-connect.service';
 
 /** Credentials tested in parallel: each test is a live call of up to 15 seconds. */
@@ -18,6 +21,8 @@ export const REVALIDATION_CHUNK = 5;
 export const REVALIDATION_SLICE_MS = 2 * 60 * 1000;
 /** The clock the slice reads; a spec binds a fake one. */
 export const REVALIDATION_CLOCK = Symbol('REVALIDATION_CLOCK');
+
+const CREDENTIAL_SOURCE = `${RLS_SOURCE.CRON}:${APP_SYSTEM_REASONS.AI_CREDENTIAL_REVALIDATE}`;
 
 const SYSTEM_ACTOR: EventActor = { id: 'system', type: 'system', label: 'scheduled AI credential revalidation' };
 
@@ -48,6 +53,11 @@ export class AiCredentialRevalidationHandler implements QueueJobHandler {
   ) {}
 
   async run(job: Job<JobEnvelope<RevalidationPayload>>): Promise<void> {
+    // Credentials of every workspace: listed as declared cross-tenant work, each one tested as its own workspace.
+    return systemScope(APP_SYSTEM_REASONS.AI_CREDENTIAL_REVALIDATE, () => this.sweep(job));
+  }
+
+  private async sweep(job: Job<JobEnvelope<RevalidationPayload>>): Promise<void> {
     // Each slice is one CronRun: cron-missed reads the last success, so the extra completions of a sliced sweep do
     // no harm. A credential whose probe fails is the sweep working (the key turns FAILING); a thrown error is not.
     const cron = new CronRun(this.logger, APP_JOB_NAMES.BULK_OPS.AI_CREDENTIAL_REVALIDATE);
@@ -74,7 +84,9 @@ export class AiCredentialRevalidationHandler implements QueueJobHandler {
       await Promise.all(
         chunk.map(async (credential) => {
           try {
-            const result = await this.connect.validate(credential.tenantId, credential.publicId, SYSTEM_ACTOR);
+            const result = await runAsTenant(credential.tenantId, CREDENTIAL_SOURCE, () =>
+              this.connect.validate(credential.tenantId, credential.publicId, SYSTEM_ACTOR),
+            );
             if (result.probe.ok) ok++;
             else failed++;
             cron.succeeded();

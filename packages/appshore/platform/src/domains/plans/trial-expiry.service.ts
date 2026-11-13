@@ -8,6 +8,7 @@ import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
+import { forEachTenant } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 const TENANT_ADDON_STATUS = TenantAddOnStatusEnum.enum;
 
@@ -38,77 +39,80 @@ export class TrialExpiryService implements QueueJobHandler {
     const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.TRIAL_EXPIRY);
 
     const now = new Date();
-
-    // Only process ACTIVE tenants — skip PENDING_APPROVAL, REJECTED, SUSPENDED
-    const expiredTrialTenants = await this.prisma.tenant.findMany({
-      where: {
-        plan: TenantPlan.TRIAL,
-        status: TenantStatus.ACTIVE,
-        trialEndsAt: { lte: now },
-      },
-      select: {
-        id: true,
-        tenantId: true,
-        plan: true,
-      },
-    });
-
-    if (expiredTrialTenants.length === 0) {
-      cron.complete({ expired: 0 });
-      return { expired: 0 };
-    }
-
-    this.logger.log(`Found ${expiredTrialTenants.length} expired trial(s) to process.`);
-
     let expired = 0;
 
-    for (const tenant of expiredTrialTenants) {
-      try {
-        await this.prisma.$transaction(async (tx) => {
-          await tx.tenant.update({
-            where: { id: tenant.id },
-            data: {
-              plan: TenantPlan.TRIAL_EXPIRED,
-              planAssignedAt: now,
-              planAssignedBy: 'system-cron',
-            },
-          });
-
-          await tx.tenantPlanEvent.create({
-            data: {
-              id: generateUuidV7(),
-              tenantId: tenant.id,
-              fromPlan: TenantPlan.TRIAL,
-              toPlan: TenantPlan.TRIAL_EXPIRED,
-              changedBy: 'system-cron',
-              reason: 'Trial period ended automatically',
-            },
-          });
-
-          // Cancel all gifted add-ons — trial perks end with the trial
-          await tx.tenantAddOn.updateMany({
-            where: {
-              tenantId: tenant.id,
-              source: 'gifted',
-              status: TENANT_ADDON_STATUS.ACTIVE,
-            },
-            data: {
-              status: TENANT_ADDON_STATUS.CANCELLED,
-              cancelledAt: now,
-              cancelledBy: 'system-trial-expiry',
-            },
-          });
+    // Lists ACTIVE trial tenants of every tenant under the declared reason, then expires each as its own tenant.
+    // Only ACTIVE tenants: PENDING_APPROVAL, REJECTED and SUSPENDED are skipped.
+    await forEachTenant(
+      'cron.trial-expiry',
+      async () => {
+        const rows = await this.prisma.tenant.findMany({
+          where: {
+            plan: TenantPlan.TRIAL,
+            status: TenantStatus.ACTIVE,
+            trialEndsAt: { lte: now },
+          },
+          select: {
+            id: true,
+            tenantId: true,
+            plan: true,
+          },
         });
-
-        expired++;
-        cron.succeeded();
-        this.logger.log(`Trial expired for tenant: ${tenant.tenantId}`);
-      } catch (err) {
-        cron.failed(tenant.id, err, tenant.tenantId);
-      }
-    }
+        if (rows.length > 0) this.logger.log(`Found ${rows.length} expired trial(s) to process.`);
+        return rows;
+      },
+      async (tenant) => {
+        try {
+          await this.expireOne(tenant.id, now);
+          expired++;
+          cron.succeeded();
+          this.logger.log(`Trial expired for tenant: ${tenant.tenantId}`);
+        } catch (err) {
+          cron.failed(tenant.id, err, tenant.tenantId);
+        }
+      },
+    );
 
     cron.complete({ expired });
     return { expired };
+  }
+
+  /** One tenant: TRIAL → TRIAL_EXPIRED, the plan event, and its gifted add-ons cancelled, in one transaction. */
+  private async expireOne(tenantDbId: number, now: Date): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantDbId },
+        data: {
+          plan: TenantPlan.TRIAL_EXPIRED,
+          planAssignedAt: now,
+          planAssignedBy: 'system-cron',
+        },
+      });
+
+      await tx.tenantPlanEvent.create({
+        data: {
+          id: generateUuidV7(),
+          tenantId: tenantDbId,
+          fromPlan: TenantPlan.TRIAL,
+          toPlan: TenantPlan.TRIAL_EXPIRED,
+          changedBy: 'system-cron',
+          reason: 'Trial period ended automatically',
+        },
+      });
+
+      // Cancel all gifted add-ons — trial perks end with the trial
+      await tx.tenantAddOn.updateMany({
+        where: {
+          tenantId: tenantDbId,
+          source: 'gifted',
+          status: TENANT_ADDON_STATUS.ACTIVE,
+        },
+        data: {
+          status: TENANT_ADDON_STATUS.CANCELLED,
+          cancelledAt: now,
+          cancelledBy: 'system-trial-expiry',
+        },
+      });
+    });
   }
 }

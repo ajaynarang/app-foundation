@@ -1,6 +1,7 @@
 import { TrialExpiryService } from '../trial-expiry.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { Logger } from '@nestjs/common';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 
 describe('TrialExpiryService', () => {
@@ -94,6 +95,25 @@ describe('TrialExpiryService', () => {
         expect.objectContaining({ event: 'cron.completed', jobName: 'trial-expiry' }),
       );
       jest.restoreAllMocks();
+    });
+  });
+
+  describe('tenant context', () => {
+    it('lists tenants as declared cross-tenant work and expires each one as its own tenant', async () => {
+      const seen: unknown[] = [];
+      prisma.tenant.findMany.mockImplementation(async () => {
+        seen.push(currentRls());
+        return [mockTenant, { ...mockTenant, id: 2, tenantId: 'tenant_def' }];
+      });
+      prisma.$transaction.mockImplementation(async () => {
+        seen.push(currentRls());
+      });
+      await service.expireTrials();
+      expect(seen).toEqual([
+        { kind: 'system', reason: 'cron.trial-expiry' },
+        { kind: 'tenant', tenantId: 1, source: 'cron:cron.trial-expiry' },
+        { kind: 'tenant', tenantId: 2, source: 'cron:cron.trial-expiry' },
+      ]);
     });
   });
 });

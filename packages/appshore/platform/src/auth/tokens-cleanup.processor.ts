@@ -5,6 +5,7 @@ import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 import { JwtTokenService } from './jwt.service';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 /**
  * Owns `tokens-cleanup` on the `bulk-ops` queue: deletes refresh-token rows no session can use
@@ -20,7 +21,8 @@ export class TokensCleanupJobHandler implements QueueJobHandler {
 
   async run(_job: Job<JobEnvelope<unknown>>): Promise<{ deleted: number }> {
     const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.TOKENS_CLEANUP);
-    const deleted = await this.jwtTokens.cleanupExpiredTokens();
+    // Refresh tokens of every tenant: declared cross-tenant work.
+    const deleted = await systemScope('sweep.tokens-cleanup', () => this.jwtTokens.cleanupExpiredTokens());
     cron.complete({ deleted });
     return { deleted };
   }

@@ -6,6 +6,7 @@ import { NOTIFICATIONS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/q
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
 import { NotificationTriggersService } from './notification-triggers.service';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 /**
  * Owns the housekeeping cron sweeps on the `notifications` queue.
@@ -31,7 +32,8 @@ export class NotificationJobsHandler implements QueueJobHandler {
     switch (job.name) {
       case NOTIFICATIONS_JOB_NAMES.CLEANUP: {
         const cron = new CronRun(this.logger, NOTIFICATIONS_JOB_NAMES.CLEANUP);
-        const result = await this.runCleanup();
+        // Notifications of every tenant: declared cross-tenant work.
+        const result = await systemScope('sweep.notification-cleanup', () => this.runCleanup());
         cron.complete(result);
         return result;
       }
