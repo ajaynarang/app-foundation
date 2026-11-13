@@ -15,8 +15,8 @@ import { RequiresScope } from '../requires-scope.decorator';
 import { intentDigest } from '../intent-digest';
 
 /**
- * Chat confirmation bound to the exact write, against real Postgres (item 8b, ported from Sally's
- * `chat-confirmation.integration.spec.ts`). Real HitlChallengeService, registry, HITL tiers, executor and pipeline;
+ * Chat confirmation bound to the exact write, against real Postgres (item 8b, ported from the reference
+ * implementation's `chat-confirmation.integration.spec.ts`). Real HitlChallengeService, registry, HITL tiers, executor and pipeline;
  * role and plan are stubbed (covered by their own specs) and the audit log is a no-op.
  *
  * A Confirm for one write cannot be spent on a different tool, on the same tool with other arguments, in another
