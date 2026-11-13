@@ -130,7 +130,8 @@ summary, description or runbook link; a runbook link whose file under `docs/runb
 that differ; a query that does not filter its environment and this product's service; a group-by label outside the
 reviewed list (no user, request or job id, phone, email or amount); a `level` value pino-loki never writes; a Logger
 context that is no `new Logger(X.name)` in the code; an `app_*` metric `metrics.ts` does not create; a `sum` over an
-ops gauge; any rule but `ecs-service-gone-worker` selecting on the worker.
+ops gauge; any rule but `ecs-service-gone-worker` selecting on the worker; notification routing that sends anything
+but a production `sev1` (checked for every env and severity, and every rule's labels) to `irm-oncall`.
 
 `pnpm check:ops` runs on `pnpm verify` and on the pre-push hook when a push touches `infra/`, `docs/runbooks/`,
 `.github/` or `tools/`. The manual workflow `.github/workflows/grafana-as-code.yml` runs the same script, and

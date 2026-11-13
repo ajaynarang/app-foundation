@@ -15,7 +15,9 @@
 //     names no personal-data field; matches only `level` values pino-loki emits;
 //   - every Logger context a query names is a real `new Logger(X.name)` in the code, and every `app_*` metric is one
 //     metrics.ts creates; ops gauges (reported by every API task when there is no worker) aggregate with max, never sum;
-//   - only the worker service-gone rule selects on the worker.
+//   - only the worker service-gone rule selects on the worker;
+//   - the notification policies route a production sev1 to the on-call contact point and every other alert (every
+//     env x severity, and every shipped rule's labels) to the notify one.
 //
 // The checks read the catalog's own output, not a re-parse of the YAML: the first check proves the two are equal.
 
@@ -23,8 +25,8 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { RULE_AREAS } from '../catalog/alert-rules.mjs';
-import { buildRuleFiles } from '../catalog/build-alerting.mjs';
-import { ENVS, HAS_WORKER, RUNBOOK_BASE, RUNBOOK_DIR, SERVICE } from '../catalog/constants.mjs';
+import { buildPolicies, buildRuleFiles } from '../catalog/build-alerting.mjs';
+import { CONTACT_POINTS, ENVS, HAS_WORKER, RUNBOOK_BASE, RUNBOOK_DIR, SERVICE } from '../catalog/constants.mjs';
 import { DASHBOARDS } from '../catalog/dashboards/index.mjs';
 import { ROOT, outputs, staleFiles } from './generate.mjs';
 import { isMain } from './lib/is-main.mjs';
@@ -173,7 +175,36 @@ export function loadInputs(repoRoot = REPO_ROOT) {
     metrics: metricSeriesNames(repoRoot),
     envs: ENVS,
     hasWorker: HAS_WORKER,
+    policies: buildPolicies(),
   };
+}
+
+// ---- routing -------------------------------------------------------------------------
+
+/** The one environment whose sev1 alerts page a human (the routing model: everything else notifies). */
+export const PAGING_ENV = 'production';
+
+function matches([label, op, value], labels) {
+  const actual = labels[label] ?? '';
+  if (op === '=') return actual === value;
+  if (op === '!=') return actual !== value;
+  if (op === '=~') return new RegExp(`^(?:${value})$`).test(actual);
+  if (op === '!~') return !new RegExp(`^(?:${value})$`).test(actual);
+  throw new Error(`unknown matcher operator "${op}"`);
+}
+
+/**
+ * The receiver an alert with these labels reaches, walking a notification policy tree as Grafana does: the first
+ * child whose matchers all hold wins (recursively, inheriting the receiver it does not set); no match keeps the
+ * parent's receiver. The catalog sets no `continue`, so one receiver per alert.
+ */
+export function routeAlert(policy, labels) {
+  for (const child of policy.routes ?? []) {
+    if ((child.object_matchers ?? []).every((m) => matches(m, labels))) {
+      return routeAlert({ ...child, receiver: child.receiver ?? policy.receiver }, labels);
+    }
+  }
+  return policy.receiver;
 }
 
 // ---- the checks ----------------------------------------------------------------
@@ -306,6 +337,37 @@ export function validateCatalog(input) {
     for (const anchor of runbookAnchors(text)) {
       if (!anchorsUsed.has(`${rbFile}#${anchor}`))
         problem(`${RUNBOOK_DIR}/${rbFile}: "## " heading #${anchor} is no rule's runbook anchor`);
+    }
+  }
+
+  // ---- routing: a production sev1 pages; everything else, staging sev1 included, notifies ----
+  if (input.policies) {
+    const trees = input.policies.policies ?? [];
+    if (trees.length !== 1) problem(`routing: expected one notification policy tree, found ${trees.length}`);
+    const [root] = trees;
+    const expected = (labels) =>
+      labels.env === PAGING_ENV && labels.severity === 'sev1' ? CONTACT_POINTS.oncall : CONTACT_POINTS.notify;
+    if (root) {
+      for (const e of envs) {
+        for (const severity of ['sev1', 'sev2']) {
+          const labels = { env: e.name, severity };
+          const got = routeAlert(root, labels);
+          if (got !== expected(labels))
+            problem(`routing: env=${e.name} severity=${severity} reaches ${got}; expected ${expected(labels)}`);
+        }
+      }
+      for (const { doc } of ruleFiles) {
+        for (const group of doc.groups) {
+          for (const rule of group.rules) {
+            const labels = rule.labels ?? {};
+            const got = routeAlert(root, labels);
+            if (got !== expected(labels))
+              problem(
+                `routing: rule ${rule.uid} (env=${labels.env} severity=${labels.severity}) reaches ${got}; expected ${expected(labels)}`,
+              );
+          }
+        }
+      }
     }
   }
 

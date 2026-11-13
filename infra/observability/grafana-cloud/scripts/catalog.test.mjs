@@ -5,13 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buildRuleFiles } from '../catalog/build-alerting.mjs';
-import { ENVS, PROJECT, REPO_URL_PLACEHOLDER, RUNBOOK_BASE, SERVICE } from '../catalog/constants.mjs';
+import { buildPolicies, buildRuleFiles } from '../catalog/build-alerting.mjs';
+import { CONTACT_POINTS, ENVS, PROJECT, REPO_URL_PLACEHOLDER, RUNBOOK_BASE, SERVICE } from '../catalog/constants.mjs';
 import { DASHBOARDS } from '../catalog/dashboards/index.mjs';
 import { outputs, staleFiles, writeAll } from './generate.mjs';
 import { parseArgs, preflight, substitute, substitutionsFrom } from './grafana-apply.mjs';
 import { toYaml } from './lib/yaml-emit.mjs';
-import { catalogRunbookRefs, loadInputs, metricSeriesNames, validateCatalog, REPO_ROOT } from './validate.mjs';
+import {
+  catalogRunbookRefs,
+  loadInputs,
+  metricSeriesNames,
+  routeAlert,
+  validateCatalog,
+  REPO_ROOT,
+} from './validate.mjs';
 
 // ---- yaml-emit ------------------------------------------------------------------
 
@@ -249,6 +256,73 @@ test('a paused rule, a rule missing in one environment, or a stray "$" fails', (
   assert.match(parity.join('\n'), /rule parity: production and staging differ on api-5xx-rate/);
   const stray = check([rule({ description: 'costs $HOME' })]);
   assert.match(stray.join('\n'), /stray "\$"/);
+});
+
+// ---- routing: a production sev1 pages, everything else notifies ------------------
+
+test('the policy tree notifies by default and has one paging route, for a production sev1', () => {
+  const { policies } = buildPolicies();
+  assert.equal(policies.length, 1);
+  const [root] = policies;
+  assert.equal(root.receiver, CONTACT_POINTS.notify);
+  assert.deepEqual(root.routes, [
+    {
+      receiver: CONTACT_POINTS.oncall,
+      object_matchers: [
+        ['env', '=', 'production'],
+        ['severity', '=', 'sev1'],
+      ],
+    },
+  ]);
+});
+
+test('routeAlert walks the tree: the first matching child wins, else the parent receiver', () => {
+  const root = buildPolicies().policies[0];
+  assert.equal(routeAlert(root, { env: 'production', severity: 'sev1' }), CONTACT_POINTS.oncall);
+  assert.equal(routeAlert(root, { env: 'production', severity: 'sev2' }), CONTACT_POINTS.notify);
+  assert.equal(routeAlert(root, { env: 'staging', severity: 'sev1' }), CONTACT_POINTS.notify);
+  assert.equal(routeAlert(root, {}), CONTACT_POINTS.notify);
+  const regex = { receiver: 'a', routes: [{ receiver: 'b', object_matchers: [['env', '=~', 'prod.*']] }] };
+  assert.equal(routeAlert(regex, { env: 'production' }), 'b');
+  assert.equal(routeAlert(regex, { env: 'xproduction' }), 'a');
+  const negated = { receiver: 'a', routes: [{ receiver: 'b', object_matchers: [['env', '!=', 'staging']] }] };
+  assert.equal(routeAlert(negated, { env: 'staging' }), 'a');
+  assert.equal(routeAlert(negated, { env: 'production' }), 'b');
+});
+
+function routingProblems(mutate, { ruleFiles } = {}) {
+  const policies = buildPolicies();
+  mutate(policies.policies[0]);
+  const real = loadInputs();
+  const { problems } = validateCatalog({ ...real, ruleFiles: ruleFiles ?? real.ruleFiles, policies });
+  return problems.filter((p) => p.startsWith('routing:'));
+}
+
+test('validate fails when a staging sev1 would page', () => {
+  const problems = routingProblems((root) => {
+    root.routes[0].object_matchers = root.routes[0].object_matchers.filter(([label]) => label !== 'env');
+  });
+  assert.match(problems.join('\n'), /routing: env=staging severity=sev1 reaches irm-oncall; expected irm-notify/);
+});
+
+test('validate fails when a production sev1 would not page, or a sev2 would', () => {
+  const noPage = routingProblems((root) => (root.routes = []));
+  assert.match(noPage.join('\n'), /routing: env=production severity=sev1 reaches irm-notify; expected irm-oncall/);
+  const sev2 = routingProblems((root) => (root.receiver = CONTACT_POINTS.oncall));
+  assert.match(sev2.join('\n'), /routing: env=production severity=sev2 reaches irm-oncall; expected irm-notify/);
+});
+
+test('validate checks every rule against the routing, not only the env and severity grid', () => {
+  const ruleFiles = buildRuleFiles([{ area: 'api', interval: '1m', rules: [rule({ severity: 'sev2' })] }]).map(
+    ({ area, doc }) => ({ file: `alerting/rules/${area}.yaml`, doc, text: toYaml(doc) }),
+  );
+  const fine = routingProblems(() => {}, { ruleFiles });
+  assert.deepEqual(fine, []);
+  const problems = routingProblems(
+    (root) => root.routes.unshift({ receiver: CONTACT_POINTS.oncall, object_matchers: [['signal', '=', 'loki']] }),
+    { ruleFiles },
+  );
+  assert.match(problems.join('\n'), /routing: rule stg-api-5xx-rate \(env=staging severity=sev2\) reaches irm-oncall/);
 });
 
 test('every runbook link starts at the repository runbook base', () => {
