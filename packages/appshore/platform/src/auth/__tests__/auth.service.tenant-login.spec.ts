@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Logger, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from '../auth.service';
 import { IdentityResolverService } from '../identity-resolver.service';
@@ -266,6 +266,23 @@ describe('AuthService.forgotPassword — every account behind the address', () =
     await service.forgotPassword({ email: 'sam@example.com', tenantId: 'ten_b' });
     expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
     expect(prisma.passwordResetToken.create.mock.calls[0][0].data.userId).toBe(11);
+  });
+
+  it('a send that fails resolves quietly and logs neither the reset link nor the address', async () => {
+    const { service, email } = build({ users: [account(10, tenantA)] });
+    email.sendEmail.mockRejectedValueOnce(new Error('No email provider is configured'));
+    const spies = (['log', 'warn', 'error', 'debug'] as const).map((level) =>
+      jest.spyOn(Logger.prototype, level).mockImplementation(() => undefined),
+    );
+
+    await expect(service.forgotPassword({ email: 'sam@example.com' })).resolves.toBeUndefined();
+
+    const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
+    expect(logged).toContain('Password reset email was not sent');
+    expect(logged).not.toContain('reset-password');
+    expect(logged).not.toContain('token=');
+    expect(logged).not.toContain('sam@example.com');
+    spies.forEach((spy) => spy.mockRestore());
   });
 
   it('disabled accounts get nothing, and an unknown address resolves quietly', async () => {

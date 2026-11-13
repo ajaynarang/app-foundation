@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isDevelopmentEnv } from '../../shared/utils/env-label';
+import { maskPhone } from '../../shared/utils/log-redaction';
+import { toLoggableError } from '../queue/job-events';
 
 @Injectable()
 export class SmsService {
@@ -36,7 +39,15 @@ export class SmsService {
 
   async sendSms(to: string, message: string): Promise<boolean> {
     if (!this.isConfiguredFlag) {
-      this.logger.warn(`SMS not sent to ${to} — Twilio not configured. Message: ${message}`);
+      // On a developer's machine the message is printed so OTP and PIN flows still work; anywhere else one line with
+      // a masked number and no body (the body is usually a code).
+      if (isDevelopmentEnv()) {
+        this.logger.warn(
+          `SMS not sent to ${maskPhone(to)} (Twilio not configured, ENV_TYPE=development). Message: ${message}`,
+        );
+      } else {
+        this.logger.warn(`SMS not sent to ${maskPhone(to)}: Twilio not configured`);
+      }
       return false;
     }
 
@@ -46,10 +57,11 @@ export class SmsService {
         from: this.fromNumber,
         to,
       });
-      this.logger.log(`SMS sent to ${to}`);
+      this.logger.log(`SMS sent to ${maskPhone(to)}`);
       return true;
-    } catch (error: any) {
-      this.logger.error(`SMS send failed to ${to}: ${error.message}`);
+    } catch (error: unknown) {
+      // Twilio's errors echo the number they refused; the err serializer masks it.
+      this.logger.error({ msg: `SMS send failed to ${maskPhone(to)}`, err: toLoggableError(error) });
       return false;
     }
   }

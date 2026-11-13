@@ -27,6 +27,7 @@ import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/pl
 import { toUserProfile } from './user-profile';
 import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
 import { ApiErrorCode, type WorkspaceChoice } from '@app/shared-types';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 
 @Injectable()
 export class AuthService {
@@ -255,7 +256,8 @@ export class AuthService {
   /**
    * Forgot-password: always resolves 200 (no account enumeration). Stores a
    * SHA-256 hash of a one-time token; the raw token goes into the emailed
-   * link. Without SMTP configured (local dev) the link is logged instead.
+   * link. With no email provider on a developer's machine (ENV_TYPE=development) the email service prints the
+   * message, link included; anywhere else the send fails and the link is never logged.
    *
    * One token and one email for each live, active account behind the address (after the hint). With more than one,
    * each email names its workspace so the reader knows which account the link resets.
@@ -290,9 +292,9 @@ export class AuthService {
         text: `Hi ${user.firstName},\n\nReset your password for your account${forAccount} (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
       });
     } catch (err) {
-      // No SMTP in local dev — surface the link in the server log so the
-      // flow still works end-to-end.
-      this.logger.warn(`Email delivery unavailable — password reset link for ${email}: ${resetUrl}`);
+      // Never the link: it is a live credential. On a developer's machine with no provider the email service has
+      // already printed the message, link included (ENV_TYPE=development console mode).
+      this.logger.warn({ msg: 'Password reset email was not sent', err: toLoggableError(err) });
     }
   }
 

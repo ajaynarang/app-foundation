@@ -2,6 +2,21 @@ import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as nodemailer from 'nodemailer';
+import { isDevelopmentEnv } from '@appshore/kernel/shared/utils/env-label';
+import { maskEmail } from '@appshore/kernel/shared/utils/log-redaction';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+
+/**
+ * Thrown by `sendEmail` when no provider (Resend or SMTP) is configured outside `ENV_TYPE=development`. A message
+ * that cannot be sent fails loudly instead of being printed to a log a vendor may hold, where it would carry reset
+ * links and invitation tokens.
+ */
+export class EmailNotConfiguredError extends Error {
+  constructor() {
+    super('No email provider is configured: set RESEND_API_KEY or the SMTP_* keys');
+    this.name = 'EmailNotConfiguredError';
+  }
+}
 
 export interface SendEmailOptions {
   to: string;
@@ -58,11 +73,12 @@ export class EmailService {
       return;
     }
 
-    // Development mode - just log to console
+    // No provider. On a developer's machine (ENV_TYPE=development) each message is printed to the log, so the
+    // zero-config flows (reset, invitation) still work; anywhere else every send throws EmailNotConfiguredError.
     this.emailProvider = 'console';
     this.logger.warn(
-      'Email service running in CONSOLE mode - emails will be logged but not sent. ' +
-        'Set RESEND_API_KEY or SMTP credentials to enable actual email sending.',
+      'Email service has no provider: with ENV_TYPE=development each message is printed to the log; in any other ' +
+        'environment every send fails. Set RESEND_API_KEY or SMTP credentials to send email.',
     );
   }
 
@@ -79,13 +95,14 @@ export class EmailService {
           await this.sendWithNodemailer({ ...options, from: fromEmail });
           break;
         case 'console':
+          if (!isDevelopmentEnv()) throw new EmailNotConfiguredError();
           this.logToConsole({ ...options, from: fromEmail });
           break;
       }
 
-      this.logger.log(`Email sent successfully to ${options.to} via ${this.emailProvider}`);
+      this.logger.log(`Email sent to ${maskEmail(options.to)} via ${this.emailProvider}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}:`, error);
+      this.logger.error({ msg: `Failed to send email to ${maskEmail(options.to)}`, err: toLoggableError(error) });
       throw error;
     }
   }
@@ -122,23 +139,18 @@ export class EmailService {
     });
   }
 
+  /** Development only (`sendEmail` checks): the message as a developer needs it, with every address masked. */
   private logToConsole(options: SendEmailOptions): void {
-    this.logger.log('========================================');
-    this.logger.log('EMAIL (Console Mode)');
-    this.logger.log('========================================');
-    this.logger.log(`From: ${options.from}`);
-    this.logger.log(`To: ${options.to}`);
-    if (options.cc && options.cc.length > 0) {
-      this.logger.log(`Cc: ${options.cc.join(', ')}`);
-    }
-    if (options.replyTo) {
-      this.logger.log(`Reply-To: ${options.replyTo}`);
-    }
-    this.logger.log(`Subject: ${options.subject}`);
-    this.logger.log('----------------------------------------');
-    this.logger.log('HTML Content:');
-    this.logger.log(options.html);
-    this.logger.log('========================================');
+    const lines = [
+      'EMAIL (console mode, ENV_TYPE=development)',
+      `To: ${maskEmail(options.to)}`,
+      ...(options.cc && options.cc.length > 0 ? [`Cc: ${options.cc.map((cc) => maskEmail(cc)).join(', ')}`] : []),
+      ...(options.replyTo ? [`Reply-To: ${maskEmail(options.replyTo)}`] : []),
+      `Subject: ${options.subject}`,
+      '----------------------------------------',
+      options.text ?? options.html,
+    ];
+    this.logger.log(lines.join('\n'));
   }
 
   /**

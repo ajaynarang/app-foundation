@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { EmailService } from '../email.service';
+import { Logger } from '@nestjs/common';
+import { EmailNotConfiguredError, EmailService } from '../email.service';
 
 // Mock resend and nodemailer
 jest.mock('resend', () => ({
@@ -18,6 +19,16 @@ jest.mock('nodemailer', () => ({
 describe('EmailService', () => {
   describe('console mode (no providers)', () => {
     let service: EmailService;
+    let logged: () => string;
+    const originalEnvType = process.env.ENV_TYPE;
+    const message = {
+      to: 'Person@Example.com',
+      cc: ['copy@example.com'],
+      replyTo: 'reply@example.com',
+      subject: 'Reset your password',
+      html: '<p><a href="http://localhost:3000/reset-password?token=raw-secret-token">Reset</a></p>',
+      text: 'Reset: http://localhost:3000/reset-password?token=raw-secret-token',
+    };
 
     beforeEach(async () => {
       const module: TestingModule = await Test.createTestingModule({
@@ -32,17 +43,48 @@ describe('EmailService', () => {
         ],
       }).compile();
       service = module.get<EmailService>(EmailService);
+      const spies = (['log', 'warn', 'error', 'debug', 'verbose'] as const).map((level) =>
+        jest.spyOn(Logger.prototype, level).mockImplementation(() => undefined),
+      );
+      logged = () => JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
     });
 
-    it('should not throw in console mode', async () => {
-      await expect(
-        service.sendEmail({
-          to: 'test@example.com',
-          subject: 'Test',
-          html: '<p>Hello</p>',
-        }),
-      ).resolves.toBeUndefined();
+    afterEach(() => {
+      jest.restoreAllMocks();
+      if (originalEnvType === undefined) delete process.env.ENV_TYPE;
+      else process.env.ENV_TYPE = originalEnvType;
     });
+
+    it('prints the message with masked addresses when ENV_TYPE=development', async () => {
+      process.env.ENV_TYPE = 'development';
+
+      await expect(service.sendEmail(message)).resolves.toBeUndefined();
+
+      expect(logged()).toContain('Reset your password');
+      expect(logged()).toContain('reset-password?token=raw-secret-token');
+      expect(logged()).toContain('p***@example.com');
+      expect(logged()).not.toContain('Person@Example.com');
+      expect(logged()).not.toContain('copy@example.com');
+      expect(logged()).not.toContain('reply@example.com');
+    });
+
+    it.each(['production', 'sandbox', 'preprod', undefined])(
+      'with ENV_TYPE=%s throws EmailNotConfiguredError and logs no recipient, body or link',
+      async (envType) => {
+        if (envType === undefined) delete process.env.ENV_TYPE;
+        else process.env.ENV_TYPE = envType;
+
+        await expect(service.sendEmail(message)).rejects.toBeInstanceOf(EmailNotConfiguredError);
+
+        const text = logged();
+        expect(text).not.toContain('raw-secret-token');
+        expect(text).not.toContain('reset-password');
+        expect(text).not.toContain('Person@Example.com');
+        expect(text.toLowerCase()).not.toContain('person@example.com');
+        expect(text).not.toContain('copy@example.com');
+        expect(text).not.toContain('Reset:');
+      },
+    );
   });
 
   describe('resend mode', () => {
