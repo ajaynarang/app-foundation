@@ -12,6 +12,7 @@ describe('DataRetentionJobHandler', () => {
     webhookDeliveryLog: { deleteMany: jest.Mock };
     job: { deleteMany: jest.Mock };
     domainEventLog: { deleteMany: jest.Mock };
+    hitlChallenge: { deleteMany: jest.Mock };
   };
   let jobCleanupJob: { cleanupOldJobs: jest.Mock };
 
@@ -21,6 +22,7 @@ describe('DataRetentionJobHandler', () => {
       webhookDeliveryLog: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       job: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
       domainEventLog: { deleteMany: jest.fn().mockResolvedValue({ count: 4 }) },
+      hitlChallenge: { deleteMany: jest.fn().mockResolvedValue({ count: 5 }) },
     };
     jobCleanupJob = { cleanupOldJobs: jest.fn().mockResolvedValue({ deletedCount: 7 }) };
 
@@ -36,7 +38,7 @@ describe('DataRetentionJobHandler', () => {
     processor = module.get<DataRetentionJobHandler>(DataRetentionJobHandler);
   });
 
-  it('runs the four cleanup queries for DATA_RETENTION jobs', async () => {
+  it('runs the cleanup queries for DATA_RETENTION jobs', async () => {
     const result = await processor.run({
       id: 'j1',
       name: BULK_OPS_JOB_NAMES.DATA_RETENTION,
@@ -47,11 +49,32 @@ describe('DataRetentionJobHandler', () => {
     expect(prisma.webhookDeliveryLog.deleteMany).toHaveBeenCalled();
     expect(prisma.job.deleteMany).toHaveBeenCalled();
     expect(prisma.domainEventLog.deleteMany).toHaveBeenCalled();
+    expect(prisma.hitlChallenge.deleteMany).toHaveBeenCalled();
     expect(result).toEqual({
       loginEventsDeleted: 1,
       webhookLogsDeleted: 2,
       completedJobsDeleted: 3,
       domainEventLogsDeleted: 4,
+      hitlChallengesDeleted: 5,
+    });
+  });
+
+  it('deletes agent confirmation challenges 24 hours after they expire, and only those', async () => {
+    const now = Date.parse('2026-11-13T12:00:00.000Z');
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await processor.run({
+        id: 'j3',
+        name: BULK_OPS_JOB_NAMES.DATA_RETENTION,
+        data: { tenantId: 'system', payload: {}, metadata: { source: 'cron', enqueuedAt: '', version: 1 } },
+      } as any);
+    } finally {
+      jest.restoreAllMocks();
+    }
+
+    // Keyed on expiry, not creation: an open or recently expired challenge stays for the approval UI and audit.
+    expect(prisma.hitlChallenge.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lt: new Date(now - 24 * 60 * 60 * 1000) } },
     });
   });
 
