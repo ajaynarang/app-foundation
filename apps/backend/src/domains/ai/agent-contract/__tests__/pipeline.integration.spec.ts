@@ -131,7 +131,9 @@ describe('Phase A pipeline integration', () => {
     } as any;
     // The read tool declares no plan feature, so the guard is never consulted; the membership read is real.
     const policy = new ToolAccessPolicyService(scopeRegistry, prisma as any, { canActivate: async () => true } as any);
-    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges, policy);
+    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges, policy, {
+      get: () => undefined,
+    } as never);
   }, 30_000);
 
   afterAll(async () => {

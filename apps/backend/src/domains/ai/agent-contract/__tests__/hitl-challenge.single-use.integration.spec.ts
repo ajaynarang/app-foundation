@@ -150,7 +150,7 @@ describe('HITL challenge single use (Postgres)', () => {
       ),
     );
 
-    expect(results.filter((r) => r !== null)).toHaveLength(1);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
     const row = await prisma.hitlChallenge.findUniqueOrThrow({ where: { id: Number(token) } });
     expect(row.consumedAt).not.toBeNull();
     const completed = await prisma.outboxEvent.count({
@@ -162,8 +162,8 @@ describe('HITL challenge single use (Postgres)', () => {
   it('a spent token is refused on the next replay', async () => {
     if (!dbReachable) return;
     const token = await openChallenge();
-    expect(await consume(token)).not.toBeNull();
-    expect(await consume(token)).toBeNull();
+    expect(await consume(token)).toMatchObject({ ok: true });
+    expect(await consume(token)).toEqual({ ok: false, reason: 'invalid' });
   }, 30_000);
 
   it('step-up cannot be completed on a used or an expired challenge', async () => {

@@ -141,6 +141,7 @@ describe('chat confirmation is bound to the exact write (Postgres)', () => {
       audit as never,
       challenges,
       allow as never,
+      { get: () => undefined } as never,
     );
   }, 30_000);
 
@@ -273,6 +274,6 @@ describe('chat confirmation is bound to the exact write (Postgres)', () => {
         toolName: NOTE_TOOL,
         argsDigest: row.argsDigest,
       }),
-    ).toBeNull();
+    ).toEqual({ ok: false, reason: 'invalid' });
   }, 30_000);
 });

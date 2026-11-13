@@ -39,6 +39,7 @@ describe('tool arguments are validated before execution, for every tool on disk'
       auditLogger as never,
       { issue: jest.fn(), consume: jest.fn() } as never,
       policy as never,
+      { get: () => undefined } as never,
     );
   });
 

@@ -11,6 +11,10 @@ describe('toolInputSchema (what tools/list serves)', () => {
     expect(schema.required).toEqual(['subject']);
     expect(props[CONFIRM_TOKEN_PARAM].description).toMatch(/hitl_required/);
     expect(props[CONFIRM_TOKEN_PARAM].description).toMatch(/approvalUrl/);
+    // The default for a standard write: wait for a person, and tell "wait" from "start over".
+    expect(props[CONFIRM_TOKEN_PARAM].description).toMatch(/approval_required/);
+    expect(props[CONFIRM_TOKEN_PARAM].description).toMatch(/approval_pending/);
+    expect(props[CONFIRM_TOKEN_PARAM].description).toMatch(/approval_denied/);
   });
 
   it('gives a tool with no zod schema an empty object schema plus the token', () => {

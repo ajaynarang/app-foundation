@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { Prisma } from '@appshore/db';
 import { HitlChallengeService } from '../hitl-challenge.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
@@ -113,7 +114,7 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'abc',
     });
-    expect(r).toBeNull();
+    expect(r).toEqual({ ok: false, reason: 'invalid' });
     expect(prisma.hitlChallenge.update).not.toHaveBeenCalled();
     expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
   });
@@ -137,7 +138,7 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'abc',
     });
-    expect(r).toBeNull();
+    expect(r).toEqual({ ok: false, reason: 'invalid' });
   });
 
   it('consume rejects when toolName mismatch', async () => {
@@ -159,7 +160,7 @@ describe('HitlChallengeService', () => {
       toolName: 'other-tool',
       argsDigest: 'abc',
     });
-    expect(r).toBeNull();
+    expect(r).toEqual({ ok: false, reason: 'invalid' });
   });
 
   it('consume rejects when argsDigest mismatch', async () => {
@@ -181,10 +182,10 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'different',
     });
-    expect(r).toBeNull();
+    expect(r).toEqual({ ok: false, reason: 'invalid' });
   });
 
-  it('consume rejects sensitive tokens whose step-up has not completed', async () => {
+  it('consume answers pending, without spending it, for sensitive tokens whose step-up has not completed', async () => {
     prisma.hitlChallenge.findFirst.mockResolvedValue({
       id: 1,
       tenantId: 7,
@@ -203,7 +204,7 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'abc',
     });
-    expect(r).toBeNull();
+    expect(r).toEqual({ ok: false, reason: 'pending' });
   });
 
   it('consume succeeds + marks consumed + emits completed event on standard-tier match', async () => {
@@ -226,11 +227,11 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'abc',
     });
-    expect(r?.id).toBe(1);
+    expect(r).toMatchObject({ ok: true, row: { id: 1 } });
     // Spent with a conditional update: only a row still unconsumed is marked.
     expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 1, consumedAt: null },
+        where: { id: 1, consumedAt: null, deniedAt: null },
         data: expect.objectContaining({ consumedAt: expect.any(Date) }),
       }),
     );
@@ -262,7 +263,7 @@ describe('HitlChallengeService', () => {
       toolName: 'void-invoice',
       argsDigest: 'abc',
     });
-    expect(r?.id).toBe(1);
+    expect(r).toMatchObject({ ok: true, row: { id: 1 } });
   });
 
   const openRow = () => ({
@@ -282,7 +283,7 @@ describe('HitlChallengeService', () => {
   it('consume refuses, and emits nothing, when another call spent the token between the read and the write', async () => {
     prisma.hitlChallenge.findFirst.mockResolvedValue(openRow());
     prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 0 });
-    expect(await svc.consume('1', consumeInput)).toBeNull();
+    expect(await svc.consume('1', consumeInput)).toEqual({ ok: false, reason: 'invalid' });
     expect(events.emit).not.toHaveBeenCalled();
   });
 
@@ -301,7 +302,7 @@ describe('HitlChallengeService', () => {
 
     const results = await Promise.all([svc.consume('1', consumeInput), svc.consume('1', consumeInput)]);
 
-    expect(results.filter((r) => r !== null)).toHaveLength(1);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(events.emit).toHaveBeenCalledTimes(1);
   });
 
@@ -311,9 +312,11 @@ describe('HitlChallengeService', () => {
     expect(prisma.hitlChallenge.updateMany).toHaveBeenCalledWith({
       where: {
         id: 1,
+        stepUpRequired: true,
         stepUpUserId: 42,
         stepUpCompleted: false,
         consumedAt: null,
+        deniedAt: null,
         expiresAt: { gt: expect.any(Date) },
         conversationId: null,
       },
@@ -335,6 +338,131 @@ describe('HitlChallengeService', () => {
     prisma.hitlChallenge.findFirst.mockResolvedValue(null);
     await svc.consume('5', { tenantId: 7, principalId: 'user:4', toolName: 't', argsDigest: 'd' });
     expect(prisma.hitlChallenge.findFirst.mock.calls[0][0].where).toMatchObject({ id: 5, conversationId: null });
+  });
+
+  describe('in-app approval of external agent writes (item 8c)', () => {
+    const standardPrincipal = fromOAuthUser({
+      onBehalfOfUserDbId: 1,
+      tenantDbId: 7,
+      role: 'MEMBER',
+      scopes: ['platform:write'],
+      clientId: 'c',
+    });
+    const approvalRow = (over: Record<string, unknown> = {}) => ({
+      ...openRow(),
+      approvalRequired: true,
+      approvedAt: null,
+      deniedAt: null,
+      ...over,
+    });
+
+    it('issue stores the exact arguments for the approver and gives the person an hour', async () => {
+      prisma.hitlChallenge.create.mockResolvedValue({ id: 9 });
+      const out = await svc.issue({
+        principal: standardPrincipal,
+        toolName: 'create-thing',
+        scopeRequired: 'platform:write',
+        tier: 'standard',
+        argsDigest: 'abc',
+        approvalRequired: true,
+        argsPreview: { subject: 'Ada', email: 'ada@example.com' },
+      });
+      expect(out).toMatchObject({ token: '9', approvalRequired: true, ttlSeconds: 3600 });
+      const { data } = prisma.hitlChallenge.create.mock.calls[0][0];
+      expect(data).toMatchObject({ approvalRequired: true, argsPreview: { subject: 'Ada', email: 'ada@example.com' } });
+      expect(data).not.toHaveProperty('argsRedacted');
+    });
+
+    it('issue never makes a sensitive write an approval row: the PIN is its approval, and it keeps the redacted copy only', async () => {
+      prisma.hitlChallenge.create.mockResolvedValue({ id: 10 });
+      const out = await svc.issue({
+        ...baseInput,
+        approvalRequired: true,
+        argsPreview: { email: 'ada@example.com' },
+        argsRedacted: { email: '[redacted-email]' },
+      });
+      expect(out).toMatchObject({ approvalRequired: false, stepUpRequired: true, ttlSeconds: 300 });
+      const { data } = prisma.hitlChallenge.create.mock.calls[0][0];
+      expect(data.approvalRequired).toBe(false);
+      expect(data).not.toHaveProperty('argsPreview');
+      expect(data.argsRedacted).toEqual({ email: '[redacted-email]' });
+    });
+
+    it('issue without approval stores no preview (self-confirm)', async () => {
+      prisma.hitlChallenge.create.mockResolvedValue({ id: 11 });
+      await svc.issue({
+        principal: standardPrincipal,
+        toolName: 'create-thing',
+        scopeRequired: 'platform:write',
+        tier: 'standard',
+        argsDigest: 'abc',
+        approvalRequired: false,
+        argsPreview: { subject: 'Ada' },
+      });
+      const { data } = prisma.hitlChallenge.create.mock.calls[0][0];
+      expect(data.approvalRequired).toBe(false);
+      expect(data).not.toHaveProperty('argsPreview');
+    });
+
+    it('consume answers pending, and spends nothing, while no person has approved', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValue(approvalRow());
+      expect(await svc.consume('1', consumeInput)).toEqual({ ok: false, reason: 'pending' });
+      expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('consume answers denied for a request a person turned down, approval or PIN row alike', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValue(approvalRow({ deniedAt: new Date() }));
+      expect(await svc.consume('1', consumeInput)).toEqual({ ok: false, reason: 'denied' });
+      prisma.hitlChallenge.findFirst.mockResolvedValue({
+        ...openRow(),
+        stepUpRequired: true,
+        stepUpCompleted: false,
+        deniedAt: new Date(),
+      });
+      expect(await svc.consume('1', consumeInput)).toEqual({ ok: false, reason: 'denied' });
+      expect(prisma.hitlChallenge.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('consume spends an approved request once and drops the approver copy of its arguments', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValue(approvalRow({ approvedAt: new Date() }));
+      prisma.hitlChallenge.updateMany.mockResolvedValue({ count: 1 });
+      expect(await svc.consume('1', consumeInput)).toMatchObject({ ok: true });
+      const { data } = prisma.hitlChallenge.updateMany.mock.calls[0][0];
+      expect(data.consumedAt).toEqual(expect.any(Date));
+      expect(data.argsPreview).toBe(Prisma.DbNull);
+    });
+
+    it('a wrong caller, tool or digest is invalid even on an approved request', async () => {
+      prisma.hitlChallenge.findFirst.mockResolvedValue(approvalRow({ approvedAt: new Date() }));
+      expect(await svc.consume('1', { ...consumeInput, argsDigest: 'other' })).toEqual({
+        ok: false,
+        reason: 'invalid',
+      });
+    });
+
+    it('tenantAllowsSelfConfirm reads the workspace switch, off unless set', async () => {
+      prisma.tenant.findUnique.mockResolvedValueOnce({ agentSelfConfirm: true }).mockResolvedValueOnce(null);
+      expect(await svc.tenantAllowsSelfConfirm(7)).toBe(true);
+      expect(await svc.tenantAllowsSelfConfirm(7)).toBe(false);
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({ where: { id: 7 }, select: { agentSelfConfirm: true } });
+    });
+
+    it("callerOf names the OAuth client from this workspace or a tenant-less one, never another tenant's", async () => {
+      prisma.oAuthClient.findFirst.mockResolvedValue({ name: 'Claude' });
+      expect(await svc.callerOf({ principalKind: 'oauth_client', principalId: 'oauth:c', tenantId: 7 })).toEqual({
+        kind: 'oauth_client',
+        label: 'Claude',
+      });
+      expect(prisma.oAuthClient.findFirst.mock.calls[0][0].where).toEqual({
+        clientId: 'c',
+        OR: [{ tenantId: 7 }, { tenantId: null }],
+      });
+      prisma.apiKey.findUnique.mockResolvedValue(null);
+      expect(await svc.callerOf({ principalKind: 'api_key', principalId: 'apikey:3', tenantId: 7 })).toEqual({
+        kind: 'api_key',
+        label: 'An API key',
+      });
+    });
   });
 
   describe('chat grants (item 8b)', () => {

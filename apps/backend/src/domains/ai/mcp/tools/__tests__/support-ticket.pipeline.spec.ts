@@ -68,7 +68,12 @@ describe('example tool pair through the whole pipeline', () => {
   };
   const plans = { getTenantPlan: jest.fn(), isFeatureEnabled: jest.fn() };
   const audit = { writePending: jest.fn(), completeSuccess: jest.fn(), completeError: jest.fn() };
-  const challenges = { issue: jest.fn(), consume: jest.fn(), consumeChatGrant: jest.fn() };
+  const challenges = {
+    issue: jest.fn(),
+    consume: jest.fn(),
+    consumeChatGrant: jest.fn(),
+    tenantAllowsSelfConfirm: jest.fn(),
+  };
   let pipeline: InvocationPipelineService;
 
   beforeAll(async () => {
@@ -92,6 +97,7 @@ describe('example tool pair through the whole pipeline', () => {
       audit as never,
       challenges as never,
       new ToolAccessPolicyService(registry, prisma as never, planGuard),
+      { get: () => undefined } as never,
     );
   });
 
@@ -156,13 +162,27 @@ describe('example tool pair through the whole pipeline', () => {
     expect(body(ran)).toEqual({ ran: true });
   });
 
-  it('step 5, confirmation: an external agent is challenged, then runs once it replays a valid token', async () => {
-    challenges.issue.mockResolvedValue({ token: 'tok-1', ttlSeconds: 300, stepUpRequired: false });
+  it('step 5, confirmation: an external agent waits for a person, then runs once it replays the approved token', async () => {
+    challenges.tenantAllowsSelfConfirm.mockResolvedValue(false);
+    challenges.issue.mockResolvedValue({
+      token: 'tok-1',
+      ttlSeconds: 3600,
+      stepUpRequired: false,
+      approvalRequired: true,
+    });
     const first = await pipeline.run(agent(), 'create-support-ticket', createArgs);
-    expect(body(first)).toMatchObject({ status: 'hitl_required', tier: 'standard', token: 'tok-1' });
+    expect(body(first)).toMatchObject({ status: 'approval_required', token: 'tok-1' });
+    // The approver is shown exactly the arguments that will run.
+    expect(challenges.issue.mock.calls[0][0]).toMatchObject({ approvalRequired: true, argsPreview: createArgs });
     expect(support.createTicket).not.toHaveBeenCalled();
 
-    challenges.consume.mockResolvedValue({ id: 'tok-1' });
+    challenges.consume.mockResolvedValueOnce({ ok: false, reason: 'pending' });
+    const early = await pipeline.run(agent(), 'create-support-ticket', { ...createArgs, _confirmToken: 'tok-1' });
+    expect(body(early)).toMatchObject({ error: 'approval_pending' });
+    expect(support.createTicket).not.toHaveBeenCalled();
+    challenges.consume.mockClear();
+
+    challenges.consume.mockResolvedValue({ ok: true, row: { id: 1 } });
     const second = await pipeline.run(agent(), 'create-support-ticket', { ...createArgs, _confirmToken: 'tok-1' });
     expect(challenges.consume).toHaveBeenCalledWith(
       'tok-1',

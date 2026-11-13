@@ -1,21 +1,35 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NEVER_EXTERNAL_SCOPES, type AgentScope } from '@app/shared-types';
 import type { UserRole } from '@appshore/db';
 import { ScopeRegistryService } from './scope-registry.service';
-import { HitlPolicyService } from './hitl-policy.service';
+import { HitlPolicyService, type HitlTier } from './hitl-policy.service';
 import { ToolExecutorService, ToolResult } from './tool-executor.service';
 import { AgentInvocationLoggerService } from './agent-invocation-logger.service';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { intentDigest } from './intent-digest';
-import { HitlChallengeService } from './hitl-challenge.service';
+import { type ConsumeRefusal, HitlChallengeService } from './hitl-challenge.service';
 import { ToolAccessPolicyService } from './tool-access-policy.service';
 import { validateToolArgs } from './tool-args';
 import { scopesForRole } from './role-scopes';
 import { CONFIRM_TOKEN_PARAM } from './tool-input-schema';
+import { redactArgs } from './arg-redactor';
 import { toolFailure } from '../mcp/tools/tool-error';
+import { agentActionWebPath } from '../../../shared/web-routes';
 
 /** What a chat write answers when the person has not confirmed this exact call in this conversation. */
 export const CONFIRMATION_REQUIRED = 'confirmation_required';
+
+/** What a retry is told when its token cannot be spent, so the agent can tell "wait" from "start over". */
+const REFUSAL_ERROR: Record<ConsumeRefusal, string> = {
+  pending: 'approval_pending',
+  denied: 'approval_denied',
+  invalid: 'hitl_invalid_or_expired',
+};
+
+function textResult(body: Record<string, unknown>): ToolResult {
+  return { content: [{ type: 'text', text: JSON.stringify(body) }] };
+}
 
 type Admitted = { scope: AgentScope; toolArgs: Record<string, unknown>; role: UserRole | null };
 
@@ -29,7 +43,9 @@ type Admitted = { scope: AgentScope; toolArgs: Record<string, unknown>; role: Us
  *    current role; a chat principal's scopes are capped at that role's scopes.
  * 4. Plan: `@RequiresPlanFeature` judged by the same rule as the REST guard.
  * 5. Confirmation for any tier above read: a signed-in user spends a chat grant (the card they confirmed for this
- *    exact write in this conversation); a third-party agent answers a challenge; Desk is gated inside Desk.
+ *    exact write in this conversation); a third-party agent answers a challenge (a standard write waits for a person
+ *    to approve it in the app unless the owner turned self-confirm on; a sensitive write always needs the PIN of the
+ *    person it acts for); Desk is gated inside Desk.
  * 6. Audit row, execute, audit result.
  * 7. Errors: an `HttpException` passes its message and code; anything else is logged and answered generically.
  *
@@ -47,6 +63,7 @@ export class InvocationPipelineService {
     private readonly auditLogger: AgentInvocationLoggerService,
     private readonly challenges: HitlChallengeService,
     private readonly policy: ToolAccessPolicyService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -103,34 +120,7 @@ export class InvocationPipelineService {
       const confirmToken = typeof sentToken === 'string' ? sentToken : undefined;
       const digest = argsDigest();
 
-      if (!confirmToken) {
-        const issued = await this.challenges.issue({
-          principal,
-          toolName,
-          scopeRequired: scope,
-          tier,
-          argsDigest: digest,
-        });
-        const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
-        const approvalUrl =
-          issued.stepUpRequired && appUrl ? `${appUrl}/agent-actions/${issued.token}/approve` : undefined;
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                status: 'hitl_required',
-                tier,
-                token: issued.token,
-                ttlSeconds: issued.ttlSeconds,
-                stepUpRequired: issued.stepUpRequired,
-                tool: toolName,
-                ...(approvalUrl && { approvalUrl }),
-              }),
-            },
-          ],
-        };
-      }
+      if (!confirmToken) return this.challenge(principal, toolName, scope, tier, digest, toolArgs);
 
       const consumed = await this.challenges.consume(confirmToken, {
         tenantId: principal.tenantId,
@@ -138,20 +128,7 @@ export class InvocationPipelineService {
         toolName,
         argsDigest: digest,
       });
-      if (!consumed) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                error: 'hitl_invalid_or_expired',
-                tool: toolName,
-              }),
-            },
-          ],
-          isError: true,
-        };
-      }
+      if ('reason' in consumed) return this.refused(consumed.reason, toolName, confirmToken);
       confirmationId = confirmToken;
     }
 
@@ -259,6 +236,76 @@ export class InvocationPipelineService {
     if (planDenial) return { refusal: planDenial };
 
     return { scope, toolArgs, role };
+  }
+
+  /**
+   * Issue the challenge a third-party write must clear. By default a standard write waits for a person to approve it
+   * in the app; a workspace whose owner turned self-confirm on gets the echo-the-token flow instead. A sensitive write
+   * always needs the PIN of the person the agent acts for, whatever the policy says. Both waiting kinds hand out the
+   * link to the approval page.
+   */
+  private async challenge(
+    principal: AgentPrincipal,
+    toolName: string,
+    scope: AgentScope,
+    tier: Exclude<HitlTier, 'none'>,
+    argsDigest: string,
+    toolArgs: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const stepUpRequired = tier === 'sensitive';
+    const approvalRequired = !stepUpRequired && !(await this.challenges.tenantAllowsSelfConfirm(principal.tenantId));
+    const issued = await this.challenges.issue({
+      principal,
+      toolName,
+      scopeRequired: scope,
+      tier,
+      argsDigest,
+      approvalRequired,
+      // The parsed arguments, which are exactly what will run. Unredacted for the approver (only the person acted for,
+      // or an owner or admin of this workspace, can open it); redacted on a PIN row.
+      argsPreview: approvalRequired ? toolArgs : undefined,
+      argsRedacted: stepUpRequired ? (redactArgs(toolArgs) as Record<string, unknown>) : undefined,
+    });
+    const approvalUrl = this.approvalUrlFor(issued.token);
+
+    if (issued.approvalRequired) {
+      return textResult({
+        status: 'approval_required',
+        tool: toolName,
+        token: issued.token,
+        ttlSeconds: issued.ttlSeconds,
+        ...(approvalUrl && { approvalUrl }),
+        message:
+          'Nothing was changed. A person must approve this in the app before it runs. Share the approval link with ' +
+          'them; once they approve, call this tool again with the same arguments plus "_confirmToken" set to the token.',
+      });
+    }
+    return textResult({
+      status: 'hitl_required',
+      tier,
+      token: issued.token,
+      ttlSeconds: issued.ttlSeconds,
+      stepUpRequired: issued.stepUpRequired,
+      tool: toolName,
+      // A sensitive write: the person enters their PIN on the approval page. A self-confirmed standard write has
+      // nothing to do in the app, so no link.
+      ...(issued.stepUpRequired && approvalUrl && { approvalUrl }),
+    });
+  }
+
+  /** The answer to a retry whose token cannot be spent: the agent can tell "wait" from "start over". */
+  private refused(reason: ConsumeRefusal, toolName: string, token: string): ToolResult {
+    const approvalUrl = reason === 'pending' ? this.approvalUrlFor(token) : undefined;
+    return {
+      ...textResult({ error: REFUSAL_ERROR[reason], tool: toolName, ...(approvalUrl && { approvalUrl }) }),
+      isError: true,
+    };
+  }
+
+  /** The web app's approval page for a token, or undefined when `APP_URL` is not set. */
+  private approvalUrlFor(token: string): string | undefined {
+    const appUrl = (this.config.get<string>('APP_URL') ?? '').replace(/\/$/, '');
+    return appUrl ? `${appUrl}${agentActionWebPath(token)}` : undefined;
   }
 
   /** A plain result (not an error): nothing changed, and the model is told how to ask for the confirmation. */

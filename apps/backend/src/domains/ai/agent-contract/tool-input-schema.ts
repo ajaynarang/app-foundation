@@ -9,7 +9,7 @@ export const CONFIRM_TOKEN_PARAM = '_confirmToken';
 const CONFIRM_TOKEN_SCHEMA = {
   type: 'string',
   description:
-    'OPTIONAL. Leave it out on the first call. A write answers with a challenge instead of running: `{"status":"hitl_required","token":"…"}`. If it also says `stepUpRequired:true`, the person you act for must first confirm with their PIN at `approvalUrl` (signed in to the app). Then repeat the call with the same arguments plus `_confirmToken` set to that token. A token is single-use, expires within minutes, and is bound to this tool and these exact arguments.',
+    'OPTIONAL. Leave it out on the first call. A write answers with a token instead of running. `{"status":"approval_required","token":"…","approvalUrl":"…"}`: a person must approve it in the app first; share `approvalUrl` with them. `{"status":"hitl_required","stepUpRequired":true,…}`: the person you act for must confirm with their PIN at `approvalUrl` (signed in to the app). `{"status":"hitl_required","stepUpRequired":false}`: nothing to wait for. Then repeat the call with the same arguments plus `_confirmToken` set to that token. While a person has not decided, the retry answers `approval_pending` (wait and retry); `approval_denied` means start over. A token is single-use, expires, and is bound to this tool and these exact arguments.',
 };
 
 /**
