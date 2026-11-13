@@ -39,7 +39,7 @@ describe('plan-gated routes', () => {
     [SubscriptionController, FEATURE_KEYS.WEBHOOKS],
     [OAuthClientsController, FEATURE_KEYS.OAUTH_CLIENTS],
     [IntegrationsController, FEATURE_KEYS.INTEGRATIONS],
-  ] as Array<[Ctor, string]>)('gates every route of %p behind its feature', (cls, feature) => {
+  ] as unknown as Array<[Ctor, string]>)('gates every route of %p behind its feature', (cls, feature) => {
     for (const handler of handlersOf(cls)) expect([handler, gateOf(cls, handler)]).toEqual([handler, feature]);
   });
 
