@@ -25,7 +25,7 @@
 // An area: { area: 'api', interval: '1m', rules: [...] }, or { area, groups: [{ name, interval, rules }] } when its
 // rules need different evaluation intervals.
 
-import { metricMatcher as m, streamSelector as sel } from './constants.mjs';
+import { awsNames, metricMatcher as m, streamSelector as sel } from './constants.mjs';
 
 const MIN = 60;
 const HOUR = 3600;
@@ -316,7 +316,7 @@ const ai = {
 
 /** CloudWatch rules: `reducer` folds the window, `op`/`threshold` decide. */
 const cw = (namespace, metricName, statistic, dimensions) => ({ namespace, metricName, statistic, dimensions });
-const rdsId = (envSpec) => ({ DBInstanceIdentifier: `${envSpec.awsPrefix}-rds-postgres` });
+const rdsId = (envSpec) => ({ DBInstanceIdentifier: awsNames(envSpec.awsPrefix).rds });
 /** Share of `max_connections` that alerts (rdsMaxConnections per environment, in constants.mjs). */
 const RDS_CONNECTIONS_SHARE = 0.75;
 export const rdsConnectionsThreshold = (envSpec) => Math.floor(envSpec.rdsMaxConnections * RDS_CONNECTIONS_SHARE);
@@ -334,8 +334,8 @@ const ecsGone = (service) => ({
   requiresWorker: service === 'worker',
   metric: (envSpec) =>
     cw('AWS/ECS', 'CPUUtilization', 'Average', {
-      ClusterName: `${envSpec.awsPrefix}-ecs-cluster`,
-      ServiceName: `${envSpec.awsPrefix}-ecs-service-${service}`,
+      ClusterName: awsNames(envSpec.awsPrefix).cluster,
+      ServiceName: awsNames(envSpec.awsPrefix).service(service),
     }),
   reducer: 'last',
   op: 'lt',
@@ -433,9 +433,12 @@ const infra = {
       kind: 'cloudwatch',
       windowSec: 10 * MIN,
       noData: INFRA_NO_DATA,
+      // CacheClusterId alone, as a CloudWatch alarm on ElastiCache sets it. Not yet seen against a live account:
+      // with matchExact, a metric published only per CacheNodeId would return no data, which pages. The cut-over in
+      // docs/observability.md checks each CloudWatch query returns data before these rules replace the alarms.
       metric: (envSpec) =>
         cw('AWS/ElastiCache', 'DatabaseMemoryUsagePercentage', 'Maximum', {
-          CacheClusterId: `${envSpec.awsPrefix}-redis-001`,
+          CacheClusterId: awsNames(envSpec.awsPrefix).redis,
         }),
       reducer: 'last',
       op: 'gt',
