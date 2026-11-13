@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { AccessToken, AgentDispatchClient, RoomAgentDispatch, RoomConfiguration } from 'livekit-server-sdk';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import type { ChatChunk } from '../agents/agent.types';
 
 @Injectable()
 export class VoiceService {
@@ -52,28 +53,11 @@ export class VoiceService {
     tenantId: number,
   ): Promise<{ token: string; url: string }> {
     // Validate conversation ownership before issuing a room token
-    const user = await this.prisma.user.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { conversationId },
-    });
-    if (!conversation) {
-      throw new NotFoundException('Conversation not found');
-    }
-    if (conversation.userId !== user.id || conversation.tenantId !== tenantId) {
-      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
-      throw new NotFoundException('Conversation not found');
-    }
+    const { userDbId } = await this.assertConversationOwner(conversationId, userId, tenantId);
 
     // Fetch user's voice preferences
     const prefs = await this.prisma.userPreferences.findUnique({
-      where: { userId: user.id },
+      where: { userId: userDbId },
       select: { voiceMode: true, voiceId: true, voiceSpeed: true },
     });
     const voicePrefs = {
@@ -136,6 +120,32 @@ export class VoiceService {
   }
 
   /**
+   * The conversation must exist and belong to this user (public id) in this tenant. Anything else answers 404: a 403
+   * would confirm that someone else's conversation exists. Returns the owner's database id.
+   */
+  async assertConversationOwner(
+    conversationId: string,
+    userId: string,
+    tenantId: number,
+  ): Promise<{ userDbId: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { conversationId },
+    });
+    if (!conversation || conversation.userId !== user.id || conversation.tenantId !== tenantId) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return { userDbId: user.id };
+  }
+
+  /**
    * Stream the assistant's response for a voice transcript.
    *
    * Delegates to AssistantAiService.generateResponse() — the exact same
@@ -147,10 +157,7 @@ export class VoiceService {
     text: string,
     userId: string,
     tenantId: number,
-  ): AsyncGenerator<{
-    type: 'text-delta' | 'card' | 'suspend' | 'blocked' | 'complete';
-    data: string;
-  }> {
+  ): AsyncGenerator<ChatChunk> {
     const assistantAi = await this.getAssistantAiService();
     yield* assistantAi.generateResponse(conversationId, text, 'voice', userId, tenantId);
   }

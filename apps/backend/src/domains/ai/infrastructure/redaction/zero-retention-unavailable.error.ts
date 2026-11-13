@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { AI_ERROR_CODE } from '@app/shared-types';
 
 /**
  * Thrown when a tenant requires zero-data-retention (ZDR) AI routing but no
@@ -15,6 +16,7 @@ export class ZeroRetentionUnavailable extends BadRequestException {
   constructor(tier: string) {
     super({
       statusCode: 400,
+      code: AI_ERROR_CODE.ZERO_RETENTION_UNAVAILABLE,
       detail:
         'This AI feature is unavailable because your account requires zero-data-retention routing and no compliant model is configured for it. Contact support.',
       tier,

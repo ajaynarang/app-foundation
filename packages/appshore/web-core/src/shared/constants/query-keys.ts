@@ -87,6 +87,10 @@ export const queryKeys = {
   webhooks: {
     root: ['webhooks'] as const,
   },
+  // ─── Workspace AI settings (retention policy + workspace AI keys) ───────
+  aiSettings: {
+    root: ['ai-settings'] as const,
+  },
   developerScopes: {
     root: ['developer-scopes'] as const,
   },
@@ -94,6 +98,14 @@ export const queryKeys = {
     root: ['oauth-clients'] as const,
     list: (tenantId?: number) =>
       tenantId === undefined ? (['oauth-clients', 'list'] as const) : (['oauth-clients', 'list', tenantId] as const),
+  },
+  // ─── An external agent's write waiting for a person, and the workspace switch ──
+  agentActions: {
+    root: ['agent-actions'] as const,
+    detail: (token: string) => ['agent-actions', token] as const,
+  },
+  agentPolicy: {
+    root: ['agent-policy'] as const,
   },
   agentActivity: {
     root: ['agent-activity'] as const,
@@ -155,6 +167,7 @@ export const queryKeys = {
   },
   conversations: {
     root: ['conversations'] as const,
+    list: () => ['conversations', 'list'] as const,
     detail: (id: string) => ['conversations', id] as const,
     messages: (id: string) => ['conversations', id, 'messages'] as const,
   },

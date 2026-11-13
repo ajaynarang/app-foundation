@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TenantPlan } from '@appshore/db';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_WARM_5M, CACHE_TTL_COLD_10M } from '@appshore/kernel/constants/cache.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
 
 @Injectable()
 export class PlansService {
@@ -13,6 +14,7 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
+    @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
   async getAllPlanConfigs() {
@@ -120,6 +122,14 @@ export class PlansService {
     ]);
 
     await this.cache.del(buildKey('app:plans', 'tenant-plan', tenantId));
+
+    // The app's reaction to the new plan (its AI budget, for one), after the change committed. A hook failure is
+    // logged and never fails the plan change.
+    try {
+      await this.provisionHooks?.planAssigned?.(tenant.id, newPlan);
+    } catch (err) {
+      this.logger.warn(`planAssigned hook failed for tenant ${tenant.id}: ${(err as Error).message}`);
+    }
 
     return result[0];
   }

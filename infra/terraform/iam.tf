@@ -92,6 +92,53 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
   })
 }
 
+# --- Bedrock (AI routes) ---
+# Both statements are off by default. Nothing changes until a variable turns them on.
+
+# The platform's zero-retention route (`platform-bedrock`): invoke the model catalog's Bedrock models with the task's
+# own credentials. Set `bedrock_models` to the catalog's base ids, then set PLATFORM_BEDROCK_REGION in Doppler.
+# Cross-region inference profiles (`us.` ids) route to the foundation model in other US regions, hence `*` on the
+# foundation model's region: the grant is scoped by model id instead.
+resource "aws_iam_role_policy" "ecs_task_bedrock" {
+  count = length(var.bedrock_models) > 0 ? 1 : 0
+  name  = "${local.prefix}-ecs-task-bedrock"
+  role  = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "BedrockInvoke"
+      Effect = "Allow"
+      Action = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+      Resource = concat(
+        [for m in var.bedrock_models : "arn:aws:bedrock:*::foundation-model/${m}"],
+        [for m in var.bedrock_models : "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:inference-profile/us.${m}"],
+      )
+    }]
+  })
+}
+
+# A workspace's own AWS account (`BEDROCK_ROLE`): the backend assumes the role the workspace created, with the
+# workspace's external id, from this task role. The resource is any role because workspace role ARNs are not known
+# ahead; the external id and the workspace's own trust policy (which must name this role) are the protection. The
+# same flag sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks (ecs.tf). AWS records a trusted role by its
+# internal id: destroying and recreating `ecs_task` breaks every workspace's trust policy until it is saved again.
+resource "aws_iam_role_policy" "ecs_task_assume_tenant_bedrock_roles" {
+  count = var.bedrock_tenant_roles_enabled ? 1 : 0
+  name  = "${local.prefix}-ecs-task-assume-tenant-bedrock-roles"
+  role  = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid      = "AssumeWorkspaceBedrockRoles"
+      Effect   = "Allow"
+      Action   = "sts:AssumeRole"
+      Resource = "arn:aws:iam::*:role/*"
+    }]
+  })
+}
+
 # --- GitHub Actions OIDC Role ---
 # GitHub Actions assumes this role via OIDC — no long-lived AWS keys needed.
 #

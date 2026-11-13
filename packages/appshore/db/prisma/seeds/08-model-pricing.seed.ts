@@ -6,8 +6,21 @@ import { PrismaClient } from '../../generated/client';
  * to compute USD cost per invocation at write time.
  *
  * Placeholder rates — verify against your providers' current pricing pages
- * (and any gateway markup you pay) before deploying. Anthropic rows were
- * verified against list pricing on 2026-06-11; OpenAI rows are unverified.
+ * (and any gateway markup you pay) before deploying. The 4.x Anthropic rows
+ * were verified against list pricing on 2026-06-11; OpenAI rows are unverified.
+ * The Claude 5.5 rows come from Anthropic's price table as cached on
+ * 2026-11-03, not the live page. OpenRouter passes Anthropic list prices
+ * through with no token markup, so its rows mirror the Anthropic ones; they
+ * are checked against the live slugs when the OpenRouter route lands. The
+ * Cohere row is a copy of a sibling product's unverified row. The `aws` rows
+ * (Bedrock: the three Claude 5.5 US geo inference profiles and Cohere Embed v4)
+ * mirror the Anthropic and Cohere rows: AWS's price table was not readable when
+ * they were written, so each is marked unverified. The three voice
+ * rows (Deepgram, Cartesia, LiveKit) are priced per unit, not per token, and
+ * were checked against each vendor's public price page on 2026-11-12.
+ *
+ * Old rows stay: the ledger prices history by model id, so a model bump adds
+ * rows and never deletes the ones it replaces.
  *
  * Pricing is data, not code: in production, prices are updated by inserting
  * a new row with `effectiveFromDate = today` and setting
@@ -15,7 +28,8 @@ import { PrismaClient } from '../../generated/client';
  * historical cost reconciliation.
  *
  * Idempotency: this seed is upsert-keyed by `(provider, model,
- * effectiveFromDate)`. Re-running it without changes is a no-op.
+ * effectiveFromDate)`. Re-running it without changes is a no-op. An existing
+ * row is never re-priced; only a cache-write rate still null is filled in.
  */
 
 interface PricingRow {
@@ -24,7 +38,17 @@ interface PricingRow {
   inputPerMtokUsd: string;
   outputPerMtokUsd: string;
   cachedInputPerMtokUsd: string | null;
+  /**
+   * The prompt-cache write rate. Anthropic bills a five-minute cache write at 1.25x input (the rate this seed uses for
+   * every Claude row, on every route). Omitted where the provider has no separate write price: a write then prices at
+   * the input rate.
+   */
+  cacheWriteInputPerMtokUsd?: string;
+  /** USD per unit for a non-token (voice) meter: one audio second, one character, one session second. */
+  unitPriceUsd?: string;
   notes: string;
+  /** Defaults to `INITIAL_EFFECTIVE_FROM_DATE`; a row added later carries the date it was added. */
+  effectiveFromDate?: Date;
 }
 
 const VERIFIED_ANTHROPIC = 'Verified against Anthropic list pricing 2026-06-11';
@@ -35,6 +59,18 @@ const VERIFICATION_NEEDED = '⚠ Placeholder — verify against provider docs be
 // effectiveUntilDate.
 const INITIAL_EFFECTIVE_FROM_DATE = new Date('2026-05-27T00:00:00.000Z');
 
+// The Claude 5.5 generation, Cohere embeddings and OpenRouter rows.
+const CLAUDE_5_5_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
+const ANTHROPIC_5_5 = "From Anthropic's price table cached 2026-11-03; ⚠ verify against the live page before deploy";
+const VIA_OPENROUTER = `Anthropic list pricing via OpenRouter (no token markup). ${VERIFICATION_NEEDED}`;
+const VIA_BEDROCK = `Bedrock on-demand, US geo inference profile, assumed equal to Anthropic list pricing. ${VERIFICATION_NEEDED}`;
+
+// The Bedrock routes (platform zero-retention route and a workspace's own AWS role).
+const BEDROCK_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
+
+// The voice vendors, priced per unit (`AiUsageUnit`). Checked against each vendor's public price page.
+const VOICE_EFFECTIVE_FROM_DATE = new Date('2026-11-12T00:00:00.000Z');
+
 const PRICING: PricingRow[] = [
   // ─── Anthropic ─────────────────────────────────────────────────────
   {
@@ -43,6 +79,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '1.000000',
     outputPerMtokUsd: '5.000000',
     cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '1.250000',
     notes: VERIFIED_ANTHROPIC,
   },
   {
@@ -51,6 +88,7 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '3.000000',
     outputPerMtokUsd: '15.000000',
     cachedInputPerMtokUsd: '0.300000',
+    cacheWriteInputPerMtokUsd: '3.750000',
     notes: VERIFIED_ANTHROPIC,
   },
   {
@@ -59,7 +97,160 @@ const PRICING: PricingRow[] = [
     inputPerMtokUsd: '5.000000',
     outputPerMtokUsd: '25.000000',
     cachedInputPerMtokUsd: '0.500000',
+    cacheWriteInputPerMtokUsd: '6.250000',
     notes: VERIFIED_ANTHROPIC,
+  },
+
+  // Claude 5.5 (fast / standard / powerful). Cache reads are 10% of input
+  // except Sonnet 5.5, which Anthropic lists at $0.10 (not $0.20).
+  {
+    provider: 'anthropic',
+    model: 'claude-haiku-5-5',
+    inputPerMtokUsd: '0.100000',
+    outputPerMtokUsd: '0.500000',
+    cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
+    notes: `Base rate only: Haiku 5.5 bills $0.50 / $2.50 per million above 100K prompt tokens, so a call that large is understated (the telemetry writer warns). ${ANTHROPIC_5_5}`,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    inputPerMtokUsd: '2.000000',
+    outputPerMtokUsd: '10.000000',
+    cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
+    notes: ANTHROPIC_5_5,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'anthropic',
+    model: 'claude-opus-5-5',
+    inputPerMtokUsd: '4.000000',
+    outputPerMtokUsd: '20.000000',
+    cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
+    notes: ANTHROPIC_5_5,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+
+  // ─── OpenRouter (the platform default language route) ──────────────
+  {
+    provider: 'openrouter',
+    model: 'anthropic/claude-haiku-5.5',
+    inputPerMtokUsd: '0.100000',
+    outputPerMtokUsd: '0.500000',
+    cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
+    notes: `Base rate only (Haiku 5.5 bills more above 100K prompt tokens). ${VIA_OPENROUTER}`,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'openrouter',
+    model: 'anthropic/claude-sonnet-5.5',
+    inputPerMtokUsd: '2.000000',
+    outputPerMtokUsd: '10.000000',
+    cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
+    notes: VIA_OPENROUTER,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'openrouter',
+    model: 'anthropic/claude-opus-5.5',
+    inputPerMtokUsd: '4.000000',
+    outputPerMtokUsd: '20.000000',
+    cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
+    notes: VIA_OPENROUTER,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+
+  // ─── Cohere (the one embedding model, Embed v4 at 1536) ────────────
+  {
+    provider: 'cohere',
+    model: 'embed-v4.0',
+    inputPerMtokUsd: '0.120000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    notes: `Embeddings: output cost is 0. ${VERIFICATION_NEEDED}`,
+    effectiveFromDate: CLAUDE_5_5_EFFECTIVE_FROM_DATE,
+  },
+
+  // ─── AWS Bedrock (zero-retention routes; ids are the catalog's bedrockId) ──
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-haiku-5-5',
+    inputPerMtokUsd: '0.100000',
+    outputPerMtokUsd: '0.500000',
+    cachedInputPerMtokUsd: '0.010000',
+    cacheWriteInputPerMtokUsd: '0.125000',
+    notes: `Base rate only (Haiku 5.5 bills more above 100K prompt tokens). ${VIA_BEDROCK}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-sonnet-5-5',
+    inputPerMtokUsd: '2.000000',
+    outputPerMtokUsd: '10.000000',
+    cachedInputPerMtokUsd: '0.100000',
+    cacheWriteInputPerMtokUsd: '2.500000',
+    notes: `Cache read at the rate AWS lowered by half on 2026-10-07. ${VIA_BEDROCK}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'us.anthropic.claude-opus-5-5',
+    inputPerMtokUsd: '4.000000',
+    outputPerMtokUsd: '20.000000',
+    cachedInputPerMtokUsd: '0.200000',
+    cacheWriteInputPerMtokUsd: '5.000000',
+    notes: VIA_BEDROCK,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'aws',
+    model: 'cohere.embed-v4:0',
+    inputPerMtokUsd: '0.120000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    notes: `Embeddings: output cost is 0. Bedrock on-demand, assumed equal to Cohere direct. ${VERIFICATION_NEEDED}`,
+    effectiveFromDate: BEDROCK_EFFECTIVE_FROM_DATE,
+  },
+
+  // ─── Voice (non-token meters, priced per unit; token rates are 0) ──
+  {
+    provider: 'deepgram',
+    model: 'nova-3',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00012833',
+    notes:
+      'Per AUDIO_SECOND: Nova-3 monolingual streaming at the $0.0077/min pay-as-you-go rate (no promo or volume rate assumed). Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'cartesia',
+    model: 'sonic-3',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00003920',
+    notes:
+      'Per CHARACTER: Sonic is 1 credit per character; the Startup plan is $49 for 1.25M credits. Other plans differ; set the rate of the plan you pay for. Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
+  },
+  {
+    provider: 'livekit',
+    model: 'agent-session',
+    inputPerMtokUsd: '0.000000',
+    outputPerMtokUsd: '0.000000',
+    cachedInputPerMtokUsd: null,
+    unitPriceUsd: '0.00016667',
+    notes:
+      'Per SESSION_SECOND: LiveKit Cloud agent session minutes at $0.01/min (the overage rate; included plan minutes are not netted). Checked 2026-11-12',
+    effectiveFromDate: VOICE_EFFECTIVE_FROM_DATE,
   },
 
   // ─── OpenAI ────────────────────────────────────────────────────────
@@ -101,22 +292,35 @@ export const seed = {
   name: 'Model Pricing',
   description: `Seeds ${PRICING.length} model_pricing rows for AI cost telemetry`,
 
-  async run(prisma: PrismaClient): Promise<{ created: number; skipped: number }> {
+  async run(prisma: PrismaClient): Promise<{ created: number; skipped: number; filled: number }> {
     let created = 0;
     let skipped = 0;
+    let filled = 0;
 
     for (const row of PRICING) {
+      const effectiveFromDate = row.effectiveFromDate ?? INITIAL_EFFECTIVE_FROM_DATE;
       const existing = await prisma.modelPricing.findUnique({
         where: {
           provider_model_effectiveFromDate: {
             provider: row.provider,
             model: row.model,
-            effectiveFromDate: INITIAL_EFFECTIVE_FROM_DATE,
+            effectiveFromDate,
           },
         },
       });
 
       if (existing) {
+        // A price is never rewritten in place. The one exception is a column added after the row was seeded: the
+        // cache-write rate fills in once, where it is still null, so a product that seeded before it existed prices
+        // cache writes too.
+        if (existing.cacheWriteInputPerMtokUsd === null && row.cacheWriteInputPerMtokUsd) {
+          await prisma.modelPricing.update({
+            where: { id: existing.id },
+            data: { cacheWriteInputPerMtokUsd: row.cacheWriteInputPerMtokUsd },
+          });
+          filled++;
+          continue;
+        }
         skipped++;
         continue;
       }
@@ -128,7 +332,9 @@ export const seed = {
           inputPerMtokUsd: row.inputPerMtokUsd,
           outputPerMtokUsd: row.outputPerMtokUsd,
           cachedInputPerMtokUsd: row.cachedInputPerMtokUsd,
-          effectiveFromDate: INITIAL_EFFECTIVE_FROM_DATE,
+          cacheWriteInputPerMtokUsd: row.cacheWriteInputPerMtokUsd ?? null,
+          unitPriceUsd: row.unitPriceUsd ?? null,
+          effectiveFromDate,
           effectiveUntilDate: null,
           notes: row.notes,
         },
@@ -136,6 +342,6 @@ export const seed = {
       created++;
     }
 
-    return { created, skipped };
+    return { created, skipped, filled };
   },
 };

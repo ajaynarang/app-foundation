@@ -4,6 +4,8 @@ import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.
 import { VoiceController } from './voice.controller';
 import { VoiceService } from './voice.service';
 import { VoiceAgentWorker } from './voice-agent.worker';
+import { VoiceUsageService } from './voice-usage.service';
+import { AiTelemetryModule } from '../infrastructure/telemetry/ai-telemetry.module';
 
 /**
  * Voice Module — LiveKit voice sessions for the assistant.
@@ -15,8 +17,8 @@ import { VoiceAgentWorker } from './voice-agent.worker';
  * Must be registered inside AiModule (which already exports AssistantAiService).
  */
 @Module({
-  imports: [ConfigModule, PrismaModule],
+  imports: [ConfigModule, PrismaModule, AiTelemetryModule],
   controllers: [VoiceController],
-  providers: [VoiceService, VoiceAgentWorker],
+  providers: [VoiceService, VoiceUsageService, VoiceAgentWorker],
 })
 export class VoiceModule {}

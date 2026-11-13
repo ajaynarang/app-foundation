@@ -1,0 +1,66 @@
+{
+  "_source": "Captured live (2026-10-18) by a sibling product with captureUsageShape: a multi-step Mastra 1.41 Agent.generate tool loop on OpenRouter -> Anthropic with automatic prompt caching (top-level cache_control). usage is the run total over every step; usage.raw is the last step. Numbers and provider names only.",
+  "usage": {
+    "inputTokens": 1316595,
+    "outputTokens": 13828,
+    "totalTokens": 1330423,
+    "reasoningTokens": 0,
+    "cachedInputTokens": 1281554,
+    "cacheCreationInputTokens": 34988,
+    "raw": {
+      "inputTokens": {
+        "total": 34989,
+        "noCache": 325,
+        "cacheRead": 34664,
+        "cacheWrite": 324
+      },
+      "outputTokens": {
+        "total": 876,
+        "text": 876,
+        "reasoning": 0
+      },
+      "raw": {
+        "prompt_tokens": 34989,
+        "prompt_tokens_details": {
+          "cached_tokens": 34664,
+          "cache_write_tokens": 324,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "completion_tokens": 876,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        },
+        "total_tokens": 35865,
+        "cost": 0,
+        "cost_details": {
+          "upstream_inference_cost": 0.0247572,
+          "upstream_inference_prompt_cost": 0.0116172,
+          "upstream_inference_completions_cost": 0.01314
+        }
+      }
+    }
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "provider": "Anthropic",
+      "usage": {
+        "promptTokens": 34989,
+        "promptTokensDetails": {
+          "cachedTokens": 34664
+        },
+        "completionTokens": 876,
+        "completionTokensDetails": {
+          "reasoningTokens": 0
+        },
+        "totalTokens": 35865,
+        "cost": 0,
+        "costDetails": {
+          "upstreamInferenceCost": 0.0247572
+        }
+      }
+    }
+  }
+}

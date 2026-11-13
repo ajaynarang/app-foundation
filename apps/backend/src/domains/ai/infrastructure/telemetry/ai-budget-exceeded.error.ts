@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
-import type { AiBudgetState } from '@app/shared-types';
+import { AI_ERROR_CODE, type AiBudgetState } from '@app/shared-types';
 
 /**
  * Thrown by `AiTelemetryService.assertBudget()` when a tenant has hit its
@@ -11,15 +11,19 @@ import type { AiBudgetState } from '@app/shared-types';
  * internal margin numbers, not something a tenant's users should see in
  * a toast. The super-admin view shows the real numbers.
  */
+export const AI_BUDGET_EXCEEDED_DETAIL =
+  'Your account has reached its AI usage limit for now. Contact your administrator to raise it.';
+
 export class AiBudgetExceededError extends HttpException {
   readonly tenantId: number;
   readonly budgetState: AiBudgetState;
 
-  constructor(tenantId: number, budgetState: AiBudgetState) {
+  constructor(tenantId: number, budgetState: AiBudgetState, detail: string = AI_BUDGET_EXCEEDED_DETAIL) {
     super(
       {
         statusCode: HttpStatus.PAYMENT_REQUIRED,
-        detail: 'Your account has reached its AI usage limit for now. Contact your administrator to raise it.',
+        code: AI_ERROR_CODE.AI_BUDGET_EXCEEDED,
+        detail,
       },
       HttpStatus.PAYMENT_REQUIRED,
     );

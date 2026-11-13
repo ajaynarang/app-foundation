@@ -9,6 +9,7 @@ jest.mock('@mastra/core/tools', () => ({ createTool: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   jsonSchema: jest.fn(),
   customProvider: jest.fn(),
   createGateway: jest.fn(),
@@ -22,7 +23,7 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AssistantAiService } from '../assistant.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { McpToolService } from '../../mcp/mcp-tool.service';
@@ -32,6 +33,18 @@ import { PromptingService } from '../../../prompting';
 import { AssistantRouterService } from '../../orchestrator/assistant-router.service';
 import { AgentRegistry } from '../../agents/agent.registry';
 import { AiTelemetryService } from '../../infrastructure/telemetry/ai-telemetry.service';
+import { AiRouteResolver } from '../../routing/ai-route-resolver.service';
+import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
+import { AiBudgetExceededError } from '../../infrastructure/telemetry/ai-budget-exceeded.error';
+import { AI_PROVIDER_CREDIT_REFUSED_DETAIL } from '../../infrastructure/telemetry/ai-provider-credit-refused.error';
+import { CredentialCryptoService } from '../../routing/credential-crypto.service';
+import { AI_SETTINGS_WEB_PATH } from '../../../../shared/web-routes';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
+import { MAX_ACTIVE_CONVERSATIONS } from '@app/shared-types';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
 
 describe('AssistantAiService', () => {
   let service: AssistantAiService;
@@ -42,6 +55,25 @@ describe('AssistantAiService', () => {
   let mockPromptService: any;
   let mockAssistantRouter: any;
   let mockAgentRegistry: any;
+  let mockTelemetry: { assertBudget: jest.Mock };
+  let mockOutbox: ReturnType<typeof createMockOutbox>;
+  /** Whether the deployment allows workspace AI keys (`AI_CREDENTIALS_KEY` set). */
+  let byokEnabled: boolean;
+
+  const buildService = (resolver: AiRouteResolver) =>
+    new AssistantAiService(
+      mockPrisma,
+      mockMcpTools,
+      mockMastra,
+      mockModeration,
+      mockPromptService,
+      mockAssistantRouter,
+      mockAgentRegistry,
+      mockTelemetry as unknown as AiTelemetryService,
+      resolver,
+      { isConfigured: () => byokEnabled } as unknown as CredentialCryptoService,
+      mockOutbox as never,
+    );
 
   beforeEach(() => {
     mockPrisma = {
@@ -54,6 +86,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_test',
           userMode: 'member',
           title: null,
+          isActive: true,
           createdAt: new Date('2026-01-01'),
           messages: [
             {
@@ -67,17 +100,28 @@ describe('AssistantAiService', () => {
           ],
         }),
         findUnique: jest.fn(),
-        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       conversationMessage: {
         create: jest.fn().mockResolvedValue({ id: 1 }),
       },
+      workspaceMember: {
+        findUnique: jest.fn().mockResolvedValue({ role: 'OWNER' }),
+      },
     };
+    byokEnabled = false;
+    mockPrisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(mockPrisma));
+    mockOutbox = createMockOutbox(mockPrisma);
 
     mockMcpTools = {
       getToolsForPersona: jest.fn().mockResolvedValue({}),
       getToolsetsForPersona: jest.fn().mockResolvedValue({ 'app-tools': {} }),
+      confirmChatCard: jest.fn().mockResolvedValue(true),
+      declineChatCard: jest.fn().mockResolvedValue(undefined),
+      revokeChatGrants: jest.fn().mockResolvedValue(undefined),
     };
 
     mockMastra = {
@@ -116,16 +160,8 @@ describe('AssistantAiService', () => {
       getAll: jest.fn().mockReturnValue([]),
     };
 
-    service = new AssistantAiService(
-      mockPrisma,
-      mockMcpTools,
-      mockMastra,
-      mockModeration,
-      mockPromptService,
-      mockAssistantRouter,
-      mockAgentRegistry,
-      { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) } as unknown as AiTelemetryService,
-    );
+    mockTelemetry = { assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }) };
+    service = buildService(makeResolver({ config: OPENROUTER }).resolver);
   });
 
   describe('createConversation', () => {
@@ -161,6 +197,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
     });
 
@@ -178,6 +215,7 @@ describe('AssistantAiService', () => {
         tenantId: 99,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
       const gen = service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1);
       await expect(gen.next()).rejects.toThrow(NotFoundException);
@@ -242,10 +280,135 @@ describe('AssistantAiService', () => {
         chunks.push(chunk);
       }
 
-      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show my summary', 'member');
+      expect(mockAssistantRouter.route).toHaveBeenCalledWith('Show my summary', 'member', 1);
       expect(mockAgentRegistry.get).toHaveBeenCalledWith('assistant');
       expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
       expect(chunks.some((c) => c.type === 'complete')).toBe(true);
+    });
+
+    it('refuses a zero-retention tenant before the agent runs or the budget is read', async () => {
+      service = buildService(makeResolver({ aiZeroRetention: true, config: OPENROUTER }).resolver);
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+        isActive: true,
+      });
+
+      await expect(async () => {
+        for await (const _chunk of service.generateResponse('conv_test', 'Private', 'text', 'user_1', 1)) {
+          // drain
+        }
+      }).rejects.toThrow(ZeroRetentionUnavailable);
+
+      expect(mockAgentRegistry.get).not.toHaveBeenCalled();
+      expect(mockTelemetry.assertBudget).not.toHaveBeenCalled();
+    });
+
+    describe('the platform cap applies only when the platform pays', () => {
+      async function* answer() {
+        yield { type: 'text-delta' as const, data: 'Hi' };
+      }
+      const routeWithPayer = (payer: 'PLATFORM' | 'TENANT') => {
+        const platform = makeResolver({ config: OPENROUTER }).resolver;
+        return {
+          resolve: async (tenantId: number, need: 'language' | 'embedding') => ({
+            ...(await platform.resolve(tenantId, need)),
+            payer,
+          }),
+        } as unknown as AiRouteResolver;
+      };
+      const overCap = () =>
+        mockTelemetry.assertBudget.mockRejectedValue(
+          new AiBudgetExceededError(1, {
+            state: 'hard',
+            dailyUsdSpent: '25',
+            monthlyUsdSpent: '25',
+            dailySoftUsd: '5',
+            dailyHardUsd: '20',
+            monthlySoftUsd: '50',
+            monthlyHardUsd: '200',
+          }),
+        );
+
+      it("serves a workspace over the cap when its language route is the workspace's own key", async () => {
+        service = buildService(routeWithPayer('TENANT'));
+        overCap();
+        mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(answer()) });
+
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+
+        expect(mockTelemetry.assertBudget).not.toHaveBeenCalled();
+        expect(chunks.some((c) => c.type === 'text-delta')).toBe(true);
+      });
+
+      it('blocks a platform-paid turn over the cap before the agent runs', async () => {
+        service = buildService(routeWithPayer('PLATFORM'));
+        overCap();
+
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+
+        expect(mockTelemetry.assertBudget).toHaveBeenCalledWith(1);
+        expect(chunks[0]).toMatchObject({ type: 'blocked' });
+        expect(mockAgentRegistry.get).not.toHaveBeenCalled();
+      });
+
+      const blockedText = async () => {
+        service = buildService(routeWithPayer('PLATFORM'));
+        overCap();
+        const chunks: any[] = [];
+        for await (const chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1))
+          chunks.push(chunk);
+        return chunks[0].data as string;
+      };
+
+      it('links the workspace owner to AI Keys when the deployment allows workspace keys', async () => {
+        byokEnabled = true;
+        expect(await blockedText()).toContain(`](${AI_SETTINGS_WEB_PATH})`);
+        expect(mockPrisma.workspaceMember.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { userId_tenantId: { userId: 1, tenantId: 1 } } }),
+        );
+      });
+
+      it('tells anyone but the owner to ask the workspace owner, with no link', async () => {
+        byokEnabled = true;
+        mockPrisma.workspaceMember.findUnique.mockResolvedValue({ role: 'ADMIN' });
+        const text = await blockedText();
+        expect(text).not.toContain(AI_SETTINGS_WEB_PATH);
+        expect(text).toMatch(/Ask the workspace owner/);
+      });
+
+      it('offers no key when the deployment has bring-your-own-key off, even to the owner', async () => {
+        const text = await blockedText();
+        expect(text).not.toContain(AI_SETTINGS_WEB_PATH);
+        expect(text).not.toMatch(/own AI key/);
+      });
+    });
+
+    it('skips external moderation for a zero-retention tenant (tells the moderator the tenant)', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+        isActive: true,
+      });
+      mockModeration.moderate.mockResolvedValue({ blocked: true, events: [] });
+
+      for await (const _chunk of service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1)) {
+        // drain
+      }
+
+      expect(mockModeration.moderate).toHaveBeenCalledWith('hello', 'input', 'member', 1);
     });
 
     it('yields followups when agent response contains them', async () => {
@@ -378,6 +541,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Existing Title',
+        isActive: true,
       });
 
       mockModeration.moderate.mockResolvedValue({
@@ -425,6 +589,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
 
       // Block at moderation to keep it simple
@@ -472,6 +637,82 @@ describe('AssistantAiService', () => {
     });
   });
 
+  describe('streamMessage — routing errors before the first byte', () => {
+    it('answers a routing refusal with its own status and code, not a 500', async () => {
+      service = buildService(makeResolver().resolver); // no platform key: nothing serves language
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+        isActive: true,
+      });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
+      const mockRes = {
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(503);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503 }));
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
+
+    const notConfiguredDetail = async () => {
+      service = buildService(makeResolver().resolver);
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Existing',
+        isActive: true,
+      });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
+      const mockRes = {
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        headersSent: false,
+      } as any;
+      await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
+      expect(mockRes.status).toHaveBeenCalledWith(503);
+      return mockRes.json.mock.calls[0][0].detail as string;
+    };
+
+    it('links the workspace owner to AI Keys when nothing serves chat and workspace keys are allowed', async () => {
+      byokEnabled = true;
+      expect(await notConfiguredDetail()).toContain(`](${AI_SETTINGS_WEB_PATH})`);
+    });
+
+    it('tells a member to ask the workspace owner when nothing serves chat', async () => {
+      byokEnabled = true;
+      mockPrisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+      const detail = await notConfiguredDetail();
+      expect(detail).not.toContain(AI_SETTINGS_WEB_PATH);
+      expect(detail).toMatch(/Ask the workspace owner/);
+    });
+
+    it("keeps the deployment's own message when workspace keys are off", async () => {
+      const detail = await notConfiguredDetail();
+      expect(detail).not.toContain(AI_SETTINGS_WEB_PATH);
+      expect(detail).toMatch(/Ask your administrator/);
+    });
+  });
+
   describe('listConversations', () => {
     it('returns formatted conversation list', async () => {
       mockPrisma.conversation.findMany.mockResolvedValue([
@@ -479,6 +720,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_1',
           userMode: 'member',
           title: 'Test Chat',
+          isActive: true,
           _count: { messages: 5 },
           messages: [{ createdAt: new Date('2026-01-01') }],
           createdAt: new Date('2026-01-01'),
@@ -497,6 +739,7 @@ describe('AssistantAiService', () => {
           conversationId: 'conv_empty',
           userMode: 'member',
           title: null,
+          isActive: true,
           _count: { messages: 0 },
           messages: [],
           createdAt: new Date('2026-02-15'),
@@ -517,6 +760,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
         messages: [
           {
             messageId: 'msg_1',
@@ -573,6 +817,79 @@ describe('AssistantAiService', () => {
       expect(mockRes.status).toHaveBeenCalled();
     });
 
+    it("resumes on the tenant's resolved model, passed through the request context", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Test',
+        isActive: true,
+      });
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      const resumeStream = jest.fn().mockRejectedValue(new Error('stop here'));
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' } as any;
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
+
+      const requestContext = resumeStream.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
+
+    it('ends a resumed turn whose provider refused for credit (recorded on `response.error`) with the refusal frame', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Test',
+        isActive: true,
+      });
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      const textStream = new ReadableStream<string>({
+        start(controller) {
+          controller.enqueue('Half');
+          controller.close();
+        },
+      });
+      const resumeStream = jest.fn().mockResolvedValue({ textStream, error: { statusCode: 402 } });
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' } as any;
+      const mockRes = {
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn().mockImplementation(() => {
+          mockRes.headersSent = true;
+        }),
+        end: jest.fn(),
+        headersSent: false,
+      } as any;
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      expect(JSON.parse(last.slice(2)).detail).toBe(AI_PROVIDER_CREDIT_REFUSED_DETAIL);
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
     it('handles resume error gracefully', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 1 });
       mockPrisma.conversation.findUnique.mockResolvedValue({
@@ -582,8 +899,10 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: 'Test',
+        isActive: true,
       });
 
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
       mockMastra.getMastra.mockReturnValue({
         getAgent: jest.fn().mockReturnValue({
           resumeStream: jest.fn().mockRejectedValue(new Error('Resume failed')),
@@ -607,6 +926,120 @@ describe('AssistantAiService', () => {
       // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
       expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
       expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
+    });
+  });
+
+  describe('resumeAgent: the card is confirmed exactly once (item 8b)', () => {
+    const conversation = {
+      id: 1,
+      conversationId: 'conv_test',
+      userId: 1,
+      tenantId: 1,
+      userMode: 'member',
+      title: 'Test',
+      isActive: true,
+    };
+    let resumeStream: jest.Mock;
+    const req = () => ({ on: jest.fn(), url: '/api/v1/conversations/conv_test/resume', method: 'POST' }) as any;
+    const res = () =>
+      ({
+        status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
+        json: jest.fn(),
+        setHeader: jest.fn(),
+        write: jest.fn(),
+        end: jest.fn(),
+        headersSent: false,
+      }) as any;
+
+    beforeEach(() => {
+      mockPrisma.conversation.findUnique.mockResolvedValue(conversation);
+      mockAgentRegistry.get.mockReturnValue({ modelAlias: 'standard' });
+      resumeStream = jest.fn().mockRejectedValue(new Error('stop after resume starts'));
+      mockMastra.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue({ resumeStream }) });
+    });
+
+    it('Confirm turns that one card into a grant, then resumes the run', async () => {
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.confirmChatCard).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        toolCallId: 'tc_1',
+      });
+      expect(resumeStream).toHaveBeenCalledWith({ confirmed: true }, expect.objectContaining({ toolCallId: 'tc_1' }));
+    });
+
+    it('a second press (the card is no longer waiting) answers 409 and never resumes the run again', async () => {
+      mockMcpTools.confirmChatCard.mockResolvedValue(false);
+      const response = res();
+
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), response);
+
+      expect(response.status).toHaveBeenCalledWith(409);
+      expect(response.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, code: 'INVALID_STATE' }));
+      expect(resumeStream).not.toHaveBeenCalled();
+    });
+
+    it('a Confirm that names no card is a 400 on toolCallId, and nothing is granted or resumed', async () => {
+      const response = res();
+
+      await service.resumeAgent('conv_test', true, undefined, 'run_1', 'user_1', 1, req(), response);
+
+      expect(response.status).toHaveBeenCalledWith(400);
+      expect(response.json.mock.calls[0][0].fieldErrors).toHaveProperty('toolCallId');
+      expect(mockMcpTools.confirmChatCard).not.toHaveBeenCalled();
+      expect(resumeStream).not.toHaveBeenCalled();
+    });
+
+    it('Cancel voids the card and resumes with confirmed false', async () => {
+      await service.resumeAgent('conv_test', false, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.declineChatCard).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        toolCallId: 'tc_1',
+      });
+      expect(mockMcpTools.confirmChatCard).not.toHaveBeenCalled();
+      expect(resumeStream).toHaveBeenCalledWith({ confirmed: false }, expect.anything());
+    });
+
+    it('the end of the resumed turn voids unspent grants (not the cards it just raised), even when it failed', async () => {
+      await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, req(), res());
+
+      expect(mockMcpTools.revokeChatGrants).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+      });
+    });
+  });
+
+  describe('a new message voids every open confirmation in the conversation (item 8b)', () => {
+    it('revokes grants and waiting cards before the turn runs', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        id: 1,
+        conversationId: 'conv_test',
+        userId: 1,
+        tenantId: 1,
+        userMode: 'member',
+        title: 'Hi',
+        isActive: true,
+      });
+      mockModeration.moderate.mockResolvedValue({ blocked: true, events: [] });
+
+      for await (const _ of service.generateResponse('conv_test', 'something else', 'text', 'user_1', 1)) {
+        // consume
+      }
+
+      expect(mockMcpTools.revokeChatGrants).toHaveBeenCalledWith({
+        tenantId: 1,
+        userDbId: 1,
+        conversationId: 'conv_test',
+        includePending: true,
+      });
     });
   });
 
@@ -663,6 +1096,7 @@ describe('AssistantAiService', () => {
         tenantId: 1,
         userMode: 'member',
         title: null,
+        isActive: true,
       });
       mockPrisma.tenant = {
         findUnique: jest.fn().mockResolvedValue({ companyName: 'Acme Inc' }),
@@ -701,5 +1135,338 @@ describe('AssistantAiService', () => {
     // prompt whose variables must be trusted (tenant name, role, time),
     // override them server-side in resolvePromptKey and add a test asserting
     // client-supplied values for those keys are ignored.
+  });
+
+  describe('PR 9: stream frames, error paths, citations, history', () => {
+    const OWN = {
+      id: 1,
+      conversationId: 'conv_test',
+      userId: 1,
+      tenantId: 1,
+      userMode: 'member',
+      title: 'T',
+      isActive: true,
+    };
+
+    /** A streaming response whose headers go out with the first write, like Express's. */
+    function streamingRes() {
+      const res: any = {
+        headersSent: false,
+        writableEnded: false,
+        setHeader: jest.fn(),
+        removeHeader: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+        write: jest.fn(() => {
+          res.headersSent = true;
+        }),
+        end: jest.fn(() => {
+          res.writableEnded = true;
+        }),
+      };
+      return res;
+    }
+    const streamReq = () => ({ on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' }) as any;
+    const frames = (res: any): string[] => res.write.mock.calls.map((c: unknown[]) => c[0] as string);
+
+    beforeEach(() => {
+      mockPrisma.conversation.findUnique.mockResolvedValue(OWN);
+    });
+
+    it('writes every chunk as its stream frame, citations and reading included', async () => {
+      const citation = { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' };
+      async function* chat() {
+        yield { type: 'reading' as const, data: JSON.stringify({ title: 'Getting started' }) };
+        yield { type: 'text-delta' as const, data: 'See Getting started.' };
+        yield { type: 'citation' as const, data: JSON.stringify(citation) };
+      }
+      mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(chat()) });
+      const res = streamingRes();
+
+      await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+      expect(frames(res)).toEqual([
+        `t:${JSON.stringify({ title: 'Getting started' })}\n`,
+        `0:${JSON.stringify('See Getting started.')}\n`,
+        `c:${JSON.stringify(citation)}\n`,
+      ]);
+      expect(res.end).toHaveBeenCalledTimes(1);
+    });
+
+    it('a failure after the stream began ends it with one terminal x: frame carrying the code and detail', async () => {
+      async function* chat() {
+        yield { type: 'text-delta' as const, data: 'Half an answer' };
+        throw new AiBudgetExceededError(1, {
+          state: 'hard',
+          dailyUsdSpent: '25',
+          monthlyUsdSpent: '25',
+          dailySoftUsd: '5',
+          dailyHardUsd: '20',
+          monthlySoftUsd: '50',
+          monthlyHardUsd: '200',
+        });
+      }
+      mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(chat()) });
+      const res = streamingRes();
+
+      await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+      const written = frames(res);
+      expect(written[0]).toBe(`0:${JSON.stringify('Half an answer')}\n`);
+      expect(written).toHaveLength(2);
+      expect(written[1].startsWith('x:')).toBe(true);
+      expect(JSON.parse(written[1].slice(2))).toEqual({
+        code: 'AI_BUDGET_EXCEEDED',
+        detail: expect.stringMatching(/AI usage limit/),
+      });
+      expect(res.json).not.toHaveBeenCalled();
+      expect(res.end).toHaveBeenCalledTimes(1);
+    });
+
+    it('an unexpected failure after the stream began says only the generic copy in its x: frame', async () => {
+      async function* chat() {
+        yield { type: 'text-delta' as const, data: 'Half' };
+        throw new Error('provider said: secret internals');
+      }
+      mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(chat()) });
+      const res = streamingRes();
+
+      await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+      const last = frames(res).at(-1);
+      const frame = JSON.parse(last.slice(2));
+      expect(frame.code).toBe('INTERNAL');
+      expect(frame.detail).not.toContain('secret internals');
+    });
+
+    it('a routing refusal before the first byte is the error envelope with the AI code, never a frame', async () => {
+      service = buildService(makeResolver().resolver); // nothing serves language
+      const res = streamingRes();
+
+      await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 503, code: 'AI_NOT_CONFIGURED' }));
+      expect(res.write).not.toHaveBeenCalled();
+    });
+
+    it('stores the citations the turn sent on the assistant message, dropping a malformed one', async () => {
+      const good = { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' };
+      async function* chat() {
+        yield { type: 'text-delta' as const, data: 'See Getting started.' };
+        yield { type: 'citation' as const, data: JSON.stringify(good) };
+        yield { type: 'citation' as const, data: JSON.stringify({ title: 'no source' }) };
+      }
+      mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(chat()) });
+
+      const chunks: any[] = [];
+      for await (const c of service.generateResponse('conv_test', 'hi', 'text', 'user_1', 1)) chunks.push(c);
+
+      expect(chunks.filter((c) => c.type === 'citation')).toHaveLength(1);
+      const assistantCall = mockPrisma.conversationMessage.create.mock.calls.find(
+        (c: any) => c[0].data.role === 'assistant',
+      );
+      expect(assistantCall[0].data.citations).toEqual([good]);
+    });
+
+    it('stores no citations column when the answer named none', async () => {
+      async function* chat() {
+        yield { type: 'text-delta' as const, data: 'Plain answer' };
+      }
+      mockAgentRegistry.get.mockReturnValue({ id: 'assistant', chat: jest.fn().mockReturnValue(chat()) });
+
+      for await (const _ of service.generateResponse('conv_test', 'hi', 'text', 'user_1', 1)) {
+        // drain
+      }
+
+      const assistantCall = mockPrisma.conversationMessage.create.mock.calls.find(
+        (c: any) => c[0].data.role === 'assistant',
+      );
+      expect(assistantCall[0].data).not.toHaveProperty('citations');
+    });
+
+    it('history returns the stored citations of a message', async () => {
+      const citation = { sourceType: 'KNOWLEDGE_DOCUMENT', sourceId: 'kb_1', title: 'Getting started' };
+      mockPrisma.conversation.findUnique.mockResolvedValue({
+        ...OWN,
+        messages: [
+          {
+            messageId: 'msg_1',
+            role: 'assistant',
+            content: 'See Getting started.',
+            inputMode: 'text',
+            intent: null,
+            card: null,
+            action: null,
+            speakText: null,
+            citations: [citation, { junk: true }],
+            createdAt: new Date('2026-01-01'),
+          },
+        ],
+      });
+
+      const result = await service.getMessages('conv_test', 'user_1', 1);
+
+      expect(result.messages[0].citations).toEqual([citation]);
+    });
+
+    describe('a conversation that is not yours answers the same 404 as a missing one', () => {
+      const cases: [string, unknown][] = [
+        ['missing', null],
+        ["another person's", { ...OWN, userId: 999, messages: [] }],
+        ["another workspace's", { ...OWN, tenantId: 99, messages: [] }],
+      ];
+
+      async function bodyOf(run: () => Promise<unknown>) {
+        try {
+          await run();
+        } catch (error) {
+          expect(error).toBeInstanceOf(NotFoundException);
+          return { status: (error as NotFoundException).getStatus(), body: (error as NotFoundException).getResponse() };
+        }
+        throw new Error('expected a 404');
+      }
+
+      it('on read, archive and send, with an identical body for all three', async () => {
+        const bodies: unknown[] = [];
+        for (const [, row] of cases) {
+          mockPrisma.conversation.findUnique.mockResolvedValue(row);
+          bodies.push(await bodyOf(() => service.getMessages('conv_x', 'user_1', 1)));
+          bodies.push(await bodyOf(() => service.archiveConversation('conv_x', 'user_1', 1)));
+          bodies.push(await bodyOf(() => service.generateResponse('conv_x', 'hi', 'text', 'user_1', 1).next()));
+        }
+        expect(new Set(bodies.map((b) => JSON.stringify(b))).size).toBe(1);
+        expect(bodies[0]).toMatchObject({ status: 404 });
+      });
+
+      it('the streaming route answers the identical envelope for all three', async () => {
+        const envelopes: unknown[] = [];
+        for (const [, row] of cases) {
+          mockPrisma.conversation.findUnique.mockResolvedValue(row);
+          const res = streamingRes();
+          await service.streamMessage('conv_x', 'hi', 'text', 'user_1', 1, streamReq(), res);
+          const { timestamp: _t, ...rest } = res.json.mock.calls[0][0];
+          envelopes.push(rest);
+        }
+        expect(new Set(envelopes.map((e) => JSON.stringify(e))).size).toBe(1);
+        expect(envelopes[0]).toMatchObject({ statusCode: 404, code: 'NOT_FOUND' });
+      });
+    });
+
+    describe('archive', () => {
+      it('archives an active conversation in one transaction with its event', async () => {
+        await service.archiveConversation('conv_test', 'user_1', 1);
+
+        expect(mockPrisma.conversation.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { isActive: false } });
+        expect(mockOutbox.emit).toHaveBeenCalledWith('app.conversation.archived', 1, {
+          conversationId: 'conv_test',
+          reason: 'user',
+        });
+      });
+
+      it('archiving an archived conversation is a no-op that still succeeds', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+
+        await expect(service.archiveConversation('conv_test', 'user_1', 1)).resolves.toBeUndefined();
+        expect(mockOutbox.transaction).not.toHaveBeenCalled();
+      });
+
+      it('refuses a message into an archived conversation with a 409, storing nothing', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+
+        const error = await service
+          .generateResponse('conv_test', 'hi', 'text', 'user_1', 1)
+          .next()
+          .then(
+            () => undefined,
+            (e: unknown) => e,
+          );
+
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as ConflictException).getResponse()).toMatchObject({ code: 'INVALID_STATE' });
+        expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+        expect(mockPrisma.conversation.update).not.toHaveBeenCalled();
+      });
+
+      it('the streaming route answers that refusal as the 409 envelope', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+        const res = streamingRes();
+
+        await service.streamMessage('conv_test', 'hi', 'text', 'user_1', 1, streamReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409, code: 'INVALID_STATE' }));
+        expect(res.write).not.toHaveBeenCalled();
+      });
+
+      it('refuses to resume a confirmation in an archived conversation with a 409, before the agent runs', async () => {
+        mockPrisma.conversation.findUnique.mockResolvedValue({ ...OWN, isActive: false });
+        const getAgent = jest.fn();
+        mockMastra.getMastra.mockReturnValue({ getAgent });
+        const res = streamingRes();
+
+        await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, streamReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'INVALID_STATE' }));
+        expect(getAgent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('the rolling cap', () => {
+      it('after a create, archives every active conversation past the newest MAX_ACTIVE_CONVERSATIONS', async () => {
+        mockPrisma.conversation.findMany.mockResolvedValue([
+          { id: 7, conversationId: 'conv_old1' },
+          { id: 8, conversationId: 'conv_old2' },
+        ]);
+
+        await service.createConversation('user_1', 1, 'member');
+
+        expect(mockPrisma.conversation.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { userId: 1, tenantId: 1, isActive: true },
+            skip: MAX_ACTIVE_CONVERSATIONS,
+          }),
+        );
+        expect(mockPrisma.conversation.updateMany).toHaveBeenCalledWith({
+          where: { id: { in: [7, 8] } },
+          data: { isActive: false },
+        });
+        expect(mockOutbox.emit).toHaveBeenCalledTimes(2);
+        expect(mockOutbox.emit).toHaveBeenCalledWith('app.conversation.archived', 1, {
+          conversationId: 'conv_old1',
+          reason: 'cap',
+        });
+      });
+
+      it('writes nothing when the person is within the cap', async () => {
+        mockPrisma.conversation.findMany.mockResolvedValue([]);
+
+        await service.createConversation('user_1', 1, 'member');
+
+        expect(mockOutbox.transaction).not.toHaveBeenCalled();
+      });
+
+      it('a failing cap never fails the create', async () => {
+        mockPrisma.conversation.findMany.mockRejectedValue(new Error('db blip'));
+
+        await expect(service.createConversation('user_1', 1, 'member')).resolves.toMatchObject({
+          conversationId: 'conv_test',
+        });
+      });
+    });
+
+    it('history lists active conversations someone spoke in, at most the cap', async () => {
+      mockPrisma.conversation.findMany.mockResolvedValue([]);
+
+      await service.listConversations('user_1', 1, 500);
+
+      expect(mockPrisma.conversation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 1, tenantId: 1, isActive: true, messages: { some: { role: 'user' } } },
+          take: MAX_ACTIVE_CONVERSATIONS,
+        }),
+      );
+    });
   });
 });

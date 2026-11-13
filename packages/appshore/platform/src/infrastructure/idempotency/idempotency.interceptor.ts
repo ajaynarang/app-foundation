@@ -1,7 +1,6 @@
 import {
   type CallHandler,
   type ExecutionContext,
-  HttpException,
   HttpStatus,
   Injectable,
   Logger,
@@ -16,9 +15,11 @@ import { catchError, mergeMap, switchMap } from 'rxjs/operators';
 import {
   IDEMPOTENCY_KEY_HEADER,
   IDEMPOTENT_REPLAYED_HEADER,
+  claimOrSkip,
   type IdempotencyClaim,
   IdempotencyStore,
   requestFingerprint,
+  withinStoreTimeout,
 } from './idempotency.store';
 
 const SKIP_IDEMPOTENCY = 'appshore:skipIdempotency';
@@ -29,9 +30,6 @@ const SKIP_IDEMPOTENCY = 'appshore:skipIdempotency';
  * marked.
  */
 export const SkipIdempotency = () => SetMetadata(SKIP_IDEMPOTENCY, true);
-
-/** A claim that does not answer within this long is skipped: a Redis outage must not stall creates. */
-const CLAIM_TIMEOUT_MS = 2000;
 
 /**
  * `Idempotency-Key` on every create (ADR "API contract", section 5; held by `idempotency.spec.ts`): an authenticated
@@ -71,34 +69,24 @@ export class IdempotencyInterceptor implements NestInterceptor {
         return next.handle().pipe(
           mergeMap((body) => from(this.remember(claim, { status, body }).then(() => body))),
           catchError((error) =>
-            from(claim.release().catch(() => undefined)).pipe(mergeMap(() => throwError(() => error))),
+            from(withinStoreTimeout(claim.release()).catch(() => undefined)).pipe(
+              mergeMap(() => throwError(() => error)),
+            ),
           ),
         );
       }),
     );
   }
 
-  /** The claim, or null (run without a key) when the store is unreachable; a 4xx from the store (409, 400) stands. */
-  private async claim(scope: string, key: string, fingerprint: ReturnType<typeof requestFingerprint>) {
-    let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), CLAIM_TIMEOUT_MS)));
-    try {
-      const claim = await Promise.race([this.store.claim(scope, key, fingerprint), timeout]);
-      if (!claim) this.logger.warn('Idempotency store did not answer in time: running without the key');
-      return claim;
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      this.logger.warn(`Idempotency store unavailable, running without the key: ${(error as Error).message}`);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
+  /** The claim, or null (run without a key) when the store is unreachable or slow; a 4xx (409, 400) stands. */
+  private claim(scope: string, key: string, fingerprint: ReturnType<typeof requestFingerprint>) {
+    return claimOrSkip(this.store, scope, key, fingerprint, this.logger);
   }
 
   /** The create already happened: failing to remember it must never turn it into an error (or a duplicate). */
   private async remember(claim: Extract<IdempotencyClaim, { kind: 'run' }>, result: { status: number; body: unknown }) {
     try {
-      await claim.complete(result);
+      await withinStoreTimeout(claim.complete(result));
     } catch (error) {
       this.logger.warn(`Idempotency: could not remember a response: ${(error as Error).message}`);
     }

@@ -10,6 +10,9 @@ import {
 import { escapeLike } from '@appshore/kernel/shared/utils/list-query';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { BUDGET_SEED_NOTE_DEFAULT, adminBudgetNote } from '../ai/routing/provisioning/plan-ai-budgets';
+import { OpenRouterProvisioningService } from '../ai/routing/provisioning/openrouter-provisioning.service';
+import { PLATFORM_PAID_SQL, payerOf } from '../ai/infrastructure/telemetry/platform-paid';
 import type {
   AiSpendSummary,
   AiSpendTenantList,
@@ -55,12 +58,20 @@ const DECIMAL = /^\d{1,12}(\.\d{1,12})?$/;
  *
  * Pagination on the invocation list uses keyset (createdAt + id) — offset
  * pagination falls apart on a high-volume ledger.
+ *
+ * Every cost figure comes with the part the platform paid (`platform_cost_usd`
+ * in the views, `PLATFORM_PAID_SQL` on the ledger): a workspace on its own
+ * credential pays its own provider, and only platform-paid cost counts toward
+ * its AI budget.
  */
 @Injectable()
 export class AdminAiSpendService {
   private readonly logger = new Logger(AdminAiSpendService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly provisioning: OpenRouterProvisioningService,
+  ) {}
 
   // ───────────────────────────────────────────────────────────────────────
   // Home — one row per tenant, last N days
@@ -88,8 +99,9 @@ export class AdminAiSpendService {
     const totals = Prisma.sql`
       WITH totals AS (
         SELECT v.tenant_id,
-               SUM(v.total_cost_usd) AS cost,
-               SUM(v.call_count)     AS calls,
+               SUM(v.total_cost_usd)    AS cost,
+               SUM(v.platform_cost_usd) AS platform_cost,
+               SUM(v.call_count)        AS calls,
                SUM(v.error_count)    AS errors
         FROM vw_ai_cost_per_tenant v
         WHERE v.day >= ${since}::date
@@ -100,7 +112,8 @@ export class AdminAiSpendService {
       this.prisma.$queryRaw<TenantTotalsRaw[]>`
         ${totals}
         SELECT t.id AS tenant_id, t.tenant_id AS tenant_slug, t.company_name,
-               totals.cost::text AS total_cost_usd, totals.calls AS call_count, totals.errors AS error_count
+               totals.cost::text AS total_cost_usd, totals.platform_cost::text AS platform_cost_usd,
+               totals.calls AS call_count, totals.errors AS error_count
         FROM totals JOIN tenants t ON t.id = totals.tenant_id
         WHERE TRUE ${search} ${after}
         ORDER BY totals.cost DESC, t.tenant_id ASC
@@ -119,12 +132,16 @@ export class AdminAiSpendService {
   /** The window in one figure: what every tenant together spent, and how many spent anything. */
   async getSummary(opts: { days: number }): Promise<AiSpendSummary> {
     const since = startOfDayUtcDaysAgo(opts.days);
-    const [row] = await this.prisma.$queryRaw<Array<{ total_cost_usd: string | null; tenant_count: bigint | number }>>`
-      SELECT SUM(total_cost_usd)::text AS total_cost_usd, COUNT(DISTINCT tenant_id) AS tenant_count
+    const [row] = await this.prisma.$queryRaw<
+      Array<{ total_cost_usd: string | null; platform_cost_usd: string | null; tenant_count: bigint | number }>
+    >`
+      SELECT SUM(total_cost_usd)::text AS total_cost_usd, SUM(platform_cost_usd)::text AS platform_cost_usd,
+             COUNT(DISTINCT tenant_id) AS tenant_count
       FROM vw_ai_cost_per_tenant
       WHERE day >= ${since}::date`;
     return {
       windowCostUsd: row?.total_cost_usd ?? (0).toFixed(6),
+      windowPlatformCostUsd: row?.platform_cost_usd ?? (0).toFixed(6),
       tenantCount: Number(row?.tenant_count ?? 0),
     };
   }
@@ -151,6 +168,7 @@ export class AdminAiSpendService {
       tenantSlug: row.tenant_slug,
       companyName: row.company_name,
       windowCostUsd: row.total_cost_usd,
+      windowPlatformCostUsd: row.platform_cost_usd,
       windowCallCount: Number(row.call_count),
       windowErrorCount: Number(row.error_count),
       sparkline: daily
@@ -169,7 +187,8 @@ export class AdminAiSpendService {
     const rows = await this.prisma.$queryRaw<SurfaceSliceRaw[]>`
       SELECT
         surface,
-        SUM(total_cost_usd)::text AS total_cost_usd,
+        SUM(total_cost_usd)::text    AS total_cost_usd,
+        SUM(platform_cost_usd)::text AS platform_cost_usd,
         SUM(call_count)::bigint   AS call_count,
         SUM(error_count)::bigint  AS error_count,
         SUM(total_tokens)::bigint AS total_tokens
@@ -182,6 +201,7 @@ export class AdminAiSpendService {
     return rows.map((r) => ({
       surface: r.surface,
       windowCostUsd: r.total_cost_usd,
+      windowPlatformCostUsd: r.platform_cost_usd,
       windowCallCount: Number(r.call_count),
       windowErrorCount: Number(r.error_count),
       windowTotalTokens: Number(r.total_tokens),
@@ -218,8 +238,12 @@ export class AdminAiSpendService {
       promptTokens: row.promptTokens,
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
+      cacheWriteTokens: row.cacheWriteTokens,
       latencyMs: row.latencyMs,
       status: row.status,
+      routeId: row.routeId,
+      credentialType: row.credentialType,
+      payer: payerOf(row.credentialType),
       langfuseTraceId: row.langfuseTraceId,
       linkRefType: row.linkRefType,
       linkRefId: row.linkRefId,
@@ -233,11 +257,14 @@ export class AdminAiSpendService {
   // Budget config (Sprint 2 — PR 10)
   // ───────────────────────────────────────────────────────────────────────
 
-  /** Fetch (or lazily create) a tenant's budget caps. */
+  /**
+   * Fetch (or lazily create) a tenant's budget caps. A row created here holds the schema defaults, which nobody
+   * chose, so it is stamped `plan:DEFAULT` and the plan seeder may still replace it.
+   */
   async getBudget(tenantId: number): Promise<AiBudget> {
     const row = await this.prisma.tenantAiBudget.upsert({
       where: { tenantId },
-      create: { tenantId },
+      create: { tenantId, notes: BUDGET_SEED_NOTE_DEFAULT },
       update: {},
     });
     return this.toBudget(row);
@@ -246,11 +273,18 @@ export class AdminAiSpendService {
   /**
    * Update a tenant's budget caps. Validation (≥0, hard≥soft, monthly≥daily)
    * is enforced by the DTO (UpdateAiBudgetSchema) at the controller boundary;
-   * here we just persist. Note: this does NOT bust AiTelemetryService's 60s
+   * here we just persist. The note is the admin's own (or null). A `plan:`
+   * stamp sent back (the sheet pre-fills the stored note) is dropped to null,
+   * so an edit always takes the row out of the plan seeder's hands. Note: this does NOT bust AiTelemetryService's 60s
    * budget cache directly — the next check picks up the new caps within a
    * minute, which is acceptable for an admin config change.
+   *
+   * The workspace's OpenRouter sub-key gets the new monthly hard cap (created when missing; a no-op unless sub-keys
+   * are on), so a raised budget is not still refused at OpenRouter's edge. Fired, not awaited: the save never waits
+   * on OpenRouter, and a failed sync is logged by the provisioning service.
    */
   async updateBudget(tenantId: number, input: UpdateAiBudgetInput): Promise<AiBudget> {
+    const notes = adminBudgetNote(input.notes);
     const row = await this.prisma.tenantAiBudget.upsert({
       where: { tenantId },
       create: {
@@ -259,21 +293,24 @@ export class AdminAiSpendService {
         dailyHardUsd: input.dailyHardUsd,
         monthlySoftUsd: input.monthlySoftUsd,
         monthlyHardUsd: input.monthlyHardUsd,
-        notes: input.notes ?? null,
+        notes,
       },
       update: {
         dailySoftUsd: input.dailySoftUsd,
         dailyHardUsd: input.dailyHardUsd,
         monthlySoftUsd: input.monthlySoftUsd,
         monthlyHardUsd: input.monthlyHardUsd,
-        notes: input.notes ?? null,
+        notes,
       },
     });
+    void this.provisioning.syncLimit(tenantId, Number(input.monthlyHardUsd));
     return this.toBudget(row);
   }
 
   /**
-   * Cost vs quota side-by-side for one tenant. Cost + budget come from this
+   * Cost vs quota side-by-side for one tenant. The budget is compared with
+   * `platformUsd` (what the platform paid); `tenantUsd` is what the workspace
+   * paid on its own credentials, shown and never capped. Cost + budget come from this
    * domain (the ledger + budget table). Quota comes from the separate
    * plan/billing system — exposed here as a best-effort array so the panel
    * can show the distinction. Quota integration is a documented follow-up:
@@ -285,18 +322,26 @@ export class AdminAiSpendService {
   async getCostVsQuota(opts: { tenantId: number; days: number }): Promise<AiCostVsQuota> {
     const since = startOfDayUtcDaysAgo(opts.days);
     const [costRows, budget] = await Promise.all([
-      this.prisma.$queryRaw<{ total_usd: string; call_count: bigint | number }[]>`
-        SELECT COALESCE(SUM(cost_usd), 0)::text AS total_usd, COUNT(*)::bigint AS call_count
+      this.prisma.$queryRaw<{ total_usd: string; platform_usd: string; call_count: bigint | number }[]>`
+        SELECT COALESCE(SUM(cost_usd), 0)::text AS total_usd,
+               COALESCE(SUM(cost_usd) FILTER (WHERE ${PLATFORM_PAID_SQL}), 0)::text AS platform_usd,
+               COUNT(*)::bigint AS call_count
         FROM ai_invocations
         WHERE tenant_id = ${opts.tenantId} AND created_at >= ${since}
       `,
       this.getBudget(opts.tenantId),
     ]);
-    const cost = costRows[0] ?? { total_usd: '0', call_count: 0 };
+    const cost = costRows[0] ?? { total_usd: '0', platform_usd: '0', call_count: 0 };
+    const tenantUsd = new Prisma.Decimal(cost.total_usd).minus(new Prisma.Decimal(cost.platform_usd));
 
     return {
       windowDays: opts.days,
-      cost: { totalUsd: cost.total_usd, callCount: Number(cost.call_count) },
+      cost: {
+        totalUsd: cost.total_usd,
+        platformUsd: cost.platform_usd,
+        tenantUsd: tenantUsd.toString(),
+        callCount: Number(cost.call_count),
+      },
       budget,
       quota: [], // see method doc — quota read API is a follow-up integration
     };
@@ -326,6 +371,7 @@ interface TenantTotalsRaw {
   tenant_slug: string;
   company_name: string;
   total_cost_usd: string;
+  platform_cost_usd: string;
   call_count: bigint | number;
   error_count: bigint | number;
 }
@@ -339,6 +385,7 @@ interface DailySliceRaw {
 interface SurfaceSliceRaw {
   surface: AiSurface;
   total_cost_usd: string;
+  platform_cost_usd: string;
   call_count: bigint | number;
   error_count: bigint | number;
   total_tokens: bigint | number;

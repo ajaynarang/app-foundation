@@ -14,3 +14,17 @@
  * Settings has to mount it too. `shared/__tests__/web-routes.spec.ts` holds this.
  */
 export const INTEGRATIONS_WEB_PATH = '/settings/general';
+
+/**
+ * The workspace AI settings screen (retention policy and the workspace's own AI keys), where a failing-key notice
+ * sends its owner and the budget notice's "Connect a key" action points (the web app's AI Keys screen).
+ */
+export const AI_SETTINGS_WEB_PATH = '/settings/ai';
+
+/**
+ * Where an external agent's approval link lands: the web app's page to approve or deny one write, or enter the PIN
+ * for a sensitive one. The pipeline hands it out with `approval_required`, and with a sensitive `hitl_required`.
+ */
+export function agentActionWebPath(token: string): string {
+  return `/agent-actions/${encodeURIComponent(token)}/approve`;
+}

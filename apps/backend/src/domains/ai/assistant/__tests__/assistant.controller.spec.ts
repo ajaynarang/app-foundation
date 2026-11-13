@@ -24,6 +24,7 @@ jest.mock('@presidio-dev/hai-guardrails', () => ({}));
 jest.mock('redact-pii', () => ({}));
 
 import { AssistantAiController } from '../assistant.controller';
+import { MAX_ACTIVE_CONVERSATIONS } from '@app/shared-types';
 
 describe('AssistantAiController', () => {
   let controller: AssistantAiController;
@@ -82,6 +83,15 @@ describe('AssistantAiController', () => {
     });
   });
 
+  describe('archiveConversation', () => {
+    it('archives through the service and answers with no body', async () => {
+      mockService.archiveConversation = jest.fn().mockResolvedValue(undefined);
+      const user = { userId: 'user_1', tenantDbId: 1 };
+      await expect(controller.archiveConversation(user, 'conv_1')).resolves.toBeUndefined();
+      expect(mockService.archiveConversation).toHaveBeenCalledWith('conv_1', 'user_1', 1);
+    });
+  });
+
   describe('listConversations', () => {
     it('delegates to service with limit', async () => {
       const user = { userId: 'user_1', tenantDbId: 1 };
@@ -91,8 +101,9 @@ describe('AssistantAiController', () => {
   });
 
   describe('ListConversationsQueryDto', () => {
-    it('defaults to 10 and answers 400 naming limit when it is not a number', async () => {
-      expect((await readQueryDto(ListConversationsQueryDto, {})).limit).toBe(10);
+    it('defaults to the history cap, clamps to it, and answers 400 naming limit when it is not a number', async () => {
+      expect((await readQueryDto(ListConversationsQueryDto, {})).limit).toBe(MAX_ACTIVE_CONVERSATIONS);
+      expect((await readQueryDto(ListConversationsQueryDto, { limit: '500' })).limit).toBe(MAX_ACTIVE_CONVERSATIONS);
       expect(await fieldErrorsOf(readQueryDto(ListConversationsQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
     });
   });

@@ -3,6 +3,7 @@ jest.mock('@presidio-dev/hai-guardrails', () => ({}));
 jest.mock('redact-pii', () => ({}));
 
 import { ModerationService } from '../moderation.service';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
 
 describe('ModerationService', () => {
   let service: ModerationService;
@@ -20,7 +21,28 @@ describe('ModerationService', () => {
       checkLeakage: jest.fn().mockResolvedValue({ flagged: false }),
       redactPii: jest.fn().mockResolvedValue({ text: 'clean text', redacted: false }),
     };
-    service = new ModerationService(mockContentModeration, mockGuardrails);
+    service = new ModerationService(mockContentModeration, mockGuardrails, makeResolver().resolver);
+  });
+
+  describe('moderate — zero retention', () => {
+    it("never sends a zero-retention workspace's text to the external moderator; local guardrails still run", async () => {
+      service = new ModerationService(
+        mockContentModeration,
+        mockGuardrails,
+        makeResolver({ aiZeroRetention: true }).resolver,
+      );
+
+      const result = await service.moderate('my private text', 'input', 'member', 7);
+
+      expect(mockContentModeration.check).not.toHaveBeenCalled();
+      expect(mockGuardrails.checkInjection).toHaveBeenCalledWith('my private text');
+      expect(result.events.map((e) => e.guard)).not.toContain('content-moderation');
+    });
+
+    it('still runs external moderation for a standard workspace', async () => {
+      await service.moderate('hello', 'input', 'member', 7);
+      expect(mockContentModeration.check).toHaveBeenCalledWith('hello');
+    });
   });
 
   describe('moderate — input', () => {

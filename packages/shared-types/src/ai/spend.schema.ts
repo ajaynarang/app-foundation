@@ -13,6 +13,14 @@ import { cursorListSchema } from '../infrastructure/cursor-list';
 const NumericString = z.string(); // Postgres `numeric` serializes as string
 
 /**
+ * Who paid for an AI call: the platform's own key (`PLATFORM`), or the workspace's own credential (`TENANT`). The
+ * platform paid when the ledger row's `credentialType` is null or starts with `PLATFORM_`. Only platform-paid cost
+ * counts toward a workspace's AI budget.
+ */
+export const AiPayerSchema = z.enum(['PLATFORM', 'TENANT']);
+export type AiPayer = z.infer<typeof AiPayerSchema>;
+
+/**
  * One row in the home table: per-tenant 7-day spend total + sparkline data.
  * `sparkline` is the last N days' costUsd in chronological order so the UI
  * can render an inline trend without a second roundtrip.
@@ -22,6 +30,8 @@ export const AiSpendTenantSummarySchema = z.object({
   tenantSlug: z.string(),
   companyName: z.string(),
   windowCostUsd: NumericString, // sum across the chosen window
+  /** The part of `windowCostUsd` the platform paid; the rest the workspace paid on its own credentials. */
+  windowPlatformCostUsd: NumericString,
   windowCallCount: z.number().int(),
   windowErrorCount: z.number().int(),
   sparkline: z.array(
@@ -41,6 +51,8 @@ export type AiSpendTenantList = z.infer<typeof AiSpendTenantListSchema>;
 /** `GET /admin/ai-spend/summary`: the window across every tenant, so the header total never depends on the pages loaded. */
 export const AiSpendSummarySchema = z.object({
   windowCostUsd: NumericString,
+  /** The part of `windowCostUsd` the platform paid. */
+  windowPlatformCostUsd: NumericString,
   tenantCount: z.number().int().min(0),
 });
 export type AiSpendSummary = z.infer<typeof AiSpendSummarySchema>;
@@ -53,6 +65,7 @@ export type AiSpendSummary = z.infer<typeof AiSpendSummarySchema>;
 export const AiSpendSurfaceRowSchema = z.object({
   surface: AiSurfaceSchema,
   windowCostUsd: NumericString,
+  windowPlatformCostUsd: NumericString,
   windowCallCount: z.number().int(),
   windowErrorCount: z.number().int(),
   windowTotalTokens: z.number().int(),
@@ -73,8 +86,14 @@ export const AiSpendInvocationItemSchema = z.object({
   promptTokens: z.number().int(),
   completionTokens: z.number().int(),
   cachedTokens: z.number().int().nullable(),
+  cacheWriteTokens: z.number().int().nullable(),
   latencyMs: z.number().int().nullable(),
   status: AiInvocationStatusSchema,
+  /** The route that served the call (`platform-openrouter`, or a workspace credential's public id); null before routing. */
+  routeId: z.string().nullable(),
+  /** The credential type behind the route (`PLATFORM_OPENROUTER`, or a workspace credential type); null before routing. */
+  credentialType: z.string().nullable(),
+  payer: AiPayerSchema,
   langfuseTraceId: z.string().nullable(),
   linkRefType: z.string().nullable(),
   linkRefId: z.string().nullable(),
@@ -143,6 +162,10 @@ export const AiCostVsQuotaSchema = z.object({
   windowDays: z.number().int(),
   cost: z.object({
     totalUsd: z.string(),
+    /** What the platform paid: the figure the budget caps apply to. */
+    platformUsd: z.string(),
+    /** What the workspace paid on its own credentials: shown, never capped. */
+    tenantUsd: z.string(),
     callCount: z.number().int(),
   }),
   budget: AiBudgetSchema,

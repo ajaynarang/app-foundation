@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@appshore/db';
+import { AiUsageUnit, Prisma } from '@appshore/db';
 import type { AiInvocation, ModelPricing, TenantAiBudget } from '@appshore/db';
 import type { AiBudgetState, AiCallContext, AiUsage } from '@app/shared-types';
 
@@ -12,9 +12,9 @@ import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.s
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
-import { ZeroRetentionUnavailable } from '../redaction/zero-retention-unavailable.error';
-import { ZDR_ELIGIBLE_TIERS } from '../providers/ai-provider';
-import type { ModelAlias } from '@app/shared-types';
+import { longPromptSurchargeAbove } from '../../routing/model-catalog';
+import { BUDGET_SEED_NOTE_DEFAULT } from '../../routing/provisioning/plan-ai-budgets';
+import { PLATFORM_PAID_SQL } from './platform-paid';
 
 /**
  * AiTelemetryService — single write path for the AI cost ledger.
@@ -26,8 +26,11 @@ import type { ModelAlias } from '@app/shared-types';
  * aggregates get invalidated through a domain event staged in the same
  * transaction as the row (the outbox, ADR "Outbox and deadlines").
  *
- * Cost math: `(promptTokens - cachedTokens) * input + cachedTokens *
- * cachedInput + completionTokens * output`, all per million tokens. If no
+ * Cost math: `(promptTokens - cachedTokens - cacheWriteTokens) * input +
+ * cachedTokens * cachedInput + cacheWriteTokens * cacheWrite +
+ * completionTokens * output`, all per million tokens. A pricing row with no
+ * cache-write rate prices a write at the input rate. A non-token meter (voice:
+ * `usageUnit` other than `TOKEN`) costs `usageQuantity * unitPriceUsd`. If no
  * `ModelPricing` row matches the provider/model at write time, the row is
  * still written with `costUsd = null` and a warning is logged — untagged
  * cost is a bug we want to see, not a silent failure that drops data.
@@ -48,8 +51,8 @@ export class AiTelemetryService {
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
     /**
-     * Signals only: the budget breaches and the zero-retention refusal have no write behind them and must fire
-     * with the database down (`no-direct-emit.allowlist.json`).
+     * Signals only: the budget breaches have no write behind them and must fire with the database down
+     * (`no-direct-emit.allowlist.json`). The zero-retention refusal is the route resolver's.
      */
     private readonly events: DomainEventService,
     private readonly outbox: OutboxService,
@@ -74,6 +77,7 @@ export class AiTelemetryService {
       throw new Error('AiTelemetryService.record: surface is required');
     }
 
+    this.warnOnLongPromptSurcharge(usage);
     const costUsd = await this.computeCost(usage);
 
     const row = await this.persistRow(usage, context, costUsd);
@@ -83,6 +87,19 @@ export class AiTelemetryService {
     void this.invalidateSpentCache(row.tenantId).catch(() => {});
 
     return row;
+  }
+
+  /**
+   * A model with a long-prompt price tier (Haiku 5.5 above 100K prompt tokens) is priced by one row at its base
+   * rate, so a call above the threshold is understated in the ledger. Say so, once per such call.
+   */
+  private warnOnLongPromptSurcharge(usage: AiUsage): void {
+    const threshold = longPromptSurchargeAbove(usage.model);
+    if (threshold !== undefined && usage.promptTokens > threshold) {
+      this.logger.warn(
+        `${usage.provider}/${usage.model} call with ${usage.promptTokens} prompt tokens is above ${threshold}; the provider bills a higher rate there, so this row's cost is understated.`,
+      );
+    }
   }
 
   /**
@@ -103,8 +120,14 @@ export class AiTelemetryService {
       return null;
     }
 
+    if (usage.usageUnit && usage.usageUnit !== AiUsageUnit.TOKEN) {
+      return this.computeUnitCost(usage, pricing);
+    }
+
+    // `promptTokens` includes the cache reads and the cache writes (`usageFromAiSdk`); each is priced at its own rate.
     const cachedTokens = usage.cachedTokens ?? 0;
-    const billableInput = Math.max(0, usage.promptTokens - cachedTokens);
+    const writtenTokens = usage.cacheWriteTokens ?? 0;
+    const billableInput = Math.max(0, usage.promptTokens - cachedTokens - writtenTokens);
 
     const PER_MTOK = new Prisma.Decimal(1_000_000);
 
@@ -112,9 +135,23 @@ export class AiTelemetryService {
     const cachedCost = pricing.cachedInputPerMtokUsd
       ? new Prisma.Decimal(cachedTokens).mul(pricing.cachedInputPerMtokUsd).div(PER_MTOK)
       : new Prisma.Decimal(0);
+    const writeCost = new Prisma.Decimal(writtenTokens)
+      .mul(pricing.cacheWriteInputPerMtokUsd ?? pricing.inputPerMtokUsd)
+      .div(PER_MTOK);
     const outputCost = new Prisma.Decimal(usage.completionTokens).mul(pricing.outputPerMtokUsd).div(PER_MTOK);
 
-    return inputCost.plus(cachedCost).plus(outputCost);
+    return inputCost.plus(cachedCost).plus(writeCost).plus(outputCost);
+  }
+
+  /** A non-token meter (voice) is priced per unit. A row with no unit price records the usage with a null cost. */
+  private computeUnitCost(usage: AiUsage, pricing: ModelPricing): Prisma.Decimal | null {
+    if (!pricing.unitPriceUsd) {
+      this.logger.warn(
+        `model_pricing row for ${usage.provider}/${usage.model} has no unit_price_usd; recording ${usage.usageUnit} usage with null cost.`,
+      );
+      return null;
+    }
+    return new Prisma.Decimal(usage.usageQuantity ?? 0).mul(pricing.unitPriceUsd);
   }
 
   /**
@@ -208,6 +245,9 @@ export class AiTelemetryService {
         completionTokens: usage.completionTokens,
         totalTokens: usage.totalTokens,
         cachedTokens: usage.cachedTokens ?? null,
+        cacheWriteTokens: usage.cacheWriteTokens ?? null,
+        usageUnit: usage.usageUnit ?? AiUsageUnit.TOKEN,
+        usageQuantity: usage.usageQuantity ?? null,
         costUsd,
         latencyMs: usage.latencyMs ?? null,
         status: usage.status,
@@ -216,49 +256,12 @@ export class AiTelemetryService {
         linkRefType: context.linkRefType ?? null,
         linkRefId: context.linkRefId ?? null,
         langfuseTraceId: context.langfuseTraceId ?? null,
+        routeId: usage.routeId ?? null,
+        credentialType: usage.credentialType ?? null,
         idempotencyKey: context.idempotencyKey ?? null,
       },
     });
     return { row, created: true };
-  }
-
-  // ───────────────────────────────────────────────────────────────────────
-  // Zero-data-retention enforcement (Sprint 2)
-  // ───────────────────────────────────────────────────────────────────────
-
-  /**
-   * For a tenant flagged `aiZeroRetention`, ensure the requested model tier
-   * has a verified ZDR provider route — else throw `ZeroRetentionUnavailable`
-   * (fail-closed). No-op for tenants without the flag.
-   *
-   * Tenant flag is cached 60s (changes rarely). The ZDR-eligible tier set is
-   * currently empty pending the provider-route decision (see
-   * `ZDR_ELIGIBLE_TIERS`), so a ZDR tenant is correctly blocked until a
-   * compliant route is wired — rather than leaking to a retaining endpoint.
-   */
-  async assertZeroRetention(tenantId: number, tier: ModelAlias): Promise<void> {
-    const requiresZdr = await this.tenantRequiresZeroRetention(tenantId);
-    if (!requiresZdr) return;
-    if (!ZDR_ELIGIBLE_TIERS.has(tier)) {
-      void this.events
-        .emit(DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE, tenantId, { tier })
-        .catch((e) => this.logger.warn(`zdr-unavailable event emit failed: ${e.message}`));
-      throw new ZeroRetentionUnavailable(tier);
-    }
-  }
-
-  private async tenantRequiresZeroRetention(tenantId: number): Promise<boolean> {
-    return this.cache.getOrSet(
-      buildKey('app:ai-telemetry', 'zdr', tenantId),
-      async () => {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id: tenantId },
-          select: { aiZeroRetention: true },
-        });
-        return tenant?.aiZeroRetention ?? false;
-      },
-      CACHE_TTL_HOT_60S,
-    );
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -341,7 +344,8 @@ export class AiTelemetryService {
       async () =>
         this.prisma.tenantAiBudget.upsert({
           where: { tenantId },
-          create: { tenantId },
+          // Stamped so the plan seeder may still replace these defaults: nobody chose them.
+          create: { tenantId, notes: BUDGET_SEED_NOTE_DEFAULT },
           update: {},
         }),
       CACHE_TTL_HOT_60S,
@@ -349,10 +353,16 @@ export class AiTelemetryService {
   }
 
   /**
-   * Sum the tenant's spend for today + the current calendar month from the
-   * ledger. Cached 60s (HOT) and busted on every new invocation, so the
-   * window of staleness is bounded. Uses a single grouped raw query rather
-   * than two findMany scans.
+   * Sum the tenant's PLATFORM-PAID spend for today + the current calendar
+   * month from the ledger. Cached 60s (HOT) and busted on every new
+   * invocation, so the window of staleness is bounded. Uses a single grouped
+   * raw query rather than two findMany scans.
+   *
+   * Only what the platform paid counts (`PLATFORM_PAID_SQL`): the cap is a
+   * control on platform money. Dollars a workspace spent on its own key never
+   * count, so removing that key mid-month, or one platform-paid call beside
+   * its own-key calls, does not trip the cap with spend that was never the
+   * platform's.
    */
   private async getSpent(tenantId: number): Promise<{ daily: Prisma.Decimal; monthly: Prisma.Decimal }> {
     const cached = await this.cache.getOrSet(
@@ -367,7 +377,7 @@ export class AiTelemetryService {
             COALESCE(SUM(cost_usd) FILTER (WHERE created_at >= ${startOfDay}), 0)::text   AS daily,
             COALESCE(SUM(cost_usd) FILTER (WHERE created_at >= ${startOfMonth}), 0)::text AS monthly
           FROM ai_invocations
-          WHERE tenant_id = ${tenantId} AND created_at >= ${startOfMonth}
+          WHERE tenant_id = ${tenantId} AND created_at >= ${startOfMonth} AND ${PLATFORM_PAID_SQL}
         `;
         const row = rows[0] ?? { daily: '0', monthly: '0' };
         return { daily: row.daily ?? '0', monthly: row.monthly ?? '0' };

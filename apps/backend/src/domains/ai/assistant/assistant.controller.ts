@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Param, Query, Body, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { Controller, Delete, Get, Post, Param, Query, Body, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
@@ -64,16 +64,35 @@ export class AssistantAiController {
 
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
-  @ApiOperation({ summary: 'List conversations for the current user' })
+  @ApiOperation({
+    summary: "List the current user's active conversations (newest first, at most the history cap)",
+  })
   @ApiResult(ConversationListResponse)
   async listConversations(@CurrentUser() user: any, @Query() query: ListConversationsQueryDto) {
     return this.service.listConversations(user.userId, user.tenantDbId, query.limit);
+  }
+
+  @Delete(':conversation_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
+  @ApiOperation({
+    summary: 'Archive one of your conversations: it leaves history; its messages are kept',
+  })
+  @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
+  @ApiNoContentResponse({ description: 'Archived (or already archived)' })
+  async archiveConversation(@CurrentUser() user: any, @Param('conversation_id') conversationId: string): Promise<void> {
+    await this.service.archiveConversation(conversationId, user.userId, user.tenantDbId);
   }
 
   @Post(':conversation_id/resume')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER)
   @ApiOperation({
     summary: 'Resume a suspended assistant agent (HITL confirmation)',
+    description:
+      'Confirm or cancel the confirm card named by `toolCallId`. Confirm turns that one card into a single-use grant ' +
+      'for the exact write it shows, then resumes the run; a card that is no longer waiting (already answered, ' +
+      'expired, unknown) answers 409 INVALID_STATE and resumes nothing. A Confirm with no `toolCallId` is a 400. ' +
+      'Cancel voids the card. Unspent grants are voided when the resumed turn ends.',
   })
   @ApiParam({ name: 'conversation_id', description: 'Conversation public id (conv_…)' })
   async resumeAgent(

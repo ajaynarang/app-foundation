@@ -1376,20 +1376,53 @@ await this.retryService.withRetry(
 
 ## 11. AI Invocation Patterns
 
-**Model aliases** (in `apps/backend/src/domains/ai/infrastructure/providers/ai-provider.ts`):
+**The resolver is the only way to get a model (NON-NEGOTIABLE).** `AiRouteResolver.resolve(tenantId, need)` in `apps/backend/src/domains/ai/routing/` picks the tenant's route for `'language'` or `'embedding'`, applies the tenant's retention policy, and fails closed with a typed error: `AiNotConfigured` (503, nothing serves the need), `ZeroRetentionUnavailable` (400, a route exists but the tenant requires zero retention and it keeps data), `AiModelNotOnRoute` (503, the catalog has no id for that alias on that route). Never catch one of these to fall back to another provider. `resolvePlatform(need)` is only for platform-owned content with no tenant (the global knowledge base). The ADR "AI provider routing is per tenant; retention is enforced in the resolver" has the decision.
 
-| Alias      | Use For                                         |
-| ---------- | ----------------------------------------------- |
-| `fast`     | Chat, classifications, simple extraction        |
-| `standard` | Document parsing, structured extraction         |
-| `powerful` | Complex extraction, fallback for critical tasks |
+**Aliases, never model ids:**
 
-Model IDs are HARDCODED in `MODEL_ID_BY_ALIAS` (single source — the cost ledger and provider routes derive from it). A model bump is a one-line change there — never an env var. Env vars hold ROUTES and TIERS, never raw model IDs.
+| Alias      | Use For                                                         |
+| ---------- | --------------------------------------------------------------- |
+| `fast`     | Classification, short summaries, memory extraction (effort low) |
+| `standard` | Chat, structured extraction (effort medium)                     |
+| `powerful` | Complex extraction, fallback for critical tasks (effort medium) |
+
+Model ids live only in `MODEL_CATALOG` (`domains/ai/routing/model-catalog.ts`): one row per alias, one id column per route family. A model bump is a change there plus pricing rows, never an env var. `model-id-literals.spec.ts` fails on a model id anywhere else. Env vars hold route keys, never model ids.
+
+**No provider client, no `process.env` outside `AI/routing/`.** Provider packages (`@ai-sdk/<provider>`, `@openrouter/*`, `openai`) and `createGateway` are imported only under `domains/ai/routing/` (the route registry builds every client) and `domains/ai/moderation/` (`ai-provider-clients.spec.ts`). Routing reads its keys through `ConfigService` from the zod schema, never `process.env` (`ai-routing-config.spec.ts`). The `ai` package itself (`generateText`, `embed`) is fine anywhere: it calls the model it is handed.
 
 ```typescript
-import { ai } from '../infrastructure/providers/ai-provider';
-const model = ai('standard');
+// Structured output: aiContext (the tenant to route by and to bill) and maxOutputTokens are required.
+const { object } = await this.structuredOutput.extract({
+  messages, schema, systemPrompt, modelAlias: 'fast', timeoutMs: 30_000,
+  maxOutputTokens: OUTPUT_CEILINGS.VERDICT,
+  aiContext: { tenantId, surface: AiSurface.DESK_STEP },
+});
+
+// A raw AI SDK call (rare; document the reason): resolve first, then call the route's model.
+const route = await this.aiRouteResolver.resolve(tenantId, 'language');
+const result = await generateText({ model: route.languageModel('standard'), maxOutputTokens: OUTPUT_CEILINGS.SUMMARY, ... });
+
+// A Mastra agent has no model of its own: pass the resolved one per call.
+const requestContext = new RequestContext([[REQUEST_MODEL_KEY, route.languageModel('standard')]]);
 ```
+
+**Every model call names an output ceiling** from `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`): `maxOutputTokens` on every `extract` and AI SDK call, `modelSettings.maxOutputTokens` on Mastra agent calls (`model-calls-name-a-ceiling.spec.ts`). Thinking is billed as output on the 5.5 models, so no ceiling is below 1,024.
+
+**Every embedding names its tenant and its intent.** `EmbeddingService.embedText(text, aiContext, intent)` and `embedBatch(texts, aiContext, intent)`: `aiContext` routes and bills the call, `intent` is `'document'` for text you store and `'query'` for text you search with (Embed v4 is asymmetric; mixing them silently degrades retrieval). Every vector is checked at 1536 dimensions. `embedForPlatform(texts, intent)` is for global content only (the knowledge-base ingest, and `kb:eval`'s queries). A search must not fail because the query cannot be embedded: catch the error and answer from full-text (the knowledge base does).
+
+**Knowledge-base rules (NON-NEGOTIABLE):**
+
+- **The server picks the audience.** `search-kb` and `get-product-info` take no audience argument; the audiences come from `kbAudiencesFor(role)` (`domains/ai/knowledge-base/kb-audience.ts`): `all`, plus the role's own audience from `ROLE_AUDIENCE` (empty in the starter). `KnowledgeBaseService` searches exactly the set it is given and refuses an empty one. A new audience is a `ROLE_AUDIENCE` entry; the content loader refuses a file tagged for an audience no role reads. The tool pipeline drops every `_`-prefixed key a caller sends and injects `_role` itself (the acting person's `WorkspaceMember` role in the workspace; null for Desk), so a role audience reaches exactly that role's members and nobody can pick one by sending `_role` (§23).
+- **Search never fails because of routing.** `hybridSearch` fuses a vector list and an any-term full-text list by reciprocal rank (`retrieval/rank-fusion.ts`), at most two chunks per source file. When the query cannot be embedded it answers from full-text, which sends nothing to a provider.
+- **The ingester owns only its rows.** `pnpm seed:knowledge` syncs by content hash and touches only rows whose `sourcePath` it wrote; a row you insert yourself keeps a null `sourcePath` and is never deleted. Changing what the chunker emits for the same input means bumping `CHUNKER_VERSION`, which re-embeds the corpus on the next sync.
+
+**Measuring retrieval and other AI behaviour (evals):** ship one eval that runs, not a framework. `pnpm kb:eval` (`domains/ai/knowledge-base/eval/`) is the worked example: pure scoring (`kb-eval.ts`, recall at k and mean reciprocal rank, unit-tested), a command that asks a golden set (`content/kb-eval/golden.json`) through the same code path and the same audience rule production runs. The method for any eval you add:
+
+1. Gold labels come from a person reading the source, never from the output of the tool under test. A label names a file or record, so a rename fails the eval's data spec instead of scoring as a silent miss.
+2. Matching is mechanical (an id or path in the top k, an exact field), never a model judging a model.
+3. Reports are dated and committed beside the change they measured (`pnpm kb:eval --report <folder>`), with the mode they ran in, counted from the run rather than from config (for `kb:eval`: `hybrid`, `full-text`, or `mixed` with how many queries fell back to full-text, since a configured route with a failing key embeds nothing), so a later run compares like with like.
+4. Measurement switches are ignored on every deployed task: resolve them to unset in `config/configuration.ts` when `isProductionEnv()` is true, as `AI_PROMPT_CACHE_OVERRIDE` and `AI_USAGE_CAPTURE_DIR` are.
+5. An eval that spends money (a live model or embedding call) is run by a person, never by CI or a hook; its pure scoring still runs under `pnpm test`.
 
 **Fallback pattern (document extraction):**
 
@@ -1399,9 +1432,28 @@ const model = ai('standard');
 
 **Prompt management:** prompts load through `PromptingService` (`apps/backend/src/domains/prompting/`) — Langfuse primary with a code-registered fallback. Register prompts via the domain's registrar; names live in `PROMPT_NAMES` (`prompting.types.ts`).
 
-**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK directly through `StructuredOutputService` (document/structured extraction) and, when the product kept Desk, Desk steps via `runStructuredLlmStep()`, orchestrated by its durable workflow engine, not BullMQ. Don't add new direct-SDK callsites without a documented reason.
+**Where each AI path is sanctioned:** all conversational/agent AI goes through the Mastra agent runtime (`domains/ai/`). Workflow-shaped exceptions call the AI SDK through `StructuredOutputService` (document/structured extraction) and, when the product kept Desk, Desk steps via `runStructuredLlmStep()`, orchestrated by its durable workflow engine, not BullMQ. Don't add new direct-SDK callsites without a documented reason.
 
-**Cost + moderation:** AI calls log to the per-tenant AI spend ledger; user-facing chat goes through moderation. Don't bypass either.
+**Cost + moderation:** every AI call lands a row in the per-tenant ledger (`ai_invocations`) with the route that served it (`routeId`, `credentialType`); user-facing chat goes through moderation. Don't bypass either.
+
+**Cost rules (NON-NEGOTIABLE):**
+
+- **Read usage through `usageFromAiSdk`** (`domains/ai/infrastructure/telemetry/usage-from-ai-sdk.ts`) for every AI SDK or Mastra result you record: it reads cache reads and cache writes on the Anthropic, OpenRouter and Bedrock shapes and sums them over a multi-step run. Never read `usage.inputTokens` by hand. `promptTokens` includes the cached and written tokens; `computeCost` prices plain input, cache reads (`cachedInputPerMtokUsd`) and cache writes (`cacheWriteInputPerMtokUsd`, else the input rate) apart.
+- **The AI budget counts platform-paid spend only.** The platform paid when `credentialType` is null or starts with `PLATFORM_`; the one statement of the rule is `PLATFORM_PAID_SQL` / `payerOf` in `telemetry/platform-paid.ts`, and the `vw_ai_cost_*` views carry `platform_cost_usd` beside `total_cost_usd`. A spend sum or report that feeds the cap uses it.
+- **Check the cap only when the platform pays:** `if (route.payer === 'PLATFORM') await aiTelemetry.assertBudget(tenantId)`, after resolving the route and before the model call. A workspace on its own key is never capped.
+- **A provider credit refusal is a budget error.** In a model call's catch block, `throw mapProviderRefusal(err, tenantId, route)` (`telemetry/ai-provider-credit-refused.error.ts`): a 402 or "credit too low" body becomes `AiProviderCreditRefused`, which every surface already handles as `AiBudgetExceededError`, and a platform-paid one is logged at error level in `logPlatformCreditRefusal`.
+- **Budgets come from the plan.** `AiBudgetSeederService` writes a workspace's caps from `PLAN_AI_BUDGETS` on approval, plan change (`planAssigned`), personal signup and single-mode boot. It owns a row only while `notes` starts with `plan:` (`plan:DEFAULT` on a row created lazily with the defaults). An admin edit writes its own note and takes the row over; never write a `plan:` note from anywhere else.
+- **A changed monthly hard cap goes to OpenRouter too.** With sub-keys on (`OPENROUTER_PROVISIONING_KEY` and `AI_CREDENTIALS_KEY`), each workspace calls `platform-openrouter` with its own key, capped at its monthly hard budget at OpenRouter's edge. Code that writes `TenantAiBudget.monthlyHardUsd` calls `OpenRouterProvisioningService.syncLimit(tenantId, cap)` after the write, fired and not awaited (it never rejects), as the seeder and the admin editor do. A sub-key is platform-paid: it is never a workspace credential and never in the tenant pool. Never mint a key at OpenRouter you could not store; the service checks the credentials key first and revokes a key whose store failed.
+- **Prompt caching is the route's.** Each registry entry declares `promptCache` (`anthropic`, `openrouter`, `bedrock` or `none`) and the resolver wraps its language models with the breakpoints (`routing/prompt-cache.ts`). Don't set `cacheControl` by hand on a message. `AI_PROMPT_CACHE_OVERRIDE=none` turns it off on a local run only.
+
+**Workspace credential rules (bring-your-own-key, NON-NEGOTIABLE):**
+
+- **A secret is never read back.** A pasted key exists only inside `AiCredentialConnectService.connectKey`; it is stored only as the `CredentialCryptoService` envelope (AES-256-GCM, bound to `tenantId:credentialPublicId`) and leaves the API only as `lastFour`. Every credential response goes through `toAiCredentialSummary`; never return a row, the envelope, `keyVersion` or `externalId`. Provider error text is passed through `redactSecret` before it is stored, logged or returned. Events carry the public id and type only.
+- **A failing workspace key is never served on the platform key.** A pool is the workspace's credentials or the platform's routes, decided per need, never both. A compatible credential that is FAILING, or whose secret cannot be decrypted, raises `AiCredentialFailing` (503); never catch it to retry on a platform route. A credential the retention policy rules out is inert (treated as absent), never deleted.
+- **Status moves only through a test.** `validate` (and the daily sweep, which calls it) is the only writer of ACTIVE and FAILING. A provider credit refusal on a workspace key is recorded through `route.reportCreditRefusal` (which `mapProviderRefusal` calls) and leaves the status ACTIVE.
+- **The switch is `AI_CREDENTIALS_KEY`.** Code that needs to know whether bring-your-own-key is on asks `CredentialCryptoService.isConfigured()`; there is no other flag and no fallback key.
+- **A new credential type** is an `AiCredentialType` value plus a `TENANT_CREDENTIAL_CAPABILITIES` entry (serves, retention, prompt cache, a builder that calls the provider only through the catalog), held by `route-registry.parity.spec.ts`.
+- **A workspace AWS role is assumed by the role it trusts.** `BEDROCK_ROLE` and `probeBedrock` assume the workspace role with the backend's own ambient credentials (`fromTemporaryCredentials` with no `masterCredentials`, `new STSClient({ region })` with none), because the workspace's trust policy names `PLATFORM_ASSUME_ROLE_ARN`, the task role. Never chain through another role. The external id is recomputed on the server (`aws-role-naming.ts`), never taken from a client, and a role is stored only after the two-direction check passes: with the id the assume succeeds, without it the assume is refused with access denied (any other error is a refusal). Held by `bedrock-ambient-credentials.spec.ts` and the probe spec.
 
 ---
 
@@ -1791,11 +1843,107 @@ domains/ai/mcp/tools/<domain>/
 
 **Tool patterns:**
 
-- `_tenantId` parameter is system-injected, never from AI input
+- Identity is server-injected: `_tenantId`, `_userId` (wire id), `_userDbId` and `_role` come from the executor,
+  spread last. A tool schema declares no `_`-prefixed field and no tenant or user field.
 - All queries filter by `tenantId` (+ lifecycle status where applicable)
-- Query tools return structured data
+- Query tools return structured data; never a numeric id (§3.4)
 - Action tools resolve entities by public business ID (`projectNumber`) before calling services
-- Error handling: catch exceptions and return `{ error: 'user-friendly message' }` instead of throwing
+- Errors: throw the service's `HttpException` (its message and code reach the caller) or let it propagate. Never
+  `return { error: err.message }`: anything that is not an `HttpException` is logged and answered with a generic
+  message by `toolFailure` (`mcp/tools/tool-error.ts`), and `mcp-arg-validation.spec.ts` fails on the raw form.
+
+### 23.1 The tool pipeline (NON-NEGOTIABLE)
+
+Every tool call, from chat (`McpToolService`), the external MCP server (OAuth clients, API keys) and Desk
+(`execute.step.ts`), runs through `InvocationPipelineService.run`, in this order: scope (exists, not never-external
+for a third party, granted), arguments (parsed against the tool's own zod schema; every `_` key the caller sent is
+dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confirmation, audit + execute, errors.
+
+- **No path around it.** No file calls a tool method except `ToolExecutorService.invoke`. A chat call with no
+  pipeline is refused (`tool_pipeline_unavailable`); there is no fallback, no anonymous toolset, and no
+  `getToolsForNames`. `McpToolInvocationContext` is required.
+- **Scope decides write versus read.** A tool is a write when its `@RequiresScope` is not read tier
+  (`ScopeRegistryService.isWriteTool`, `McpToolService.isWriteTool`). There is no hand-kept write list; chat offers
+  `confirm-action` and an external agent is challenged from the scope alone.
+- **Role.** A tool whose REST twin has `@Roles(...)` declares `@RestrictToRoles([...])` with the same roles. The
+  pipeline reads the acting person's current `WorkspaceMember` role in the principal's workspace (the OAuth
+  client's person, the API key's owner), never the persona or the home tenant. No membership row is a refusal on
+  every tool, restricted or not. A chat principal's persona scopes are capped at the current role's scopes. Desk is
+  exempt.
+- **Plan.** A tool whose REST twin has `@RequireFeature(key)` declares `@RequiresPlanFeature(key)`. The pipeline
+  runs the real `PlanGuard` against a synthetic request (`ToolAccessPolicyService.evaluateFeature`), for every
+  principal kind including Desk. Never copy the plan rule.
+- Role and plan run before confirmation; their refusals are plain results (`role_not_permitted`, `not_on_plan`),
+  not `isError`.
+- **Confirmation.** Deny by default: every principal kind but a signed-in user and a Desk duty gets a challenge
+  token for a non-read tier. Desk is never challenged by the pipeline (Desk's gate step runs before every execute)
+  and the tier is still written on the audit row. No tool or prompt may carry a switch that skips confirmation
+  (the old `_invocationSource` on `confirm-action` was one).
+- **One intent digest, single use.** A confirmation is bound to the tool and `intentDigest(schema, args)`
+  (`agent-contract/intent-digest.ts`): top-level `_` keys dropped, parsed through the tool's schema, canonical JSON
+  with keys sorted at every depth, SHA-256 over the exact values. Every path that records or checks a confirmation
+  (the challenge token and the chat grant) calls that one function; never hash the redacted copy
+  (`redactArgs` is for the invocation log only) and never `JSON.stringify` with a key list. A token or grant is
+  spent with a conditional update (`updateMany` where `consumedAt: null`, then check `count`), never a read then an
+  unconditional `update`, so two racing retries cannot both run. A step-up is marked only on an open row (unused,
+  unexpired). `hitl_challenges` rows are deleted 24 hours after `expiresAt` by the data-retention job.
+- **Chat grants (a signed-in user).** A chat write runs only against the card the person confirmed for that exact
+  call in that conversation. `confirm-action` names the write tool and its exact `args`; the server
+  (`McpToolService`'s intent recorder) checks it is a write the person could run (`pipeline.preflight`, steps 1 to 4) with arguments the tool accepts, records the intent (`HitlChallengeService.recordChatIntent`, explicit
+  `conversationId` and `toolCallId` columns on `hitl_challenges`) and builds the card from the recorded tool and
+  args, never from model prose (`buildConfirmFrame` unwraps Mastra's envelope). `POST .../resume` confirms exactly
+  that card, once (a second press is 409, and a Confirm with no `toolCallId` is 400); Cancel voids it. The
+  pipeline spends a confirmed grant only for the same conversation, tool and `intentDigest`
+  (`consumeChatGrant`); with none it answers `confirmation_required` and changes nothing. A new user message voids
+  every open card in the conversation, and the end of a resumed turn voids unspent grants. A user principal
+  without a `conversationId` can never write. A chat grant is never a challenge token: `consume` and
+  `markStepUpCompleted` read only rows with no conversation. A delegated sub-agent gets a read-only toolset
+  (`{ readOnly: true }`: no write, no `confirm-action`).
+- **External agents wait for a person.** A third-party standard write is issued as an approval request
+  (`approvalRequired`, the parsed `argsPreview`) and answers `approval_required` with `approvalUrl`
+  (`agentActionWebPath`, on `APP_URL` read through `ConfigService`); it runs only after a person approves it at
+  `POST /agent-actions/:token/approve` and the agent replays the token. The owner's `Tenant.agentSelfConfirm`
+  (`PUT /agent-policy`) switches standard writes back to self-confirm. A sensitive write always needs the PIN of the
+  person acted for (`POST /mcp/hitl/:token/step-up`), whatever the policy: it is never an approval row, the Approve
+  route refuses it, and it stores only `argsRedacted`. `consume` refuses without spending: `pending` (not approved,
+  or no PIN yet), `denied`, `invalid`; the pipeline answers `approval_pending` / `approval_denied` /
+  `hitl_invalid_or_expired`. A decision is a conditional `updateMany` on still-pending, raised with its event in the
+  same `OutboxService.transaction`. Only the person acted for or a workspace owner or admin reads a request
+  (`GET /agent-actions/:token`, 404 across workspaces); `argsPreview` may hold personal data, so it is never logged
+  or put in an event, and it is nulled when the request is spent or denied. These routes take a person's session
+  (JWT and `@Roles`); never open them to an agent credential.
+- **Retry-safe creates.** A create tool with no natural key (nothing unique the caller sends, so a retry would make
+  a second record) declares `idempotencyKey: idempotencyKeyArg` from `agent-contract/tool-idempotency.ts` in its
+  `parameters`, and is listed in `IDEMPOTENT_CREATE_TOOLS` in `tool-idempotency.spec.ts` (a `create-*` write that
+  is on neither that list nor `NATURAL_KEY_CREATES` fails the spec). The executor does the rest with the one
+  `IdempotencyStore` the `Idempotency-Key` header uses, through the same `claimOrSkip` helper, with
+  `requestFingerprint('tool:<name>', args)` and the scope `tdb:<tenantId>:u:<userDbId>`, per workspace and the
+  person acted for; the same key and arguments within 24 hours replay the first success; the same key on another
+  call is `IDEMPOTENCY_KEY_REUSED`, a retry while the first still runs is `IDEMPOTENCY_KEY_IN_USE`; a failure (or a
+  throw) releases the key; a store that fails or does not answer within 2 s (`IDEMPOTENCY_STORE_TIMEOUT_MS`; the
+  Redis client queues commands during an outage instead of rejecting them) runs the call without it. The key is
+  taken out before the method runs, so a tool never reads it, and it is part of the confirmation digest like any
+  other argument. Never build a second store or hand-roll a dedupe in a tool, and
+  never declare the key on a read.
+- `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
+  `_confirmToken` documented. Never build a tool's input schema another way.
+- Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients
+  and API keys also share one per-workspace ceiling (`AGENT_TENANT_CEILING_PER_MINUTE`, default 600).
+- The example pair (`mcp/tools/support-ticket.tool.ts`) shows each rule, and
+  `support-ticket.pipeline.spec.ts` walks it through every step. Copy its shape for a new tool.
+- **Tool availability hides, it never permits.** A tool whose channel or vendor may be unconfigured (an SMS tool
+  with no sending number) gets a rule in `TOOL_AVAILABILITY_RULES` (`agent-contract/tool-availability.service.ts`,
+  bound in `AgentContractModule`; the starter binds none). An unavailable tool is left out of `tools/list`, every
+  chat toolset and `confirm-action`, so the model never promises it. Never use a rule for who may run a tool: that
+  is scope, role and plan in the pipeline.
+- **MCP prompts.** Curated prompts live in `PROMPT_LIBRARY` (`assistant/prompts/prompt-registry.data.ts`, empty in
+  the starter) and are served by `prompts/list` and `prompts/get`, filtered by the acting person's current
+  `WorkspaceMember` role (`ToolAccessPolicyService.actingRole`, the pipeline's lookup), never the token's role. The
+  authoring rules are in that file's header and held by `prompt-registry.data.spec.ts`: kebab-case names, human
+  references not ids, every placeholder declared, tools named only inside one `<tools>` block and listed in
+  `suggestedTools`. An undeclared or missing required argument is a 400 that names it, sent to the client as MCP
+  invalid-params. A prompt is a suggestion, never a permission: the tools it leads to still run through the
+  pipeline.
 
 ## 23a. Optional features (Desk)
 

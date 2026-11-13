@@ -6,6 +6,7 @@ jest.mock('@mastra/memory', () => ({ Memory: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   jsonSchema: jest.fn(),
   customProvider: jest.fn(),
   createGateway: jest.fn(),
@@ -18,8 +19,44 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { AbstractBaseAgent } from '../base.agent';
-import { AgentDefinition } from '../agent.types';
+import { AbstractBaseAgent, CHAT_STEP_MAX_OUTPUT_TOKENS } from '../base.agent';
+import { AgentContext, AgentDefinition } from '../agent.types';
+import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+import { makeResolver } from '../../routing/__tests__/resolver-fixtures';
+import { ZeroRetentionUnavailable } from '../../infrastructure/redaction/zero-retention-unavailable.error';
+import { AiProviderCreditRefused } from '../../infrastructure/telemetry/ai-provider-credit-refused.error';
+import { Logger } from '@nestjs/common';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
+const CTX: AgentContext = {
+  userMode: 'member',
+  tenantId: 1,
+  userId: 'user_1',
+  userDbId: 1,
+  conversationId: 'conv_1',
+  inputMode: 'text',
+};
+
+/** A Mastra agent whose stream yields `parts` and reports `usage` once drained. */
+function streamingAgent(parts: string[], usage: Record<string, number> = {}) {
+  const read = jest.fn();
+  for (const value of parts) read.mockResolvedValueOnce({ done: false, value });
+  read.mockResolvedValueOnce({ done: true, value: undefined });
+  return {
+    getInstructions: jest.fn().mockResolvedValue('Base instructions'),
+    stream: jest.fn().mockResolvedValue({
+      textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+      suspendPayload: undefined,
+      usage: Promise.resolve(usage),
+    }),
+  };
+}
+
+async function drain(stream: AsyncGenerator<unknown>): Promise<unknown[]> {
+  const out: unknown[] = [];
+  for await (const chunk of stream) out.push(chunk);
+  return out;
+}
 
 class TestAgent extends AbstractBaseAgent {
   readonly definition: AgentDefinition = {
@@ -56,7 +93,155 @@ describe('AbstractBaseAgent', () => {
       record: jest.fn().mockResolvedValue({ id: 'inv-chat' }),
     };
 
-    agent = new TestAgent(mockSkillLoader, mockMcpToolService, mockMastraProvider, mockAiTelemetry);
+    agent = new TestAgent(
+      mockSkillLoader,
+      mockMcpToolService,
+      mockMastraProvider,
+      mockAiTelemetry,
+      makeResolver({ config: OPENROUTER }).resolver,
+    );
+  });
+
+  describe('routing', () => {
+    it("hands the agent the tenant's resolved model for its alias through the request context", async () => {
+      const mockAgent = streamingAgent(['hi']);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+
+      const requestContext = mockAgent.stream.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
+
+    it('records the turn against the route that served it', async () => {
+      const mockAgent = streamingAgent(['hi'], { inputTokens: 12, outputTokens: 3 });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockAiTelemetry.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openrouter',
+          model: 'anthropic/claude-sonnet-5.5',
+          routeId: 'platform-openrouter',
+          credentialType: 'PLATFORM_OPENROUTER',
+          promptTokens: 12,
+          completionTokens: 3,
+        }),
+        expect.objectContaining({ tenantId: 1, surface: 'CHAT' }),
+      );
+    });
+
+    it('records cache reads and writes from the run total and the per-step provider metadata', async () => {
+      const mockAgent = streamingAgent(['hi']);
+      const response = await mockAgent.stream();
+      mockAgent.stream.mockResolvedValue({
+        ...response,
+        usage: Promise.resolve({ inputTokens: 50, outputTokens: 5 }),
+        totalUsage: Promise.resolve({ inputTokens: 9000, outputTokens: 700 }),
+        steps: Promise.resolve([
+          { providerMetadata: { anthropic: { cacheCreationInputTokens: 1500, cacheReadInputTokens: 2000 } } },
+          { providerMetadata: { anthropic: { cacheCreationInputTokens: 500, cacheReadInputTokens: 4000 } } },
+        ]),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      for await (const _chunk of agent.chat('Test message', CTX)) {
+        // drain
+      }
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockAiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        promptTokens: 9000,
+        completionTokens: 700,
+        cachedTokens: 6000,
+        cacheWriteTokens: 2000,
+      });
+    });
+
+    it('turns a provider credit refusal into the budget error, whether the stream start or the stream throws', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const refusal = Object.assign(new Error('requires more credits, or fewer max_tokens'), { statusCode: 402 });
+
+      const atStart = streamingAgent([]);
+      atStart.stream.mockRejectedValue(refusal);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(atStart) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+
+      const midStream = streamingAgent([]);
+      const read = jest.fn().mockResolvedValueOnce({ done: false, value: 'par' }).mockRejectedValueOnce(refusal);
+      midStream.stream.mockResolvedValue({
+        textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+        usage: Promise.resolve({}),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(midStream) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+
+      const recorded = streamingAgent(['par']);
+      const recordedResponse = await recorded.stream();
+      recorded.stream.mockResolvedValue({ ...recordedResponse, error: refusal });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(recorded) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      jest.restoreAllMocks();
+    });
+
+    it('raises any other stream error after the text that streamed, so the route can end the turn with an x: frame', async () => {
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const broken = streamingAgent([]);
+      const failure = new Error('socket hang up');
+      const read = jest.fn().mockResolvedValueOnce({ done: false, value: 'Half' }).mockRejectedValueOnce(failure);
+      broken.stream.mockResolvedValue({
+        textStream: { getReader: () => ({ read, releaseLock: jest.fn() }) },
+        usage: Promise.resolve({}),
+      });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(broken) });
+
+      const seen: unknown[] = [];
+      const run = async () => {
+        for await (const chunk of agent.chat('Test message', CTX)) seen.push(chunk);
+      };
+      await expect(run()).rejects.toBe(failure);
+      expect(seen).toEqual([{ type: 'text-delta', data: 'Half' }]);
+
+      // The same when Mastra ends the text and records the error on the response instead of throwing it.
+      const recorded = streamingAgent(['par']);
+      const recordedResponse = await recorded.stream();
+      recorded.stream.mockResolvedValue({ ...recordedResponse, error: failure });
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(recorded) });
+      await expect(drain(agent.chat('Test message', CTX))).rejects.toBe(failure);
+      jest.restoreAllMocks();
+    });
+
+    it('refuses a zero-retention tenant before anything streams: the message never reaches a retaining route', async () => {
+      agent = new TestAgent(
+        mockSkillLoader,
+        mockMcpToolService,
+        mockMastraProvider,
+        mockAiTelemetry,
+        makeResolver({ aiZeroRetention: true, config: OPENROUTER }).resolver,
+      );
+      const mockAgent = streamingAgent(['hi']);
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      await expect(agent.chat('Private message', CTX).next()).rejects.toThrow(ZeroRetentionUnavailable);
+      expect(mockAgent.stream).not.toHaveBeenCalled();
+      expect(mockAiTelemetry.record).not.toHaveBeenCalled();
+    });
+
+    it("hands a delegated execute the tenant's resolved model too", async () => {
+      const mockAgent = { generate: jest.fn().mockResolvedValue({ text: 'ok' }) };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      await agent.execute('summarize', {}, CTX);
+
+      const requestContext = mockAgent.generate.mock.calls[0][1].requestContext;
+      expect(requestContext.get(REQUEST_MODEL_KEY)).toMatchObject({ modelId: 'anthropic/claude-sonnet-5.5' });
+    });
   });
 
   it('exposes definition properties', () => {
@@ -112,6 +297,11 @@ describe('AbstractBaseAgent', () => {
         ]),
       );
       expect(mockReader.releaseLock).toHaveBeenCalled();
+      // Every step of the chat stream names its output ceiling, never the provider's whole window.
+      expect(CHAT_STEP_MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(1024);
+      expect(mockAgent.stream.mock.calls[0][1].modelSettings).toEqual({
+        maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS,
+      });
     });
 
     it('yields card when card accumulator has data', async () => {
@@ -190,6 +380,41 @@ describe('AbstractBaseAgent', () => {
       expect(payload.runId).toBe('run_123');
     });
 
+    it("the suspend chunk is the server-built card from Mastra's envelope, never the model's own confirm-action input", async () => {
+      const card = { action: 'Create Item', description: 'Create Item: name: "Desk"', tool: 'create-item', args: {} };
+      const mockAgent = {
+        getInstructions: jest.fn().mockResolvedValue('instructions'),
+        stream: jest.fn().mockResolvedValue({
+          textStream: {
+            getReader: () => ({ read: jest.fn().mockResolvedValueOnce({ done: true }), releaseLock: jest.fn() }),
+          },
+          suspendPayload: {
+            toolCallId: 'call_1',
+            toolName: 'confirm-action',
+            suspendPayload: card,
+            args: { description: 'model prose' },
+          },
+          runId: 'run_9',
+        }),
+      };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+
+      const chunks: any[] = [];
+      for await (const chunk of agent.chat('make one', {
+        userMode: 'member',
+        tenantId: 1,
+        userId: 'user_1',
+        userDbId: 1,
+        conversationId: 'conv_1',
+        inputMode: 'text',
+      })) {
+        chunks.push(chunk);
+      }
+
+      const frame = JSON.parse(chunks.find((c) => c.type === 'suspend').data);
+      expect(frame).toEqual({ ...card, toolCallId: 'call_1', runId: 'run_9' });
+    });
+
     it('injects voice instructions when inputMode is voice', async () => {
       const mockReader = {
         read: jest.fn().mockResolvedValueOnce({ done: true }),
@@ -250,6 +475,32 @@ describe('AbstractBaseAgent', () => {
 
       expect(result.text).toBe('Result text');
       expect(mockAgent.generate).toHaveBeenCalled();
+      expect(mockAgent.generate.mock.calls[0][1].modelSettings).toEqual({
+        maxOutputTokens: CHAT_STEP_MAX_OUTPUT_TOKENS,
+      });
+    });
+
+    it('a delegated sub-agent gets a read-only toolset: no write, no confirm-action', async () => {
+      const mockAgent = { generate: jest.fn().mockResolvedValue({ text: 'ok' }) };
+      mockMastraProvider.getMastra.mockReturnValue({ getAgent: jest.fn().mockReturnValue(mockAgent) });
+      const ctx = {
+        userMode: 'member' as const,
+        tenantId: 1,
+        userId: 'user_1',
+        userDbId: 1,
+        conversationId: 'conv_1',
+        inputMode: 'text' as const,
+      };
+
+      await agent.execute('summarize', {}, ctx);
+
+      expect(mockMcpToolService.getToolsetsForPersona).toHaveBeenCalledWith(
+        'member',
+        { tenantId: 1, userId: 'user_1', userDbId: 1, conversationId: 'conv_1' },
+        undefined,
+        undefined,
+        { readOnly: true },
+      );
     });
   });
 

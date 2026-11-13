@@ -1,28 +1,14 @@
 import { z } from 'zod';
-import { McpToolService } from '../../mcp-tool.service';
-import { PipelineError } from '../../../agent-contract/invocation-pipeline.service';
+import { McpToolService, TOOL_PIPELINE_UNAVAILABLE } from '../../mcp-tool.service';
+import { TOOL_FAILED_MESSAGE } from '../tool-error';
 
 /**
- * Pipeline-routing tests for McpToolService.
- *
- * Tool `execute` closures delegate to InvocationPipelineService.run(...)
- * when a pipeline service is provided and tenant context is available.
- * When no pipeline is wired (Mastra boot-order edge case), or the pipeline
- * throws PipelineError, the legacy in-closure path runs.
+ * Pipeline routing for McpToolService. Every chat tool call goes through InvocationPipelineService.run(...). There is
+ * no path to a tool method around it: with the pipeline unset the call is refused, and a pipeline throw is answered
+ * with a safe failure (never by running the tool directly, never with the raw message).
  */
 describe('McpToolService — pipeline routing', () => {
-  const healthSymbol = Symbol('HealthTool');
-  const recordsSymbol = Symbol('RecordsQueryTool');
-  const mockHealthInstance = {
-    healthCheck: jest.fn().mockResolvedValue({
-      content: [{ type: 'text', text: '{"status":"ok"}' }],
-    }),
-  };
-  const mockRecordsInstance = {
-    queryRecords: jest.fn().mockResolvedValue({
-      content: [{ type: 'text', text: '{"count":0}' }],
-    }),
-  };
+  const recordsProvider = { queryRecords: jest.fn() };
 
   function buildRegistry() {
     return {
@@ -30,102 +16,70 @@ describe('McpToolService — pipeline routing', () => {
       getTools: jest.fn().mockReturnValue([
         {
           type: 'tool',
-          metadata: {
-            name: 'health-check',
-            description: 'Check health',
-            parameters: z.object({}),
-          },
-          providerClass: healthSymbol,
-          methodName: 'healthCheck',
-        },
-        {
-          type: 'tool',
-          metadata: {
-            name: 'query-records',
-            description: 'Query loads',
-            parameters: z.object({}),
-          },
-          providerClass: recordsSymbol,
+          metadata: { name: 'query-records', description: 'Query', parameters: z.object({}) },
+          providerClass: class RecordsQueryTool {},
           methodName: 'queryRecords',
         },
       ]),
     };
   }
 
-  const mockModuleRef = {
-    get: jest.fn().mockImplementation((token: any) => {
-      if (token === healthSymbol) return mockHealthInstance;
-      if (token === recordsSymbol) return mockRecordsInstance;
-      return null;
-    }),
-  };
-
-  const mockAiPrisma = {
-    executeWithRlsContext: jest.fn((_t, _u, _r, fn) => fn()),
-  };
+  const CONTEXT = { tenantId: 7, userId: '42', userDbId: 42 };
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('routes through pipeline and returns unwrapped JSON', async () => {
-    const pipeline = {
-      run: jest.fn().mockResolvedValue({
-        content: [{ type: 'text', text: '{"count":5}' }],
-      }),
-    };
-
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+  it('routes through the pipeline and returns unwrapped JSON', async () => {
+    const pipeline = { run: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: '{"count":5}' }] }) };
+    const svc = new McpToolService(buildRegistry() as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('member', {
-      tenantId: 7,
-      userId: '42',
-      userDbId: 42,
-    });
-    const result = await (tools['query-records'] as any).execute({
-      status: 'active',
-    });
+    const tools = await svc.getToolsForPersona('member', CONTEXT);
+    const result = await (tools['query-records'] as any).execute({ status: 'active' });
 
     expect(pipeline.run).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'user', userId: 42, tenantId: 7 }),
       'query-records',
       { status: 'active' },
     );
-    expect(mockRecordsInstance.queryRecords).not.toHaveBeenCalled();
-    expect(mockAiPrisma.executeWithRlsContext).not.toHaveBeenCalled();
     expect(result).toEqual({ count: 5 });
   });
 
-  it('falls through to legacy path when pipeline throws PipelineError', async () => {
-    const pipeline = {
-      run: jest.fn().mockRejectedValue(new PipelineError('unrecoverable pipeline error')),
-    };
-
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+  it('refuses the call with tool_pipeline_unavailable when the pipeline is not wired', async () => {
+    const svc = new McpToolService(buildRegistry() as any, undefined);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('member', {
-      tenantId: 7,
-      userId: '42',
-      userDbId: 42,
-    });
-    await (tools['query-records'] as any).execute({});
+    const tools = await svc.getToolsForPersona('member', CONTEXT);
+    const result = await (tools['query-records'] as any).execute({});
 
-    expect(pipeline.run).toHaveBeenCalled();
-    expect(mockRecordsInstance.queryRecords).toHaveBeenCalled();
+    expect(result).toEqual({ error: TOOL_PIPELINE_UNAVAILABLE, tool: 'query-records' });
+    expect(recordsProvider.queryRecords).not.toHaveBeenCalled();
   });
 
-  it('skips pipeline branch when no execution context is provided', async () => {
-    const pipeline = { run: jest.fn() };
-
-    const svc = new McpToolService(buildRegistry() as any, mockModuleRef as any, mockAiPrisma as any, pipeline as any);
+  it('answers a pipeline throw with the safe failure and never falls back to the tool', async () => {
+    const pipeline = { run: jest.fn().mockRejectedValue(new Error('relation "x" does not exist')) };
+    const svc = new McpToolService(buildRegistry() as any, pipeline as any);
     await svc.onModuleInit();
 
-    const tools = await svc.getToolsForPersona('prospect');
-    await (tools['health-check'] as any).execute({});
+    const tools = await svc.getToolsForPersona('member', CONTEXT);
+    const result = await (tools['query-records'] as any).execute({});
 
-    expect(pipeline.run).not.toHaveBeenCalled();
-    expect(mockHealthInstance.healthCheck).toHaveBeenCalled();
+    expect(result).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
+    expect(recordsProvider.queryRecords).not.toHaveBeenCalled();
+  });
+
+  it('hands the pipeline the model args untouched; the pipeline (not this file) drops `_` keys', async () => {
+    const pipeline = { run: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: '{}' }] }) };
+    const svc = new McpToolService(buildRegistry() as any, pipeline as any);
+    await svc.onModuleInit();
+
+    const tools = await svc.getToolsForPersona('member', CONTEXT);
+    await (tools['query-records'] as any).execute({ _tenantId: 999 });
+
+    // The principal is built from the session context, whatever the model sent.
+    expect(pipeline.run).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 7, userId: 42 }), 'query-records', {
+      _tenantId: 999,
+    });
   });
 });

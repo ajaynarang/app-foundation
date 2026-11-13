@@ -1,18 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import { knownKbAudiences } from '../kb-audience';
 
 export interface KnowledgeEntry {
   title: string;
   content: string;
   documentType: 'faq' | 'feature' | 'use_case' | 'comparison' | 'pricing' | 'guide' | 'reference';
-  audience: 'user' | 'all';
+  /** One of `knownKbAudiences()` (kb-audience.ts): `all`, or an audience a role in `ROLE_AUDIENCE` reads. */
+  audience: string;
   category: string;
   keywords: string[];
+  /** Path relative to the content root, e.g. `knowledge-base/getting-started/welcome.md`. The ingester's key. */
+  sourcePath: string;
 }
 
-const KNOWLEDGE_BASE_DIR = path.resolve(process.cwd(), 'content/knowledge-base');
-const PRODUCT_MANUAL_DIR = path.resolve(process.cwd(), 'content/product-manual');
+const CONTENT_ROOT = path.resolve(process.cwd(), 'content');
+const KNOWLEDGE_BASE_DIR = path.join(CONTENT_ROOT, 'knowledge-base');
+const PRODUCT_MANUAL_DIR = path.join(CONTENT_ROOT, 'product-manual');
 
 function collectMarkdownFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
@@ -32,7 +37,6 @@ function collectMarkdownFiles(dir: string): string[] {
 }
 
 const VALID_DOC_TYPES = new Set(['faq', 'feature', 'use_case', 'comparison', 'pricing', 'guide', 'reference']);
-const VALID_AUDIENCES = new Set(['user', 'all']);
 
 function parseEntries(dir: string): KnowledgeEntry[] {
   const files = collectMarkdownFiles(dir);
@@ -52,8 +56,10 @@ function parseEntries(dir: string): KnowledgeEntry[] {
       );
     }
 
-    if (!VALID_AUDIENCES.has(data.audience)) {
-      throw new Error(`Invalid audience "${data.audience}" in ${filePath}. Valid: ${[...VALID_AUDIENCES].join(', ')}`);
+    // Only an audience some caller can read: a file tagged for nobody would be stored and never found.
+    const audiences = knownKbAudiences();
+    if (!audiences.includes(data.audience)) {
+      throw new Error(`Invalid audience "${data.audience}" in ${filePath}. Valid: ${audiences.join(', ')}`);
     }
 
     return {
@@ -62,7 +68,9 @@ function parseEntries(dir: string): KnowledgeEntry[] {
       documentType: data.documentType,
       audience: data.audience,
       category: data.category,
-      keywords: data.keywords ?? [],
+      // YAML reads a bare `1099` or `true` as a non-string; the column is text[].
+      keywords: ((data.keywords as unknown[] | undefined) ?? []).map(String),
+      sourcePath: path.relative(CONTENT_ROOT, filePath).split(path.sep).join('/'),
     };
   });
 }

@@ -10,6 +10,10 @@ import { StructuredOutputService } from '../../../ai/infrastructure/providers/st
 import { AI_LINK_REF_TYPES } from '../../../ai/infrastructure/telemetry/ai-telemetry.constants';
 import { PromptingService } from '../../../prompting/prompting.service';
 import { PROMPT_NAMES } from '../../../prompting/prompting.types';
+import { OUTPUT_CEILINGS } from '../../../ai/routing/output-ceilings';
+
+/** One short memory note. */
+export const MEMORY_EXTRACT_MAX_OUTPUT_TOKENS = OUTPUT_CEILINGS.SUMMARY;
 
 /**
  * Closing transition that triggers a memory write at episode close.
@@ -247,6 +251,7 @@ export class DeskMemoryWriterService {
           schema: MemoryExtractSchema,
           modelAlias: 'fast',
           timeoutMs: EXTRACT_TIMEOUT_MS,
+          maxOutputTokens: MEMORY_EXTRACT_MAX_OUTPUT_TOKENS,
           aiContext: {
             tenantId: input.tenantId,
             surface: AiSurface.MEMORY_EXTRACT,
@@ -282,9 +287,10 @@ export class DeskMemoryWriterService {
     return `${input.outcome} (transition=${input.transition}) for ${JSON.stringify(input.entityRef)}`;
   }
 
-  private async safeEmbed(text: string, aiContext?: AiCallContext): Promise<number[] | null> {
+  /** The memory's vector, embedded on the tenant's own route as a `document`; null (written without one) on failure. */
+  private async safeEmbed(text: string, aiContext: AiCallContext): Promise<number[] | null> {
     try {
-      return await this.embedder.embedText(text, aiContext);
+      return await this.embedder.embedText(text, aiContext, 'document');
     } catch (err) {
       this.logger.warn(`Embedder unreachable; writing memory without embedding (${describeError(err)})`);
       return null;

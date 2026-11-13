@@ -55,7 +55,7 @@ export class AssistantRouterService {
     return PERSONA_DEFAULT_AGENT[userMode] ?? DEFAULT_AGENT;
   }
 
-  async route(message: string, userMode: UserMode): Promise<RouteResult> {
+  async route(message: string, userMode: UserMode, tenantId: number): Promise<RouteResult> {
     // Step 1: Regex match against task skill triggers
     const regexMatch = this.regexMatch(message);
     if (regexMatch) {
@@ -81,7 +81,7 @@ export class AssistantRouterService {
     }
 
     // Step 3: Multi-domain personas → Haiku classifier
-    const classification = await this.classifier.classify(message);
+    const classification = await this.classifier.classify(message, tenantId);
     let taskSkillContent: string | null = null;
     if (classification.taskSkill) {
       taskSkillContent = (await this.skillLoader.getSkill(classification.taskSkill)) || null;

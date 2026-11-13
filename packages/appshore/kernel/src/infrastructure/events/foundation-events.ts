@@ -174,6 +174,16 @@ export const FOUNDATION_EVENT_REGISTRY = [
     aggregateType: 'conversation',
   },
   {
+    key: 'app.conversation.archived',
+    constantName: 'CONVERSATION_ARCHIVED',
+    label: 'Conversation Archived',
+    description:
+      'A conversation was archived: by its owner (reason "user") or by the rolling history cap (reason "cap"). Rows and messages are kept. Internal-only; no SSE bridge.',
+    category: 'AI',
+    visibility: 'internal' as const,
+    aggregateType: 'conversation',
+  },
+  {
     key: 'app.ai.invocation-recorded',
     constantName: 'AI_INVOCATION_RECORDED',
     label: 'AI Invocation Recorded',
@@ -207,9 +217,57 @@ export const FOUNDATION_EVENT_REGISTRY = [
     constantName: 'AI_ZERO_RETENTION_UNAVAILABLE',
     label: 'AI Zero-Retention Route Unavailable',
     description:
-      'A tenant requires zero-data-retention AI routing but no ZDR-eligible model is configured for the requested tier.',
+      'A tenant requires zero-data-retention AI routing but no zero-retention route serves the requested need. The call is refused, never downgraded.',
     category: 'AI',
     visibility: 'internal' as const,
+    aggregateType: 'tenant',
+  },
+  {
+    key: 'app.ai.credential-connected',
+    constantName: 'AI_CREDENTIAL_CONNECTED',
+    label: 'AI Credential Connected',
+    description:
+      "A workspace connected its own AI provider key: a test call passed and the key is stored encrypted. Carries the credential's public id and type, never the key.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-validated',
+    constantName: 'AI_CREDENTIAL_VALIDATED',
+    label: 'AI Credential Validated',
+    description: 'A workspace AI credential passed a test (on connect, "Test again" or the daily sweep) and is ACTIVE.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-failed',
+    constantName: 'AI_CREDENTIAL_FAILED',
+    label: 'AI Credential Failed',
+    description:
+      'A workspace AI credential failed a test and is FAILING: the AI calls it served are blocked, never moved to the platform key. Owners and admins are told.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.credential-removed',
+    constantName: 'AI_CREDENTIAL_REMOVED',
+    label: 'AI Credential Removed',
+    description: 'A workspace removed one of its own AI provider keys.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'ai-credential',
+  },
+  {
+    key: 'app.ai.retention-policy-changed',
+    constantName: 'WORKSPACE_RETENTION_POLICY_CHANGED',
+    label: 'Workspace Retention Policy Changed',
+    description:
+      'A workspace owner required or dropped zero data retention for AI calls. Routing changes on the next call; credentials the policy rules out stay stored, unused.',
+    category: 'AI',
+    visibility: 'external' as const,
     aggregateType: 'tenant',
   },
 
@@ -240,6 +298,36 @@ export const FOUNDATION_EVENT_REGISTRY = [
     category: 'AI',
     visibility: 'external' as const,
     aggregateType: 'agent-invocation',
+  },
+  {
+    key: 'app.agent.action-approved',
+    constantName: 'AGENT_ACTION_APPROVED',
+    label: 'Agent Action Approved',
+    description:
+      "A person approved an external agent's write in the app: the agent may run it once, with exactly the arguments shown. Carries the token, tool and caller name, never the arguments The token is the request's row number, not a secret: only the agent it was issued to can spend it, for that tool and those arguments.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'agent-invocation',
+  },
+  {
+    key: 'app.agent.action-denied',
+    constantName: 'AGENT_ACTION_DENIED',
+    label: 'Agent Action Denied',
+    description:
+      "A person denied an external agent's write in the app: the token can no longer run it. Carries the token, tool and caller name, never the arguments The token is the request's row number, not a secret: only the agent it was issued to can spend it, for that tool and those arguments.",
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'agent-invocation',
+  },
+  {
+    key: 'app.agent.policy-changed',
+    constantName: 'WORKSPACE_AGENT_POLICY_CHANGED',
+    label: 'Workspace Agent Policy Changed',
+    description:
+      'A workspace owner let external agents confirm their own standard writes, or put human approval back. Takes effect on the next agent call; a sensitive write always needs the PIN.',
+    category: 'AI',
+    visibility: 'external' as const,
+    aggregateType: 'tenant',
   },
 
   // ─── API Keys ──────────────────────────────────────────────────────

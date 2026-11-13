@@ -60,6 +60,10 @@ export function AiSpendPage() {
           <p className="text-2xl font-bold text-foreground tabular-nums">
             {formatUsdPrecise(summary.data.windowCostUsd)}
           </p>
+          <p className="text-xs text-muted-foreground">
+            {formatUsdPrecise(summary.data.windowPlatformCostUsd)} paid by the platform; the rest on workspaces&apos;
+            own keys
+          </p>
         </div>
       )}
 
@@ -97,6 +101,11 @@ export function AiSpendPage() {
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
                     {formatUsdPrecise(tenant.windowCostUsd)}
+                    {tenant.windowPlatformCostUsd !== tenant.windowCostUsd && (
+                      <div className="text-xs font-normal text-muted-foreground">
+                        {formatUsdPrecise(tenant.windowPlatformCostUsd)} platform
+                      </div>
+                    )}
                     {tenant.windowErrorCount > 0 && (
                       <StatusBadge tone="danger" className="ml-2">
                         {tenant.windowErrorCount} err

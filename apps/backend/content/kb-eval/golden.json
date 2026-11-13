@@ -1,0 +1,53 @@
+{
+  "description": "Retrieval golden set for pnpm kb:eval. Each question names the content files a reader would expect to answer it, labelled by reading the content, never from search output. Replace these with questions over your own content.",
+  "questions": [
+    {
+      "q": "How do I invite a teammate to my workspace?",
+      "caller": "OWNER",
+      "expect": ["knowledge-base/workspaces/members-and-roles.md"]
+    },
+    {
+      "q": "What can an admin do that a member cannot?",
+      "caller": "ADMIN",
+      "expect": ["knowledge-base/workspaces/members-and-roles.md"]
+    },
+    {
+      "q": "Can I resend or revoke a pending invitation?",
+      "caller": "ADMIN",
+      "expect": ["knowledge-base/workspaces/members-and-roles.md"]
+    },
+    {
+      "q": "Will the assistant change my data without asking?",
+      "caller": "MEMBER",
+      "expect": ["knowledge-base/assistant/ai-assistant.md"]
+    },
+    {
+      "q": "Why did my oldest conversation disappear from history?",
+      "caller": "MEMBER",
+      "expect": ["knowledge-base/assistant/ai-assistant.md"]
+    },
+    {
+      "q": "The assistant says the spending cap is reached. What now?",
+      "caller": "OWNER",
+      "expect": ["knowledge-base/assistant/ai-assistant.md"]
+    },
+    {
+      "q": "Which frontmatter fields does a knowledge-base file need?",
+      "caller": "ADMIN",
+      "expect": ["knowledge-base/getting-started/writing-knowledge-base-content.md"]
+    },
+    {
+      "q": "How do I re-embed every document after changing content?",
+      "caller": "OWNER",
+      "expect": ["knowledge-base/getting-started/writing-knowledge-base-content.md"]
+    },
+    {
+      "q": "Where do I put my own product documentation?",
+      "caller": "MEMBER",
+      "expect": [
+        "knowledge-base/getting-started/welcome.md",
+        "knowledge-base/getting-started/writing-knowledge-base-content.md"
+      ]
+    }
+  ]
+}

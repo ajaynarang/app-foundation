@@ -60,6 +60,7 @@ describe('AgentRateLimitGuard', () => {
       limit: 120,
       remaining: 0,
       resetAt,
+      budget: 'principal',
     });
     const res = { setHeader: jest.fn() };
     const req = {
@@ -77,8 +78,23 @@ describe('AgentRateLimitGuard', () => {
     } catch (e: any) {
       expect(e).toBeInstanceOf(HttpException);
       expect(e.getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      expect(e.getResponse()).toEqual({ code: 'RATE_LIMITED', detail: expect.stringContaining('agent') });
     }
     expect(res.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(String));
+  });
+
+  it('names the workspace ceiling when that is the budget that ran out', async () => {
+    service.consume.mockResolvedValue({
+      allowed: false,
+      limit: 600,
+      remaining: 0,
+      resetAt: new Date(Date.now() + 5_000),
+      budget: 'workspace',
+    });
+    const req = { agentPrincipal: fromApiKey({ apiKeyId: 1, tenantId: 7, userId: 1, scopes: [] }) };
+    await expect(guard.canActivate(execCtx(req))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'RATE_LIMITED', detail: expect.stringContaining('workspace') }),
+    });
   });
 
   it('passes through req.apiKey.rateLimitPerMinute as override for api_key principals', async () => {

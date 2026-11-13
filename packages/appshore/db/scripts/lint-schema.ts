@@ -41,6 +41,8 @@ const KNOWN_TOKEN_TABLES = new Set([
   'ApiKey',
   'PasswordResetToken',
   'ConversationSession',
+  // A workspace's own AI provider key, stored only as an AES-256-GCM envelope; the table holds nothing else.
+  'AiCredential',
 ]);
 
 /** Tables that don't need tenant scoping (global reference data, the Tenant table itself). */

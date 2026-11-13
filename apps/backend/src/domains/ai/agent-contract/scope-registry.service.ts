@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { McpRegistryDiscoveryService } from '@rekog/mcp-nest';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { AgentScope } from '@app/shared-types';
+import { scopeTier, SCOPE_TIERS, type AgentScope, type FeatureKey } from '@app/shared-types';
+import type { UserRole } from '@appshore/db';
 import { getRequiredScope } from './requires-scope.decorator';
+import { getToolPlanFeature, getToolRoleRestriction } from './tool-policy.decorator';
+import { toolInputSchema } from './tool-input-schema';
 import { PERMANENTLY_EXCLUDED_TOOL_NAMES, SCOPE_IMPLICATIONS } from './scope-registry.constants';
 
 type ToolRecord = {
@@ -11,6 +13,10 @@ type ToolRecord = {
   methodName: string;
   description: string;
   parameters: unknown;
+  /** `@RestrictToRoles`: the workspace roles allowed to run it; undefined = any role the scope admits. */
+  roles?: readonly UserRole[];
+  /** `@RequiresPlanFeature`: the plan feature the workspace must have. */
+  planFeature?: FeatureKey;
 };
 
 export interface RegisteredToolDescriptor {
@@ -93,6 +99,8 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
           methodName,
           description: tool.metadata.description ?? '',
           parameters: tool.metadata.parameters,
+          roles: getToolRoleRestriction(providerClass.prototype as object, methodName),
+          planFeature: getToolPlanFeature(providerClass.prototype as object, methodName),
         });
         const set = this.namesByScope.get(scope) ?? new Set<string>();
         set.add(name);
@@ -124,15 +132,42 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
     return allowed;
   }
 
-  resolveProvider(toolName: string): { providerClass: ToolRecord['providerClass']; methodName: string } | undefined {
-    const rec = this.toolByName.get(toolName);
-    return rec ? { providerClass: rec.providerClass, methodName: rec.methodName } : undefined;
+  /** The tool's zod parameters, which the pipeline parses a caller's arguments against. */
+  parametersForTool(toolName: string): unknown {
+    return this.toolByName.get(toolName)?.parameters;
+  }
+
+  /** The workspace roles a tool is restricted to (`@RestrictToRoles`), or undefined when it has no restriction. */
+  roleRestrictionForTool(toolName: string): readonly UserRole[] | undefined {
+    return this.toolByName.get(toolName)?.roles;
+  }
+
+  /** The plan feature a tool requires (`@RequiresPlanFeature`), or undefined. */
+  planFeatureForTool(toolName: string): FeatureKey | undefined {
+    return this.toolByName.get(toolName)?.planFeature;
   }
 
   /**
-   * Walk the registered tool map and project each entry to an MCP-shaped
-   * descriptor (name, description, JSON-Schema inputSchema). Internal params
-   * (`_tenantId`, `_userId`) are stripped so external agents never see them.
+   * A write is any tool whose `@RequiresScope` is not read tier. The one rule for "is this a write": the pipeline's
+   * confirmation, the chat's confirm-action offer and the MCP annotations all follow it. There is no hand-kept list.
+   */
+  isWriteTool(toolName: string): boolean {
+    const scope = this.scopeForTool(toolName);
+    return scope !== undefined && scopeTier(scope) !== SCOPE_TIERS.READ;
+  }
+
+  resolveProvider(
+    toolName: string,
+  ): { providerClass: ToolRecord['providerClass']; methodName: string; parameters: unknown } | undefined {
+    const rec = this.toolByName.get(toolName);
+    return rec
+      ? { providerClass: rec.providerClass, methodName: rec.methodName, parameters: rec.parameters }
+      : undefined;
+  }
+
+  /**
+   * Walk the registered tool map and project each entry to an MCP-shaped descriptor (name, description, JSON-Schema
+   * inputSchema from `toolInputSchema`: server-injected params stripped, the replay token documented).
    */
   getAllTools(): RegisteredToolDescriptor[] {
     const out: RegisteredToolDescriptor[] = [];
@@ -140,37 +175,11 @@ export class ScopeRegistryService implements OnApplicationBootstrap {
       out.push({
         name,
         description: rec.description,
-        inputSchema: this.toInputSchema(rec.parameters),
+        inputSchema: toolInputSchema(rec.parameters),
         scope: rec.scope,
       });
     }
     return out;
-  }
-
-  private toInputSchema(parameters: unknown): Record<string, unknown> {
-    let schema: Record<string, unknown> = { type: 'object', properties: {} };
-    if (parameters && typeof parameters === 'object' && 'shape' in (parameters as Record<string, unknown>)) {
-      schema = zodToJsonSchema(parameters as never);
-    }
-    if (schema.properties && typeof schema.properties === 'object') {
-      const props = schema.properties as Record<string, unknown>;
-      // Strip server-injected identity params — agents must never see them.
-      delete props._tenantId;
-      delete props._userId;
-      if (Array.isArray(schema.required)) {
-        schema.required = (schema.required as string[]).filter((r) => r !== '_tenantId' && r !== '_userId');
-      }
-      // Surface the HITL replay token. The pipeline uses it on every
-      // non-read tool; advertising it here lets external agents (Claude,
-      // ChatGPT) complete the two-step confirm flow on their own without
-      // hand-coded knowledge of the protocol.
-      props._confirmToken = {
-        type: 'string',
-        description:
-          'OPTIONAL. If the previous call to this tool returned `{"status":"hitl_required","token":"…"}`, replay the call with `_confirmToken` set to that token value to actually execute. Tokens are single-use, expire in minutes, and are scoped to this exact tool + arguments. For sensitive-tier tools the response will also carry `stepUpRequired:true` and an `approvalUrl` — direct the user to that URL to enter their PIN, then replay with the same token.',
-      };
-    }
-    return schema;
   }
 
   private expandGrantedScopes(granted: readonly AgentScope[]): Set<AgentScope> {

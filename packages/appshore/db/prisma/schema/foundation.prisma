@@ -153,10 +153,15 @@ model Tenant {
 
   // When true, this tenant's AI traffic must route through zero-data-retention
   // (ZDR) provider endpoints — no prompt/response retention at the provider.
-  // Enforced in AiProvider.resolveModel; if no ZDR-eligible model exists for
-  // the requested tier, the call throws ZeroRetentionUnavailable. For
-  // compliance-sensitive customers.
+  // Enforced in AiRouteResolver; if no zero-retention route serves the need,
+  // the call throws ZeroRetentionUnavailable, never a downgrade. The owner
+  // flips it at PATCH /ai-settings/policy. For compliance-sensitive customers.
   aiZeroRetention Boolean @default(false) @map("ai_zero_retention")
+
+  // External agents (OAuth clients, API keys) wait for a person to approve a standard write in the app by default.
+  // When the owner sets this, they confirm their own standard writes by echoing the token instead. A sensitive write
+  // always needs the acting person's PIN, whatever this says. The owner flips it at PUT /agent-policy.
+  agentSelfConfirm Boolean @default(false) @map("agent_self_confirm")
 
   isActive  Boolean  @default(false) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -216,6 +221,8 @@ model Tenant {
   hitlChallenges         HitlChallenge[]
   aiInvocations          AiInvocation[]
   aiBudget               TenantAiBudget?
+  aiCredentials          AiCredential[]
+  aiSubKey               TenantAiSubKey?
 
   @@index([status])
   // Serves the every-minute scheduler heartbeat scan for tenants with the
@@ -972,6 +979,8 @@ model ConversationMessage {
   card      Json?   @db.JsonB
   action    Json?   @db.JsonB
   speakText String? @map("speak_text") @db.Text
+  /// The sources the answer named: Citation[] from @app/shared-types, at most MAX_CITATIONS_PER_MESSAGE.
+  citations Json?   @db.JsonB
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -1008,12 +1017,20 @@ model KnowledgeDocument {
   parentDocId String? @map("parent_doc_id") @db.VarChar(50)
   totalChunks Int     @default(1) @map("total_chunks")
 
+  // Incremental ingest: the content file a chunk came from (relative to the content root), the hash of what shaped
+  // its chunks, and its heading path. A row with a null sourcePath was written by other means; the ingester never
+  // touches it.
+  sourcePath  String? @map("source_path") @db.VarChar(255)
+  contentHash String? @map("content_hash") @db.Char(64)
+  section     String? @db.VarChar(255)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([documentType, audience])
   @@index([audience])
   @@index([category])
+  @@index([sourcePath])
   @@map("knowledge_documents")
 }
 
@@ -2284,12 +2301,32 @@ model HitlChallenge {
   stepUpUserId    Int?    @map("step_up_user_id")
   stepUpCompleted Boolean @default(false) @map("step_up_completed")
 
+  // A chat grant (a signed-in user's confirmation in in-app chat) sets these three; a third-party agent challenge
+  // leaves them null. `toolCallId` is the confirm card (the suspended confirm-action call); `confirmedAt` is when the
+  // person pressed Confirm on it. The grant is spent once (`consumedAt`) on the same conversation, tool and digest.
+  conversationId String?   @map("conversation_id") @db.VarChar(80)
+  toolCallId     String?   @map("tool_call_id") @db.VarChar(128)
+  confirmedAt    DateTime? @map("confirmed_at") @db.Timestamptz
+
+  // An external agent's write waiting for a person (GET agent-actions/:token). `approvalRequired`: a standard write
+  // that a person approves or denies in the app. `argsPreview`: the exact arguments, internal keys stripped, kept only
+  // on an approval row so the approver sees what will run; it may hold personal data, is never logged, and is set to
+  // null once the row is spent or denied. `argsRedacted`: the redacted arguments shown on a PIN step-up row.
+  // `approvedAt` / `deniedAt` / `decidedById`: the decision and who made it.
+  approvalRequired Boolean   @default(false) @map("approval_required")
+  argsPreview      Json?     @map("args_preview")
+  argsRedacted     Json?     @map("args_redacted")
+  approvedAt       DateTime? @map("approved_at") @db.Timestamptz
+  deniedAt         DateTime? @map("denied_at") @db.Timestamptz
+  decidedById      Int?      @map("decided_by_id")
+
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([tenantId, expiresAt])
   @@index([tenantId, principalId, consumedAt])
+  @@index([tenantId, conversationId])
   @@map("hitl_challenges")
 }
 
@@ -2312,6 +2349,17 @@ enum AiSurface {
   MEMORY_EXTRACT
   EMBEDDING
   KB_INGEST
+  /// The speech half of a voice session (speech-to-text, text-to-speech, session time). Its language turns are CHAT.
+  VOICE
+}
+
+/// What `AiInvocation.usageQuantity` counts. Language and embedding calls are metered in tokens (the token columns);
+/// the voice vendors bill by audio second, spoken character or connected session second instead.
+enum AiUsageUnit {
+  TOKEN
+  AUDIO_SECOND
+  CHARACTER
+  SESSION_SECOND
 }
 
 /// Terminal status of an AI invocation as observed by the wrapper.
@@ -2343,6 +2391,14 @@ model AiInvocation {
   completionTokens Int  @default(0) @map("completion_tokens")
   totalTokens      Int  @default(0) @map("total_tokens")
   cachedTokens     Int? @map("cached_tokens")
+  /// Prompt tokens written to the provider's prompt cache on this call (billed at the write rate). Included in
+  /// `promptTokens`, like `cachedTokens`. Null when the provider reported nothing.
+  cacheWriteTokens Int? @map("cache_write_tokens")
+
+  /// Non-token meters (voice). On these rows the token columns stay 0, so token totals are never mixed with seconds
+  /// or characters, and `usageQuantity` holds the count in `usageUnit`. Token rows keep `TOKEN` and a null quantity.
+  usageUnit     AiUsageUnit @default(TOKEN) @map("usage_unit")
+  usageQuantity Int?        @map("usage_quantity")
 
   /// Denormalized cost in USD computed at write time from `ModelPricing`. Null
   /// when no matching pricing row was found (the call still gets recorded —
@@ -2371,6 +2427,14 @@ model AiInvocation {
   /// deep-link from a Postgres row back to the trace with prompt + response.
   langfuseTraceId String? @map("langfuse_trace_id") @db.VarChar(128)
 
+  /// Which resolved route served this call: `platform-openrouter`, `platform-cohere`, or (with bring-your-own-key) a
+  /// workspace credential's public id. An audit string, not a foreign key. Null on rows written before routing.
+  routeId String? @map("route_id") @db.VarChar(64)
+
+  /// The credential type behind the route: `PLATFORM_OPENROUTER`, `PLATFORM_COHERE`, or a workspace credential type.
+  /// The platform paid when this is null or starts with `PLATFORM_`.
+  credentialType String? @map("credential_type") @db.VarChar(40)
+
   /// Optional idempotency key. When present, duplicate writes (e.g. retried
   /// HTTP calls inside a parser) are no-ops.
   idempotencyKey String? @unique @map("idempotency_key") @db.VarChar(200)
@@ -2392,16 +2456,20 @@ model AiInvocation {
 /// pricing for replay/backfill. `cachedInputPerMtokUsd` is nullable because
 /// not every provider exposes a separate cached-input price.
 model ModelPricing {
-  id                    Int       @id @default(autoincrement())
-  provider              String    @db.VarChar(40)
-  model                 String    @db.VarChar(80)
-  inputPerMtokUsd       Decimal   @map("input_per_mtok_usd") @db.Decimal(10, 6)
-  outputPerMtokUsd      Decimal   @map("output_per_mtok_usd") @db.Decimal(10, 6)
-  cachedInputPerMtokUsd Decimal?  @map("cached_input_per_mtok_usd") @db.Decimal(10, 6)
-  effectiveFromDate     DateTime  @map("effective_from_date") @db.Date
-  effectiveUntilDate    DateTime? @map("effective_until_date") @db.Date
-  notes                 String?   @db.Text
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  id                        Int       @id @default(autoincrement())
+  provider                  String    @db.VarChar(40)
+  model                     String    @db.VarChar(80)
+  inputPerMtokUsd           Decimal   @map("input_per_mtok_usd") @db.Decimal(10, 6)
+  outputPerMtokUsd          Decimal   @map("output_per_mtok_usd") @db.Decimal(10, 6)
+  cachedInputPerMtokUsd     Decimal?  @map("cached_input_per_mtok_usd") @db.Decimal(10, 6)
+  /// The prompt-cache write rate. Null prices a cache write at the plain input rate.
+  cacheWriteInputPerMtokUsd Decimal?  @map("cache_write_input_per_mtok_usd") @db.Decimal(10, 6)
+  /// USD per single unit for a non-token meter (one second of audio, one character). Null on token-priced rows.
+  unitPriceUsd              Decimal?  @map("unit_price_usd") @db.Decimal(12, 8)
+  effectiveFromDate         DateTime  @map("effective_from_date") @db.Date
+  effectiveUntilDate        DateTime? @map("effective_until_date") @db.Date
+  notes                     String?   @db.Text
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@unique([provider, model, effectiveFromDate])
   @@index([provider, model, effectiveFromDate(sort: Desc)])
@@ -2422,10 +2490,105 @@ model TenantAiBudget {
   monthlySoftUsd Decimal @default(50) @map("monthly_soft_usd") @db.Decimal(10, 2)
   monthlyHardUsd Decimal @default(200) @map("monthly_hard_usd") @db.Decimal(10, 2)
 
+  /// Who owns the caps. A value starting `plan:` (`plan:STARTER`, or `plan:DEFAULT` for a row created lazily with the
+  /// defaults above) is the plan seeder's, and a plan change may rewrite it. Anything else, including null, is an
+  /// admin's, and the seeder never touches it.
   notes String? @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("tenant_ai_budgets")
+}
+
+/// The provider a workspace credential connects. Every type has an entry in the route registry
+/// (`TENANT_CREDENTIAL_CAPABILITIES`), which says what it serves and its retention. `BEDROCK_ROLE` exists so the AWS
+/// role flow adds no migration; until it ships it serves nothing and the connect API refuses it.
+enum AiCredentialType {
+  ANTHROPIC_KEY
+  BEDROCK_ROLE
+  OPENROUTER_KEY
+  VERCEL_GATEWAY_KEY
+}
+
+/// A workspace credential's health. ACTIVE serves. FAILING failed its last test and blocks the needs it would serve
+/// (the platform's key is never used in its place). DISABLED is the owner's choice and counts as absent. A test moves a
+/// credential between ACTIVE and FAILING only.
+enum AiCredentialStatus {
+  ACTIVE
+  FAILING
+  DISABLED
+}
+
+/// A workspace's own AI route (bring-your-own-key): the workspace pays for the calls it serves, and the platform cap
+/// does not apply to them. A pasted secret is stored only as an AES-256-GCM envelope bound to
+/// `tenantId:publicId` (`CredentialCryptoService`), so a ciphertext moved to another row fails to decrypt; it is never
+/// read back by the API. A `BEDROCK_ROLE` stores no secret. The resolver reads these rows straight from Postgres on
+/// every resolve, never from a cache.
+model AiCredential {
+  id       Int    @id @default(autoincrement())
+  /// `aicred_…` (`generateId`). Also the ledger's `routeId` for every call this credential served.
+  publicId String @unique @map("public_id") @db.VarChar(30)
+  tenantId Int    @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type     AiCredentialType
+  status   AiCredentialStatus @default(ACTIVE)
+  /// Lower serves first. A new credential gets the tenant's highest plus one.
+  priority Int                @default(0)
+
+  /// `<ivHex>:<authTagHex>:<cipherHex>`. Null for a `BEDROCK_ROLE`.
+  encryptedSecret String? @map("encrypted_secret") @db.Text
+  /// Which `AI_CREDENTIALS_KEY` generation encrypted the secret.
+  keyVersion      Int     @default(1) @map("key_version")
+  /// The only trace of the secret the API shows.
+  lastFour        String? @map("last_four") @db.VarChar(4)
+
+  roleArn    String? @map("role_arn") @db.VarChar(2048)
+  externalId String? @map("external_id") @db.VarChar(64)
+  awsRegion  String? @map("aws_region") @db.VarChar(32)
+
+  /// An Anthropic key only: the owner attested the organisation has a zero-retention agreement with Anthropic.
+  zdrAttested   Boolean   @default(false) @map("zdr_attested")
+  zdrAttestedBy Int?      @map("zdr_attested_by")
+  zdrAttestedAt DateTime? @map("zdr_attested_at") @db.Timestamptz
+
+  lastValidatedAt DateTime? @map("last_validated_at") @db.Timestamptz
+  /// The provider's reason for the last failed test or credit refusal, with the secret redacted.
+  lastError       String?   @map("last_error") @db.Text
+  createdBy       Int       @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([tenantId, status])
+  @@map("ai_credentials")
+}
+
+/// A workspace's own OpenRouter runtime key on the platform's account (per-workspace sub-keys). The platform still pays,
+/// so this is not a workspace credential and never joins the tenant pool: `platform-openrouter` simply calls with this
+/// key instead of the master `OPENROUTER_API_KEY`, and OpenRouter enforces `limitUsd` (the workspace's monthly hard
+/// cap, reset monthly) at its own edge. Created and kept in step by `OpenRouterProvisioningService` only when
+/// `OPENROUTER_PROVISIONING_KEY` and `AI_CREDENTIALS_KEY` are both set. The key is stored only as an AES-256-GCM
+/// envelope bound to `tenantId:subkey_openrouter`.
+model TenantAiSubKey {
+  id       Int    @id @default(autoincrement())
+  tenantId Int    @unique @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// The provider that issued the key. `openrouter` is the only one today.
+  provider     String  @default("openrouter") @db.VarChar(20)
+  /// `<ivHex>:<authTagHex>:<cipherHex>`.
+  encryptedKey String  @map("encrypted_key") @db.Text
+  /// Which `AI_CREDENTIALS_KEY` generation encrypted the key.
+  keyVersion   Int     @default(1) @map("key_version")
+  /// OpenRouter's hash of the key: the handle for updating its limit or revoking it. Not a secret.
+  keyHash      String  @map("key_hash") @db.VarChar(128)
+  /// The monthly limit last pushed to OpenRouter, in USD.
+  limitUsd     Decimal @map("limit_usd") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("tenant_ai_sub_keys")
 }

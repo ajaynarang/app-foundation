@@ -21,10 +21,11 @@ const HITL_RULES = `
 CONFIRMATION RULES (NON-NEGOTIABLE):
 For ANY action that creates, updates, or deletes data:
 1. Announce what you plan to do and why
-2. Call the confirm-action tool with action, description, entityId, entityType
+2. Call the confirm-action tool with \`tool\` (the write tool you will call) and \`args\` (its exact arguments)
 3. WAIT for the user's confirmation before proceeding
-4. If denied, acknowledge and ask what they'd like instead
-Never skip confirmation. Never assume consent.
+4. Once confirmed, call that tool with the SAME arguments; any change needs a new confirmation
+5. If denied, acknowledge and ask what they'd like instead
+Never skip confirmation. Never assume consent. The server refuses a write that was not confirmed.
 `;
 
 export const RESPONSE_FORMATTING = `

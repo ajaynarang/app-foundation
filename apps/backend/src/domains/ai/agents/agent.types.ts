@@ -19,8 +19,8 @@ export interface AgentContext {
   userId: string;
   /**
    * Resolved numeric DB id (`User.id`). Needed for `AgentPrincipal`
-   * construction when tools route through `InvocationPipelineService`,
-   * and for the RLS session variable `app.current_user_id`. Callers resolve via
+   * construction when tools route through `InvocationPipelineService`.
+   * Callers resolve via
    * `BaseTenantController.getUserDbId` (or `AssistantAiService.getUserDbId`)
    * before entering agent.chat().
    */
@@ -31,8 +31,12 @@ export interface AgentContext {
   voiceInstructions?: string;
 }
 
+/**
+ * One chunk of a chat turn. `reading` (a source being read, transient) and `citation` (a source the answer named)
+ * carry JSON payloads; the HTTP route writes each as its stream frame (`STREAM_FRAME` in `@app/shared-types`).
+ */
 export interface ChatChunk {
-  type: 'text-delta' | 'card' | 'suspend' | 'blocked' | 'complete' | 'followups';
+  type: 'text-delta' | 'reading' | 'citation' | 'card' | 'suspend' | 'blocked' | 'complete' | 'followups';
   data: string;
 }
 
@@ -51,6 +55,8 @@ export interface AssistantAgentContract {
   readonly id: AgentId;
   readonly displayName: string;
   readonly mastraAgentId: string;
+  /** The alias the agent runs on; its model comes from the tenant's route per request. */
+  readonly modelAlias: AgentDefinition['modelAlias'];
   readonly domainSkills: string[];
   readonly taskSkills: string[];
   readonly personas: UserMode[];

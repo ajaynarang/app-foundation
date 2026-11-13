@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/features/auth';
 import { authApi } from '@/features/auth/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@app/ui/components/ui/card';
@@ -20,6 +21,7 @@ import { DISPLAY_FORMATS } from '@appshore/web-core/shared/lib/utils/date-utils'
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
 import { PageHeader, RelativeTime } from '@/shared/components/page-chrome';
 import { roleLabel } from '@/features/platform/settings/constants';
+import { agentActionReturnPath } from '@/features/platform/agent-actions';
 
 function IdentityCard() {
   const { user, setUser } = useAuthStore();
@@ -132,6 +134,7 @@ function EmailCard() {
 
 function PhoneCard() {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [phoneStep, setPhoneStep] = useState<'idle' | 'enter' | 'otp'>('idle');
   const [pinStep, setPinStep] = useState<'idle' | 'enter'>('idle');
   const [phoneE164, setPhoneE164] = useState('');
@@ -179,6 +182,9 @@ function PhoneCard() {
       // Fix 1: Refresh store so hasPinSet reflects immediately
       const updated = await authApi.getProfile();
       useAuthStore.getState().setUser(updated);
+      // Sent here from an agent approval page that needs a PIN: take the person back to it.
+      const back = agentActionReturnPath(window.location.search);
+      if (back) router.push(back);
     } catch {
       showError('Failed to set PIN');
     } finally {

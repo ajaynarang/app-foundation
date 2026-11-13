@@ -90,16 +90,16 @@ tests/         — Playwright QA suite (@app/qa)
 
 ### Backend domains (`apps/backend/src/domains/`)
 
-| Domain           | What it does (all domain-free / generic)                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------- |
-| `billing/`       | Stripe subscriptions, wallet, dunning                                                              |
-| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                            |
-| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                             |
-| `support/`       | Ticketing                                                                                          |
-| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                        |
-| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                           |
-| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + RLS + voice |
-| `prompting/`     | Prompt management (one generic assistant fallback)                                                 |
+| Domain           | What it does (all domain-free / generic)                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| `billing/`       | Stripe subscriptions, wallet, dunning                                                        |
+| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                      |
+| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                       |
+| `support/`       | Ticketing                                                                                    |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                  |
+| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                     |
+| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + voice |
+| `prompting/`     | Prompt management (one generic assistant fallback)                                           |
 
 <!-- feature:desk:start -->
 
@@ -136,6 +136,9 @@ bind to app implementations.
   The API process consumes too unless `QUEUE_PROCESSORS_ENABLED=false` (Terraform `api_queue_processors_enabled`,
   shipped `true`; turn it off only once a worker task runs).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
+  Every call runs through the one tool pipeline (scope, arguments, role, plan, confirmation, audit): give each tool
+  `@RequiresScope`, and `@RestrictToRoles` / `@RequiresPlanFeature` to match its REST twin (backend-patterns §23.1;
+  `mcp/tools/support-ticket.tool.ts` is the example).
 - **Notification types, policies + WhatsApp templates:** notification types are strings, not a Prisma enum. Declare
   yours in `apps/backend/src/platform-glue/notifications/notification-types.ts` (`APP_NOTIFICATION_TYPES`) and their
   policies and templates in `app-notification-policies.ts` beside it; `hooks.module.ts` binds them to
@@ -158,7 +161,8 @@ bind to app implementations.
 <!-- feature:desk:end -->
 
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
-- **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge`.
+- **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge` (incremental;
+  `--force` re-embeds all). Measure retrieval with `pnpm kb:eval` against `apps/backend/content/kb-eval/golden.json`.
 
 ---
 
@@ -169,7 +173,8 @@ docker compose up -d postgres redis          # Postgres (pgvector) on :5499, Red
 pnpm install
 pnpm --filter @app/shared-types build         # build shared types (dependents need its dist)
 cp apps/web/.env.example apps/web/.env.local   # web env (NEXT_PUBLIC_API_URL etc.)
-cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL, ANTHROPIC_API_KEY, ...)
+cd apps/backend && cp .env.example .env        # fill in secrets (DATABASE_URL; OPENROUTER_API_KEY for chat,
+                                               # COHERE_API_KEY for knowledge-base vector search)
 pnpm prisma:generate                           # Prisma client + shared-enum codegen
 pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
                                                # foundation packages (the backend consumes their dist)

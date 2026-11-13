@@ -44,6 +44,15 @@ describe('configuration — production boot guard', () => {
     'THROTTLE_LIMIT',
     'THROTTLE_TTL_MS',
     'TRUST_PROXY',
+    'OPENROUTER_API_KEY',
+    'COHERE_API_KEY',
+    'OPENAI_API_KEY',
+    'AI_PROMPT_CACHE_OVERRIDE',
+    'AI_USAGE_CAPTURE_DIR',
+    'AI_CREDENTIALS_KEY',
+    'PLATFORM_BEDROCK_REGION',
+    'PLATFORM_ASSUME_ROLE_ARN',
+    'PLATFORM_BEDROCK_CFN_TEMPLATE_URL',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -289,12 +298,22 @@ describe('configuration — production boot guard', () => {
       load({ NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399', ...overrides });
 
     it('defaults to 100 requests per minute and no explicit trust-proxy setting', () => {
-      expect(dev({}).edge).toEqual({ throttleLimit: 100, throttleTtlMs: 60_000 });
+      expect(dev({}).edge).toEqual({ throttleLimit: 100, throttleTtlMs: 60_000, agentTenantCeilingPerMinute: 600 });
+    });
+
+    it('takes the agent workspace ceiling from AGENT_TENANT_CEILING_PER_MINUTE', () => {
+      expect(dev({ AGENT_TENANT_CEILING_PER_MINUTE: '50' }).edge.agentTenantCeilingPerMinute).toBe(50);
+      expect(() => dev({ AGENT_TENANT_CEILING_PER_MINUTE: '0' })).toThrow();
     });
 
     it('takes the limit, the window and trust proxy from the environment', () => {
       const config = dev({ THROTTLE_LIMIT: '600', THROTTLE_TTL_MS: '30000', TRUST_PROXY: '2' });
-      expect(config.edge).toEqual({ throttleLimit: 600, throttleTtlMs: 30_000, trustProxy: '2' });
+      expect(config.edge).toEqual({
+        throttleLimit: 600,
+        throttleTtlMs: 30_000,
+        agentTenantCeilingPerMinute: 600,
+        trustProxy: '2',
+      });
     });
 
     it.each([
@@ -384,6 +403,146 @@ describe('configuration — production boot guard', () => {
           LIVEKIT_URL: 'ws://localhost:7880',
         }),
       ).not.toThrow();
+    });
+  });
+
+  describe('platform AI route keys', () => {
+    const dev = { NODE_ENV: 'development', REDIS_URL: 'redis://localhost:6399' };
+
+    it('are optional: a keyless machine boots, in development and in production', () => {
+      const config = load({ ...dev, OPENROUTER_API_KEY: undefined, COHERE_API_KEY: undefined, OPENAI_API_KEY: '' });
+      expect(config.openRouterApiKey).toBeUndefined();
+      expect(config.cohereApiKey).toBeUndefined();
+      expect(config.openaiApiKey).toBeUndefined();
+      expect(() => load(validProduction())).not.toThrow();
+    });
+
+    it('carries each key under its own name', () => {
+      const config = load({
+        ...dev,
+        OPENROUTER_API_KEY: 'sk-or-v1-test',
+        COHERE_API_KEY: 'co-test',
+        OPENAI_API_KEY: 'sk-openai-test',
+      });
+      expect(config.openRouterApiKey).toBe('sk-or-v1-test');
+      expect(config.cohereApiKey).toBe('co-test');
+      expect(config.openaiApiKey).toBe('sk-openai-test');
+    });
+
+    it('names the retired AI variables still set, and carries none of their values', () => {
+      const config = load({
+        ...dev,
+        AI_PROVIDER: 'anthropic',
+        AI_GATEWAY_API_KEY: 'vck-test',
+        ANTHROPIC_API_KEY: 'sk-ant-test',
+      });
+      expect(config.retiredAiEnvVars).toEqual(['AI_PROVIDER', 'AI_GATEWAY_API_KEY', 'ANTHROPIC_API_KEY']);
+      expect(JSON.stringify(config)).not.toMatch(/vck-test|sk-ant-test/);
+      expect(config).not.toHaveProperty('anthropicApiKey');
+    });
+
+    describe('the AI measurement switches (local runs only)', () => {
+      const switches = { AI_PROMPT_CACHE_OVERRIDE: 'none', AI_USAGE_CAPTURE_DIR: '/tmp/usage-capture' };
+
+      it('are honoured on a local run', () => {
+        const config = load({ ...dev, ENV_TYPE: undefined, ...switches });
+        expect(config.aiPromptCacheOverride).toBe('none');
+        expect(config.aiUsageCaptureDir).toBe('/tmp/usage-capture');
+      });
+
+      it('resolve to unset when ENV_TYPE=production', () => {
+        const config = load({ ...validProduction(), NODE_ENV: 'development', ENV_TYPE: 'production', ...switches });
+        expect(config.aiPromptCacheOverride).toBeUndefined();
+        expect(config.aiUsageCaptureDir).toBeUndefined();
+      });
+
+      it('resolve to unset on a sandbox or staging task, which runs with NODE_ENV=production', () => {
+        const config = load({ ...validProduction(), ENV_TYPE: 'sandbox', ...switches });
+        expect(config.aiPromptCacheOverride).toBeUndefined();
+        expect(config.aiUsageCaptureDir).toBeUndefined();
+      });
+
+      it('refuse an override other than none', () => {
+        expect(() => load({ ...dev, ENV_TYPE: undefined, AI_PROMPT_CACHE_OVERRIDE: 'off' })).toThrow();
+      });
+    });
+
+    describe('the Bedrock keys', () => {
+      const ROLE_A = 'arn:aws:iam::123456789012:role/app-ecs-task';
+      const ROLE_B = 'arn:aws:iam::123456789012:role/app-ecs-worker';
+
+      it('are optional: unset leaves the platform Bedrock route and the tenant role flow off', () => {
+        const config = load({ ...dev });
+        expect(config.platformBedrockRegion).toBeUndefined();
+        expect(config.platformAssumeRoleArn).toEqual([]);
+        expect(config.platformBedrockCfnTemplateUrl).toBeUndefined();
+        expect(() => load(validProduction())).not.toThrow();
+      });
+
+      it('carry the region, the CloudFormation link, and every role ARN of the comma-separated list', () => {
+        const config = load({
+          ...dev,
+          PLATFORM_BEDROCK_REGION: 'us-east-1',
+          PLATFORM_ASSUME_ROLE_ARN: ` ${ROLE_A} , ${ROLE_B},`,
+          PLATFORM_BEDROCK_CFN_TEMPLATE_URL: 'https://example.com/bedrock-role.yaml',
+        });
+        expect(config.platformBedrockRegion).toBe('us-east-1');
+        expect(config.platformAssumeRoleArn).toEqual([ROLE_A, ROLE_B]);
+        expect(config.platformBedrockCfnTemplateUrl).toBe('https://example.com/bedrock-role.yaml');
+      });
+
+      it('refuse to boot with a malformed region or role ARN (a typo would deny every tenant connect)', () => {
+        expect(() => load({ ...dev, PLATFORM_BEDROCK_REGION: 'US East 1' })).toThrow(/PLATFORM_BEDROCK_REGION/);
+        expect(() => load({ ...dev, PLATFORM_ASSUME_ROLE_ARN: `${ROLE_A},app-ecs-worker` })).toThrow(
+          /PLATFORM_ASSUME_ROLE_ARN/,
+        );
+      });
+    });
+
+    describe('AI_CREDENTIALS_KEY (the bring-your-own-key switch)', () => {
+      const AI_KEY = '0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0';
+
+      it('is optional and has no default: unset leaves bring-your-own-key off, in development and in production', () => {
+        expect(load({ ...dev }).aiCredentialsKey).toBeUndefined();
+        expect(load(validProduction()).aiCredentialsKey).toBeUndefined();
+        expect(load({ ...dev, AI_CREDENTIALS_KEY: '' }).aiCredentialsKey).toBeUndefined();
+      });
+
+      it('carries a 64-hex-character key', () => {
+        expect(load({ ...dev, AI_CREDENTIALS_KEY: AI_KEY }).aiCredentialsKey).toBe(AI_KEY);
+      });
+
+      it.each([
+        ['too short', 'abc123'],
+        ['64 characters, not all hex (Buffer.from would silently truncate it)', 'g'.repeat(64)],
+        ['too long', `${AI_KEY}00`],
+      ])('refuses to boot with a key that is %s, in any environment', (_label, value) => {
+        expect(() => load({ ...dev, AI_CREDENTIALS_KEY: value })).toThrow(
+          /AI_CREDENTIALS_KEY must be 64 hex characters/,
+        );
+        expect(() => load({ ...validProduction(), AI_CREDENTIALS_KEY: value })).toThrow(
+          /AI_CREDENTIALS_KEY must be 64 hex characters/,
+        );
+      });
+    });
+
+    describe('OPENROUTER_PROVISIONING_KEY (per-workspace sub-keys)', () => {
+      it('is optional with no default, so sub-keys are off until an operator sets it', () => {
+        expect(load({ ...dev }).openRouterProvisioningKey).toBeUndefined();
+        expect(load(validProduction()).openRouterProvisioningKey).toBeUndefined();
+        expect(load({ ...dev, OPENROUTER_PROVISIONING_KEY: '' }).openRouterProvisioningKey).toBeUndefined();
+      });
+
+      it('carries the management key', () => {
+        expect(load({ ...dev, OPENROUTER_PROVISIONING_KEY: 'sk-or-mgmt-test' }).openRouterProvisioningKey).toBe(
+          'sk-or-mgmt-test',
+        );
+      });
+    });
+
+    it('lists no retired variable when none is set (a blank one counts as unset)', () => {
+      const config = load({ ...dev, AI_PROVIDER: undefined, AI_GATEWAY_API_KEY: '', ANTHROPIC_API_KEY: undefined });
+      expect(config.retiredAiEnvVars).toEqual([]);
     });
   });
 

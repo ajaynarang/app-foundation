@@ -160,6 +160,32 @@ describe('VoiceService', () => {
     });
   });
 
+  describe('assertConversationOwner', () => {
+    it("returns the owner's database id when the conversation is the user's in that tenant", async () => {
+      await expect(service.assertConversationOwner('conv_1', 'user_1', 1)).resolves.toEqual({ userDbId: 1 });
+    });
+
+    it('answers 404 for an unknown conversation', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue(null);
+      await expect(service.assertConversationOwner('conv_x', 'user_1', 1)).rejects.toThrow(NotFoundException);
+    });
+
+    it('answers 404 for an unknown user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      await expect(service.assertConversationOwner('conv_1', 'user_x', 1)).rejects.toThrow(NotFoundException);
+    });
+
+    it('answers 404 for a conversation of another tenant', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({ id: 1, conversationId: 'conv_1', userId: 1, tenantId: 2 });
+      await expect(service.assertConversationOwner('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
+    });
+
+    it('answers 404 for a conversation of another user', async () => {
+      mockPrisma.conversation.findUnique.mockResolvedValue({ id: 1, conversationId: 'conv_1', userId: 5, tenantId: 1 });
+      await expect(service.assertConversationOwner('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('generateVoiceResponse', () => {
     it('delegates to AssistantAiService.generateResponse', async () => {
       async function* mockGen() {

@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-12T07:39:53.444Z
- * Source: 22 domains, 95 endpoints
- * Controllers scanned: 273 total endpoints across all controllers
+ * Generated: 2026-11-13T06:33:28.401Z
+ * Source: 22 domains, 102 endpoints
+ * Controllers scanned: 286 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -117,11 +117,60 @@ export const RBAC_MATRIX: RbacEntry[] = [
     expectations: { MEMBER: 400, ADMIN: 400, OWNER: 400, SUPER_ADMIN: 400 },
   },
   {
+    method: 'GET', path: '/agent-policy',
+    description: 'AgentActionsController: GET /agent-policy',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'GET', path: '/ai-settings',
+    description: 'AiCredentialController: GET /ai-settings',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+  {
     method: 'GET', path: '/developer/scopes',
     description: 'DeveloperScopesController: GET /developer/scopes',
     domain: 'ai',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'PUT', path: '/agent-policy',
+    description: 'AgentActionsController: PUT /agent-policy',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/ai-settings/credentials',
+    description: 'AiCredentialController: POST /ai-settings/credentials',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/ai-settings/credentials/bedrock/begin',
+    description: 'AiCredentialController: POST /ai-settings/credentials/bedrock/begin',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/ai-settings/credentials/bedrock/complete',
+    description: 'AiCredentialController: POST /ai-settings/credentials/bedrock/complete',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'PATCH', path: '/ai-settings/policy',
+    description: 'AiCredentialController: PATCH /ai-settings/policy',
+    domain: 'ai',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: null, SUPER_ADMIN: 403 },
   },
 
   // ═══════════════════════════════════════════════════════

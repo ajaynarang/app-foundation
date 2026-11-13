@@ -8,7 +8,7 @@ jest.mock('../../../../prompting/prompting.service', () => ({
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
-import { DeskMemoryWriterService } from '../desk-memory-writer.service';
+import { DeskMemoryWriterService, MEMORY_EXTRACT_MAX_OUTPUT_TOKENS } from '../desk-memory-writer.service';
 
 // Duck-typed mocks — importing the real classes would pull in Langfuse
 // (ESM) and trigger Jest's dynamic-import worker error. The writer only
@@ -91,6 +91,9 @@ describe('DeskMemoryWriterService — close-step write map', () => {
         }),
       }),
     );
+    // One short memory note, never the provider's whole output window.
+    expect(MEMORY_EXTRACT_MAX_OUTPUT_TOKENS).toBeGreaterThanOrEqual(1024);
+    expect(structured.extract.mock.calls[0][0].maxOutputTokens).toBe(MEMORY_EXTRACT_MAX_OUTPUT_TOKENS);
   });
 
   it('approve_edited → PATTERN/CORRECT/0.90', async () => {
@@ -329,6 +332,7 @@ describe('DeskMemoryWriterService — writeOperatorRule (Rules tab "Add a rule")
     expect(embedder.embedText).toHaveBeenCalledWith(
       'Escalate invoices > $10k to Bill before Friday',
       expect.objectContaining({ surface: 'MEMORY_EXTRACT', tenantId: expect.any(Number) }),
+      'document',
     );
   });
 });

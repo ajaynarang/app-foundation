@@ -1,10 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { GuardrailsEngineResult } from '@presidio-dev/hai-guardrails';
 import { SyncRedactor } from 'redact-pii';
+import { importEsm } from '../../../shared/utils/esm-import';
 import type { GuardCheckResult, PiiCheckResult, PiiRedactResult } from './types';
 
-// Loaded lazily via dynamic import to handle the ESM-only package in a CJS NestJS context
-type GuardrailsEngine = InstanceType<typeof import('@presidio-dev/hai-guardrails').GuardrailsEngine>;
+// The package is ESM-only. A plain `await import()` compiles to `require()` in this CommonJS
+// build and fails, so it loads through importEsm (guardrails-real-load.spec.ts proves it).
+type HaiGuardrails = typeof import('@presidio-dev/hai-guardrails');
+type GuardrailsEngine = InstanceType<HaiGuardrails['GuardrailsEngine']>;
+
+const HAI_GUARDRAILS_PACKAGE = '@presidio-dev/hai-guardrails';
 
 @Injectable()
 export class GuardrailsService {
@@ -24,7 +29,7 @@ export class GuardrailsService {
   private async initEngines(): Promise<void> {
     try {
       const { GuardrailsEngine, injectionGuard, secretGuard, piiGuard, leakageGuard, SelectionType } =
-        await import('@presidio-dev/hai-guardrails');
+        await importEsm<HaiGuardrails>(HAI_GUARDRAILS_PACKAGE);
 
       this.injectionEngine = new GuardrailsEngine({
         guards: [

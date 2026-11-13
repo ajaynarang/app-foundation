@@ -13,7 +13,12 @@ export type {
   GetMessagesResponse,
 } from '@app/shared-types';
 
-import type { CreateConversationResponse, ListConversationsResponse, GetMessagesResponse } from '@app/shared-types';
+import {
+  MAX_ACTIVE_CONVERSATIONS,
+  type CreateConversationResponse,
+  type ListConversationsResponse,
+  type GetMessagesResponse,
+} from '@app/shared-types';
 
 // ── API Functions ──
 
@@ -24,8 +29,14 @@ export async function createConversation(userMode: string): Promise<CreateConver
   });
 }
 
-export async function listConversations(limit: number = 10): Promise<ListConversationsResponse> {
+/** This person's active conversations in this workspace, newest first (at most the history cap). */
+export async function listConversations(limit: number = MAX_ACTIVE_CONVERSATIONS): Promise<ListConversationsResponse> {
   return apiClient<ListConversationsResponse>(`/conversations?limit=${limit}`);
+}
+
+/** Archive a conversation: it leaves history; its messages are kept on the server. */
+export async function deleteConversation(conversationId: string): Promise<void> {
+  await apiClient<void>(`/conversations/${conversationId}`, { method: 'DELETE' });
 }
 
 export async function getConversationMessages(conversationId: string): Promise<GetMessagesResponse> {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ContentModerationService } from './content-moderation.service';
 import { GuardrailsService } from './guardrails.service';
+import { AiRouteResolver } from '../routing/ai-route-resolver.service';
 import type { ModerationDirection, ModerationResult, GuardrailEvent } from './types';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class ModerationService {
   constructor(
     private readonly contentModeration: ContentModerationService,
     private readonly guardrails: GuardrailsService,
+    private readonly aiRouteResolver: AiRouteResolver,
   ) {}
 
   /**
@@ -26,26 +28,42 @@ export class ModerationService {
     }
   }
 
-  async moderate(text: string, direction: ModerationDirection, persona: string): Promise<ModerationResult> {
+  /**
+   * `tenantId` is the workspace the text belongs to. Input moderation sends text to an external provider, so it is
+   * skipped for a workspace that requires zero data retention; the local guardrails still run. Output moderation is
+   * local only.
+   */
+  async moderate(
+    text: string,
+    direction: ModerationDirection,
+    persona: string,
+    tenantId?: number,
+  ): Promise<ModerationResult> {
     if (direction === 'input') {
-      return this.moderateInput(text, persona);
+      return this.moderateInput(text, persona, tenantId);
     }
     return this.moderateOutput(text);
   }
 
-  private async moderateInput(text: string, persona: string): Promise<ModerationResult> {
+  private async moderateInput(text: string, persona: string, tenantId?: number): Promise<ModerationResult> {
     const events: GuardrailEvent[] = [];
 
-    // Layer 1: OpenAI content moderation (toxicity, hate, etc.)
-    // Runs first — blocks immediately if flagged (fast, ~300ms)
-    const contentResult = await this.contentModeration.check(text);
-    events.push({
-      guard: 'content-moderation',
-      result: contentResult.flagged ? 'block' : 'pass',
-      categories: contentResult.categories,
-    });
-    if (contentResult.flagged) {
-      return { blocked: true, events };
+    // Layer 1: OpenAI content moderation (toxicity, hate, etc.). An EXTERNAL, standard-retention endpoint, so it is
+    // skipped for a zero-retention workspace: no tenant text reaches a retaining provider. Runs first otherwise and
+    // blocks immediately if flagged (fast, ~300ms).
+    const externalAllowed = tenantId === undefined || !(await this.aiRouteResolver.isZeroRetention(tenantId));
+    if (externalAllowed) {
+      const contentResult = await this.contentModeration.check(text);
+      events.push({
+        guard: 'content-moderation',
+        result: contentResult.flagged ? 'block' : 'pass',
+        categories: contentResult.categories,
+      });
+      if (contentResult.flagged) {
+        return { blocked: true, events };
+      }
+    } else {
+      this.logger.debug('Skipping external content moderation for a zero-retention workspace');
     }
 
     // Layer 2: hai-guardrails — run injection, secrets, PII in parallel

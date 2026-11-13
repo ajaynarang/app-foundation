@@ -2,13 +2,17 @@ import { Test } from '@nestjs/testing';
 
 import { AdminAiSpendService } from '../admin-ai-spend.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { isSeederOwned } from '../../ai/routing/provisioning/plan-ai-budgets';
+import { OpenRouterProvisioningService } from '../../ai/routing/provisioning/openrouter-provisioning.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 
 describe('AdminAiSpendService', () => {
   let service: AdminAiSpendService;
   let prisma: any;
+  let provisioning: { syncLimit: jest.Mock };
 
   beforeEach(async () => {
+    provisioning = { syncLimit: jest.fn().mockResolvedValue(undefined) };
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       aiInvocation: {
@@ -27,7 +31,11 @@ describe('AdminAiSpendService', () => {
     };
 
     const module = await Test.createTestingModule({
-      providers: [AdminAiSpendService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AdminAiSpendService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: OpenRouterProvisioningService, useValue: provisioning },
+      ],
     }).compile();
 
     service = module.get(AdminAiSpendService);
@@ -39,6 +47,7 @@ describe('AdminAiSpendService', () => {
       tenant_slug: slug,
       company_name: `${slug} Inc`,
       total_cost_usd: cost,
+      platform_cost_usd: '0.750000',
       call_count: 15n,
       error_count: 1n,
     });
@@ -76,6 +85,7 @@ describe('AdminAiSpendService', () => {
           tenantSlug: 'acme',
           companyName: 'acme Inc',
           windowCostUsd: '3.750000',
+          windowPlatformCostUsd: '0.750000',
           windowCallCount: 15,
           windowErrorCount: 1,
           sparkline: [
@@ -159,15 +169,25 @@ describe('AdminAiSpendService', () => {
 
   describe('getSummary', () => {
     it('sums the window across every tenant in SQL, so the figure never depends on the pages loaded', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([{ total_cost_usd: '53.750000', tenant_count: 2n }]);
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { total_cost_usd: '53.750000', platform_cost_usd: '13.750000', tenant_count: 2n },
+      ]);
 
-      expect(await service.getSummary({ days: 7 })).toEqual({ windowCostUsd: '53.750000', tenantCount: 2 });
+      expect(await service.getSummary({ days: 7 })).toEqual({
+        windowCostUsd: '53.750000',
+        windowPlatformCostUsd: '13.750000',
+        tenantCount: 2,
+      });
       expect(prisma.$queryRaw.mock.calls[0][0].join('?')).toContain('COUNT(DISTINCT tenant_id)');
     });
 
     it('answers zero, not null, for a window with no spend', async () => {
-      prisma.$queryRaw.mockResolvedValueOnce([{ total_cost_usd: null, tenant_count: 0n }]);
-      expect(await service.getSummary({ days: 7 })).toEqual({ windowCostUsd: '0.000000', tenantCount: 0 });
+      prisma.$queryRaw.mockResolvedValueOnce([{ total_cost_usd: null, platform_cost_usd: null, tenant_count: 0n }]);
+      expect(await service.getSummary({ days: 7 })).toEqual({
+        windowCostUsd: '0.000000',
+        windowPlatformCostUsd: '0.000000',
+        tenantCount: 0,
+      });
     });
   });
 
@@ -177,6 +197,7 @@ describe('AdminAiSpendService', () => {
         {
           surface: 'DESK_STEP',
           total_cost_usd: '4.000000',
+          platform_cost_usd: '1.000000',
           call_count: 40n,
           error_count: 2n,
           total_tokens: 120000n,
@@ -189,6 +210,7 @@ describe('AdminAiSpendService', () => {
         {
           surface: 'DESK_STEP',
           windowCostUsd: '4.000000',
+          windowPlatformCostUsd: '1.000000',
           windowCallCount: 40,
           windowErrorCount: 2,
           windowTotalTokens: 120000,
@@ -209,6 +231,9 @@ describe('AdminAiSpendService', () => {
         promptTokens: 1000,
         completionTokens: 500,
         cachedTokens: null,
+        cacheWriteTokens: null,
+        routeId: null,
+        credentialType: null,
         latencyMs: 1234,
         status: 'OK',
         langfuseTraceId: 'lf-1',
@@ -229,6 +254,29 @@ describe('AdminAiSpendService', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].costUsd).toBe('0.010500');
       expect(result.nextCursor).toBeNull();
+    });
+
+    it('says which route served each call and who paid', async () => {
+      prisma.aiInvocation.findMany.mockResolvedValue([
+        makeRow({
+          id: 'a',
+          routeId: 'platform-openrouter',
+          credentialType: 'PLATFORM_OPENROUTER',
+          cacheWriteTokens: 300,
+        }),
+        makeRow({ id: 'b', routeId: 'aicred_x1', credentialType: 'ANTHROPIC_KEY' }),
+        makeRow({ id: 'c' }),
+      ]);
+      prisma.aiInvocation.count.mockResolvedValue(3);
+
+      const { items } = await service.listInvocations({ tenantId: 1, limit: 50 });
+
+      expect(items.map(({ routeId, credentialType, payer }) => ({ routeId, credentialType, payer }))).toEqual([
+        { routeId: 'platform-openrouter', credentialType: 'PLATFORM_OPENROUTER', payer: 'PLATFORM' },
+        { routeId: 'aicred_x1', credentialType: 'ANTHROPIC_KEY', payer: 'TENANT' },
+        { routeId: null, credentialType: null, payer: 'PLATFORM' },
+      ]);
+      expect(items[0].cacheWriteTokens).toBe(300);
     });
 
     it('peeks one extra row to compute a next cursor', async () => {
@@ -301,7 +349,7 @@ describe('AdminAiSpendService', () => {
     it('upserts (getOrCreate) and serializes Decimal caps to strings', async () => {
       const budget = await service.getBudget(7);
       expect(prisma.tenantAiBudget.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: 7 }, create: { tenantId: 7 }, update: {} }),
+        expect.objectContaining({ where: { tenantId: 7 }, create: { tenantId: 7, notes: 'plan:DEFAULT' }, update: {} }),
       );
       expect(budget).toEqual({
         dailySoftUsd: '5',
@@ -332,14 +380,55 @@ describe('AdminAiSpendService', () => {
         notes: 'raised for enterprise pilot',
       });
     });
+
+    // The sheet pre-fills the stored note, so a save of a stamped row sends `plan:DEFAULT` straight back. Stored as
+    // typed, the row would stay the seeder's and the next plan change would overwrite the admin's caps.
+    it.each(['plan:DEFAULT', 'plan:PROFESSIONAL'])(
+      'never stores the seeder stamp %s, so the edit takes the row out of the seeder hands',
+      async (stamp) => {
+        await service.updateBudget(7, {
+          dailySoftUsd: 10,
+          dailyHardUsd: 40,
+          monthlySoftUsd: 100,
+          monthlyHardUsd: 400,
+          notes: stamp,
+        });
+        const call = prisma.tenantAiBudget.upsert.mock.calls[0][0];
+        expect(call.update.notes).toBeNull();
+        expect(call.create.notes).toBeNull();
+        expect(isSeederOwned(call.update.notes, true)).toBe(false);
+      },
+    );
+  });
+
+  describe('updateBudget keeps the OpenRouter sub-key in step', () => {
+    const input = { dailySoftUsd: 10, dailyHardUsd: 40, monthlySoftUsd: 100, monthlyHardUsd: 400, notes: null };
+
+    it('pushes the new monthly hard cap to the workspace sub-key', async () => {
+      await service.updateBudget(7, input);
+      expect(provisioning.syncLimit).toHaveBeenCalledWith(7, 400);
+    });
+
+    it('never waits on OpenRouter: the save returns while the sync is still pending', async () => {
+      provisioning.syncLimit.mockReturnValue(new Promise(() => undefined));
+      await expect(service.updateBudget(7, input)).resolves.toEqual(expect.objectContaining({ monthlyHardUsd: '200' }));
+    });
+
+    it('a failed save syncs nothing', async () => {
+      prisma.tenantAiBudget.upsert.mockRejectedValue(new Error('db down'));
+      await expect(service.updateBudget(7, input)).rejects.toThrow('db down');
+      expect(provisioning.syncLimit).not.toHaveBeenCalled();
+    });
   });
 
   describe('getCostVsQuota', () => {
     it('returns cost from the ledger, the budget, and an empty quota array', async () => {
-      prisma.$queryRaw.mockResolvedValue([{ total_usd: '3.500000', call_count: 12n }]);
+      prisma.$queryRaw.mockResolvedValue([{ total_usd: '3.500000', platform_usd: '1.250000', call_count: 12n }]);
       const result = await service.getCostVsQuota({ tenantId: 7, days: 30 });
       expect(result.windowDays).toBe(30);
-      expect(result.cost).toEqual({ totalUsd: '3.500000', callCount: 12 });
+      // The budget is compared with what the platform paid; the workspace's own-key spend is shown beside it.
+      expect(result.cost).toEqual({ totalUsd: '3.500000', platformUsd: '1.250000', tenantUsd: '2.25', callCount: 12 });
+      expect(prisma.$queryRaw.mock.calls[0][0].join('?')).toContain('FILTER (WHERE');
       expect(result.budget.dailyHardUsd).toBe('20');
       expect(result.quota).toEqual([]); // quota read API is a follow-up
     });

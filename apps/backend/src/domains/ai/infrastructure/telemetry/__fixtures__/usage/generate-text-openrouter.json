@@ -1,0 +1,28 @@
+{
+  "_source": "ai@6 generateText on @openrouter/ai-sdk-provider 2.10 with no inputTokenDetails: the read is in providerMetadata.openrouter.usage.promptTokensDetails.cachedTokens, the write only in the raw usage (prompt_tokens_details.cache_write_tokens). Numbers synthetic; the live-*.json fixtures are live captures.",
+  "usage": {
+    "inputTokens": 9000,
+    "outputTokens": 700,
+    "totalTokens": 9700,
+    "raw": {
+      "prompt_tokens": 9000,
+      "completion_tokens": 700,
+      "prompt_tokens_details": {
+        "cached_tokens": 6000,
+        "cache_write_tokens": 2000
+      }
+    }
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "provider": "Anthropic",
+      "usage": {
+        "promptTokens": 9000,
+        "completionTokens": 700,
+        "promptTokensDetails": {
+          "cachedTokens": 6000
+        }
+      }
+    }
+  }
+}
