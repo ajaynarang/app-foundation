@@ -9,11 +9,21 @@ import { AuthService } from '../auth.service';
 import { IdentityResolverService } from '../identity-resolver.service';
 import { JwtTokenService } from '../jwt.service';
 import { LoginEventService } from '../login-event.service';
+import {
+  CREATE_EMAIL_UNIQUE_INDEX_SQL,
+  EMAIL_UNIQUE_INDEX,
+  EMAIL_UNIQUE_INDEX_LOCK_KEY,
+  emailUniqueIndexExists,
+} from '@appshore/db/email-uniqueness';
 
 /**
  * Tenant-aware login against real Postgres: two live accounts on one email (the schema allows it, unique only per
  * tenant), real bcrypt, real refresh rows. Proves the session row lands in the workspace the rules pick, and that the
- * duplicate pair the unit spec fakes can actually exist.
+ * duplicate pair the unit spec fakes can actually exist on a database that predates one-account-per-email.
+ *
+ * A migrated database refuses that pair (index `users_email_live_key`), so the spec plays such a database: it holds
+ * the index's advisory lock for its whole run, drops the index, and recreates it in afterAll once its rows are gone.
+ * Every spec that needs the index present takes the same lock first.
  *
  * Skipped when DATABASE_URL is unset or names no usable database. Every row hangs off the tenants and users this run
  * creates, and is deleted with them in afterAll.
@@ -37,6 +47,8 @@ const meta = { ip: null, userAgent: 'tenant-login-spec' };
 
 describe('Tenant-aware login (Postgres)', () => {
   let pool: pg.Pool;
+  let lockClient: pg.Client | undefined;
+  let indexWasPresent = false;
   let prisma: PrismaClient;
   let dbReachable = false;
   let auth: AuthService;
@@ -75,6 +87,13 @@ describe('Tenant-aware login (Postgres)', () => {
       console.warn(`tenant-login.integration: no usable database (${(err as Error).message}) — skipping`);
       return;
     }
+
+    // Play a database from before the unique-email index (see the header).
+    lockClient = new pg.Client({ connectionString: DATABASE_URL });
+    await lockClient.connect();
+    await lockClient.query('SELECT pg_advisory_lock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
+    indexWasPresent = await emailUniqueIndexExists(lockClient);
+    if (indexWasPresent) await lockClient.query(`DROP INDEX "${EMAIL_UNIQUE_INDEX}"`);
 
     const makeTenant = async (name: string) => {
       const tenant = await prisma.tenant.create({
@@ -131,7 +150,7 @@ describe('Tenant-aware login (Postgres)', () => {
       { sendEmail: async () => undefined } as any,
       new IdentityResolverService(prisma as any, configService),
     );
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => {
     if (dbReachable) {
@@ -142,6 +161,11 @@ describe('Tenant-aware login (Postgres)', () => {
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
       await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
       await prisma.$disconnect();
+    }
+    if (lockClient) {
+      if (indexWasPresent) await lockClient.query(CREATE_EMAIL_UNIQUE_INDEX_SQL);
+      await lockClient.query('SELECT pg_advisory_unlock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
+      await lockClient.end();
     }
     await pool?.end().catch(() => undefined);
   });

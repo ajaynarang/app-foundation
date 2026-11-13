@@ -302,6 +302,9 @@ model User {
   aiInvocations           AiInvocation[]
 
   @@unique([tenantId, email])
+  // NOTE: one live account per email is enforced by the partial unique index users_email_live_key on
+  // lower(email) WHERE deleted_at IS NULL, created in raw SQL (migration users_email_unique_live, which skips it
+  // while duplicates exist; pnpm accounts:enforce-unique-email creates it later). Prisma cannot express it.
   @@index([tenantId])
   @@index([email])
   @@index([phone])
