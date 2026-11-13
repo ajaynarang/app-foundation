@@ -25,6 +25,7 @@
     "verify": "bash tools/verify/verify.sh",
     "verify:api": "bash tools/verify/api-qa.sh",
     "verify:scaffold": "node tools/init-app/check-variants.mjs",
+    "check:ops": "bash tools/verify/check-ops.sh",
     "test:init-app": "node --test tools/init-app/",
     "verify:arch": "turbo run build --filter=@app/backend^... --output-logs=errors-only && pnpm --filter @app/backend exec jest src/architecture && pnpm --filter @app/web exec jest src/shared/components/__tests__/single-component-set.test.ts src/shared/components/page-chrome/__tests__/theme-tokens.test.ts src/features/__tests__/ui-grammar-guard.test.ts",
     "// — Backend shortcuts": "",
