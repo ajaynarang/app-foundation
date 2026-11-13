@@ -1,5 +1,6 @@
 import type { Job } from 'bullmq';
 import { requestContextStorage } from '../request-context.middleware';
+import { currentRls, rlsStorage, runAsTenant } from '../../rls/rls-context';
 import { SYSTEM_JOB_TENANT, resolveJobTenant, withJobContext, withJobLogContext } from '../job-log-context';
 
 function makeJob(partial: Partial<Job>): Job {
@@ -123,6 +124,29 @@ describe('withJobContext', () => {
 
   it('keeps the old name as an alias for one release', () => {
     expect(withJobLogContext).toBe(withJobContext);
+  });
+});
+
+describe('withJobContext tenant context', () => {
+  it('runs the job as the tenant its payload names, sourced from the job name', async () => {
+    const job = makeJob({ id: 'j-1', name: 'send-digest', data: { tenantId: 'acme-co', tenantDbId: 7 } });
+    expect(await withJobContext(job, async () => currentRls())).toEqual({
+      kind: 'tenant',
+      tenantId: 7,
+      source: 'job:send-digest',
+    });
+  });
+
+  it("is its own boundary: the job's tenant replaces an enclosing request's", async () => {
+    const job = makeJob({ id: 'j-2', name: 'send-digest', data: { tenantDbId: 8 } });
+    const seen = await runAsTenant(7, 'jwt', () => withJobContext(job, async () => currentRls()));
+    expect(seen).toMatchObject({ kind: 'tenant', tenantId: 8 });
+  });
+
+  it('runs a system job with an empty holder, never inheriting the caller', async () => {
+    const job = makeJob({ id: 'j-3', name: 'data-retention', data: { tenantId: SYSTEM_JOB_TENANT } });
+    const seen = await runAsTenant(7, 'jwt', () => withJobContext(job, async () => rlsStorage.getStore()));
+    expect(seen).toEqual({});
   });
 });
 

@@ -1,6 +1,7 @@
 import { trace } from '@opentelemetry/api';
 import { logContextMixin } from '../log-context-mixin';
 import { requestContextStorage } from '../request-context.middleware';
+import { rlsStorage } from '../../rls/rls-context';
 
 describe('logContextMixin', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -40,5 +41,17 @@ describe('logContextMixin', () => {
     } as any);
 
     expect(logContextMixin()).toEqual({ traceId: 'a'.repeat(32), spanId: 'b'.repeat(16) });
+  });
+
+  it('adds the rls.* fields of the current tenant context', () => {
+    const fields = requestContextStorage.run({ requestId: 'req-1' }, () =>
+      rlsStorage.run({ ctx: { kind: 'tenant', tenantId: 7, source: 'jwt' } }, () => logContextMixin()),
+    );
+
+    expect(fields).toMatchObject({ requestId: 'req-1', 'rls.kind': 'tenant', 'rls.tenant': '7', 'rls.source': 'jwt' });
+  });
+
+  it('reports rls.kind=none inside a request nobody pinned to a tenant', () => {
+    expect(rlsStorage.run({}, () => logContextMixin())).toEqual({ 'rls.kind': 'none' });
   });
 });

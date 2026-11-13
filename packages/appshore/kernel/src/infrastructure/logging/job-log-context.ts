@@ -1,5 +1,6 @@
 import type { Job } from 'bullmq';
 import { requestContextStorage, type RequestContext } from './request-context.middleware';
+import { RLS_SOURCE, isRlsTenantId, runInJobScope, toRlsTenantId } from '../rls/rls-context';
 
 /** The `tenantId` that cron and global jobs carry instead of a real tenant. */
 export const SYSTEM_JOB_TENANT = 'system';
@@ -13,34 +14,18 @@ export interface JobTenant {
   logTenantId?: string;
 }
 
-const NUMERIC_ID = /^[1-9]\d*$/;
-
-function isTenantDbId(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
-}
-
-/** A positive integer, or its canonical decimal string. Anything else (a public id, 'system', '07', 0) is not one. */
-function toTenantDbId(raw: unknown): number | undefined {
-  if (isTenantDbId(raw)) return raw;
-  if (typeof raw === 'string' && NUMERIC_ID.test(raw)) {
-    const id = Number(raw);
-    return isTenantDbId(id) ? id : undefined;
-  }
-  return undefined;
-}
-
 /**
  * Which tenant a job belongs to, from its payload. The envelope's numeric `tenantDbId` wins; a numeric `tenantId`
  * (number or numeric string) also counts. When the two disagree the job names no numeric tenant. A public string id
- * stays as the log tenant only. Item 19 (tenant context) builds its job scope on this.
+ * stays as the log tenant only: the job then runs with no tenant context.
  */
 export function resolveJobTenant(job: Job<JobData>): JobTenant {
   const data = job.data && typeof job.data === 'object' ? job.data : undefined;
   const rawTenantId = data?.tenantId;
   const logTenantId = rawTenantId != null ? String(rawTenantId) : undefined;
 
-  const fromTenantId = toTenantDbId(rawTenantId);
-  const fromDbId = isTenantDbId(data?.tenantDbId) ? data?.tenantDbId : undefined;
+  const fromTenantId = toRlsTenantId(rawTenantId);
+  const fromDbId = isRlsTenantId(data?.tenantDbId) ? data?.tenantDbId : undefined;
 
   if (fromDbId !== undefined && fromTenantId !== undefined && fromDbId !== fromTenantId) {
     return { logTenantId };
@@ -49,8 +34,12 @@ export function resolveJobTenant(job: Job<JobData>): JobTenant {
 }
 
 /**
- * Run a BullMQ job body inside the log context, so every line it writes carries `jobName`, `jobId`, `tenantId` (and
- * `tenantDbId` when the payload names one) and `requestId`, without the processor passing them by hand.
+ * Run a BullMQ job body inside both context stores:
+ * - the log context, so every line it writes carries `jobName`, `jobId`, `tenantId` (and `tenantDbId` when the
+ *   payload names one) and `requestId`, without the processor passing them by hand;
+ * - the tenant context (`rls-context.ts`), so the job runs as the tenant its payload names, or with no tenant for a
+ *   system job. A job is its own boundary: it never inherits the tenant of whatever enqueued or invoked it.
+ *
  * `BaseQueueDispatcher` already wraps every job it dispatches; a processor that owns its own queue wraps itself.
  *
  *   async process(job: Job<MyData>) {
@@ -74,7 +63,7 @@ export function withJobContext<T>(job: Job<JobData>, fn: () => Promise<T>): Prom
     jobId: job.id != null ? String(job.id) : undefined,
   };
 
-  return requestContextStorage.run(ctx, fn);
+  return requestContextStorage.run(ctx, () => runInJobScope(tenantDbId, `${RLS_SOURCE.JOB}:${job.name}`, fn));
 }
 
 /**
