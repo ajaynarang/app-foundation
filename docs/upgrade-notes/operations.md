@@ -420,3 +420,32 @@ require it arrive in the next change.
 
 **How to turn it back.** There is no switch, because nothing is enforced. To silence strict mode in a product's own
 tests, remove the `setupFiles` entry; deployed tasks never set it.
+
+## 2026-11-13: every job, table, event handler and super-admin route declares its tenant context
+
+**What changes when you pull it.** Three architecture specs now fail `pnpm test` until your own code declares what
+the foundation's already does. Nothing changes at run time for code that already passes them, and nothing is enforced
+in the database.
+
+- **Jobs** (`rls-job-context-coverage.spec.ts`). Every job name a handler lists (`readonly jobNames`) is declared in
+  `apps/backend/src/platform-glue/queue/job-context.ts` (`APP_JOB_CONTEXT`): `tenant` (the payload names it),
+  `forEachTenant` or `system` with a reason, or `noDatabase`. A reason must be entered by a `systemScope(reason, …)`
+  or `forEachTenant(reason, …)` call; an app reason goes in `APP_SYSTEM_REASONS` there. The foundation's crons now
+  run that way: `job-cleanup`, `data-retention`, `login-events-cleanup`, `tokens-cleanup`, the notifications
+  `cleanup` and `whatsapp-stale-sweep` in `systemScope`, `trial-expiry` and `ai-credential-revalidate` list across
+  tenants and then handle each tenant as itself. A new queue with its own `@Processor` is added to the spec's list.
+- **Tables** (`rls-registry.spec.ts`). Every model in `app.prisma` gets a class in
+  `apps/backend/src/platform-glue/database/app-rls-registry.ts` (`tenant`, `tenant_nullable`, `child` with its
+  parent, `identity`, `identity_system`, `catalog`, `platform`), consistent with its `tenantId` column.
+- **Event handlers** (`rls-context-coverage.spec.ts`). Every `@OnEvent` handler becomes `@OnTenantEvent` (it runs as
+  the tenant its payload names), or goes on the spec's allow-list with a reason (no database access, or cross-tenant
+  by design with its own `systemScope`). `eventEmitter.on(…)` and its siblings are refused. The AI budget nudge
+  listener is now `@OnTenantEvent`: in strict mode (tests) an event with no usable tenant id throws; deployed, it is
+  logged and ignored as before.
+- **Super-admin routes** (same spec). A handler whose `@Roles` is exactly `SUPER_ADMIN` carries `@SystemScope(reason)`
+  (it reads across tenants) or `@TargetTenant(param, 'id' | 'slug')` (it acts on the one tenant its URL names); a
+  route open to any other role carries neither. Every foundation super-admin route is annotated.
+
+**What to set first.** Nothing. Run `pnpm test` after the pull and add a declaration for each name the specs print.
+
+**How to turn it back.** Revert the change. There is no switch, because nothing is enforced.
