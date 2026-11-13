@@ -716,6 +716,40 @@ rewrites the table on its next run.
 
 **Rollback.** Revert the change. Nothing is stored differently.
 
+## 16. Confirmations bound to the exact write: one intent digest, single use, challenge retention
+
+**What changed.**
+
+- One digest. A challenge token is bound to `intentDigest(schema, args)` in `agent-contract/intent-digest.ts`: the
+  caller's top-level `_` keys dropped, the rest parsed through the tool's zod schema (defaults applied, unknown keys
+  dropped), canonical JSON with keys sorted at every depth, SHA-256 over the exact values. The old digest hashed the
+  redacted copy with the top-level keys as a `JSON.stringify` allow-list, so `{ invoice: { amount: 5 } }` and
+  `{ invoice: { amount: 500 } }` matched, and so did two different email addresses. `digestArgs` is deleted.
+  `redactArgs` stays, for the invocation log only; the log's `argsDigest` column is now a sorted-at-every-depth
+  hash of that redacted copy (a log fingerprint, never used to authorise).
+- Single use. A token is spent with a conditional update (`consumed_at IS NULL`); of two racing replays of one
+  token, one runs and the other answers `hitl_invalid_or_expired`. Before, both could run the write.
+- Step-up. `POST /mcp/hitl/:token/step-up` marks only an open challenge (unused, unexpired, not already stepped up,
+  for the person it names). Otherwise it answers 404 `Challenge not found, already used or expired`. Before, it
+  marked a used or expired challenge as stepped up and answered success.
+- Retention. The `data-retention` job deletes `hitl_challenges` rows 24 hours after `expiresAt`. Its summary gains
+  `hitlChallengesDeleted`. Before, nothing deleted them.
+
+**Env.** None. **Schema.** None.
+
+**Who notices.**
+
+- An external agent holding a challenge token issued before the deploy: its digest no longer matches, so the replay
+  fails closed (`hitl_invalid_or_expired`). Call again for a new token. Open tokens expire within ten minutes.
+- An agent that re-sent a confirmed call with a changed value inside a nested object or a redacted-looking field:
+  that is now a different call and needs a new challenge.
+- Anything that read `hitl_challenges` rows older than a day after expiry: they are gone after the next retention run.
+- A product that imported `digestArgs`: use `intentDigest` for a confirmation, or `sha256Canonical` for a fingerprint.
+
+**What to do.** Nothing.
+
+**Rollback.** Revert the change. Nothing is stored differently; rows the retention job already deleted stay deleted.
+
 ## Deploy order for `ai_reader`
 
 A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops

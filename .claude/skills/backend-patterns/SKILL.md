@@ -1879,6 +1879,14 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   token for a non-read tier. Desk is never challenged by the pipeline (Desk's gate step runs before every execute)
   and the tier is still written on the audit row. No tool or prompt may carry a switch that skips confirmation
   (the old `_invocationSource` on `confirm-action` was one).
+- **One intent digest, single use.** A confirmation is bound to the tool and `intentDigest(schema, args)`
+  (`agent-contract/intent-digest.ts`): top-level `_` keys dropped, parsed through the tool's schema, canonical JSON
+  with keys sorted at every depth, SHA-256 over the exact values. Every path that records or checks a confirmation
+  (the challenge token now, the chat grant next) calls that one function; never hash the redacted copy
+  (`redactArgs` is for the invocation log only) and never `JSON.stringify` with a key list. A token or grant is
+  spent with a conditional update (`updateMany` where `consumedAt: null`, then check `count`), never a read then an
+  unconditional `update`, so two racing retries cannot both run. A step-up is marked only on an open row (unused,
+  unexpired). `hitl_challenges` rows are deleted 24 hours after `expiresAt` by the data-retention job.
 - `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
   `_confirmToken` documented. Never build a tool's input schema another way.
 - Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients
