@@ -1556,6 +1556,112 @@
         ],
         "type": "object"
       },
+      "AgentAction": {
+        "properties": {
+          "approvalRequired": {
+            "type": "boolean"
+          },
+          "args": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "argsRedacted": {
+            "type": "boolean"
+          },
+          "caller": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "oauth_client",
+                  "api_key"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "label"
+            ],
+            "type": "object"
+          },
+          "canDecide": {
+            "type": "boolean"
+          },
+          "canStepUp": {
+            "type": "boolean"
+          },
+          "decidedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "decidedBy": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "hasPinSet": {
+            "type": "boolean"
+          },
+          "onBehalfOf": {
+            "nullable": true,
+            "type": "string"
+          },
+          "scopeRequired": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "DENIED",
+              "EXPIRED",
+              "USED"
+            ],
+            "type": "string"
+          },
+          "stepUpRequired": {
+            "type": "boolean"
+          },
+          "tier": {
+            "enum": [
+              "standard",
+              "sensitive"
+            ],
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "tool",
+          "tier",
+          "scopeRequired",
+          "status",
+          "stepUpRequired",
+          "approvalRequired",
+          "caller",
+          "onBehalfOf",
+          "args",
+          "argsRedacted",
+          "expiresAt",
+          "decidedAt",
+          "decidedBy",
+          "canDecide",
+          "canStepUp",
+          "hasPinSet"
+        ],
+        "type": "object"
+      },
       "AgentActivityPage": {
         "properties": {
           "counts": {
@@ -1686,6 +1792,17 @@
           "items",
           "nextCursor",
           "total"
+        ],
+        "type": "object"
+      },
+      "AgentPolicy": {
+        "properties": {
+          "selfConfirm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selfConfirm"
         ],
         "type": "object"
       },
@@ -8235,61 +8352,6 @@
         ],
         "type": "object"
       },
-      "HitlChallengeContext": {
-        "properties": {
-          "callerKind": {
-            "type": "string"
-          },
-          "callerLabel": {
-            "type": "string"
-          },
-          "consumed": {
-            "type": "boolean"
-          },
-          "expired": {
-            "type": "boolean"
-          },
-          "expiresAt": {
-            "type": "string"
-          },
-          "hasPinSet": {
-            "type": "boolean"
-          },
-          "requiresStepUp": {
-            "type": "boolean"
-          },
-          "scopeRequired": {
-            "type": "string"
-          },
-          "stepUpCompleted": {
-            "type": "boolean"
-          },
-          "tier": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "token",
-          "tool",
-          "tier",
-          "scopeRequired",
-          "callerLabel",
-          "callerKind",
-          "expiresAt",
-          "requiresStepUp",
-          "stepUpCompleted",
-          "consumed",
-          "expired",
-          "hasPinSet"
-        ],
-        "type": "object"
-      },
       "HitlStepUpResult": {
         "properties": {
           "status": {
@@ -12822,6 +12884,18 @@
             "type": "number"
           }
         },
+        "type": "object"
+      },
+      "UpdateAgentPolicyDto": {
+        "properties": {
+          "selfConfirm": {
+            "description": "True lets external agents confirm their own standard writes by repeating the call with the token. False (default) makes each one wait for a person to approve it in the app. A sensitive write always needs the PIN.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selfConfirm"
+        ],
         "type": "object"
       },
       "UpdateAiBudgetDto": {
@@ -18113,6 +18187,147 @@
         ]
       }
     },
+    "/api/v1/agent-actions/{token}": {
+      "get": {
+        "operationId": "AgentActionsController_get",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "An external agent's write waiting for (or past) a person: the tool, the caller, and what it will run",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
+    "/api/v1/agent-actions/{token}/approve": {
+      "post": {
+        "operationId": "AgentActionsController_approve",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a standard write: the agent may run it once, with exactly these arguments",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
+    "/api/v1/agent-actions/{token}/deny": {
+      "post": {
+        "operationId": "AgentActionsController_deny",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deny a write (standard or sensitive): the agent cannot run it",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
     "/api/v1/agent-activity": {
       "get": {
         "operationId": "AgentActivityController_list",
@@ -18222,6 +18437,88 @@
         "summary": "List agent invocation activity for a principal (redacted args)",
         "tags": [
           "Agent Activity"
+        ]
+      }
+    },
+    "/api/v1/agent-policy": {
+      "get": {
+        "operationId": "AgentActionsController_getPolicy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPolicy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether external agents confirm their own standard writes or wait for a person (default)",
+        "tags": [
+          "Agent Actions"
+        ]
+      },
+      "put": {
+        "operationId": "AgentActionsController_setPolicy",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentPolicyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPolicy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Let external agents confirm their own standard writes, or put human approval back",
+        "tags": [
+          "Agent Actions"
         ]
       }
     },
@@ -24242,54 +24539,6 @@
         "summary": "MCP endpoint for API-key principals",
         "tags": [
           "MCP"
-        ]
-      }
-    },
-    "/api/v1/mcp/hitl/{token}": {
-      "get": {
-        "description": "Returns redacted args, the calling principal label, expiry, and whether the user has a PIN set. The PIN itself is never returned. Tenant-scoped.",
-        "operationId": "HitlStepUpController_getContext",
-        "parameters": [
-          {
-            "description": "HITL challenge token returned by the prior tools/call attempt",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HitlChallengeContext"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            },
-            "description": "An error: the API error envelope; `code` says what happened"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Fetch context for a pending HITL challenge (for the approval UI)",
-        "tags": [
-          "MCP HITL"
         ]
       }
     },
