@@ -61,12 +61,25 @@ describe('ToolExecutorService', () => {
       _userId: 'user_demo_owner',
       _userDbId: 42,
       _role: 'MEMBER',
+      _conversationId: null,
     });
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: 42 },
       select: { userId: true },
     });
     expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+  });
+
+  it("injects _conversationId from a chat principal, last, so a caller's copy never wins", async () => {
+    const ToolClass = class {};
+    mockScopeRegistry.resolveProvider.mockReturnValue({ providerClass: ToolClass, methodName: 'run' });
+    const instance = { run: jest.fn().mockResolvedValue('ok') };
+    mockModuleRef.get.mockReturnValue(instance);
+    const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_mine' });
+
+    await svc.execute('x', { _conversationId: 'conv_other' }, principal, { role: 'MEMBER' });
+
+    expect(instance.run.mock.calls[0][0]._conversationId).toBe('conv_mine');
   });
 
   it('injects _userId: null when the user row cannot be resolved', async () => {
@@ -108,15 +121,19 @@ describe('ToolExecutorService', () => {
     mockModuleRef.get.mockReturnValue(instance);
     const principal = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
 
-    await svc.execute('x', { _tenantId: 999, _userId: 'someone-else', _userDbId: 1, _role: 'OWNER' }, principal, {
-      role: 'MEMBER',
-    });
+    await svc.execute(
+      'x',
+      { _tenantId: 999, _userId: 'someone-else', _userDbId: 1, _role: 'OWNER', _conversationId: 'conv_other' },
+      principal,
+      { role: 'MEMBER' },
+    );
 
     expect(instance.run).toHaveBeenCalledWith({
       _tenantId: 7,
       _userId: 'user_demo_owner',
       _userDbId: 42,
       _role: 'MEMBER',
+      _conversationId: null,
     });
   });
 

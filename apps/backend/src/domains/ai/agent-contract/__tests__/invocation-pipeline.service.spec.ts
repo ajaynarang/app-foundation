@@ -35,6 +35,7 @@ const mockLogger = {
 const mockChallenges = {
   issue: jest.fn(),
   consume: jest.fn(),
+  consumeChatGrant: jest.fn(),
 };
 
 describe('InvocationPipelineService', () => {
@@ -45,6 +46,7 @@ describe('InvocationPipelineService', () => {
     mockHitl.tokenTtlSeconds.mockReturnValue(300);
     mockChallenges.issue.mockReset();
     mockChallenges.consume.mockReset();
+    mockChallenges.consumeChatGrant.mockReset();
     mockRegistry.parametersForTool.mockReturnValue(undefined);
     mockPolicy.actingRole.mockResolvedValue('MEMBER');
     mockPolicy.checkRole.mockReturnValue(null);
@@ -268,21 +270,89 @@ describe('InvocationPipelineService', () => {
     expect(mockLogger.writePending).not.toHaveBeenCalled();
   });
 
-  it('does not call challenges.issue/consume for user principals (chat stays on inline-confirm UI path)', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('platform:write');
-    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
-    mockHitl.resolveTier.mockReturnValue('standard');
-    mockLogger.writePending.mockResolvedValue('row-1');
-    mockExecutor.execute.mockResolvedValue({
-      content: [{ type: 'text', text: 'sent' }],
+  describe('chat grants (item 8b): a signed-in user writes only against a confirmed card', () => {
+    const schema = z.object({ subject: z.string(), detail: z.object({ amount: z.number() }) });
+    const args = { subject: 'Printer', detail: { amount: 5 } };
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['create-thing']));
+      mockRegistry.parametersForTool.mockReturnValue(schema);
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockLogger.writePending.mockResolvedValue('row-1');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'created' }] });
     });
 
-    const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
-    await svc.run(p, 'send-invoice', { id: 1 });
+    it('a write with no grant answers confirmation_required, changes nothing and logs nothing', async () => {
+      mockChallenges.consumeChatGrant.mockResolvedValue(null);
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
 
-    expect(mockChallenges.issue).not.toHaveBeenCalled();
-    expect(mockChallenges.consume).not.toHaveBeenCalled();
-    expect(mockExecutor.execute).toHaveBeenCalled();
+      const res = await svc.run(p, 'create-thing', args);
+
+      expect(res.isError).toBeFalsy();
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ status: 'confirmation_required', tool: 'create-thing' });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+    });
+
+    it('a user principal outside a conversation can never write, and no grant is even looked for', async () => {
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
+
+      const res = await svc.run(p, 'create-thing', args);
+
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ status: 'confirmation_required' });
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('spends the grant for this conversation, tool and exact digest, then runs and records the grant on the audit row', async () => {
+      mockChallenges.consumeChatGrant.mockResolvedValue('77');
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      const res = await svc.run(p, 'create-thing', { ...args, _tenantId: 999 });
+
+      expect(mockChallenges.consumeChatGrant).toHaveBeenCalledWith({
+        tenantId: 7,
+        userId: 42,
+        conversationId: 'conv_a',
+        toolName: 'create-thing',
+        argsDigest: intentDigest(schema, args),
+      });
+      expect(mockLogger.writePending).toHaveBeenCalledWith(expect.objectContaining({ confirmationTokenId: '77' }));
+      expect(res.content[0].text).toBe('created');
+      // The chat path never issues or replays a third-party challenge.
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+    });
+
+    it('a read needs no grant', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockHitl.resolveTier.mockReturnValue('none');
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      await svc.run(p, 'create-thing', args);
+
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('preflight runs steps 1 to 4 only: no grant is spent, nothing is logged or run', async () => {
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      expect(await svc.preflight(p, 'create-thing', args)).toBeNull();
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('preflight returns the refusal the pipeline would give (a role refusal), so no card is raised for it', async () => {
+      const denial = { content: [{ type: 'text', text: JSON.stringify({ status: 'role_not_permitted' }) }] };
+      mockPolicy.checkRole.mockReturnValue(denial);
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      expect(await svc.preflight(p, 'create-thing', args)).toBe(denial);
+    });
   });
 
   describe('arguments (step 2)', () => {
@@ -435,7 +505,14 @@ describe('InvocationPipelineService', () => {
       mockLogger.writePending.mockResolvedValue('row-o');
       mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'voided' }] });
       prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'OWNER' });
-      const chat = fromUser({ userId: 4, tenantId: 9, role: 'OWNER', scopes: scopesForRole('OWNER') });
+      mockChallenges.consumeChatGrant.mockResolvedValue('5');
+      const chat = fromUser({
+        userId: 4,
+        tenantId: 9,
+        role: 'OWNER',
+        scopes: scopesForRole('OWNER'),
+        conversationId: 'conv_o',
+      });
 
       const res = await real.run(chat, 'void-invoice', { id: 1 });
 

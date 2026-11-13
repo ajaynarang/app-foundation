@@ -8,7 +8,8 @@ export type HitlTier = 'none' | 'standard' | 'sensitive';
 export class HitlPolicyService {
   /**
    * Resolve the HITL tier of a call from the tool's scope. Every principal kind gets the same tier; what differs is
-   * who confirms. The pipeline challenges a third-party agent, a chat user confirms through `confirm-action`, and a
+   * who confirms. The pipeline challenges a third-party agent, a chat user confirms a card raised by `confirm-action`
+   * (the pipeline spends that grant), and a
    * Desk duty is never challenged by the pipeline (Desk's gate step runs before every execute and gates by this same
    * tier). The tier is recorded on the audit row for every kind, Desk included.
    */

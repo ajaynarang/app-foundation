@@ -68,7 +68,7 @@ describe('example tool pair through the whole pipeline', () => {
   };
   const plans = { getTenantPlan: jest.fn(), isFeatureEnabled: jest.fn() };
   const audit = { writePending: jest.fn(), completeSuccess: jest.fn(), completeError: jest.fn() };
-  const challenges = { issue: jest.fn(), consume: jest.fn() };
+  const challenges = { issue: jest.fn(), consume: jest.fn(), consumeChatGrant: jest.fn() };
   let pipeline: InvocationPipelineService;
 
   beforeAll(async () => {
@@ -103,11 +103,19 @@ describe('example tool pair through the whole pipeline', () => {
     audit.writePending.mockResolvedValue('row-1');
     support.createTicket.mockResolvedValue(TICKET);
     support.listTicketsForTenant.mockResolvedValue({ items: [TICKET], nextCursor: null, total: 1 });
+    // The member in chat has confirmed the card for the write under test, unless a case says otherwise.
+    challenges.consumeChatGrant.mockResolvedValue('grant-1');
   });
 
   const body = (res: { content: Array<{ text: string }> }) => JSON.parse(res.content[0].text);
   const member = () =>
-    fromUser({ userId: 5, tenantId: 7, role: 'MEMBER', scopes: ['platform:read', 'platform:write'] });
+    fromUser({
+      userId: 5,
+      tenantId: 7,
+      role: 'MEMBER',
+      scopes: ['platform:read', 'platform:write'],
+      conversationId: 'conv_1',
+    });
   const agent = () =>
     fromOAuthUser({ onBehalfOfUserDbId: 5, tenantDbId: 7, role: 'ADMIN', scopes: ['platform:write'], clientId: 'c' });
   const createArgs = { subject: 'Printer on fire', description: 'Smoke from tray 2' };
@@ -163,6 +171,23 @@ describe('example tool pair through the whole pipeline', () => {
     // The digest the replay is checked against is the one the challenge was issued for.
     expect(challenges.consume.mock.calls[0][1].argsDigest).toBe(challenges.issue.mock.calls[0][0].argsDigest);
     expect(body(second)).toMatchObject({ created: true, ticket: { ticketNumber: 'ST-1001' } });
+  });
+
+  it('step 5, confirmation in chat: a member writes only against the card they confirmed for these exact arguments', async () => {
+    challenges.consumeChatGrant.mockResolvedValue(null);
+    const unconfirmed = await pipeline.run(member(), 'create-support-ticket', createArgs);
+    expect(body(unconfirmed)).toMatchObject({ status: 'confirmation_required', tool: 'create-support-ticket' });
+    expect(support.createTicket).not.toHaveBeenCalled();
+    expect(audit.writePending).not.toHaveBeenCalled();
+
+    challenges.consumeChatGrant.mockResolvedValue('grant-1');
+    const confirmed = await pipeline.run(member(), 'create-support-ticket', createArgs);
+    expect(challenges.consumeChatGrant).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tenantId: 7, userId: 5, conversationId: 'conv_1', toolName: 'create-support-ticket' }),
+    );
+    expect(body(confirmed)).toMatchObject({ created: true });
+    expect(audit.writePending).toHaveBeenCalledWith(expect.objectContaining({ confirmationTokenId: 'grant-1' }));
+    expect(challenges.issue).not.toHaveBeenCalled();
   });
 
   it('step 6, audit and execute: the write is logged at its tier and runs with the server identity only', async () => {

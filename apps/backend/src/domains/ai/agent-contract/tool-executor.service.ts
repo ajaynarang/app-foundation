@@ -58,6 +58,8 @@ export class ToolExecutorService {
       _userId: userIdString,
       _userDbId: userDbId,
       _role: context.role ?? null,
+      // The chat conversation a call belongs to, from the principal: null outside chat, never the caller's copy.
+      _conversationId: principal.kind === 'user' ? (principal.conversationId ?? null) : null,
     };
 
     try {
