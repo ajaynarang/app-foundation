@@ -2059,6 +2059,26 @@
           "timestamp": {
             "description": "ISO-8601",
             "type": "string"
+          },
+          "workspaces": {
+            "description": "Only on 409 WORKSPACE_SELECTION_REQUIRED: retry the sign-in with one of these tenantIds",
+            "items": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "tenantId": {
+                  "description": "The tenant's public id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenantId",
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -8345,6 +8365,11 @@
           "email": {
             "example": "owner@example.com",
             "type": "string"
+          },
+          "tenantId": {
+            "description": "Limit the reset to one workspace: the tenant's public id, which the web form sends from a tenant subdomain. Without it, every account on this email gets its own link.",
+            "example": "ten_acme",
+            "type": "string"
           }
         },
         "required": [
@@ -10336,6 +10361,11 @@
           },
           "password": {
             "type": "string"
+          },
+          "tenantId": {
+            "description": "The workspace to sign in to: the tenant's public id, which the web form sends from a tenant subdomain. Only accounts in that workspace are considered.",
+            "example": "ten_acme",
+            "type": "string"
           }
         },
         "required": [
@@ -10375,6 +10405,11 @@
             "type": "string"
           },
           "pin": {
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "The workspace to sign in to: the tenant's public id, which the web form sends from a tenant subdomain. Only accounts in that workspace are considered.",
+            "example": "ten_acme",
             "type": "string"
           }
         },
@@ -10996,6 +11031,11 @@
       "SendOtpDto": {
         "properties": {
           "phone": {
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "The workspace to sign in to: the tenant's public id, which the web form sends from a tenant subdomain. Only accounts in that workspace are considered.",
+            "example": "ten_acme",
             "type": "string"
           }
         },
@@ -12417,9 +12457,14 @@
           "logoUrl": {
             "nullable": true,
             "type": "string"
+          },
+          "tenantId": {
+            "description": "The tenant's public id — the login form's workspace hint",
+            "type": "string"
           }
         },
         "required": [
+          "tenantId",
           "companyName",
           "logoUrl"
         ],
@@ -14257,6 +14302,26 @@
             "type": "string"
           },
           "phone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone",
+          "code"
+        ],
+        "type": "object"
+      },
+      "VerifyOtpLoginDto": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "The workspace to sign in to: the tenant's public id, which the web form sends from a tenant subdomain. Only accounts in that workspace are considered.",
+            "example": "ten_acme",
             "type": "string"
           }
         },
@@ -19408,6 +19473,16 @@
             },
             "description": ""
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "WORKSPACE_SELECTION_REQUIRED: choose one of `workspaces` and retry"
+          },
           "default": {
             "content": {
               "application/json": {
@@ -19419,7 +19494,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "First-party email + password login",
+        "summary": "First-party email + password login; 409 WORKSPACE_SELECTION_REQUIRED (with `workspaces`) when the password matches accounts in several workspaces — retry with one `tenantId`",
         "tags": [
           "Authentication"
         ]
@@ -19819,7 +19894,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VerifyOtpDto"
+                "$ref": "#/components/schemas/VerifyOtpLoginDto"
               }
             }
           },

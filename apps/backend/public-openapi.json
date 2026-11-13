@@ -35,6 +35,26 @@
           "timestamp": {
             "description": "ISO-8601",
             "type": "string"
+          },
+          "workspaces": {
+            "description": "Only on 409 WORKSPACE_SELECTION_REQUIRED: retry the sign-in with one of these tenantIds",
+            "items": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "tenantId": {
+                  "description": "The tenant's public id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenantId",
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
