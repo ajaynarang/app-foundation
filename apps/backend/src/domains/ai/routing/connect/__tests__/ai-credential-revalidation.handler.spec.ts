@@ -126,15 +126,15 @@ describe('AiCredentialRevalidationHandler (the daily sweep)', () => {
     const { handler, prisma, connect, job } = setup(rows(3), { probeMs: 10 });
     const listed: unknown[] = [];
     const tested: Array<[number, unknown]> = [];
-    const list = prisma.aiCredential.findMany.getMockImplementation()!;
+    const list = prisma.aiCredential.findMany.getMockImplementation();
     prisma.aiCredential.findMany.mockImplementation(async (args: any) => {
       listed.push(currentRls());
       return list(args);
     });
-    connect.validate.mockImplementation(async (tenantId: number) => {
+    connect.validate.mockImplementation((async (tenantId: number) => {
       tested.push([tenantId, currentRls()]);
       return { probe: { ok: true } };
-    });
+    }) as never);
     await handler.run(job());
     expect(listed).toEqual([{ kind: 'system', reason: 'cron.ai-credential-revalidate' }]);
     expect(tested).toEqual(
