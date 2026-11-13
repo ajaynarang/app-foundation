@@ -4,6 +4,8 @@ import type { Deadline, Prisma } from '@appshore/db';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { RLS_SOURCE, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 import { PrismaService } from '../database/prisma.service';
 import { DeadlineHandlerRegistry } from './deadline-handler.registry';
 import { DEADLINE_HANDLERS, PENDING_DEADLINE, type DeadlineOutcome } from './deadline.types';
@@ -60,6 +62,9 @@ export function deadlineBackoffMs(attempts: number): number {
  * records its outcome. A handler that throws or times out (or a kind with no handler) leaves
  * `lastError` and a capped backoff; the row is retried until it resolves, because a lapse is never
  * forgiven by a broken handler. Rows are isolated: one failure never blocks another.
+ *
+ * Tenant context: the sweep is declared system work (`deadline-sweep`), because it claims rows of every tenant; each
+ * handler runs as its row's tenant (`runAsTenant`), and the outcome is recorded back in the system scope.
  */
 @Injectable()
 export class DeadlineSweeper implements QueueJobHandler {
@@ -75,7 +80,11 @@ export class DeadlineSweeper implements QueueJobHandler {
     return withJobContext(job, () => this.sweep());
   }
 
-  async sweep(): Promise<DeadlineSweepSummary> {
+  sweep(): Promise<DeadlineSweepSummary> {
+    return systemScope('deadline-sweep', () => this.sweepAll());
+  }
+
+  private async sweepAll(): Promise<DeadlineSweepSummary> {
     const summary: DeadlineSweepSummary = {
       claimed: 0,
       fired: 0,
@@ -129,7 +138,8 @@ export class DeadlineSweeper implements QueueJobHandler {
     }
     let outcome: DeadlineOutcome;
     try {
-      outcome = await withTimeout(handler.fire(row), DEADLINE_HANDLER_TIMEOUT_MS);
+      const fire = runAsTenant(row.tenantId, `${RLS_SOURCE.DEADLINE}:${row.kind}`, () => handler.fire(row));
+      outcome = await withTimeout(fire, DEADLINE_HANDLER_TIMEOUT_MS);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Deadline ${row.id} (${row.kind}) handler threw on attempt ${row.attempts}: ${message}`);

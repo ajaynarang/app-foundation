@@ -1,4 +1,5 @@
 import type { Job } from 'bullmq';
+import { currentRls, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { DeadlineHandlerRegistry } from '../deadline-handler.registry';
 import {
@@ -102,6 +103,55 @@ describe('DeadlineSweeper', () => {
     expect((leaseUntil as Date).getTime() - (now as Date).getTime()).toBe(DEADLINE_LEASE_MS);
     expect((now as Date).getTime()).toBeGreaterThanOrEqual(before);
     expect(limit).toBe(DEADLINE_SWEEP_BATCH_SIZE);
+  });
+
+  describe('tenant context', () => {
+    it('claims in the deadline-sweep system scope', async () => {
+      const scopes: unknown[] = [];
+      prisma.$queryRaw.mockImplementation(async () => {
+        scopes.push(currentRls());
+        return [];
+      });
+
+      await sweeper.sweep();
+
+      expect(scopes).toEqual([{ kind: 'system', reason: 'deadline-sweep' }]);
+    });
+
+    it("runs each handler as its row's tenant, and records the outcome back in the system scope", async () => {
+      const seen: unknown[] = [];
+      registry.register({
+        kind: 'TEST_KIND',
+        fire: jest.fn(async () => {
+          await new Promise((resolve) => setImmediate(resolve));
+          seen.push(currentRls());
+          return { outcome: 'fired' as const };
+        }),
+      });
+      const stampScopes: unknown[] = [];
+      prisma.deadline.updateMany.mockImplementation(async () => {
+        stampScopes.push(currentRls());
+        return { count: 1 };
+      });
+      prisma.$queryRaw.mockResolvedValueOnce([
+        claimed({ id: 'dl-1', tenantId: 4 }),
+        claimed({ id: 'dl-2', tenantId: 9 }),
+      ]);
+
+      await sweeper.sweep();
+
+      expect(seen).toEqual([
+        { kind: 'tenant', tenantId: 4, source: 'deadline:TEST_KIND' },
+        { kind: 'tenant', tenantId: 9, source: 'deadline:TEST_KIND' },
+      ]);
+      expect(new Set(stampScopes.map((s) => JSON.stringify(s)))).toEqual(
+        new Set([JSON.stringify({ kind: 'system', reason: 'deadline-sweep' })]),
+      );
+    });
+
+    it('refuses to run inside a tenant request (strict mode)', async () => {
+      await expect(runAsTenant(7, 'jwt', () => sweeper.sweep())).rejects.toThrow(/system scope \(deadline-sweep\)/);
+    });
   });
 
   it('stamps firedAt and releases the lease when the handler fires', async () => {

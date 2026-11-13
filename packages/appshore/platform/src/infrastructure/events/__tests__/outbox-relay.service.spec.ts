@@ -1,4 +1,6 @@
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { Logger } from '@nestjs/common';
+import { currentRls, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import {
   OUTBOX_RELAY_BATCH,
@@ -45,8 +47,9 @@ describe('OutboxRelay', () => {
     prisma.outboxEvent.updateMany.mockResolvedValue({ count: 0 });
     prisma.outboxEvent.update.mockResolvedValue({});
     const events = { publish: jest.fn().mockResolvedValue(undefined) };
-    const relay = new OutboxRelay(prisma as never, events as never);
-    return { prisma, events, relay };
+    const tenants = { resolveToDbId: jest.fn().mockResolvedValue(null) };
+    const relay = new OutboxRelay(prisma as never, events as never, tenants as never);
+    return { prisma, events, relay, tenants };
   }
 
   it('waits out the longest outbox transaction before calling a row abandoned (occurredAt is stamped at staging)', () => {
@@ -192,6 +195,92 @@ describe('OutboxRelay', () => {
     it('is quiet when there is nothing to do', async () => {
       const { relay } = make();
       expect(await relay.tick()).toEqual({ claimed: 0, published: 0, failed: 0, purged: 0 });
+    });
+  });
+
+  describe('tenant context', () => {
+    /** Records the context each publish runs in. */
+    function recordPublishes(events: { publish: jest.Mock }) {
+      const seen: Array<{ id: string; ctx: unknown }> = [];
+      events.publish.mockImplementation(async (event: { id: string }) => {
+        await new Promise((resolve) => setImmediate(resolve));
+        seen.push({ id: event.id, ctx: currentRls() });
+      });
+      return seen;
+    }
+
+    it('claims and purges in the outbox-relay system scope', async () => {
+      const { prisma, relay } = make();
+      const scopes: unknown[] = [];
+      prisma.$queryRaw.mockImplementation(async () => {
+        scopes.push(currentRls());
+        return [];
+      });
+      prisma.$executeRaw.mockImplementation(async () => {
+        scopes.push(currentRls());
+        return 0;
+      });
+
+      await relay.tick(now);
+
+      expect(scopes).toEqual([
+        { kind: 'system', reason: 'outbox-relay' },
+        { kind: 'system', reason: 'outbox-relay' },
+      ]);
+    });
+
+    it("publishes each event as its emitter's tenant, a numeric id or a public id resolved to one", async () => {
+      const { prisma, events, relay, tenants } = make();
+      prisma.$queryRaw.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      prisma.outboxEvent.findMany.mockResolvedValue([
+        row('a', '2026-10-09T11:00:00Z', { tenantId: '10' }),
+        row('b', '2026-10-09T11:01:00Z', { tenantId: 'acme-co' }),
+      ]);
+      tenants.resolveToDbId.mockResolvedValue(12);
+      const seen = recordPublishes(events);
+
+      await relay.tick(now);
+
+      expect(tenants.resolveToDbId).toHaveBeenCalledWith('acme-co');
+      expect(seen).toEqual([
+        { id: 'a', ctx: { kind: 'tenant', tenantId: 10, source: 'event:app.widget.expired' } },
+        { id: 'b', ctx: { kind: 'tenant', tenantId: 12, source: 'event:app.widget.expired' } },
+      ]);
+    });
+
+    it('publishes an event with no tenant in the public scope', async () => {
+      const { prisma, events, relay } = make();
+      prisma.$queryRaw.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      prisma.outboxEvent.findMany.mockResolvedValue([
+        row('a', '2026-10-09T11:00:00Z', { tenantId: '' }),
+        row('b', '2026-10-09T11:01:00Z', { tenantId: 'system' }),
+      ]);
+      const seen = recordPublishes(events);
+
+      await relay.tick(now);
+
+      expect(seen.map((s) => s.ctx)).toEqual([
+        { kind: 'public', source: 'event:app.widget.expired' },
+        { kind: 'public', source: 'event:app.widget.expired' },
+      ]);
+    });
+
+    it('publishes an event whose public id names no tenant with no context, and warns', async () => {
+      const { prisma, events, relay } = make();
+      prisma.$queryRaw.mockResolvedValue([{ id: 'a' }]);
+      prisma.outboxEvent.findMany.mockResolvedValue([row('a', '2026-10-09T11:00:00Z', { tenantId: 'gone-co' })]);
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const seen = recordPublishes(events);
+
+      expect(await relay.relay(now)).toEqual({ claimed: 1, published: 1, failed: 0 });
+      expect(seen).toEqual([{ id: 'a', ctx: undefined }]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('names no known tenant'));
+      warn.mockRestore();
+    });
+
+    it('refuses to run inside a tenant request (strict mode)', async () => {
+      const { relay } = make();
+      await expect(runAsTenant(7, 'jwt', () => relay.tick(now))).rejects.toThrow(/system scope \(outbox-relay\)/);
     });
   });
 });
