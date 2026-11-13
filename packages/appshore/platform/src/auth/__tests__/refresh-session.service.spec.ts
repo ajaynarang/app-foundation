@@ -1,4 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { RefreshSessionService, type RefreshSession } from '../refresh-session.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -130,6 +131,39 @@ describe('RefreshSessionService', () => {
         failReason: 'refresh_reuse',
       });
       expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: 'auth.refresh_reuse', familyId: 'rt_1' }));
+    });
+
+    it('reports a reuse to the error tracker at warning level, ids only', async () => {
+      const retiredAt = new Date(Date.now() - 60_000);
+      prisma.refreshToken.findUnique.mockResolvedValue(
+        makeRow({ isRevoked: true, revokedAt: retiredAt, rotatedAt: retiredAt, tenantId: tenantY.id }),
+      );
+      jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+      const report = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+
+      await expect(validate()).rejects.toThrow(UnauthorizedException);
+
+      expect(report).toHaveBeenCalledTimes(1);
+      const [err, tags, options] = report.mock.calls[0];
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).name).toBe('RefreshTokenReuseError');
+      expect(tags).toEqual({ tenantDbId: tenantY.id, source: 'http' });
+      expect(options).toEqual({ level: 'warning' });
+      expect(JSON.stringify({ message: (err as Error).message, tags })).not.toContain('stored-hash');
+      report.mockRestore();
+    });
+
+    it('does not report a token presented within the grace window', async () => {
+      const retiredAt = new Date(Date.now() - 2_000);
+      prisma.refreshToken.findUnique.mockResolvedValue(
+        makeRow({ isRevoked: true, revokedAt: retiredAt, rotatedAt: retiredAt }),
+      );
+      const report = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+
+      await expect(validate()).rejects.toThrow(UnauthorizedException);
+
+      expect(report).not.toHaveBeenCalled();
+      report.mockRestore();
     });
 
     it('a retired token presented within the grace window gets a plain 401 and the family survives', async () => {

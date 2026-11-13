@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { AiBudgetState, AiPayer } from '@app/shared-types';
 import { AiBudgetExceededError } from './ai-budget-exceeded.error';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
 
 /** No platform cap was hit (the provider said no), so the state carries no spend figures. */
 const PROVIDER_REFUSED_STATE: AiBudgetState = {
@@ -56,13 +57,20 @@ const logger = new Logger('AiProviderCreditRefused');
 /**
  * The one place a credit refusal on a PLATFORM-paid route is reported: at error level, because it follows the budget
  * path (a 402, not a 5xx) and so would otherwise reach no alert. On `platform-openrouter` it usually means the
- * platform's OpenRouter balance ran out or, with a per-workspace sub-key, that the workspace spent its monthly cap. The error tracker's call goes here when one is added. A refusal on a
+ * platform's OpenRouter balance ran out or, with a per-workspace sub-key, that the workspace spent its monthly cap. It is also
+ * reported to the error tracker here, the one place all the catch blocks reach. A refusal on a
  * workspace's own key is the workspace's to fix and is not logged as a platform fault.
  */
-export function logPlatformCreditRefusal(route: { payer: AiPayer; routeId: string }, tenantId: number | null): void {
+export function logPlatformCreditRefusal(
+  route: { payer: AiPayer; routeId: string },
+  tenantId: number | null,
+  error: unknown,
+): void {
   if (route.payer !== 'PLATFORM') return;
   const whose = tenantId === null ? 'platform content' : `workspace ${tenantId}`;
   logger.error(`Provider refused a platform-paid call for credit on ${route.routeId} (${whose})`);
+  // Not a 5xx, so the envelope writer never reports it: this is its one tracker call (source `ai`).
+  reportError(error, { ...(tenantId === null ? {} : { tenantDbId: tenantId }), source: ERROR_SOURCE.AI });
 }
 
 /**
@@ -76,7 +84,7 @@ export function mapProviderRefusal(
   route: { payer: AiPayer; routeId: string; reportCreditRefusal?: (detail: string) => void },
 ): unknown {
   if (!isProviderCreditRefusal(error)) return error;
-  logPlatformCreditRefusal(route, tenantId);
+  logPlatformCreditRefusal(route, tenantId, error);
   if (route.payer === 'TENANT') route.reportCreditRefusal?.(refusalText(error));
   return new AiProviderCreditRefused(tenantId);
 }

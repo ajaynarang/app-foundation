@@ -6,6 +6,15 @@ import { JwtTokenService, type AuthMethod } from './jwt.service';
 import { LoginEventService } from './login-event.service';
 import type { UserProfileDto } from './dto/login.dto';
 import { toUserProfile } from './user-profile';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
+
+/** The error-tracker issue for a reused refresh token. It names no token, user or address: ids ride as tags. */
+class RefreshTokenReuseError extends Error {
+  override readonly name = 'RefreshTokenReuseError';
+  constructor() {
+    super('A retired refresh token was presented again; the session was revoked');
+  }
+}
 
 /** What the refresh guard puts on the request: the presented token's session. */
 export interface RefreshSession {
@@ -203,6 +212,12 @@ export class RefreshSessionService {
       tokenId: row.tokenId,
       userDbId: row.userId,
     });
+    // A possible stolen token: one warning-level issue in the tracker (the log line alone reaches no one).
+    reportError(
+      new RefreshTokenReuseError(),
+      { tenantDbId: row.tenantId ?? undefined, source: ERROR_SOURCE.HTTP },
+      { level: 'warning' },
+    );
   }
 
   /** The `authMethod` claim of an already-verified refresh token, carried onto its successor. */
