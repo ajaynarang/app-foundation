@@ -11,6 +11,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshJwtStrategy } from './strategies/refresh-jwt.strategy';
 import { RefreshSessionService } from './refresh-session.service';
 import { IdentityResolverService } from './identity-resolver.service';
+import { EmailUniquenessCheck } from './email-uniqueness.check';
 import { FirebaseAuthService } from './firebase-auth.service';
 import { PinService } from './pin.service';
 import { PrismaModule } from '../infrastructure/database/prisma.module';
@@ -43,6 +44,7 @@ import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-enve
     JwtTokenService,
     RefreshSessionService,
     IdentityResolverService,
+    EmailUniquenessCheck,
     JwtStrategy,
     RefreshJwtStrategy,
     FirebaseAuthService,
