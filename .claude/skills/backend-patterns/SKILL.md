@@ -1899,6 +1899,19 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   without a `conversationId` can never write. A chat grant is never a challenge token: `consume` and
   `markStepUpCompleted` read only rows with no conversation. A delegated sub-agent gets a read-only toolset
   (`{ readOnly: true }`: no write, no `confirm-action`).
+- **External agents wait for a person.** A third-party standard write is issued as an approval request
+  (`approvalRequired`, the parsed `argsPreview`) and answers `approval_required` with `approvalUrl`
+  (`agentActionWebPath`, on `APP_URL` read through `ConfigService`); it runs only after a person approves it at
+  `POST /agent-actions/:token/approve` and the agent replays the token. The owner's `Tenant.agentSelfConfirm`
+  (`PUT /agent-policy`) switches standard writes back to self-confirm. A sensitive write always needs the PIN of the
+  person acted for (`POST /mcp/hitl/:token/step-up`), whatever the policy: it is never an approval row, the Approve
+  route refuses it, and it stores only `argsRedacted`. `consume` refuses without spending: `pending` (not approved,
+  or no PIN yet), `denied`, `invalid`; the pipeline answers `approval_pending` / `approval_denied` /
+  `hitl_invalid_or_expired`. A decision is a conditional `updateMany` on still-pending, raised with its event in the
+  same `OutboxService.transaction`. Only the person acted for or a workspace owner or admin reads a request
+  (`GET /agent-actions/:token`, 404 across workspaces); `argsPreview` may hold personal data, so it is never logged
+  or put in an event, and it is nulled when the request is spent or denied. These routes take a person's session
+  (JWT and `@Roles`); never open them to an agent credential.
 - `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
   `_confirmToken` documented. Never build a tool's input schema another way.
 - Agent rate limits (`AgentRateLimitGuard`): an OAuth client's budget is per client **and** person; OAuth clients

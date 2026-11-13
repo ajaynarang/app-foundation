@@ -773,7 +773,8 @@ rewrites the table on its next run.
   injects `_conversationId` (null outside chat) last in the spread, with the other server identity params.
 - A delegated sub-agent (`execute`) gets a read-only toolset: no write tool and no `confirm-action`.
 - A chat grant is never a challenge token: `consume`, `POST /mcp/hitl/:token/step-up` and `GET /mcp/hitl/:token`
-  read only rows with no conversation.
+  read only rows with no conversation. (Section 18 folds `GET /mcp/hitl/:token` into `GET /agent-actions/:token`,
+  which keeps the same rule.)
 - The web `ConfirmationCard` shows the exact arguments, offers Confirm and Cancel only on the card the agent is
   waiting on, and marks a card "no longer waiting" on a 409.
 
@@ -796,6 +797,64 @@ rewrites the table on its next run.
 **What to do.** Update product prompts that describe `confirm-action`'s inputs. Nothing else.
 
 **Rollback.** Revert the change. The three columns are nullable and can stay; old code ignores them.
+
+## 18. External agent writes wait for a person: the approval page and the self-confirm switch
+
+**What changed.**
+
+- An OAuth client or API key calling a standard write no longer self-confirms by default. It answers
+  `{"status":"approval_required","token","ttlSeconds","approvalUrl"}` and runs nothing. The person the agent acts
+  for, or an owner or admin of that workspace, opens `approvalUrl` (`APP_URL/agent-actions/<token>/approve`) and
+  approves or denies it. The agent then repeats the call with the same arguments plus `_confirmToken`, and it runs
+  once. A request waits up to an hour; after an approval the agent has at least 15 minutes to retry.
+- A retry the person has not decided yet answers `approval_pending` (with the link); a denied one answers
+  `approval_denied`. Neither spends the token. Unknown, expired, used or mismatched tokens still answer
+  `hitl_invalid_or_expired`.
+- A sensitive write still needs the PIN of the person the agent acts for, whatever the policy says. The same page
+  now serves it: the redacted arguments and a PIN field that posts to the unchanged `POST /mcp/hitl/:token/step-up`.
+  A person with no PIN set is sent to Settings > Profile and brought back after saving one. The Approve button never
+  unlocks a sensitive write; Deny works for both kinds. A retry before the PIN answers `approval_pending` (it was
+  `hitl_invalid_or_expired`).
+- `Tenant.agentSelfConfirm` (default false) is the owner's switch back to the old flow for standard writes
+  (`hitl_required` with no link; repeat the call with the token). `GET /agent-policy` (owner, admin) and
+  `PUT /agent-policy` (owner) read and set it; the owner's row is on Settings > AI Assistants.
+- New routes: `GET /agent-actions/:token` (the tool, tier, caller, the person acted for, the expiry, whether the
+  viewer has a PIN, and the arguments: the exact ones on an approval request, the redacted ones on a PIN request),
+  `POST /agent-actions/:token/approve`, `POST /agent-actions/:token/deny`. A second decision, or a decision on an
+  expired or used request, is 409. Only the person acted for or an owner or admin of the workspace may open a
+  request (403 for other members, 404 for another workspace).
+- Removed: `GET /mcp/hitl/:token`. `GET /agent-actions/:token` replaces it. No caller in the web app, the mobile app
+  or the QA suite used it.
+- The pipeline reads `APP_URL` through `ConfigService` for the link. With `APP_URL` unset, no `approvalUrl` is
+  sent.
+- `argsPreview` (the exact arguments an approver sees) may hold personal data. It is stored only on an approval
+  request, readable only by the people above, never logged, and set to null once the request is spent or denied.
+  The challenge row itself is deleted a day after it expires (section 16).
+- Events: `AGENT_ACTION_APPROVED`, `AGENT_ACTION_DENIED` and `WORKSPACE_AGENT_POLICY_CHANGED` (external; webhook
+  subscribers can receive them). They carry the token, tool and caller name, or the new policy; never the
+  arguments.
+
+**Env.** No new variable. `APP_URL` (already read for email and invitation links, and in `apps/backend/.env.example`)
+must be set where agents should get a link. The shipped Terraform does not set it; a product sets it the way it sets
+its other web links.
+
+**Schema.** Migration `agent_action_approval`: on `hitl_challenges`, `approval_required` (default false),
+`args_preview`, `args_redacted`, `approved_at`, `denied_at`, `decided_by_id`; on `tenants`, `agent_self_confirm`
+(default false). Additive; existing rows keep their defaults.
+
+**Who notices.**
+
+- Every product with external agents: their standard writes now wait for a person. An agent built against the old
+  flow that repeats the call at once will get `approval_pending` until someone approves.
+- Anyone who called `GET /mcp/hitl/:token`: call `GET /agent-actions/:token` instead (camelCase body, see above).
+- A challenge issued before the deploy keeps `approval_required = false` and finishes on the old flow; it expires
+  within ten minutes.
+
+**What to do.** Tell workspace owners about the new default. An owner who wants the old behaviour turns on "Let
+agents confirm their own changes" on Settings > AI Assistants. Set `APP_URL` in every environment that serves agents.
+
+**Rollback.** Revert the change. The new columns have defaults or are nullable and can stay; old code ignores them.
+Requests waiting for approval at the time of the rollback can no longer be approved; their agents ask again.
 
 ## Deploy order for `ai_reader`
 
