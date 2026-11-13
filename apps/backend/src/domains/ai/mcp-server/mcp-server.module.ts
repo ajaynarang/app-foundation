@@ -9,6 +9,7 @@ import { OAuthProviderModule } from '@appshore/platform/domains/oauth-provider/o
 import { AgentContractModule } from '../agent-contract/agent-contract.module';
 import { AuthModule } from '@appshore/platform/auth/auth.module';
 import { ApiKeysModule } from '@appshore/platform/domains/api-keys/api-keys.module';
+import { PromptRegistryModule } from '../assistant/prompts/prompt-registry.module';
 
 /**
  * MCP Server Module — Exposes app tools to external AI clients
@@ -20,7 +21,7 @@ import { ApiKeysModule } from '@appshore/platform/domains/api-keys/api-keys.modu
  * - HitlStepUpController handles POST /mcp/hitl/:token/step-up (PIN-based step-up for sensitive-tier tools)
  */
 @Module({
-  imports: [McpToolsModule, OAuthProviderModule, AgentContractModule, AuthModule, ApiKeysModule],
+  imports: [McpToolsModule, OAuthProviderModule, AgentContractModule, AuthModule, ApiKeysModule, PromptRegistryModule],
   controllers: [McpServerController, McpRootController, HitlStepUpController],
   providers: [McpServerService, AgentRateLimitGuard],
 })

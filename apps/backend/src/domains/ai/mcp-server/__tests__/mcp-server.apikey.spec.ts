@@ -24,6 +24,9 @@ import { McpServerService } from '../mcp-server.service';
 import { InvocationPipelineService } from '../../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../agent-contract/scope-registry.service';
 import { fromApiKey } from '@appshore/platform/auth/agent-principal';
+import { ToolAccessPolicyService } from '../../agent-contract/tool-access-policy.service';
+import { ToolAvailabilityService } from '../../agent-contract/tool-availability.service';
+import { PromptRegistryService } from '../../assistant/prompts/prompt-registry.service';
 
 describe('McpServerService — API-key principal path', () => {
   let service: McpServerService;
@@ -36,6 +39,9 @@ describe('McpServerService — API-key principal path', () => {
         McpServerService,
         { provide: InvocationPipelineService, useValue: pipeline },
         { provide: ScopeRegistryService, useValue: {} },
+        { provide: ToolAccessPolicyService, useValue: {} },
+        { provide: ToolAvailabilityService, useValue: {} },
+        { provide: PromptRegistryService, useValue: {} },
       ],
     }).compile();
     service = mod.get(McpServerService);
