@@ -4,6 +4,7 @@ import { listSourceFiles, stripComments } from './source-text.scan';
 import {
   consoleCalls,
   firstImport,
+  importsInOrder,
   metricFactoryCalls,
   nodeEnvProductionComparisons,
   sensitiveIdentifiers,
@@ -65,6 +66,7 @@ const ERROR_TRACKING = /\/error-tracking\//;
 
 const ENTRY_POINTS = ['apps/backend/src/main.ts', 'apps/backend/src/worker.ts'];
 const TELEMETRY_MODULE = '@appshore/kernel/infrastructure/telemetry/telemetry';
+const ERROR_TRACKING_INSTRUMENT = '@appshore/kernel/infrastructure/error-tracking/instrument';
 
 interface SourceFile {
   rel: string;
@@ -168,6 +170,7 @@ describe('log hygiene: the checks themselves', () => {
 
   it('reads the first import of a file', () => {
     expect(firstImport("// hi\nimport { a } from './a';\nimport './b';")).toBe('./a');
+    expect(importsInOrder("// hi\nimport { a } from './a';\nimport './b';")).toEqual(['./a', './b']);
     expect(firstImport("import './side-effect';")).toBe('./side-effect');
   });
 });
@@ -206,6 +209,16 @@ describe('log hygiene: the repository', () => {
       expect({ entry, first: firstImport(fs.readFileSync(path.join(REPO, entry), 'utf8')) }).toEqual({
         entry,
         first: TELEMETRY_MODULE,
+      });
+    }
+  });
+
+  it('both process entry points import error tracking second, right after telemetry', () => {
+    for (const entry of ENTRY_POINTS) {
+      const imports = importsInOrder(fs.readFileSync(path.join(REPO, entry), 'utf8'));
+      expect({ entry, firstTwo: imports.slice(0, 2) }).toEqual({
+        entry,
+        firstTwo: [TELEMETRY_MODULE, ERROR_TRACKING_INSTRUMENT],
       });
     }
   });

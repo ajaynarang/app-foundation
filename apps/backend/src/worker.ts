@@ -24,6 +24,8 @@
 // OpenTelemetry first: auto-instrumentation can only patch pg, ioredis and
 // http if it loads before AppModule pulls them in.
 import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
+// Error tracking second, before AppModule loads (a no-op without SENTRY_DSN).
+import '@appshore/kernel/infrastructure/error-tracking/instrument';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';

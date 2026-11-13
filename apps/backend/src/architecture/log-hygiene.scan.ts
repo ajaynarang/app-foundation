@@ -244,3 +244,8 @@ export function sentryImports(source: string): Finding[] {
 export function firstImport(source: string): string | undefined {
   return /^\s*import\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/m.exec(source)?.[1];
 }
+
+/** Every module a file imports, in source order (static `import` statements only). */
+export function importsInOrder(source: string): string[] {
+  return [...source.matchAll(/^\s*import\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/gm)].map((m) => m[1]);
+}
