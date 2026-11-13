@@ -202,7 +202,7 @@ resource "aws_iam_role_policy" "github_deploy" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         # GetAuthorizationToken cannot be scoped to a specific repo — must be *.
         Sid      = "ECRAuth"
@@ -423,7 +423,60 @@ resource "aws_iam_role_policy" "github_deploy" {
           "ecr:ListTagsForResource"
         ]
         Resource = "*"
+      },
+      {
+        # The Grafana CloudWatch read role (grafana.tf). Create, tag and delete are scoped to that role's name; its
+        # inline policy is written through iam:PutRolePolicy above.
+        Sid    = "GrafanaRoleManage"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:DeleteRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:ListRoleTags",
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}-iam-role-grafana-*"
       }
-    ]
+      ],
+      # The level 1 alarms (alarms.tf): refresh, threshold edits, and the deletes the grafana_alerting_live apply
+      # needs. Keyed on alarm_email, not on alarms_enabled, so the grant is in place before that apply instead of being
+      # removed by it. CI cannot create the SNS topic or its subscription: the first level 1 apply runs with admin
+      # credentials.
+      var.alarm_email != "" ? [{
+        Sid    = "AlarmsRead"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "sns:GetTopicAttributes",
+          "sns:GetSubscriptionAttributes",
+          "sns:ListTagsForResource",
+        ]
+        Resource = "*"
+      }] : [],
+      var.alarm_email != "" ? [{
+        Sid    = "AlarmsMaintain"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DeleteAlarms",
+          "sns:Unsubscribe",
+          "sns:DeleteTopic",
+        ]
+        Resource = [
+          "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${local.prefix}-*",
+          "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${local.prefix}-alerts",
+          "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${local.prefix}-alerts:*",
+        ]
+      }] : [],
+      # The budget (budget.tf) outlives the alarms, so its read grant is separate.
+      local.budget_enabled ? [{
+        Sid      = "BudgetRead"
+        Effect   = "Allow"
+        Action   = ["budgets:ViewBudget", "budgets:ListTagsForResource"]
+        Resource = "*"
+    }] : [])
   })
 }

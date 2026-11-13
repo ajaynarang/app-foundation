@@ -164,3 +164,58 @@ variable "doppler_token" {
   type        = string
   sensitive   = true
 }
+
+# Observability, level 1 (docs/observability.md): CloudWatch alarms and a budget email, the no-vendor fallback.
+variable "alarm_email" {
+  description = "Email subscribed to the CloudWatch alarm SNS topic and to the budget. Empty (the default) creates no topic, no alarm and no budget. After the first apply AWS emails a subscription confirmation; nothing is delivered until it is confirmed."
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly AWS cost budget in USD, emailed to alarm_email at 80% actual and 100% forecast. An AWS budget measures the whole account, not this stack: when staging and production share an account and both set alarm_email, set 0 in one of them so the account has one budget. 0 = no budget."
+  type        = number
+  default     = 100
+
+  validation {
+    condition     = var.monthly_budget_usd >= 0
+    error_message = "monthly_budget_usd must be 0 (no budget) or a positive amount."
+  }
+}
+
+variable "rds_connections_alarm_threshold" {
+  description = "DatabaseConnections above which the level 1 alarm fires: 75% of the instance's max_connections, which RDS derives from the class (about DBInstanceClassMemory / 9531392). 75 fits a 1 GiB class (about 100); keep it in step with rdsMaxConnections in the Grafana catalog's constants.mjs."
+  type        = number
+  default     = 75
+}
+
+variable "container_insights" {
+  description = "ECS Container Insights on the cluster. Off by default: no alarm or Grafana rule here needs it (service-gone reads the free AWS/ECS CPUUtilization metric), and it is billed per metric. Set true to keep it on an existing stack."
+  type        = bool
+  default     = false
+}
+
+# Observability, level 2: Grafana Cloud reads CloudWatch through a read-only role (grafana.tf).
+variable "grafana_alerting_live" {
+  description = "Set true as the LAST step of going to level 2 (docs/observability.md), after the Grafana rules are applied and test-fired: every level 1 CloudWatch alarm, the SNS topic and its subscription are removed in that apply. The budget stays. Production refuses it until the Grafana read-only role exists (both grafana_cloud_* values set)."
+  type        = bool
+  default     = false
+
+  # In production the flag removes every CloudWatch alarm, so Grafana must already be able to read CloudWatch.
+  validation {
+    condition     = !(var.grafana_alerting_live && var.env == "production" && (var.grafana_cloud_aws_account_id == "" || var.grafana_cloud_external_id == ""))
+    error_message = "grafana_alerting_live = true in production needs grafana_cloud_aws_account_id and grafana_cloud_external_id: the Grafana CloudWatch read role must exist before the CloudWatch alarms are removed."
+  }
+}
+
+variable "grafana_cloud_aws_account_id" {
+  description = "The AWS account Grafana Cloud assumes roles from (shown in its CloudWatch datasource setup). Empty = no Grafana read role."
+  type        = string
+  default     = ""
+}
+
+variable "grafana_cloud_external_id" {
+  description = "The external id Grafana Cloud presents when it assumes the read role (shown in its CloudWatch datasource setup). Not a secret: it guards against the confused-deputy problem. Empty = no Grafana read role."
+  type        = string
+  default     = ""
+}

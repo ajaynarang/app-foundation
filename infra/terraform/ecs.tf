@@ -3,9 +3,10 @@
 resource "aws_ecs_cluster" "main" {
   name = "${local.prefix}-ecs-cluster"
 
+  # Off by default (var.container_insights): no alarm or Grafana rule needs it, and it is billed per metric.
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = var.container_insights ? "enabled" : "disabled"
   }
 
   tags = { Name = "${local.prefix}-ecs-cluster" }
