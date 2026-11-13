@@ -33,6 +33,7 @@
     "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations": "One config per (integration type, vendor) for the workspace: a unique key, bounded by VENDOR_REGISTRY",
     "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/vendors": "The static VENDOR_REGISTRY (code-defined)",
     "packages/appshore/platform/src/domains/announcements/broadcasts-public.controller.ts :: GET /broadcasts/active": "The broadcasts live right now for the banner: read with take ACTIVE_BROADCAST_SCAN_CAP and cut to ACTIVE_BROADCAST_CAP (20)",
+    "packages/appshore/platform/src/domains/outbound/outbound-admin.controller.ts :: GET /super-admin/outbound/allow-list": "The outbound gate's allow-list, kept by hand by super-admins for a test environment, read with take OUTBOUND_ALLOW_LIST_CAP (500)",
     "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans": "The plan catalog: one row per value of the TenantPlan enum"
   },
   "BOUNDED_READS": {

@@ -11,6 +11,7 @@ import { PlansModule } from '@appshore/platform/domains/plans/plans.module';
 import { OAuthProviderModule } from '@appshore/platform/domains/oauth-provider/oauth-provider.module';
 import { AnnouncementsModule } from '@appshore/platform/domains/announcements/announcements.module';
 import { LoginActivityModule } from '@appshore/platform/domains/login-activity/login-activity.module';
+import { OutboundAdminModule } from '@appshore/platform/domains/outbound/outbound-admin.module';
 
 /**
  * PlatformModule aggregates all platform/infrastructure modules:
@@ -24,6 +25,7 @@ import { LoginActivityModule } from '@appshore/platform/domains/login-activity/l
  * - Plans: Pricing tier management and entitlements
  * - OAuth Provider: OAuth 2.1 authorization server for external API access
  * - Login Activity: Sign-in audit log surfaces for tenant admins and platform staff
+ * - Outbound: the super-admin allow-list and held-back list of the outbound gate (ADR "Outbound gate")
  */
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { LoginActivityModule } from '@appshore/platform/domains/login-activity/l
     OAuthProviderModule,
     AnnouncementsModule,
     LoginActivityModule,
+    OutboundAdminModule,
   ],
   exports: [
     TenantsModule,

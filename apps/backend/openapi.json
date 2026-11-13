@@ -4314,6 +4314,33 @@
         ],
         "type": "object"
       },
+      "CreateOutboundAllowEntryDto": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "EMAIL",
+              "EMAIL_DOMAIN",
+              "PHONE",
+              "HOST"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "example": "QA inbox",
+            "type": "string"
+          },
+          "value": {
+            "description": "An email, an email domain, a phone in E.164 or a host",
+            "example": "qa@example.com",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "type": "object"
+      },
       "CreateTicketDto": {
         "properties": {
           "category": {
@@ -10339,6 +10366,189 @@
           "contactEmail",
           "contactPhone",
           "timezone"
+        ],
+        "type": "object"
+      },
+      "OutboundAllowEntry": {
+        "properties": {
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "nullable": true,
+            "properties": {
+              "email": {
+                "nullable": true,
+                "type": "string"
+              },
+              "firstName": {
+                "nullable": true,
+                "type": "string"
+              },
+              "lastName": {
+                "nullable": true,
+                "type": "string"
+              },
+              "userId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "userId",
+              "email",
+              "firstName",
+              "lastName"
+            ],
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "EMAIL",
+              "EMAIL_DOMAIN",
+              "PHONE",
+              "HOST"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "nullable": true,
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "note",
+          "createdAt",
+          "createdBy"
+        ],
+        "type": "object"
+      },
+      "OutboundStatus": {
+        "properties": {
+          "bootstrapEntries": {
+            "exclusiveMinimum": false,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "environment": {
+            "enum": [
+              "production",
+              "staging",
+              "development",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "isLive": {
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "live",
+              "allowlist"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "isLive",
+          "environment",
+          "bootstrapEntries"
+        ],
+        "type": "object"
+      },
+      "OutboundSuppressionList": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "exclusiveMinimum": false,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "items": {
+            "items": {
+              "properties": {
+                "channel": {
+                  "enum": [
+                    "email",
+                    "sms",
+                    "push",
+                    "whatsapp",
+                    "webhook"
+                  ],
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "recipient": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "subject": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "tenant": {
+                  "nullable": true,
+                  "properties": {
+                    "companyName": {
+                      "type": "string"
+                    },
+                    "tenantId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "tenantId",
+                    "companyName"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "id",
+                "channel",
+                "recipient",
+                "subject",
+                "source",
+                "createdAt",
+                "tenant"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          },
+          "total": {
+            "exclusiveMinimum": false,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "total"
         ],
         "type": "object"
       },
@@ -26886,6 +27096,226 @@
         "summary": "KPIs + Notable across all tenants (optionally filtered by tenantId)",
         "tags": [
           "Login Activity (Super Admin)"
+        ]
+      }
+    },
+    "/api/v1/super-admin/outbound/allow-list": {
+      "get": {
+        "operationId": "OutboundAdminController_listEntries",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OutboundAllowEntry"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Allow-listed recipients, by kind then value",
+        "tags": [
+          "Outbound (Super Admin)"
+        ]
+      },
+      "post": {
+        "operationId": "OutboundAdminController_createEntry",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutboundAllowEntryDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundAllowEntry"
+                }
+              }
+            },
+            "description": "Created: the new resource"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an email, email domain, phone number or web host to the allow-list",
+        "tags": [
+          "Outbound (Super Admin)"
+        ]
+      }
+    },
+    "/api/v1/super-admin/outbound/allow-list/{entry_id}": {
+      "delete": {
+        "operationId": "OutboundAdminController_deleteEntry",
+        "parameters": [
+          {
+            "description": "The allow-list entry id (uuid)",
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry removed; sends to it are held back from now on"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an allow-list entry",
+        "tags": [
+          "Outbound (Super Admin)"
+        ]
+      }
+    },
+    "/api/v1/super-admin/outbound/held-back": {
+      "get": {
+        "operationId": "OutboundAdminController_listSuppressions",
+        "parameters": [
+          {
+            "description": "Page size, 1–100 (out of range is clamped)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`nextCursor` from the previous page",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundSuppressionList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sends the outbound gate held back, newest first (cursor-paged)",
+        "tags": [
+          "Outbound (Super Admin)"
+        ]
+      }
+    },
+    "/api/v1/super-admin/outbound/status": {
+      "get": {
+        "operationId": "OutboundAdminController_getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutboundStatus"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The outbound mode of this environment (live or allowlist)",
+        "tags": [
+          "Outbound (Super Admin)"
         ]
       }
     },

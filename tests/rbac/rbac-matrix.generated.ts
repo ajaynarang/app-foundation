@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-13T06:33:28.401Z
- * Source: 22 domains, 102 endpoints
- * Controllers scanned: 286 total endpoints across all controllers
+ * Generated: 2026-11-13T16:01:23.495Z
+ * Source: 23 domains, 106 endpoints
+ * Controllers scanned: 291 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -717,6 +717,38 @@ export const RBAC_MATRIX: RbacEntry[] = [
     domain: 'onboarding',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // OUTBOUND
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/super-admin/outbound/allow-list',
+    description: 'OutboundAdminController: GET /super-admin/outbound/allow-list',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/super-admin/outbound/held-back',
+    description: 'OutboundAdminController: GET /super-admin/outbound/held-back',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/super-admin/outbound/status',
+    description: 'OutboundAdminController: GET /super-admin/outbound/status',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'POST', path: '/super-admin/outbound/allow-list',
+    description: 'OutboundAdminController: POST /super-admin/outbound/allow-list',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
   },
 
   // ═══════════════════════════════════════════════════════
