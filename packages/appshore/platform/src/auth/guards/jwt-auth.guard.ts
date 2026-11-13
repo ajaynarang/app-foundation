@@ -4,6 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { RLS_SOURCE, isRlsTenantId, setRlsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -44,15 +45,19 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Enrich AsyncLocalStorage log context with tenantId/userId from JWT payload.
     // Only for HTTP contexts — WebSocket and RPC contexts do not have an Express request.
     if (authenticatedUser && context.getType() === 'http') {
+      const tenantDbId = authenticatedUser.tenantDbId;
+      // The request runs as the session's tenant (rls-context.ts). SUPER_ADMIN has no tenant, so its scope stays
+      // empty; a super-admin route declares `@SystemScope` or `@TargetTenant` instead.
+      if (isRlsTenantId(tenantDbId)) setRlsTenant(tenantDbId, RLS_SOURCE.JWT);
+
       const request = context.switchToHttp().getRequest();
       if (request?.setLogContext) {
-        const tenantDbId = authenticatedUser.tenantDbId;
         request.setLogContext({
           tenantId: String(authenticatedUser.tenantId ?? ''),
           userId: String(authenticatedUser.id ?? authenticatedUser.userId ?? ''),
           ...(authenticatedUser.role ? { role: String(authenticatedUser.role) } : {}),
           // SUPER_ADMIN has no tenant, so it carries no tenantDbId.
-          ...(Number.isSafeInteger(tenantDbId) && tenantDbId > 0 ? { tenantDbId: String(tenantDbId) } : {}),
+          ...(isRlsTenantId(tenantDbId) ? { tenantDbId: String(tenantDbId) } : {}),
         });
       }
     }

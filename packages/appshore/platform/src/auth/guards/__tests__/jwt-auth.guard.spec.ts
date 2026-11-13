@@ -1,3 +1,4 @@
+import { currentRls, rlsStorage } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -168,6 +169,32 @@ describe('JwtAuthGuard', () => {
       const result = guard.handleRequest(null, user, null, ctx);
 
       expect(result).toEqual(user);
+    });
+  });
+
+  describe('tenant context', () => {
+    it('pins the open request scope to the token tenant, sourced jwt', () => {
+      const user = { id: 1, tenantId: 'tnt-1', tenantDbId: 7 } as any;
+      mockSuperHandleRequest.mockReturnValue(user);
+
+      const seen = rlsStorage.run({}, () => {
+        guard.handleRequest(null, user, null, createMockContext());
+        return currentRls();
+      });
+
+      expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'jwt' });
+    });
+
+    it('leaves a tenantless session (SUPER_ADMIN) with no context', () => {
+      const user = { id: 1, role: 'SUPER_ADMIN' } as any;
+      mockSuperHandleRequest.mockReturnValue(user);
+
+      const seen = rlsStorage.run({}, () => {
+        guard.handleRequest(null, user, null, createMockContext());
+        return currentRls();
+      });
+
+      expect(seen).toBeUndefined();
     });
   });
 });

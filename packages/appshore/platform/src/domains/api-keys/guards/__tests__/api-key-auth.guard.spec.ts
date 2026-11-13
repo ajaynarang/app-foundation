@@ -1,3 +1,4 @@
+import { currentRls, rlsStorage } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { Test } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { ApiKeyAuthGuard } from '../api-key-auth.guard';
@@ -106,5 +107,23 @@ describe('ApiKeyAuthGuard', () => {
     };
     await guard.canActivate(execCtx(req));
     expect(req.agentPrincipal.ipAllowlist).toBeUndefined();
+  });
+
+  it("pins the request to the key owner's tenant, sourced api-key", async () => {
+    service.validateKey.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      scopes: ['platform:read'],
+      ipAllowlist: [],
+      user: { id: 42, tenantId: 7 },
+    });
+    const req: any = { headers: { authorization: 'Bearer sk_live_x' }, ip: '1.2.3.4' };
+
+    const seen = await rlsStorage.run({}, async () => {
+      await guard.canActivate(execCtx(req));
+      return currentRls();
+    });
+
+    expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'api-key' });
   });
 });
