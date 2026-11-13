@@ -1,4 +1,4 @@
-// node --test infra/observability/grafana-cloud/   (part of `pnpm check:ops`)
+// node --test infra/observability/grafana-cloud/scripts/*.test.mjs   (part of `pnpm check:ops`)
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

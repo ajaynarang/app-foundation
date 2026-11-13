@@ -9,7 +9,8 @@
 # In order:
 #   1. generate.mjs --check   the generated alerting/ and dashboards/ files match catalog/
 #   2. validate.mjs           rules, runbooks, label hygiene, names checked against the code
-#   3. the catalog specs      node --test infra/observability/grafana-cloud/
+#   3. the catalog specs      node --test infra/observability/grafana-cloud/scripts/*.test.mjs (files, not the
+#                             directory: Node 22 reads each --test argument as a file or glob, not a folder)
 #   4. hermetic shell tests   every *.test.sh under .github/scripts/ and tools/
 #   5. Terraform              fmt -check, init -backend=false, validate, test (the AWS provider is mocked, so no
 #                             credentials and no cloud calls); one skip line when the terraform binary is absent.
@@ -47,7 +48,7 @@ run() {
 
 run "grafana: generated files match the catalog" node "${CATALOG}/scripts/generate.mjs" --check
 run "grafana: validate" node "${CATALOG}/scripts/validate.mjs"
-run "grafana: catalog specs" node --test "${CATALOG}/"
+run "grafana: catalog specs" node --test "${CATALOG}"/scripts/*.test.mjs
 
 shell_tests=$(find .github/scripts tools -name '*.test.sh' -type f 2>/dev/null | sort)
 if [ -z "$shell_tests" ]; then
