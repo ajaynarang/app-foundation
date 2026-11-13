@@ -1,12 +1,7 @@
 import pg from 'pg';
 import * as crypto from 'crypto';
 import { findDuplicateAccounts, formatDuplicateReport } from '../duplicate-accounts';
-import {
-  CREATE_EMAIL_UNIQUE_INDEX_SQL,
-  EMAIL_UNIQUE_INDEX,
-  EMAIL_UNIQUE_INDEX_LOCK_KEY,
-  emailUniqueIndexExists,
-} from '../../src/email-uniqueness';
+import { emailUniqueIndexExists } from '../../src/email-uniqueness';
 
 describe('duplicate-accounts report', () => {
   const row = (email: string, userId: string, tenantId: string | null) => ({
@@ -90,14 +85,16 @@ describe('duplicate-accounts report', () => {
  * Against real Postgres: two live accounts in two tenants, emails differing only by case; a deleted third.
  *
  * A migrated database refuses that pair (index `users_email_live_key`), so the spec plays a database from before the
- * index: it holds the index's advisory lock, drops the index, and recreates it in afterAll once its rows are gone.
+ * index in a throwaway schema: copies of `users`, `tenants` and `workspace_members` (columns and defaults only, no
+ * indexes) with `search_path` pointing there. The shared database's own index is never touched, so a killed run
+ * leaves at most an orphan `dup_report_probe_*` schema behind, never a database without the rule.
  */
 describe('duplicate-accounts report (Postgres)', () => {
   // No default: the spec writes rows, so it runs only against a database someone named.
   const DATABASE_URL = process.env.DATABASE_URL;
   const suffix = crypto.randomBytes(4).toString('hex');
+  const schema = `dup_report_probe_${process.pid}_${suffix}`;
   let client: pg.Client | undefined;
-  let indexWasPresent = false;
   const tenantIds: number[] = [];
 
   beforeAll(async () => {
@@ -115,9 +112,14 @@ describe('duplicate-accounts report (Postgres)', () => {
       await candidate.end().catch(() => undefined);
       return;
     }
-    await client.query('SELECT pg_advisory_lock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
-    indexWasPresent = await emailUniqueIndexExists(client);
-    if (indexWasPresent) await client.query(`DROP INDEX "${EMAIL_UNIQUE_INDEX}"`);
+    await client.query(`CREATE SCHEMA ${schema}`);
+    for (const table of ['tenants', 'users', 'workspace_members']) {
+      await client.query(`CREATE TABLE ${schema}.${table} (LIKE public.${table} INCLUDING DEFAULTS)`);
+    }
+    await client.query(`SET search_path TO ${schema}, public`);
+    // The report must see a database without the rule, or the pair below could not exist.
+    expect(await emailUniqueIndexExists(client)).toBe(false);
+
     for (const name of ['a', 'b', 'c']) {
       const { rows } = await client.query(
         `INSERT INTO tenants (tenant_id, company_name, status, is_active, created_at, updated_at)
@@ -135,16 +137,15 @@ describe('duplicate-accounts report (Postgres)', () => {
     await insertUser(0, `dup-${suffix}@example.com`, false);
     await insertUser(1, `Dup-${suffix}@Example.com`, false);
     await insertUser(2, `dup-${suffix}@example.com`, true);
-    // Waits for the index's advisory lock, which another package's spec may be holding.
-  }, 60_000);
+  });
 
   afterAll(async () => {
     if (!client) return;
-    await client.query('DELETE FROM users WHERE user_id LIKE $1', [`user_dup_%_${suffix}`]);
-    await client.query('DELETE FROM tenants WHERE id = ANY($1)', [tenantIds]);
-    if (indexWasPresent) await client.query(CREATE_EMAIL_UNIQUE_INDEX_SQL);
-    await client.query('SELECT pg_advisory_unlock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
-    await client.end();
+    try {
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    } finally {
+      await client.end();
+    }
   });
 
   it('lists the two live accounts under one lowercased email and leaves the deleted one out', async () => {

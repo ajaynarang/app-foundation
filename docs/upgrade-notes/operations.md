@@ -128,8 +128,12 @@ deploy carries on. While the index is absent the backend logs one warning at boo
   that creates users the same way: a lookup by exact case misses `Jane@x.com` when given `jane@x.com`.
 - A product with duplicates: the deploy succeeds without the index and the boot warning appears. Nothing else
   changes until you enforce it.
-- A test of your own that writes two live accounts on one email now fails on a migrated database. The starter's
-  two such specs drop the index for their run under an advisory lock and recreate it afterwards.
+- A test of your own that writes two live accounts on one email now fails on a migrated database. Write such a
+  pair in a throwaway schema (`CREATE TABLE <schema>.users (LIKE public.users INCLUDING DEFAULTS)`, then
+  `SET search_path`), as the starter's raw-SQL specs do. The one starter spec that needs the pair through Prisma
+  (`tenant-login.integration.spec.ts`; Prisma names `public` in every query) drops the index under an advisory lock
+  and recreates it in a `finally`; a run killed before then leaves the index absent, which the boot warning reports
+  and `pnpm accounts:enforce-unique-email` repairs.
 
 **What to set first.** Nothing. If you have duplicates: `DATABASE_URL=... pnpm accounts:duplicates`, merge them
 (`docs/operations.md`, "Duplicate accounts"), then `DATABASE_URL=... pnpm accounts:enforce-unique-email`. You can

@@ -22,8 +22,11 @@ import {
  * duplicate pair the unit spec fakes can actually exist on a database that predates one-account-per-email.
  *
  * A migrated database refuses that pair (index `users_email_live_key`), so the spec plays such a database: it holds
- * the index's advisory lock for its whole run, drops the index, and recreates it in afterAll once its rows are gone.
- * Every spec that needs the index present takes the same lock first.
+ * the index's advisory lock for its whole run, drops the index, and recreates it in afterAll once its rows are gone
+ * (in a `finally`, failing loudly if it cannot). Every spec that needs the index present takes the same lock first.
+ * A copy in a throwaway schema is not used here, because the real AuthService runs through Prisma, which names the
+ * `public` schema in every query. A run killed before afterAll leaves the database without the index: the backend
+ * then logs `auth.email_uniqueness_unenforced` at boot, and `pnpm accounts:enforce-unique-email` puts it back.
  *
  * Skipped when DATABASE_URL is unset or names no usable database. Every row hangs off the tenants and users this run
  * creates, and is deleted with them in afterAll.
@@ -153,22 +156,39 @@ describe('Tenant-aware login (Postgres)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    if (dbReachable) {
-      await prisma.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.loginEvent.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.workspaceMember.deleteMany({ where: { userId: { in: userIds } } });
-      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-      await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
-      await prisma.$disconnect();
+    try {
+      if (dbReachable) {
+        await prisma.passwordResetToken.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.loginEvent.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.workspaceMember.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+        await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
+      }
+    } finally {
+      // Runs even when the cleanup above fails: the index must come back.
+      await restoreIndex();
+      await prisma?.$disconnect().catch(() => undefined);
+      await pool?.end().catch(() => undefined);
     }
-    if (lockClient) {
-      if (indexWasPresent) await lockClient.query(CREATE_EMAIL_UNIQUE_INDEX_SQL);
-      await lockClient.query('SELECT pg_advisory_unlock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
-      await lockClient.end();
-    }
-    await pool?.end().catch(() => undefined);
   });
+
+  /** Recreate the index this run dropped, or fail loudly with how to put it back by hand. */
+  async function restoreIndex(): Promise<void> {
+    if (!lockClient) return;
+    try {
+      if (indexWasPresent) await lockClient.query(CREATE_EMAIL_UNIQUE_INDEX_SQL);
+    } catch (err) {
+      throw new Error(
+        `tenant-login.integration dropped ${EMAIL_UNIQUE_INDEX} and could not recreate it ` +
+          `(${(err as Error).message}). The database named by DATABASE_URL no longer enforces one live account per ` +
+          'email: run pnpm accounts:duplicates, merge what it lists, then pnpm accounts:enforce-unique-email.',
+      );
+    } finally {
+      await lockClient.query('SELECT pg_advisory_unlock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]).catch(() => undefined);
+      await lockClient.end().catch(() => undefined);
+    }
+  }
 
   const it_ = (name: string, fn: () => Promise<void>) =>
     it(name, async () => {
