@@ -32,14 +32,14 @@ outside AWS, so a product that sets these keys lists Sentry as a subprocessor in
 
 ### What reaches Sentry
 
-| Source     | Reported by                                                                                                      |
-| ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| `http`     | Every 5xx answer, once, where its body is written (`writeErrorEnvelope`), and a 5xx a streaming route ends with. |
-| `job`      | A queue job's final failure (`reportJobFailure`). A retry BullMQ will run again is not reported.                 |
-| `cron`     | Each tenant a scheduled sweep fails for (`CronRun.failed`).                                                      |
-| `event`    | A domain event that could not be queued for its durable path, or not written to the event log.                   |
-| `workflow` | A durable workflow function that used up its retries.                                                            |
-| `ai`       | A provider refusing a platform-paid AI call for credit (not a 5xx, so nothing else reports it).                  |
+| Source     | Reported by                                                                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http`     | Every 5xx answer, once, where its body is written (`writeErrorEnvelope`; `OAuthErrorFilter` on the OAuth protocol routes), and a 5xx a streaming route ends with. |
+| `job`      | A queue job's final failure (`reportJobFailure`). A retry BullMQ will run again is not reported.                                                                  |
+| `cron`     | Each tenant a scheduled sweep fails for (`CronRun.failed`).                                                                                                       |
+| `event`    | A domain event that could not be queued for its durable path, or not written to the event log.                                                                    |
+| `workflow` | A durable workflow function that used up its retries.                                                                                                             |
+| `ai`       | A provider refusing a platform-paid AI call for credit (not a 5xx, so nothing else reports it).                                                                   |
 
 A reused refresh token (a possible stolen session) is reported at warning level. A 4xx is never reported; a line
 logged at error level is not reported either, because the tracker does not read logs. The SDK's own Nest

@@ -58,7 +58,8 @@ the source, so `pnpm test` (and `pnpm verify`) fails when one of them slips. The
 9. **Metric instruments are created only in `metrics.ts`.** Labels are code constants, or values normalised there
    into a closed set. Never `userId`, `requestId`, `jobId`, a phone, an email or an amount. `tenant` appears only on
    `app_job_failed`, `app_ai_invocation` and `app_ai_invocation_cost_usd`. _Spec-checked._
-10. **A 5xx answer is reported where its body is written** (`writeErrorEnvelope`). Every other error is reported
+10. **A 5xx answer is reported where its body is written** (`writeErrorEnvelope`, and `OAuthErrorFilter` on the
+    OAuth protocol routes, whose RFC 6749 body is not the envelope). Every other error is reported
     through `reportError` with a `source` tag. Nothing else calls the Sentry SDK, and `@sentry/` is imported only
     under an `error-tracking/` folder. Logging at error level reports nothing: the tracker does not read logs.
     _The import is spec-checked._

@@ -252,8 +252,9 @@ export function buildErrorEnvelope(exception: unknown, request: Pick<Request, 'u
 
 /**
  * Answer an error with the envelope. The global filter writes through this, and so does a `@Res()` / streaming
- * route that fails before its headers are sent, so this is the one place an error body is written, and the one place
- * a 5xx is reported to the error tracker. Returns false — and writes and reports nothing — once headers are out; the
+ * route that fails before its headers are sent, so this is the one place an envelope body is written, and where its
+ * 5xx is reported to the error tracker. (The OAuth protocol routes answer RFC 6749 bodies through `OAuthErrorFilter`,
+ * which reports its own 5xx the same way.) Returns false — and writes and reports nothing — once headers are out; the
  * caller then ends its stream itself.
  */
 export function writeErrorEnvelope(
@@ -267,7 +268,7 @@ export function writeErrorEnvelope(
   response.removeHeader('Transfer-Encoding');
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.status(envelope.statusCode).json(envelope);
-  // The one place a 5xx reaches the error tracker (docs/standards/observability.md, rule 10): the global filter
+  // Where an envelope's 5xx reaches the error tracker (docs/standards/observability.md, rule 10): the global filter
   // and every `@Res` route write through here, so each 5xx is reported once, whichever path wrote it.
   reportServerError(exception, envelope.statusCode);
   return true;

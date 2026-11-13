@@ -185,7 +185,8 @@ function stripUndefined(tags: ErrorTags): ErrorTags {
 
 /**
  * Reports a server-side failure (5xx) only; a client error is expected behaviour. Carries the request's tenant,
- * role, requestId and traceId. Called from one place: `writeErrorEnvelope`, after it wrote the body.
+ * role, requestId and traceId. Called where an error body is written, after it is written: `writeErrorEnvelope`, and
+ * `OAuthErrorFilter`, which writes the RFC 6749 body on the OAuth protocol routes instead of the envelope.
  */
 export function reportServerError(exception: unknown, status: number): void {
   if (status < SERVER_ERROR_STATUS) return;
