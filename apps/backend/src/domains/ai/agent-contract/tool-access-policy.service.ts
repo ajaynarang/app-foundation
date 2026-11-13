@@ -16,8 +16,6 @@ import type { ToolResult } from './tool-executor.service';
 @Injectable()
 export class ToolAccessPolicyService {
   private readonly logger = new Logger(ToolAccessPolicyService.name);
-  /** Tenant DB id to its wire-format id (immutable; `PlanGuard` looks plans up by it). */
-  private readonly tenantKeys = new Map<number, string>();
 
   constructor(
     private readonly registry: ScopeRegistryService,
@@ -41,17 +39,28 @@ export class ToolAccessPolicyService {
   }
 
   /**
-   * `@RestrictToRoles`: the tool runs only for the roles its REST twin allows. A Desk duty is exempt (its own scope
-   * grant governs it). A person with no membership in this workspace is refused.
+   * Membership, then `@RestrictToRoles`. A Desk duty is exempt from both (it acts under its supervisor's enablement
+   * and its own scope grant). Any other principal whose acting person has no membership row in this workspace is
+   * refused on EVERY tool, restricted or not: neither the API-key guard nor the OAuth token guard checks membership,
+   * so this is the one place a key or grant whose owner left the workspace is stopped. Then a restricted tool runs
+   * only for the roles its REST twin allows.
    */
   checkRole(principal: AgentPrincipal, toolName: string, role: UserRole | null): ToolResult | null {
+    if (principal.kind === 'desk_responsibility') return null;
+    if (!role) {
+      this.logger.warn(`role_not_permitted: ${principal.auditId} has no membership in tenant ${principal.tenantId}`);
+      return refusal({
+        status: 'role_not_permitted',
+        tool: toolName,
+        message: 'You are not a member of this workspace, so this cannot run here. Ask a workspace admin to add you.',
+      });
+    }
     const roles = this.registry.roleRestrictionForTool(toolName);
     if (!roles) return null;
-    if (principal.kind === 'desk_responsibility') return null;
-    if (role && roles.includes(role)) return null;
+    if (roles.includes(role)) return null;
 
     this.logger.warn(
-      `role_not_permitted: ${principal.auditId} (role=${role ?? 'none'}) attempted ${toolName}; requires ${roles.join('/')}`,
+      `role_not_permitted: ${principal.auditId} (role=${role}) attempted ${toolName}; requires ${roles.join('/')}`,
     );
     return refusal({
       status: 'role_not_permitted',
@@ -107,13 +116,13 @@ export class ToolAccessPolicyService {
     }
   }
 
+  /**
+   * The wire tenant id `PlanGuard` looks plans up by. Read each time, not cached: only plan-gated tools reach here,
+   * and a process-wide map keyed by tenant would grow without bound.
+   */
   private async tenantKey(tenantDbId: number): Promise<string | null> {
-    const cached = this.tenantKeys.get(tenantDbId);
-    if (cached) return cached;
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantDbId }, select: { tenantId: true } });
-    if (!tenant) return null;
-    this.tenantKeys.set(tenantDbId, tenant.tenantId);
-    return tenant.tenantId;
+    return tenant?.tenantId ?? null;
   }
 }
 

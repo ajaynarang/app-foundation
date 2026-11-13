@@ -82,9 +82,23 @@ describe('ToolAccessPolicyService', () => {
   describe('checkRole', () => {
     const user = fromUser({ userId: 4, tenantId: 9, role: 'OWNER' });
 
-    it('allows a tool with no restriction for anyone, even with no membership', () => {
+    it('allows a tool with no restriction for any member of the workspace', () => {
       registry.roleRestrictionForTool.mockReturnValue(undefined);
-      expect(svc.checkRole(user, 't', null)).toBeNull();
+      expect(svc.checkRole(user, 't', UserRole.MEMBER)).toBeNull();
+    });
+
+    it('refuses every tool, restricted or not, for a person with no membership row in this workspace', () => {
+      registry.roleRestrictionForTool.mockReturnValue(undefined);
+      const key = fromApiKey({ apiKeyId: 2, tenantId: 3, userId: 12, scopes: ['platform:read'] });
+      const grant = fromOAuthUser({ onBehalfOfUserDbId: 11, tenantDbId: 3, role: 'X', scopes: [], clientId: 'c' });
+      for (const p of [user, key, grant]) {
+        const res = svc.checkRole(p, 'list-support-tickets', null);
+        expect(res?.isError).toBeFalsy();
+        expect(JSON.parse(res.content[0].text)).toMatchObject({
+          status: 'role_not_permitted',
+          tool: 'list-support-tickets',
+        });
+      }
     });
 
     it('allows a role on the list', () => {
@@ -109,9 +123,11 @@ describe('ToolAccessPolicyService', () => {
       expect(JSON.parse(res.content[0].text).status).toBe('role_not_permitted');
     });
 
-    it('exempts a Desk duty (its scope grant governs it)', () => {
-      registry.roleRestrictionForTool.mockReturnValue([UserRole.OWNER]);
+    it('exempts a Desk duty from membership and role (its scope grant governs it)', () => {
       const desk = fromDeskResponsibility({ responsibilityId: 1, tenantId: 3, scopes: [], enabledByUserId: 5 });
+      registry.roleRestrictionForTool.mockReturnValue([UserRole.OWNER]);
+      expect(svc.checkRole(desk, 't', null)).toBeNull();
+      registry.roleRestrictionForTool.mockReturnValue(undefined);
       expect(svc.checkRole(desk, 't', null)).toBeNull();
     });
   });
@@ -161,6 +177,15 @@ describe('ToolAccessPolicyService', () => {
       flags.isEnabled.mockResolvedValue(false);
       const res = await svc.checkPlan(user, 't', UserRole.MEMBER);
       expect(JSON.parse(res.content[0].text)).toMatchObject({ status: 'not_on_plan', reason: 'FEATURE_DISABLED' });
+    });
+
+    it('reads the wire tenant id on each call (no unbounded per-tenant cache)', async () => {
+      registry.planFeatureForTool.mockReturnValue('webhooks');
+      plans.getTenantPlan.mockResolvedValue(TenantPlan.PROFESSIONAL);
+      plans.isFeatureEnabled.mockResolvedValue(true);
+      await svc.checkPlan(user, 't', UserRole.MEMBER);
+      await svc.checkPlan(user, 't', UserRole.MEMBER);
+      expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(2);
     });
 
     it('refuses when the workspace does not exist', async () => {

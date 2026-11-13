@@ -20,7 +20,7 @@ import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.co
  * into agent_invocation_logs, with mocked registry/moduleRef. The
  * pipeline is always on. Skipped when DATABASE_URL is unset or names no usable
  * database: Postgres is unreachable, refuses the login, has no such database, is
- * not migrated, or holds no seeded tenant. Any other failure in setup fails the spec.
+ * not migrated, or holds no seeded workspace member. Any other failure in setup fails the spec.
  * The rows a run writes (its agent_invocation_logs row and the outbox_events row of
  * app.agent.invocation-completed) are deleted in afterAll.
  */
@@ -62,6 +62,7 @@ describe('Phase A pipeline integration', () => {
   let pipeline: InvocationPipelineService;
   let dbReachable = false;
   let testTenantId: number;
+  let testUserId: number;
   const suiteStart = new Date();
 
   beforeAll(async () => {
@@ -73,14 +74,17 @@ describe('Phase A pipeline integration', () => {
       pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
       const adapter = new PrismaPg(pool);
       prisma = new PrismaClient({ adapter });
-      const anyTenant = await prisma.tenant.findFirst({
+      // The pipeline refuses a person with no membership in the workspace, so act as a real member.
+      const member = await prisma.workspaceMember.findFirst({
         orderBy: { id: 'asc' },
+        select: { userId: true, tenantId: true },
       });
-      if (!anyTenant) {
-        console.warn('pipeline.integration: no seeded tenant — skipping');
+      if (!member) {
+        console.warn('pipeline.integration: no seeded workspace member — skipping');
         return;
       }
-      testTenantId = anyTenant.id;
+      testTenantId = member.tenantId;
+      testUserId = member.userId;
       dbReachable = true;
     } catch (err) {
       if (!isNoDatabase(err)) throw err;
@@ -155,7 +159,7 @@ describe('Phase A pipeline integration', () => {
 
     const before = new Date();
     const principal = fromUser({
-      userId: 1,
+      userId: testUserId,
       tenantId: testTenantId,
       role: 'MEMBER',
       scopes: ['platform:read'],
