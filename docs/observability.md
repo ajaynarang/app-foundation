@@ -35,12 +35,19 @@ In this order. Each step is safe to stop after.
 3. **Paging.** Create two Grafana IRM integrations (one that pages, one that notifies) and set their webhook URLs as
    secrets of the `grafana-apply` workflow, with `GRAFANA_URL` and a service-account token. Run the workflow with
    `plan`, read it, then `apply`.
-4. **Test-fire.** One test page through IRM, and one real rule on staging: stop the worker service (or, with no worker
-   task, disable the heartbeat's schedule row `('maintenance', 'ops-heartbeat')`) and wait for
-   `worker-heartbeat-missing` to notify. Turn it back on. The rules are untested against real traffic until this
-   step: they are written from the code, not tuned on a live stack.
-5. **Uptime.** Add the outside-in checks (below).
-6. **Only then** remove the level 1 alarms (`grafana_alerting_live = true`, with the level 1 Terraform).
+4. **Test-fire.** One test page through IRM, and one real rule on staging: disable the heartbeat's schedule row
+   `('maintenance', 'ops-heartbeat')` (find its id with `GET /admin/schedules`, then
+   `PATCH /admin/schedules/:id` with `{"isEnabled": false}`) and wait for `worker-heartbeat-missing` to notify, about
+   fifteen minutes. Re-enable it with `{"isEnabled": true}`. Do not stop the worker service for this: by default the
+   API consumes every queue too (`api_queue_processors_enabled = true`), so the heartbeat keeps beating and the rule
+   never fires. The rules are untested against real traffic until this step: they are written from the code, not
+   tuned on a live stack.
+5. **CloudWatch data.** In Grafana Explore, run each CloudWatch rule's query (RDS, Redis, the ECS services) for each
+   environment and check that it returns data. Those rules treat no data as alerting, so a wrong dimension or prefix
+   would page for good once they are live. The dimension sets come from the AWS metric documentation, not a live
+   account.
+6. **Uptime.** Add the outside-in checks (below).
+7. **Only then** remove the level 1 alarms (`grafana_alerting_live = true`, with the level 1 Terraform).
 
 ### Uptime, outside-in
 
