@@ -142,3 +142,52 @@ run the report before you pull, to know which case you are in.
 **How to turn it back.** Deploy the previous release; the old code works with the index in place. To allow
 duplicates again, drop it: `DROP INDEX IF EXISTS "users_email_live_key";`. Leave the migration in place: it does
 not run twice, and `pnpm accounts:enforce-unique-email` puts the index back.
+
+## 2026-11-13: logging standard; email outside development fails without a provider
+
+**What changed.**
+
+- **Email with no provider.** With no `RESEND_API_KEY` and no `SMTP_*` keys, `EmailService.sendEmail` used to print
+  the whole message (recipient, HTML body with its reset and invitation links) to the log and report success, in
+  every environment. Now it prints the message only with `ENV_TYPE=development`, with every address masked. In any
+  other environment, `ENV_TYPE` unset included, it prints nothing and throws `EmailNotConfiguredError`, so the send
+  fails, and a caller that records deliveries records it as failed. Password reset still answers 200 (no account enumeration); its log
+  line no longer carries the link.
+- **SMS with no Twilio.** `SmsService.sendSms` still returns `false`. Outside `ENV_TYPE=development` it logs one
+  line with a masked number and no message body (the body was usually a code).
+- **Log lines.** Request lines drop the whole query string, not only `token=`. Phones and emails in log lines are
+  masked (`maskEmail`, `maskPhone`), and errors a provider throws are masked in every field. Lines inside a request
+  also carry `tenantDbId` and `role`; every job dispatched through a queue dispatcher carries `jobName`, `jobId` and
+  its tenant. A failed job attempt is one structured `job.failed` line; a job with no handler is logged at error
+  level as `job.unknown` (it was a warning); a permanent failure that cannot be stored is a `job.dead_letter` line.
+  The mock OTP value is no longer logged.
+- **Log transport.** With `LOG_TRANSPORT=loki`, outside development, logs now go to stdout and to Loki (they went to
+  Loki only). An empty `LOKI_URL` outside development means no Loki target and one stderr line at boot (it used to
+  fall back to `http://localhost:3100`). The `env` label comes from `ENV_TYPE` (`production`, `staging` for
+  `sandbox` and `preprod`, `development`), not `NODE_ENV`; `level` is no longer promoted by the code (pino-loki
+  adds `level` and `hostname` itself). `LOKI_USERNAME` and `LOKI_PASSWORD` set basic auth.
+- **Queue board bypass.** `BULL_BOARD_AUTH=false` is honoured only with `ENV_TYPE=development`; it used to be
+  honoured whenever `NODE_ENV` was not `production`.
+- **Renames.** `withJobLogContext` is now `withJobContext`
+  (`@appshore/kernel/infrastructure/logging/job-log-context`). The old name stays as an alias for one release.
+  `maskUrlSecrets` is removed from `log-filter.ts`; use `stripQueryString` from
+  `@appshore/kernel/shared/utils/log-redaction`.
+- **Worker.** `worker.ts` imports telemetry first, so the worker's `pg`, `ioredis` and `http` calls are traced, and
+  a worker whose boot hangs releases its buffered logs after 90 seconds with an error line naming the stall.
+- **A new spec.** `apps/backend/src/architecture/log-hygiene.spec.ts` fails on a `NODE_ENV === 'production'`
+  comparison, a logger call that interpolates a phone, email, token or URL unmasked, a `console.*` call outside its
+  allow-list, a metric instrument created outside `metrics.ts`, and a Sentry import outside `error-tracking/`. The
+  rules are in `docs/standards/observability.md`.
+
+**Who notices.** A non-development environment (staging, a preview) that runs without an email provider: every
+send now fails where it used to "succeed" silently. Code of your own that calls `sendEmail` and does not catch will
+see the error. Code of your own that the new spec flags fails `pnpm test` until it is fixed.
+
+**What to set first.** For each deployed environment that should send email, set `RESEND_API_KEY` (or the four
+`SMTP_*` keys) before you deploy. A local run keeps working as long as `apps/backend/.env` has
+`ENV_TYPE=development`, as `.env.example` sets it. If you ship logs to Grafana Cloud, set `LOKI_URL`,
+`LOKI_USERNAME` and `LOKI_PASSWORD`. Rename `withJobLogContext` to `withJobContext` in your own processors before the
+alias goes.
+
+**How to turn it back.** Deploy the previous release; nothing is stored differently. There is no switch to print
+email bodies outside development, on purpose: set a provider instead.
