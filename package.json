@@ -20,6 +20,7 @@
     "prepare": "husky || true",
     "// — Gates (CI is manual-only: these run locally)": "",
     "lint:schema": "pnpm --filter @appshore/db lint:schema",
+    "accounts:duplicates": "pnpm --filter @appshore/db accounts:duplicates",
     "verify": "bash tools/verify/verify.sh",
     "verify:api": "bash tools/verify/api-qa.sh",
     "verify:scaffold": "node tools/init-app/check-variants.mjs",
