@@ -17,6 +17,7 @@ import { AgentActivityController } from './agent-activity.controller';
 import { DeveloperScopesController } from './developer-scopes.controller';
 import { AgentActionsController } from './agent-actions.controller';
 import { AgentActionsService } from './agent-actions.service';
+import { TOOL_AVAILABILITY_RULES, ToolAvailabilityService } from './tool-availability.service';
 
 @Module({
   imports: [forwardRef(() => McpToolsModule), FeatureFlagsModule, PlansModule, CacheModule],
@@ -34,6 +35,10 @@ import { AgentActionsService } from './agent-actions.service';
     // The tool side of the plan rule runs the real REST guard (see ToolAccessPolicyService.evaluateFeature).
     PlanGuard,
     ToolAccessPolicyService,
+    // Tool availability rules: the starter ships none. Replace with a factory that builds your rules (see
+    // tool-availability.service.ts); an unavailable tool is left out of tools/list and every chat toolset.
+    { provide: TOOL_AVAILABILITY_RULES, useValue: [] },
+    ToolAvailabilityService,
   ],
   exports: [
     ScopeRegistryService,
@@ -43,6 +48,8 @@ import { AgentActionsService } from './agent-actions.service';
     HitlChallengeService,
     RateLimitService,
     AgentActivityService,
+    ToolAccessPolicyService,
+    ToolAvailabilityService,
   ],
 })
 export class AgentContractModule {}

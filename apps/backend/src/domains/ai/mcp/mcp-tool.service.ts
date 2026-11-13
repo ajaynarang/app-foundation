@@ -10,6 +10,7 @@ import {
 } from '../assistant/mastra/tools/confirm-action.tool';
 import { InvocationPipelineService } from '../agent-contract/invocation-pipeline.service';
 import { HitlChallengeService } from '../agent-contract/hitl-challenge.service';
+import { ToolAvailabilityService } from '../agent-contract/tool-availability.service';
 import { getRequiredScope } from '../agent-contract/requires-scope.decorator';
 import { intentDigest, prepareIntentArgs } from '../agent-contract/intent-digest';
 import { fromUser, type UserPrincipal } from '@appshore/platform/auth/agent-principal';
@@ -83,6 +84,7 @@ export class McpToolService implements OnModuleInit {
     private readonly registry: McpRegistryDiscoveryService,
     @Optional() private readonly pipeline?: InvocationPipelineService,
     @Optional() private readonly challenges?: HitlChallengeService,
+    @Optional() private readonly toolAvailability?: ToolAvailabilityService,
   ) {}
 
   // eslint-disable-next-line @typescript-eslint/require-await -- satisfies OnModuleInit contract
@@ -148,6 +150,8 @@ export class McpToolService implements OnModuleInit {
     for (const toolName of this.allTools.keys()) {
       const registeredTool = this.allTools.get(toolName);
       if (!registeredTool) continue;
+      // A tool whose channel is not configured is never offered, so the model cannot promise it.
+      if (!this.isAvailable(toolName)) continue;
       // A delegated sub-agent gets reads only, so it can neither raise a card nor spend the person's confirmation.
       if (options.readOnly && this.isWriteTool(toolName)) continue;
 
@@ -223,6 +227,11 @@ export class McpToolService implements OnModuleInit {
     if (!registered?.providerClass?.prototype) return false;
     const scope = getRequiredScope(registered.providerClass.prototype, registered.methodName);
     return scope !== undefined && scopeTier(scope) !== SCOPE_TIERS.READ;
+  }
+
+  /** False when `ToolAvailabilityService` withholds the tool. Without the service every tool is available. */
+  private isAvailable(toolName: string): boolean {
+    return this.toolAvailability?.isAvailable(toolName) ?? true;
   }
 
   /**
@@ -306,7 +315,7 @@ export class McpToolService implements OnModuleInit {
         return { ok: false, error: 'Confirmation is not available in this session.' };
       }
       const registered = this.allTools.get(tool);
-      if (!registered || !this.isWriteTool(tool)) {
+      if (!registered || !this.isWriteTool(tool) || !this.isAvailable(tool)) {
         return {
           ok: false,
           error: `"${tool}" is not a change you can ask the person to confirm. Name the write tool you will call.`,

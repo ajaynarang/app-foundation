@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CardAccumulator, McpToolService } from '../../mcp-tool.service';
 import { RequiresScope } from '../../../agent-contract/requires-scope.decorator';
 import { intentDigest } from '../../../agent-contract/intent-digest';
+import { ToolAvailabilityService } from '../../../agent-contract/tool-availability.service';
 
 /**
  * McpToolService unit tests: tool exposure, the result unwrap, cards, and the write set derived from scopes. Every
@@ -112,6 +113,53 @@ describe('McpToolService', () => {
       const service = createService();
       const tools = await service.getToolsForPersona('member', CONTEXT);
       expect(Object.keys(tools).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('tool availability', () => {
+    const withheld = (...names: string[]) => new ToolAvailabilityService([{ tools: names, isAvailable: () => false }]);
+
+    it('leaves a tool that is not available out of the toolset', async () => {
+      const service = new McpToolService(mockRegistry, pipeline as never, undefined, withheld('query-items'));
+      await service.onModuleInit();
+      const names = Object.keys(await service.getToolsForPersona('admin', CONTEXT)).sort();
+      expect(names).toEqual(['get-product-info', 'health-check', 'search-kb']);
+    });
+
+    it('offers no confirm-action when the only write is not available', async () => {
+      mockRegistry.getTools.mockReturnValue(toolsWith(makeTool('create-item', z.object({}), 'createItem', ItemsTool)));
+      const service = new McpToolService(mockRegistry, pipeline as never, undefined, withheld('create-item'));
+      await service.onModuleInit();
+      const toolsets = await service.getToolsetsForPersona('admin', { ...CONTEXT, conversationId: 'c' });
+      expect(toolsets['app-tools']).not.toHaveProperty('create-item');
+      expect(toolsets['app-tools']).not.toHaveProperty('confirm-action');
+    });
+
+    it('refuses to raise a confirm card for a write that is not available', async () => {
+      mockRegistry.getTools.mockReturnValue(
+        toolsWith(
+          makeTool('create-item', z.object({}), 'createItem', ItemsTool),
+          makeTool('create-other', z.object({}), 'createItem', ItemsTool),
+        ),
+      );
+      const challenges = { recordChatIntent: jest.fn() };
+      const preflight = jest.fn().mockResolvedValue(null);
+      const service = new McpToolService(
+        mockRegistry,
+        { ...pipeline, preflight } as never,
+        challenges as never,
+        withheld('create-other'),
+      );
+      await service.onModuleInit();
+      const toolsets = await service.getToolsetsForPersona('admin', { ...CONTEXT, conversationId: 'c' });
+      const confirm = toolsets['app-tools']['confirm-action'] as any;
+      const suspend = jest.fn();
+
+      const result = await confirm.execute({ tool: 'create-other', args: {} }, { agent: { suspend, toolCallId: 't' } });
+
+      expect(suspend).not.toHaveBeenCalled();
+      expect(result.confirmed).toBe(false);
+      expect(challenges.recordChatIntent).not.toHaveBeenCalled();
     });
   });
 
