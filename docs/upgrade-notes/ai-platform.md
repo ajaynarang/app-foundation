@@ -884,7 +884,9 @@ defaults or are nullable and can stay; old code ignores them.
   result back, and nothing is created twice. It is the same Redis store the `Idempotency-Key` header uses, scoped to
   the workspace and the person the call acts for. The same key on a different call answers
   `IDEMPOTENCY_KEY_REUSED`; a retry while the first call still runs answers `IDEMPOTENCY_KEY_IN_USE`; a failed call
-  frees its key. If Redis cannot be reached the call runs without the key.
+  frees its key. If Redis fails or does not answer within 2 seconds the call runs without the key, and remembering the
+  result is bounded the same way, so an outage never stalls a create. The HTTP interceptor and the executor share
+  that bounded claim (`claimOrSkip` in `idempotency.store.ts`).
 - The example write `create-support-ticket` declares it. Its `tools/list` input schema gains an optional
   `idempotencyKey` string (1 to 255 visible ASCII characters; a UUID is ideal).
 - The key is an argument like any other for confirmation: an approval or a chat card is bound to it. The chat card

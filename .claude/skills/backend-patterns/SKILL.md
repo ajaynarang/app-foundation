@@ -1916,12 +1916,14 @@ dropped; a failure is `VALIDATION_FAILED` with `fieldErrors`), role, plan, confi
   a second record) declares `idempotencyKey: idempotencyKeyArg` from `agent-contract/tool-idempotency.ts` in its
   `parameters`, and is listed in `IDEMPOTENT_CREATE_TOOLS` in `tool-idempotency.spec.ts` (a `create-*` write that
   is on neither that list nor `NATURAL_KEY_CREATES` fails the spec). The executor does the rest with the one
-  `IdempotencyStore` the `Idempotency-Key` header uses: `claim(scope, key, requestFingerprint('tool:<name>',
-args))` with the scope `tdb:<tenantId>:u:<userDbId>`, per workspace and the person acted for; the same key and arguments
-  within 24 hours replay the first success; the same key on another call is `IDEMPOTENCY_KEY_REUSED`, a retry while
-  the first still runs is `IDEMPOTENCY_KEY_IN_USE`; a failure releases the key; an unreachable store runs the call
-  without it. The key is taken out before the method runs, so a tool never reads it, and it is part of the
-  confirmation digest like any other argument. Never build a second store or hand-roll a dedupe in a tool, and
+  `IdempotencyStore` the `Idempotency-Key` header uses, through the same `claimOrSkip` helper, with
+  `requestFingerprint('tool:<name>', args)` and the scope `tdb:<tenantId>:u:<userDbId>`, per workspace and the
+  person acted for; the same key and arguments within 24 hours replay the first success; the same key on another
+  call is `IDEMPOTENCY_KEY_REUSED`, a retry while the first still runs is `IDEMPOTENCY_KEY_IN_USE`; a failure (or a
+  throw) releases the key; a store that fails or does not answer within 2 s (`IDEMPOTENCY_STORE_TIMEOUT_MS`; the
+  Redis client queues commands during an outage instead of rejecting them) runs the call without it. The key is
+  taken out before the method runs, so a tool never reads it, and it is part of the confirmation digest like any
+  other argument. Never build a second store or hand-roll a dedupe in a tool, and
   never declare the key on a read.
 - `tools/list` serves `toolInputSchema(parameters)` (`agent-contract/tool-input-schema.ts`): `_` properties stripped,
   `_confirmToken` documented. Never build a tool's input schema another way.
