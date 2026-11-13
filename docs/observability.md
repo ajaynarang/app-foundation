@@ -8,8 +8,8 @@ Nothing here is required to boot, test or deploy. With no key set the app runs, 
 nothing anywhere. Each vendor is switched on by its own key and is a no-op without it.
 
 > This page grows with the observability work. Today it covers error tracking, traces, metrics, the crons and
-> heartbeat behind them, and the local stack. Alert rules, dashboards and the AWS fallback alarms are added to it as
-> they land.
+> heartbeat behind them, the dashboards and alert routing kept as code, and the local stack. The alert rules, their
+> runbooks and the AWS fallback alarms are added to it as they land.
 
 ## Error tracking (Sentry)
 
@@ -145,6 +145,28 @@ are left out on purpose; their two age gauges cover them.
 Redis, the scheduler and a consumer all work, so its absence is the signal. It needs no schedule row; a disabled
 row `('maintenance', 'ops-heartbeat')` removes it, which is how a test-fire proves the missing-heartbeat alert pages
 on a stack with no worker to stop.
+
+## Dashboards and alert routing (Grafana as code)
+
+Dashboards, alert routing and (as they land) alert rules live in the repo, under
+[`infra/observability/grafana-cloud/`](../infra/observability/grafana-cloud/README.md), and are applied to a hosted
+Grafana stack by `grafana-apply.mjs`. Nothing is created in Grafana by hand except the datasources and the IRM
+integrations.
+
+- **The source is `catalog/`.** `alerting/` and `dashboards/` are generated from it by `generate.mjs`; never edit
+  them by hand. `pnpm check:ops` (in `pnpm verify`, and on the pre-push hook for a push that touches `infra/`,
+  `docs/runbooks/`, `.github/` or `tools/`) fails when they are stale, and runs `validate.mjs` over every query.
+- **Product constants.** `PROJECT` (the Terraform `project` value) and `REPO_URL` in `catalog/constants.mjs`; every
+  service name, AWS name and runbook link derives from them. `pnpm init-app` sets both and regenerates. A product
+  with no worker task (`worker_desired_count = 0`) sets `HAS_WORKER = false` there and regenerates, so nothing
+  selects on a service that sends no metric.
+- **Boards:** overview, queues and jobs, SLOs, per-tenant health. Each has an environment selector; the `env` values
+  are the same three the logs, metrics and errors carry.
+- **Routing:** a `sev1` in production pages through the `irm-oncall` contact point; everything else, a staging
+  `sev1` included, notifies through `irm-notify`. Both are Grafana IRM webhooks.
+- **Applying** is a dry run unless `--apply` is passed. `--apply` needs `GRAFANA_URL`, `GRAFANA_SA_TOKEN` and
+  `IRM_ONCALL_WEBHOOK_URL` (apply-time secrets, never app config or Doppler), and refuses while `REPO_URL` is the
+  placeholder, while a generated file is stale, or (for rules) before Loki has seen logs from both environments.
 
 ## The local stack
 

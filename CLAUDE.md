@@ -287,4 +287,8 @@ success + error toasts; every loading state shows a Skeleton.
   refuses a route without a summary, a described path param or a documented success body (`@ApiResult` with a
   response schema named in the controller group's `openapi.responses.ts`). Regenerate and commit both files with any
   change to a route, a DTO or a response. Production serves the public subset at `/api/openapi.json`.
+- **`pnpm check:ops`** — the operations files that are not Jest specs: the Grafana-as-code catalog under
+  `infra/observability/grafana-cloud/` (generated files fresh, `validate.mjs`, its specs), the ops shell tests and
+  Terraform fmt / validate / test. It runs inside `pnpm verify`, and the pre-push hook runs it when a push touches
+  `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files.
 - **Pre-commit hook** — Prettier on staged files.

@@ -16,9 +16,10 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ### `init-app/`
 
-| Script                  | What it does                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| `init-app/init-app.mjs` | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`. |
+| Script                                      | What it does                                                                                                                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init-app/init-app.mjs`                     | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`.                                                                                    |
+| `init-app/check-scaffold-observability.mjs` | Copies the tree, runs init-app, and checks the Grafana-as-code catalog was renamed, regenerated and still validates. A step of `pnpm verify:scaffold`; runs alone in seconds. |
 
 ### `db/`
 
@@ -37,10 +38,12 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ### `verify/`
 
-| Script             | What it does                                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verify/verify.sh` | `pnpm verify`: format check, lint, schema lint, type-check, unit tests, build. Ends with one result line.                                                            |
-| `verify/api-qa.sh` | `pnpm verify:api`: builds, migrates, seeds, boots the backend and runs the Playwright `api` project against it. For a change to the wire. Ends with one result line. |
+| Script                       | What it does                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify/verify.sh`           | `pnpm verify`: format check, lint, schema lint, type-check, unit tests, `check:ops`, build. Ends with one result line.                                                                                                                                                                                                                                  |
+| `verify/api-qa.sh`           | `pnpm verify:api`: builds, migrates, seeds, boots the backend and runs the Playwright `api` project against it. For a change to the wire. Ends with one result line.                                                                                                                                                                                    |
+| `verify/check-ops.sh`        | `pnpm check:ops`: the Grafana-as-code catalog (`generate.mjs --check`, `validate.mjs`, its specs), every `*.test.sh` under `.github/scripts/` and `tools/`, and Terraform fmt / validate / test when `terraform` is installed. Part of `pnpm verify`; the pre-push hook runs it when a push touches `infra/`, `docs/runbooks/`, `.github/` or `tools/`. |
+| `verify/push-touches-ops.sh` | Used by the pre-push hook: exit 0 when the pushed commits touch the paths `check:ops` checks. Its hermetic test is `push-touches-ops.test.sh`.                                                                                                                                                                                                          |
 
 ## Common tasks
 
