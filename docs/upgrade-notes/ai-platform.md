@@ -940,10 +940,46 @@ with a factory that builds your rules.
 
 **Rollback.** Revert the change. No data is involved.
 
+## 21. The `ai_reader` role is dropped; migration `drop_ai_reader_role`; the AI domain never imports Desk
+
+**What changed.**
+
+- Migration `20261113210000_drop_ai_reader_role` revokes what `20260611000001_ai_reader_rls` granted to the
+  `ai_reader` role in this database (SELECT on `knowledge_documents`, `conversations` and `conversation_messages`,
+  USAGE on schema `public`, and the migration user's membership in the role), then drops the role. Roles are
+  cluster-wide in Postgres and grants are per database, so when another database on the same server still grants to
+  the role (a shadow database, a second product, a grant you added), the drop is skipped with a notice
+  (`role ai_reader not dropped: ...`) instead of failing; the last database to run the migration drops it. A
+  migration user that may not drop the role also gets a notice. No table, column or row changes. The migration is
+  safe to re-run and does nothing where the role does not exist.
+- New architecture spec `apps/backend/src/architecture/ai-imports-no-desk.spec.ts`: no file under `domains/ai/`
+  (specs included) imports the Desk folder. Desk imports AI, never the reverse, so a product scaffolded without Desk
+  keeps a working AI domain. The spec names the Desk folder, so it is on `tools/init-app/features/desk.residue.json`.
+- The `desk-patterns` skill gains one rule: after adding a responsibility key, outcome or event, run `pnpm build`
+  (ts-jest does not type-check).
+
+**Env.** None. **Schema.** No model change; one migration that drops a role.
+
+**Who notices.** Nobody on the wire, provided the deploy order below is kept. Operators may see the notice in the
+migration log when other databases on the server still grant to the role; that is expected.
+
+**What to do.**
+
+- Follow "Deploy order for `ai_reader`" below. This is the one change in this note that must not be pulled together
+  with the ones before it.
+- If you added your own grants to `ai_reader` (for your tool tables), revoke them, or the role stays: the migration
+  only revokes the grants the starter made. Then drop the role by hand (`DROP ROLE ai_reader;`) once no database
+  grants to it.
+- If you added an AI file that imports Desk, move that code into the Desk folder and have Desk call AI.
+
+**Rollback.** Re-create the role only if you roll back past section 2 (the old code needs it): re-run sections 1
+and 2 of `20260611000001_ai_reader_rls`. Otherwise nothing uses the role and there is nothing to restore.
+
 ## Deploy order for `ai_reader`
 
-A later change in this project adds the migration `drop_ai_reader_role`, which revokes the role's grants and drops
-it. Old tasks run `SET LOCAL ROLE ai_reader` on every tool call, so that migration must not run while any task on
-the old code is still serving. Deploy every change before it (at least section 2 above) in every environment
-first, and only then pull the change that drops the role. Pulled in one deploy, both migrations would run while old
-tasks still switch to the role.
+Section 21's migration, `drop_ai_reader_role`, revokes the role's grants and drops it. Tasks on code from before
+section 2 run `SET LOCAL ROLE ai_reader` on every tool call, so that migration must not run while any such task is
+still serving. Deploy every change up to section 20 (at least section 2) in every environment first, and confirm no
+old task is left, and only then pull the change that drops the role. Pulled in one deploy, both migrations would run
+while old tasks still switch to the role, and their tool calls would fail with `role "ai_reader" does not exist`.
+This order is written here, not enforced by the code.
