@@ -34,6 +34,9 @@ export function killSwitchKey(feature: string): string {
 export const PLAN_ENFORCEMENT_MODES = ['enforce', 'log'] as const;
 export type PlanEnforcementMode = (typeof PLAN_ENFORCEMENT_MODES)[number];
 
+/** The `event` of the one warning log mode writes per would-be denial. Alert rules and log queries key on it. */
+export const PLAN_WOULD_DENY_EVENT = 'plan.would_deny';
+
 export function planEnforcementMode(value: unknown): PlanEnforcementMode {
   return value === 'log' ? 'log' : 'enforce';
 }

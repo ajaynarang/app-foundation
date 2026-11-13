@@ -16,7 +16,12 @@ import {
   userLimitReachedError,
   type PlanDenialCode,
 } from '../../auth/guards/plan-access.errors';
-import { bypassesPlanChecks, killSwitchKey, planEnforcementMode } from '../../auth/guards/plan-access.rules';
+import {
+  PLAN_WOULD_DENY_EVENT,
+  bypassesPlanChecks,
+  killSwitchKey,
+  planEnforcementMode,
+} from '../../auth/guards/plan-access.rules';
 
 export interface EntitlementActor {
   role?: string | null;
@@ -137,7 +142,7 @@ export class TenantEntitlementsService {
     if (options.strict || planEnforcementMode(this.config.get('planEnforcement')) !== 'log') return false;
     this.logger.warn({
       msg: `Plan would deny ${feature} (${denial.code})`,
-      event: 'plan.would_deny',
+      event: PLAN_WOULD_DENY_EVENT,
       feature,
       plan: denial.plan,
       route: options.route ?? null,
