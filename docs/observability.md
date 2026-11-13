@@ -35,13 +35,24 @@ In this order. Each step is safe to stop after.
 3. **Paging.** Create two Grafana IRM integrations (one that pages, one that notifies) and set their webhook URLs as
    secrets of the `grafana-apply` workflow, with `GRAFANA_URL` and a service-account token. Run the workflow with
    `plan`, read it, then `apply`.
-4. **Test-fire.** One test page through IRM, and one real rule on staging: disable the heartbeat's schedule row
-   `('maintenance', 'ops-heartbeat')` (find its id with `GET /admin/schedules`, then
-   `PATCH /admin/schedules/:id` with `{"isEnabled": false}`) and wait for `worker-heartbeat-missing` to notify, about
-   fifteen minutes. Re-enable it with `{"isEnabled": true}`. Do not stop the worker service for this: by default the
+4. **Test-fire.** One test page through IRM, and one real rule on staging: disable the heartbeat. It runs with no
+   schedule row, so first create one (nothing ships it, and `PATCH` only edits a row that exists), enabled and with
+   the default interval, so it changes nothing yet:
+
+   ```sql
+   INSERT INTO job_schedules (category, job_type, schedule_type, pattern, interval_ms, is_enabled, updated_at)
+   VALUES ('maintenance', 'ops-heartbeat', 'interval', NULL, 300000, true, NOW())
+   ON CONFLICT (category, job_type) DO NOTHING;
+   ```
+
+   Find its id with `GET /admin/schedules`, then `PATCH /admin/schedules/:id` with `{"isEnabled": false}`: that
+   removes the repeatable from BullMQ at once. Wait for `worker-heartbeat-missing` to notify, about fifteen minutes.
+   Then `PATCH` it back to `{"isEnabled": true}` and leave the row: enabled with the default interval it behaves
+   exactly as no row, and the next test-fire can reuse it. Do not stop the worker service for this: by default the
    API consumes every queue too (`api_queue_processors_enabled = true`), so the heartbeat keeps beating and the rule
    never fires. The rules are untested against real traffic until this step: they are written from the code, not
    tuned on a live stack.
+
 5. **CloudWatch data.** In Grafana Explore, run each CloudWatch rule's query (RDS, Redis, the ECS services) for each
    environment and check that it returns data. Those rules treat no data as alerting, so a wrong dimension or prefix
    would page for good once they are live. The dimension sets come from the AWS metric documentation, not a live
@@ -188,9 +199,9 @@ and the one missed-run rule stays silent for it. The outbox relay (every 10 s) a
 are left out on purpose; their two age gauges cover them.
 
 `ops-heartbeat` runs every five minutes on `bulk-ops` and writes one `ops.heartbeat` line. The line exists only if
-Redis, the scheduler and a consumer all work, so its absence is the signal. It needs no schedule row; a disabled
-row `('maintenance', 'ops-heartbeat')` removes it, which is how a test-fire proves the missing-heartbeat alert pages
-on a stack with no worker to stop.
+Redis, the scheduler and a consumer all work, so its absence is the signal. It needs no schedule row and none
+ships; a row `('maintenance', 'ops-heartbeat')` an operator inserts is honoured, and disabling it removes the beat,
+which is how a test-fire proves the missing-heartbeat alert pages on a stack with no worker to stop (step 4 above).
 
 ## Dashboards, alert rules and routing (Grafana as code)
 

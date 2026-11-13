@@ -100,8 +100,10 @@ budget. Background work, the outbox relay and the deadline sweep included, has s
 - Redis full or unreachable: fix Redis first; queued jobs resume on their own.
 - A job holding the lane: let it finish if it is near the end, otherwise fix it to work in slices; see the lane note
   at the top.
-- Heartbeat schedule disabled on purpose (the row `('maintenance', 'ops-heartbeat')` in `job_schedules`, used for a
-  test-fire): re-enable it with `PATCH /admin/schedules/:id`.
+- Heartbeat schedule disabled on purpose (the row `('maintenance', 'ops-heartbeat')` in `job_schedules`, which
+  none ships: an operator inserts it for a test-fire, see the level 2 steps in `docs/observability.md`): find its id
+  with `GET /admin/schedules` and re-enable it with `PATCH /admin/schedules/:id` and `{"isEnabled": true}`. With no
+  such row in the list, the heartbeat is not disabled by a schedule; look at the other causes.
 
 ### Escalation
 
