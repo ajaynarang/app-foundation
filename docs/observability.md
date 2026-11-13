@@ -42,7 +42,9 @@ outside AWS, so a product that sets these keys lists Sentry as a subprocessor in
 | `ai`       | A provider refusing a platform-paid AI call for credit (not a 5xx, so nothing else reports it).                  |
 
 A reused refresh token (a possible stolen session) is reported at warning level. A 4xx is never reported; a line
-logged at error level is not reported either, because the tracker does not read logs.
+logged at error level is not reported either, because the tracker does not read logs. The SDK's own Nest
+integration is switched off, because it would report every failed job attempt and every throwing `@OnEvent` handler
+on its own, untagged (`sentry-auto-capture.spec.ts`).
 
 Every event is tagged with ids only, from the request or job it ran in: `tenantId` (the public id), `tenantDbId`,
 `role`, `jobName`, `jobId`, `queue`, `requestId`, `traceId`. A web event from a failed API call carries the

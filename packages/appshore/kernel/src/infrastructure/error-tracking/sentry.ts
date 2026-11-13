@@ -38,9 +38,16 @@ export function resolveSentryEnvironment(raw: string | undefined = process.env.E
   return env === 'unknown' ? 'development' : env;
 }
 
+/** The SDK's NestJS integration, named as the SDK names it. */
+const NEST_INTEGRATION = 'Nest';
+
 /**
  * Error tracking only. Tracing stays with the OpenTelemetry pipeline (`infrastructure/telemetry`), so Sentry does not
  * register its own OpenTelemetry provider and no traces sample rate is set. Null when `SENTRY_DSN` is unset.
+ *
+ * The default Nest integration is dropped: it wraps every `@Processor` process(), `@OnEvent` handler and `@Cron`
+ * method and captures their errors itself, untagged, so every failed BullMQ attempt (retries included) would be
+ * reported and the final failure reported twice. Those paths report through `reportError` (rule 10).
  */
 export function buildSentryOptions(env: NodeJS.ProcessEnv = process.env): NodeOptions | null {
   const dsn = env.SENTRY_DSN?.trim();
@@ -52,6 +59,7 @@ export function buildSentryOptions(env: NodeJS.ProcessEnv = process.env): NodeOp
     release: env.SENTRY_RELEASE?.trim() || undefined,
     dataCollection: SENTRY_DATA_COLLECTION,
     enableOpenTelemetrySetup: false,
+    integrations: (defaults) => defaults.filter((integration) => integration.name !== NEST_INTEGRATION),
   };
 }
 
