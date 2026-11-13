@@ -6,7 +6,8 @@ import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
 import { TwilioVerifyService } from '../../../infrastructure/sms/twilio-verify.service';
 import { PinService } from '../../../auth/pin.service';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { TenantEntitlementsService } from '../../entitlements/tenant-entitlements.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 
 describe('UserInvitationsService', () => {
@@ -59,6 +60,8 @@ describe('UserInvitationsService', () => {
     get: jest.fn(),
   };
 
+  const mockEntitlements = { assertUserSeatAvailable: jest.fn() };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -87,12 +90,14 @@ describe('UserInvitationsService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        { provide: TenantEntitlementsService, useValue: mockEntitlements },
       ],
     }).compile();
 
     service = module.get<UserInvitationsService>(UserInvitationsService);
 
     jest.clearAllMocks();
+    mockEntitlements.assertUserSeatAvailable.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -107,6 +112,26 @@ describe('UserInvitationsService', () => {
       tenantId: 'tenant_abc',
       tenant: { id: 1 },
     };
+
+    it('a pending invitation takes a seat: refused, and nothing written or sent, when the plan is full', async () => {
+      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 1, tenantId: 'tenant_abc' });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 1 });
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.userInvitation.findFirst.mockResolvedValue(null);
+      mockEntitlements.assertUserSeatAvailable.mockRejectedValue(
+        new ForbiddenException({ code: 'USER_LIMIT_REACHED', detail: 'full' }),
+      );
+
+      await expect(
+        service.inviteUser(
+          { email: 'new@example.com', firstName: 'N', lastName: 'U', role: 'MEMBER' as any },
+          defaultCurrentUser,
+        ),
+      ).rejects.toMatchObject({ response: { code: 'USER_LIMIT_REACHED' } });
+      expect(mockEntitlements.assertUserSeatAvailable).toHaveBeenCalledWith(1, { route: 'POST /invitations' });
+      expect(mockPrismaService.userInvitation.create).not.toHaveBeenCalled();
+      expect(mockEmailService.sendUserInvitation).not.toHaveBeenCalled();
+    });
 
     it('should create invitation for new user', async () => {
       const inviteDto = {

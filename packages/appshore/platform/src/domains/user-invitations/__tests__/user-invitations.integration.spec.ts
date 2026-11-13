@@ -50,6 +50,7 @@ describe('Invitations and one live account per email (Postgres)', () => {
       { checkVerification: async () => true } as any,
       { hashPin: async () => 'pin-hash' } as any,
       { get: () => undefined } as any,
+      { assertUserSeatAvailable: async () => undefined } as any,
     );
     ready = true;
   }, 60_000);

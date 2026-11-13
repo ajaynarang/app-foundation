@@ -27,6 +27,7 @@ import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
 import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
+import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
 
@@ -58,6 +59,7 @@ export class UserInvitationsService {
     private twilioVerifyService: TwilioVerifyService,
     private pinService: PinService,
     private configService: ConfigService,
+    private entitlements: TenantEntitlementsService,
   ) {}
 
   /**
@@ -150,6 +152,9 @@ export class UserInvitationsService {
         throw new ConflictException('Invitation already sent to this email');
       }
     }
+
+    // A pending invitation takes a seat: refused once the plan's user limit is in use.
+    await this.entitlements.assertUserSeatAvailable(tenantId, { route: 'POST /invitations' });
 
     // Create invitation
     const token = nanoid();
