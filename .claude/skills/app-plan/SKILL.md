@@ -42,8 +42,8 @@ Follow its task breakdown, red-green-refactor per task and review checkpoints ex
 - **Tests:** the specs to add, mirroring the nearest neighbour and using `@appshore/platform/test/*` fixtures. A guard,
   rule or fix gets a spec that fails without it. 90% line and branch coverage on changed backend code is the review
   bar (`app-reviewer`, tests dimension); no threshold is configured.
-- **Scaffolding:** a task touching `tools/init-app/`, a feature manifest, a skill or agent name, or a line naming
-  `inngest` or `domains/desk` outside the Desk folder adds `pnpm verify:scaffold` to the gates.
+- **Scaffolding:** a task touching `tools/init-app/`, a feature manifest, a skill or agent name, or a Desk-only line
+  outside the Desk folder (one the Desk manifest must list) adds `pnpm verify:scaffold` to the gates.
 
 ## Step 3 — File the plan
 

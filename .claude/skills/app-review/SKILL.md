@@ -49,8 +49,8 @@ In PR mode also check the record:
   (`gh pr view <n> --json headRefOid`, first seven characters), with no `+dirty`. Missing, stale or dirty is a
   finding, and the review verdict cannot be READY or CLEAN.
 - A wire change (controller, DTO, serializer, status code, error envelope) carries a `pnpm verify:api` line; a
-  scaffolding change (`tools/init-app/`, a feature manifest, a skill or agent name, the residue list, a line naming
-  `inngest` or `domains/desk` outside the Desk folder) carries a `pnpm verify:scaffold` line.
+  scaffolding change (`tools/init-app/`, a feature manifest, a skill or agent name, the residue list, a Desk-only line
+  outside the Desk folder) carries a `pnpm verify:scaffold` line.
 - A route, DTO or response change includes the regenerated `apps/backend/openapi.json` and `public-openapi.json`.
 - The PR template's Docs, Conventions and Decision record sections are filled; a convention change updates its
   reference in the same PR; code that contradicts a binding doc or ADR with no amendment is a finding.

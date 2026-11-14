@@ -71,7 +71,7 @@ Commit the docs with the code. The PR body names what changed under "Docs", or "
 pnpm verify             # always; keep its last line
 pnpm verify:api         # the wire changed: a route, DTO, serializer, status code or the error envelope
 pnpm verify:scaffold    # tools/init-app/, a feature manifest, a skill or agent name, the residue list, or a
-                        # line naming inngest or domains/desk outside the Desk folder
+                        # Desk-only line outside the Desk folder
 ```
 
 `pnpm verify` ends `verify: PASS <sha> (<n>s)` or `verify: FAIL at "<step>" <sha> (<n>s)`. Run it on the commit you
