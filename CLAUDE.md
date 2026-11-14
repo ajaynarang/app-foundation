@@ -282,7 +282,7 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
 - **Guards before prose.** Every rule in a skill names its guard or says review-only; `pnpm guards` fails when a skill,
   agent or doc cites something that does not exist. A reviewer is never spent on a rule a guard holds.
 - **Settings for the workflow** are in `.claude/workflow.json`: the skill prefix, the default branch, the plans folder
-  and whether git tracks it (`plans`; untracked in the template, because its repository is public), the CI mode.
+  and whether git tracks it (`plans.tracked`: false in the template, because its repository is public; `init-app --plans` sets it per product), the CI mode.
 - **The pull request carries its record**: the `pnpm verify` line for its head commit, docs changed, the ADR touched
   (`.github/pull_request_template.md`). The owner merges.
 
