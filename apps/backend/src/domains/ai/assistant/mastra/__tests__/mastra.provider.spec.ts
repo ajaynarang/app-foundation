@@ -1,7 +1,10 @@
+// Like the real Mastra 1.x: shutdown() closes the storage it was given.
 jest.mock('@mastra/core', () => ({
-  Mastra: jest.fn().mockImplementation(() => ({
+  Mastra: jest.fn().mockImplementation((config: { storage?: { close(): Promise<void> } }) => ({
     getAgent: jest.fn().mockReturnValue({}),
-    shutdown: jest.fn().mockResolvedValue(undefined),
+    shutdown: jest.fn(async () => {
+      await config.storage?.close();
+    }),
   })),
 }));
 jest.mock('@mastra/core/agent', () => ({
@@ -11,10 +14,17 @@ jest.mock('@mastra/core/agent', () => ({
     model: config.model,
   })),
 }));
+// Like the real PostgresStore: close() ends its pg pool, and pg refuses to end a pool twice.
 jest.mock('@mastra/pg', () => ({
-  PostgresStore: jest.fn().mockImplementation(() => ({
-    close: jest.fn().mockResolvedValue(undefined),
-  })),
+  PostgresStore: jest.fn().mockImplementation(() => {
+    let ended = false;
+    return {
+      close: jest.fn(async () => {
+        if (ended) throw new Error('Called end on pool more than once');
+        ended = true;
+      }),
+    };
+  }),
 }));
 jest.mock('@mastra/memory', () => ({
   Memory: jest.fn().mockImplementation(() => ({})),
@@ -29,6 +39,8 @@ jest.mock('@mastra/langfuse', () => ({
 import { InternalServerErrorException } from '@nestjs/common';
 import { RequestContext } from '@mastra/core/request-context';
 import { Agent } from '@mastra/core/agent';
+import { Mastra } from '@mastra/core';
+import { PostgresStore } from '@mastra/pg';
 import { Observability } from '@mastra/observability';
 import { MastraProvider } from '../mastra.provider';
 import { PiiMaskingSpanOutputProcessor } from '../../../infrastructure/telemetry/pii-masking-span-output-processor';
@@ -69,9 +81,31 @@ describe('MastraProvider', () => {
   });
 
   describe('onModuleDestroy', () => {
-    it('shuts down Mastra and closes store', async () => {
+    it('shuts down Mastra, which closes the store, and does not end the pool a second time', async () => {
       await provider.onModuleInit();
-      await expect(provider.onModuleDestroy()).resolves.not.toThrow();
+      await expect(provider.onModuleDestroy()).resolves.toBeUndefined();
+
+      const store = (PostgresStore as unknown as jest.Mock).mock.results.at(-1)?.value;
+      expect(store.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('is safe to call twice', async () => {
+      await provider.onModuleInit();
+      await provider.onModuleDestroy();
+      await expect(provider.onModuleDestroy()).resolves.toBeUndefined();
+    });
+
+    it('closes the store itself when Mastra was never created', async () => {
+      (Mastra as unknown as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('bad config');
+      });
+      await expect(provider.onModuleInit()).rejects.toThrow('bad config');
+      jest.spyOn((provider as any).logger, 'error').mockImplementation(() => undefined);
+
+      await expect(provider.onModuleDestroy()).resolves.toBeUndefined();
+
+      const store = (PostgresStore as unknown as jest.Mock).mock.results.at(-1)?.value;
+      expect(store.close).toHaveBeenCalledTimes(1);
     });
   });
 

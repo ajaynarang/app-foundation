@@ -125,12 +125,21 @@ export class MastraProvider implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Mastra initialized with ${Object.keys(agents).length} agents`);
   }
 
+  /**
+   * `Mastra.shutdown()` closes the storage it was given, which ends the store's pg pool. Closing the store again
+   * makes pg throw "Called end on pool more than once", so the store is closed here only when no Mastra instance
+   * owns it (initialisation failed after the store was built). Safe to call twice.
+   */
   async onModuleDestroy() {
-    if (this.mastra) {
-      await this.mastra.shutdown();
+    const { mastra, store } = this;
+    this.mastra = null;
+    this.store = null;
+    if (mastra) {
+      await mastra.shutdown();
       this.logger.log('Mastra shut down');
+      return;
     }
-    await this.store?.close();
+    await store?.close();
   }
 
   getMastra(): Mastra {
