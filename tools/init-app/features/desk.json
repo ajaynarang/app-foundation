@@ -29,7 +29,9 @@
     "CLAUDE.md",
     ".claude/skills/backend-patterns/SKILL.md",
     "docs/upgrade-notes/operations.md",
-    "docs/operations.md"
+    "docs/operations.md",
+    "docs/domain-map.md",
+    "docs/module-map.md"
   ],
   "jsonEntries": [
     { "file": "package.json", "path": ["scripts", "// — Inngest (Desk durable workflow engine — local dev)"] },
