@@ -41,6 +41,29 @@ removed. Everything cross-cutting remains and works:
 
 ---
 
+## Binding docs (read before any product work)
+
+These docs are the architecture of record. Before planning, designing or building a product feature, read the ones
+it touches; they override improvisation. In the starter they are skeletons: each has a filled "Foundation (already
+here)" part where the starter already decides something, and an empty "Your product" part to fill in the product's
+first days (`/app-runway` walks them in order). `docs/README.md` indexes every other doc.
+
+| Doc                                 | What it binds                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `docs/VISION.md`                    | Who the product is for, what it does, what it will not do                       |
+| `docs/domain-map.md`                | Every entity, what it means, how entities relate (the schema holds the columns) |
+| `docs/lifecycles-and-invariants.md` | The always-true rules, each with its guard, and every state machine             |
+| `docs/module-map.md`                | Which folder owns what, and which way dependencies point                        |
+| `docs/event-vocabulary.md`          | Every domain event; use the names verbatim                                      |
+| `docs/epics.md`                     | Build order, and what "demoable" means for each epic                            |
+| `docs/adr/`                         | The decisions that are expensive to change, and why (index in its `README.md`)  |
+
+**The amendment rule.** Deviating from a binding doc is allowed only as a deliberate amendment: change the doc, and
+the ADR it rests on, in the same pull request as the code. Never drift silently. A new decision that is expensive to
+undo gets its own ADR, started from `docs/adr/0000-template.md`.
+
+---
+
 ## Tenancy models (config toggle)
 
 The same codebase runs three ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
@@ -135,7 +158,8 @@ bind to app implementations.
 
 - **New domain:** add a module under `apps/backend/src/domains/<your-domain>/`, a feature under
   `apps/web/src/features/<your-domain>/`, and models in
-  `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma).
+  `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma). What the workflow must know
+  about it (vocabulary, personas, review checks) goes in the domain skill (`docs/adding-your-domain.md`).
 - **Domain events:** add entries to `APP_EVENT_REGISTRY` in
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
   automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events). Raise an event
@@ -154,8 +178,8 @@ bind to app implementations.
   shipped `true`; turn it off only once a worker task runs).
 - **MCP tools:** register `@Tool` providers in `apps/backend/src/domains/ai/mcp/mcp-tools.module.ts`.
   Every call runs through the one tool pipeline (scope, arguments, role, plan, confirmation, audit): give each tool
-  `@RequiresScope`, and `@RestrictToRoles` / `@RequiresPlanFeature` to match its REST twin (backend-patterns §23.1;
-  `mcp/tools/support-ticket.tool.ts` is the example).
+  `@RequiresScope`, and `@RestrictToRoles` / `@RequiresPlanFeature` to match its REST twin
+  (`.claude/skills/app-conventions/references/ai-tools.md`; `mcp/tools/support-ticket.tool.ts` is the example).
 - **Notification types, policies + WhatsApp templates:** notification types are strings, not a Prisma enum. Declare
   yours in `apps/backend/src/platform-glue/notifications/notification-types.ts` (`APP_NOTIFICATION_TYPES`) and their
   policies and templates in `app-notification-policies.ts` beside it; `hooks.module.ts` binds them to
@@ -217,41 +241,57 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 ## Code conventions
 
-### camelCase (NON-NEGOTIABLE)
+The rules live in the conventions skill, `.claude/skills/app-conventions/SKILL.md`: the non-negotiables that hold in
+every layer, each with the guard that holds it, and a routing table to one reference per area (routes and errors,
+lists, the database, events and the outbox, jobs and deadlines, AI routing and tools, observability, the outbound
+gate, plans, tenancy, auth and sessions, infra and deploy, the web kit, mobile). Read the index before any code; open
+a reference only for the area you touch. The short form:
 
-All API responses, request bodies, DTOs, service params, and frontend types use **camelCase**.
-Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, URL params
-(`:tenant_id`), and query keys on the wire: a query DTO declares `@QueryString({ name: 'tenant_id' }) tenantId`,
-so the property is still camelCase.
+- **camelCase on the wire** (responses, bodies, DTOs, service params, web types). snake_case only in Prisma blocks,
+  URL params (`:tenant_id`) and query-string keys (`@QueryString({ name: 'tenant_id' }) tenantId`).
+- **Enums come from the Prisma schema** (`packages/appshore/db/prisma/schema/*.prisma`): the backend imports them from
+  `@appshore/db`, never `@prisma/client`; the web imports the generated mirror
+  (`packages/shared-types/src/generated/prisma-enums.ts`, held by `enum-codegen-parity.spec.ts`). App vocabularies
+  (events, jobs, deadline kinds, notification types) are strings with a registry.
+- **One error envelope** (`statusCode, code, detail, fieldErrors?, …`; no `message` key): throw a NestJS exception
+  or an `api-errors` factory, never `throw new Error(` on an HTTP path (ADR "API contract"; `error-envelope.spec.ts`).
+- **No `Int` id crosses the API**; another tenant's record is 404 (ADR "ID boundary"; `id-boundary.spec.ts`).
+- **Generated files, real env files and applied migrations are never hand-edited**: regenerate, or add a migration.
+  The protected-paths hook (`.claude/hooks/protected-paths.mjs`) refuses the edit.
+- **shadcn components from `@app/ui` only, theme tokens only, dark mode always works**; every mutation shows a
+  success and an error toast, every loading state a skeleton.
 
-### Enums = Prisma (single source of truth)
+---
 
-All enums live in `packages/appshore/db/prisma/schema/*.prisma`. Backend code imports enums and
-the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); frontend/shared-types
-import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
-Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
-via the db package's `scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it.
-One decided exception: notification types are strings with an app registry (`PLATFORM_NOTIFICATION_TYPES` in
-`@app/shared-types` plus the app's `notification-types.ts`), so a product adds a type without editing
-`foundation.prisma`.
+## Workflow
 
-### API errors (one envelope)
+How work is done is in `docs/how-we-build.md`, the playbook; the decision is the ADR "Workflow: a conventions index,
+guards before prose, and the product's own domain skill" (`docs/adr/0015-workflow-conventions-index-guards-domain-skill.md`).
 
-Every error body is `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing
-else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
-code). There is no `message` key. Throw a NestJS exception or a factory from
-`@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
-writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. Every query
-string is a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
-(`docs/adr/`), held by `apps/backend/src/architecture/error-envelope.spec.ts` and `field-errors.spec.ts`.
+- **Skills** (`.claude/skills/`, invoked as `/<name>`): `app-brainstorm` → `app-plan` → `app-execute` → `app-review`
+  is the loop for a feature; `app-epic` drives an epic from `docs/epics.md` slice by slice; `app-dev-docs` (`slice`,
+  `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
+  running app; `app-deploy` starts a deploy workflow and watches it; `app-test-notes` writes a hand-testing script;
+  `app-standards-audit` audits an area and files each gap with its guard; `app-runway` fills the binding docs and the
+  domain skill in a product's first days. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+- **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
+  vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
+  each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
+  foundation skill is edited to add a domain (`docs/adding-your-domain.md`).
+- **Agents** (`.claude/agents/`): `app-explorer` (read-only search), `app-reviewer` (one review dimension per run),
+  `app-qa-runner` (drives the app, reports what it saw), `app-persona` (plays one of the product's personas).
+- **Guards before prose.** Every rule in a skill names its guard or says review-only; `pnpm guards` fails when a skill,
+  agent or doc cites something that does not exist. A reviewer is never spent on a rule a guard holds.
+- **Settings for the workflow** are in `.claude/workflow.json`: the skill prefix, the default branch, the plans folder
+  and whether git tracks it (`plans.tracked`: false in the template, because its repository is public; `init-app --plans` sets it per product), the CI mode.
+- **The pull request carries its record**: the `pnpm verify` line for its head commit, docs changed, the ADR touched
+  (`.github/pull_request_template.md`). The owner merges.
 
-### UI standards
+<!-- feature:desk:start -->
 
-shadcn/ui components only (no raw `<button>`/`<input>`). They come from `@app/ui/components/ui/*`, the one
-component set; the web app keeps no copy. Dark-theme tokens (`bg-background`,
-`text-foreground`, `border-border`) — never standalone light-only colors. Sheet for 4+ field
-forms, Dialog for quick actions, AlertDialog for destructive confirmations. Every mutation shows
-success + error toasts; every loading state shows a Skeleton.
+- **Desk** work has its own skill, routed from the conventions index; it runs the same loop.
+
+<!-- feature:desk:end -->
 
 ---
 
@@ -260,14 +300,22 @@ success + error toasts; every loading state shows a Skeleton.
 - **Unit:** co-located `**/*.spec.ts` in `apps/backend/src` AND `packages/appshore/*/src`
   (Jest per package). Run `pnpm test` (turbo runs all). Platform test fixtures (prisma/cache/queue
   mocks, tenant/user factories) come from `@appshore/platform/test/*`.
-- **Mobile:** `cd apps/mobile && flutter analyze && flutter test`.
 - **E2E / smoke / RBAC:** `tests/` (`@app/qa`, Playwright). Run `pnpm test:qa`.
+
+<!-- feature:mobile:start -->
+
+**Mobile:** `cd apps/mobile && flutter analyze && flutter test` (`pnpm mobile:test`).
+
+<!-- feature:mobile:end -->
 
 ### Gates (CI is manual-only, so these run locally)
 
 - **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
-  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`) and the
-  build, stops at the first failure, and ends with one line: `verify: PASS` or `verify: FAIL at "<step>"`. The
+  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`; the web
+  jest also runs `@appshore/web-core`'s tests), `pnpm guards` and their tests, `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
+  build, stops at the first failure, and ends with one line: `verify: PASS <sha> (<n>s)` or
+  `verify: FAIL at "<step>" <sha> (<n>s)`, where `<sha>` is the commit the run started on and `+dirty` follows it
+  when the tree had uncommitted changes (ADR "CI is manual by default; enforcement is local"). The
   integration specs need Postgres and Redis (`docker compose up -d postgres redis`, or export `DATABASE_URL` and
   `REDIS_URL`).
 - **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
@@ -276,16 +324,20 @@ success + error toasts; every loading state shows a Skeleton.
   third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
   so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
-  `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
-  Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,
-  builds the foundation packages, regenerates OpenAPI and the RBAC matrix, type-checks the backend, web and
-  `tests/`, runs the backend specs, and checks that nothing names `inngest` or `domains/desk` in the `--desk no` copy
-  unless `tools/init-app/features/desk.residue.json` lists it. It takes minutes and needs Postgres and Redis.
+  `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
+  residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo
+  (every default inside a fresh `git init`; mobile and Desk off with prefix `zz` and no git; Desk on with plans
+  untracked), checks what `init-app` wrote (skill prefix, reserved names, plans, no `verified:` line, each feature
+  fully kept or removed), installs, builds the foundation packages, regenerates OpenAPI and the RBAC matrix,
+  type-checks the backend, web and `tests/`, runs the backend specs, then `pnpm guards`, `pnpm test:guards`,
+  `pnpm test:hooks` and a search for every template skill name, and checks that nothing names `inngest` or
+  `domains/desk` in a copy without Desk unless `tools/init-app/features/desk.residue.json` lists it. It takes
+  minutes and needs Postgres and Redis.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
   holds it. It then runs the web guards: `single-component-set.test.ts` (the shadcn components live in `@app/ui`
-  and `apps/web/src/shared/components/ui/` holds no copy), `theme-tokens.test.ts` (every text token clears WCAG AA)
+  and the web app keeps no copy under `src/shared/components/ui/`), `theme-tokens.test.ts` (every text token clears WCAG AA)
   and `ui-grammar-guard.test.ts` (theme tokens only, status tones, `RowActions`, `PageHeader` on every settings and
   admin page, `ListErrorState` on every list). Dates go through `useFormatters()`: lint bans `toLocaleDateString`
   and `toLocaleTimeString`.
@@ -305,4 +357,24 @@ success + error toasts; every loading state shows a Skeleton.
   `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files. A new alert
   rule needs its `## <rule key>` section in `docs/runbooks/`; applying to Grafana is the manual `grafana-apply`
   workflow.
-- **Pre-commit hook** — Prettier on staged files.
+- **`pnpm guards`** — the repository guards in `tools/guards/`, Node only, under a second. The skills guard
+  (`guard:skills`, `guard:docs`, `guard:source`) fails when a skill, agent or doc cites a file, glob, symbol, skill or
+  guard that does not exist (a backticked path that starts at a root folder, a relative link, a `sources:` anchor),
+  and when a source comment names a path under `.claude/` or a skill; cite a guard or a file under `docs/` instead.
+  `guard:ci` keeps every workflow manual (`.claude/workflow.json`: `ci`, `manualAlways`). A path the root
+  `.gitignore` ignores is not checked; a doc names a deleted file as ~~`path`~~. `pnpm test:guards` runs their tests.
+  The convention gate (`guard:conventions`, `tools/guards/convention-gate.mjs`) holds the text rules no spec holds
+  yet (`throw new Error(` on an HTTP path, an empty catch, `process.env` outside config and bootstrap, a raw
+  `<button>` or `<input>`, file size) against `convention-gate.baseline.json`: a count may only fall, a new hit fails.
+  Regenerate the baseline with `node tools/guards/convention-gate.mjs --update-baseline`, never by hand. When a
+  baselined hit only moved (a renamed file, or a file split as the size rule asks), add `--allow-moved`: it accepts
+  the new key while no rule's total across the tree rises, and say so in the pull request.
+- **Pre-commit hook** — Prettier on staged files and the convention gate on staged `.ts`/`.tsx` files (`lint-staged`),
+  then `pnpm guards`. The pre-push hook and `pnpm verify` run `pnpm guards`, `pnpm test:guards` and
+  `pnpm test:hooks` too.
+- **Claude Code hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`) — the protected-paths hook blocks an
+  edit to a generated file, a real env file or an applied migration; the convention gate and the drift reminder
+  (`.claude/hooks/hotspots/*.json`, and any skill or doc whose `sources:` name the file by path or glob, not by
+  folder) advise after an edit. `pnpm test:hooks` runs their fixture tests. The settings also deny reading real env
+  and key files (env files by name, since a deny rule cannot exempt `.env.example`; a new env name gets a line there
+  and in the hook test's list) and declare the `superpowers` plugin.

@@ -2,7 +2,7 @@
 # Format: Model.field:rule  (or  Model:rule  for model-level rules)
 #
 # When a table is migrated to compliance, REMOVE its entries from this file.
-# Convention in .claude/skills/backend-patterns/id-convention.md
+# Convention in docs/standards/id-convention.md
 #
 # tenant-scoping-missing entries are tables scoped through a parent row (a user,
 # a subscription, a conversation) or platform-wide by design. PasswordResetToken

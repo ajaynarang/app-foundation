@@ -1,1 +1,5 @@
+# Prettier on the staged files, then the convention gate on the staged .ts and .tsx files (lint-staged in package.json).
 pnpm exec lint-staged
+# The repository guards (tools/guards; under a second on the whole tree, so they run on every commit): skills, agents,
+# docs and source comments cite only what exists, and every workflow keeps CI manual.
+pnpm guards

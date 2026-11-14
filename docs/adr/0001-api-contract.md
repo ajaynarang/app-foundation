@@ -198,3 +198,25 @@ pre-push hook (`pnpm verify:arch`, the backend's architecture specs) or in `pnpm
   without parsing copy.
 - The rules are written into the `backend-patterns` skill (section 4.1 query DTOs, section 10 errors) and the
   `frontend-patterns` skill (the API error shape), and the `review` skill checks them.
+
+### Amendment — 2026-11-14: where the rule text lives
+
+The `backend-patterns` skill is retired. Its rule text for this record moved, unchanged in substance, to the
+conventions skill's references: `.claude/skills/app-conventions/references/api-contract.md` (status by route shape,
+naming, DTOs and query DTOs, OpenAPI, `Idempotency-Key`, the ID boundary), `errors.md` (the envelope, codes, copy)
+and `lists-and-pagination.md` (cursor lists, bounded reads) beside it. The decision is unchanged; the specs in "What is
+enforced, and by what" still hold it.
+
+### Amendment — 2026-11-14: the web half of the rule text
+
+The `frontend-patterns` skill is retired too. Its text for this record (the API error shape the web reads, the error
+utils, the mutation error pattern) moved, unchanged in substance, to
+`.claude/skills/app-conventions/references/forms-and-sheets.md` ("Errors") and `frontend-data.md` ("The API layer")
+beside it. The decision is unchanged.
+
+### Amendment — 2026-11-14: the review skill
+
+- The `review` skill is now `app-review`, and it holds no rule text. It runs the guards, lint and the architecture
+  specs, which hold this record's rules (the specs in "What is enforced, and by what"), and sends `app-reviewer`
+  agents only after what no spec sees, listed under "Flag in review" in `api-contract.md`, `errors.md` and
+  `lists-and-pagination.md` (ADR [Workflow](0015-workflow-conventions-index-guards-domain-skill.md)).

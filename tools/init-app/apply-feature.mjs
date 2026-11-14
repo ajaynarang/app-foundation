@@ -3,20 +3,25 @@
  * apply-feature — remove an optional feature from this repo, or show what removing it covers.
  *
  *   node tools/init-app/apply-feature.mjs --remove desk            # strip Desk
+ *   node tools/init-app/apply-feature.mjs --remove mobile          # strip the Flutter app
  *   node tools/init-app/apply-feature.mjs --remove desk --dry-run  # print what it would strip
  *   node tools/init-app/apply-feature.mjs --list desk              # print everything the manifest covers
  *
- * A feature is described by its manifest, `tools/init-app/features/<name>.json`, with four keys:
+ * A feature is described by its manifest, `tools/init-app/features/<name>.json`, with four keys (and one optional):
  *   paths              files and folders to delete
  *   markers            files holding blocks between `feature:<name>:start` and `feature:<name>:end` comment lines;
  *                      each block is removed with both marker lines (any comment syntax: //, #, <!-- -->)
  *   jsonEntries        { file, path, value? }: delete the key at `path`, or, with `value`, remove that value from
  *                      the array at `path` (package.json included)
  *   allowlistPrefixes  { prefix, files }: delete every key, at any depth, that starts with `prefix`
+ *   presentWhen        optional, a repo-relative path: the feature counts as kept while that path exists. For a
+ *                      feature with no backend seam (mobile). Without it, the seam says (OPTIONAL_FEATURES in
+ *                      apps/backend/src/platform-glue/features/index.ts), as optional-features.spec.ts reads it.
  *
- * Safe to run twice: whatever is already gone is skipped. `pnpm init-app --<name> no` calls the same code before
- * its rename rules, so the manifest is always matched against template text. A product that pulls template updates
- * keeps this folder: running `--remove` again deletes a returning file and strips a new marked block.
+ * Safe to run twice: whatever is already gone is skipped. `pnpm init-app --<name> no` (`--desk no`, `--mobile no`)
+ * calls the same code before its rename rules, so the manifest is always matched against template text. A product
+ * that pulls template updates keeps this folder: running `--remove` again deletes a returning file and strips a new
+ * marked block.
  *
  * Zero dependencies. Node >= 20.
  */
@@ -53,9 +58,14 @@ export function loadManifest(name, featuresDir = FEATURES_DIR) {
   const manifest = { name };
   for (const key of MANIFEST_KEYS) manifest[key] = raw[key] ?? [];
   for (const key of Object.keys(raw)) {
-    if (!MANIFEST_KEYS.includes(key) && !key.startsWith('$')) {
-      throw new Error(`${file}: unknown key "${key}" (expected ${MANIFEST_KEYS.join(', ')}).`);
+    if (!MANIFEST_KEYS.includes(key) && key !== 'presentWhen' && !key.startsWith('$')) {
+      throw new Error(`${file}: unknown key "${key}" (expected ${MANIFEST_KEYS.join(', ')}, presentWhen).`);
     }
+  }
+  if ('presentWhen' in raw) {
+    if (typeof raw.presentWhen !== 'string' || !raw.presentWhen || path.isAbsolute(raw.presentWhen))
+      throw new Error(`${file}: presentWhen must be a repo-relative path.`);
+    manifest.presentWhen = raw.presentWhen;
   }
   return manifest;
 }

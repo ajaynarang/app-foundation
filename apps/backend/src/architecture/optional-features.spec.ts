@@ -7,6 +7,7 @@ import {
   SEAM_DIR_REL,
   footprintProblems,
   importsOutsideSeam,
+  isKept,
   keptFeatures,
   listManifests,
   textFiles,
@@ -20,6 +21,9 @@ import {
  * `<name>.feature.ts` is the one file outside the feature's folder that imports its code, and `index.ts` lists what
  * the product kept. That list is the only record of the choice. Everything else the feature brings outside its
  * folder is named in its manifest, `tools/init-app/features/<name>.json`, which `apply-feature.mjs` strips.
+ *
+ * A feature with no backend seam (mobile) says where it lives instead: its manifest's `presentWhen` path. It counts as
+ * kept while that path exists, and `OPTIONAL_FEATURES` does not list it. Either way the state is read from the tree.
  *
  * - A kept feature: every path, marked block, JSON entry and allowlist file of its manifest exists.
  * - A dropped feature: none of its paths exist and no marked block, JSON entry or allowlist key of it remains.
@@ -37,18 +41,22 @@ describe('optional features', () => {
   const kept = keptFeatures(REPO_ROOT);
   const files = textFiles(REPO_ROOT);
 
-  it('finds the Desk manifest, and the template itself keeps Desk', () => {
-    expect(manifests.map((m) => m.name)).toContain('desk');
+  it('finds the Desk and mobile manifests, and the template itself keeps both', () => {
+    expect(manifests.map((m) => m.name)).toEqual(expect.arrayContaining(['desk', 'mobile']));
+    expect(manifests.find((m) => m.name === 'mobile')?.presentWhen).toBe('apps/mobile');
     // Split so init-app's rename leaves it alone: a scaffolded product may have said no.
     const templateName = ['app', 'foundation'].join('-');
     const rootName = (JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as { name: string })
       .name;
-    if (rootName === templateName) expect(kept).toContain('desk');
+    if (rootName === templateName) {
+      expect(kept).toContain('desk');
+      expect(manifests.filter((m) => m.presentWhen).every((m) => isKept(REPO_ROOT, m, kept))).toBe(true);
+    }
   });
 
   it('every kept feature has a manifest, and every seam file is listed in index.ts', () => {
-    const names = new Set(manifests.map((m) => m.name));
-    expect(kept.filter((k) => !names.has(k))).toEqual([]);
+    const seamed = new Set(manifests.filter((m) => !m.presentWhen).map((m) => m.name));
+    expect(kept.filter((k) => !seamed.has(k))).toEqual([]);
     const seamFiles = fs
       .readdirSync(path.join(REPO_ROOT, SEAM_DIR_REL))
       .filter((f) => f.endsWith('.feature.ts'))
@@ -57,7 +65,7 @@ describe('optional features', () => {
   });
 
   it.each(manifests.map((m) => [m.name, m] as const))('%s: the footprint matches the choice in index.ts', (_, m) => {
-    expect(footprintProblems(REPO_ROOT, m, kept.includes(m.name))).toEqual([]);
+    expect(footprintProblems(REPO_ROOT, m, isKept(REPO_ROOT, m, kept))).toEqual([]);
   });
 
   it.each(manifests.map((m) => [m.name, m] as const))('%s: no backend file imports it outside the seam', (_, m) => {
@@ -151,6 +159,30 @@ describe('optional features', () => {
       } finally {
         manifest.markers.pop();
       }
+    });
+
+    it('a manifest with presentWhen is kept while that path exists, whatever index.ts says', () => {
+      const gadget: FeatureManifest = {
+        ...manifest,
+        name: 'gadget',
+        presentWhen: 'apps/gadget',
+        paths: ['apps/gadget'],
+      };
+      expect(isKept(root, gadget, keptFeatures(root))).toBe(false);
+      write('apps/gadget/main.dart', 'void main() {}\n');
+      expect(isKept(root, gadget, keptFeatures(root))).toBe(true);
+      // Without the key, the seam decides: demo is imported in index.ts, so it is kept.
+      expect(isKept(root, manifest, keptFeatures(root))).toBe(true);
+      expect(isKept(root, { ...manifest, name: 'other' }, keptFeatures(root))).toBe(false);
+    });
+
+    it('presentWhen is read from the manifest file, and must be a repo-relative path', () => {
+      // The fixture's demo.json carries its name, which a manifest file never does; drop it so only gadget is read.
+      fs.rmSync(path.join(root, FEATURES_DIR_REL, 'demo.json'));
+      write(`${FEATURES_DIR_REL}/gadget.json`, JSON.stringify({ presentWhen: 'apps/gadget', paths: ['apps/gadget'] }));
+      expect(listManifests(root).find((m) => m.name === 'gadget')?.presentWhen).toBe('apps/gadget');
+      write(`${FEATURES_DIR_REL}/gadget.json`, JSON.stringify({ presentWhen: ['apps/gadget'] }));
+      expect(() => listManifests(root)).toThrow(/presentWhen must be a repo-relative path/);
     });
 
     it('prose that quotes the marker token is not a marker', () => {

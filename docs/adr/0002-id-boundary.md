@@ -42,7 +42,7 @@ identifier, never an `Int` primary key.
 
 ### A sixth id role: the public id
 
-The id convention (`id-convention.md` in the `backend-patterns` skill) names five roles. This record adds a sixth.
+The id convention (`docs/standards/id-convention.md`) names five roles. This record adds a sixth.
 
 > A **public id** is a separate unique column. It is never the primary key, and it never duplicates a sibling
 > `*Number`.

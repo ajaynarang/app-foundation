@@ -2,7 +2,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 /**
  * Generate a fresh time-sortable UUIDv7. Use for new audit / event / log row
- * inserts on tables whose PK convention is UUIDv7 per id-convention.md Rule 2.
+ * inserts on tables whose PK convention is UUIDv7 per docs/standards/id-convention.md Rule 2.
  */
 export function generateUuidV7(): string {
   return uuidv7();

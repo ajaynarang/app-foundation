@@ -50,7 +50,7 @@ export function ApiKeyMintSheet({ open, onOpenChange }: Props) {
       setCreated(data);
     },
     onError: (err: Error) => {
-      showError(extractErrorMessage(err) || "Couldn't create the key");
+      showError("Couldn't create the key", extractErrorMessage(err));
     },
   });
 

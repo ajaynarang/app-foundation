@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml
 # Manual by default: run it from the Actions tab (or `gh workflow run ci.yml`).
-# To run on every push to main and every PR targeting it, uncomment the two
-# triggers below. Fails if lint, type-check, test, build or the Terraform checks fail.
+# To run on every push and pull request, uncomment the two triggers below and set `ci` to `on-push` in `.claude/workflow.json`.
+# The triggers target main. Fails if lint, type-check, test, build or the Terraform checks fail.
 
 name: CI
 
@@ -41,12 +41,40 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   # Backend CI
   # ─────────────────────────────────────────────────────────────
+  # The unit tests of every package (all but the Playwright suite) run here, through turbo: the same
+  # `turbo run test --filter=!@app/qa` that `pnpm verify` runs. The integration specs need Postgres and Redis, so
+  # the job has both and migrates first.
   backend:
-    name: Backend and foundation packages — Lint, Type-check, Test, Build
+    name: Backend, foundation packages and every unit suite — Lint, Type-check, Test, Build
     runs-on: ubuntu-latest # runs-on: self-hosted
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # ESLint and tsc over the whole backend can exceed Node's default heap on the runner.
       NODE_OPTIONS: --max-old-space-size=6144
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/app?schema=public
+      REDIS_URL: redis://localhost:6379
 
     steps:
       - name: Checkout
@@ -86,20 +114,22 @@ jobs:
       - name: Type-check
         run: pnpm --filter=backend type-check
 
-      - name: Unit tests
-        run: pnpm --filter=backend test
-
       # Most platform behaviour (auth, guards, notifications, cache, queues) lives in
       # the foundation packages, and their specs are type-checked only here.
       - name: Foundation packages — type-check
         run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform type-check
 
-      - name: Foundation packages — unit tests
-        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform test
+      - name: Migrate the test database
+        run: pnpm --filter @appshore/db prisma:migrate:deploy
 
+      # Every package's suite: backend, @appshore/{kernel,db,platform}, shared-types, test-utils, and the web app
+      # (whose jest also runs @appshore/web-core's tests). The same command `pnpm verify` runs.
+      - name: Unit tests (every package, through turbo)
+        run: pnpm exec turbo run test --filter=!@app/qa
+
+      # Fails the run when a mutation route has neither @Roles() nor @Public() (tools/verify/rbac-audit.test.sh).
       - name: RBAC gap audit
-        run: npx tsx tests/scripts/audit-rbac-gaps.ts --ci
-        continue-on-error: true
+        run: pnpm audit:rbac
 
       - name: Build (verify compilation)
         run: pnpm --filter=shared-types build && pnpm --filter=backend build
@@ -208,8 +238,7 @@ jobs:
       - name: Type-check
         run: pnpm --filter=@app/web type-check
 
-      - name: Unit tests
-        run: pnpm --filter=@app/web test
+      # The web unit tests run with every other suite in the backend job (turbo).
 
       - name: Build (verify compilation)
         run: pnpm --filter=@app/web build
@@ -221,6 +250,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
 
+  # feature:mobile:start
   # ─────────────────────────────────────────────────────────────
   # Mobile CI (Flutter) — independent of the node jobs
   # ─────────────────────────────────────────────────────────────
@@ -249,16 +279,18 @@ jobs:
       - name: Test
         run: flutter test
 
+  # feature:mobile:end
   # ─────────────────────────────────────────────────────────────
   # Scaffold variants: scaffolds the repo with and without each optional feature
-  # (Desk) and proves each copy installs, type-checks and passes the backend specs,
+  # (Desk, mobile), under a new skill prefix, with and without git, and proves each
+  # copy installs, type-checks, passes the backend specs and the workflow guards,
   # and that nothing outside the residue list still names Desk. It calls the same
   # script as `pnpm verify:scaffold`. Like every job in this file it runs only when
   # the workflow is started by hand, or on push and pull request once the triggers
   # above are uncommented.
   # ─────────────────────────────────────────────────────────────
   scaffold-variants:
-    name: Scaffold variants — with and without Desk
+    name: Scaffold variants — with and without Desk and mobile
     runs-on: ubuntu-latest # runs-on: self-hosted
     services:
       postgres:

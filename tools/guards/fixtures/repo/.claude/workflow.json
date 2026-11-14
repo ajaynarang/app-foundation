@@ -1,0 +1,9 @@
+{
+  "skillPrefix": "fx",
+  "reservedNames": ["fx-backend", "fx-postgres"],
+  "defaultBranch": "main",
+  "plans": { "folder": "docs/plans", "tracked": false },
+  "ci": "manual",
+  "manualAlways": [],
+  "githubProject": null
+}

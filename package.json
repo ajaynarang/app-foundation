@@ -14,7 +14,7 @@
     "lint": "turbo run lint",
     "format": "turbo run format",
     "format:check": "turbo run format:check",
-    "format:check:root": "prettier --check --ignore-path .prettierignore \"*.{md,json,yaml,yml}\" docs .claude .github tools scripts infra",
+    "format:check:root": "prettier --check --ignore-path .gitignore --ignore-path .prettierignore \"*.{md,json,yaml,yml}\" docs .claude .github tools scripts infra",
     "type-check": "turbo run type-check",
     "clean": "turbo run clean && rm -rf node_modules",
     "prepare": "husky || true",
@@ -26,7 +26,17 @@
     "verify:api": "bash tools/verify/api-qa.sh",
     "verify:scaffold": "node tools/init-app/check-variants.mjs",
     "check:ops": "bash tools/verify/check-ops.sh",
+    "audit:rbac": "tsx tests/scripts/audit-rbac-gaps.ts --ci",
     "test:init-app": "node --test tools/init-app/*.test.mjs",
+    "// — Repository guards (tools/guards; Node only, seconds)": "",
+    "guards": "node tools/guards/skills-guard.mjs && node tools/guards/ci-triggers.mjs && node tools/guards/convention-gate.mjs",
+    "guard:skills": "node tools/guards/skills-guard.mjs --target skills",
+    "guard:docs": "node tools/guards/skills-guard.mjs --target docs",
+    "guard:source": "node tools/guards/skills-guard.mjs --target source",
+    "guard:ci": "node tools/guards/ci-triggers.mjs",
+    "guard:conventions": "node tools/guards/convention-gate.mjs",
+    "test:guards": "node --test tools/guards/*.test.mjs",
+    "test:hooks": "node --test .claude/hooks/tests/*.test.mjs",
     "verify:arch": "turbo run build --filter=@app/backend^... --output-logs=errors-only && pnpm --filter @app/backend exec jest src/architecture && pnpm --filter @app/web exec jest src/shared/components/__tests__/single-component-set.test.ts src/shared/components/page-chrome/__tests__/theme-tokens.test.ts src/features/__tests__/ui-grammar-guard.test.ts",
     "// — Backend shortcuts": "",
     "backend:dev": "turbo run dev --filter=@app/backend",
@@ -83,7 +93,11 @@
     "node": ">=20.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,md,yaml,yml}": [
+    "*.{ts,tsx}": [
+      "prettier --write --ignore-path .prettierignore",
+      "node tools/guards/convention-gate.mjs --files"
+    ],
+    "*.{js,jsx,json,md,yaml,yml}": [
       "prettier --write --ignore-path .prettierignore"
     ]
   },

@@ -47,6 +47,11 @@
       "reason": "The decision record for Desk opt-in names the Desk folder the seam guards."
     },
     {
+      "file": "docs/adr/0017-state-lives-in-postgres.md",
+      "match": "inngest",
+      "reason": "A decision record: it says state stays in Postgres while an engine only orchestrates, naming the engine Desk runs on as the case. It holds in a product without Desk, which is why removing Desk loses no state."
+    },
+    {
       "file": "CLAUDE.md",
       "match": "inngest",
       "reason": "The pnpm verify:scaffold gate text names the residue search strings."
@@ -55,21 +60,21 @@
       "file": "CLAUDE.md",
       "match": "domains/desk",
       "reason": "The pnpm verify:scaffold gate text names the residue search strings."
-    },
-    {
-      "file": ".claude/skills/backend-patterns/SKILL.md",
-      "match": "inngest",
-      "reason": "The optional-features rule (section 23a) names the residue search strings."
-    },
-    {
-      "file": ".claude/skills/backend-patterns/SKILL.md",
-      "match": "domains/desk",
-      "reason": "The optional-features rule (section 23a) names the Desk folder a Desk change stays in."
     },
     {
       "file": "apps/backend/src/architecture/ai-imports-no-desk.spec.ts",
       "match": "domains/desk",
       "reason": "The architecture spec that keeps the AI domain from importing Desk names the Desk folder it guards. It must stay in a product without Desk, so a later change cannot make AI depend on Desk again."
+    },
+    {
+      "file": "tools/guards/skills-guard.mjs",
+      "match": "domains/desk",
+      "reason": "FEATURE_FOLDERS names the Desk folder: the skills guard fails on a requires: desk skill, reference or hotspot file when that folder is absent, which is how a product without Desk catches a returning Desk file."
+    },
+    {
+      "file": ".claude/workflow.json",
+      "match": "inngest",
+      "reason": "reservedNames lists <name>-inngest, the container name init-app renames, so no skill or agent name may start with it. Every product keeps the list, Desk or not."
     },
     {
       "file": "apps/backend/src/architecture/feature-key-coverage.spec.ts",
