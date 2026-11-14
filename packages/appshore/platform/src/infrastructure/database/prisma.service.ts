@@ -33,6 +33,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleDestroy() {
     await this.$disconnect();
-    await this.pool.end();
+    // The pg adapter may already have ended the pool during $disconnect; ending it again throws
+    // "Called end on pool more than once" and fails the shutdown.
+    if (!this.pool.ended) await this.pool.end();
   }
 }
