@@ -496,7 +496,8 @@ inside the callback. A spec with its own `$transaction` mock that still has an a
   too: close it first. Production tunnels on 5434, needs `production` typed (or `--yes` plus `CONFIRM_ENV=production`
   with no terminal) and, to seed, `SUPER_ADMIN_PASSWORD` in `apps/backend/.env.aws.production`.
 - **New** `tools/ops/maintenance-mode.sh` (`on`, `off`, `status`) writes the maintenance document the web middleware
-  already reads.
+  already reads. It writes nothing when the document cannot be read for any reason other than "not found"; the
+  operator role needs `s3:ListBucket` on the CDN bucket, or S3 reports a missing document as 403.
 
 **What to set first.** Set `PRODUCTION_DEPLOYERS` before your next production deploy. Set `SUPER_ADMIN_PASSWORD` and
 `COHERE_API_KEY` in each environment's Doppler config if you want a seeded super-admin password and embeddings. If your

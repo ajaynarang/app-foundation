@@ -184,6 +184,9 @@ ENV=production tools/ops/maintenance-mode.sh on          # asks you to type 'pro
 Every write reads the document first and changes only its own keys (`enabled`, `reason`, `message`,
 `estimatedEndTime`, `startedAt`), so keys a product adds survive. Each write invalidates `/status/*` on the CDN; the
 document's own cache is 30 seconds. With no terminal, a production write needs `CONFIRM_ENV=production`.
+Only a missing document starts from an empty one; any other failed read (access denied, throttling, the network)
+stops the script with nothing written. S3 reports a missing object as 403 to a role without `s3:ListBucket` on the
+bucket, so give the operator role that permission or the first write is refused.
 
 ## Process switches
 

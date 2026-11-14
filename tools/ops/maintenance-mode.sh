@@ -19,7 +19,7 @@
 #   Production writes need `production` typed, or CONFIRM_ENV=production when there is no terminal.
 #
 # Every write is read-modify-write: keys this script does not own stay as they are (a product may add its own, such
-# as a mobile version gate). Needs the AWS CLI with a session for that account, and jq.
+# as a mobile version gate). A read that fails for any reason but "not found" writes nothing. Needs the AWS CLI with a session for that account, and jq.
 set -euo pipefail
 
 ENV="${ENV:-staging}"
@@ -113,18 +113,32 @@ confirm_write_target() {
   fi
 }
 
-# The current document, or {} when it is absent or not JSON. Falling back to {} is deliberate: raising maintenance
-# during an outage must not be blocked by a missing object.
+# The current document, or {} when there is none yet or it is not JSON. Only "not found" falls back to {}: raising
+# maintenance during an outage must not be blocked by a missing object. Any other failed read (access denied,
+# throttling, the network) stops the script, because the write that follows would replace the document and drop
+# keys this script does not own. Without s3:ListBucket, S3 reports a missing object as 403, which also stops it.
 read_current() {
-  local content
-  if content=$(aws s3 cp "s3://${BUCKET}/${S3_KEY}" - 2>/dev/null); then
+  local content err
+  err=$(mktemp)
+  if content=$(aws s3 cp "s3://${BUCKET}/${S3_KEY}" - 2>"$err"); then
+    rm -f "$err"
     if printf '%s' "$content" | jq -e 'type == "object"' >/dev/null 2>&1; then
       printf '%s\n' "$content"
-      return
+      return 0
     fi
     echo "WARNING: the existing ${S3_KEY} is not a JSON object; starting fresh." >&2
+    echo '{}'
+    return 0
   fi
-  echo '{}'
+  if grep -qE '\(404\)|NoSuchKey|Not Found|does not exist' "$err"; then
+    rm -f "$err"
+    echo '{}'
+    return 0
+  fi
+  echo "ERROR: could not read s3://${BUCKET}/${S3_KEY}; nothing was written:" >&2
+  sed 's/^/  /' "$err" >&2
+  rm -f "$err"
+  return 1
 }
 
 put_document() {
@@ -153,9 +167,11 @@ invalidate_cdn() {
 
 enable_maintenance() {
   local reason="${1:-Scheduled maintenance}" duration="${2:-1h}" secs end updated
+  local current
   secs=$(parse_duration "$duration") || exit 1
   end=$(iso_in "$secs")
-  updated=$(read_current | jq \
+  current=$(read_current) || exit 1
+  updated=$(printf '%s' "$current" | jq \
     --arg reason "$reason" \
     --arg message "${reason} is in progress. We'll be back shortly." \
     --arg end "$end" \
@@ -170,8 +186,9 @@ enable_maintenance() {
 
 disable_maintenance() {
   # `. + {enabled: false}`, never a fresh object: replacing the document would drop keys this script does not own.
-  local updated
-  updated=$(read_current | jq 'del(.reason, .message, .estimatedEndTime, .startedAt) + {enabled: false}')
+  local current updated
+  current=$(read_current) || exit 1
+  updated=$(printf '%s' "$current" | jq 'del(.reason, .message, .estimatedEndTime, .startedAt) + {enabled: false}')
   put_document "$updated"
   echo ""
   echo "✓ Maintenance mode OFF for ${ENV}"

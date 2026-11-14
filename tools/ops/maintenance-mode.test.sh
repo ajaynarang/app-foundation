@@ -16,7 +16,8 @@ bin="$work/bin"
 mkdir -p "$bin" "$work/s3"
 export S3_ROOT="$work/s3" CALLS="$work/calls.log"
 
-# aws s3 cp s3://bucket/key -   reads  $S3_ROOT/bucket/key (exit 1 when absent)
+# aws s3 cp s3://bucket/key -   reads  $S3_ROOT/bucket/key; when absent, exits 1 with the real CLI's 404 message
+#                               STUB_READ_FAIL=denied|network makes the read fail the way S3 does for those
 # aws s3 cp - s3://bucket/key   writes $S3_ROOT/bucket/key from stdin
 cat >"$bin/aws" <<'EOF'
 #!/usr/bin/env bash
@@ -25,7 +26,16 @@ if [ "$1 $2" = "s3 cp" ]; then
   if [ "$3" = "-" ]; then
     dest="${4#s3://}"; mkdir -p "$S3_ROOT/$(dirname "$dest")"; cat >"$S3_ROOT/$dest"; exit 0
   fi
-  src="${3#s3://}"; [ -f "$S3_ROOT/$src" ] || exit 1; cat "$S3_ROOT/$src"; exit 0
+  case "${STUB_READ_FAIL:-}" in
+    denied) echo "fatal error: An error occurred (403) when calling the HeadObject operation: Forbidden" >&2; exit 1 ;;
+    network) echo "fatal error: Could not connect to the endpoint URL: \"https://example.invalid/\"" >&2; exit 1 ;;
+  esac
+  src="${3#s3://}"
+  if [ ! -f "$S3_ROOT/$src" ]; then
+    echo "fatal error: An error occurred (404) when calling the HeadObject operation: Key \"${src#*/}\" does not exist" >&2
+    exit 1
+  fi
+  cat "$S3_ROOT/$src"; exit 0
 fi
 if [ "$1 $2" = "cloudfront list-distributions" ]; then echo "EDIST123"; exit 0; fi
 exit 0
@@ -77,6 +87,20 @@ check "on with no document yet: starts from an empty object" jqdoc "$STG" '.enab
 printf 'not json' >"$S3_ROOT/$STG/status/maintenance.json"
 run off
 check "off over a broken document: writes a valid one" jqdoc "$STG" '.enabled == false'
+
+# A read that fails for any reason but "not found" (access denied, throttling, the network) must not write: the put
+# would replace the document and drop keys the script does not own.
+doc "$STG" | jq '. + {apps: {ios: {minSupported: "1.2.3"}}}' >"$work/keep.json"
+cp "$work/keep.json" "$S3_ROOT/$STG/status/maintenance.json"
+for failure in denied network; do
+  for action in on off; do
+    STUB_READ_FAIL=$failure run $action
+    check "$action when the read fails ($failure): refused" test $? -ne 0
+    check "$action when the read fails ($failure): nothing written" bash -c "! grep -q 's3 cp - ' '$CALLS'"
+    check "$action when the read fails ($failure): the document is unchanged" cmp -s "$work/keep.json" "$S3_ROOT/$STG/status/maintenance.json"
+    check "$action when the read fails ($failure): the error is shown" grep -q "could not read" "$work/out.log"
+  done
+done
 
 # --- bad input ---
 run on "x" 2days
