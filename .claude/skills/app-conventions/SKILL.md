@@ -51,12 +51,16 @@ condense, and its rules hold all the same.
 | Compose services, Terraform, deploy workflows                                 | `infra/README.md` and `docs/operations.md`                                                |
 | Desk, the optional workflow engine                                            | [the `desk-patterns` skill](../desk-patterns/SKILL.md)                                    |
 
-**Web** (`apps/web`, `@app/ui`, `@appshore/web-core`) and **mobile** (`apps/mobile`)
+**Web** (`apps/web`, `@app/ui`, `@appshore/web-core`) and **mobile** (the Flutter app, when the product has one)
 
-| Working on                                               | Read                                                           |
-| -------------------------------------------------------- | -------------------------------------------------------------- |
-| Components, data hooks, lists, forms, page chrome, theme | the `frontend-patterns` skill (until the web references land)  |
-| The Flutter app                                          | the `mobile-patterns` skill (until the mobile reference lands) |
+| Working on                                                                    | Read                                                    |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Feature folders, components, status maps, utilities, routes, auth, providers  | [`frontend-core.md`](references/frontend-core.md)       |
+| Shared types, the API layer, query and mutation hooks, SSE, URL state, stores | [`frontend-data.md`](references/frontend-data.md)       |
+| A list page: the cursor list, URL params, the branch order, pickers, tables   | [`frontend-lists.md`](references/frontend-lists.md)     |
+| Sheets, dialogs, forms, the feedback layers, error boundaries                 | [`forms-and-sheets.md`](references/forms-and-sheets.md) |
+| Page chrome, row actions, status tones, dark theme, responsive, microcopy     | [`ui-grammar.md`](references/ui-grammar.md)             |
+| The Flutter app                                                               | [`mobile.md`](references/mobile.md)                     |
 
 The ids and names behind the database rules are `docs/standards/id-convention.md` and `docs/standards/column-naming.md`;
 the logging standard is `docs/standards/observability.md`. The binding docs and ADRs are listed in `CLAUDE.md`.

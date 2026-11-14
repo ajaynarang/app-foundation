@@ -42,8 +42,11 @@ where it does not follow a rule yet, the step says what to do instead.
    [`plans-and-entitlements.md`](plans-and-entitlements.md)).
 8. **Tool.** A read tool and a write tool through the one pipeline, matching the REST twin's role and plan
    ([`ai-tools.md`](ai-tools.md); copy `support-ticket.tool.ts`).
-9. **Web list and form.** The feature folder under `apps/web/src/features/<domain>/`, the list page and the form sheet
-   (the `frontend-patterns` skill until the frontend references land).
+9. **Web list and form.** The feature folder under `apps/web/src/features/<domain>/` ([`frontend-core.md`](frontend-core.md)),
+   its API object and hooks ([`frontend-data.md`](frontend-data.md)), the list page
+   ([`frontend-lists.md`](frontend-lists.md), [`ui-grammar.md`](ui-grammar.md)) and the form sheet
+   ([`forms-and-sheets.md`](forms-and-sheets.md)). `apps/web/src/features/platform/api-keys/` is the reference
+   folder.
 10. **Tests.** Unit specs per branch, the other-tenant case, run-twice for anything at least once
     ([`testing.md`](testing.md)).
 
@@ -67,6 +70,17 @@ where it does not follow a rule yet, the step says what to do instead.
 - [ ] New env vars are in the config schema, `.env.example`, `docs/doppler.md` and, when deployed, Terraform
       (`infra/terraform/`).
 - [ ] MCP tools still match the API for every entity the assistant can reach.
+- [ ] Web: page chrome from `@/shared/components/page-chrome` with a title and a subtitle; a growing list on
+      `useListParams` and `useCursorList`, branching loading, error, empty, rows, then `ListFooter`.
+- [ ] Web: entity types re-exported from `@app/shared-types`; keys added to `queryKeys` with distinct list and
+      detail segments; tiers from `QUERY_TIERS`, never a hand-written `staleTime`.
+- [ ] Web: every mutation has a success and an error toast; every `isLoading` shows a skeleton; buttons take
+      `loading`.
+- [ ] Web: Sheet, Dialog or AlertDialog chosen by field count and destructiveness; destructive actions confirm.
+- [ ] Web: statuses map to tones in `constants.ts`, each map listed in `STATUS_MAPS`; theme tokens only; dates
+      through `useFormatters()`; storage keys in `STORAGE_KEYS`.
+- [ ] Web: real-time data has its SSE touchpoints and an `SSE_INVALIDATION_MAP` entry.
+- [ ] Web: checked at 375, 768 and 1440 px in both themes; the page title and subtitle follow the microcopy rules.
 - [ ] A binding doc the change makes untrue is amended in this pull request; a changed convention is amended in its
       reference under `.claude/skills/app-conventions/references/`.
 - [ ] The OpenAPI documents are regenerated and committed (`pnpm --filter @app/backend openapi:generate`).

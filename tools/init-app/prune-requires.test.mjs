@@ -102,6 +102,8 @@ test("the template's own conventions index loses its Desk row, and only that row
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-requires-real-'));
   for (const top of ['.claude', 'docs']) fs.cpSync(path.join(root, top), path.join(dir, top), { recursive: true });
+  // Mobile stays in this scaffold, so its reference and row must stay too.
+  fs.mkdirSync(path.join(dir, FEATURE_FOLDERS.mobile), { recursive: true });
   const indexRel = '.claude/skills/app-conventions/SKILL.md';
   const before = fs.readFileSync(path.join(dir, indexRel), 'utf8');
   const deskRows = before.split('\n').filter((l) => l.startsWith('|') && l.includes('(../desk-patterns/SKILL.md)'));
@@ -114,4 +116,26 @@ test("the template's own conventions index loses its Desk row, and only that row
   assert.ok(!after.includes('desk-patterns'));
   assert.equal(after.split('\n').length, before.split('\n').length - 1);
   assert.ok(!exists(dir, '.claude/hooks/hotspots/desk.json'));
+});
+
+test("the template's own conventions index loses its mobile row and the mobile reference, and only those, when mobile is removed", () => {
+  // The real .claude and docs folders, as `--mobile no` leaves them: apps/mobile is gone, Desk stays.
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-requires-mobile-'));
+  for (const top of ['.claude', 'docs']) fs.cpSync(path.join(root, top), path.join(dir, top), { recursive: true });
+  fs.mkdirSync(path.join(dir, FEATURE_FOLDERS.desk), { recursive: true });
+  const indexRel = '.claude/skills/app-conventions/SKILL.md';
+  const mobileRel = '.claude/skills/app-conventions/references/mobile.md';
+  assert.ok(exists(dir, mobileRel), 'the template ships a mobile reference');
+  const before = fs.readFileSync(path.join(dir, indexRel), 'utf8');
+  const mobileRows = before.split('\n').filter((l) => l.startsWith('|') && l.includes('(references/mobile.md)'));
+  assert.equal(mobileRows.length, 1, 'the index has one mobile row, linked to the mobile reference');
+
+  pruneRequires(dir);
+
+  assert.ok(!exists(dir, mobileRel));
+  const after = fs.readFileSync(path.join(dir, indexRel), 'utf8');
+  assert.ok(!after.includes('references/mobile.md'));
+  assert.equal(after.split('\n').length, before.split('\n').length - 1);
+  assert.ok(exists(dir, '.claude/skills/desk-patterns/SKILL.md'));
 });

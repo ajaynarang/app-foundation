@@ -14,6 +14,8 @@ examples:
   - NotImplementedException
   - SCREAMING_SNAKE_CASE
   - pendingCount
+  - handleX
+  - onX
 ---
 
 # Code quality: the reasoning behind the size, naming, comment and DRY rules
@@ -95,6 +97,34 @@ copying existing code that breaks them. When you touch code that breaks one, imp
 - `forwardRef` means a cycle. Look for the third concept that should own the shared state first; accept it only when
   the cycle cannot be broken. [review-only: needs judgement]
 
+### React and the web
+
+- One component, one purpose: a component that renders a list, manages its filters and submits a form is three
+  components under a lean parent. Extend by composition (children, slots, callbacks), not by an internal
+  `if (variant === 'x')`; a variant keeps the base component's contract (`onClick`, `disabled`). Props stay narrow:
+  pass the fields a row renders, not the whole entity. Data access goes through a hook, never a `fetch` in a
+  component. [review-only: needs judgement]
+- One component per file, the file named for its export in `kebab-case.tsx` (hooks `use-<thing>.ts`); subcomponents
+  only one parent uses sit beside it in its folder, not in its file. Props interfaces are `<Component>Props`;
+  handlers are `handleX` inside and `onX` on props; booleans read `isLoading`, `hasError`, `canEdit`.
+  [review-only: names need reading]
+- A component is at most about 150 lines and its JSX about 40 per render function; a hook at most 50 lines and one
+  cohesive surface (data, status and actions for one resource). A god-hook doing three things is three hooks.
+  [review-only: the target is a prompt to look; the gate's ceiling is gate:file-size]
+- Derive, do not sync: a value computable from props or state is computed (`useMemo` when it is expensive), never
+  copied in by a `useEffect`. An effect is the last resort after an event handler, a derived value and a memo.
+  [review-only: needs reading]
+- `useMemo` and `useCallback` are for three cases: a derived value in an effect's dependency array, a value handed to
+  a memoized child, or a computation that is really expensive (sorting or mapping thousands of items). Not for a
+  trivial scalar. [review-only: needs judgement]
+- A non-reactive value (a file input, a debouncer, a "did this fire" flag, an observer) lives in `useRef`, never in
+  `useState`. State is never mutated in place: `setItems([...items, x])`. [review-only: needs reading]
+- A dynamic list's `key` is a stable id, never the array index. [review-only: lint does not flag index keys]
+- Tailwind classes in JSX, no per-component CSS files, and an inline `style` only for a single dynamic value.
+  [review-only: needs reading]
+- Every interactive element is reachable by keyboard with a visible focus style. [review-only: no accessibility spec
+  runs]
+
 ## Recipe: split a file the size rule flags
 
 1. Find the seams: groups of methods that share state and callers, and nothing else. A query side and a command side,
@@ -116,3 +146,6 @@ copying existing code that breaks them. When you touch code that breaks one, imp
 - A nested ternary: an `if` or a `switch`.
 - A comment that repeats the code, commented-out code, a TODO with no owner: delete.
 - `new SomeService()` in business code: inject it.
+- A `useEffect` that sets state derivable from props or state: derive it.
+- `key={index}` on a list that changes: use the row's id.
+- An icon-only button with no `aria-label`, or `data`, `info`, `obj` as a component's state name.
