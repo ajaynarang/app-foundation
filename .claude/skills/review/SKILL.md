@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 
 # Code Review
 
-You are the code review guardian for this platform. You enforce all project conventions defined in `app-conventions` (and its references) and `frontend-patterns`, catch architectural violations, and auto-fix convention issues.
+You are the code review guardian for this platform. You enforce all project conventions defined in `app-conventions` and its references, catch architectural violations, and auto-fix convention issues.
 
 Check log lines, metric labels and error reports against `docs/standards/observability.md`.
 
@@ -31,7 +31,7 @@ Parse `$ARGUMENTS` to determine review mode:
 - **Backend** → `apps/backend/`, `packages/appshore/{kernel,db,platform}/`, or `packages/shared-types/`
 - **Frontend** → `apps/web/`, `packages/appshore/web-core/`, or `packages/ui/`
 - **Both** → changes span both
-- **Other** → `apps/mobile/`, `infra/`, `tests/`, config files — apply general checks only (mobile: see `mobile-patterns`)
+- **Other** → `apps/mobile/`, `infra/`, `tests/`, config files — apply general checks only (mobile: see the `app-conventions` reference `references/mobile.md`)
 
 **Check level:**
 
@@ -136,13 +136,15 @@ Dispatch with `subagent_type: "general-purpose"` and this prompt:
 ```
 You are reviewing frontend code for convention compliance.
 
-FIRST: Read the skill at <repo-root>/.claude/skills/frontend-patterns/SKILL.md — this is your authoritative reference.
+FIRST: Read <repo-root>/.claude/skills/app-conventions/SKILL.md, then the web references under
+<repo-root>/.claude/skills/app-conventions/references/ (frontend-core.md, frontend-data.md, frontend-lists.md,
+forms-and-sheets.md, ui-grammar.md) for the areas the diff touches — these are your authoritative reference.
 
 MODE: {full|tiered}
 FILES TO REVIEW: {file list}
 DIFF: {diff content or instructions to get it}
 
-Review every file against the frontend patterns skill. For each violation found, report:
+Review every file against the conventions index and those web references. For each violation found, report:
 - File path and line number
 - Which pattern section is violated
 - Severity: CRITICAL | CONVENTION | SUGGESTION
@@ -178,7 +180,7 @@ Review every file against the frontend patterns skill. For each violation found,
 22. Button variants: correct variant for context (default/destructive/outline/ghost)
 23. Toasts imported from @app/ui, never raw toast()
 
-## CODE QUALITY checks (always, all files — see Section 0 of the frontend-patterns skill):
+## CODE QUALITY checks (always, all files — see the `app-conventions` reference `references/code-quality.md`, React and the web):
 24. Component > 300 lines → CONVENTION: split into subcomponents (header/body/actions regions)
 25. Custom hook > 50 lines → CONVENTION: split — one hook = one cohesive surface
 26. JSX render block > 40 lines → CONVENTION: extract local subcomponents
@@ -270,7 +272,7 @@ Output the review report in this exact format:
 
 ## Rules
 
-1. **Never skip the pattern skills** — always read `app-conventions` (with the references the diff touches) and `frontend-patterns` fresh (they evolve)
+1. **Never skip the pattern skills** — always read `app-conventions` (with the references the diff touches) fresh (they evolve)
 2. **PR mode is exhaustive** — check ALL files, not just changed lines
 3. **Auto-fix only unambiguous conventions** — when in doubt, report instead of fixing
 4. **Verify after auto-fix** — run linting to confirm fixes don't break anything

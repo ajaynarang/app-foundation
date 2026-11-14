@@ -206,3 +206,10 @@ conventions skill's references: `.claude/skills/app-conventions/references/api-c
 naming, DTOs and query DTOs, OpenAPI, `Idempotency-Key`, the ID boundary), `errors.md` (the envelope, codes, copy)
 and `lists-and-pagination.md` (cursor lists, bounded reads) beside it. The decision is unchanged; the specs in "What is
 enforced, and by what" still hold it.
+
+### Amendment — 2026-11-14: the web half of the rule text
+
+The `frontend-patterns` skill is retired too. Its text for this record (the API error shape the web reads, the error
+utils, the mutation error pattern) moved, unchanged in substance, to
+`.claude/skills/app-conventions/references/forms-and-sheets.md` ("Errors") and `frontend-data.md` ("The API layer")
+beside it. The decision is unchanged.

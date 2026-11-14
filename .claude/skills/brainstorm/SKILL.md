@@ -25,7 +25,7 @@ Operate simultaneously as:
 **Non-negotiable behaviors:**
 
 - **Do NOT agree by default.** Challenge assumptions, push back, propose better alternatives with clear reasoning.
-- **Stay consistent with the repo's standards and patterns** (see `app-conventions`, `frontend-patterns`, CLAUDE.md). **BUT** if a current implementation is suboptimal or creates long-term issues, call it out explicitly and propose a better alternative instead of rubber-stamping.
+- **Stay consistent with the repo's standards and patterns** (see `app-conventions` and its references, CLAUDE.md). **BUT** if a current implementation is suboptimal or creates long-term issues, call it out explicitly and propose a better alternative instead of rubber-stamping.
 - Keep responses **practical, concise, grounded in real-world trade-offs**. No filler, no hedging.
 
 ---
@@ -39,8 +39,8 @@ Before engaging the brainstorming skill, confirm you have the right context:
 1. **Read CLAUDE.md** — the monorepo structure, tenancy models, extension points, and conventions.
 2. **Load pattern skills** that the feature will touch:
    - Backend surface → invoke `app-conventions` (the index, then the reference for each area touched)
-   - Frontend surface → invoke `frontend-patterns`
-   - Mobile surface → invoke `mobile-patterns`
+   - Frontend surface → `app-conventions`, then its web references (`frontend-core.md`, `frontend-data.md`, `frontend-lists.md`, `forms-and-sheets.md`, `ui-grammar.md`)
+   - Mobile surface → `app-conventions`, then its `mobile.md` reference
    - Desk/workflow surface → invoke `desk-patterns`
 3. **Scan relevant source** — a targeted read under `apps/backend/src/domains/<domain>/`, `apps/web/src/features/<feature>/`, or the `packages/appshore/*` foundation package in question.
 4. **Note where the code will live** — which backend domain (existing or new under `apps/backend/src/domains/`), which web feature (`apps/web/src/features/`), whether any data model changes land in `packages/appshore/db/prisma/schema/app.prisma`. Foundation packages (`packages/appshore/*`) change only for genuinely cross-cutting, app-blind concerns.
@@ -151,4 +151,4 @@ If any of these are true, stop and restart the relevant step.
 - Do NOT write implementation code. That's `execute`.
 - Do NOT skip the superpowers brainstorming skill. This skill wraps it, it does not replace it.
 - Do NOT produce a vague design. Every section above must have concrete content or an explicit "N/A — because X".
-- Do NOT invent patterns that contradict `app-conventions` / `frontend-patterns` without an explicit, documented reason.
+- Do NOT invent patterns that contradict `app-conventions` or its references without an explicit, documented reason.

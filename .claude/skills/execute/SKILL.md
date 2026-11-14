@@ -36,8 +36,8 @@ You are implementing a change end-to-end: plan → code → tests → PR → rev
 2. Read CLAUDE.md for structure, conventions, and the quick-start commands.
 3. **Invoke the relevant pattern skills before writing code:**
    - Backend changes → `app-conventions` (the index, then the reference for each area: modules, routes, errors, lists, Prisma, events, jobs, AI, tools)
-   - Frontend changes → `frontend-patterns` (API, hooks, sheets, tables, forms, SSE, state, styling)
-   - Mobile changes → `mobile-patterns`
+   - Frontend changes → `app-conventions` and its web references (structure, data hooks, lists, sheets and forms, page chrome and theme)
+   - Mobile changes → `app-conventions` and its `mobile.md` reference
    - Desk changes → `desk-patterns`
 4. Create a feature branch off an up-to-date default branch: `git switch -c feat/<slug>`. Never commit directly to the default branch.
 
@@ -46,7 +46,7 @@ You are implementing a change end-to-end: plan → code → tests → PR → rev
 Invoke `superpowers:executing-plans` using the loaded plan. That skill defines the per-task RED→GREEN→REFACTOR loop with review checkpoints. Follow it exactly, with these repo-specific rules layered in:
 
 - For every backend task, honor `app-conventions` and the references for the areas touched: domain placement under `apps/backend/src/domains/`, DTOs implementing `@app/shared-types` interfaces, enums from `@appshore/db`, events through `OutboxService.transaction` + `APP_EVENT_REGISTRY`, sanctioned AI paths only, camelCase everywhere except the Prisma/URL-param exceptions, `@db.Date` vs `@db.Timestamptz` handled deliberately, tenant scoping on every query.
-- For every frontend task, honor `frontend-patterns`: TanStack Query hooks with centralized query keys, FormSheet for 4+ field forms, Dialog only for 1–4 fields or quick actions, AlertDialog only for destructive, `<Button loading>` not manual spinners, Skeleton not spinner for `isLoading`, `showSuccess` + `showError` on every mutation, dark-theme-safe tokens, min 44×44 touch targets, responsive at 375/768/1440.
+- For every frontend task, honor the `app-conventions` web references: TanStack Query hooks with centralized query keys, FormSheet for 4+ field forms, Dialog only for 1–4 fields or quick actions, AlertDialog only for destructive, `<Button loading>` not manual spinners, Skeleton not spinner for `isLoading`, `showSuccess` + `showError` on every mutation, dark-theme-safe tokens, min 44×44 touch targets, responsive at 375/768/1440.
 - **Use `superpowers:test-driven-development`** inside each task — test first, watch it fail, implement, watch it pass.
 - Commit on the feature branch after every task — interruptions must leave recoverable, green progress.
 
@@ -110,7 +110,7 @@ Post a short final summary: PR URL, coverage delta, notable trade-offs, any out-
 
 - You're about to push to the default branch directly.
 - A test was "fixed" by weakening the assertion.
-- You skipped `superpowers:executing-plans`, `app-conventions`, or `frontend-patterns`.
+- You skipped `superpowers:executing-plans`, or `app-conventions` (with the references for the areas touched).
 - You copied a constant/type instead of importing from `@app/shared-types` or the canonical source.
 - You hand-wrote an enum that belongs in the Prisma schema.
 - You emitted an event without going through `DomainEventService` + the registry.
@@ -127,7 +127,7 @@ If any of these are true, stop and correct.
 ## What NOT to do
 
 - Do NOT stop for feedback in the middle of the implementation loop. Proceed through code → tests → PR → review → fixes.
-- Do NOT skip the pattern skills. `app-conventions` (backend) and `frontend-patterns` are mandatory for their respective surfaces.
+- Do NOT skip the pattern skills. `app-conventions` and the references for the areas touched are mandatory on every surface.
 - Do NOT skip the `review` skill.
 - Do NOT merge the PR. Stop at a green, reviewed PR awaiting human merge.
 - Do NOT invent tests to pad coverage — every test must assert real behavior.
