@@ -13,8 +13,11 @@ export class FileStorageService {
   constructor(private readonly configService: ConfigService) {
     this.bucket = this.configService.get<string>('s3.bucket', process.env.S3_BUCKET || 'app-files');
     const region = this.configService.get<string>('s3.region', 'us-east-1');
+    // Optional S3-compatible endpoint (S3_ENDPOINT: the local MinIO in docker-compose.yml, or any S3-compatible
+    // store). Unset means real AWS S3. An endpoint-addressed store needs path-style addressing.
+    const endpoint = this.configService.get<string>('s3.endpoint', '');
 
-    this.s3Client = new S3Client({ region });
+    this.s3Client = new S3Client({ region, ...(endpoint ? { endpoint, forcePathStyle: true } : {}) });
   }
 
   generateS3Key(params: { tenantId: number; entityType: string; entityId: number; fileName: string }): string {

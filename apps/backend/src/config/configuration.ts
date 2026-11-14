@@ -221,6 +221,8 @@ const configSchema = z.object({
   s3: z.object({
     bucket: z.string().default('app-files'),
     region: z.string().default('us-east-1'),
+    /** Optional S3-compatible endpoint (the local MinIO in dev); unset means real AWS S3. */
+    endpoint: z.string().url('S3_ENDPOINT must be a URL, e.g. http://localhost:9300').optional(),
   }),
 });
 
@@ -476,6 +478,7 @@ export default (): Configuration => {
     s3: {
       bucket: process.env.S3_BUCKET,
       region: process.env.S3_REGION,
+      endpoint: env('S3_ENDPOINT'),
     },
   };
 

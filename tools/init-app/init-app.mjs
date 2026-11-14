@@ -9,7 +9,7 @@
  *   - `app-foundation`            → <name>            (package names, README, CLAUDE.md, landing page)
  *   - `app-backend|frontend`      → <name>-*          (Doppler projects via doppler.yaml + scripts,
  *                                                      OTel/Grafana service names, compose services)
- *   - `app-postgres|redis|loki|tempo|grafana|inngest` → <name>-*  (docker container names)
+ *   - `app-postgres|redis|minio|loki|tempo|grafana|inngest` → <name>-*  (docker container names; `app-minio-init` follows)
  *   - `__PROJECT__`               → <name>            (Terraform state bucket in infra/)
  *   - terraform var.project default `"app"` → <name>
  *   - postgres db `app` (DATABASE_URL + POSTGRES_DB)  → <db>
@@ -249,8 +249,8 @@ function buildRules(cfg) {
       apply: (s) => s.replace(/\bapp-(backend|frontend)\b/g, `${name}-$1`),
     },
     {
-      id: `app-{postgres,redis,loki,tempo,grafana,inngest} → ${name}-*`,
-      apply: (s) => s.replace(/\bapp-(postgres|redis|loki|tempo|grafana|inngest)\b/g, `${name}-$1`),
+      id: `app-{postgres,redis,minio,loki,tempo,grafana,inngest} → ${name}-*`,
+      apply: (s) => s.replace(/\bapp-(postgres|redis|minio|loki|tempo|grafana|inngest)\b/g, `${name}-$1`),
     },
     {
       id: `__PROJECT__ → ${name}`,

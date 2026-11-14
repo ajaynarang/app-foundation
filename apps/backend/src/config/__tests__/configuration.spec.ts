@@ -56,6 +56,7 @@ describe('configuration — production boot guard', () => {
     'OUTBOUND_MODE',
     'OUTBOUND_LIVE_OUTSIDE_PRODUCTION',
     'PLAN_ENFORCEMENT',
+    'S3_ENDPOINT',
   ];
 
   const validProduction = (): Record<string, string> => ({
@@ -236,6 +237,26 @@ describe('configuration — production boot guard', () => {
 
     it('refuses any other value instead of guessing', () => {
       expect(() => load({ ...dev, PLAN_ENFORCEMENT: 'off' })).toThrow();
+    });
+  });
+
+  describe('S3_ENDPOINT (local MinIO)', () => {
+    const dev = { REDIS_URL: 'redis://cache.internal:6379', ENV_TYPE: 'development' };
+
+    it('is unset by default, which means real AWS S3', () => {
+      expect(load(dev).s3.endpoint).toBeUndefined();
+    });
+
+    it('treats a blank value as unset', () => {
+      expect(load({ ...dev, S3_ENDPOINT: '  ' }).s3.endpoint).toBeUndefined();
+    });
+
+    it('passes a URL through to the storage service', () => {
+      expect(load({ ...dev, S3_ENDPOINT: 'http://localhost:9300' }).s3.endpoint).toBe('http://localhost:9300');
+    });
+
+    it('refuses a value that is not a URL', () => {
+      expect(() => load({ ...dev, S3_ENDPOINT: 'minio port 9300' })).toThrow();
     });
   });
 
