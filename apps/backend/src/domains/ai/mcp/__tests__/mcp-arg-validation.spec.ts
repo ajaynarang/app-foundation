@@ -8,16 +8,16 @@ import { ScopeRegistryService } from '../../agent-contract/scope-registry.servic
 import { HitlPolicyService } from '../../agent-contract/hitl-policy.service';
 import { discoverTools, toolFiles } from './discover-tools';
 
-/**
- * Every tool's arguments are validated against its own zod `parameters` before any service runs, and a failure is a
- * structured `VALIDATION_FAILED` with `fieldErrors`, never a stack trace from deep in a service. Runs over EVERY
- * `@Tool` on disk, through the real pipeline and the real scope registry, so a new tool is covered the day it ships.
- */
 /** Schema keys a caller could use to claim an identity: any `_` key, and any tenant or user field. */
 function identityFields(keys: string[]): string[] {
   return keys.filter((key) => key.startsWith('_') || /^(tenant|user)(Id|DbId|PublicId)?$/i.test(key));
 }
 
+/**
+ * Every tool's arguments are validated against its own zod `parameters` before any service runs, and a failure is a
+ * structured `VALIDATION_FAILED` with `fieldErrors`, never a stack trace from deep in a service. Runs over EVERY
+ * `@Tool` on disk, through the real pipeline and the real scope registry, so a new tool is covered the day it ships.
+ */
 describe('tool arguments are validated before execution, for every tool on disk', () => {
   const tools = discoverTools();
   const executor = { execute: jest.fn() };
