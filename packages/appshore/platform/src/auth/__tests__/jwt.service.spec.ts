@@ -1,16 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService as NestJwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { JwtTokenService, parseDurationMs } from '../jwt.service';
+import { JwtTokenService, SESSION_LOCK_NAMESPACE, parseDurationMs } from '../jwt.service';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
-const mockPrisma = {
+const mockPrisma: any = {
   refreshToken: {
     create: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
     deleteMany: jest.fn(),
+    findFirst: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
   },
+  $executeRaw: jest.fn().mockResolvedValue(1),
+  // An interactive transaction runs its callback with the mock itself as `tx`.
+  $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(mockPrisma)),
+};
+
+/** The SQL text of the n-th `$executeRaw` call and its bound values. */
+const rawSql = (n = 0) => {
+  const [strings, ...values] = mockPrisma.$executeRaw.mock.calls[n] as [TemplateStringsArray, ...unknown[]];
+  return { sql: strings.join('?'), values };
 };
 
 const mockJwtService = {
@@ -165,10 +176,12 @@ describe('JwtTokenService', () => {
 
     it('a successor stays in the family, names its predecessor, and never outlives the session max age', async () => {
       config({ 'jwt.refreshExpiry': '7d', 'jwt.sessionMaxAge': '30d' });
+      mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.refreshToken.findUniqueOrThrow.mockResolvedValue({ id: 40 });
       const familyStartedAt = new Date(Date.now() - 29 * DAY_MS);
       const pair = await service.rotateRefreshToken(
         user,
-        { tokenId: 'rt_old', familyId: 'rt_first', familyStartedAt },
+        { tokenId: 'rt_old', familyId: 'rt_first', familyStartedAt, previousTokenId: null },
         'phone_otp',
       );
 
@@ -177,36 +190,114 @@ describe('JwtTokenService', () => {
       expect(row.tokenId).not.toBe('rt_old');
       // 30-day family started 29 days ago: one day left, not seven.
       expect(row.expiresAt.getTime()).toBeLessThanOrEqual(familyStartedAt.getTime() + 30 * DAY_MS);
-      expect(pair.familyId).toBe('rt_first');
+      expect(pair?.familyId).toBe('rt_first');
       expect(mockJwtService.sign.mock.calls[0][0]).toMatchObject({ sid: 'rt_first', authMethod: 'phone_otp' });
       expect(mockJwtService.sign.mock.calls[1][0]).toMatchObject({ prev: 'rt_old', authMethod: 'phone_otp' });
     });
 
-    it('retiring a predecessor is one conditional update that also retires its unretired siblings', async () => {
-      mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+    describe('rotateRefreshToken: one locked transaction', () => {
+      const presented = {
+        tokenId: 'rt_cur',
+        familyId: 'rt_first',
+        familyStartedAt: new Date(),
+        previousTokenId: 'rt_old',
+      };
 
-      await service.retirePredecessor({ tokenId: 'rt_new', familyId: 'rt_first', previousTokenId: 'rt_old' });
-
-      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: {
-          familyId: 'rt_first',
-          isRevoked: false,
-          OR: [{ tokenId: 'rt_old' }, { previousTokenId: 'rt_old', tokenId: { not: 'rt_new' } }],
-        },
-        data: { isRevoked: true, revokedAt: expect.any(Date), rotatedAt: expect.any(Date) },
+      beforeEach(() => {
+        config({});
+        mockPrisma.refreshToken.findUniqueOrThrow.mockResolvedValue({ id: 40 });
       });
-      const { data } = mockPrisma.refreshToken.updateMany.mock.calls[0][0];
-      expect(data.revokedAt).toBe(data.rotatedAt);
+
+      it("takes the user's session lock first, inside the transaction", async () => {
+        mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.rotateRefreshToken(user, presented);
+
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        const { sql, values } = rawSql();
+        expect(sql).toContain('pg_advisory_xact_lock(');
+        expect(values).toEqual([SESSION_LOCK_NAMESPACE, user.id]);
+        expect(mockPrisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+          mockPrisma.refreshToken.updateMany.mock.invocationCallOrder[0],
+        );
+      });
+
+      it('issues nothing when the presented token is no longer live', async () => {
+        mockPrisma.refreshToken.updateMany.mockResolvedValueOnce({ count: 0 });
+
+        await expect(service.rotateRefreshToken(user, presented)).resolves.toBeNull();
+
+        expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
+          where: { tokenId: 'rt_cur', familyId: 'rt_first', userId: user.id, isRevoked: false },
+          data: { lastUsedAt: expect.any(Date) },
+        });
+        expect(mockPrisma.refreshToken.create).not.toHaveBeenCalled();
+      });
+
+      it('retires every older live row of the family and any sibling, never the presented token', async () => {
+        mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.rotateRefreshToken(user, presented);
+
+        expect(mockPrisma.refreshToken.updateMany).toHaveBeenNthCalledWith(2, {
+          where: {
+            familyId: 'rt_first',
+            isRevoked: false,
+            tokenId: { not: 'rt_cur' },
+            OR: [{ id: { lt: 40 } }, { previousTokenId: 'rt_old' }],
+          },
+          data: { isRevoked: true, revokedAt: expect.any(Date), rotatedAt: expect.any(Date) },
+        });
+        const { data } = mockPrisma.refreshToken.updateMany.mock.calls[1][0];
+        expect(data.revokedAt).toBe(data.rotatedAt);
+      });
     });
 
-    it('revoking a family revokes every live token in it, without marking any as rotated', async () => {
+    it('a workspace switch issues the successor of the newest live row, under the session lock', async () => {
+      config({});
+      const familyStartedAt = new Date();
+      mockPrisma.refreshToken.findFirst.mockResolvedValue({
+        tokenId: 'rt_newest',
+        familyId: 'rt_first',
+        familyStartedAt,
+      });
+
+      await service.issueSwitchSuccessor(user, 'rt_first');
+
+      expect(rawSql().values).toEqual([SESSION_LOCK_NAMESPACE, user.id]);
+      expect(mockPrisma.refreshToken.findFirst).toHaveBeenCalledWith({
+        where: { familyId: 'rt_first', userId: user.id, isRevoked: false },
+        orderBy: [{ id: 'desc' }],
+      });
+      expect(mockPrisma.refreshToken.create.mock.calls[0][0].data).toMatchObject({
+        familyId: 'rt_first',
+        previousTokenId: 'rt_newest',
+      });
+      // Nothing is retired at the switch: its response can be lost.
+      expect(mockPrisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('a workspace switch starts a new session when the family has no live token', async () => {
+      config({});
+      mockPrisma.refreshToken.findFirst.mockResolvedValue(null);
+
+      const pair = await service.issueSwitchSuccessor(user, 'rt_gone');
+
+      const row = mockPrisma.refreshToken.create.mock.calls[0][0].data;
+      expect(row.previousTokenId).toBeNull();
+      expect(row.familyId).toBe(row.tokenId);
+      expect(pair.familyId).toBe(row.tokenId);
+    });
+
+    it('revoking a family revokes every live token in it under the session lock, and says how many', async () => {
       mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 3 });
 
-      await service.revokeFamily('rt_first');
+      await expect(service.revokeFamily('rt_first', user.id)).resolves.toBe(3);
 
+      expect(rawSql().values).toEqual([SESSION_LOCK_NAMESPACE, user.id]);
       expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { familyId: 'rt_first', isRevoked: false },
+        where: { familyId: 'rt_first', userId: user.id, isRevoked: false },
         data: { isRevoked: true, revokedAt: expect.any(Date) },
       });
     });

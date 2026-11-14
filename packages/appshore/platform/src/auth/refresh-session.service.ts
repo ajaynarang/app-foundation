@@ -50,7 +50,8 @@ export interface RefreshResult {
  * Rules (the template's own on top of the rotation it shares with its sibling products):
  * - The presented token must match the stored hash, not just name a row.
  * - A token retired by rotation and presented again is reuse: the whole family is revoked, a `REFRESH_REUSE` login
- *   failure is written, and one warning is logged. Within `jwt.refreshReuseGraceSeconds` of its retirement it is a
+ *   failure is written, and one warning is logged. When the family has no live token left (a logout, an earlier
+ *   reuse), there is nothing to revoke, and it is a plain 401 with no event. Within `jwt.refreshReuseGraceSeconds` of its retirement it is a
  *   request that was already in flight, and gets a plain 401.
  * - A row revoked without rotation (logout, password reset, an admin) gets a plain 401.
  * - A session never outlives `jwt.sessionMaxAge` from its family's start.
@@ -121,23 +122,16 @@ export class RefreshSessionService {
   }
 
   /**
-   * Turn a validated session into a successor token pair. Retires the predecessor first (this token being presented
-   * proves the client received it), then issues the successor in the same family.
+   * Turn a validated session into a successor token pair. The token service does the rotation in one locked
+   * transaction: the presented token must still be live, the rows it makes stale are retired (it being presented
+   * proves the client received it), and the successor is issued in the same family. A token revoked or retired
+   * since it was validated (a reuse revoked the family, a sibling was presented first) gets a plain 401.
    */
   async refresh(session: RefreshSession): Promise<RefreshResult> {
     const user = await this.prisma.user.findUnique({ where: { id: session.dbId }, include: { tenant: true } });
     if (!user || !user.isActive) throw new UnauthorizedException('User not found or inactive');
 
     const workspace = await this.resolveSessionWorkspace(user, session.sessionTenantDbId);
-
-    if (session.previousTokenId) {
-      await this.jwtTokenService.retirePredecessor({
-        tokenId: session.tokenId,
-        familyId: session.familyId,
-        previousTokenId: session.previousTokenId,
-      });
-    }
-    await this.prisma.refreshToken.update({ where: { tokenId: session.tokenId }, data: { lastUsedAt: new Date() } });
 
     const pair = await this.jwtTokenService.rotateRefreshToken(
       {
@@ -148,9 +142,15 @@ export class RefreshSessionService {
         tenantId: workspace.tenant?.tenantId,
         tenantDbId: workspace.tenant?.id ?? null,
       },
-      { tokenId: session.tokenId, familyId: session.familyId, familyStartedAt: session.familyStartedAt },
+      {
+        tokenId: session.tokenId,
+        familyId: session.familyId,
+        familyStartedAt: session.familyStartedAt,
+        previousTokenId: session.previousTokenId,
+      },
       session.authMethod,
     );
+    if (!pair) throw new UnauthorizedException('Invalid or revoked refresh token');
 
     return {
       accessToken: pair.accessToken,
@@ -196,7 +196,10 @@ export class RefreshSessionService {
     const retiredAt = row.revokedAt?.getTime() ?? 0;
     if (Date.now() - retiredAt <= this.jwtTokenService.reuseGraceMs()) return;
 
-    await this.jwtTokenService.revokeFamily(row.familyId);
+    // A family already fully revoked (a logout, an earlier reuse) loses nothing: a stale token re-sent then is a
+    // plain 401, not a reuse to record or report.
+    const revoked = await this.jwtTokenService.revokeFamily(row.familyId, row.userId);
+    if (revoked === 0) return;
     await this.loginEventService.recordFailure({
       userId: row.userId,
       tenantId: row.tenantId,

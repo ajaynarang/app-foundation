@@ -1,12 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService as NestJwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '@appshore/db';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import * as crypto from 'crypto';
 
 export type AuthMethod = 'email_password' | 'phone_pin' | 'phone_otp';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * First key of the transaction-scoped advisory lock that serialises every change to one user's refresh-token rows
+ * (`pg_advisory_xact_lock(SESSION_LOCK_NAMESPACE, userId)`). Any fixed int4 works; this one spells "RFSH".
+ */
+export const SESSION_LOCK_NAMESPACE = 0x52465348;
 
 /** Used when the configured value is missing or unparseable. */
 const DEFAULT_REFRESH_TTL_MS = 7 * DAY_MS;
@@ -43,6 +50,11 @@ export interface SessionLineage {
   familyStartedAt: Date;
 }
 
+/** The token being presented to refresh: its lineage, and the token it replaced (null for a family's first). */
+export interface PresentedToken extends SessionLineage {
+  previousTokenId: string | null;
+}
+
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
@@ -57,7 +69,9 @@ export interface TokenPair {
  * A family is one session. Its first token's id is the family id, which the access token carries as `sid`. Every
  * refresh issues a successor in the same family ([rotateRefreshToken]). The presented token is NOT cut short then:
  * the response carrying the successor can be lost, and the client must still be able to refresh with what it holds.
- * It is retired the first time its successor is presented ([retirePredecessor]), which proves the client got it.
+ * It is retired the first time its successor is presented ([retireStaleRows]), which proves the client got it.
+ * Every write to a user's rows that can race a refresh (rotate, switch, revoke a family) takes the user's session
+ * lock, so a refresh validated a moment ago cannot add a live token to a family that was revoked meanwhile.
  * Presenting a retired token again is reuse, and revokes the family (RefreshSessionService).
  */
 @Injectable()
@@ -89,42 +103,103 @@ export class JwtTokenService {
 
   /** Start a new session: a token pair whose refresh token is the first of a new family. */
   async generateTokenPair(user: SessionUser, authMethod?: AuthMethod): Promise<TokenPair> {
-    return this.issue(user, authMethod, null);
+    return this.issue(this.prisma, user, authMethod, null);
   }
 
   /**
-   * Issue the successor of a presented refresh token, in the same family. The presented token stays valid until
-   * this successor is first presented (see the class comment).
+   * The refresh step, atomic with the row's state. Under the user's session lock, in one transaction:
+   * - the presented token must still be live (it passed validation, but a reuse, a logout or a sibling's
+   *   presentation may have revoked it since); when it is not, nothing is written and the result is `null`;
+   * - the rows it makes stale are retired ([retireStaleRows]);
+   * - it is stamped used, and its successor is issued in the same family.
+   * The presented token itself stays valid until the successor is first presented (see the class comment).
    */
-  async rotateRefreshToken(user: SessionUser, presented: SessionLineage, authMethod?: AuthMethod): Promise<TokenPair> {
-    return this.issue(user, authMethod, presented);
+  async rotateRefreshToken(
+    user: SessionUser,
+    presented: PresentedToken,
+    authMethod?: AuthMethod,
+  ): Promise<TokenPair | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockSessions(tx, user.id);
+      const now = new Date();
+      const { count } = await tx.refreshToken.updateMany({
+        where: { tokenId: presented.tokenId, familyId: presented.familyId, userId: user.id, isRevoked: false },
+        data: { lastUsedAt: now },
+      });
+      if (count !== 1) return null;
+      await this.retireStaleRows(tx, presented, now);
+      return this.issue(tx, user, authMethod, presented);
+    });
   }
 
   /**
-   * Retire the token a presented successor replaced, and any sibling: another unretired token that replaced the
-   * same one (two tabs that refreshed together). One conditional update, so it is atomic and idempotent. `rotatedAt`
-   * marks the rows as retired by rotation, which is what makes presenting one again detectable as reuse.
+   * A workspace switch: a successor in the session's family with the new workspace, issued under the session lock.
+   * The switch request carries no refresh cookie, so the predecessor is the family's newest live row, which is not
+   * necessarily the token the client holds. Nothing is retired here (the response can be lost); when the switch's
+   * successor is first presented, [retireStaleRows] retires every older live row of the family, so the token the
+   * client held stays valid in the old workspace no longer than that. A family with no live row (or none named)
+   * starts a new session.
    */
-  async retirePredecessor(presented: { tokenId: string; familyId: string; previousTokenId: string }): Promise<void> {
-    const now = new Date();
-    await this.prisma.refreshToken.updateMany({
+  async issueSwitchSuccessor(
+    user: SessionUser,
+    familyId: string | null | undefined,
+    authMethod?: AuthMethod,
+  ): Promise<TokenPair> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockSessions(tx, user.id);
+      const newest = familyId
+        ? await tx.refreshToken.findFirst({
+            where: { familyId, userId: user.id, isRevoked: false },
+            orderBy: [{ id: 'desc' }],
+          })
+        : null;
+      return this.issue(
+        tx,
+        user,
+        authMethod,
+        newest ? { tokenId: newest.tokenId, familyId: newest.familyId, familyStartedAt: newest.familyStartedAt } : null,
+      );
+    });
+  }
+
+  /**
+   * Presenting a token proves the client holds it, so every other live row of its family that is older than it is
+   * stale: its predecessor, a token a workspace switch skipped over, a sibling issued before it. A sibling issued
+   * after it (another unretired token that replaced the same one: two tabs that refreshed together) is stale too.
+   * Its own successors are not: a lost response must not log the client out. `rotatedAt` marks the rows as retired
+   * by rotation, which is what makes presenting one again detectable as reuse. Runs under the session lock.
+   */
+  private async retireStaleRows(tx: Prisma.TransactionClient, presented: PresentedToken, now: Date): Promise<void> {
+    const self = await tx.refreshToken.findUniqueOrThrow({
+      where: { tokenId: presented.tokenId },
+      select: { id: true },
+    });
+    await tx.refreshToken.updateMany({
       where: {
         familyId: presented.familyId,
         isRevoked: false,
+        tokenId: { not: presented.tokenId },
         OR: [
-          { tokenId: presented.previousTokenId },
-          { previousTokenId: presented.previousTokenId, tokenId: { not: presented.tokenId } },
+          { id: { lt: self.id } },
+          ...(presented.previousTokenId ? [{ previousTokenId: presented.previousTokenId }] : []),
         ],
       },
       data: { isRevoked: true, revokedAt: now, rotatedAt: now },
     });
   }
 
-  /** End a session: revoke every live token of the family. A revoked (not rotated) token gets a plain 401. */
-  async revokeFamily(familyId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: { familyId, isRevoked: false },
-      data: { isRevoked: true, revokedAt: new Date() },
+  /**
+   * End a session: revoke every live token of the family, under the session lock, so a refresh in flight cannot add
+   * a live successor after it. A revoked (not rotated) token gets a plain 401. Returns how many rows it revoked.
+   */
+  async revokeFamily(familyId: string, userId: number): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockSessions(tx, userId);
+      const { count } = await tx.refreshToken.updateMany({
+        where: { familyId, userId, isRevoked: false },
+        data: { isRevoked: true, revokedAt: new Date() },
+      });
+      return count;
     });
   }
 
@@ -168,7 +243,13 @@ export class JwtTokenService {
     return result.count;
   }
 
+  /** Serialise every change to this user's refresh-token rows until the transaction ends. */
+  private async lockSessions(tx: Prisma.TransactionClient, userId: number): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SESSION_LOCK_NAMESPACE}::int, ${userId}::int)`;
+  }
+
   private async issue(
+    db: Prisma.TransactionClient | PrismaService,
     user: SessionUser,
     authMethod: AuthMethod | undefined,
     predecessor: SessionLineage | null,
@@ -214,7 +295,7 @@ export class JwtTokenService {
       } as any,
     );
 
-    await this.prisma.refreshToken.create({
+    await db.refreshToken.create({
       data: {
         tokenId,
         userId: user.id,

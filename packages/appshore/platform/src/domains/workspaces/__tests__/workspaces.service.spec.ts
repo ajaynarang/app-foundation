@@ -30,7 +30,7 @@ const mockJwt = {
     refreshTokenId: 'rt_1',
     familyId: 'rt_1',
   }),
-  rotateRefreshToken: jest.fn().mockResolvedValue({
+  issueSwitchSuccessor: jest.fn().mockResolvedValue({
     accessToken: 'at',
     refreshToken: 'rt',
     refreshTokenId: 'rt_9',
@@ -114,20 +114,10 @@ describe('WorkspacesService', () => {
 
     it("issues a successor in the session's family, carrying the target workspace + membership role", async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
-      const familyStartedAt = new Date('2026-11-01T00:00:00Z');
-      mockPrisma.refreshToken.findFirst.mockResolvedValue({ tokenId: 'rt_8', familyId: 'rt_family', familyStartedAt });
-
       const result = await service.switch(1, 'demo-two', { familyId: 'rt_family', authMethod: 'email_password' });
 
-      expect(mockPrisma.refreshToken.findFirst).toHaveBeenCalledWith({
-        where: { familyId: 'rt_family', userId: 1, isRevoked: false },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      });
-      expect(mockJwt.rotateRefreshToken).toHaveBeenCalledWith(
-        sessionUser,
-        { tokenId: 'rt_8', familyId: 'rt_family', familyStartedAt },
-        'email_password',
-      );
+      // The token service picks the predecessor under the session lock (jwt.service.spec.ts).
+      expect(mockJwt.issueSwitchSuccessor).toHaveBeenCalledWith(sessionUser, 'rt_family', 'email_password');
       expect(mockJwt.generateTokenPair).not.toHaveBeenCalled();
       expect(result.workspace).toEqual({
         tenantId: 'demo-two',
@@ -154,14 +144,12 @@ describe('WorkspacesService', () => {
       expect(mockPrisma.workspaceMember.update).not.toHaveBeenCalled();
     });
 
-    it('starts a new session when the family has no live token (an access token from before rotation)', async () => {
+    it('passes no family when the access token names none', async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
-      mockPrisma.refreshToken.findFirst.mockResolvedValue(null);
 
-      await service.switch(1, 'demo-two', { familyId: 'rt_old' });
+      await service.switch(1, 'demo-two', {});
 
-      expect(mockJwt.generateTokenPair).toHaveBeenCalledWith(sessionUser, undefined);
-      expect(mockJwt.rotateRefreshToken).not.toHaveBeenCalled();
+      expect(mockJwt.issueSwitchSuccessor).toHaveBeenCalledWith(sessionUser, undefined, undefined);
     });
 
     it('404s when the user has no membership in the target workspace', async () => {

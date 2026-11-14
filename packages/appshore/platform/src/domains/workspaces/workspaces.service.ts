@@ -95,19 +95,9 @@ export class WorkspacesService {
       tenantId: membership.tenant.tenantId,
       tenantDbId: membership.tenantId,
     };
-    const current = session.familyId
-      ? await this.prisma.refreshToken.findFirst({
-          where: { familyId: session.familyId, userId: userDbId, isRevoked: false },
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        })
-      : null;
-    const tokens = current
-      ? await this.jwtTokenService.rotateRefreshToken(
-          sessionUser,
-          { tokenId: current.tokenId, familyId: current.familyId, familyStartedAt: current.familyStartedAt },
-          session.authMethod,
-        )
-      : await this.jwtTokenService.generateTokenPair(sessionUser, session.authMethod);
+    // Same family, new workspace. The predecessor is the family's newest live row (the switch request carries no
+    // refresh cookie); the token the client actually held is retired when this successor is first presented.
+    const tokens = await this.jwtTokenService.issueSwitchSuccessor(sessionUser, session.familyId, session.authMethod);
 
     return {
       accessToken: tokens.accessToken,

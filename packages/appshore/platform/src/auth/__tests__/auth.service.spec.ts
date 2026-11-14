@@ -331,12 +331,12 @@ describe('AuthService - Phone Auth', () => {
 
   describe('logout', () => {
     it('revokes the whole session (refresh-token family) and records the logout', async () => {
-      mockJwtTokenService.revokeFamily.mockResolvedValue(undefined);
+      mockJwtTokenService.revokeFamily.mockResolvedValue(1);
       mockLoginEventService.recordLogout.mockResolvedValue(undefined);
 
       await service.logout('rt_family', 1, 1);
 
-      expect(mockJwtTokenService.revokeFamily).toHaveBeenCalledWith('rt_family');
+      expect(mockJwtTokenService.revokeFamily).toHaveBeenCalledWith('rt_family', 1);
       expect(mockLoginEventService.recordLogout).toHaveBeenCalledWith({
         userId: 1,
         tenantId: 1,

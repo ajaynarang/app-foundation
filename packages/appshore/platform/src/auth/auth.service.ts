@@ -50,7 +50,7 @@ export class AuthService {
 
   /** Sign out one session: `sessionId` is the access token's `sid`, the refresh-token family. */
   async logout(sessionId: string, userId: number, tenantId: number | null): Promise<void> {
-    await this.jwtTokenService.revokeFamily(sessionId);
+    await this.jwtTokenService.revokeFamily(sessionId, userId);
     await this.loginEventService.recordLogout({
       userId,
       tenantId,

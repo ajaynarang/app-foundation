@@ -234,6 +234,95 @@ describe('Refresh-token rotation (Postgres)', () => {
     await expect(refresh(third.refreshToken)).resolves.toBeTruthy();
   });
 
+  describe('the refresh step is atomic with validation', () => {
+    const validate = (refreshToken: string) => {
+      const payload = nestJwt.verify<{ tokenId: string }>(refreshToken, { secret: REFRESH_SECRET });
+      return sessions.validatePresentedToken(payload.tokenId, refreshToken, meta);
+    };
+    const reuseEvents = () =>
+      prisma.loginEvent.count({ where: { userId: user.id, failReason: LoginFailReason.REFRESH_REUSE } });
+
+    it('a family revoked after the token was validated gets no new live token', async () => {
+      if (!dbReachable) return;
+      const first = await login();
+      const session = await validate(first.refreshToken);
+
+      await tokens.revokeFamily(first.familyId, user.id); // a reuse elsewhere, or a logout, lands in between
+
+      await expect(sessions.refresh(session)).rejects.toThrow(UnauthorizedException);
+      expect(await liveTokens(first.familyId)).toEqual([]);
+    });
+
+    it('a family revoked while a refresh is in flight never keeps a live token', async () => {
+      if (!dbReachable) return;
+      const first = await login();
+      const session = await validate(first.refreshToken);
+      // Pause the refresh after it wrote the successor and before its transaction commits.
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const issue = (tokens as any).issue.bind(tokens);
+      jest.spyOn(tokens as any, 'issue').mockImplementation(async (...args: unknown[]) => {
+        const pair = await issue(...args);
+        await gate;
+        return pair;
+      });
+
+      const refreshing = sessions.refresh(session);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const revoking = tokens.revokeFamily(first.familyId, user.id); // a reuse elsewhere, or a logout
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      release();
+      await Promise.allSettled([refreshing, revoking]);
+
+      expect(await liveTokens(first.familyId)).toEqual([]);
+    });
+
+    it('a token retired as a sibling while it is being refreshed cannot start an orphan chain', async () => {
+      if (!dbReachable) return;
+      const first = await login();
+      const [a, b] = await Promise.all([refresh(first.refreshToken), refresh(first.refreshToken)]);
+      const sessionB = await validate(b.refreshToken); // B passes validation...
+
+      const fromA = await refresh(a.refreshToken); // ...then A is presented and retires B as its sibling
+
+      await expect(sessions.refresh(sessionB)).rejects.toThrow(UnauthorizedException);
+      expect(await prisma.refreshToken.count({ where: { previousTokenId: tokenIdOf(b) } })).toBe(0);
+      expect((await liveTokens(first.familyId)).map((t) => t.tokenId).sort()).toEqual(
+        [tokenIdOf(a), tokenIdOf(fromA)].sort(),
+      );
+    });
+
+    it('a retired token presented after the family was fully revoked is a plain 401, not reuse', async () => {
+      if (!dbReachable) return;
+      const first = await login();
+      const second = await refresh(first.refreshToken);
+      await refresh(second.refreshToken); // retires `first` by rotation
+      await tokens.revokeFamily(first.familyId, user.id); // logout
+      const before = await reuseEvents();
+
+      await expect(refresh(first.refreshToken)).rejects.toThrow(UnauthorizedException);
+
+      expect(await reuseEvents()).toBe(before);
+    });
+  });
+
+  it('presenting a workspace switch successor retires the token the client held, not only the newest row', async () => {
+    if (!dbReachable) return;
+    const first = await login();
+    const held = await refresh(first.refreshToken); // the client holds this one
+    await refresh(held.refreshToken); // a successor whose response was lost: the newest live row
+
+    const switched = await workspaces.switch(user.id, tenantY.tenantId, { familyId: first.familyId });
+    const afterSwitch = await refresh(switched.refreshToken);
+
+    expect((await row(tokenIdOf(held))).isRevoked).toBe(true);
+    expect((await liveTokens(first.familyId)).map((t) => t.tokenId).sort()).toEqual(
+      [tokenIdOf(switched), tokenIdOf(afterSwitch)].sort(),
+    );
+
+    await workspaces.switch(user.id, tenantX.tenantId, {});
+  });
+
   it('a token that does not match the stored hash is refused', async () => {
     if (!dbReachable) return;
     const first = await login();
@@ -291,7 +380,7 @@ describe('Refresh-token rotation (Postgres)', () => {
     const first = await login();
     await refresh(first.refreshToken);
 
-    await tokens.revokeFamily(first.familyId);
+    await tokens.revokeFamily(first.familyId, user.id);
 
     expect(await liveTokens(first.familyId)).toEqual([]);
   });

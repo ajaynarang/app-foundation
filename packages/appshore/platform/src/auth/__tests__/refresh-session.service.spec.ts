@@ -75,8 +75,7 @@ describe('RefreshSessionService', () => {
     };
     jwt = {
       matchesStoredHash: jest.fn().mockReturnValue(true),
-      revokeFamily: jest.fn().mockResolvedValue(undefined),
-      retirePredecessor: jest.fn().mockResolvedValue(undefined),
+      revokeFamily: jest.fn().mockResolvedValue(2),
       rotateRefreshToken: jest
         .fn()
         .mockResolvedValue({ accessToken: 'at', refreshToken: 'rt', refreshTokenId: 'rt_3', familyId: 'rt_1' }),
@@ -122,7 +121,7 @@ describe('RefreshSessionService', () => {
       const warn = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
 
       await expect(validate()).rejects.toThrow(UnauthorizedException);
-      expect(jwt.revokeFamily).toHaveBeenCalledWith('rt_1');
+      expect(jwt.revokeFamily).toHaveBeenCalledWith('rt_1', 1);
       expect(loginEvents.recordFailure).toHaveBeenCalledWith({
         userId: 1,
         tenantId: tenantY.id,
@@ -131,6 +130,23 @@ describe('RefreshSessionService', () => {
         failReason: 'refresh_reuse',
       });
       expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: 'auth.refresh_reuse', familyId: 'rt_1' }));
+    });
+
+    it('a retired token of a family with nothing left to revoke (a logout) is a plain 401: no event, no report', async () => {
+      const retiredAt = new Date(Date.now() - 60_000);
+      prisma.refreshToken.findUnique.mockResolvedValue(
+        makeRow({ isRevoked: true, revokedAt: retiredAt, rotatedAt: retiredAt }),
+      );
+      jwt.revokeFamily.mockResolvedValue(0);
+      const warn = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+      const report = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+
+      await expect(validate()).rejects.toThrow(UnauthorizedException);
+
+      expect(loginEvents.recordFailure).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+      expect(report).not.toHaveBeenCalled();
+      report.mockRestore();
     });
 
     it('reports a reuse to the error tracker at warning level, ids only', async () => {
@@ -213,41 +229,26 @@ describe('RefreshSessionService', () => {
   });
 
   describe('refresh', () => {
-    it('always rotates: issues a successor in the same family, naming the presented token', async () => {
+    it('always rotates: hands the presented token, with its predecessor, to the atomic rotation', async () => {
       prisma.user.findUnique.mockResolvedValue(makeUser());
 
       const result = await service.refresh(makeSession());
 
       expect(jwt.rotateRefreshToken).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1, userId: 'user_1', tenantId: tenantX.tenantId, tenantDbId: tenantX.id }),
-        { tokenId: 'rt_2', familyId: 'rt_1', familyStartedAt: expect.any(Date) },
+        { tokenId: 'rt_2', familyId: 'rt_1', familyStartedAt: expect.any(Date), previousTokenId: 'rt_1' },
         'email_password',
       );
       expect(result).toMatchObject({ accessToken: 'at', refreshToken: 'rt' });
-      expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-        where: { tokenId: 'rt_2' },
-        data: { lastUsedAt: expect.any(Date) },
-      });
     });
 
-    it('retires the predecessor when a successor is presented', async () => {
+    it('a token revoked or retired since it was validated gets a plain 401, and nothing is recorded', async () => {
       prisma.user.findUnique.mockResolvedValue(makeUser());
+      jwt.rotateRefreshToken.mockResolvedValue(null);
 
-      await service.refresh(makeSession());
-
-      expect(jwt.retirePredecessor).toHaveBeenCalledWith({
-        tokenId: 'rt_2',
-        familyId: 'rt_1',
-        previousTokenId: 'rt_1',
-      });
-    });
-
-    it('retires nothing for the first token of a family', async () => {
-      prisma.user.findUnique.mockResolvedValue(makeUser());
-
-      await service.refresh(makeSession({ previousTokenId: null, tokenId: 'rt_1' }));
-
-      expect(jwt.retirePredecessor).not.toHaveBeenCalled();
+      await expect(service.refresh(makeSession())).rejects.toThrow(UnauthorizedException);
+      expect(loginEvents.recordFailure).not.toHaveBeenCalled();
+      expect(jwt.revokeFamily).not.toHaveBeenCalled();
     });
 
     it("mints from the session's workspace and that membership's role, not the user's default", async () => {
@@ -276,7 +277,6 @@ describe('RefreshSessionService', () => {
         UnauthorizedException,
       );
       expect(jwt.rotateRefreshToken).not.toHaveBeenCalled();
-      expect(jwt.retirePredecessor).not.toHaveBeenCalled();
     });
 
     it('fails when the session workspace is inactive', async () => {
