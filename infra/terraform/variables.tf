@@ -100,7 +100,27 @@ variable "bedrock_models" {
 }
 
 variable "bedrock_tenant_roles_enabled" {
-  description = "Lets workspaces connect their own AWS account (BEDROCK_ROLE): grants the task role sts:AssumeRole and sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to the task role's ARN, the principal a workspace's trust policy names. Off by default."
+  description = "Lets workspaces connect their own AWS account (BEDROCK_ROLE): grants both task roles (API and worker) sts:AssumeRole and sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to both task role ARNs, the principals a workspace's trust policy names. Off by default."
+  type        = bool
+  default     = false
+}
+
+# The worker task role split (iam.tf)
+variable "worker_own_task_role" {
+  description = "Run the worker task under its own task role (ecs_task_worker) instead of the API's (ecs_task). True by default, which is right for a new stack and for any stack with bedrock_tenant_roles_enabled off. A stack with workspace Bedrock roles already connected applies with false first (the worker role is created and both ARNs land in PLATFORM_ASSUME_ROLE_ARN while the worker keeps ecs_task), has each such workspace re-save its trust policy (the Settings sheet then lists both ARNs), then sets true. Otherwise worker-side calls on those credentials are denied and the revalidation sweep marks them failing."
+  type        = bool
+  default     = true
+}
+
+# ECS Exec. Every session is written to the ecs-exec log group (cloudwatch.tf) either way.
+variable "api_enable_exec" {
+  description = "ECS Exec into the API tasks. On by default: the migration jobs and tools/db/tunnel.sh use an API task as the jump host to the private database."
+  type        = bool
+  default     = true
+}
+
+variable "worker_enable_exec" {
+  description = "ECS Exec into the worker tasks. Off by default: nothing needs a shell there, and the tunnel and migration jobs jump through the API. Turn on for an incident, then off again."
   type        = bool
   default     = false
 }
@@ -121,6 +141,17 @@ variable "rds_allocated_storage" {
   description = "Allocated storage in GB for RDS (min 20 for gp3)"
   type        = number
   default     = 20
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Ceiling (GB) for RDS storage autoscaling: RDS grows the volume on its own when free space runs low, up to this cap. 0 turns autoscaling off. Must exceed rds_allocated_storage."
+  type        = number
+  default     = 200
+
+  validation {
+    condition     = var.rds_max_allocated_storage == 0 || var.rds_max_allocated_storage > var.rds_allocated_storage
+    error_message = "rds_max_allocated_storage is 0 (off) or larger than rds_allocated_storage."
+  }
 }
 
 variable "rds_db_name" {

@@ -9,6 +9,19 @@ resource "aws_ecs_cluster" "main" {
     value = var.container_insights ? "enabled" : "disabled"
   }
 
+  # Every ECS Exec session (the commands typed and what they printed) goes to the ecs-exec log group, so a shell into
+  # a task leaves a transcript.
+  configuration {
+    execute_command_configuration {
+      logging = "OVERRIDE"
+
+      log_configuration {
+        cloud_watch_log_group_name     = aws_cloudwatch_log_group.ecs_exec.name
+        cloud_watch_encryption_enabled = false
+      }
+    }
+  }
+
   tags = { Name = "${local.prefix}-ecs-cluster" }
 }
 
@@ -22,13 +35,17 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   }
 }
 
-# The role a workspace's AWS Bedrock role must trust: the task role the API and the worker share. Set only when
-# bedrock_tenant_roles_enabled, so the task definitions stay byte-identical while it is off. Set it here, never in
+# The roles a workspace's AWS Bedrock role must trust: both task roles, API first, comma-separated (the backend reads a
+# list and names every ARN in the trust policy it hands a workspace). Both are listed even while the worker still runs
+# under ecs_task (worker_own_task_role = false), so workspaces can add the worker role before the switch. Set only
+# when bedrock_tenant_roles_enabled, so the task definitions stay byte-identical while it is off. Set it here, never in
 # Doppler: Doppler values override the task environment.
 locals {
   bedrock_tenant_role_env = var.bedrock_tenant_roles_enabled ? [
-    { name = "PLATFORM_ASSUME_ROLE_ARN", value = aws_iam_role.ecs_task.arn },
+    { name = "PLATFORM_ASSUME_ROLE_ARN", value = join(",", [aws_iam_role.ecs_task.arn, aws_iam_role.ecs_task_worker.arn]) },
   ] : []
+
+  worker_task_role_arn = var.worker_own_task_role ? aws_iam_role.ecs_task_worker.arn : aws_iam_role.ecs_task.arn
 
   # Exactly one process role reports the ops gauges (queue depth, cron intervals, outbox and deadline ages), so
   # nothing is counted twice: the worker. With no worker task the API consumes every queue and reports them instead.
@@ -121,7 +138,7 @@ resource "aws_ecs_task_definition" "worker" {
   cpu                      = var.worker_cpu
   memory                   = var.worker_memory
   execution_role_arn       = aws_iam_role.ecs_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  task_role_arn            = local.worker_task_role_arn
 
   container_definitions = jsonencode([{
     name      = "worker"
@@ -159,10 +176,11 @@ resource "aws_ecs_service" "api" {
   desired_count   = var.api_desired_count
   launch_type     = "FARGATE"
 
-  # Enable ECS Exec for running migrations and debugging without SSH.
+  # ECS Exec (var.api_enable_exec, on by default): the migration jobs and tools/db/tunnel.sh jump through an API task to
+  # the private database. Sessions are logged to the ecs-exec log group.
   # Usage: aws ecs execute-command --cluster <cluster> --task <task-arn> \
   #          --container api --interactive --command "npx prisma migrate deploy"
-  enable_execute_command = true
+  enable_execute_command = var.api_enable_exec
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
@@ -196,7 +214,9 @@ resource "aws_ecs_service" "worker" {
   desired_count   = var.worker_desired_count
   launch_type     = "FARGATE"
 
-  enable_execute_command = true
+  # Off unless worker_enable_exec: nothing needs a shell here, and the tunnel jumps through the API. Sessions are
+  # logged when on.
+  enable_execute_command = var.worker_enable_exec
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
