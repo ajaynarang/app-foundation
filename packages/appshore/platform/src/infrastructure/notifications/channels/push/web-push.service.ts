@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import * as webpush from 'web-push';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import {
   OUTBOUND_GATE,
   OUTBOUND_SOURCE,
@@ -36,7 +37,7 @@ export class PushService {
         this.logger.log('Web Push configured with VAPID keys');
       } catch (error: any) {
         this.isConfigured = false;
-        this.logger.warn(`Web Push not configured — invalid VAPID keys: ${error.message}`);
+        this.logger.warn({ msg: 'Web Push not configured — invalid VAPID keys', err: toLoggableError(error) });
       }
     } else {
       this.isConfigured = false;
@@ -129,7 +130,7 @@ export class PushService {
           this.logger.log(`Removed expired push subscription for user ${userId}`);
         } else {
           recordOutboundFailed(OUTBOUND_CHANNEL.PUSH);
-          this.logger.error(`Push send failed for user ${userId}: ${error.message}`);
+          this.logger.error({ msg: `Push send failed for user ${userId}`, err: toLoggableError(error) });
         }
       }
     }

@@ -19,6 +19,7 @@ import {
 } from './whatsapp.constants';
 import type { WhatsAppSendJobPayload } from './whatsapp-dispatch.service';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import { OUTBOUND_GATE, type OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 export type { WhatsAppSendJobPayload } from './whatsapp-dispatch.service';
@@ -125,7 +126,10 @@ export class WhatsAppSendHandler implements QueueJobHandler {
         throw err;
       }
       recordOutboundFailed(OUTBOUND_CHANNEL.WHATSAPP);
-      this.logger.warn(`WhatsApp send ${deliveryId} failed for good on attempt ${attempt}: ${(err as Error).message}`);
+      this.logger.warn({
+        msg: `WhatsApp send ${deliveryId} failed for good on attempt ${attempt}`,
+        err: toLoggableError(err),
+      });
       const reason =
         err instanceof WhatsAppSendError && err.failureReason
           ? err.failureReason

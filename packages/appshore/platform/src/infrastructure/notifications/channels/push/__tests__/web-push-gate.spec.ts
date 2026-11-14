@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
 import type { OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
@@ -7,6 +8,7 @@ import {
 } from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 import type { PrismaService } from '../../../../database/prisma.service';
 import { PushService } from '../web-push.service';
+import { renderLogCalls } from '../../../../../test/helpers/rendered-log';
 
 jest.mock('web-push', () => ({ setVapidDetails: jest.fn(), sendNotification: jest.fn() }));
 
@@ -44,5 +46,20 @@ describe('PushService behind the outbound gate', () => {
       title: '[STG] T',
       body: 'B',
     });
+  });
+
+  it('logs a refused push as an err field the serializer masks, never in the message', async () => {
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    (webpush.sendNotification as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error('Received unexpected response code for person@example.com'), { statusCode: 400 }),
+    );
+
+    await expect(service(allowAllOutboundGate()).sendPushToUser(5, { title: 'T', body: 'B' })).resolves.toBe(0);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: expect.any(String), err: expect.any(Object) }),
+    );
+    expect(renderLogCalls(errorSpy.mock.calls)).not.toContain('person@example.com');
+    errorSpy.mockRestore();
   });
 });

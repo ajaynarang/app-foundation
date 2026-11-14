@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationDeliveryService } from '../delivery.service';
@@ -17,6 +18,7 @@ import {
   requiredParam,
   type WhatsAppTemplateMap,
 } from '../../channels/whatsapp/whatsapp-template.registry';
+import { renderLogCalls } from '../../../../test/helpers/rendered-log';
 
 /** The templates these tests render; every other type deliberately has none. */
 const TEMPLATES: WhatsAppTemplateMap = {
@@ -485,6 +487,79 @@ describe('NotificationDeliveryService', () => {
       expect(mockSms.sendSms).not.toHaveBeenCalled();
     });
   });
+  describe('provider errors in the log (logging standard, rules 3 and 4)', () => {
+    // Nodemailer and Twilio echo the recipient in their error text. The err serializer masks it; the message must
+    // not carry it past the serializer.
+    const ADDRESS = 'person@example.com';
+    const PHONE = '+15551234567';
+    const providerError = () =>
+      new Error(`Can't send mail - all recipients were rejected: 550 5.1.1 <${ADDRESS}> ${PHONE} unknown`);
+
+    let errorSpy: jest.SpyInstance;
+    beforeEach(() => {
+      errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+      for (const fn of [
+        mockEmail.sendEmail,
+        mockSms.sendSms,
+        mockPush.sendPushToUser,
+        mockFcm.sendToUser,
+        mockInApp.create,
+      ]) {
+        fn.mockReset();
+      }
+    });
+
+    const deliverOn = (channel: DeliveryChannel) =>
+      service.deliver({
+        recipientUserId: 'user-1',
+        recipientDbId: 100,
+        tenantId: 1,
+        type: 'TEST',
+        category: 'SYSTEM',
+        title: 'Match update',
+        message: 'Details inside',
+        channels: plan(channel),
+        recipientEmail: ADDRESS,
+        recipientPhone: PHONE,
+      });
+
+    it.each([
+      ['email', DeliveryChannel.EMAIL, () => mockEmail.sendEmail.mockRejectedValue(providerError())],
+      [
+        'sms',
+        DeliveryChannel.SMS,
+        () => {
+          mockSms.getIsConfigured.mockReturnValueOnce(true);
+          mockSms.sendSms.mockRejectedValue(providerError());
+        },
+      ],
+      [
+        'push',
+        DeliveryChannel.PUSH,
+        () => {
+          mockPush.sendPushToUser.mockRejectedValue(providerError());
+          mockFcm.sendToUser.mockRejectedValue(providerError());
+        },
+      ],
+      ['in-app', DeliveryChannel.IN_APP, () => mockInApp.create.mockRejectedValue(providerError())],
+    ])('a %s failure logs the error as a masked err field, never in the message', async (_name, channel, arrange) => {
+      arrange();
+
+      await deliverOn(channel);
+
+      expect(errorSpy).toHaveBeenCalled();
+      const printed = renderLogCalls(errorSpy.mock.calls);
+      expect(printed).not.toContain(ADDRESS);
+      expect(printed).not.toContain(PHONE);
+      for (const [entry] of errorSpy.mock.calls) {
+        expect(entry).toEqual(expect.objectContaining({ msg: expect.any(String), err: expect.any(Object) }));
+      }
+    });
+  });
+
   describe('outcomes', () => {
     it('records SENT / FAILED / SKIPPED per channel — a missing address is a row, not silence', async () => {
       mockInApp.create.mockResolvedValue({ notificationId: 'n1' });

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { DevicePlatform } from '@appshore/db';
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
 import { FcmService } from '../fcm.service';
@@ -7,6 +8,7 @@ import {
 } from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 import type { OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 import { initializeFirebase, admin } from '../../../../../config/firebase.config';
+import { renderLogCalls } from '../../../../../test/helpers/rendered-log';
 
 jest.mock('../../../../../config/firebase.config', () => ({
   initializeFirebase: jest.fn(),
@@ -178,6 +180,21 @@ describe('FcmService', () => {
       sendEachForMulticast.mockRejectedValue(new Error('fcm down'));
 
       await expect(service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' })).resolves.toBe(0);
+    });
+
+    it('logs a multicast failure as an err field the serializer masks, never in the message', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const service = new FcmService(prisma, allowAllOutboundGate());
+      prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
+      sendEachForMulticast.mockRejectedValue(new Error('Project of person@example.com is over quota'));
+
+      await service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: expect.any(String), err: expect.any(Object) }),
+      );
+      expect(renderLogCalls(errorSpy.mock.calls)).not.toContain('person@example.com');
+      errorSpy.mockRestore();
     });
 
     it('no-ops when Firebase app initialization returns null', async () => {

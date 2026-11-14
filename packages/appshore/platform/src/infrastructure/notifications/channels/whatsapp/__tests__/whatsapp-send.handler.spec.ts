@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
@@ -10,6 +11,7 @@ import { DeliveryLedgerService } from '../../../pipeline/delivery-ledger.service
 import { WhatsAppSendHandler, dailySendCounterKey, type WhatsAppSendJobPayload } from '../whatsapp-send.handler';
 import { WHATSAPP_PORT, WhatsAppSendError } from '../whatsapp.port';
 import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import { renderLogCalls } from '../../../../../test/helpers/rendered-log';
 
 describe('WhatsAppSendHandler', () => {
   let handler: WhatsAppSendHandler;
@@ -164,6 +166,17 @@ describe('WhatsAppSendHandler', () => {
     await expect(handler.run(job(0, 5))).resolves.toBeUndefined();
     expect(ledger.markFailed).toHaveBeenCalledWith('d1', 'PROVIDER_ERROR', 1);
   });
+  it("logs a final failure as an err field the serializer masks, never the provider's text in the message", async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    whatsapp.sendTemplate.mockRejectedValue(new WhatsAppSendError('Meta 400: +919876543210 is not a user', false));
+
+    await handler.run(job(0, 5));
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.objectContaining({ msg: expect.any(String), err: expect.any(Object) }));
+    expect(renderLogCalls(warnSpy.mock.calls)).not.toContain('9876543210');
+    warnSpy.mockRestore();
+  });
+
   it('claims the row BEFORE calling the provider, with the attempt number', async () => {
     whatsapp.sendTemplate.mockResolvedValue({ providerMessageId: 'im_1' });
     await handler.run(job(1, 5));

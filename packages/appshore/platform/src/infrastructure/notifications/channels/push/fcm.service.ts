@@ -3,6 +3,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { initializeFirebase, admin } from '../../../../config/firebase.config';
 import { DevicePlatform } from '@appshore/db';
 import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import {
   OUTBOUND_GATE,
   OUTBOUND_SOURCE,
@@ -125,9 +126,9 @@ export class FcmService {
       }
 
       return result.successCount;
-    } catch (error: any) {
+    } catch (error) {
       recordOutboundFailed(OUTBOUND_CHANNEL.PUSH, devices.length);
-      this.logger.error(`FCM multicast failed for user ${userDbId}: ${error.message}`);
+      this.logger.error({ msg: `FCM multicast failed for user ${userDbId}`, err: toLoggableError(error) });
       return 0;
     }
   }

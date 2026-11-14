@@ -13,6 +13,7 @@ import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 import { isTestMarker } from '@appshore/kernel/shared/utils/test-marker.util';
 import { FcmService } from '../channels/push/fcm.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import {
   DELIVERY_SKIP_REASONS,
   failed,
@@ -226,8 +227,8 @@ export class NotificationDeliveryService {
           ? sent(DeliveryChannel.IN_APP)
           : skipped(DeliveryChannel.IN_APP, DELIVERY_SKIP_REASONS.DROPPED_TEST_MARKER),
       );
-    } catch (error: any) {
-      this.logger.error(`In-app delivery failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error({ msg: 'In-app delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.IN_APP] = false;
       run.outcomes.push(failed(DeliveryChannel.IN_APP, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }
@@ -258,8 +259,9 @@ export class NotificationDeliveryService {
       });
       run.results[DeliveryChannel.EMAIL] = true;
       run.outcomes.push(sent(DeliveryChannel.EMAIL));
-    } catch (error: any) {
-      this.logger.error(`Email delivery failed: ${error.message}`);
+    } catch (error) {
+      // The provider's text can name the recipient; only the err serializer masks it.
+      this.logger.error({ msg: 'Email delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.EMAIL] = false;
       run.outcomes.push(failed(DeliveryChannel.EMAIL, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }
@@ -296,7 +298,7 @@ export class NotificationDeliveryService {
     ]);
     for (const settled of [webResult, fcmResult]) {
       if (settled.status === 'rejected') {
-        this.logger.error(`Push delivery failed: ${(settled.reason as Error)?.message}`);
+        this.logger.error({ msg: 'Push delivery failed', err: toLoggableError(settled.reason) });
       }
     }
     // A user with no registered device reached nobody. Reporting that as a
@@ -329,8 +331,8 @@ export class NotificationDeliveryService {
       run.outcomes.push(
         wasSent ? sent(DeliveryChannel.SMS) : failed(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.PROVIDER_ERROR),
       );
-    } catch (error: any) {
-      this.logger.error(`SMS delivery failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error({ msg: 'SMS delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.SMS] = false;
       run.outcomes.push(failed(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }
