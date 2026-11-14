@@ -285,8 +285,8 @@ Desk runs.
 Every GitHub Actions workflow runs only when started: from the Actions tab, or `gh workflow run <file>`. None runs
 on a push or a pull request.
 
-- **Check workflows** (`ci.yml`, `grafana-as-code.yml`, `container.yml`) keep their `push` and `pull_request`
-  triggers in the file, commented out under a one-line note. To run one on every push, uncomment them.
+- **Check workflows** (`ci.yml`, `grafana-as-code.yml`, `container.yml`, `guards.yml`) keep their `push` and
+  `pull_request` triggers in the file, commented out under a one-line note.
 - **Deploy and apply workflows** (`deploy-all.yml`, `deploy-frontend.yml`, `quality-gate.yml`, `grafana-apply.yml`)
   have `workflow_dispatch` only and no commented triggers. They change a live environment and must never run on a
   push.
@@ -294,3 +294,16 @@ on a push or a pull request.
   the RBAC gap audit, build) before a pull request, ending with a result line that names the commit it checked; the pre-commit hook (Prettier on staged files); the pre-push hook (the architecture
   specs on every push, and `pnpm check:ops` when the push touches `infra/`, `docs/runbooks/`, `.github/` or
   `tools/`). A rule that must always hold is a Jest spec or part of `check:ops`, never a CI job alone.
+- **The rule is held by a guard.** `pnpm guard:ci` (`tools/guards/ci-triggers.mjs`, part of `pnpm guards`, so it
+  runs in both hooks and in `pnpm verify`) reads `ci` and `manualAlways` in `.claude/workflow.json`. With `ci` set to
+  `manual` it fails on a live `push`, `pull_request`, `pull_request_target`, `schedule` or `workflow_run` trigger, on
+  a check workflow without the commented triggers and the note, and on any push or pull request trigger, live or
+  commented, in a workflow on `manualAlways` (the deploy and apply workflows above).
+
+To run the check workflows on every push and pull request, both steps, in one commit:
+
+1. Uncomment the `push` and `pull_request` triggers in each check workflow.
+2. Set `ci` to `on-push` in `.claude/workflow.json`. Without it, `pnpm guard:ci` fails the commit and the push.
+
+Then, if wanted, make the checks required in branch protection (the list is in the ADR "CI is manual by default;
+enforcement is local", `docs/adr/0007-ci-manual-enforcement-local.md`).

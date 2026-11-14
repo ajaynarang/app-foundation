@@ -11,16 +11,18 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 | `ops/`      | Operator switches (maintenance mode)                  |
 | `dev/`      | Local dev environment helpers                         |
 | `verify/`   | The local gates a branch passes before a pull request |
+| `guards/`   | The repository guards (`pnpm guards`)                 |
 | `.dumps/`   | Saved DB dumps (gitignored)                           |
 
 ## Scripts
 
 ### `init-app/`
 
-| Script                                      | What it does                                                                                                                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init-app/init-app.mjs`                     | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`.                                                                                    |
-| `init-app/check-scaffold-observability.mjs` | Copies the tree, runs init-app, and checks the Grafana-as-code catalog was renamed, regenerated and still validates. A step of `pnpm verify:scaffold`; runs alone in seconds. |
+| Script                                      | What it does                                                                                                                                                                                             |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init-app/init-app.mjs`                     | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`.                                                                                                               |
+| `init-app/prune-requires.mjs`               | The prune step of init-app: deletes the skill, reference, agent and hotspot files whose `requires:` feature folder is gone, and the table rows that linked to them. Tested by `prune-requires.test.mjs`. |
+| `init-app/check-scaffold-observability.mjs` | Copies the tree, runs init-app, and checks the Grafana-as-code catalog was renamed, regenerated and still validates. A step of `pnpm verify:scaffold`; runs alone in seconds.                            |
 
 ### `db/`
 
@@ -87,3 +89,15 @@ pnpm dev:side:stop
 - Scripts are language-agnostic operator tooling. TypeScript scripts that need the backend dep graph (Prisma client, NestJS bootstrap) live in `apps/backend/scripts/` instead.
 - Path-relative paths inside scripts compute `TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"` so subfolders can reach repo root via `$TOOLS_DIR/..`.
 - Dumps land in `tools/.dumps/` (gitignored) regardless of which `db/*.sh` script writes them. A staging dump can hold real people's data: delete it when done.
+
+### `guards/`
+
+| Script                       | What it does                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guards/skills-guard.mjs`    | `pnpm guard:skills`, `guard:docs`, `guard:source`: skills, agents, docs and source comments cite only files, globs, symbols, skills and guards that exist; skill names carry the prefix; no home path, project id or versioned model id. Its fixtures are under `guards/fixtures/`. |
+| `guards/ci-triggers.mjs`     | `pnpm guard:ci`: every workflow keeps `workflow_dispatch`; in `manual` mode no workflow starts on its own and each check workflow keeps its commented triggers and the note; `manualAlways` workflows never carry a push trigger.                                                   |
+| `guards/workflow-config.mjs` | Reads and validates `.claude/workflow.json` for both guards.                                                                                                                                                                                                                        |
+
+`pnpm guards` runs both guards; `pnpm test:guards` runs their tests (`guards/*.test.mjs`). Both run in the pre-push
+hook and `pnpm verify`; `pnpm guards` also runs in the pre-commit hook. The manual workflow `.github/workflows/guards.yml`
+runs the same two commands.

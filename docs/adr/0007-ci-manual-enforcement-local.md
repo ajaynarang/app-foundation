@@ -63,3 +63,14 @@ The template itself sets no required check: with manual CI, a required check wou
   finding.
 - A developer whose machine cannot run the integration specs (no Postgres or Redis) can start the `CI` workflow on
   the branch instead: `gh workflow run ci.yml --ref <branch>`.
+
+### Amendment — 2026-11-14: the CI-triggers guard and the `ci` key
+
+- Step 2 of "How a product turns CI on" is now concrete: set `ci` to `on-push` in `.claude/workflow.json`. The
+  file's `manualAlways` list names the deploy and apply workflows (`deploy-all.yml`, `deploy-frontend.yml`,
+  `quality-gate.yml`, `grafana-apply.yml`), which never carry a push or pull request trigger, live or commented.
+- The rule is held by `tools/guards/ci-triggers.mjs` (`pnpm guard:ci`, part of `pnpm guards`), which runs in the
+  pre-commit and pre-push hooks and in `pnpm verify`. In `manual` mode it also fails on a live `schedule` or
+  `workflow_run` trigger, since nothing in CI may start on its own. Every check workflow's note now names both steps,
+  so uncommenting alone fails the guard.
+- The guards workflow is `.github/workflows/guards.yml`; its job, for step 3, is `workflow-guards`.

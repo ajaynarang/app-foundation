@@ -290,7 +290,7 @@ success + error toasts; every loading state shows a Skeleton.
 
 - **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
   It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`; the web
-  jest also runs `@appshore/web-core`'s tests), `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
+  jest also runs `@appshore/web-core`'s tests), `pnpm guards` and their tests, `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
   build, stops at the first failure, and ends with one line: `verify: PASS <sha> (<n>s)` or
   `verify: FAIL at "<step>" <sha> (<n>s)`, where `<sha>` is the commit the run started on and `+dirty` follows it
   when the tree had uncommitted changes (ADR "CI is manual by default; enforcement is local"). The
@@ -331,4 +331,11 @@ success + error toasts; every loading state shows a Skeleton.
   `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files. A new alert
   rule needs its `## <rule key>` section in `docs/runbooks/`; applying to Grafana is the manual `grafana-apply`
   workflow.
-- **Pre-commit hook** — Prettier on staged files.
+- **`pnpm guards`** — the repository guards in `tools/guards/`, Node only, under a second. The skills guard
+  (`guard:skills`, `guard:docs`, `guard:source`) fails when a skill, agent or doc cites a file, glob, symbol, skill or
+  guard that does not exist (a backticked path that starts at a root folder, a relative link, a `sources:` anchor),
+  and when a source comment names a path under `.claude/` or a skill; cite a guard or a file under `docs/` instead.
+  `guard:ci` keeps every workflow manual (`.claude/workflow.json`: `ci`, `manualAlways`). A path the root
+  `.gitignore` ignores is not checked; a doc names a deleted file as ~~`path`~~. `pnpm test:guards` runs their tests.
+- **Pre-commit hook** — Prettier on staged files, then `pnpm guards`. The pre-push hook and `pnpm verify` run
+  `pnpm guards` and `pnpm test:guards` too.
