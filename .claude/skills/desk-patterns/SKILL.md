@@ -17,9 +17,42 @@ The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engi
 
 ## 0. Read the canon first
 
-- The **`backend-patterns`** skill §24 (Desk summary) — plus the full architecture below.
+- The **`app-conventions`** skill for every backend rule a responsibility's code follows (its index, then the
+  reference for the area you touch), plus the Desk rules and the full architecture below.
 - `apps/backend/src/domains/desk/responsibilities/index.ts` — the registry, with the `welcome` example and the add-a-responsibility checklist in its doc comment.
 - `apps/backend/src/domains/desk/responsibilities/definition.types.ts` — the `ResponsibilityDefinition` contract (the spec).
+
+### Desk rules (the summary)
+
+- Steps run in Inngest workers, not HTTP: **throw plain `Error`**, not NestJS exceptions.
+- The gate algorithm (`core/gate/gate.algorithm.ts`) is pure and job-blind; per-responsibility conditions ride in through
+  the definition's `conditionsEvaluator`.
+- Trust thresholds are single-source in shared-types (`TRUST_LEVEL_CONFIDENCE_THRESHOLDS`); never inline them.
+- Responsibilities call existing domain services through MCP tools in the execute step; never duplicate business logic.
+  Every Desk tool call runs through the one tool pipeline (the `app-conventions` reference
+  [`ai-tools.md`](../app-conventions/references/ai-tools.md)): the plan check runs for a Desk duty, the role check and
+  the pipeline's confirmation do not, because Desk's gate step runs before every execute.
+- Use `DESK_OUTCOMES` constants (`shared-steps/outcomes.ts`), never bare outcome strings.
+- LLM steps go through `runStructuredLlmStep()` (`shared-steps/_llm-step.helper.ts`): prompt through PromptingService,
+  Zod-validated output, cost-ledger logging, with `aiContext.surface` set to `AiSurface.DESK_STEP`.
+- Desk workflow functions run over HTTP, so they stay in the API process even when `QUEUE_PROCESSORS_ENABLED=false`
+  makes it producer-only.
+
+### Desk stays removable
+
+Desk is chosen at scaffold time and reached only through `apps/backend/src/platform-glue/features/desk.feature.ts`
+(`OPTIONAL_FEATURES`; held by `apps/backend/src/architecture/optional-features.spec.ts`).
+
+- A Desk change stays inside `apps/backend/src/domains/desk/`.
+- A Desk-only line outside that folder (an env line, a doc line, a seed row, a package script) sits between
+  `feature:desk:start` and `feature:desk:end` comment lines, and its file is listed in
+  `tools/init-app/features/desk.json` (`markers`). A Desk-only file goes in `paths`; a JSON key or array value in
+  `jsonEntries`; an allowlist entry under the Desk folder is covered by `allowlistPrefixes`.
+- A line that must stay in every product and still names `inngest` or `domains/desk` (a guard that tests whether the
+  Desk folder exists) goes on `tools/init-app/features/desk.residue.json` with its reason.
+- `pnpm verify:scaffold` proves both scaffolds (`--desk no`, `--desk yes`) still install, type-check and pass. Run it
+  before a pull request that touches `tools/init-app/`, `platform-glue/features/`, a file the manifest names, or a Desk
+  file outside the Desk folder. The Desk tables stay in the schema either way, empty without Desk.
 
 ### Domain structure
 
@@ -207,7 +240,8 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 - Recipient/entity id sourced from the LLM draft instead of hydrate.
 - `triggers` is `[{ kind: 'manual' }]` only for a duty that has a natural cadence — you stripped the domain trigger instead of leaving it disabled-by-default.
 - You added a responsibility key, outcome or event and ran only the specs, not `pnpm build` (ts-jest does not type-check, so a missing `Record` entry passes the tests).
-- A new domain enum/status hand-written instead of added to the Prisma schema (see `backend-patterns` §6.4).
+- A new domain enum/status hand-written instead of added to the Prisma schema (see the `app-conventions` database
+  reference, [`database.md`](../app-conventions/references/database.md), "Enums").
 - Trust thresholds inlined instead of imported from `TRUST_LEVEL_CONFIDENCE_THRESHOLDS`.
 - Skipping the `plan` or `review` skills — this skill wraps them, it doesn't replace them.
 

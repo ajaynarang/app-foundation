@@ -57,16 +57,6 @@
       "reason": "The pnpm verify:scaffold gate text names the residue search strings."
     },
     {
-      "file": ".claude/skills/backend-patterns/SKILL.md",
-      "match": "inngest",
-      "reason": "The optional-features rule (section 23a) names the residue search strings."
-    },
-    {
-      "file": ".claude/skills/backend-patterns/SKILL.md",
-      "match": "domains/desk",
-      "reason": "The optional-features rule (section 23a) names the Desk folder a Desk change stays in."
-    },
-    {
       "file": "apps/backend/src/architecture/ai-imports-no-desk.spec.ts",
       "match": "domains/desk",
       "reason": "The architecture spec that keeps the AI domain from importing Desk names the Desk folder it guards. It must stay in a product without Desk, so a later change cannot make AI depend on Desk again."
