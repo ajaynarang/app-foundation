@@ -1,7 +1,5 @@
 ---
 owner: foundation
-status: interim
-pending: F2
 sources:
   - docs/adr/0001-api-contract.md
   - docs/adr/0002-id-boundary.md
@@ -15,6 +13,11 @@ sources:
   - packages/appshore/platform/src/infrastructure/idempotency
   - packages/appshore/platform/src/shared/base/base-tenant.controller.ts#BaseTenantController
   - apps/backend/src/domains/support/support.controller.ts#SupportController
+  - apps/backend/src/domains/feedback/feedback-admin.controller.ts#FeedbackAdminController
+  - apps/backend/src/domains/feedback/feedback.serializer.ts#toPublicFeedback
+  - apps/backend/src/domains/feedback/openapi.responses.ts#FeedbackResponse
+  - packages/appshore/platform/src/infrastructure/idempotency/idempotency.store.ts#IDEMPOTENCY_MAX_BODY_BYTES
+  - packages/appshore/platform/src/shared/http/deprecation.ts#MIN_SUNSET_DAYS
   - docs/standards/id-convention.md
 guards:
   - api-contract.spec.ts
@@ -31,14 +34,16 @@ examples:
 
 # API contract: status by route shape, naming, DTOs, query DTOs, the ID boundary, OpenAPI, idempotency
 
-Moved from the old backend skill; condensed with its recipe in its finish pull request. The decisions are
-`docs/adr/0001-api-contract.md` and `docs/adr/0002-id-boundary.md`. The ratchet,
-`apps/backend/src/architecture/api-contract.spec.ts`, holds one rule per line of the first ADR (`status/*`,
-`naming/*`, `edge/*`, `input/*`, `errors/*`, `output/*`, `docs/*`); the starter passes all of them, its
-`api-contract.baseline.json` is `{}`, and a test keeps it empty. Errors are in [`errors.md`](errors.md); lists in
-[`lists-and-pagination.md`](lists-and-pagination.md).
+One contract for people and agents. The decisions are `docs/adr/0001-api-contract.md` and
+`docs/adr/0002-id-boundary.md`. The ratchet, `apps/backend/src/architecture/api-contract.spec.ts`, holds one rule per
+line of the first ADR (`status/*`, `naming/*`, `edge/*`, `input/*`, `errors/*`, `output/*`, `docs/*`); the starter
+passes all of them, its `api-contract.baseline.json` is `{}`, and a test keeps it empty. Errors are in
+[`errors.md`](errors.md); lists in [`lists-and-pagination.md`](lists-and-pagination.md).
 
-The shape of a controller is `apps/backend/src/domains/support/support.controller.ts`.
+The recipe below is the feedback admin routes (`apps/backend/src/domains/feedback/`): public ids in the URL, a
+serializer on the way out, response schemas named once. The support routes (`support.controller.ts`) are the
+reference slice for lists, but still address a ticket by its numeric id, an `id-boundary.allowlist.json` entry; do not
+copy that part.
 
 ## Rules
 
@@ -109,7 +114,7 @@ The shape of a controller is `apps/backend/src/domains/support/support.controlle
 - The builder adds the error envelope to every operation; the OAuth protocol routes get RFC 6749's error shape instead.
   [guard: swagger-completeness.spec.ts]
 - In production (`isProductionEnv()`), `/api/openapi.json` serves the public subset; a local run serves the full
-  document. [guard: openapi.spec.ts]
+  document. [guard: swagger-completeness.spec.ts]
 - The public subset is derived, never listed (`apps/backend/src/bootstrap/public-openapi.ts`): a route is public when
   it is `@Public()` with an outside credential, metered as an agent, or speaks an agent protocol. A new credential guard
   goes in `AGENT_AUTH_GUARDS` or `NON_CREDENTIAL_GUARDS`; the generator stops on a guard it cannot classify.
@@ -117,27 +122,31 @@ The shape of a controller is `apps/backend/src/domains/support/support.controlle
 - A QA or dev lever is not part of the contract: `@ApiExcludeController()`. [guard: swagger-completeness.spec.ts]
 - A breaking change ships as v2 beside v1, and the v1 route is marked
   `@DeprecatedRoute({ since, sunset, successor })`, which writes `Deprecation`, `Sunset` and `Link`; a sunset less than
-  182 days after `since` throws at boot. [guard: deprecation.spec.ts]
+  `MIN_SUNSET_DAYS` (182) after `since` throws at boot. [guard: deprecation.spec.ts]
 
 ### Creates are retry-safe: Idempotency-Key
 
 - The global `IdempotencyInterceptor` covers every authenticated POST whose status is 201 or 202: the same key and
-  request within 24 hours replays the first answer with `Idempotent-Replayed: true`; the same key on another request is
+  request from the same person in the same workspace within 24 hours replays the first answer with
+  `Idempotent-Replayed: true`; the same key on another request is
   409 `IDEMPOTENCY_KEY_REUSED`; a retry while the first runs is 409 `IDEMPOTENCY_KEY_IN_USE`. Only a success is kept;
   if Redis does not answer in 2 seconds the request runs without the key. You write nothing for it.
   [guard: idempotency.spec.ts]
 - Not covered: no tenant on the request, `@Public()`, multipart uploads, `@Res()` without passthrough, and any status
   but 201 and 202. An action POST (200) makes the action itself idempotent (a state check, an upsert).
-  [guard: openapi.spec.ts]
+  [guard: idempotency.spec.ts, openapi.spec.ts]
 - `@SkipIdempotency()` goes on every create whose body shows a secret once (an API key, a client or signing secret, a
   token-bearing link), so a replay never stores it in Redis. [guard: swagger-completeness.spec.ts]
 - A body over 256 KB is not remembered. [guard: idempotency.spec.ts]
 
 ### The ID boundary
 
-- An `Int` primary key never crosses the API: not in a URL, a query, a body, a response, an event payload that leaves
-  the process, a tool input or a cursor. The canonical text is `docs/standards/id-convention.md` (role 6 and "The
-  boundary"). [guard: id-boundary.spec.ts]
+- An `Int` primary key never crosses the API: not in a URL, a query, a body, a response, a tool input, an event payload
+  that leaves the process or a cursor. The canonical text is `docs/standards/id-convention.md` (role 6 and "The
+  boundary"). The spec reads DTOs, route params, MCP tool inputs and the shared-types schemas.
+  [guard: id-boundary.spec.ts]
+- Event payloads and cursors are outside what the spec reads: name the public id there too.
+  [review-only: no spec reads payloads or cursor contents]
 - Resolve on the way in: `@Param('id', ParseUUIDPipe) publicId: string`, the service finds the row by its public id and
   answers 404 when it is unknown. No `ParseIntPipe` on a new route param, no DTO property named `id` or `*Id` typed
   `number`. [guard: id-boundary.spec.ts]
@@ -183,6 +192,59 @@ The shape of a controller is `apps/backend/src/domains/support/support.controlle
 | `@QuerySort(allowed, fallback)`    | a named sort option (`newest`), never a column or a direction                 |
 | `@QueryDate`                       | an ISO instant or `YYYY-MM-DD` (a UTC day, both bounds inclusive)             |
 | `@QuerySearch`                     | `q`: one value, control characters removed, trimmed, capped at 200 characters |
+
+## Recipe: add an endpoint
+
+Trimmed from `apps/backend/src/domains/feedback/feedback-admin.controller.ts` (an admin route, so it is
+`@SystemScope`; a tenant route scopes its read by `tenantId` instead):
+
+```typescript
+const FEEDBACK_ID_PARAM = { name: 'id', description: 'The feedback’s public id (uuid)' } as const;
+
+@ApiTags('Feedback (Admin)')
+@Controller('admin/feedback')
+@ApiBearerAuth()
+@Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
+export class FeedbackAdminController {
+  constructor(private readonly feedbackService: FeedbackService) {}
+
+  @Patch(':id/resolve')
+  @ApiOperation({ summary: 'Resolve feedback with note' })
+  @ApiParam(FEEDBACK_ID_PARAM)
+  @ApiResult(FeedbackResponse)
+  async resolve(
+    @Param('id', ParseUUIDPipe) feedbackId: string,
+    @Body() dto: ResolveFeedbackDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.feedbackService.resolve(feedbackId, user.dbId, dto);
+  }
+
+  @Post(':id/categorize')
+  @HttpCode(HttpStatus.OK) // an action on a record: 200 with the record as it is now, never 201
+  @ApiOperation({ summary: 'AI-categorize feedback (on-demand)' })
+  @ApiParam(FEEDBACK_ID_PARAM)
+  @ApiResult(FeedbackResponse)
+  async categorize(@Param('id', ParseUUIDPipe) feedbackId: string) {
+    return this.feedbackService.categorizeWithAi(feedbackId);
+  }
+}
+```
+
+The service resolves the public id and answers 404 when it is unknown, then serializes with `toPublicFeedback`
+(`feedback.serializer.ts`), which emits `feedbackId` and never the `Int` key; the response schema is named once in
+`openapi.responses.ts` (`defineResponseSchema('Feedback', PublicFeedbackSchema)`).
+
+1. Write the body DTO: a class with `@ApiProperty` and class-validator decorators on every field (`ResolveFeedbackDto`).
+   A query string is a DTO from the query-DTO kit.
+2. Add the route: `@Roles`, `@ApiOperation({ summary })`, `@ApiParam` for each param, `@HttpCode` on every POST and
+   DELETE, `@ApiResult(schema, status)`. Take a record by its public id through `ParseUUIDPipe`.
+3. In the service, find the row by public id inside the caller's tenant (`findFirst({ where: { publicId, tenantId } })`)
+   and throw `NotFoundException` when it is missing; an illegal transition is `invalidState(...)`.
+4. Return through the domain's `toPublic…` serializer; add or extend the Zod schema in `openapi.responses.ts`.
+5. Run `pnpm --filter @app/backend openapi:generate` and commit `openapi.json` and `public-openapi.json` with the code.
+6. Run `pnpm verify:arch`, then `pnpm verify:api` because the wire changed, and paste its last line in the pull request.
 
 ## Flag in review
 
