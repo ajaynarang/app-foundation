@@ -111,6 +111,26 @@ test('a manualAlways workflow with a live pull_request trigger fails in on-push 
   assert.ok(rules(repo({ 'deploy.yml': body }, { ci: 'on-push' })).includes('deploy.yml:manual-always'));
 });
 
+test('a manualAlways workflow with a live schedule or workflow_run fails in manual mode', () => {
+  const schedule = DEPLOY_OK.replace('on:\n', "on:\n  schedule:\n    - cron: '0 3 * * *'\n");
+  assert.ok(rules(repo({ 'deploy.yml': schedule })).includes('deploy.yml:live-trigger'));
+  const run = DEPLOY_OK.replace('on:\n', 'on:\n  workflow_run:\n    workflows: [Check]\n    types: [completed]\n');
+  assert.ok(rules(repo({ 'deploy.yml': run })).includes('deploy.yml:live-trigger'));
+});
+
+test('a manualAlways workflow with a commented push trigger outside the on: block fails', () => {
+  const body = DEPLOY_OK.replace('on:\n', '# push:\n#   branches: [main]\non:\n');
+  assert.ok(rules(repo({ 'deploy.yml': body })).includes('deploy.yml:manual-always'));
+});
+
+test('the sequence form of on: is read', () => {
+  const pushList = 'name: X\non:\n  - push\n  - workflow_dispatch\njobs: {}\n';
+  assert.ok(rules(repo({ 'deploy.yml': pushList })).includes('deploy.yml:manual-always'));
+  assert.ok(rules(repo({ 'check.yml': pushList }, { manualAlways: [] })).includes('check.yml:live-trigger'));
+  const manualList = 'name: X\non:\n  - workflow_dispatch\njobs: {}\n';
+  assert.deepEqual(rules(repo({ 'deploy.yml': manualList })), []);
+});
+
 test('prose that mentions push without a colon is not a trigger', () => {
   const body = DEPLOY_OK.replace('# Manual only', '# No push or pull_request trigger, live or commented. Manual only');
   assert.deepEqual(rules(repo({ 'deploy.yml': body })), []);

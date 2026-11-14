@@ -11,7 +11,8 @@
  *   manualAlways               never carries push, pull_request or pull_request_target, live or commented, in any
  *                              mode; every entry names a file that exists.
  *
- * A line scan of the `on:` block, Node built-ins only (no YAML library). Exit 1 on any finding.
+ * In manual mode the live-trigger rule covers manualAlways files too. A line scan of the `on:` block (mapping, inline
+ * and sequence forms), Node built-ins only (no YAML library). Exit 1 on any finding.
  *
  *   node tools/guards/ci-triggers.mjs [--root <dir>]
  */
@@ -51,7 +52,8 @@ export function readTriggers(text) {
     if (line.trimStart().startsWith('#')) continue;
     const indent = line.length - line.trimStart().length;
     childIndent ??= indent;
-    const key = line.match(/^\s*([\w-]+)\s*:/);
+    // A mapping key (`push:`) or a sequence item (`- push`) at the block's own indent names a trigger.
+    const key = line.match(/^\s*([\w-]+)\s*:/) ?? line.match(/^\s*-\s+([\w-]+)\s*(?:#.*)?$/);
     if (indent === childIndent && key) live.push(key[1]);
   }
   return { live, commented };
@@ -86,6 +88,11 @@ export function checkWorkflows(root) {
     const { live, commented } = readTriggers(text);
     if (!live.includes('workflow_dispatch')) add(file, 'no-dispatch', 'must keep workflow_dispatch as a live trigger');
 
+    // In manual mode nothing may start on its own, manualAlways (deploy and apply) workflows included.
+    if (cfg.ci === 'manual')
+      for (const t of live.filter((t) => SELF_STARTING.includes(t)))
+        add(file, 'live-trigger', `ci is "manual" in ${WORKFLOW_FILE}: the ${t} trigger must be commented out`);
+
     if (isManualAlways(file, cfg.manualAlways)) {
       const found = new Set([...live, ...commented].filter((t) => PUSH_TRIGGERS.includes(t)));
       for (const l of text.split('\n')) found.add(l.match(COMMENTED_PUSH_LINE)?.[1]);
@@ -96,8 +103,6 @@ export function checkWorkflows(root) {
     }
 
     if (cfg.ci !== 'manual') continue;
-    for (const t of live.filter((t) => SELF_STARTING.includes(t)))
-      add(file, 'live-trigger', `ci is "manual" in ${WORKFLOW_FILE}: the ${t} trigger must be commented out`);
     for (const t of ['push', 'pull_request'])
       if (!commented.includes(t) && !live.includes(t))
         add(file, 'commented-triggers', `a check workflow keeps its ${t} trigger in the on: block, commented out`);
