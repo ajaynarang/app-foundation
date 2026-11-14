@@ -1,6 +1,7 @@
 # .github/workflows/container.yml
 # Manual by default: run it from the Actions tab (or `gh workflow run container.yml`).
-# To run it on every push to main and every PR that touches these paths, uncomment the two triggers below.
+# To run on every push and pull request, uncomment the two triggers below and set `ci` to `on-push` in `.claude/workflow.json`.
+# The triggers run only for pushes to main and pull requests that touch the paths listed.
 #
 # Builds the backend image with the frozen install (a dropped `COPY patches/` line fails the build), runs it and checks
 # the container is not root: .github/scripts/check-container-user.sh, which a developer can run with Docker up. The

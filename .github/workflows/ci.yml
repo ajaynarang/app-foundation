@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml
 # Manual by default: run it from the Actions tab (or `gh workflow run ci.yml`).
-# To run on every push to main and every PR targeting it, uncomment the two
-# triggers below. Fails if lint, type-check, test, build or the Terraform checks fail.
+# To run on every push and pull request, uncomment the two triggers below and set `ci` to `on-push` in `.claude/workflow.json`.
+# The triggers target main. Fails if lint, type-check, test, build or the Terraform checks fail.
 
 name: CI
 
