@@ -63,3 +63,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | [0014](0014-one-web-app.md)                                    | One web app: the separate console is removed; admin and settings live in the web app                          | Adopted |
 | [0015](0015-workflow-conventions-index-guards-domain-skill.md) | Workflow: a conventions index, guards before prose, the product's own domain skill                            | Adopted |
 | [0016](0016-planning-artifacts-tracked-in-products.md)         | Planning artifacts: untracked in the template, tracked by default in a product                                | Adopted |
+| [0017](0017-state-lives-in-postgres.md)                        | State lives in Postgres; the workflow engine only orchestrates                                                | Adopted |

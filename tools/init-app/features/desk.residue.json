@@ -47,6 +47,11 @@
       "reason": "The decision record for Desk opt-in names the Desk folder the seam guards."
     },
     {
+      "file": "docs/adr/0017-state-lives-in-postgres.md",
+      "match": "inngest",
+      "reason": "A decision record: it says state stays in Postgres while an engine only orchestrates, naming the engine Desk runs on as the case. It holds in a product without Desk, which is why removing Desk loses no state."
+    },
+    {
       "file": "CLAUDE.md",
       "match": "inngest",
       "reason": "The pnpm verify:scaffold gate text names the residue search strings."
