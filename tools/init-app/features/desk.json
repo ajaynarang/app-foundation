@@ -45,8 +45,10 @@
       "files": [
         "apps/backend/src/architecture/api-contract.allowlist.json",
         "apps/backend/src/architecture/no-direct-emit.allowlist.json",
-        "apps/backend/src/architecture/id-boundary.allowlist.json"
+        "apps/backend/src/architecture/id-boundary.allowlist.json",
+        "tools/guards/convention-gate.baseline.json"
       ]
-    }
+    },
+    { "prefix": "desk", "files": ["apps/backend/src/architecture/domain-boundaries.allowed.json"] }
   ]
 }
