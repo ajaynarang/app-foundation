@@ -87,11 +87,12 @@ opaque: pass it back, never build or parse it.
 - The query key holds every filter, so a changed control is a new list, back on page one. While it loads, the
   previous rows stay on screen dimmed (`isRefreshing`, passed to `ListRows`, `ListCardGrid` or the table wrapper);
   never swap rows for a skeleton on a filter change. [guard: use-cursor-list.test.tsx, list-row.test.tsx]
-- Branch the list zone in this order: `isLoading` → `PageLoadingSkeleton` (the shape of the list, `variant` and
-  `rows`); `isError` → `ListErrorState` (a title, the error, Retry); `items.length === 0` → `PageEmptyState`;
-  otherwise the list, then `ListFooter`. A failed fetch never reads as "No … yet".
+- Branch the list zone in this order: an option filter's `status === 'error'` → `ListErrorState` with a Retry for
+  the options (a held list is disabled, so it is neither loading nor failed and would otherwise read as empty);
+  `isLoading` → `PageLoadingSkeleton` (the shape of the list, `variant` and `rows`); `isError` → `ListErrorState`
+  (a title, the error, Retry); `items.length === 0` → `PageEmptyState`; otherwise the list, then `ListFooter`. A failed fetch never reads as "No … yet".
   [guard: ui-grammar-guard.test.ts, use-cursor-list.test.tsx]
-- The empty state has two flavours, picked by `listEmptyKind({ isNarrowed, windowLabel })`: `first-run` (nothing
+- The empty state has three flavours, picked by `listEmptyKind({ isNarrowed, windowLabel })`: `first-run` (nothing
   exists yet; say what will appear here), `no-match` (a search or filter hides everything; offer Clear) and
   `empty-window` (nothing in the date window; name the window and offer all time). An empty pivot other than the
   landing one says "nothing in this view". [guard: list-empty-kind.test.ts]
@@ -257,7 +258,14 @@ function TimersPageInner() {
           />
         </ListFilterRow>
 
-        {deadlines.isLoading || kindFilter.status === 'loading' ? (
+        {kindFilter.status === 'error' ? (
+          <ListErrorState
+            title="Couldn't load the deadline kinds this list is filtered by."
+            error={kindsQuery.error}
+            onRetry={() => kindsQuery.refetch()}
+            isRetrying={kindsQuery.isRefetching}
+          />
+        ) : deadlines.isLoading || kindFilter.status === 'loading' ? (
           <PageLoadingSkeleton variant="table" rows={8} />
         ) : deadlines.isError ? (
           <ListErrorState
@@ -269,7 +277,7 @@ function TimersPageInner() {
         ) : deadlines.items.length === 0 ? (
           <PageEmptyState
             icon={Timer}
-            title={list.isFiltered ? 'No timers in this view' : 'Nothing is waiting'}
+            title={list.isFiltered || list.status !== 'PENDING' ? 'No timers in this view' : 'Nothing is waiting'}
             action={
               list.isFiltered ? (
                 <Button variant="outline" size="sm" onClick={list.clear}>
@@ -303,8 +311,8 @@ function TimersPageInner() {
 3. Write the hook over `useCursorList`; the query object is everything the server filters on.
 4. Write the module-level config: statuses (the pivot values, "All" last), the named sorts, the filters
    (`ANY_FILTER_VALUE` for server-defined options, an enum's `.options` otherwise), `defaultDateWindow` if dated.
-5. Wrap the page in `Suspense` (the URL hook reads search params), then render the zones and the four branches in
-   the order above. Map each status to a tone in the feature's `constants.ts` and render it as a `StatusBadge`
+5. Wrap the page in `Suspense` (the URL hook reads search params), then render the zones and the branches in the
+   order above, the options-error branch first when the page has an option filter. Map each status to a tone in the feature's `constants.ts` and render it as a `StatusBadge`
    ([`ui-grammar.md`](ui-grammar.md)).
 6. Check it at 375, 768 and 1440 px in both themes: one filter row, nothing off-screen, the footer always there.
 
