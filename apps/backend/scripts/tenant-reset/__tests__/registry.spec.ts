@@ -88,7 +88,7 @@ describe('tenant reset registry', () => {
       });
       expect({ table: entry.table, delegate: entry.delegate }).toEqual({
         table: entry.table,
-        delegate: model!.charAt(0).toLowerCase() + model!.slice(1),
+        delegate: model.charAt(0).toLowerCase() + model.slice(1),
       });
     }
   });

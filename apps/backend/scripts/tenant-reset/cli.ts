@@ -11,7 +11,7 @@ import 'dotenv/config';
 import pg from 'pg';
 import { PrismaClient } from '@appshore/db';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { runReset, type ResetClient, type ResetRow, type ResetSummary } from './core';
+import { runReset, type ResetRow, type ResetSummary } from './core';
 import type { ResetMode } from './registry';
 import { HARD_CONFIRM_FLAG, SafetyError } from './safety';
 
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString });
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   try {
-    const summary = await runReset(prisma as unknown as ResetClient, {
+    const summary = await runReset(prisma, {
       ...args,
       onRow: (row) => console.log(formatRow(row)),
     });

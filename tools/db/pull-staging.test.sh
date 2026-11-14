@@ -116,7 +116,7 @@ check "the restore drops owners and privileges" called "pg_restore .*-p 5495 .*-
 check "the database dropped is the stg-debug one" called "dropdb -h localhost -p 5495"
 check "migrate deploy runs on stg-debug" called "prisma migrate deploy | DATABASE_URL=postgresql://postgres:postgres@localhost:5495/app"
 check "the dev database (5499) is never touched" not_called "5499"
-check "no role is created" not_called "CREATE ROLE"
+check "no database role is created or switched to" not_called "[Rr][Oo][Ll][Ee]"
 
 reset_calls
 check "the default dump folder is tools/.dumps" grep -q 'DUMP_DIR="${PULL_STAGING_DUMP_DIR:-$TOOLS_DIR/.dumps}"' "$HERE/pull-staging.sh"
