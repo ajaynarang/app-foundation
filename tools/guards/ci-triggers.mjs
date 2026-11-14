@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { loadWorkflowConfig, WORKFLOW_FILE } from './workflow-config.mjs';
+import { isEntryModule, loadWorkflowConfig, repoRootOf, WORKFLOW_FILE } from './workflow-config.mjs';
 
 export const WORKFLOWS_DIR = '.github/workflows';
 export const ENABLE_NOTE =
@@ -111,8 +111,7 @@ export function checkWorkflows(root) {
 
 function main() {
   const i = process.argv.indexOf('--root');
-  const root =
-    i > -1 ? path.resolve(process.argv[i + 1]) : path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+  const root = i > -1 ? path.resolve(process.argv[i + 1]) : repoRootOf(import.meta.url);
   const findings = checkWorkflows(root);
   for (const f of findings)
     console.error(
@@ -122,4 +121,4 @@ function main() {
   process.exit(findings.length ? 1 : 0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) main();
+if (isEntryModule(import.meta.url)) main();

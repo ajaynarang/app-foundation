@@ -27,7 +27,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { loadWorkflowConfig, WORKFLOW_FILE } from './workflow-config.mjs';
+import { isEntryModule, loadWorkflowConfig, repoRootOf, WORKFLOW_FILE } from './workflow-config.mjs';
 
 /** Optional features and the folder whose presence means the feature is in this product. */
 export const FEATURE_FOLDERS = { mobile: 'apps/mobile', desk: 'apps/backend/src/domains/desk' };
@@ -595,7 +595,7 @@ function main() {
     console.error(`--target must be one of: ${TARGETS.join(', ')}`);
     process.exit(2);
   }
-  const root = path.resolve(arg('--root') ?? path.join(path.dirname(new URL(import.meta.url).pathname), '../..'));
+  const root = arg('--root') ? path.resolve(arg('--root')) : repoRootOf(import.meta.url);
   const findings = checkRepo(root, { targets: target ? [target] : TARGETS });
   for (const f of findings) console.error(`${f.file}:${f.line}: [${f.rule}] ${f.message}`);
   const label = `guard:${target ?? 'skills+docs+source'}`;
@@ -603,4 +603,4 @@ function main() {
   process.exit(findings.length ? 1 : 0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) main();
+if (isEntryModule(import.meta.url)) main();

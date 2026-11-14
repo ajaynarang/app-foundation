@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { checkWorkflows, ENABLE_NOTE } from './ci-triggers.mjs';
 
 const BASE_CFG = {
@@ -136,6 +137,6 @@ test('an invalid workflow.json fails the guard', () => {
 });
 
 test('the repository itself passes', () => {
-  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   assert.deepEqual(checkWorkflows(root), []);
 });

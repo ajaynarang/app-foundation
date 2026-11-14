@@ -5,6 +5,28 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * True when the module at `metaUrl` (its import.meta.url) is the script node was started with. Compares file paths,
+ * not URL pathnames: a pathname is percent-encoded, so a checkout under a path with a space or non-ASCII characters
+ * would never match and the guard would exit 0 having checked nothing. realpath on both sides covers symlinks.
+ */
+export function isEntryModule(metaUrl) {
+  if (!process.argv[1]) return false;
+  const real = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  return real(process.argv[1]) === real(fileURLToPath(metaUrl));
+}
+
+/** The repository root for a guard module under tools/guards: two folders above the module's own file. */
+export const repoRootOf = (metaUrl) => path.resolve(path.dirname(fileURLToPath(metaUrl)), '..', '..');
 
 export const WORKFLOW_FILE = '.claude/workflow.json';
 export const CI_MODES = ['manual', 'on-push'];
