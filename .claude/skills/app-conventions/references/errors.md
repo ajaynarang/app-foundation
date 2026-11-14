@@ -1,7 +1,5 @@
 ---
 owner: foundation
-status: interim
-pending: F2
 sources:
   - packages/appshore/kernel/src/shared/errors/api-errors.ts#invalidState
   - packages/appshore/kernel/src/shared/errors/api-errors.ts#parseWithSchema
@@ -9,6 +7,10 @@ sources:
   - packages/appshore/platform/src/shared/filters/error-envelope.ts#writeErrorEnvelope
   - packages/appshore/platform/src/domains/oauth-provider/oauth-error.filter.ts#oauthError
   - packages/appshore/kernel/src/infrastructure/retry/retry.service.ts#RetryService
+  - packages/appshore/kernel/src/infrastructure/retry/retry.module.ts#RetryModule
+  - packages/appshore/kernel/src/infrastructure/logging/log-filter.ts
+  - packages/appshore/platform/src/domains/api-keys/api-keys.service.ts#pause
+  - apps/backend/src/domains/ai/assistant/assistant.service.ts#asHttpError
   - docs/adr/0001-api-contract.md
 guards:
   - error-envelope.spec.ts
@@ -21,8 +23,9 @@ guards:
 
 # Errors: the envelope, codes, helpers, copy rules, external API errors, retry
 
-Moved from the old backend skill; condensed with its recipe in its finish pull request. The decision is the ADR "API
-contract", `docs/adr/0001-api-contract.md`.
+Every failure a person or an agent sees has one shape and one meaning per status. The decision is the ADR "API
+contract", `docs/adr/0001-api-contract.md`. How the web shows these errors is in
+[`forms-and-sheets.md`](forms-and-sheets.md).
 
 ## Rules
 
@@ -67,8 +70,9 @@ contract", `docs/adr/0001-api-contract.md`.
 - A DTO failure from `AppValidationPipe` is `VALIDATION_FAILED` with one `detail` (or "3 fields have validation
   errors") and `fieldErrors` keyed by field, dot paths for nested fields, the wire name for a query field.
   [guard: field-errors.spec.ts]
-- 5xx logs at `error` with the stack, 4xx at `warn`; `/sse/` and `/health/` are silent.
-  [guard: error-envelope.spec.ts]
+- 5xx logs at `error` with the error as an `err` field, 4xx at `warn`, never with the query string. In development
+  only, errors on `/api/v1/sse/` and `/api/v1/health/` are not logged (`SILENT_PREFIXES` in the kernel's
+  `log-filter.ts`); a deployed task logs them. [guard: error-envelope.spec.ts]
 
 ### Copy
 
@@ -88,9 +92,49 @@ contract", `docs/adr/0001-api-contract.md`.
 
 ### Retry
 
-- An external call that may fail transiently goes through `RetryService.withRetry(operation, options, context)` from
-  `@appshore/kernel` (`infrastructure/retry/`), with `maxAttempts`, `baseDelayMs`, `maxDelayMs` and `exponentialBase`,
-  and a context string for the log. [guard: retry.service.spec.ts]
+- A transient failure of an outside call made inside a request may be retried with
+  `RetryService.withRetry(operation, options, context)` (`@appshore/kernel`, `infrastructure/retry/`; import
+  `RetryModule`): `maxAttempts`, `baseDelayMs`, `maxDelayMs`, `exponentialBase`, and `retryableErrors`, which defaults
+  to the network codes `ECONNRESET`, `ETIMEDOUT` and `ENOTFOUND`; anything else fails at once. No call site uses it
+  yet. [guard: retry.service.spec.ts]
+- Work that can wait is not retried inside the request: it goes on a queue, whose attempts and backoff do the retry
+  ([`jobs-and-deadlines.md`](jobs-and-deadlines.md)). [review-only: whether a call can wait needs reading]
+
+## Recipe: refuse a request
+
+Trimmed from `pause` in `packages/appshore/platform/src/domains/api-keys/api-keys.service.ts` (API keys keep their
+numeric id, an exception the ADR "ID boundary" records; a new domain takes a public id):
+
+```typescript
+async pause(id: number, tenantId: number): Promise<ApiKeyDto> {
+  const apiKey = await this.findTenantKeyOrThrow(id, tenantId); // findFirst scoped by tenant: missing or not yours is 404
+  if (apiKey.revokedAt) {
+    throw invalidState('A revoked key cannot be paused'); // 409 INVALID_STATE, copy a person can act on
+  }
+  // ... the write and its event, through the outbox
+}
+```
+
+And a route that writes its own response, from `streamMessage` in
+`apps/backend/src/domains/ai/assistant/assistant.service.ts`:
+
+```typescript
+} catch (err) {
+  this.logger.error(`Failed to resolve promptKey=${options.promptKey}`, err instanceof Error ? err.stack : String(err));
+  writeErrorEnvelope(res, req, new InternalServerErrorException('Failed to resolve prompt'));
+  return;
+}
+```
+
+1. Bad input: let the DTO refuse it; a check the DTO cannot make is `fieldError(field, copy)`.
+2. Not found or another tenant's: scope the read by `tenantId` and throw `NotFoundException` with the same copy for
+   both.
+3. A state that forbids the action: `invalidState(copy)`; a duplicate: `duplicate(copy)`; a stale write:
+   `stale(copy)`.
+4. An outside call that fails: log the detail, rethrow with plain copy (`InternalServerErrorException`, or the typed
+   refusal the domain owns). A route with `@Res()` answers through `writeErrorEnvelope`.
+5. A new code every domain shares: add it to `ApiErrorCode`; otherwise throw `{ code, detail }` from the domain.
+6. Add a spec that asserts the status and `code`, never the copy, and run `pnpm verify:arch`.
 
 ## Flag in review
 
@@ -99,3 +143,4 @@ contract", `docs/adr/0001-api-contract.md`.
 - A hand-written error body, or an extra key on an exception.
 - `error.message` forwarded into an exception.
 - Internal ids, field names or vendor text in `detail`.
+- A test that asserts the error copy instead of the status and `code`.
