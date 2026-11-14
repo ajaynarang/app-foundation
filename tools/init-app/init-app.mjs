@@ -369,7 +369,8 @@ if (cfg.mobile === 'no') {
 
 // The prune step: after the features are removed, and before any rename, so it reads template names.
 {
-  const actions = pruneRequires(ROOT, { dryRun });
+  const absentFeatures = [cfg.desk === 'no' && 'desk', cfg.mobile === 'no' && 'mobile'].filter(Boolean);
+  const actions = pruneRequires(ROOT, { dryRun, absentFeatures });
   if (actions.length) {
     console.log(`  ${dryRun ? 'Would prune' : 'Pruned'} files that require a removed feature:`);
     for (const a of actions) console.log(`    ${a}`);

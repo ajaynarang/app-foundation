@@ -85,3 +85,12 @@ test('dry run reports and changes nothing', () => {
 test('a repo with no .claude folder is a no-op', () => {
   assert.deepEqual(pruneRequires(repo({ 'README.md': '# x\n' })), []);
 });
+
+test('a dry run counts the features init-app is about to remove as absent, though their folders are still there', () => {
+  const dir = repo({ ...files(), [`${FEATURE_FOLDERS.mobile}/pubspec.yaml`]: 'name: x\n' });
+  fs.mkdirSync(path.join(dir, FEATURE_FOLDERS.desk), { recursive: true });
+  const actions = pruneRequires(dir, { dryRun: true, absentFeatures: ['desk', 'mobile'] });
+  assert.equal(actions.length, 6);
+  assert.ok(exists(dir, '.claude/skills/fx-feature/SKILL.md'));
+  assert.deepEqual(pruneRequires(dir, { dryRun: true, absentFeatures: ['desk'] }).length, 3);
+});

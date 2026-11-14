@@ -11,9 +11,15 @@ import { FEATURE_FOLDERS, parseFrontmatter } from '../guards/skills-guard.mjs';
 
 const listOf = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
-/** Prunes `root`; returns one line per action. With dryRun, changes nothing and reports the same lines. */
-export function pruneRequires(root, { dryRun = false } = {}) {
-  const absent = (feature) => feature in FEATURE_FOLDERS && !fs.existsSync(path.join(root, FEATURE_FOLDERS[feature]));
+/**
+ * Prunes `root`; returns one line per action. With dryRun, changes nothing and reports the same lines. A dry run
+ * leaves the feature folders in place, so the caller passes the features it is removing as `absentFeatures`; each
+ * counts as absent whether or not its folder is still on disk.
+ */
+export function pruneRequires(root, { dryRun = false, absentFeatures = [] } = {}) {
+  const absent = (feature) =>
+    feature in FEATURE_FOLDERS &&
+    (absentFeatures.includes(feature) || !fs.existsSync(path.join(root, FEATURE_FOLDERS[feature])));
   const needsAbsent = (rel) => {
     try {
       const { fm } = parseFrontmatter(fs.readFileSync(path.join(root, rel), 'utf8'));
