@@ -16,10 +16,15 @@ product" part written, the domain skill is filled, and epic E1 is ready for `app
 
 ## Before you start
 
-- **Not in the starter itself.** If the root `package.json` is still named `app-foundation`, this is the template,
-  not a product: stop and say the runway runs in a product made with `pnpm init-app`.
-- **Resume, do not restart.** Read the docs in the order below. A doc whose "Your product" part has no "How to fill
-  this" line left is done; start at the first one that still has one, and say which.
+- **Not in the starter itself.** Read `TEMPLATE_NAME` in `tools/init-app/init-app.mjs` (init-app never rewrites its
+  own folder, so it keeps the template's name). If the root `package.json` name equals it, this is the template, not
+  a product: stop and say the runway runs in a product made with `pnpm init-app`.
+- **Resume, do not restart.** Check each step in the order below, and start at the first one that is not done; say
+  which. A doc is done when the part the product writes has no "How to fill this" line left. That part is "Your
+  product" where the doc has one; `docs/VISION.md` and `docs/epics.md` have no foundation part, so the whole doc is
+  the product's. Step 4 is done when `docs/adr/` holds a record numbered above the last one the starter shipped (`git log
+--diff-filter=A -- docs/adr/` shows which came with the scaffold; in doubt, ask the owner). Step 8 is done when every file under `.claude/skills/app-domain/` says `filled: true`. Step 9 is done when the "Binding
+  docs" section of `CLAUDE.md` no longer says the docs are skeletons.
 - **Read first:** `CLAUDE.md` (the "Binding docs" table and the amendment rule), `docs/how-we-build.md`, and the
   "Foundation (already here)" part of each doc. The foundation already decides tenants, users, sessions, plans,
   billing, notifications, events, jobs, timers and AI; the product builds on those and never redefines one.
@@ -35,8 +40,8 @@ it is the binding doc of the step you are on, so do not let it write a spec or h
   Changing a doc now is free; changing merged code is not.
 - **Never invent a fact.** What the owner does not know yet goes under "Open questions" in `docs/VISION.md`, with the
   date. A guess written as a decision is the most expensive line in the runway.
-- **Leave the foundation parts alone.** Write only under "Your product". Delete each "How to fill this" line once its
-  section is written. Leave `sources:` and `verified:` lines as they are; `app-dev-docs audit` owns them.
+- **Leave the foundation parts alone.** Write only under "Your product" (in `docs/VISION.md` and `docs/epics.md`,
+  anywhere: the whole doc is the product's). Delete each "How to fill this" line once its section is written. Leave `sources:` and `verified:` lines as they are; `app-dev-docs audit` owns them.
 - **Low fidelity.** Names, shapes and rules, not columns or screens. The schema holds the columns, later.
 - **Commit each doc** once the owner approves it, one commit per doc, with a message that says why.
 

@@ -5,7 +5,7 @@
  *
  * For each variant: copy the tree (tracked and untracked, not ignored) to a temp folder; run
  * `init-app --name scaffoldcheck … --yes --force`; check the regenerated alert catalog
- * (check-scaffold-observability.mjs); install; build the foundation packages; regenerate the OpenAPI
+ * (check-scaffold-observability.mjs) and the runway's starter check (runwayStarterCheck); install; build the foundation packages; regenerate the OpenAPI
  * documents and the RBAC matrix; type-check the backend, apps/web, packages/test-utils and tests/; migrate; run the
  * backend unit and architecture specs.
  *
@@ -57,6 +57,29 @@ export function residueHits(root) {
     for (const s of SEARCH_STRINGS) if (lower.includes(s)) hits.push({ file: rel, match: s });
   }
   return hits;
+}
+
+/**
+ * The runway skill refuses to run in the starter. After init-app has renamed the template to the product, that check
+ * must not name the product (it would then refuse the product), and must point at TEMPLATE_NAME in init-app.mjs, which
+ * the rename walker never rewrites. Returns the problems, empty when the check holds.
+ */
+export function runwayStarterCheck(root, name) {
+  const prefix = JSON.parse(fs.readFileSync(path.join(root, '.claude/workflow.json'), 'utf8')).skillPrefix;
+  const rel = `.claude/skills/${prefix}-runway/SKILL.md`;
+  const text = fs.readFileSync(path.join(root, rel), 'utf8');
+  const start = text.indexOf('**Not in the starter itself.**');
+  if (start < 0) return [`${rel}: no "Not in the starter itself" check`];
+  const rest = text.slice(start);
+  const end = rest.search(/\n(?:- \*\*|#)/);
+  const check = end < 0 ? rest : rest.slice(0, end);
+  const problems = [];
+  if (check.includes(name)) problems.push(`${rel}: the starter check names the product "${name}"`);
+  if (!check.includes('`TEMPLATE_NAME`') || !check.includes('`tools/init-app/init-app.mjs`'))
+    problems.push(
+      `${rel}: the starter check does not compare against \`TEMPLATE_NAME\` in tools/init-app/init-app.mjs`,
+    );
+  return problems;
 }
 
 /** Reads the residue list and checks its shape: every entry names a file, one bare search string and a reason. */
@@ -143,6 +166,11 @@ function runVariant(name, { keep }) {
     for (const p of observability) console.error(`  ${p}`);
     if (observability.length) throw Object.assign(new Error(), { step: `${name}: observability catalog` });
     console.log('  the Grafana-as-code catalog is regenerated in the new name and validates.');
+
+    const runway = runwayStarterCheck(dir, 'scaffoldcheck');
+    for (const p of runway) console.error(`  ${p}`);
+    if (runway.length) throw Object.assign(new Error(), { step: `${name}: runway starter check` });
+    console.log('  the runway still tells the product from the starter.');
 
     const manifest = loadManifest('desk');
     const { present, missing } = featurePresence(dir, manifest);
