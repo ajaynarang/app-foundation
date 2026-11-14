@@ -342,7 +342,9 @@ success + error toasts; every loading state shows a Skeleton.
   The convention gate (`guard:conventions`, `tools/guards/convention-gate.mjs`) holds the text rules no spec holds
   yet (`throw new Error(` on an HTTP path, an empty catch, `process.env` outside config and bootstrap, a raw
   `<button>` or `<input>`, file size) against `convention-gate.baseline.json`: a count may only fall, a new hit fails.
-  Regenerate the baseline with `node tools/guards/convention-gate.mjs --update-baseline`, never by hand.
+  Regenerate the baseline with `node tools/guards/convention-gate.mjs --update-baseline`, never by hand. When a
+  baselined hit only moved (a renamed file, or a file split as the size rule asks), add `--allow-moved`: it accepts
+  the new key while no rule's total across the tree rises, and say so in the pull request.
 - **Pre-commit hook** — Prettier on staged files and the convention gate on staged `.ts`/`.tsx` files (`lint-staged`),
   then `pnpm guards`. The pre-push hook and `pnpm verify` run `pnpm guards`, `pnpm test:guards` and
   `pnpm test:hooks` too.

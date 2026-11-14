@@ -15,6 +15,7 @@ import {
   compareToBaseline,
   countTree,
   parseBaselineText,
+  rulesThatGrew,
   stripComments,
 } from './convention-gate.mjs';
 
@@ -196,6 +197,51 @@ test('--update-baseline refuses to raise a count or add a key', () => {
   assert.match(r.stderr, /http-plain-error/);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, BASELINE_FILE), 'utf8')).entries, {
     [SERVICE]: { 'http-plain-error': 1 },
+  });
+});
+
+test('rulesThatGrew: a hit that moved to another file is not growth; a new hit is', () => {
+  const baseline = { [SERVICE]: { 'http-plain-error': 2 } };
+  assert.deepEqual(rulesThatGrew({ [OTHER]: { 'http-plain-error': 2 } }, baseline), []);
+  assert.deepEqual(
+    rulesThatGrew({ [SERVICE]: { 'http-plain-error': 1 }, [OTHER]: { 'http-plain-error': 1 } }, baseline),
+    [],
+  );
+  assert.deepEqual(
+    rulesThatGrew({ [OTHER]: { 'http-plain-error': 2, 'process-env': 1 } }, baseline).map(
+      (g) => `${g.rule}:${g.count}/${g.allowed}`,
+    ),
+    ['process-env:1/0'],
+  );
+  assert.deepEqual(
+    rulesThatGrew({ [SERVICE]: { 'http-plain-error': 2 }, [OTHER]: { 'http-plain-error': 1 } }, baseline).map(
+      (g) => `${g.rule}:${g.count}/${g.allowed}`,
+    ),
+    ['http-plain-error:3/2'],
+  );
+});
+
+test('--update-baseline --allow-moved accepts a renamed or split file, and still refuses a new hit', () => {
+  const dir = tmp();
+  write(dir, SERVICE, ERR + ERR);
+  gate(dir, '--update-baseline');
+  fs.rmSync(path.join(dir, SERVICE));
+  write(dir, OTHER, ERR + ERR);
+  const plain = gate(dir, '--update-baseline');
+  assert.equal(plain.status, 1, 'without the flag a moved hit is a new key');
+  assert.match(plain.stdout, /--allow-moved/);
+  const moved = gate(dir, '--update-baseline', '--allow-moved');
+  assert.equal(moved.status, 0, moved.stdout + moved.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, BASELINE_FILE), 'utf8')).entries, {
+    [OTHER]: { 'http-plain-error': 2 },
+  });
+  assert.equal(gate(dir).status, 0);
+  write(dir, SERVICE, ERR);
+  const grew = gate(dir, '--update-baseline', '--allow-moved');
+  assert.equal(grew.status, 1, 'a hit that adds to the total is new code, not a move');
+  assert.match(grew.stderr, /http-plain-error/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, BASELINE_FILE), 'utf8')).entries, {
+    [OTHER]: { 'http-plain-error': 2 },
   });
 });
 

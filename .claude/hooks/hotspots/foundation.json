@@ -72,7 +72,7 @@
     },
     {
       "paths": ["tools/guards/convention-gate.mjs", "tools/guards/convention-gate.baseline.json"],
-      "say": "The convention gate changed: the baseline is never edited or merged by hand; regenerate it with node tools/guards/convention-gate.mjs --update-baseline, which refuses a higher count."
+      "say": "The convention gate changed: the baseline is never edited or merged by hand; regenerate it with node tools/guards/convention-gate.mjs --update-baseline, which refuses a higher count (add --allow-moved when hits only moved to a renamed or split file)."
     }
   ]
 }

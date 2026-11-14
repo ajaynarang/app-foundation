@@ -22,9 +22,15 @@
  * rewritten, so the ratchet tightens. On a merge conflict, do not merge the file by hand: run --update-baseline,
  * which reads both sides of the conflict and allows the larger count of each entry.
  *
+ * Moving a baselined hit (renaming a file, or splitting one as the file-size rule asks) makes a new key, which a
+ * plain --update-baseline refuses. Add --allow-moved: it accepts new and raised keys as long as no rule's total
+ * across the tree rises above the baseline's total, so hits moved and none were added. Use it only for a move, and
+ * say so in the pull request; the baseline diff shows the old key gone and the new one in its place.
+ *
  *   node tools/guards/convention-gate.mjs                     the whole tree against the baseline
  *   node tools/guards/convention-gate.mjs --files <f>...      only these files (pre-commit, through lint-staged)
  *   node tools/guards/convention-gate.mjs --update-baseline   rewrite the baseline; refuses a higher count or new key
+ *     [--allow-moved]                                         accept moved hits: no rule's tree total may rise
  *   [--root <dir>]                                            another checkout (default: this file's repository)
  *
  * Node built-ins only; no git needed. Exit 1 on any finding.
@@ -261,6 +267,21 @@ export function compareToBaseline(current, baseline, files) {
   return { over, stale };
 }
 
+/**
+ * The rules whose total across the tree is above the baseline's total for that rule, as { rule, count, allowed }.
+ * Empty when every hit over the baseline is one that moved from another file (a rename or a split).
+ */
+export function rulesThatGrew(current, baseline) {
+  const total = (entries, rule) => Object.values(entries).reduce((a, r) => a + (r[rule] ?? 0), 0);
+  const grew = [];
+  for (const rule of RULE_IDS) {
+    const count = total(current, rule);
+    const allowed = total(baseline, rule);
+    if (count > allowed) grew.push({ rule, count, allowed });
+  }
+  return grew;
+}
+
 /** One file against the baseline, for the edit hook: its hits, and what is over or under the baseline. */
 export function checkOne(root, rel) {
   if (!inScope(rel)) return { hits: {}, over: [], stale: [] };
@@ -306,11 +327,21 @@ function main() {
     const current = countTree(root);
     const existed = fs.existsSync(path.join(root, BASELINE_FILE));
     const { over } = compareToBaseline(current, baseline);
-    if (existed && over.length)
-      fail(
-        over.map((o) => describe(o)),
-        `${over.length} count(s) above the baseline; fix the code, the baseline only falls`,
-      );
+    if (existed && over.length) {
+      if (!argv.includes('--allow-moved'))
+        fail(
+          over.map((o) => describe(o)),
+          `${over.length} count(s) above the baseline; fix the code, the baseline only falls (if these hits only moved from a renamed or split file, add --allow-moved)`,
+        );
+      const grew = rulesThatGrew(current, baseline);
+      if (grew.length)
+        fail(
+          grew.map(
+            (g) => `[${g.rule}] ${g.count} hit(s) across the tree, baseline ${g.allowed}: ${ruleMessage(g.rule)}`,
+          ),
+          `${grew.length} rule total(s) above the baseline; --allow-moved accepts only hits that moved, fix the new ones`,
+        );
+    }
     const entries = sortEntries(current);
     fs.mkdirSync(path.dirname(path.join(root, BASELINE_FILE)), { recursive: true });
     fs.writeFileSync(
