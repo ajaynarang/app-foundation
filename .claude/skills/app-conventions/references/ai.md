@@ -75,10 +75,15 @@ There are three sanctioned ways to call a model. Pick by the shape of the work.
 
 ### Moderation
 
-- User text in chat is moderated before the model sees it: `ModerationService.moderate` with `'input'` runs content
-  moderation first, then the guards (prompt injection, secrets, system-prompt leakage) in parallel; a block stops the
-  turn, personal data is flagged and logged, never blocked. The answer is moderated on the way out (`'output'`), which
-  redacts personal data. [guard: moderation-pipeline.integration.spec.ts]
+- User text in chat is moderated before the model sees it: `ModerationService.moderate` with `'input'` runs external
+  content moderation first (a flag blocks the turn), then injection, secrets and personal-data detection in parallel.
+  Injection or secrets blocks the turn; personal data is only flagged and logged, never blocked.
+  [guard: moderation-pipeline.integration.spec.ts, moderation.service.spec.ts]
+- External content moderation is a standard-retention vendor, so it is skipped for a zero-retention workspace
+  (`AiRouteResolver.isZeroRetention`): that workspace's text never leaves for it, and only the local guards run.
+  [guard: moderation.service.spec.ts]
+- The answer is moderated on the way out (`'output'`): a system-prompt leakage check that flags (never blocks), and
+  personal-data redaction. [guard: moderation.service.spec.ts]
 - The guardrails package must really load in the production module format; a failed load fails every guard open.
   [guard: guardrails-real-load.spec.ts]
 - Moderation fails open on its own infrastructure error (the message goes through and a warning is logged), by
