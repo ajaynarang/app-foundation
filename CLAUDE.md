@@ -27,8 +27,10 @@ removed. Everything cross-cutting remains and works:
   moderation, per-tenant AI budget, HITL) and an **empty MCP toolset** as your extension point.
 - **Billing** — Stripe subscriptions, wallet, plan entitlements, add-ons (generic).
 - **Infra** — Postgres (pgvector) + Redis, BullMQ queues, transactional outbox, timers, SSE realtime, S3 storage,
-  email/SMS/push, OTel traces and metrics + pino logs + Sentry errors (each off until its key is set;
-  `docs/observability.md`), a local-only Loki/Tempo/Prometheus/Grafana compose profile, Terraform.
+  email/SMS/push, OTel traces and metrics + pino logs + Sentry errors (each off until its key is set; three levels:
+  0 stdout only, 1 CloudWatch alarms with `alarm_email`, 2 Grafana Cloud and Sentry; `docs/observability.md`), a
+  local-only Loki/Tempo/Prometheus/Grafana compose profile, Terraform. Operator procedures (deploy gate,
+  migrations, maintenance switch, outbound gate, tenant reset, staging-debug stack) are in `docs/operations.md`.
 
 <!-- feature:desk:start -->
 

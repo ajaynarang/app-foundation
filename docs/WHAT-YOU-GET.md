@@ -46,8 +46,9 @@ Open `http://localhost:3000/login`, sign in as the owner, and you're inside a li
 - First-party **email + password** auth (bcrypt, forgot/reset password, change password,
   session revocation) — works with zero external services.
 - Phone **OTP** and **PIN** login; **Firebase** token exchange as an optional alternative.
-- JWT access + refresh tokens (hashed at rest, httpOnly cookie, revocable; not rotated on use),
-  login-event history.
+- JWT access + refresh tokens (hashed at rest, httpOnly cookie, revocable; every refresh rotates the token, and a
+  retired token presented again revokes the session), login-event history. One live account per email; a
+  workspace is a membership of it.
 - Roles (`OWNER / ADMIN / MEMBER / SUPER_ADMIN`), invitations (email/SMS), **API keys**
   with scopes/rotation, and a full **OAuth 2.1 provider** (PKCE — your app can be
   "Sign in with X" for MCP clients like Claude).
@@ -114,8 +115,12 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 **Delivery**
 
 - docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache/S3/ALB), GitHub Actions
-  CI (lint, type-check, unit suites, Flutter analyze/test) + deploy pipeline, Playwright QA
-  suite (auto-generated RBAC matrix over every controller, smoke, API tests).
+  CI (lint, type-check, unit suites, Flutter analyze/test) + deploy pipeline, all manual-only (local gates
+  `pnpm verify` and the git hooks are what always runs), Playwright QA suite (auto-generated RBAC matrix over every
+  controller, smoke, API tests).
+- Operator tools (`docs/operations.md`): a production deploy gate (`PRODUCTION_DEPLOYERS`), migration and tunnel
+  scripts with typed production confirmation, a maintenance switch, a gated tenant reset for demo and QA
+  workspaces, and a staging-debug stack that copies staging into a second local database.
 
 ---
 

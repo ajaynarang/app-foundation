@@ -7,9 +7,10 @@ metrics go, and which keys switch each one on. The rules every log line and erro
 Nothing here is required to boot, test or deploy. With no key set the app runs, writes JSON logs to stdout and sends
 nothing anywhere. Each vendor is switched on by its own key and is a no-op without it.
 
-> This page grows with the observability work. Today it covers the three levels and the order to climb them, the
-> AWS fallback alarms and budget (level 1), error tracking, traces, metrics, the crons and heartbeat behind them, the
-> dashboards, alert rules, routing and runbooks kept as code, the deploy markers, and the local stack.
+Sections: the three levels and the order to climb them, the AWS fallback alarms and budget (level 1), logs, error
+tracking, traces and metrics, the crons and heartbeat behind them, the dashboards, alert rules, routing and runbooks
+kept as code, the deploy markers, and the local stack. Running the product (deploys, migrations, switches) is in
+[`operations.md`](operations.md).
 
 ## Three levels
 
@@ -106,6 +107,24 @@ answering 502, 503 or 504. Level 2 therefore includes two HTTP checks from outsi
 integration: `GET <api>/api/v1/health/live` and `GET <web>/`. Grafana Synthetic Monitoring does this in the same
 stack; a separate uptime service (Better Stack and others) works too and sends its pages to the same IRM integration.
 Neither is kept as code here.
+
+## Logs
+
+Every process writes one JSON line per log call to stdout. In ECS that is CloudWatch, at every level, and it stays
+on when Loki is added: stdout is the break-glass copy (boot output, crashes). What a line must and must not carry is
+in [`standards/observability.md`](standards/observability.md).
+
+| Key             | Where   | What it does                                                                                                                                                                        |
+| --------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`     | backend | Pino level for every target (default `info`).                                                                                                                                       |
+| `LOG_TRANSPORT` | backend | `loki` also ships logs to Loki. Outside development stdout keeps its JSON copy; in development the terminal gets pretty lines.                                                      |
+| `LOKI_URL`      | backend | The Loki push endpoint. Unset outside development: no Loki target, and one stderr line at boot says so. Under `pnpm dev` (`NODE_ENV=development`) it falls back to the local stack. |
+| `LOKI_USERNAME` | backend | Basic-auth user (a hosted stack's id). Used only with `LOKI_PASSWORD`.                                                                                                              |
+| `LOKI_PASSWORD` | backend | Basic-auth password (an access token).                                                                                                                                              |
+
+Loki labels are `service` (from `OTEL_SERVICE_NAME`) and `env` (from `ENV_TYPE`: `production`, `staging` or
+`development`), plus `level` and `hostname`, which pino-loki adds. Nothing else is a label; tenant, request and job
+ids stay in the JSON body. Loki is best-effort: an outage drops its copy silently and stdout carries on.
 
 ## Error tracking (Sentry)
 

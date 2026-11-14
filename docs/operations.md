@@ -2,6 +2,10 @@
 
 How to run a product built from this starter once it has real users. Each section is the procedure for one job.
 
+Sections: duplicate accounts and merging them, the outbound gate, deploy, database migrations and the tunnel,
+containers and task roles, the maintenance switch, tenant reset, staging data on a laptop, process switches, and
+CI. Where errors, logs, traces and metrics go is in [`observability.md`](observability.md).
+
 ## Duplicate accounts
 
 The rule is one live account per email. A workspace is a membership of that one account (`WorkspaceMember`), not a
@@ -210,6 +214,55 @@ Only a missing document starts from an empty one; any other failed read (access 
 stops the script with nothing written. S3 reports a missing object as 403 to a role without `s3:ListBucket` on the
 bucket, so give the operator role that permission or the first write is refused.
 
+## Tenant reset
+
+`pnpm --filter @app/backend tenant:reset` deletes one workspace's data, in foreign-key order and in one
+transaction, from a development, QA or staging database. Use it to give a demo or QA workspace a clean start.
+
+```bash
+DATABASE_URL=postgresql://... pnpm --filter @app/backend tenant:reset --tenant demo --mode soft --dry-run
+DATABASE_URL=postgresql://... pnpm --filter @app/backend tenant:reset --tenant demo --mode soft --yes
+DATABASE_URL=postgresql://... pnpm --filter @app/backend tenant:reset --tenant demo --mode hard --yes \
+  --i-understand-this-deletes-the-tenant
+```
+
+- `soft` deletes the workspace's activity (chat, jobs, events, notifications and their ledger, support, sign-in
+  history, timers, outbox rows) and keeps the workspace, its people, its configuration and its billing. `hard` also
+  deletes the workspace; an account that belongs to another workspace too keeps its login and moves there.
+- It refuses `ENV_TYPE=production`, a deployed process (`NODE_ENV=production`), an unset `DATABASE_URL`, a host that
+  names `prod`, and any workspace not listed in `ALLOWED_TENANTS` in `apps/backend/scripts/tenant-reset/safety.ts`
+  (the template lists the seeded `demo` and `demo-two`). List your QA and demo workspaces there; never a customer's.
+- Nothing that belongs to no workspace is touched: super-admins, plans, flags, schedules, the knowledge base.
+- For staging, open the tunnel first (`tools/db/tunnel.sh`, port 5433) and point `DATABASE_URL` at it.
+- A new tenant table must be added to its registry, in delete order; `pnpm test` fails until it is. The steps, the
+  modes in full and every safety check are in `apps/backend/scripts/tenant-reset/README.md`.
+
+## Staging data on a laptop
+
+To reproduce a staging problem locally, copy the staging database into a second local stack, never into the dev
+database. `docker-compose.stg-debug.yml` runs its own Postgres (`localhost:5495`) and Redis (`localhost:6395`), with
+their own container names and volumes, bound to loopback.
+
+```bash
+pnpm stg-debug:up         # start the second stack
+pnpm stg-debug:pull       # dump staging and restore it into stg-debug (tools/db/pull-staging.sh)
+pnpm stg-debug:backend    # run the backend with DATABASE_URL and REDIS_URL pointed at it
+pnpm stg-debug:reset      # stop the stack and delete its data
+```
+
+- Staging only. `--env` takes no other value and the only restore target is the stg-debug database. The staging
+  host comes from `DATABASE_URL` in `apps/backend/.env.aws.staging` (or `RDS_HOST`) and must be a
+  `<project>-staging-…` host, as for `migrate.sh`. The tunnel jumps through an API task and never reuses an open port.
+- The dump is taken with `--no-owner --no-privileges`, so no role or grant from staging is needed locally.
+- After the restore it runs `prisma migrate deploy`, so the copy has this checkout's schema (`--skip-migrate` to
+  keep staging's).
+- Other modes: `--dump-only`, `--restore-only` (the latest dump), `--use-dump <file>`, `--list-dumps`.
+- A staging database can hold real people's data. Dumps go to `tools/.dumps/` (gitignored); delete them and run
+  `pnpm stg-debug:reset` when you are done. Keep the outbound gate on: the backend runs with your local `.env`, and
+  outside production it sends only to the allow-list unless that file sets `OUTBOUND_MODE=live` (see "Outbound
+  gate"). The allow-list is a table, so staging's list comes with the copy. Do not set `live` while a staging copy
+  is loaded.
+
 ## Process switches
 
 - `QUEUE_PROCESSORS_ENABLED`: `false` makes a process producer-only. Unset means it consumes, so `pnpm dev` keeps
@@ -226,3 +279,18 @@ environment pays for no cron tick, and turning a tenant's automatic schedule on 
 Run now and event-driven Desk runs still work. Unset means on. Use it on an environment that does not use automatic
 Desk runs.
 <!-- feature:desk:end -->
+
+## CI is manual
+
+Every GitHub Actions workflow runs only when started: from the Actions tab, or `gh workflow run <file>`. None runs
+on a push or a pull request.
+
+- **Check workflows** (`ci.yml`, `grafana-as-code.yml`, `container.yml`) keep their `push` and `pull_request`
+  triggers in the file, commented out under a one-line note. To run one on every push, uncomment them.
+- **Deploy and apply workflows** (`deploy-all.yml`, `deploy-frontend.yml`, `quality-gate.yml`, `grafana-apply.yml`)
+  have `workflow_dispatch` only and no commented triggers. They change a live environment and must never run on a
+  push.
+- **What always runs is local.** `pnpm verify` (format, lint, schema lint, type-check, unit tests, `pnpm check:ops`,
+  build) before a pull request; the pre-commit hook (Prettier on staged files); the pre-push hook (the architecture
+  specs on every push, and `pnpm check:ops` when the push touches `infra/`, `docs/runbooks/`, `.github/` or
+  `tools/`). A rule that must always hold is a Jest spec or part of `check:ops`, never a CI job alone.

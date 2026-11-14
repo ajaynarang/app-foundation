@@ -264,6 +264,10 @@ Desk (the Inngest workflow engine, only when the product kept it):
 
 <!-- feature:desk:end -->
 
+Never set in Doppler: `QUEUE_PROCESSORS_ENABLED` and `OPS_GAUGES_FROM_API`. Terraform sets them on the API task only
+(`api_queue_processors_enabled`, and `worker_desired_count = 0`), and a Doppler value would override the container
+environment of the worker too (`docs/operations.md`, "Process switches").
+
 ### Web (`app-frontend`)
 
 The web app boots with zero env vars locally (code falls back to `http://localhost:8000/api/v1` /

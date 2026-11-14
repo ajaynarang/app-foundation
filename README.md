@@ -165,6 +165,10 @@ guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what tha
   repo is optimized for AI-assisted development).
 - **[init-app](tools/init-app/README.md)** — the one-command rename tool.
 - **[Doppler secrets guide](docs/doppler.md)** — production-grade env management.
+- **[Operations](docs/operations.md)** — deploys, migrations, the maintenance and outbound switches, tenant reset,
+  staging data on a laptop, and why CI is manual.
+- **[Observability](docs/observability.md)** — where errors, logs, traces and metrics go, and the keys that switch
+  each one on.
 
 ## Contributing & license
 
