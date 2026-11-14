@@ -33,6 +33,7 @@
     "prisma:migrate:status": "pnpm --filter @appshore/db prisma:migrate:status",
     "prisma:studio": "pnpm --filter @appshore/db prisma:studio",
     "// — Database (reset, push, cleanup)": "",
+    "tenant:reset": "tsx scripts/tenant-reset/cli.ts",
     "db:seed": "pnpm --filter @appshore/db db:seed",
     "db:reset": "pnpm --filter @appshore/db db:reset",
     "db:push": "pnpm --filter @appshore/db db:push",
