@@ -95,8 +95,11 @@ contract", `docs/adr/0001-api-contract.md`. How the web shows these errors is in
 - A transient failure of an outside call made inside a request may be retried with
   `RetryService.withRetry(operation, options, context)` (`@appshore/kernel`, `infrastructure/retry/`; import
   `RetryModule`): `maxAttempts`, `baseDelayMs`, `maxDelayMs`, `exponentialBase`, and `retryableErrors`, which defaults
-  to the network codes `ECONNRESET`, `ETIMEDOUT` and `ENOTFOUND`; anything else fails at once. No call site uses it
-  yet. [guard: retry.service.spec.ts]
+  to the network codes `ECONNRESET`, `ETIMEDOUT` and `ENOTFOUND`. `RetryService.isRetryable` retries an error whose
+  `code` is one of those codes or whose message contains one, an HTTP response with `response.status` 429 or 5xx, and
+  a timeout (`name` `TimeoutError` or a message containing `timeout`); anything else, including any other HTTP status,
+  fails at once. So a vendor 500 or 429 is retried up to `maxAttempts`. No call site uses it yet.
+  [guard: retry.service.spec.ts]
 - Work that can wait is not retried inside the request: it goes on a queue, whose attempts and backoff do the retry
   ([`jobs-and-deadlines.md`](jobs-and-deadlines.md)). [review-only: whether a call can wait needs reading]
 
