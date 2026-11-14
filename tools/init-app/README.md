@@ -85,6 +85,17 @@ node tools/init-app/apply-feature.mjs --remove desk            # remove it (safe
 
 `pnpm init-app --desk no` runs the same removal before its renames, so the manifest always matches template text.
 
+### The prune step
+
+Skills, references, agents and hotspot files are never listed in a manifest (a skill rename would break the path).
+Instead, a file that belongs to a feature says so: frontmatter `requires: desk` (or `mobile`), or a hotspot file
+named after the feature (`.claude/hooks/hotspots/<feature>.json`). Right after the manifests run, and after
+`--mobile no` deletes `apps/mobile`, init-app runs [`prune-requires.mjs`](prune-requires.mjs): it deletes every such
+file whose feature folder (`apps/mobile`, the Desk folder) is gone, and removes each row of a skill's table that
+linked to a file that no longer exists. It reads the disk only, so it does not care how the feature was removed. The
+skills guard (`pnpm guards`) fails on a `requires:` file whose folder is absent, so a file that comes back with a
+template update is caught on the next commit.
+
 ### What stays without Desk
 
 - **The tables.** The seven Desk models and their enums stay in `foundation.prisma`, the generated client and the

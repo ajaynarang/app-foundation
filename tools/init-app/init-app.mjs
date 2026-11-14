@@ -22,6 +22,8 @@
  * Optional features, removed BEFORE the rename rules so each manifest is matched against template text:
  *   - `--desk no` (the default) strips Desk through tools/init-app/features/desk.json (apply-feature.mjs)
  *   - `--mobile no` deletes apps/mobile
+ * Then the prune step (prune-requires.mjs) reads the disk: every skill, reference, agent and hotspot file that
+ * requires a feature whose folder is now gone is deleted, with the skill-table rows that linked to it.
  *
  * Never touched: .git, node_modules, pnpm-lock.yaml (run `pnpm install` after a scope rename),
  * docs/superpowers/ (historical design docs), tools/init-app/ (this tool).
@@ -33,6 +35,7 @@ import { parseArgs } from 'node:util';
 import { createInterface } from 'node:readline/promises';
 import { execFileSync, execSync } from 'node:child_process';
 import { loadManifest, removeFeature } from './apply-feature.mjs';
+import { pruneRequires } from './prune-requires.mjs';
 import {
   CONSTANTS_FILE as OBSERVABILITY_CONSTANTS,
   GENERATE_SCRIPT as OBSERVABILITY_GENERATE,
@@ -352,6 +355,28 @@ if (cfg.desk === 'no') {
   console.log('');
 }
 
+if (cfg.mobile === 'no') {
+  const mobileDir = path.join(ROOT, 'apps', 'mobile');
+  if (fs.existsSync(mobileDir)) {
+    if (dryRun) {
+      console.log('  Would delete apps/mobile (--mobile no).');
+    } else {
+      fs.rmSync(mobileDir, { recursive: true, force: true });
+      console.log('  Deleted apps/mobile (--mobile no).');
+    }
+  }
+}
+
+// The prune step: after the features are removed, and before any rename, so it reads template names.
+{
+  const actions = pruneRequires(ROOT, { dryRun });
+  if (actions.length) {
+    console.log(`  ${dryRun ? 'Would prune' : 'Pruned'} files that require a removed feature:`);
+    for (const a of actions) console.log(`    ${a}`);
+    console.log('');
+  }
+}
+
 const stats = new Map(rules.map((r) => [r.id, { files: 0, lines: 0 }]));
 let touched = 0;
 
@@ -386,18 +411,6 @@ for (const [id, s] of stats) {
   console.log(`    ${s.files > 0 ? '✔' : '·'} ${id.padEnd(58)} ${s.files} file(s), ~${s.lines} line(s)`);
 }
 console.log(`\n  ${dryRun ? 'Would touch' : 'Touched'} ${touched} file(s).`);
-
-if (cfg.mobile === 'no') {
-  const mobileDir = path.join(ROOT, 'apps', 'mobile');
-  if (fs.existsSync(mobileDir)) {
-    if (dryRun) {
-      console.log('  Would delete apps/mobile (--mobile no).');
-    } else {
-      fs.rmSync(mobileDir, { recursive: true, force: true });
-      console.log('  Deleted apps/mobile (--mobile no).');
-    }
-  }
-}
 
 // The alert and dashboard files are generated from the constants just set. generate.mjs is plain Node, so this runs
 // before `pnpm install`; if it cannot, the command is printed.
