@@ -466,3 +466,45 @@ order. The shared `createMockPrisma()` no longer accepts an array: a unit test t
 inside the callback. A spec with its own `$transaction` mock that still has an array branch can drop it.
 
 **How to turn it back.** Revert the change. Nothing at run time depends on it.
+
+## 2026-11-14: production deploys are locked until `PRODUCTION_DEPLOYERS` is set; the tunnel's jump host is the API task
+
+**What changes when you pull it.**
+
+- **Deploy workflow.** A production run of `deploy-all.yml` fails in its first job unless the GitHub login that
+  started it is in the repo variable `PRODUCTION_DEPLOYERS` (comma-separated). Unset, production is locked. Staging is
+  unchanged.
+- The migration jobs pick their SSM jump host from the API service only (`aws ecs list-tasks --service-name
+<project>-<env>-ecs-service-api`). They used to take the first running task of any service, which could be the
+  worker. Every `list-tasks` call in the workflow and in `tools/db/` must name its service
+  (`.github/scripts/check-ecs-service-filter.sh`, in `pnpm check:ops` and the workflow's validate job).
+- Each migration job syncs the knowledge base after the base seeds (`pnpm seed:knowledge`, once per deploy, never
+  fatal; it needs `COHERE_API_KEY` in Doppler to embed). The job builds the foundation packages and runs a throwaway
+  Redis for it.
+- Production seeds run with `ENV_TYPE=production` and Doppler's `SUPER_ADMIN_PASSWORD`. Before, they ran with neither,
+  so a super-admin created on a fresh production database got the shared dev password.
+- The image is built with `docker/build-push-action` and the GitHub Actions cache, after a free-disk step; the build
+  job times out after 40 minutes. The `BUILD_SHA` argument is kept.
+- **`tools/db/migrate.sh` and `tools/db/tunnel.sh`.** Both take `--env staging|production` (migrate also `local`).
+  The jump host is always a task of the API service; `--container` is gone and the default is no longer the worker.
+  The database host must start with `<project>-<env>-`. An existing tunnel on the port is never reused, in staging
+  too: close it first. Production tunnels on 5434, needs `production` typed (or `--yes` plus `CONFIRM_ENV=production`
+  with no terminal) and, to seed, `SUPER_ADMIN_PASSWORD` in `apps/backend/.env.aws.production`.
+- **New** `tools/ops/maintenance-mode.sh` (`on`, `off`, `status`) writes the maintenance document the web middleware
+  already reads.
+
+**What to set first.** Set `PRODUCTION_DEPLOYERS` before your next production deploy. Set `SUPER_ADMIN_PASSWORD` and
+`COHERE_API_KEY` in each environment's Doppler config if you want a seeded super-admin password and embeddings. If your
+Terraform `project` is not `app`, run the scripts with `PROJECT=<name>`. Deploy this before any change that turns off
+ECS Exec on the worker.
+
+**How to turn it back.** Revert the workflow and the two scripts. To keep the workflow but open production to
+everyone who can run it, there is no switch: list the logins.
+
+<!-- feature:desk:start -->
+
+**Desk.** `DESK_SCHEDULER_ENABLED=false` (new, unset means on) keeps the Desk scheduler heartbeat from being
+registered with Inngest and refuses turning a tenant's automatic schedule on with a 409 `INVALID_STATE`. Nothing
+changes until you set it; unset it to turn back.
+
+<!-- feature:desk:end -->

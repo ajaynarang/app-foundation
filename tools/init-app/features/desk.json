@@ -28,7 +28,8 @@
     "README.md",
     "CLAUDE.md",
     ".claude/skills/backend-patterns/SKILL.md",
-    "docs/upgrade-notes/operations.md"
+    "docs/upgrade-notes/operations.md",
+    "docs/operations.md"
   ],
   "jsonEntries": [
     { "file": "package.json", "path": ["scripts", "// — Inngest (Desk durable workflow engine — local dev)"] },
