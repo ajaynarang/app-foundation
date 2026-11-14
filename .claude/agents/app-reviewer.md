@@ -48,9 +48,10 @@ responsive at 375, 768 and 1440, copy.
 
 **mobile** — `mobile.md`, when the product has the Flutter app.
 
-**domain** — the product's own checks, in its domain skill's `review-checks.md`
-(`.claude/skills/<prefix>-domain/references/review-checks.md`). If the product has no domain skill yet, return an
-empty list and say so.
+**domain** — the product's own checks, in the domain skill's
+`.claude/skills/app-domain/references/review-checks.md`, plus its "Where this product differs" table
+(`.claude/skills/app-domain/SKILL.md`): a diff that breaks a foundation rule without a row there is a finding. While
+`review-checks.md` says `filled: false`, the product has not written its checks: return an empty list and say so.
 
 ## Method
 

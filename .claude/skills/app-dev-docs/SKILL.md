@@ -33,21 +33,22 @@ later and never silently (the amendment rule in `CLAUDE.md`).
 1. List the diff: `git diff --name-only origin/<default-branch>...HEAD` (`defaultBranch` in `.claude/workflow.json`).
 2. Update what the diff makes untrue, using this table. Read the source for every claim you write.
 
-   | You changed                                                                   | Update                                                                                         |
-   | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-   | a Prisma model or relation (`packages/appshore/db/prisma/schema/`)            | `docs/domain-map.md`                                                                           |
-   | an enum value, a status, a transition, an invariant                           | `docs/lifecycles-and-invariants.md`                                                            |
-   | an event in `APP_EVENT_REGISTRY`                                              | `docs/event-vocabulary.md`                                                                     |
-   | a new domain, feature folder or package, or an import arrow between domains   | `docs/module-map.md` (and `apps/backend/src/architecture/domain-boundaries.allowed.json`)      |
-   | a decision that is expensive to undo, or one an ADR records                   | a new ADR from `docs/adr/0000-template.md`, or a dated amendment; the index in its README      |
-   | an epic's scope or "demoable when"                                            | `docs/epics.md`                                                                                |
-   | a convention (a rule, its guard, a recipe)                                    | its `app-conventions` reference, or the index's non-negotiables                                |
-   | a root script, port, env var, setup step or extension point                   | `README.md`, `CLAUDE.md` (quick start, extension points, gates), `docs/doppler.md`             |
-   | the config schema or an `.env.example`                                        | `docs/doppler.md`                                                                              |
-   | deploy, migrations, the outbound gate, an operator procedure, a workflow file | `docs/operations.md`; a new alert rule's section in `docs/runbooks/`                           |
-   | logging, metrics, traces, error reporting                                     | `docs/observability.md`, `docs/standards/observability.md`                                     |
-   | a guard, hook, gate step or skill                                             | `CLAUDE.md` ("Gates", "Workflow"), `docs/how-we-build.md`, `tools/guards/` or the tools README |
-   | a file a doc's or reference's `sources:` names                                | that doc or reference (the drift reminder names it)                                            |
+   | You changed                                                                       | Update                                                                                         |
+   | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+   | a Prisma model or relation (`packages/appshore/db/prisma/schema/`)                | `docs/domain-map.md`                                                                           |
+   | an enum value, a status, a transition, an invariant                               | `docs/lifecycles-and-invariants.md`                                                            |
+   | an event in `APP_EVENT_REGISTRY`                                                  | `docs/event-vocabulary.md`                                                                     |
+   | a new domain, feature folder or package, or an import arrow between domains       | `docs/module-map.md` (and `apps/backend/src/architecture/domain-boundaries.allowed.json`)      |
+   | a decision that is expensive to undo, or one an ADR records                       | a new ADR from `docs/adr/0000-template.md`, or a dated amendment; the index in its README      |
+   | an epic's scope or "demoable when"                                                | `docs/epics.md`                                                                                |
+   | a convention (a rule, its guard, a recipe)                                        | its `app-conventions` reference, or the index's non-negotiables                                |
+   | a persona, a role, an invariant no guard holds, a deliberate foundation exception | the domain skill (`app-domain`) and its references; an exception also needs its ADR            |
+   | a root script, port, env var, setup step or extension point                       | `README.md`, `CLAUDE.md` (quick start, extension points, gates), `docs/doppler.md`             |
+   | the config schema or an `.env.example`                                            | `docs/doppler.md`                                                                              |
+   | deploy, migrations, the outbound gate, an operator procedure, a workflow file     | `docs/operations.md`; a new alert rule's section in `docs/runbooks/`                           |
+   | logging, metrics, traces, error reporting                                         | `docs/observability.md`, `docs/standards/observability.md`                                     |
+   | a guard, hook, gate step or skill                                                 | `CLAUDE.md` ("Gates", "Workflow"), `docs/how-we-build.md`, `tools/guards/` or the tools README |
+   | a file a doc's or reference's `sources:` names                                    | that doc or reference (the drift reminder names it)                                            |
 
 3. Bump `verified:` on each hand-written doc you re-checked in full. Do not bump a doc you only touched in passing.
 4. Run `pnpm guard:docs` and `pnpm guard:skills`. A dead link or a missing path is fixed, never excluded. A file

@@ -36,8 +36,10 @@ and a short kebab name (`142-ticket-reopen`).
 
 ## Preconditions to check every time
 
-The foundation's list. The product's own (its personas and roles, its settings, its demo data) is in its domain
-skill, `.claude/skills/<prefix>-domain/references/test-preconditions.md` once that exists; read it too.
+The foundation's list. The product's own (its logins per persona, its settings, its demo data, its timing) is in its
+domain skill, `.claude/skills/app-domain/references/test-preconditions.md`, and the people the notes are written for
+in `.claude/skills/app-domain/references/personas.md`; read both. A file that says `filled: false` has not been
+written yet: use this list alone, and say so at the top of the notes.
 
 - **Logins.** The seeds create `owner@example.com` (OWNER), `admin-user@example.com` (ADMIN) and `member@example.com`
   (MEMBER) in the demo workspace, and `admin@example.com`, the platform SUPER_ADMIN, all with the dev password from

@@ -62,6 +62,11 @@ condense, and its rules hold all the same.
 | Page chrome, row actions, status tones, dark theme, responsive, microcopy     | [`ui-grammar.md`](references/ui-grammar.md)             |
 | The Flutter app                                                               | [`mobile.md`](references/mobile.md)                     |
 
+This product's own vocabulary, personas and review checks are in its domain skill, and every foundation rule it
+deliberately does not follow is listed, with its ADR, in
+[Where this product differs](../app-domain/SKILL.md#where-this-product-differs). A difference not listed there is
+drift.
+
 The ids and names behind the database rules are `docs/standards/id-convention.md` and `docs/standards/column-naming.md`;
 the logging standard is `docs/standards/observability.md`. The binding docs and ADRs are listed in `CLAUDE.md`.
 

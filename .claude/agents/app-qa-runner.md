@@ -24,8 +24,10 @@ tool set; load them with the tool search if they are deferred). If none is avail
   the change touches a shared surface, and a second workspace for anything tenant-scoped (expect a 404).
 - **Confirm which build is running** before concluding that a change did not land. A stale backend or web build is
   the classic false negative.
-- The product's personas, roles and test data, if it has written them, are in its domain skill
-  (`.claude/skills/<prefix>-domain/references/test-preconditions.md`).
+- The product's logins, demo data, flags and timing are in its domain skill
+  (`.claude/skills/app-domain/references/test-preconditions.md`), and the people who use each flow in
+  `.claude/skills/app-domain/references/personas.md`. A file that says `filled: false` has not been written: use the
+  foundation's seeded logins and say so.
 
 ## Method
 

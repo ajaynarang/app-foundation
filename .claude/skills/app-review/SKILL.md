@@ -66,17 +66,17 @@ Agent(subagent_type: "app-reviewer",
                Guards already run and their findings are known: <list or 'none'>; do not repeat them.")
 ```
 
-| Dimension       | Dispatch when                                                   |
-| --------------- | --------------------------------------------------------------- |
-| `correctness`   | always                                                          |
-| `conventions`   | always (only what the guards cannot see)                        |
-| `authz-tenancy` | a controller, service, guard, query, tool or job changed        |
-| `contract`      | a route, DTO, serializer, event, webhook or tool schema changed |
-| `tests`         | any source changed                                              |
-| `performance`   | a query, list, job, cache or hot path changed                   |
-| `ui`            | `apps/web/`, `packages/ui/` or web-core changed                 |
-| `mobile`        | `apps/mobile/` changed (and the product has it)                 |
-| `domain`        | the product's domain skill exists and the diff touches a domain |
+| Dimension       | Dispatch when                                                             |
+| --------------- | ------------------------------------------------------------------------- |
+| `correctness`   | always                                                                    |
+| `conventions`   | always (only what the guards cannot see)                                  |
+| `authz-tenancy` | a controller, service, guard, query, tool or job changed                  |
+| `contract`      | a route, DTO, serializer, event, webhook or tool schema changed           |
+| `tests`         | any source changed                                                        |
+| `performance`   | a query, list, job, cache or hot path changed                             |
+| `ui`            | `apps/web/`, `packages/ui/` or web-core changed                           |
+| `mobile`        | `apps/mobile/` changed (and the product has it)                           |
+| `domain`        | the domain skill's review checks are filled and the diff touches a domain |
 
 For a change to auth, the tool pipeline, billing, the outbox or deadlines, run `correctness` twice with different
 framings and keep only the findings that survive both.

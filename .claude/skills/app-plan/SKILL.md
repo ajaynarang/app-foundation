@@ -64,8 +64,9 @@ On top of what `superpowers:writing-plans` produces, the plan carries these sect
 7. **Docs (required)** — never empty. The binding docs and ADRs the change amends (`docs/domain-map.md` for a new
    entity, `docs/lifecycles-and-invariants.md` for a state or invariant, `docs/event-vocabulary.md` for an event,
    `docs/module-map.md` for a new folder or arrow, an ADR for a decision that is expensive to undo), the
-   `app-conventions` reference that changes if a convention changes, and `README.md` or `CLAUDE.md` claims the change
-   makes untrue. When nothing changes, write "none, because <reason>". **The last task of the plan runs
+   `app-conventions` reference that changes if a convention changes, the domain skill (`app-domain`) for a new
+   persona, an invariant no guard holds or a deliberate difference from a foundation rule, and `README.md` or
+   `CLAUDE.md` claims the change makes untrue. When nothing changes, write "none, because <reason>". **The last task of the plan runs
    `/app-dev-docs slice`.**
 8. **Gates** — `pnpm verify` always; `pnpm verify:api` for a wire change; `pnpm verify:scaffold` for a scaffolding
    change; `cd apps/mobile && flutter analyze && flutter test` for mobile.
