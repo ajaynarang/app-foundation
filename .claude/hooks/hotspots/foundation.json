@@ -66,12 +66,49 @@
         "apps/backend/src/platform-glue/webhooks/delivery.processor.ts"
       ],
       "say": "A send primitive changed: every outbound email, SMS, push, WhatsApp message and webhook goes through the outbound gate (outbound-gate-coverage.spec.ts holds it).",
-      "docs": ["docs/adr/0006-outbound-gate.md", "docs/operations.md"]
+      "docs": [
+        "docs/adr/0006-outbound-gate.md",
+        "docs/operations.md",
+        ".claude/skills/app-conventions/references/outbound-gate.md"
+      ]
+    },
+    {
+      "paths": [
+        "packages/appshore/kernel/src/infrastructure/telemetry/metrics.ts",
+        "packages/appshore/kernel/src/infrastructure/queue/job-events.ts",
+        "infra/observability/grafana-cloud/catalog/**/*.mjs"
+      ],
+      "say": "A metric, a structured event or the alert catalog changed: labels stay a closed set, every alert rule has its runbook section, and the generated Grafana files are regenerated, never edited (node infra/observability/grafana-cloud/scripts/generate.mjs, then pnpm check:ops).",
+      "docs": [
+        "docs/observability.md",
+        "docs/standards/observability.md",
+        ".claude/skills/app-conventions/references/observability.md"
+      ]
+    },
+    {
+      "paths": [
+        "packages/shared-types/src/platform/feature-keys.ts",
+        "packages/appshore/db/prisma/seeds/04-plan-entitlements.seed.ts"
+      ],
+      "say": "A plan feature key or its entitlement rows changed: every key has a row on every plan and is enforced somewhere or listed display-only with a reason (feature-key-coverage.spec.ts), and the web upgrade registry has its pitch.",
+      "docs": [".claude/skills/app-conventions/references/plans-and-entitlements.md"]
+    },
+    {
+      "paths": [
+        "apps/backend/src/platform-glue/queue/job-context.ts",
+        "apps/backend/src/platform-glue/database/app-rls-registry.ts",
+        "packages/appshore/kernel/src/infrastructure/rls/*.ts"
+      ],
+      "say": "The tenant context changed: every job name, table, event handler and super-admin route declares its context (the rls-* specs), and a new system reason is a reviewed change.",
+      "docs": ["docs/adr/0009-tenancy.md", ".claude/skills/app-conventions/references/tenancy.md"]
     },
     {
       "paths": [".github/workflows/*.yml"],
       "say": "A workflow changed: CI is manual-only. workflow_dispatch is the only live trigger; a check workflow keeps its push and pull_request triggers commented out under the two-step note; a workflow on manualAlways in .claude/workflow.json carries none. pnpm guard:ci checks it.",
-      "docs": ["docs/adr/0007-ci-manual-enforcement-local.md"]
+      "docs": [
+        "docs/adr/0007-ci-manual-enforcement-local.md",
+        ".claude/skills/app-conventions/references/infra-and-deploy.md"
+      ]
     },
     {
       "paths": ["tools/guards/convention-gate.mjs", "tools/guards/convention-gate.baseline.json"],

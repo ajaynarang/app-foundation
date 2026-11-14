@@ -14,8 +14,8 @@ examples:
 
 The rules that hold everywhere, then a map to the detail. The non-negotiables below are the whole contract; read
 them. Open a reference only for the area you touch. Each reference lists its `sources:` (the code it describes) and
-its `guards:` (what holds it); a reference marked `status: interim` is moved text that its finish pull request will
-condense, and its rules hold all the same.
+its `guards:` (what holds it), its rules each tagged with their guard, one or more recipes, and what to flag in
+review.
 
 ## References: open on demand
 
@@ -29,27 +29,27 @@ condense, and its rules hold all the same.
 
 **Backend** (`apps/backend`, `packages/appshore/*`)
 
-| Working on                                                                    | Read                                                                                      |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Modules, services, state machines, shared types, caching, integrations        | [`backend-core.md`](references/backend-core.md)                                           |
-| Routes, status codes, DTOs, query DTOs, the ID boundary, OpenAPI, idempotency | [`api-contract.md`](references/api-contract.md)                                           |
-| The error envelope, codes, copy, external errors, retry                       | [`errors.md`](references/errors.md)                                                       |
-| Cursor lists, bounded reads, list tests                                       | [`lists-and-pagination.md`](references/lists-and-pagination.md)                           |
-| Prisma models, naming, enums, transactions, migrations                        | [`database.md`](references/database.md)                                                   |
-| The event registry, the outbox, SSE, webhooks                                 | [`events-and-outbox.md`](references/events-and-outbox.md)                                 |
-| Queues, job handlers, deadlines, API and worker roles, shutdown               | [`jobs-and-deadlines.md`](references/jobs-and-deadlines.md)                               |
-| The guard chain, roles, record-level checks, rate limits                      | [`auth-and-access.md`](references/auth-and-access.md)                                     |
-| Plan gates on routes, jobs and tools                                          | [`plans-and-entitlements.md`](references/plans-and-entitlements.md)                       |
-| The config schema, the production boot guard, Doppler, feature flags          | [`config-and-secrets.md`](references/config-and-secrets.md)                               |
-| Notifications, file storage and streaming, health checks, billing             | [`platform-services.md`](references/platform-services.md)                                 |
-| Logging, error reporting, metrics, traces                                     | [`observability.md`](references/observability.md)                                         |
-| Model calls, prompts, moderation, the knowledge base, evals                   | [`ai.md`](references/ai.md)                                                               |
-| Model aliases, the route resolver, tenant keys, OpenRouter, AI cost           | [`ai-routing.md`](references/ai-routing.md)                                               |
-| MCP tools and the one tool pipeline                                           | [`ai-tools.md`](references/ai-tools.md)                                                   |
-| A tenant context with no request in hand (jobs, crons, system work)           | `CLAUDE.md`, "Tenancy models", and [the tenancy ADR](../../../docs/adr/0009-tenancy.md)   |
-| A send to a person or a system outside (email, SMS, push, WhatsApp, webhook)  | [the outbound gate ADR](../../../docs/adr/0006-outbound-gate.md) and `docs/operations.md` |
-| Compose services, Terraform, deploy workflows                                 | `infra/README.md` and `docs/operations.md`                                                |
-| Desk, the optional workflow engine                                            | [the Desk skill](../app-desk/SKILL.md)                                                    |
+| Working on                                                                     | Read                                                                                |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Modules, services, state machines, shared types, caching, integrations         | [`backend-core.md`](references/backend-core.md)                                     |
+| Routes, status codes, DTOs, query DTOs, the ID boundary, OpenAPI, idempotency  | [`api-contract.md`](references/api-contract.md)                                     |
+| The error envelope, codes, copy, external errors, retry                        | [`errors.md`](references/errors.md)                                                 |
+| Cursor lists, bounded reads, list tests                                        | [`lists-and-pagination.md`](references/lists-and-pagination.md)                     |
+| Prisma models, naming, enums, transactions, migrations                         | [`database.md`](references/database.md)                                             |
+| The event registry, the outbox, SSE, webhooks                                  | [`events-and-outbox.md`](references/events-and-outbox.md)                           |
+| Queues, job handlers, deadlines, API and worker roles, shutdown                | [`jobs-and-deadlines.md`](references/jobs-and-deadlines.md)                         |
+| The guard chain, roles, record checks, sessions, API keys, OAuth, rate limits  | [`auth-and-access.md`](references/auth-and-access.md)                               |
+| Plan gates on routes, jobs and tools, seats, the upgrade prompt                | [`plans-and-entitlements.md`](references/plans-and-entitlements.md)                 |
+| The config schema, the production boot guard, Doppler, feature flags           | [`config-and-secrets.md`](references/config-and-secrets.md)                         |
+| Notifications, file storage and streaming, health checks, billing              | [`platform-services.md`](references/platform-services.md)                           |
+| Logging, error reporting, metrics, traces, alerts and runbooks                 | [`observability.md`](references/observability.md)                                   |
+| Model calls, prompts, moderation, the knowledge base, evals                    | [`ai.md`](references/ai.md)                                                         |
+| Model aliases, the route resolver, tenant keys, OpenRouter, AI cost            | [`ai-routing.md`](references/ai-routing.md)                                         |
+| MCP tools and the one tool pipeline                                            | [`ai-tools.md`](references/ai-tools.md)                                             |
+| The tenancy modes, scoping, work with no request in hand (jobs, crons, events) | [`tenancy.md`](references/tenancy.md)                                               |
+| A send to a person or a system outside (email, SMS, push, WhatsApp, webhook)   | [`outbound-gate.md`](references/outbound-gate.md)                                   |
+| Compose services, Terraform, deploy workflows, what a product changes first    | [`infra-and-deploy.md`](references/infra-and-deploy.md); deploying is `/app-deploy` |
+| Desk, the optional workflow engine                                             | [the Desk skill](../app-desk/SKILL.md)                                              |
 
 **Web** (`apps/web`, `@app/ui`, `@appshore/web-core`) and **mobile** (the Flutter app, when the product has one)
 
@@ -110,6 +110,15 @@ the logging standard is `docs/standards/observability.md`. The binding docs and 
 - **A model is reached only through the route resolver, by alias** (`fast`, `standard`, `powerful`); ids live only in
   the model catalog ([`ai-routing.md`](references/ai-routing.md)). A tool call runs only through the one pipeline.
   [guard: model-id-literals.spec.ts, ai-provider-clients.spec.ts, ai-tool-path.spec.ts]
+- **Every send to a person or a system outside passes the outbound gate** (email, SMS, push, WhatsApp, webhooks), so
+  a test environment never messages real people ([`outbound-gate.md`](references/outbound-gate.md)).
+  [guard: outbound-gate-coverage.spec.ts]
+- **Every unit of work runs in a declared tenant context**: a request is pinned by the auth guards, every job name,
+  event handler and super-admin route declares its context ([`tenancy.md`](references/tenancy.md)).
+  [guard: rls-job-context-coverage.spec.ts, rls-context-coverage.spec.ts]
+- **A plan check is a call to `TenantEntitlementsService`** (through `@RequireFeature` on a route), never a copy of
+  the rule ([`plans-and-entitlements.md`](references/plans-and-entitlements.md)).
+  [guard: plan-gated-routes.spec.ts, feature-key-coverage.spec.ts]
 - **Config through the schema.** `process.env` only in config and bootstrap files; everything else asks `ConfigService`.
   [guard: gate:process-env]
 - **Generated files, real env files and applied migrations are never hand-edited.** Regenerate the enum mirror and
