@@ -74,3 +74,5 @@ The template itself sets no required check: with manual CI, a required check wou
   `workflow_run` trigger, since nothing in CI may start on its own. Every check workflow's note now names both steps,
   so uncommenting alone fails the guard.
 - The guards workflow is `.github/workflows/guards.yml`; its job, for step 3, is `workflow-guards`.
+- "Enforcement is local" above now has the guards in every layer: the pre-commit hook runs `pnpm guards` after
+  Prettier on the staged files, and the pre-push hook and `pnpm verify` run `pnpm guards` and `pnpm test:guards`.
