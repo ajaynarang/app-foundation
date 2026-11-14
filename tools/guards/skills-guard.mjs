@@ -124,7 +124,7 @@ function globSource(glob) {
   }
   return re;
 }
-const globToRegExp = (glob) => new RegExp(`^${globSource(glob)}/?$`);
+export const globToRegExp = (glob) => new RegExp(`^${globSource(glob)}/?$`);
 
 const isGlob = (p) => /[*?{]/.test(p);
 

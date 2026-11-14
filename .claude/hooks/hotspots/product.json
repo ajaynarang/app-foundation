@@ -1,0 +1,4 @@
+{
+  "$comment": "This product's own drift hotspots, read by .claude/hooks/drift-reminder.mjs. Same shape as foundation.json: { paths: [globs], say: what the change makes untrue, docs: [files to re-check] }. Owned by the product; the foundation never writes here.",
+  "hotspots": []
+}
