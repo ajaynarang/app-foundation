@@ -4,11 +4,17 @@ import { type DeskScheduleState } from '../types';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
+import { assertAutomaticSchedulesAvailable } from './scheduler-availability';
+
 /**
  * Reads + writes the tenant-wide Desk schedule master switch
  * (`Tenant.deskScheduleEnabled`). When off (the default), the scheduler
  * heartbeat skips the whole tenant and nothing runs autonomously — a single
  * "pause all automatic runs" control. Manual "Run now" never consults it.
+ *
+ * Above it sits the platform switch (`DESK_SCHEDULER_ENABLED`, see
+ * `scheduler-availability.ts`). While that is off, arming the master switch is
+ * refused (409): the setting could not take effect. Pausing is always allowed.
  */
 @Injectable()
 export class DeskScheduleService {
@@ -29,6 +35,7 @@ export class DeskScheduleService {
   }
 
   async setState(tenantId: number, enabled: boolean): Promise<DeskScheduleState> {
+    if (enabled) assertAutomaticSchedulesAvailable();
     const tenant = await this.prisma.tenant.update({
       where: { id: tenantId },
       data: { deskScheduleEnabled: enabled },

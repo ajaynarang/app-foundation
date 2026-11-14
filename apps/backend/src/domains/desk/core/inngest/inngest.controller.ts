@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { serve } from 'inngest/express';
 
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
+import { isDeskSchedulerEnabled } from '../scheduler/scheduler-availability';
 import { buildDeskInngestFunctions } from './desk-inngest-functions';
 import { InngestClientService } from './inngest.client';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -15,7 +16,8 @@ import { ApiExcludeController } from '@nestjs/swagger';
  *   - Introspect functions (GET)
  *
  * Registered functions:
- *   - deskSchedulerFunction    — cron `* * * * *` (every minute) heartbeat
+ *   - deskSchedulerFunction    — cron `* * * * *` (every minute) heartbeat,
+ *                                left out when `DESK_SCHEDULER_ENABLED=false`
  *
  * The starter ships NO responsibility workflow functions (the registry is
  * empty). When you add a responsibility, build its Inngest function (one per
@@ -54,7 +56,14 @@ export class InngestController implements OnApplicationBootstrap {
     const client = this.inngest.client;
 
     // Register your responsibility workflow functions in desk-inngest-functions.ts.
-    const functions = buildDeskInngestFunctions(client);
+    const schedulerEnabled = isDeskSchedulerEnabled();
+    const functions = buildDeskInngestFunctions(client, { schedulerEnabled });
+    if (!schedulerEnabled) {
+      this.logger.warn(
+        'Automatic Desk runs are off for this environment (DESK_SCHEDULER_ENABLED=false): the scheduler heartbeat ' +
+          'is not registered with Inngest. Run now and event-driven runs still work.',
+      );
+    }
 
     // `serveOrigin` is the origin Inngest uses when POSTing back to run
     // a step. In local dev the Inngest dev server runs in Docker, so
