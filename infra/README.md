@@ -195,6 +195,8 @@ Key settings:
 - **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from Doppler, which doesn't auto-sync with RDS rotation.
 - **`publicly_accessible = false`** — cannot be reached from the internet, only from inside the VPC
 - **`storage_encrypted = true`** — data on disk is encrypted
+- **Storage autoscaling** — RDS grows the volume when free space runs low, up to `rds_max_allocated_storage`
+  (default 200 GB; `0` turns it off)
 - **Staging:** no final snapshot on destroy (cheap teardowns), 1-day backups, no deletion protection
 - **Production:** final snapshot taken before any destroy, 7-day backups, deletion protection on (Terraform will refuse to delete it without explicit override)
 
@@ -210,7 +212,7 @@ Serverless Redis — you don't provision capacity upfront, it scales automatical
 
 ### `terraform/iam.tf` — Permissions
 
-IAM is AWS's permission system. Three roles are created:
+IAM is AWS's permission system. Four roles are created:
 
 **ECS Execution Role** — used by AWS (not your code) to:
 
@@ -218,16 +220,23 @@ IAM is AWS's permission system. Three roles are created:
 - Inject the Doppler service token from SSM Parameter Store into containers
 - Write logs to CloudWatch
 
-**ECS Task Role** — used by your running app code to:
+**ECS Task Roles** — used by your running app code. The API has `…-iam-role-ecs-task`, the worker its own
+`…-iam-role-ecs-task-worker` (`worker_own_task_role`, default `true`), so a worker-only grant never lands on the API.
+Both may:
 
 - Read/write objects in the S3 documents bucket
-- Use ECS Exec (SSH-like access into a running container for migrations/debugging)
+- Use ECS Exec (SSH-like access into a running container for migrations/debugging) and write its session transcript
+- Invoke Bedrock and assume a workspace's Bedrock role, only when `bedrock_models` / `bedrock_tenant_roles_enabled`
+  are set
 
 **GitHub Deploy Role** — used by GitHub Actions to:
 
 - Push Docker images to ECR
 - Register new task definitions
 - Update ECS services
+
+In production the role trusts only the `main` branch and the `production` GitHub environment; in staging, any ref
+of the repo.
 
 GitHub assumes this role via **OIDC** — no AWS access keys stored in GitHub secrets. GitHub proves its identity via a token that AWS verifies. Much more secure than rotating long-lived keys.
 
@@ -280,10 +289,11 @@ That's it — no Route 53, no DNS migration. Your domain stays at Hostinger.
 
 ### `terraform/cloudwatch.tf` — Logs
 
-Creates two log groups:
+Creates three log groups:
 
 - `/app/staging/api` — everything your API container prints to stdout/stderr
 - `/app/staging/worker` — same for the worker container
+- `/app/staging/ecs-exec` — every ECS Exec session (commands and output); kept 30 days in staging, 365 in production
 
 Staging logs kept 7 days, production 30 days. View them in AWS Console → CloudWatch → Log Groups, or via CLI:
 
@@ -346,7 +356,10 @@ Two task definitions:
 
 **Circuit breaker** — if a new deploy fails health checks repeatedly, ECS automatically rolls back to the previous version. You don't have to do anything.
 
-**ECS Exec** — lets you run commands inside a running container (for migrations, debugging). Like SSH but for containers:
+**ECS Exec** — lets you run commands inside a running container (for migrations, debugging). Like SSH but for
+containers. On for the API (`api_enable_exec`; the migration tunnel jumps through it), off for the worker
+(`worker_enable_exec`). Every session is logged to the `ecs-exec` log group. The container runs as the `node` user,
+not root:
 
 ```bash
 aws ecs execute-command \
