@@ -54,7 +54,7 @@ Desk is chosen at scaffold time and reached only through `apps/backend/src/platf
   `jsonEntries`; an allowlist entry under the Desk folder is covered by `allowlistPrefixes`.
 - A line that must stay in every product and still names `inngest` or `domains/desk` (a guard that tests whether the
   Desk folder exists) goes on `tools/init-app/features/desk.residue.json` with its reason.
-- `pnpm verify:scaffold` proves both scaffolds (`--desk no`, `--desk yes`) still install, type-check and pass. Run it
+- `pnpm verify:scaffold` proves the scaffolds with and without Desk still install, type-check and pass. Run it
   before a pull request that touches `tools/init-app/`, `platform-glue/features/`, a file the manifest names, or a Desk
   file outside the Desk folder. The Desk tables stay in the schema either way, empty without Desk.
 

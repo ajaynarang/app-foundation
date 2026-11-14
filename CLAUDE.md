@@ -323,11 +323,15 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
   so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
-  `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
-  Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,
-  builds the foundation packages, regenerates OpenAPI and the RBAC matrix, type-checks the backend, web and
-  `tests/`, runs the backend specs, and checks that nothing names `inngest` or `domains/desk` in the `--desk no` copy
-  unless `tools/init-app/features/desk.residue.json` lists it. It takes minutes and needs Postgres and Redis.
+  `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
+  residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo
+  (every default inside a fresh `git init`; mobile and Desk off with prefix `zz` and no git; Desk on with plans
+  untracked), checks what `init-app` wrote (skill prefix, reserved names, plans, no `verified:` line, each feature
+  fully kept or removed), installs, builds the foundation packages, regenerates OpenAPI and the RBAC matrix,
+  type-checks the backend, web and `tests/`, runs the backend specs, then `pnpm guards`, `pnpm test:guards`,
+  `pnpm test:hooks` and a search for every template skill name, and checks that nothing names `inngest` or
+  `domains/desk` in a copy without Desk unless `tools/init-app/features/desk.residue.json` lists it. It takes
+  minutes and needs Postgres and Redis.
 - **Pre-push hook** (`.husky/pre-push`, installed by `pnpm install`) — runs `pnpm verify:arch` on every push: the
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook

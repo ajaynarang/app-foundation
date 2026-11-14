@@ -282,14 +282,15 @@ jobs:
   # feature:mobile:end
   # ─────────────────────────────────────────────────────────────
   # Scaffold variants: scaffolds the repo with and without each optional feature
-  # (Desk) and proves each copy installs, type-checks and passes the backend specs,
+  # (Desk, mobile), under a new skill prefix, with and without git, and proves each
+  # copy installs, type-checks, passes the backend specs and the workflow guards,
   # and that nothing outside the residue list still names Desk. It calls the same
   # script as `pnpm verify:scaffold`. Like every job in this file it runs only when
   # the workflow is started by hand, or on push and pull request once the triggers
   # above are uncommented.
   # ─────────────────────────────────────────────────────────────
   scaffold-variants:
-    name: Scaffold variants — with and without Desk
+    name: Scaffold variants — with and without Desk and mobile
     runs-on: ubuntu-latest # runs-on: self-hosted
     services:
       postgres:
