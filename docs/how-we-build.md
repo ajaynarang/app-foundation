@@ -47,6 +47,9 @@ build epic E1. How the domain skill reaches the rest of the workflow is [Adding 
    Playwright suite.
 6. **Merge.** The owner merges. `/app-epic` offers a merge only with a passing verify line for the head commit and a
    review verdict on the pull request.
+7. **Deploy** (`/app-deploy`). Works out what changed since the running release, starts the manual deploy workflow
+   and watches it to green. Staging by default; production only from `main`, by a listed deployer, on an explicit
+   go-ahead.
 
 Two more skills run alongside: `/app-dev-docs` (modes `slice`, `epic`, `audit`) keeps the docs true to the code, and
 `/app-standards-audit` audits one area against the written standards and files each gap with the guard that will keep

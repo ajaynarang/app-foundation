@@ -243,8 +243,9 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 The rules live in the conventions skill, `.claude/skills/app-conventions/SKILL.md`: the non-negotiables that hold in
 every layer, each with the guard that holds it, and a routing table to one reference per area (routes and errors,
-lists, the database, events and the outbox, jobs and deadlines, AI routing and tools, the web kit, mobile). Read the
-index before any code; open a reference only for the area you touch. The short form:
+lists, the database, events and the outbox, jobs and deadlines, AI routing and tools, observability, the outbound
+gate, plans, tenancy, auth and sessions, infra and deploy, the web kit, mobile). Read the index before any code; open
+a reference only for the area you touch. The short form:
 
 - **camelCase on the wire** (responses, bodies, DTOs, service params, web types). snake_case only in Prisma blocks,
   URL params (`:tenant_id`) and query-string keys (`@QueryString({ name: 'tenant_id' }) tenantId`).
@@ -270,9 +271,9 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
 - **Skills** (`.claude/skills/`, invoked as `/<name>`): `app-brainstorm` → `app-plan` → `app-execute` → `app-review`
   is the loop for a feature; `app-epic` drives an epic from `docs/epics.md` slice by slice; `app-dev-docs` (`slice`,
   `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
-  running app; `app-test-notes` writes a hand-testing script; `app-standards-audit` audits an area and files each gap
-  with its guard; `app-runway` fills the binding docs and the domain skill in a product's first days. They wrap the
-  `superpowers` plugin, declared in `.claude/settings.json`.
+  running app; `app-deploy` starts a deploy workflow and watches it; `app-test-notes` writes a hand-testing script;
+  `app-standards-audit` audits an area and files each gap with its guard; `app-runway` fills the binding docs and the
+  domain skill in a product's first days. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
 - **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
   vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
   each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
