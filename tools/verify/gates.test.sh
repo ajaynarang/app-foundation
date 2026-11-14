@@ -21,6 +21,8 @@ has() { # <file> <fixed string> <name>
 
 has "$VERIFY" 'run "format check" pnpm format:check' "verify runs the format check"
 has "$VERIFY" 'pnpm format:check:root' "verify runs the format check outside packages"
+# The plans folder (docs/superpowers) is git-ignored in the template; Prettier reads .gitignore only when told to.
+has "$PACKAGE" 'prettier --check --ignore-path .gitignore --ignore-path .prettierignore' "the root format check skips git-ignored files"
 has "$VERIFY" 'run "lint" pnpm lint' "verify runs lint"
 has "$VERIFY" 'run "schema lint" pnpm lint:schema' "verify runs the schema lint"
 has "$VERIFY" 'run "type-check" pnpm type-check' "verify runs type-check"
