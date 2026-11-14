@@ -109,7 +109,7 @@ the logging standard is `docs/standards/observability.md`. The binding docs and 
   `setTimeout`. [guard: deadline.service.spec.ts]
 - **A model is reached only through the route resolver, by alias** (`fast`, `standard`, `powerful`); ids live only in
   the model catalog ([`ai-routing.md`](references/ai-routing.md)). A tool call runs only through the one pipeline.
-  [guard: model-id-literals.spec.ts, ai-provider-clients.spec.ts, pipeline.integration.spec.ts]
+  [guard: model-id-literals.spec.ts, ai-provider-clients.spec.ts, ai-tool-path.spec.ts]
 - **Config through the schema.** `process.env` only in config and bootstrap files; everything else asks `ConfigService`.
   [guard: gate:process-env]
 - **Generated files, real env files and applied migrations are never hand-edited.** Regenerate the enum mirror and
