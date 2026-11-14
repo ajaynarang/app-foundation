@@ -168,6 +168,28 @@ Use `tools/db/migrate.sh`, not `prisma migrate dev`, against any shared database
 - The knowledge-base sync runs after the seeds in the full and seed-only modes, in every environment. A failure warns
   and does not stop the run.
 
+## Containers, task roles and ECS Exec
+
+- **The backend container runs as `node`**, never root. Every `COPY` in the final stage carries `--chown=node:node`
+  (not a `chown -R`, which would store every file twice) and the image ends with `USER node`. Both Dockerfiles copy
+  `patches/` before the frozen install, because the root `package.json` has pnpm `patchedDependencies`.
+  `pnpm check:ops` holds all three (`.github/scripts/check-dockerfiles.sh`). The full check builds and runs the
+  image: `bash .github/scripts/check-container-user.sh` with Docker up, or the manual `container.yml` workflow.
+- **Two task roles.** The API runs as `<project>-<env>-iam-role-ecs-task`, the worker as
+  `<project>-<env>-iam-role-ecs-task-worker` (`worker_own_task_role`, default `true`). They hold the same grants
+  today; give a worker-only permission to the worker role, not to both. The Bedrock statements follow
+  `bedrock_models` and `bedrock_tenant_roles_enabled` on both roles, and `PLATFORM_ASSUME_ROLE_ARN` lists both ARNs,
+  because a workspace's Bedrock trust policy must name every role that calls with it. Recreating either role breaks
+  every workspace's trust policy until it is saved again (AWS records a trusted role by its internal id).
+- **ECS Exec** is on for the API (`api_enable_exec`, the tunnel's jump host) and off for the worker
+  (`worker_enable_exec`). Turn the worker's on for an incident, then off again. Every session, commands and output, is
+  written to `/<project>/<env>/ecs-exec`.
+- **Production deploy trust.** The production deploy role trusts only `repo:<repo>:ref:refs/heads/main` and
+  `repo:<repo>:environment:production`; staging trusts any ref of the repo. A job that names a GitHub environment
+  presents the environment subject, one that names none (the image build) the branch subject.
+- **Changes to the deploy role's own trust** (and the first apply that creates a new role or log group the deploy role
+  cannot yet manage) run once with admin credentials; the deploy role cannot rewrite its own trust policy.
+
 ## Maintenance switch
 
 `tools/ops/maintenance-mode.sh` turns maintenance mode on or off for the web app. It writes

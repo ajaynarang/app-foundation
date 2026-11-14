@@ -188,6 +188,7 @@ public https URL of the API, `CORS_ORIGINS` lists no local origin, `INNGEST_DEV`
 | `OUTBOUND_ALLOWLIST_BOOTSTRAP`        | No                                                                                                   | No      | Comma list of emails, `@domains`, phones and webhook hosts added to the allow-list                                                                        | —                                                                                                            |
 | `S3_BUCKET`                           | No (default `app-documents`)                                                                         | No      | File-storage bucket                                                                                                                                       | Terraform output / AWS S3 console                                                                            |
 | `S3_REGION`                           | No (default `us-east-1`)                                                                             | No      | Bucket region                                                                                                                                             | —                                                                                                            |
+| `S3_ENDPOINT`                         | No (unset means real AWS S3)                                                                         | No      | S3-compatible endpoint, addressed path-style: the local MinIO (`http://localhost:9300`). Never set on a deployed stack                                    | `docker-compose.yml` (`minio`)                                                                               |
 | `AWS_ACCESS_KEY_ID`                   | No (uploads fail without; ECS uses task role instead)                                                | Yes     | S3 credentials for local dev                                                                                                                              | AWS IAM → user with S3 access                                                                                |
 | `AWS_SECRET_ACCESS_KEY`               | No                                                                                                   | Yes     | S3 credentials for local dev                                                                                                                              | AWS IAM                                                                                                      |
 | `ANTHROPIC_API_KEY`                   | No (not a platform route; nothing in the app reads it)                                               | Yes     | Dev and test key only: `ai:live-check` reads it; a workspace connects it in Settings as its own credential                                                | Anthropic console (console.anthropic.com) → API Keys                                                         |
@@ -240,11 +241,11 @@ public https URL of the API, `CORS_ORIGINS` lists no local origin, `INNGEST_DEV`
 
 AWS Bedrock (the zero-retention routes):
 
-- `PLATFORM_ASSUME_ROLE_ARN` is the API and worker task role today (they share `ecs_task`). When the worker gets a
-  role of its own, the value holds both ARNs, and a workspace connected before that must add the worker role to its
-  trust policy.
-- AWS stores a trusted role by its internal id. Destroying and recreating `ecs_task` breaks every workspace's trust
-  policy until the workspace saves it again.
+- `PLATFORM_ASSUME_ROLE_ARN` holds both task role ARNs, API first (`ecs_task`, then `ecs_task_worker`), on both task
+  definitions. A workspace connected while the worker still shared `ecs_task` must add the worker role to its trust
+  policy before the worker switches roles (`worker_own_task_role`; `docs/upgrade-notes/operations.md`).
+- AWS stores a trusted role by its internal id. Destroying and recreating either task role breaks every workspace's
+  trust policy until the workspace saves it again.
 - On a dev machine the AWS credentials are the developer's, not the task role. A workspace Bedrock connect works
   locally only when `PLATFORM_ASSUME_ROLE_ARN` is the developer's own principal and the test role trusts it.
 - For zero retention on `platform-bedrock`, also set the AWS account's Bedrock data retention mode to `none` in that

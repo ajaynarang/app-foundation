@@ -514,3 +514,63 @@ registered with Inngest and refuses turning a tenant's automatic schedule on wit
 changes until you set it; unset it to turn back.
 
 <!-- feature:desk:end -->
+
+## 2026-11-14: worker task role and Exec, narrowed production trust, non-root container, local S3
+
+Apply this after the previous entry (the deploy workflow's API-only jump host) is deployed in that environment: once
+the worker loses ECS Exec, a migration job that still picks any running task can land on the worker and fail.
+
+**What changes when you pull it.**
+
+- **The container runs as `node`, not root.** `apps/backend/Dockerfile` copies every file with `--chown=node:node`
+  and ends with `USER node`. The image keeps `COPY patches/` before the frozen install. If you added a step that
+  writes outside `/app` or `/tmp` at runtime, or binds a port under 1024, it now fails; move it or give that path to
+  `node`. `.github/scripts/check-dockerfiles.sh` (in `pnpm check:ops`) holds the `USER` line, the `--chown` copies
+  and the `patches/` copy; `.github/scripts/check-container-user.sh` (the manual `container.yml` workflow, or by hand
+  with Docker up) builds the image and checks `id -u` is not 0.
+- **The worker has its own task role**, `<project>-<env>-iam-role-ecs-task-worker`, with the same grants the shared
+  role had (ECS Exec channels, the documents bucket, and the two Bedrock statements under `bedrock_models` and
+  `bedrock_tenant_roles_enabled`). The worker task definition uses it while `worker_own_task_role` is `true`, the
+  default. The next apply creates the role and a new worker task-definition revision.
+- **`PLATFORM_ASSUME_ROLE_ARN` lists both task role ARNs** (API first) on both task definitions, when
+  `bedrock_tenant_roles_enabled` is on. The backend already reads it as a list and names every ARN in the trust
+  policy it hands a workspace.
+- **ECS Exec is off on the worker** (`worker_enable_exec`, default `false`) and stays on for the API
+  (`api_enable_exec`, default `true`: the migration jobs and `tools/db/tunnel.sh` jump through it). Every Exec
+  session is now written to a new log group, `/<project>/<env>/ecs-exec` (365 days in production, 30 in staging),
+  and both task roles may write to it.
+- **The production deploy role trusts two subjects only**: `repo:<repo>:ref:refs/heads/main` and
+  `repo:<repo>:environment:production`. It used to trust `repo:<repo>:*`, so any branch or pull-request workflow in
+  the repo could assume it. Staging keeps `repo:<repo>:*`. The deploy workflow already refuses production from any
+  branch but `main`, so a normal deploy is unaffected.
+- **RDS storage autoscaling is on**, up to `rds_max_allocated_storage` (default 200 GB; `0` turns it off). It is an
+  in-place modification with no downtime; you pay only for storage RDS actually adds.
+- **The deploy role may now** pass the worker role, create, tag and delete that one role, create the `ecs-exec` log
+  group and update the cluster's Exec logging setting.
+- **Local S3.** `docker compose up -d minio minio-init` starts a MinIO on `localhost:9300` (console `9301`) with the
+  `app-files` bucket. Set `S3_ENDPOINT=http://localhost:9300` (new, optional; unset means real AWS S3) and the two
+  MinIO keys in `apps/backend/.env` to use it; the storage service then addresses it path-style. MinIO no longer
+  publishes images on Docker Hub, so the compose file uses `pgsty/minio`, a community build of the same server.
+
+**What to set first.**
+
+- **Run this one apply with admin credentials** in each environment. It changes the deploy role's own trust policy,
+  which the deploy role may not change, and it creates the worker role and the log group before the deploy role's
+  new grants exist. Later deploys run from CI as before.
+- **A stack with workspace Bedrock roles already connected** (`bedrock_tenant_roles_enabled = true` and at least one
+  workspace on `BEDROCK_ROLE`) switches in two steps, or worker-side calls on those credentials are denied and the
+  daily revalidation sweep marks them failing:
+  1. Apply with `worker_own_task_role = false`. The worker role is created and both ARNs are in
+     `PLATFORM_ASSUME_ROLE_ARN`; the worker keeps running under `ecs_task`.
+  2. Have each such workspace re-save its trust policy from the Settings sheet, which now lists both ARNs.
+  3. Set `worker_own_task_role = true` (or remove the line) and apply.
+
+  Any other stack keeps the default and switches in one apply.
+
+- If something you run assumed the production deploy role from a branch other than `main` or from a job without the
+  `production` environment, move it to one of those first.
+
+**How to turn it back.** `worker_own_task_role = false` puts the worker back on the shared role (the worker role stays,
+unused). `worker_enable_exec = true` turns Exec on the worker back on. `rds_max_allocated_storage = 0` turns storage
+autoscaling off. The production trust has no switch; revert the `github_deploy_subjects` local in `iam.tf` to widen
+it. To run the container as root again, remove the `USER node` line (`check:ops` then fails, on purpose).
