@@ -198,6 +198,7 @@ test('a requires: file whose feature folder is absent fails, and is fine once th
     '.claude/skills/fx-conventions/references/mobile.md',
     '---\nowner: foundation\nrequires: mobile\n---\n\n# Mobile\n',
   );
+  edit(dir, INDEX, '(references/api.md).', '(references/api.md). Mobile: [mobile](references/mobile.md).');
   write(dir, '.claude/hooks/hotspots/desk.json', '{ "hotspots": [] }\n');
   const found = rulesOf(dir, ['skills']);
   assert.ok(found.includes('.claude/skills/fx-conventions/references/mobile.md:requires'));
@@ -223,6 +224,26 @@ test('inline code in a rules section must name a word in the source tree or an e
   const dir = copy();
   edit(dir, REF, '`ExampleThing` is only', '`MadeUpHelper` is only');
   assert.ok(rulesOf(dir, ['skills']).includes(`${REF}:symbol`));
+});
+
+test('status: is interim or absent, and an interim file names its finish pull request in pending:', () => {
+  const dir = copy();
+  edit(dir, REF, 'owner: foundation\n', 'owner: foundation\nstatus: interim\npending: F2\n');
+  assert.deepEqual(rulesOf(dir, ['skills']), []);
+  edit(dir, REF, 'pending: F2\n', '');
+  assert.deepEqual(rulesOf(dir, ['skills']), [`${REF}:status`]);
+  edit(dir, REF, 'status: interim\n', 'status: draft\npending: F2\n');
+  assert.deepEqual(rulesOf(dir, ['skills']), [`${REF}:status`]);
+  edit(dir, REF, 'status: draft\n', '');
+  assert.deepEqual(rulesOf(dir, ['skills']), [`${REF}:status`]);
+});
+
+test("a reference that its skill's SKILL.md does not link fails", () => {
+  const dir = copy();
+  write(dir, '.claude/skills/fx-conventions/references/orphan.md', '---\nowner: foundation\n---\n\n# Orphan\n');
+  assert.deepEqual(rulesOf(dir, ['skills']), [`.claude/skills/fx-conventions/references/orphan.md:reference-unlinked`]);
+  edit(dir, INDEX, '(references/api.md).', '(references/api.md). Orphans: [orphan](references/orphan.md).');
+  assert.deepEqual(rulesOf(dir, ['skills']), []);
 });
 
 test('a fenced example of ten lines or more must name the file it came from', () => {

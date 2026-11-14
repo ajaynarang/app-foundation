@@ -6,8 +6,9 @@
  *   skills  (.claude/**)  skill and agent names (folder, prefix, reserved names), relative links, backticked repo
  *                         paths and globs, `<prefix>-<name>` tokens, home paths, GitHub project node ids, the vault
  *                         word, versioned Claude model ids, the paths in hooks/hotspots/*.json and settings.json.
- *                         Files that carry the new frontmatter (owner, sources, guards, requires, status, examples)
- *                         also get: owner, sources and `path#Symbol` anchors, guards, the size budget, a guard tag or
+ *                         Files that carry the new frontmatter (owner, sources, guards, requires, status, pending,
+ *                         examples) also get: owner, sources and `path#Symbol` anchors, guards, `status: interim` with
+ *                         `pending: F<n>`, a link from the skill's SKILL.md to each of its references, the size budget, a guard tag or
  *                         review-only on every rule, requires: against the feature folders, inline code in a rules
  *                         section resolving to a source word or an examples entry, and the origin of a long example.
  *   docs                  CLAUDE.md, README.md, docs/** (not the plans folder), tools/**\/README.md, .github/*.md:
@@ -39,7 +40,9 @@ export const FRONTMATTER_REQUIRED = false;
 export const TARGETS = ['skills', 'docs', 'source'];
 
 const ROOT_FOLDERS = ['apps/', 'packages/', 'infra/', 'tools/', 'tests/', 'docs/', '.github/', '.claude/'];
-const NEW_KEYS = ['owner', 'sources', 'guards', 'requires', 'status', 'examples'];
+const NEW_KEYS = ['owner', 'sources', 'guards', 'requires', 'status', 'pending', 'examples'];
+// A reference that is moved text its finish pull request has not condensed yet: `status: interim`, `pending: F<n>`.
+const PENDING = /^F[1-9]$/;
 const BUDGET = { skill: 200, reference: 450 };
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -447,6 +450,13 @@ function checkNewFrontmatter(ctx, rel, fm, body, offset, add) {
       add(rel, 1, 'requires', `requires: ${feature}, but ${FEATURE_FOLDERS[feature]} is absent`);
   }
 
+  if ('status' in fm || 'pending' in fm) {
+    if (fm.status !== 'interim') add(rel, 1, 'status', `status: is "interim" or absent; got "${fm.status ?? ''}"`);
+    else if (!PENDING.test(fm.pending ?? ''))
+      add(rel, 1, 'status', 'status: interim needs pending: F<n>, the finish pull request that condenses it');
+  }
+  checkReferenceLinked(ctx, rel, add);
+
   const lines = body.split('\n').length + offset;
   const budget = /\/references\//.test(rel) ? BUDGET.reference : BUDGET.skill;
   if (lines > budget) add(rel, 1, 'size', `${lines} lines; the budget is ${budget}`);
@@ -483,6 +493,17 @@ function checkNewFrontmatter(ctx, rel, fm, body, offset, add) {
     }
   });
   closeItem();
+}
+
+/** A file under `<skill>/references/` is reached only through its skill's routing table, so SKILL.md must link it. */
+function checkReferenceLinked(ctx, rel, add) {
+  const m = rel.match(/^(\.claude\/skills\/[^/]+)\/(references\/.+)$/);
+  if (!m) return;
+  const index = readText(ctx.root, `${m[1]}/SKILL.md`) ?? '';
+  const linked = [...index.matchAll(/\]\(([^)\s#]+)(?:#[^)]*)?\)/g)].some(
+    (l) => path.posix.normalize(path.posix.join(m[1], l[1])) === rel,
+  );
+  if (!linked) add(rel, 1, 'reference-unlinked', `${m[1]}/SKILL.md does not link ${m[2]}; add its routing-table row`);
 }
 
 function checkRuleTag(ctx, rel, item, add) {
