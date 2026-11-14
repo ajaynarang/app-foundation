@@ -311,7 +311,7 @@ success + error toasts; every loading state shows a Skeleton.
   architecture specs in `apps/backend/src/architecture/`, which hold the repo's rules (layer boundaries, schema
   conventions, the error envelope, the API contract ratchet). A new rule gets a spec in that folder, so the hook
   holds it. It then runs the web guards: `single-component-set.test.ts` (the shadcn components live in `@app/ui`
-  and `apps/web/src/shared/components/ui/` holds no copy), `theme-tokens.test.ts` (every text token clears WCAG AA)
+  and the web app keeps no copy under `src/shared/components/ui/`), `theme-tokens.test.ts` (every text token clears WCAG AA)
   and `ui-grammar-guard.test.ts` (theme tokens only, status tones, `RowActions`, `PageHeader` on every settings and
   admin page, `ListErrorState` on every list). Dates go through `useFormatters()`: lint bans `toLocaleDateString`
   and `toLocaleTimeString`.

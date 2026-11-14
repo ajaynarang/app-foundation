@@ -65,7 +65,7 @@ These principles take precedence over convenience, speed, or mimicking existing 
 - **Constants**: `SCREAMING_SNAKE_CASE`. Export from a dedicated `constants.ts` or the module that owns the concept.
 - **Event names**: `app.<aggregate>.<past-tense-action>` — `app.project.created`, `app.task.status-changed`. Always past tense for facts.
 - **Avoid**: `Manager`, `Helper`, `Util`, `Handler` without a sharper noun. `Data`, `Info`, `Obj` as type names. Hungarian notation. Abbreviations that aren't universal.
-- **Schema-level column naming** (Prisma fields, FK columns, `*Number` business IDs, `<verb>At` timestamps, `*Cents` money, etc.): see [`column-naming.md`](./column-naming.md).
+- **Schema-level column naming** (Prisma fields, FK columns, `*Number` business IDs, `<verb>At` timestamps, `*Cents` money, etc.): see [`docs/standards/column-naming.md`](../../../docs/standards/column-naming.md).
 
 ### Comments
 
@@ -373,7 +373,7 @@ contract change is a reviewed diff of `apps/backend/openapi.json`.
 
 Held by `apps/backend/src/architecture/swagger-completeness.spec.ts` (runs the generator; fails on an incomplete
 document, an unclassified route, or drift from the committed files, and names the regenerate command), the ratchet
-rules `docs/api-operation` and `docs/response-documented`, and `tests/api/contract/openapi.spec.ts` under
+rules docs/api-operation and docs/response-documented (rule ids in `api-contract.spec.ts`), and `tests/api/contract/openapi.spec.ts` under
 `pnpm verify:api` (the served document equals the committed one, and every parameterless GET body matches its
 published schema).
 
@@ -584,7 +584,7 @@ async listInvoices(tenantId: number, query: InvoiceListQuery = {}): Promise<Curs
 
 ### 3.4 The ID Boundary (NON-NEGOTIABLE)
 
-An Int primary key never crosses the API. The canonical text is [`id-convention.md`](./id-convention.md) (role 6
+An Int primary key never crosses the API. The canonical text is [`docs/standards/id-convention.md`](../../../docs/standards/id-convention.md) (role 6
 and "The boundary"); the decision record is the ADR "ID boundary".
 
 - **Resolve on the way in.** `@Param('id', ParseUUIDPipe) publicId: string`, then the service resolves it
@@ -595,7 +595,7 @@ and "The boundary"); the decision record is the ADR "ID boundary".
   `feedback.serializer.ts`, `notification.serializer.ts`.
 - **Public ids in event payloads.**
 - A new aggregate takes `generateId(prefix)` in a `VarChar(30)`. An existing table that needs an address takes
-  `public_id UUID` with the five-step migration in `id-convention.md`.
+  `public_id UUID` with the five-step migration in `docs/standards/id-convention.md`.
 - Held by `apps/backend/src/architecture/id-boundary.spec.ts`. The numeric ids that exist today are listed in
   `id-boundary.allowlist.json` with a reason each; the list may only shrink.
 
@@ -683,7 +683,7 @@ Base classes: `CursorQueryDto` (`limit`, `cursor`), `ListQueryDto` (+ `q`), `Dat
 - A text search goes into Prisma through `containsText(term)` from `list-query`, which escapes the LIKE wildcards.
   Never hand-write `{ contains: term }` for user input.
 - A body whose wire shape a standard defines (RFC 7591 client registration) is a DTO marked `@ProtocolWireDto`
-  (`app-validation-pipe`): it may ignore unknown fields and adds the standard's error code.
+  (`@appshore/kernel/shared/utils/app-validation-pipe`): it may ignore unknown fields and adds the standard's error code.
 - A date a service reads as text keeps its text: `QueryCalendarDate('date_from')` (a `YYYY-MM-DD` day in the
   tenant's timezone) and `QueryDateText()` (a date or an instant) in `apps/backend/src/shared/dto/query-date-text.ts`.
   Use `@QueryDate` when the service wants a `Date`.
@@ -785,7 +785,7 @@ model Project {
 }
 ```
 
-**Rules — see [`id-convention.md`](./id-convention.md) and [`column-naming.md`](./column-naming.md) for the canonical version.**
+**Rules — see [`docs/standards/id-convention.md`](../../../docs/standards/id-convention.md) and [`docs/standards/column-naming.md`](../../../docs/standards/column-naming.md) for the canonical version.**
 
 - Model names: singular PascalCase. Table names: plural snake_case via `@@map()`
 - Fields: camelCase. Columns: snake_case via `@map()`
@@ -816,7 +816,7 @@ pnpm prisma:migrate:deploy    # apply committed migrations (CI/prod)
 - Backfill migrations should be separate from schema migrations
 - When adding new models, extend the mock Prisma model list in `@appshore/platform/test/mocks/prisma.mock` if the tests need it
 
-**ID generation — see [`id-convention.md`](./id-convention.md) (canonical).**
+**ID generation — see [`docs/standards/id-convention.md`](../../../docs/standards/id-convention.md) (canonical).**
 
 Five roles, summarized:
 

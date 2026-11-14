@@ -7,7 +7,7 @@ Schema-level (Prisma model fields → DB columns), for `packages/appshore/db/pri
 
 2. **Foreign-key columns: `<relation>Id`** (Int, references the parent's `id` PK).
    `projectId Int`, `taskId Int`, `tenantId Int`. Unambiguous — there is no
-   competing `<entity>Id String` column (see id-convention.md).
+   competing `<entity>Id String` column (see [`id-convention.md`](id-convention.md)).
 
 3. **Public business identifiers: `<entity>Number`.**
    `Project.projectNumber`, `Invoice.invoiceNumber`.

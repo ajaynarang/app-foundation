@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Hermetic test of the root .gitignore: git worktrees (`.worktrees/`, `.claude/worktrees/`) and Claude Code's
-# per-machine settings stay out of the repository, while the tracked `.claude/` files and `.env.example` stay in.
+# Hermetic test of the root .gitignore: git worktrees (the two worktree folders) and Claude Code's per-machine
+# settings stay out of the repository, while Claude Code's tracked files and `.env.example` stay in.
 # The rules are copied into a throwaway repository, so this repository is only read. Run by `pnpm check:ops`.
 set -euo pipefail
 

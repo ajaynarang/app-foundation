@@ -34,6 +34,10 @@ epics.
 
 - [`standards/observability.md`](standards/observability.md): the rules every log line, metric, trace and error
   report follows.
+- [`standards/id-convention.md`](standards/id-convention.md): the six roles an id column can have, and the one that
+  crosses the API.
+- [`standards/column-naming.md`](standards/column-naming.md): how schema fields and columns are named (held by
+  `pnpm lint:schema`).
 
 ## Running a product
 

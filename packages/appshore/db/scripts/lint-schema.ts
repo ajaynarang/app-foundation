@@ -1,7 +1,7 @@
 /**
  * Schema linter — enforces APP ID + column naming convention.
- * See .claude/skills/backend-patterns/id-convention.md
- *     .claude/skills/backend-patterns/column-naming.md
+ * See docs/standards/id-convention.md
+ *     docs/standards/column-naming.md
  */
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
