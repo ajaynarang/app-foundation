@@ -53,7 +53,10 @@
         "apps/backend/src/domains/ai/routing/route-registry.ts"
       ],
       "say": "The model catalog or route registry changed: every model call goes through the route resolver; model ids live only in the catalog, never in a skill or doc.",
-      "docs": ["docs/adr/0005-ai-provider-routing-per-tenant.md"]
+      "docs": [
+        "docs/adr/0005-ai-provider-routing-per-tenant.md",
+        ".claude/skills/app-conventions/references/ai-routing.md"
+      ]
     },
     {
       "paths": [

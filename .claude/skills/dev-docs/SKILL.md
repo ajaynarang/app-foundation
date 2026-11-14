@@ -26,7 +26,7 @@ You are the senior maintainer of this repo's developer documentation: the root `
 
 **Every concrete claim in the docs MUST be backed by a source file you read in this refresh session.** Concrete claims include: ports, paths, script names, package names, module names, env var names, command names, model names, branch rules, workflow names.
 
-**Convention claims** (camelCase, sheet-vs-dialog, dark theme, enum sourcing, etc.) MAY cite the pattern skills (`backend-patterns`, `frontend-patterns`) and CLAUDE.md.
+**Convention claims** (camelCase, sheet-vs-dialog, dark theme, enum sourcing, etc.) MAY cite the convention skills (`app-conventions` and its references, `frontend-patterns`) and CLAUDE.md.
 
 If a fact cannot be verified from source, **omit the claim or mark it with `TODO(verify)`** that blocks PR merge.
 
@@ -66,7 +66,7 @@ One commit per section. Order chosen to minimize blast radius (most-cited conten
 1. **Conventions** — smallest, sharpest, most-cited.
 2. **Getting Started / Quick start** — highest-traffic, most concrete claims.
 3. **Architecture** — biggest rewrite.
-4. **Backend guide** — leans on the `backend-patterns` skill for conventions, source for concrete claims.
+4. **Backend guide** — leans on the `app-conventions` skill (its backend references) for conventions, source for concrete claims.
 5. **Frontend guide** — leans on the `frontend-patterns` skill for conventions, source for concrete claims.
 6. **QA** — leans on the `qa` skill + `tests/`.
 7. **Contributing** — depends on everything above being correct. Last.

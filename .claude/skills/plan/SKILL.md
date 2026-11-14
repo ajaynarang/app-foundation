@@ -23,7 +23,7 @@ You are authoring an implementation plan for this codebase. This skill wraps `su
 **Non-negotiables:**
 
 - Do **NOT** agree by default. If the input design has a flaw, fix it in the plan — don't carry it forward. Call out existing code that is suboptimal and, if it's inside this plan's blast radius, include a targeted fix step.
-- Stay consistent with `backend-patterns`, `frontend-patterns`, and CLAUDE.md.
+- Stay consistent with `app-conventions`, `frontend-patterns`, and CLAUDE.md.
 
 ---
 
@@ -34,7 +34,7 @@ You are authoring an implementation plan for this codebase. This skill wraps `su
 1. Read the input (design, brainstorm, or spec) from `$ARGUMENTS`.
 2. Read CLAUDE.md for the monorepo structure and conventions.
 3. Invoke the relevant pattern skills before drafting:
-   - Backend touch → `backend-patterns`
+   - Backend touch → `app-conventions` (the index, then the reference for each area touched)
    - Frontend touch → `frontend-patterns`
    - Mobile touch → `mobile-patterns`
    - Desk touch → `desk-patterns`
@@ -121,7 +121,7 @@ End with: the plan's absolute path, the target branch name (e.g. `feat/<slug>` o
 - Event emission isn't going through `DomainEventService` + the event registry.
 - An AI call bypasses the sanctioned paths without justification.
 - A task silently modifies `packages/appshore/*` for an app-specific concern.
-- You skipped `superpowers:writing-plans`, `backend-patterns`, or `frontend-patterns`.
+- You skipped `superpowers:writing-plans`, `app-conventions`, or `frontend-patterns`.
 
 ---
 

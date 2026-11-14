@@ -8,6 +8,11 @@ Closes #
 
 <!-- Which binding docs (`CLAUDE.md` → "Binding docs"), READMEs or other docs this changes, or "none, because …". -->
 
+## Conventions
+
+<!-- If this changes a convention, the reference that states it (`.claude/skills/app-conventions/references/<area>.md`,
+or the index) is updated in this PR: name it. Otherwise "no convention changed". -->
+
 ## Decision record
 
 <!-- ADR added (`docs/adr/<number>-<title>.md`), ADR amended (which one, which amendment), or "none". -->

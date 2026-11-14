@@ -198,3 +198,11 @@ pre-push hook (`pnpm verify:arch`, the backend's architecture specs) or in `pnpm
   without parsing copy.
 - The rules are written into the `backend-patterns` skill (section 4.1 query DTOs, section 10 errors) and the
   `frontend-patterns` skill (the API error shape), and the `review` skill checks them.
+
+### Amendment — 2026-11-14: where the rule text lives
+
+The `backend-patterns` skill is retired. Its rule text for this record moved, unchanged in substance, to the
+conventions skill's references: `.claude/skills/app-conventions/references/api-contract.md` (status by route shape,
+naming, DTOs and query DTOs, OpenAPI, `Idempotency-Key`, the ID boundary), `errors.md` (the envelope, codes, copy)
+and `lists-and-pagination.md` (cursor lists, bounded reads) beside it. The decision is unchanged; the specs in "What is
+enforced, and by what" still hold it.
