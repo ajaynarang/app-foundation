@@ -45,19 +45,20 @@ Your product's own decisions go in this folder too, with the same numbering.
 
 ## Records
 
-| #                                                   | Decision                                                                                                      | Status  |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
-| [0001](0001-api-contract.md)                        | API contract: one contract for people and agents (status, errors, inputs, lists, versioning)                  | Adopted |
-| [0002](0002-id-boundary.md)                         | ID boundary: an Int primary key never crosses the API; the public id is a sixth id role                       | Adopted |
-| [0003](0003-outbox-and-deadlines.md)                | Outbox and deadlines: every domain event commits with its write; delivery is at least once; a timer is a row  | Adopted |
-| [0004](0004-optional-features-desk-opt-in.md)       | Optional features: Desk is opt-in at scaffold time; the seam and the manifest remove it; its tables stay      | Adopted |
-| [0005](0005-ai-provider-routing-per-tenant.md)      | AI provider routing is per tenant; retention is enforced in the resolver                                      | Adopted |
-| [0006](0006-outbound-gate.md)                       | Outbound gate: outside production only allow-listed recipients are messaged; every held-back send is recorded | Adopted |
-| [0007](0007-ci-manual-enforcement-local.md)         | CI is manual by default; enforcement is local (git hooks and `pnpm verify`, whose result line a PR carries)   | Adopted |
-| [0008](0008-package-layering.md)                    | Package layering: kernel, db, platform, apps; dependency arrows point one way                                 | Adopted |
-| [0009](0009-tenancy.md)                             | Tenancy: three modes, workspace membership, one live account per email, manual scoping, a declared context    | Adopted |
-| [0010](0010-enums-from-prisma-open-vocabularies.md) | Enums come from Prisma and the mirror is generated; open vocabularies are strings with a registry             | Adopted |
-| [0011](0011-one-postgres-plus-redis.md)             | One Postgres (pgvector) plus Redis; no second store                                                           | Adopted |
-| [0012](0012-credentials-at-rest.md)                 | Credentials at rest: keys hashed, secrets encrypted, production refuses to boot on a default or placeholder   | Adopted |
-| [0013](0013-outbound-webhooks.md)                   | Outbound webhooks: SSRF guard at save and at delivery; Standard Webhooks signing with rotation                | Adopted |
-| [0014](0014-one-web-app.md)                         | One web app: the separate console is removed; admin and settings live in the web app                          | Adopted |
+| #                                                              | Decision                                                                                                      | Status  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
+| [0001](0001-api-contract.md)                                   | API contract: one contract for people and agents (status, errors, inputs, lists, versioning)                  | Adopted |
+| [0002](0002-id-boundary.md)                                    | ID boundary: an Int primary key never crosses the API; the public id is a sixth id role                       | Adopted |
+| [0003](0003-outbox-and-deadlines.md)                           | Outbox and deadlines: every domain event commits with its write; delivery is at least once; a timer is a row  | Adopted |
+| [0004](0004-optional-features-desk-opt-in.md)                  | Optional features: Desk is opt-in at scaffold time; the seam and the manifest remove it; its tables stay      | Adopted |
+| [0005](0005-ai-provider-routing-per-tenant.md)                 | AI provider routing is per tenant; retention is enforced in the resolver                                      | Adopted |
+| [0006](0006-outbound-gate.md)                                  | Outbound gate: outside production only allow-listed recipients are messaged; every held-back send is recorded | Adopted |
+| [0007](0007-ci-manual-enforcement-local.md)                    | CI is manual by default; enforcement is local (git hooks and `pnpm verify`, whose result line a PR carries)   | Adopted |
+| [0008](0008-package-layering.md)                               | Package layering: kernel, db, platform, apps; dependency arrows point one way                                 | Adopted |
+| [0009](0009-tenancy.md)                                        | Tenancy: three modes, workspace membership, one live account per email, manual scoping, a declared context    | Adopted |
+| [0010](0010-enums-from-prisma-open-vocabularies.md)            | Enums come from Prisma and the mirror is generated; open vocabularies are strings with a registry             | Adopted |
+| [0011](0011-one-postgres-plus-redis.md)                        | One Postgres (pgvector) plus Redis; no second store                                                           | Adopted |
+| [0012](0012-credentials-at-rest.md)                            | Credentials at rest: keys hashed, secrets encrypted, production refuses to boot on a default or placeholder   | Adopted |
+| [0013](0013-outbound-webhooks.md)                              | Outbound webhooks: SSRF guard at save and at delivery; Standard Webhooks signing with rotation                | Adopted |
+| [0014](0014-one-web-app.md)                                    | One web app: the separate console is removed; admin and settings live in the web app                          | Adopted |
+| [0015](0015-workflow-conventions-index-guards-domain-skill.md) | Workflow: a conventions index, guards before prose, the product's own domain skill                            | Adopted |

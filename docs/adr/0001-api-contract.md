@@ -213,3 +213,10 @@ The `frontend-patterns` skill is retired too. Its text for this record (the API 
 utils, the mutation error pattern) moved, unchanged in substance, to
 `.claude/skills/app-conventions/references/forms-and-sheets.md` ("Errors") and `frontend-data.md` ("The API layer")
 beside it. The decision is unchanged.
+
+### Amendment — 2026-11-14: the review skill
+
+- The `review` skill is now `app-review`, and it holds no rule text. It runs the guards, lint and the architecture
+  specs, which hold this record's rules (the specs in "What is enforced, and by what"), and sends `app-reviewer`
+  agents only after what no spec sees, listed under "Flag in review" in `api-contract.md`, `errors.md` and
+  `lists-and-pagination.md` (ADR [Workflow](0015-workflow-conventions-index-guards-domain-skill.md)).

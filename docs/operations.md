@@ -309,3 +309,6 @@ To run the check workflows on every push and pull request, both steps, in one co
 
 Then, if wanted, make the checks required in branch protection (the list is in the ADR "CI is manual by default;
 enforcement is local", `docs/adr/0007-ci-manual-enforcement-local.md`).
+
+How the gates fit into the day's work (the edit, commit, push and pull request layers, and the record a reviewer
+checks) is in `docs/how-we-build.md`, under "The gates".

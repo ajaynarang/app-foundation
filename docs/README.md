@@ -27,8 +27,13 @@ epics.
 - [`adr/`](adr/README.md): architecture decision records, with the index, how a number is taken and how to amend.
   The starter's own records cover the API contract, the ID boundary, the outbox and deadlines, optional features,
   AI provider routing, the outbound gate, manual CI, package layering, tenancy, enums and vocabularies, the one
-  database, credentials at rest, outbound webhooks and the one web app. Start a new one from
+  database, credentials at rest, outbound webhooks, the one web app and the workflow. Start a new one from
   [`adr/0000-template.md`](adr/0000-template.md).
+
+## How work is done
+
+- [`how-we-build.md`](how-we-build.md): the playbook: the three sizes of work, the loop and the skills that run it,
+  the agents, who does what, the local gates, and the three steps that turn CI on.
 
 ## Standards
 

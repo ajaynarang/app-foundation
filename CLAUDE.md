@@ -240,43 +240,51 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 
 ## Code conventions
 
-### camelCase (NON-NEGOTIABLE)
+The rules live in the conventions skill, `.claude/skills/app-conventions/SKILL.md`: the non-negotiables that hold in
+every layer, each with the guard that holds it, and a routing table to one reference per area (routes and errors,
+lists, the database, events and the outbox, jobs and deadlines, AI routing and tools, the web kit, mobile). Read the
+index before any code; open a reference only for the area you touch. The short form:
 
-All API responses, request bodies, DTOs, service params, and frontend types use **camelCase**.
-Exceptions (snake_case is correct): Prisma `where`/`data`/`select`/`include`/`orderBy` blocks, URL params
-(`:tenant_id`), and query keys on the wire: a query DTO declares `@QueryString({ name: 'tenant_id' }) tenantId`,
-so the property is still camelCase.
+- **camelCase on the wire** (responses, bodies, DTOs, service params, web types). snake_case only in Prisma blocks,
+  URL params (`:tenant_id`) and query-string keys (`@QueryString({ name: 'tenant_id' }) tenantId`).
+- **Enums come from the Prisma schema** (`packages/appshore/db/prisma/schema/*.prisma`): the backend imports them from
+  `@appshore/db`, never `@prisma/client`; the web imports the generated mirror
+  (`packages/shared-types/src/generated/prisma-enums.ts`, held by `enum-codegen-parity.spec.ts`). App vocabularies
+  (events, jobs, deadline kinds, notification types) are strings with a registry.
+- **One error envelope** (`statusCode, code, detail, fieldErrors?, …`; no `message` key): throw a NestJS exception
+  or an `api-errors` factory, never `throw new Error(` on an HTTP path (ADR "API contract"; `error-envelope.spec.ts`).
+- **No `Int` id crosses the API**; another tenant's record is 404 (ADR "ID boundary"; `id-boundary.spec.ts`).
+- **Generated files, real env files and applied migrations are never hand-edited**: regenerate, or add a migration.
+  The protected-paths hook (`.claude/hooks/protected-paths.mjs`) refuses the edit.
+- **shadcn components from `@app/ui` only, theme tokens only, dark mode always works**; every mutation shows a
+  success and an error toast, every loading state a skeleton.
 
-### Enums = Prisma (single source of truth)
+---
 
-All enums live in `packages/appshore/db/prisma/schema/*.prisma`. Backend code imports enums and
-the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); frontend/shared-types
-import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
-That file is generated: `pnpm --filter @appshore/db prisma:generate` regenerates it via the db package's
-`scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it. The protected-paths hook
-(`.claude/hooks/protected-paths.mjs`) refuses an edit to a generated file, a real env file or a migration already on
-the default branch.
-One decided exception: notification types are strings with an app registry (`PLATFORM_NOTIFICATION_TYPES` in
-`@app/shared-types` plus the app's `notification-types.ts`), so a product adds a type without editing
-`foundation.prisma`.
+## Workflow
 
-### API errors (one envelope)
+How work is done is in `docs/how-we-build.md`, the playbook; the decision is the ADR "Workflow: a conventions index,
+guards before prose, and the product's own domain skill" (`docs/adr/0015-workflow-conventions-index-guards-domain-skill.md`).
 
-Every error body is `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing
-else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
-code). There is no `message` key. Throw a NestJS exception or a factory from
-`@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
-writes its own response calls `writeErrorEnvelope`. A 400 names its field; a state conflict is a 409. Every query
-string is a query DTO from `@appshore/kernel/shared/utils/query-dto`. The decision is the ADR "API contract"
-(`docs/adr/`), held by `apps/backend/src/architecture/error-envelope.spec.ts` and `field-errors.spec.ts`.
+- **Skills** (`.claude/skills/`, invoked as `/<name>`): `app-brainstorm` → `app-plan` → `app-execute` → `app-review`
+  is the loop for a feature; `app-epic` drives an epic from `docs/epics.md` slice by slice; `app-dev-docs` (`slice`,
+  `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
+  running app; `app-test-notes` writes a hand-testing script; `app-standards-audit` audits an area and files each gap
+  with its guard. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+- **Agents** (`.claude/agents/`): `app-explorer` (read-only search), `app-reviewer` (one review dimension per run),
+  `app-qa-runner` (drives the app, reports what it saw), `app-persona` (plays one of the product's personas).
+- **Guards before prose.** Every rule in a skill names its guard or says review-only; `pnpm guards` fails when a skill,
+  agent or doc cites something that does not exist. A reviewer is never spent on a rule a guard holds.
+- **Settings for the workflow** are in `.claude/workflow.json`: the skill prefix, the default branch, the plans folder
+  and whether git tracks it (`plans`; untracked in the template, because its repository is public), the CI mode.
+- **The pull request carries its record**: the `pnpm verify` line for its head commit, docs changed, the ADR touched
+  (`.github/pull_request_template.md`). The owner merges.
 
-### UI standards
+<!-- feature:desk:start -->
 
-shadcn/ui components only (no raw `<button>`/`<input>`). They come from `@app/ui/components/ui/*`, the one
-component set; the web app keeps no copy. Dark-theme tokens (`bg-background`,
-`text-foreground`, `border-border`) — never standalone light-only colors. Sheet for 4+ field
-forms, Dialog for quick actions, AlertDialog for destructive confirmations. Every mutation shows
-success + error toasts; every loading state shows a Skeleton.
+- **Desk** work has its own skill, routed from the conventions index; it runs the same loop.
+
+<!-- feature:desk:end -->
 
 ---
 
