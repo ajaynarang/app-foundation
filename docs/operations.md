@@ -132,8 +132,9 @@ a database role (`tools/verify/check-no-db-roles.sh`, in `pnpm check:ops`).
 service (`<project>-<env>-ecs-service-api`; never the worker, whose ECS Exec is off), then runs
 `prisma migrate deploy`, the base seeds and the knowledge-base sync.
 
-- Production seeds run with `ENV_TYPE=production`, so no dev credential is seeded. A super-admin the seed creates
-  gets `SUPER_ADMIN_PASSWORD` from Doppler, or no password when it is not set (the job warns).
+- Production seeds run with `ENV_TYPE=production`, so no dev credential and no demo data is seeded: no "demo"
+  workspace and no owner, admin or member user (single-tenant gets only the implicit tenant row). A super-admin the
+  seed creates gets `SUPER_ADMIN_PASSWORD` from Doppler, or no password when it is not set (the job warns).
 - The knowledge-base sync (`pnpm seed:knowledge`) runs once per deploy, after the seeds. It is incremental, so an
   unchanged corpus is a no-op. It never fails the deploy: on failure the job warns, adds a `kb-sync-failed` Grafana
   annotation and sends a sev2 notification (each a no-op until its values exist), and the assistant keeps the
@@ -163,7 +164,7 @@ Use `tools/db/migrate.sh`, not `prisma migrate dev`, against any shared database
 - The jump host is a running task of the API service. `--container` is gone.
 - Production: every run that writes needs `production` typed, even with `--yes`. With no terminal (a script) it needs
   `--yes` and `CONFIRM_ENV=production`. Seeding production needs `SUPER_ADMIN_PASSWORD` in `.env.aws.production`,
-  runs with `ENV_TYPE=production` and never resets. Langfuse keys come only from that file.
+  runs with `ENV_TYPE=production` (no demo workspace, no demo users) and never resets. Langfuse keys come only from that file.
 - The knowledge-base sync runs after the seeds in the full and seed-only modes, in every environment. A failure warns
   and does not stop the run.
 

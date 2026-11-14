@@ -34,7 +34,8 @@ The seed prints ready-to-use **dev credentials** (non-production only):
 
 Phone sign-in also works out of the box: `+1 555 555 0100`, PIN `1234` (mock OTP `123456`).
 Open `http://localhost:3000/login`, sign in as the owner, and you're inside a live workspace
-("Demo Workspace" in multi-tenant mode; "Default Workspace" in single-tenant mode).
+("Demo Workspace" in multi-tenant mode; "Default Workspace" in single-tenant mode). Production seeding
+(`ENV_TYPE=production`) creates none of these demo accounts or the demo workspace.
 
 ---
 

@@ -483,6 +483,11 @@ inside the callback. A spec with its own `$transaction` mock that still has an a
   Redis for it.
 - Production seeds run with `ENV_TYPE=production` and Doppler's `SUPER_ADMIN_PASSWORD`. Before, they ran with neither,
   so a super-admin created on a fresh production database got the shared dev password.
+- Production seeds no longer create demo data. Seed `00-first-tenant` used to create, on any database, the ACTIVE
+  ENTERPRISE "demo" and "demo-two" workspaces (multi-tenant) and the `owner@example.com`, `admin-user@example.com` and
+  `member@example.com` users. With `ENV_TYPE=production` it now creates none of them: single-tenant gets only the
+  implicit tenant row, multi-tenant gets nothing. Rows an earlier production seed wrote are not removed; check for a
+  `demo` subdomain and those three emails, and delete or deactivate them by hand.
 - The image is built with `docker/build-push-action` and the GitHub Actions cache, after a free-disk step; the build
   job times out after 40 minutes. The `BUILD_SHA` argument is kept.
 - **`tools/db/migrate.sh` and `tools/db/tunnel.sh`.** Both take `--env staging|production` (migrate also `local`).
