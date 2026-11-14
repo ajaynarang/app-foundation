@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { OutboxEvent } from '@appshore/db';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { SYSTEM_JOB_TENANT } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import {
   RLS_SOURCE,
   runAsPublic,
@@ -12,7 +15,7 @@ import {
 import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 import { PrismaService } from '../database/prisma.service';
 import { TenantIdResolver } from './tenant-id-resolver.service';
-import { describeError, fromOutboxRow, truncateError } from './outbox-row';
+import { fromOutboxRow, truncateError } from './outbox-row';
 import { OUTBOX_TRANSACTION_TIMEOUT_MAX_MS } from './outbox.service';
 
 /**
@@ -91,7 +94,17 @@ export class OutboxRelay {
         published.push(row.id);
       } catch (error) {
         failed += 1;
-        this.logger.warn(`Outbox relay could not publish ${row.event} (${row.id}): ${describeError(error)}`);
+        // Warn, not error: the row is retried after its lease. Reported so the outbox-backlog runbook's tracker
+        // search finds the failure while the backlog grows; Sentry groups the repeats.
+        this.logger.warn({
+          msg: `Outbox relay could not publish ${row.event} (${row.id})`,
+          err: toLoggableError(error),
+        });
+        reportError(error, {
+          jobName: BULK_OPS_JOB_NAMES.OUTBOX_RELAY,
+          tenantId: row.tenantId ?? undefined,
+          source: ERROR_SOURCE.JOB,
+        });
         await this.prisma.outboxEvent.update({ where: { id: row.id }, data: { lastError: truncateError(error) } });
       }
     }

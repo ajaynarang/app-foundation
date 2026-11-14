@@ -151,9 +151,11 @@ events are late. Nothing is lost: the rows stay until published.
 1. **The web page `/admin/timers`**: the durability strip shows the outbox backlog and its oldest age.
 2. **Is a long job holding `bulk-ops`?** The Queues and jobs board, cron run time against the five-minute line, and
    the BullMQ board's active job on `bulk-ops`.
-3. **Is the relay failing?** Loki, `{sel} | json | jobName="outbox-relay" | level=~"50|error"`, and Sentry for
-   `jobName:outbox-relay`. Also check [worker-heartbeat-missing](#worker-heartbeat-missing): if it fires too, the
-   lane is down, fix that.
+3. **Is the relay failing?** A relay that fails on one event logs a warning (`Outbox relay could not publish ...`,
+   with an `err` field) and reports the error to Sentry with the tag `jobName:outbox-relay`. Loki,
+   `{sel} | json | jobName="outbox-relay" | level=~"40|50|warn|error"`; Sentry, `jobName:outbox-relay`. The
+   event's own `last_error` is on the row. Also check [worker-heartbeat-missing](#worker-heartbeat-missing): if it
+   fires too, the lane is down, fix that.
 
 ### Mitigation
 
@@ -173,16 +175,22 @@ Not resolved in 30 minutes: escalate to the owner.
 ### What it means
 
 Timers are rows; the deadline sweep on `bulk-ops` fires due ones every 30 seconds. A deadline fifteen minutes late
-means the sweep is not running or its handler keeps failing, so whatever those timers do (expiries, reminders,
-follow-ups) has not happened.
+means the sweep is not running or not reaching it, so whatever those timers do (expiries, reminders, follow-ups) has
+not happened.
+
+A handler that keeps failing does not trip this rule. A row whose last run threw has a last error and waits out its
+own backoff, and the gauge leaves those rows out. Such a timer shows as FAILING on `/admin/timers`, and every failed
+run is reported to Sentry with the tag `jobName:deadline-sweep`.
 
 ### First three checks
 
 1. **The web page `/admin/timers`**: the overdue and failing counts, and the timers themselves with their kind and
    last error.
 2. **Is a long job holding `bulk-ops`?** As for [outbox-backlog](#outbox-backlog).
-3. **Is one kind failing?** Loki, `{sel} | json | jobName="deadline-sweep" | level=~"50|error"`; Sentry for
-   `jobName:deadline-sweep`. A handler that throws for one deadline is retried on each sweep.
+3. **Is one kind failing?** A handler that throws, or a kind with no handler, logs a warning (with an `err`
+   field) and reports the error to Sentry. Loki,
+   `{sel} | json | jobName="deadline-sweep" | level=~"40|50|warn|error"`; Sentry, `jobName:deadline-sweep`. A
+   failing row is retried after its backoff (up to one hour).
 
 ### Mitigation
 

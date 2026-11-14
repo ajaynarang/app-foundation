@@ -4,6 +4,8 @@ import type { Deadline, Prisma } from '@appshore/db';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import { RLS_SOURCE, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 import { PrismaService } from '../database/prisma.service';
@@ -134,6 +136,7 @@ export class DeadlineSweeper implements QueueJobHandler {
     const handler = this.handlers.get(row.kind);
     if (!handler) {
       this.logger.warn(`Deadline ${row.id}: no handler for kind "${row.kind}" — backing off`);
+      this.report(new Error(`No deadline handler for kind ${row.kind}`), row);
       return this.recordFailure(row, `no handler for kind ${row.kind}`);
     }
     let outcome: DeadlineOutcome;
@@ -142,10 +145,26 @@ export class DeadlineSweeper implements QueueJobHandler {
       outcome = await withTimeout(fire, DEADLINE_HANDLER_TIMEOUT_MS);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Deadline ${row.id} (${row.kind}) handler threw on attempt ${row.attempts}: ${message}`);
+      this.logger.warn({
+        msg: `Deadline ${row.id} (${row.kind}) handler threw on attempt ${row.attempts}`,
+        err: toLoggableError(error),
+      });
+      this.report(error, row);
       return this.recordFailure(row, message);
     }
     return this.recordOutcome(row, outcome);
+  }
+
+  /**
+   * A failing row leaves the `deadline-sweep-late` gauge (it is FAILING on the Timers page and waits out its backoff),
+   * so the tracker is where a handler that keeps failing shows up. Retries repeat the report; Sentry groups them.
+   */
+  private report(error: unknown, row: Deadline): void {
+    reportError(error, {
+      jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP,
+      tenantId: row.tenantId,
+      source: ERROR_SOURCE.JOB,
+    });
   }
 
   /**

@@ -196,7 +196,7 @@ const jobs = {
       expr: (env) => `max(app_deadline_oldest_due_seconds{${m(env)}}) > ${LANE_WINDOW_SEC}`,
       summary: 'A pending deadline has been past due for more than 15 minutes',
       description:
-        'The deadline sweep runs every 30 s. A deadline 15 minutes past due means the sweep is not running or its handler keeps failing, so timers are not firing.',
+        'The deadline sweep runs every 30 s. A deadline 15 minutes past due means the sweep is not running or not reaching it, so timers are not firing. A failing handler does not trip this rule: its rows show as FAILING on /admin/timers and each failed run is reported to Sentry.',
       runbook: 'queues-jobs.md#deadline-sweep-late',
     },
   ],

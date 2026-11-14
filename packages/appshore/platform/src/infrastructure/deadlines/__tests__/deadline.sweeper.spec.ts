@@ -1,4 +1,7 @@
 import type { Job } from 'bullmq';
+import { Logger } from '@nestjs/common';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
+import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { currentRls, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { DeadlineHandlerRegistry } from '../deadline-handler.registry';
@@ -252,6 +255,40 @@ describe('DeadlineSweeper', () => {
     expect(delay).toBeGreaterThanOrEqual(deadlineBackoffMs(3));
     expect(delay).toBeLessThan(deadlineBackoffMs(3) + 1_000);
     expect(summary.failed).toBe(1);
+  });
+
+  it('reports a throwing handler to the tracker with the sweep job name, so the runbook finds it', async () => {
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const failure = new Error('database hiccup');
+    registry.register(handlerReturning('TEST_KIND', failure));
+    prisma.$queryRaw.mockResolvedValueOnce([claimed({ tenantId: 7 })]);
+
+    await sweeper.sweep();
+
+    expect(reportSpy).toHaveBeenCalledWith(failure, {
+      jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP,
+      tenantId: 7,
+      source: errorTracking.ERROR_SOURCE.JOB,
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: expect.stringContaining('TEST_KIND'), err: expect.any(Object) }),
+    );
+    reportSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('reports a kind with no handler too: it can never fire until the code changes', async () => {
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+    prisma.$queryRaw.mockResolvedValueOnce([claimed({ kind: 'MYSTERY' })]);
+
+    await sweeper.sweep();
+
+    expect(reportSpy).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP, source: errorTracking.ERROR_SOURCE.JOB }),
+    );
+    reportSpy.mockRestore();
   });
 
   it('records a non-Error throw as text and cuts lastError to the column width', async () => {

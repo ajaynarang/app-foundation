@@ -1,5 +1,6 @@
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { Logger } from '@nestjs/common';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { currentRls, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import {
@@ -132,6 +133,30 @@ describe('OutboxRelay', () => {
       expect(prisma.outboxEvent.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: { in: ['b'] } } }),
       );
+    });
+
+    it('reports each failed event to the tracker with the relay job name, so the outbox-backlog runbook finds it', async () => {
+      const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const { prisma, events, relay } = make();
+      prisma.$queryRaw.mockResolvedValue([{ id: 'a' }]);
+      prisma.outboxEvent.findMany.mockResolvedValue([row('a', '2026-10-09T11:00:00Z')]);
+      const failure = new Error('subscriber blew up');
+      events.publish.mockRejectedValue(failure);
+
+      await relay.relay(now);
+
+      expect(reportSpy).toHaveBeenCalledWith(failure, {
+        jobName: BULK_OPS_JOB_NAMES.OUTBOX_RELAY,
+        tenantId: '10',
+        source: errorTracking.ERROR_SOURCE.JOB,
+      });
+      // Rule 4: the error is an err field, not text in the message.
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: expect.stringContaining('app.widget.expired'), err: expect.any(Object) }),
+      );
+      reportSpy.mockRestore();
+      warnSpy.mockRestore();
     });
 
     it('marks nothing when every claimed row fails (they retry after the lease)', async () => {
