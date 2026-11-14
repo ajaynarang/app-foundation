@@ -273,7 +273,8 @@ success + error toasts; every loading state shows a Skeleton.
 - **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
   or error body), and paste its last line too. It builds the backend, migrates, seeds, boots it and runs the
   Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
-  third-party key. `API_QA_PORT` picks the port when 8000 is taken.
+  third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
+  so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
   Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,

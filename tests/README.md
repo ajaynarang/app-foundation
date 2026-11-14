@@ -13,6 +13,8 @@ Playwright-based QA for the platform starter. One framework, one package, all cr
 
 `pnpm verify:api` (from the repo root) runs the Playwright `api` project, which is smoke + rbac + `api/`, against a
 backend it builds, migrates, seeds, starts and stops itself. Run it before a pull request that changes the wire.
+Export `DATABASE_URL` and `REDIS_URL` first (the local compose values are in `apps/backend/.env.example`); it has no
+default for either and stops when one is unset.
 
 ## Directory layout
 

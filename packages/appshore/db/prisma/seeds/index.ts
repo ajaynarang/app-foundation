@@ -2,7 +2,7 @@ import { PrismaClient } from '../../generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import * as dotenv from 'dotenv';
-import { detectEnvironment, checkSafety, logSeedResult, logHeader, getDatabaseName } from './utils';
+import { detectEnvironment, checkSafety, logSeedResult, logHeader, getDatabaseName, requireDatabaseUrl } from './utils';
 import { printCredentialSummary } from './dev-credentials';
 
 // Load environment variables. The db package usually has no .env of its own —
@@ -125,8 +125,7 @@ async function main(): Promise<void> {
   const env = detectEnvironment();
 
   // Initialize Prisma
-  const connectionString =
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
+  const connectionString = requireDatabaseUrl();
   const pool = new pg.Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
