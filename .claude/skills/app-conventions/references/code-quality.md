@@ -149,3 +149,5 @@ copying existing code that breaks them. When you touch code that breaks one, imp
 - A `useEffect` that sets state derivable from props or state: derive it.
 - `key={index}` on a list that changes: use the row's id.
 - An icon-only button with no `aria-label`, or `data`, `info`, `obj` as a component's state name.
+- State mutated before it is set (`arr.push(x); setArr(arr)`); an inline `style` with more than one dynamic value.
+- A generic, flag or option with no caller today: remove it.

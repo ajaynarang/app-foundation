@@ -101,3 +101,4 @@ is in [`errors.md`](errors.md); the mutation hooks are in [`frontend-data.md`](f
 - A disabled control with no tooltip saying why.
 - A raw `error.message` in a toast.
 - A spinner where a skeleton belongs, or a skeleton of a different size than what loads.
+- An edit sheet that closes on an outside click (`onInteractOutside` not prevented) and loses typed input.

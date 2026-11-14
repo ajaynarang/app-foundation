@@ -49,7 +49,7 @@ condense, and its rules hold all the same.
 | A tenant context with no request in hand (jobs, crons, system work)           | `CLAUDE.md`, "Tenancy models", and [the tenancy ADR](../../../docs/adr/0009-tenancy.md)   |
 | A send to a person or a system outside (email, SMS, push, WhatsApp, webhook)  | [the outbound gate ADR](../../../docs/adr/0006-outbound-gate.md) and `docs/operations.md` |
 | Compose services, Terraform, deploy workflows                                 | `infra/README.md` and `docs/operations.md`                                                |
-| Desk, the optional workflow engine                                            | [the `desk-patterns` skill](../desk-patterns/SKILL.md)                                    |
+| Desk, the optional workflow engine                                            | [the Desk skill](../app-desk/SKILL.md)                                                    |
 
 **Web** (`apps/web`, `@app/ui`, `@appshore/web-core`) and **mobile** (the Flutter app, when the product has one)
 

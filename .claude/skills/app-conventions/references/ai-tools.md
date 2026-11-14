@@ -121,3 +121,5 @@ every step: copy its shape for a new tool.
 - `return { error: err.message }` in a tool.
 - A confirmation hashed any way but `intentDigest`; a token spent with a read then an update.
 - A create tool with no natural key and no idempotency key.
+- A tool listed or offered without passing `ToolAvailabilityService`, or an availability rule used as a permission;
+  a prompt served by a role from the token instead of `ToolAccessPolicyService.actingRole`.

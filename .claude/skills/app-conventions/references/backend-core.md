@@ -146,6 +146,7 @@ numeric `:id` (listed in `id-boundary.allowlist.json`); a new domain takes a pub
 
 - A query without the tenant filter, or a tenant comparison answered with 403.
 - `update({ status })` from a generic update method.
+- A tenant-scoped service method that does not take `tenantId` as a parameter; a new one takes it first.
 - `.catch(() => {})`, or a `.catch` that logs nothing.
 - A hand-written Zod enum or TTL literal.
 - A nested `getOrSet`.

@@ -193,3 +193,4 @@ The shape of a controller is `apps/backend/src/domains/support/support.controlle
 - A create that shows a secret without `@SkipIdempotency()`.
 - `ParseIntPipe` on a new route; a numeric id in a response, event, tool or cursor.
 - `@Query('x')`, `@Body('x')`, `parseInt` in a controller, `{ contains: term }` for user input.
+- A controller without `@ApiTags` and, behind a credential, `@ApiBearerAuth`.
