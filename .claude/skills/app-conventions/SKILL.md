@@ -53,14 +53,14 @@ condense, and its rules hold all the same.
 
 **Web** (`apps/web`, `@app/ui`, `@appshore/web-core`) and **mobile** (the Flutter app, when the product has one)
 
-| Working on                                                                    | Read                                                    |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Feature folders, components, status maps, utilities, routes, auth, providers  | [`frontend-core.md`](references/frontend-core.md)       |
-| Shared types, the API layer, query and mutation hooks, SSE, URL state, stores | [`frontend-data.md`](references/frontend-data.md)       |
-| A list page: the cursor list, URL params, the branch order, pickers, tables   | [`frontend-lists.md`](references/frontend-lists.md)     |
-| Sheets, dialogs, forms, the feedback layers, error boundaries                 | [`forms-and-sheets.md`](references/forms-and-sheets.md) |
-| Page chrome, row actions, status tones, dark theme, responsive, microcopy     | [`ui-grammar.md`](references/ui-grammar.md)             |
-| The Flutter app                                                               | [`mobile.md`](references/mobile.md)                     |
+| Working on                                                                     | Read                                                    |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Feature folders, components, status maps, utilities, routes, auth, providers   | [`frontend-core.md`](references/frontend-core.md)       |
+| Shared types, the API layer, query and mutation hooks, SSE, URL state, stores  | [`frontend-data.md`](references/frontend-data.md)       |
+| A list page: the recipe, table or cards or rows, the filter row, URL and dates | [`frontend-lists.md`](references/frontend-lists.md)     |
+| Sheets, dialogs, forms, the feedback layers, error boundaries                  | [`forms-and-sheets.md`](references/forms-and-sheets.md) |
+| Page chrome, row actions, status tones, dark theme, responsive, microcopy      | [`ui-grammar.md`](references/ui-grammar.md)             |
+| The Flutter app                                                                | [`mobile.md`](references/mobile.md)                     |
 
 This product's own vocabulary, personas and review checks are in its domain skill, and every foundation rule it
 deliberately does not follow is listed, with its ADR, in
