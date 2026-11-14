@@ -210,7 +210,12 @@ async function gatherConfig() {
     plans: flags.plans,
     repoUrl: flags['repo-url'],
   };
-  const question = (name) => INIT_OPTIONS.find((o) => o.name === name).question;
+  // The questions, defaults and choices all come from INIT_OPTIONS, the list `--describe` prints.
+  const opt = (name) => INIT_OPTIONS.find((o) => o.name === name);
+  const question = (name) => opt(name).question;
+  const def = (name) => opt(name).default;
+  const choiceHint = (name) => ` (${opt(name).choices.join('/')})`;
+  const isChoice = (name, value) => opt(name).choices.includes(value);
   const remoteRepoUrl = detectRepoUrl();
 
   if (flags.yes) {
@@ -223,25 +228,25 @@ async function gatherConfig() {
     };
     cfg.name = cfg.name || (await ask(question('name')));
     cfg.displayName = cfg.displayName || (await ask(question('display-name'), titleCase(cfg.name || '')));
-    cfg.scope = cfg.scope || (await ask(question('scope'), '@app'));
+    cfg.scope = cfg.scope || (await ask(question('scope'), def('scope')));
     cfg.db = cfg.db || (await ask(question('db'), (cfg.name || '').replace(/-/g, '_')));
-    cfg.tenancy = cfg.tenancy || (await ask(question('tenancy'), 'multi'));
-    cfg.mobile = cfg.mobile || (await ask(`${question('mobile')} (yes/no)`, 'yes'));
-    cfg.desk = cfg.desk || (await ask(`${question('desk')} (yes/no)`, 'no'));
+    cfg.tenancy = cfg.tenancy || (await ask(question('tenancy'), def('tenancy')));
+    cfg.mobile = cfg.mobile || (await ask(question('mobile') + choiceHint('mobile'), def('mobile')));
+    cfg.desk = cfg.desk || (await ask(question('desk') + choiceHint('desk'), def('desk')));
     cfg.skillPrefix = cfg.skillPrefix || (await ask(question('skill-prefix'), defaultSkillPrefix(cfg.name || '')));
-    cfg.plans = cfg.plans || (await ask(`${question('plans')} (tracked/untracked)`, 'tracked'));
+    cfg.plans = cfg.plans || (await ask(question('plans') + choiceHint('plans'), def('plans')));
     cfg.repoUrl = cfg.repoUrl || (await ask(question('repo-url'), remoteRepoUrl ?? ''));
     rl.close();
   }
 
   cfg.displayName = cfg.displayName || titleCase(cfg.name);
-  cfg.scope = cfg.scope || '@app';
+  cfg.scope = cfg.scope || def('scope');
   cfg.db = cfg.db || cfg.name.replace(/-/g, '_');
-  cfg.tenancy = cfg.tenancy || 'multi';
-  cfg.mobile = cfg.mobile || 'yes';
-  cfg.desk = cfg.desk || 'no';
+  cfg.tenancy = cfg.tenancy || def('tenancy');
+  cfg.mobile = cfg.mobile || def('mobile');
+  cfg.desk = cfg.desk || def('desk');
   cfg.skillPrefix = cfg.skillPrefix || defaultSkillPrefix(cfg.name);
-  cfg.plans = cfg.plans || 'tracked';
+  cfg.plans = cfg.plans || def('plans');
   cfg.repoUrl = cfg.repoUrl || remoteRepoUrl || '';
 
   if (!VALID.name.test(cfg.name)) fail(`Invalid --name "${cfg.name}" — must match ${VALID.name}`);
@@ -251,10 +256,11 @@ async function gatherConfig() {
   const tenancy = normalizeTenancy(cfg.tenancy);
   if (!tenancy) fail(`Invalid --tenancy "${cfg.tenancy}" — must be multi, single or personal (or mt, st)`);
   cfg.tenancy = tenancy;
-  if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
-  if (!['yes', 'no'].includes(cfg.desk)) fail(`Invalid --desk "${cfg.desk}" — must be yes or no`);
-  if (!['tracked', 'untracked'].includes(cfg.plans))
-    fail(`Invalid --plans "${cfg.plans}" — must be tracked or untracked`);
+  if (!isChoice('mobile', cfg.mobile))
+    fail(`Invalid --mobile "${cfg.mobile}" — must be ${opt('mobile').choices.join(' or ')}`);
+  if (!isChoice('desk', cfg.desk)) fail(`Invalid --desk "${cfg.desk}" — must be ${opt('desk').choices.join(' or ')}`);
+  if (!isChoice('plans', cfg.plans))
+    fail(`Invalid --plans "${cfg.plans}" — must be ${opt('plans').choices.join(' or ')}`);
   cfg.reservedNames = reservedNamesFor(cfg.name, cfg.skillPrefix, TEMPLATE_WORKFLOW.reservedNames);
   const prefixProblems = skillPrefixProblems(
     cfg.skillPrefix,

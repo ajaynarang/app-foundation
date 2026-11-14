@@ -18,6 +18,7 @@ import {
   scaffoldProblems,
   variantDir,
 } from './check-variants.mjs';
+import { INIT_OPTIONS } from './scaffold-text.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -159,6 +160,18 @@ test('the three variants cover Desk on and off, mobile on and off, git and no gi
   assert.deepEqual(VARIANTS.defaults.args, []);
   assert.ok(VARIANTS.lean.args.includes('--skill-prefix'));
   assert.ok(VARIANTS['desk-untracked'].name.length > 8 && !VARIANTS['desk-untracked'].name.includes('-'));
+});
+
+// The defaults variant runs init-app with no option flags, so what it expects is what init-app picks on its own.
+// Those expectations must be the defaults INIT_OPTIONS (and so `--describe`) states: a default changed in one place
+// and not the other fails here or in the variant run below.
+test('the defaults variant expects exactly the defaults INIT_OPTIONS states', () => {
+  const def = (name) => INIT_OPTIONS.find((o) => o.name === name).default;
+  const { expect } = VARIANTS.defaults;
+  assert.equal(expect.desk, def('desk') === 'yes');
+  assert.equal(expect.mobile, def('mobile') === 'yes');
+  assert.equal(expect.plansTracked, def('plans') === 'tracked');
+  assert.equal(expect.tenancy, def('tenancy'));
 });
 
 // The part of each variant that needs no install: copy, git init when asked, init-app, and the checks of what it
