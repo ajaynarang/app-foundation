@@ -25,3 +25,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | [0004](0004-optional-features-desk-opt-in.md)  | Optional features: Desk is opt-in at scaffold time; the seam and the manifest remove it; its tables stay      | Adopted |
 | [0005](0005-ai-provider-routing-per-tenant.md) | AI provider routing is per tenant; retention is enforced in the resolver                                      | Adopted |
 | [0006](0006-outbound-gate.md)                  | Outbound gate: outside production only allow-listed recipients are messaged; every held-back send is recorded | Adopted |
+| [0007](0007-ci-manual-enforcement-local.md)    | CI is manual by default; enforcement is local (git hooks and `pnpm verify`, whose result line a PR carries)   | Adopted |

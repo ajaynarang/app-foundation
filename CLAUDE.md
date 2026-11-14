@@ -266,8 +266,11 @@ success + error toasts; every loading state shows a Skeleton.
 ### Gates (CI is manual-only, so these run locally)
 
 - **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
-  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`) and the
-  build, stops at the first failure, and ends with one line: `verify: PASS` or `verify: FAIL at "<step>"`. The
+  It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`; the web
+  jest also runs `@appshore/web-core`'s tests), `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
+  build, stops at the first failure, and ends with one line: `verify: PASS <sha> (<n>s)` or
+  `verify: FAIL at "<step>" <sha> (<n>s)`, where `<sha>` is the commit the run started on and `+dirty` follows it
+  when the tree had uncommitted changes (ADR "CI is manual by default; enforcement is local"). The
   integration specs need Postgres and Redis (`docker compose up -d postgres redis`, or export `DATABASE_URL` and
   `REDIS_URL`).
 - **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
