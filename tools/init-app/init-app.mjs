@@ -19,11 +19,18 @@
  *   - `@app/` workspace scope     → <scope>/          (only when --scope is not @app)
  *   - Grafana-as-code PROJECT / REPO_URL → <name> / <repo-url>, then the catalog is regenerated
  *
- * Optional features, removed BEFORE the rename rules so each manifest is matched against template text:
- *   - `--desk no` (the default) strips Desk through tools/init-app/features/desk.json (apply-feature.mjs)
- *   - `--mobile no` deletes apps/mobile
- * Then the prune step (prune-requires.mjs) reads the disk: every skill, reference, agent and hotspot file that
- * requires a feature whose folder is now gone is deleted, with the skill-table rows that linked to it.
+ * The order inside one run:
+ *   1. Optional features, removed through their manifests (apply-feature.mjs) so each is matched against template
+ *      text: `--desk no` (the default) with features/desk.json, `--mobile no` with features/mobile.json.
+ *   2. The prune step (prune-requires.mjs) reads the disk: every skill, reference, agent and hotspot file that
+ *      requires a feature whose folder is now gone is deleted, with the skill-table rows that linked to it.
+ *   3. The skill prefix (skill-prefix.mjs): each `app-<x>` skill folder and agent file becomes `<prefix>-<x>`, and
+ *      exactly those names are replaced, as whole tokens, in the files the walker visits (not in source code).
+ *   4. The rename rules below.
+ *   5. `.claude/workflow.json` is written for the product (prefix, reserved names, plans), `--plans tracked` drops the
+ *      plans folder from .gitignore, and every `verified:` line leaves the docs (scaffold-text.mjs).
+ *
+ * `--describe` prints every option as JSON (name, question, choices, default) and changes nothing.
  *
  * Never touched: .git, node_modules, pnpm-lock.yaml (run `pnpm install` after a scope rename),
  * docs/superpowers/ (historical design docs), tools/init-app/ (this tool).
@@ -36,6 +43,21 @@ import { createInterface } from 'node:readline/promises';
 import { execFileSync, execSync } from 'node:child_process';
 import { loadManifest, removeFeature } from './apply-feature.mjs';
 import { pruneRequires } from './prune-requires.mjs';
+import {
+  defaultSkillPrefix,
+  renameSkills,
+  reservedNamesFor,
+  skillPrefixProblems,
+  workflowSkillNames,
+} from './skill-prefix.mjs';
+import {
+  INIT_OPTIONS,
+  clearVerifiedLines,
+  normalizeTenancy,
+  stripPlansIgnore,
+  writeWorkflowConfig,
+} from './scaffold-text.mjs';
+import { loadWorkflowConfig } from '../guards/workflow-config.mjs';
 import {
   CONSTANTS_FILE as OBSERVABILITY_CONSTANTS,
   GENERATE_SCRIPT as OBSERVABILITY_GENERATE,
@@ -62,9 +84,12 @@ const { values: flags } = parseArgs({
     'display-name': { type: 'string' },
     scope: { type: 'string' },
     db: { type: 'string' },
-    tenancy: { type: 'string' }, // mt | st
+    tenancy: { type: 'string' }, // multi | single | personal (mt and st still work)
     mobile: { type: 'string' }, // yes | no — keep the Flutter companion app?
     desk: { type: 'string' }, // yes | no — include Desk (default no)?
+    'skill-prefix': { type: 'string' }, // <prefix>-<name> for every skill and agent
+    plans: { type: 'string' }, // tracked | untracked — plans, specs and test notes in git?
+    describe: { type: 'boolean', default: false },
     'repo-url': { type: 'string' }, // https://github.com/<org>/<repo> — runbook links in the alert catalog
     yes: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
@@ -80,15 +105,33 @@ if (flags.help) {
   --display-name <string>  Human name, e.g. "Acme CRM" (default: title-cased name)
   --scope <@scope>         Workspace package scope (default: @app — keeping it is safest)
   --db <snake_case>        Postgres database name (default: name with dashes as underscores)
-  --tenancy <mt|st|personal>  Tenancy mode written to .env.example files (default: mt)
+  --tenancy <multi|single|personal>
+                           Tenancy mode written to .env.example files (default: multi; mt and st also work)
   --mobile <yes|no>        Keep the Flutter mobile companion app at apps/mobile (default: yes)
-  --desk <yes|no>   Include Desk, the Inngest workflow engine for background AI agents (default: no)
+  --desk <yes|no>          Include Desk, the Inngest workflow engine for background AI agents (default: no)
+  --skill-prefix <prefix>  Skills and agents become <prefix>-<name>: 2 to 12 lowercase letters or digits
+                           (default: the name if one word of at most 8 characters, the initials of several words,
+                           else the first three letters)
+  --plans <tracked|untracked>  Whether git tracks the plans folder, docs/superpowers (default: tracked)
   --repo-url <url>         Your repository, e.g. https://github.com/acme/acme-crm: alert runbook links point there
                            (default: the git remote origin, unless it is the template's own)
   --yes                    Non-interactive; accept defaults for everything not passed
   --dry-run                Show per-file replacement counts; change nothing
   --force                  Skip the git-clean and already-initialized guards
+  --describe               Print every option as JSON (name, question, choices, default) and exit
 `);
+  process.exit(0);
+}
+
+if (flags.describe) {
+  const options = INIT_OPTIONS.map(({ name, question, choices, default: def, defaultRule }) => ({
+    name,
+    question,
+    choices,
+    default: def,
+    ...(defaultRule ? { defaultRule } : {}),
+  }));
+  console.log(JSON.stringify({ tool: 'init-app', options }, null, 2));
   process.exit(0);
 }
 
@@ -113,6 +156,13 @@ function titleCase(kebab) {
 // ---------------------------------------------------------------------------
 // Guards
 // ---------------------------------------------------------------------------
+
+let TEMPLATE_WORKFLOW;
+try {
+  TEMPLATE_WORKFLOW = loadWorkflowConfig(ROOT);
+} catch (e) {
+  fail(e.message);
+}
 
 const rootPkgPath = path.join(ROOT, 'package.json');
 const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, 'utf8'));
@@ -156,8 +206,11 @@ async function gatherConfig() {
     tenancy: flags.tenancy,
     mobile: flags.mobile,
     desk: flags.desk,
+    skillPrefix: flags['skill-prefix'],
+    plans: flags.plans,
     repoUrl: flags['repo-url'],
   };
+  const question = (name) => INIT_OPTIONS.find((o) => o.name === name).question;
   const remoteRepoUrl = detectRepoUrl();
 
   if (flags.yes) {
@@ -168,41 +221,47 @@ async function gatherConfig() {
       const a = (await rl.question(`  ${q}${def ? ` [${def}]` : ''}: `)).trim();
       return a || def || '';
     };
-    cfg.name = cfg.name || (await ask('App name (kebab-case slug, e.g. acme-crm)'));
-    cfg.displayName = cfg.displayName || (await ask('Display name', titleCase(cfg.name || '')));
-    cfg.scope = cfg.scope || (await ask('Package scope (keep @app unless you have a reason)', '@app'));
-    cfg.db = cfg.db || (await ask('Postgres database name', (cfg.name || '').replace(/-/g, '_')));
-    cfg.tenancy =
-      cfg.tenancy ||
-      (await ask('Tenancy — mt (multi-tenant), st (single-tenant), or personal (workspace per user)', 'mt'));
-    cfg.mobile = cfg.mobile || (await ask('Include the Flutter mobile companion app? (yes/no)', 'yes'));
-    cfg.desk =
-      cfg.desk ||
-      (await ask(
-        'Include Desk, the Inngest workflow engine for background AI agents? Timers and recurring jobs work without it. (yes/no)',
-        'no',
-      ));
-    cfg.repoUrl =
-      cfg.repoUrl || (await ask('Repository URL, for alert runbook links (blank to set later)', remoteRepoUrl ?? ''));
+    cfg.name = cfg.name || (await ask(question('name')));
+    cfg.displayName = cfg.displayName || (await ask(question('display-name'), titleCase(cfg.name || '')));
+    cfg.scope = cfg.scope || (await ask(question('scope'), '@app'));
+    cfg.db = cfg.db || (await ask(question('db'), (cfg.name || '').replace(/-/g, '_')));
+    cfg.tenancy = cfg.tenancy || (await ask(question('tenancy'), 'multi'));
+    cfg.mobile = cfg.mobile || (await ask(`${question('mobile')} (yes/no)`, 'yes'));
+    cfg.desk = cfg.desk || (await ask(`${question('desk')} (yes/no)`, 'no'));
+    cfg.skillPrefix = cfg.skillPrefix || (await ask(question('skill-prefix'), defaultSkillPrefix(cfg.name || '')));
+    cfg.plans = cfg.plans || (await ask(`${question('plans')} (tracked/untracked)`, 'tracked'));
+    cfg.repoUrl = cfg.repoUrl || (await ask(question('repo-url'), remoteRepoUrl ?? ''));
     rl.close();
   }
 
   cfg.displayName = cfg.displayName || titleCase(cfg.name);
   cfg.scope = cfg.scope || '@app';
   cfg.db = cfg.db || cfg.name.replace(/-/g, '_');
-  cfg.tenancy = cfg.tenancy || 'mt';
+  cfg.tenancy = cfg.tenancy || 'multi';
   cfg.mobile = cfg.mobile || 'yes';
   cfg.desk = cfg.desk || 'no';
+  cfg.skillPrefix = cfg.skillPrefix || defaultSkillPrefix(cfg.name);
+  cfg.plans = cfg.plans || 'tracked';
   cfg.repoUrl = cfg.repoUrl || remoteRepoUrl || '';
 
   if (!VALID.name.test(cfg.name)) fail(`Invalid --name "${cfg.name}" — must match ${VALID.name}`);
   if (cfg.name === TEMPLATE_NAME) fail(`--name cannot be "${TEMPLATE_NAME}" — pick your app's name.`);
   if (!VALID.scope.test(cfg.scope)) fail(`Invalid --scope "${cfg.scope}" — must match ${VALID.scope}`);
   if (!VALID.db.test(cfg.db)) fail(`Invalid --db "${cfg.db}" — must match ${VALID.db}`);
-  if (!['mt', 'st', 'personal'].includes(cfg.tenancy))
-    fail(`Invalid --tenancy "${cfg.tenancy}" — must be mt, st, or personal`);
+  const tenancy = normalizeTenancy(cfg.tenancy);
+  if (!tenancy) fail(`Invalid --tenancy "${cfg.tenancy}" — must be multi, single or personal (or mt, st)`);
+  cfg.tenancy = tenancy;
   if (!['yes', 'no'].includes(cfg.mobile)) fail(`Invalid --mobile "${cfg.mobile}" — must be yes or no`);
   if (!['yes', 'no'].includes(cfg.desk)) fail(`Invalid --desk "${cfg.desk}" — must be yes or no`);
+  if (!['tracked', 'untracked'].includes(cfg.plans))
+    fail(`Invalid --plans "${cfg.plans}" — must be tracked or untracked`);
+  cfg.reservedNames = reservedNamesFor(cfg.name, cfg.skillPrefix, TEMPLATE_WORKFLOW.reservedNames);
+  const prefixProblems = skillPrefixProblems(
+    cfg.skillPrefix,
+    [...cfg.reservedNames, ...TEMPLATE_WORKFLOW.reservedNames],
+    workflowSkillNames(ROOT, TEMPLATE_WORKFLOW.skillPrefix),
+  );
+  if (prefixProblems.length) fail(`Invalid --skill-prefix: ${prefixProblems.join('; ')}`);
   if (cfg.repoUrl && !isValidRepoUrl(cfg.repoUrl))
     fail(`Invalid --repo-url "${cfg.repoUrl}" — must look like https://github.com/<org>/<repo>`);
   return cfg;
@@ -241,8 +300,8 @@ const BRANDING_FILES = [
 function buildRules(cfg) {
   const { name, displayName, scope, db, tenancy } = cfg;
   void tenancy;
-  const mt = tenancy === 'st' ? 'false' : 'true';
-  const mode = tenancy === 'mt' ? 'multi' : tenancy === 'st' ? 'single' : 'personal';
+  const mt = tenancy === 'single' ? 'false' : 'true';
+  const mode = tenancy;
   const rules = [
     {
       id: `${TEMPLATE_NAME} → ${name}`,
@@ -339,33 +398,26 @@ const rules = buildRules(cfg);
 const dryRun = flags['dry-run'];
 
 console.log(
-  `\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy}, desk: ${cfg.desk})\n`,
+  `\n  ${dryRun ? 'DRY RUN — ' : ''}Initializing "${cfg.name}" (display: "${cfg.displayName}", scope: ${cfg.scope}, db: ${cfg.db}, tenancy: ${cfg.tenancy}, mobile: ${cfg.mobile}, desk: ${cfg.desk}, skill prefix: ${cfg.skillPrefix}, plans: ${cfg.plans})\n`,
 );
 
-// Optional features go first, so every manifest is matched against template text, before any rename.
-if (cfg.desk === 'no') {
+// Optional features go first, so every manifest is matched against template text, before any rename. Each one goes
+// through its manifest, the same call as `node tools/init-app/apply-feature.mjs --remove <feature>`.
+for (const [feature, label] of [
+  ['desk', 'Desk'],
+  ['mobile', 'the Flutter app'],
+]) {
+  if (cfg[feature] !== 'no') continue;
   let actions;
   try {
-    actions = removeFeature(ROOT, loadManifest('desk'), { dryRun });
+    actions = removeFeature(ROOT, loadManifest(feature), { dryRun });
   } catch (e) {
-    fail(`Could not remove Desk: ${e.message}`);
+    fail(`Could not remove ${label}: ${e.message}`);
   }
-  console.log(`  ${dryRun ? 'Would remove' : 'Removed'} Desk (--desk no):`);
+  console.log(`  ${dryRun ? 'Would remove' : 'Removed'} ${label} (--${feature} no):`);
   for (const a of actions) console.log(`    ${a}`);
   if (actions.length === 0) console.log('    nothing (already removed)');
   console.log('');
-}
-
-if (cfg.mobile === 'no') {
-  const mobileDir = path.join(ROOT, 'apps', 'mobile');
-  if (fs.existsSync(mobileDir)) {
-    if (dryRun) {
-      console.log('  Would delete apps/mobile (--mobile no).');
-    } else {
-      fs.rmSync(mobileDir, { recursive: true, force: true });
-      console.log('  Deleted apps/mobile (--mobile no).');
-    }
-  }
 }
 
 // The prune step: after the features are removed, and before any rename, so it reads template names.
@@ -374,6 +426,16 @@ if (cfg.mobile === 'no') {
   const actions = pruneRequires(ROOT, { dryRun, absentFeatures });
   if (actions.length) {
     console.log(`  ${dryRun ? 'Would prune' : 'Pruned'} files that require a removed feature:`);
+    for (const a of actions) console.log(`    ${a}`);
+    console.log('');
+  }
+}
+
+// The skill prefix: after the prune, so the names come from the folders that are left; before the rename rules.
+{
+  const actions = renameSkills(ROOT, { from: TEMPLATE_WORKFLOW.skillPrefix, to: cfg.skillPrefix, dryRun });
+  if (actions.length) {
+    console.log(`  Skill prefix ${TEMPLATE_WORKFLOW.skillPrefix}- → ${cfg.skillPrefix}-:`);
     for (const a of actions) console.log(`    ${a}`);
     console.log('');
   }
@@ -413,6 +475,33 @@ for (const [id, s] of stats) {
   console.log(`    ${s.files > 0 ? '✔' : '·'} ${id.padEnd(58)} ${s.files} file(s), ~${s.lines} line(s)`);
 }
 console.log(`\n  ${dryRun ? 'Would touch' : 'Touched'} ${touched} file(s).`);
+
+// What the workflow reads that cannot be read from disk, written for the product; then the plans choice and the
+// template's verified: shas, which name commits the product's history does not have.
+{
+  writeWorkflowConfig(
+    ROOT,
+    { skillPrefix: cfg.skillPrefix, reservedNames: cfg.reservedNames, plansTracked: cfg.plans === 'tracked' },
+    { dryRun },
+  );
+  console.log(
+    `\n  ${dryRun ? 'Would write' : 'Wrote'} .claude/workflow.json (skill prefix ${cfg.skillPrefix}, plans ${cfg.plans}).`,
+  );
+  const gitignore = path.join(ROOT, '.gitignore');
+  if (cfg.plans === 'tracked' && fs.existsSync(gitignore)) {
+    const before = fs.readFileSync(gitignore, 'utf8');
+    const after = stripPlansIgnore(before, TEMPLATE_WORKFLOW.plans.folder);
+    if (after !== before) {
+      if (!dryRun) fs.writeFileSync(gitignore, after);
+      console.log(
+        `  ${dryRun ? 'Would stop' : 'Stopped'} ignoring ${TEMPLATE_WORKFLOW.plans.folder}/ (--plans tracked).`,
+      );
+    }
+  }
+  const cleared = clearVerifiedLines(ROOT, { dryRun });
+  if (cleared.length)
+    console.log(`  ${dryRun ? 'Would clear' : 'Cleared'} the template's verified: line in ${cleared.length} doc(s).`);
+}
 
 // The alert and dashboard files are generated from the constants just set. generate.mjs is plain Node, so this runs
 // before `pnpm install`; if it cannot, the command is printed.
@@ -459,6 +548,7 @@ if (!dryRun) {
   console.log(`
   Next steps:
     1. pnpm install                       # refresh the lockfile (required after a scope rename)
+       pnpm exec prettier --write .claude docs   # realign any Markdown table the skill rename shifted
     2. Secrets: see docs/doppler.md       # or: cp apps/backend/.env.example apps/backend/.env
                                           #     cp apps/web/.env.example apps/web/.env.local
        Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend
@@ -480,5 +570,7 @@ if (!dryRun) {
        and update the Documentation link there to your repo.
     7. Review the diff and commit. Keep tools/init-app/ if you plan to pull template updates:
        apply-feature.mjs is how a returning file of a removed feature is removed again.
+    8. Your skills are /${cfg.skillPrefix}-<name> (.claude/skills/). Start with /${cfg.skillPrefix}-runway to write the
+       product's binding docs and its domain skill.
 `);
 }

@@ -18,11 +18,13 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ### `init-app/`
 
-| Script                                      | What it does                                                                                                                                                                                             |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init-app/init-app.mjs`                     | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`.                                                                                                               |
-| `init-app/prune-requires.mjs`               | The prune step of init-app: deletes the skill, reference, agent and hotspot files whose `requires:` feature folder is gone, and the table rows that linked to them. Tested by `prune-requires.test.mjs`. |
-| `init-app/check-scaffold-observability.mjs` | Copies the tree, runs init-app, and checks the Grafana-as-code catalog was renamed, regenerated and still validates. A step of `pnpm verify:scaffold`; runs alone in seconds.                            |
+| Script                                      | What it does                                                                                                                                                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init-app/init-app.mjs`                     | Renames the template (package scope, project name, infra prefix). Run via `pnpm init-app`.                                                                                                                    |
+| `init-app/skill-prefix.mjs`                 | The skill prefix step of init-app: the default prefix, the reserved names for the app, and the rename of every `app-<x>` skill and agent, folder and whole-token mentions. Tested by `skill-prefix.test.mjs`. |
+| `init-app/scaffold-text.mjs`                | init-app's option table (`--describe`), tenancy names, the plans choice in `.gitignore` and `.claude/workflow.json`, and clearing `verified:` lines. Tested by `scaffold-text.test.mjs`.                      |
+| `init-app/prune-requires.mjs`               | The prune step of init-app: deletes the skill, reference, agent and hotspot files whose `requires:` feature folder is gone, and the table rows that linked to them. Tested by `prune-requires.test.mjs`.      |
+| `init-app/check-scaffold-observability.mjs` | Copies the tree, runs init-app, and checks the Grafana-as-code catalog was renamed, regenerated and still validates. A step of `pnpm verify:scaffold`; runs alone in seconds.                                 |
 
 ### `db/`
 
