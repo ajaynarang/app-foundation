@@ -47,7 +47,8 @@ pnpm init-app --name acme-crm --yes --dry-run
 | Grafana-as-code `PROJECT` / `REPO_URL`          | `<name>` / `--repo-url` | `infra/observability/grafana-cloud/catalog/constants.mjs`; then `generate.mjs` regenerates the alerting and dashboard files (or the command is printed) |
 
 Never touched: `.git`, `node_modules`, `pnpm-lock.yaml` (regenerate with `pnpm install`),
-`docs/superpowers/` (historical design docs), **`packages/appshore/` package names**
+`docs/superpowers/` (historical design docs), git worktrees under `.worktrees/` and `.claude/worktrees/`,
+**`packages/appshore/` package names**
 (`@appshore/*` is the platform brand, not your app), and this tool itself.
 
 ## Safety
