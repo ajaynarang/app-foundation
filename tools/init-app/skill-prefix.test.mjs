@@ -32,7 +32,7 @@ test('the default prefix: one short word as is, the initials of several words, t
   assert.equal(defaultSkillPrefix('acme-crm'), 'ac');
   assert.equal(defaultSkillPrefix('big-red-dog-app'), 'brda');
   assert.equal(defaultSkillPrefix('scaffoldcheck'), 'sca');
-  assert.equal(defaultSkillPrefix('throughline'), 'thr');
+  assert.equal(defaultSkillPrefix('northwind'), 'nor');
 });
 
 test('a prefix is 2 to 12 lowercase letters or digits, and never a reserved name or the start of one', () => {

@@ -38,8 +38,8 @@ pnpm init-app --describe
 | `--describe`     | off                       | Print every option as JSON and exit                                                                                                          |
 
 The default skill prefix: the name when it is one word of at most 8 characters (`acme` gives `acme`), the initials of
-its words when it has several (`acme-crm` gives `ac`), the first three letters of one longer word (`throughline`
-gives `thr`). The interactive run offers it and accepts another.
+its words when it has several (`acme-crm` gives `ac`), the first three letters of one longer word (`northwind`
+gives `nor`). The interactive run offers it and accepts another.
 
 ## What it renames
 

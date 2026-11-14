@@ -17,7 +17,7 @@ const MAX_SHORT_WORD = 8;
 
 /**
  * One word of at most 8 characters: the word. Several words: their initials (`acme-crm` gives `ac`). One longer
- * word: its first three letters (`throughline` gives `thr`).
+ * word: its first three letters (`northwind` gives `nor`).
  */
 export function defaultSkillPrefix(name) {
   const words = name.split('-').filter(Boolean);
