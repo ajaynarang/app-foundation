@@ -41,6 +41,29 @@ removed. Everything cross-cutting remains and works:
 
 ---
 
+## Binding docs (read before any product work)
+
+These docs are the architecture of record. Before planning, designing or building a product feature, read the ones
+it touches; they override improvisation. In the starter they are skeletons: each has a filled "Foundation (already
+here)" part where the starter already decides something, and an empty "Your product" part to fill in the product's
+first days. `docs/README.md` indexes every other doc.
+
+| Doc                                 | What it binds                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `docs/VISION.md`                    | Who the product is for, what it does, what it will not do                       |
+| `docs/domain-map.md`                | Every entity, what it means, how entities relate (the schema holds the columns) |
+| `docs/lifecycles-and-invariants.md` | The always-true rules, each with its guard, and every state machine             |
+| `docs/module-map.md`                | Which folder owns what, and which way dependencies point                        |
+| `docs/event-vocabulary.md`          | Every domain event; use the names verbatim                                      |
+| `docs/epics.md`                     | Build order, and what "demoable" means for each epic                            |
+| `docs/adr/`                         | The decisions that are expensive to change, and why (index in its `README.md`)  |
+
+**The amendment rule.** Deviating from a binding doc is allowed only as a deliberate amendment: change the doc, and
+the ADR it rests on, in the same pull request as the code. Never drift silently. A new decision that is expensive to
+undo gets its own ADR, started from `docs/adr/0000-template.md`.
+
+---
+
 ## Tenancy models (config toggle)
 
 The same codebase runs three ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
