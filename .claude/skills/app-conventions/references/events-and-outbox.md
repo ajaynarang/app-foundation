@@ -41,8 +41,8 @@ The decision is the ADR "Outbox and deadlines", `docs/adr/0003-outbox-and-deadli
 
 ### The registry
 
-- An event key is `app.<aggregate>.<action>` in kebab-case, every key and constant name unique.
-  [guard: event-registry.spec.ts]
+- An event key is `app.<aggregate>.<action>` in lowercase kebab-case (`/^app\.[a-z0-9-]+\.[a-z0-9-]+$/`), every key
+  and constant name unique. [guard: event-registry.spec.ts]
 - The action is a fact in the past tense (`app.ai.credential-connected`, `app.api-key.revoked`), never a command.
   [review-only: tense needs reading]
 - Every registered key is listed verbatim, in backticks, in `docs/event-vocabulary.md`, with what it means.
