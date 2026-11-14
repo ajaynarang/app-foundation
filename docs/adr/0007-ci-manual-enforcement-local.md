@@ -76,3 +76,13 @@ The template itself sets no required check: with manual CI, a required check wou
 - The guards workflow is `.github/workflows/guards.yml`; its job, for step 3, is `workflow-guards`.
 - "Enforcement is local" above now has the guards in every layer: the pre-commit hook runs `pnpm guards` after
   Prettier on the staged files, and the pre-push hook and `pnpm verify` run `pnpm guards` and `pnpm test:guards`.
+
+### Amendment — 2026-11-14: the convention gate and the Claude Code hooks
+
+- The convention gate (`tools/guards/convention-gate.mjs`, `pnpm guard:conventions`) joins `pnpm guards`, so it runs
+  in the pre-commit and pre-push hooks and in `pnpm verify`. It also runs through `lint-staged` on the staged `.ts`
+  and `.tsx` files, after Prettier. Its baseline (`tools/guards/convention-gate.baseline.json`) may only fall.
+- The Claude Code hooks in `.claude/hooks/` (wired in `.claude/settings.json`) are the fast warning while an
+  assistant edits: the protected-paths hook blocks an edit to a generated file, a real env file or an applied
+  migration; the convention gate and the drift reminder advise and never block. Their fixture tests,
+  `pnpm test:hooks`, run in the pre-push hook, in `pnpm verify` and in `guards.yml`.

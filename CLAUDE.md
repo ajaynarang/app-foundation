@@ -252,8 +252,10 @@ so the property is still camelCase.
 All enums live in `packages/appshore/db/prisma/schema/*.prisma`. Backend code imports enums and
 the Prisma client from **`@appshore/db`** (never `@prisma/client` directly); frontend/shared-types
 import the generated mirror in `packages/shared-types/src/generated/prisma-enums.ts`.
-Never hand-edit that generated file — `pnpm --filter @appshore/db prisma:generate` regenerates it
-via the db package's `scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it.
+That file is generated: `pnpm --filter @appshore/db prisma:generate` regenerates it via the db package's
+`scripts/generate-shared-enums.ts`, and `enum-codegen-parity.spec.ts` guards it. The protected-paths hook
+(`.claude/hooks/protected-paths.mjs`) refuses an edit to a generated file, a real env file or a migration already on
+the default branch.
 One decided exception: notification types are strings with an app registry (`PLATFORM_NOTIFICATION_TYPES` in
 `@app/shared-types` plus the app's `notification-types.ts`), so a product adds a type without editing
 `foundation.prisma`.
@@ -337,5 +339,15 @@ success + error toasts; every loading state shows a Skeleton.
   and when a source comment names a path under `.claude/` or a skill; cite a guard or a file under `docs/` instead.
   `guard:ci` keeps every workflow manual (`.claude/workflow.json`: `ci`, `manualAlways`). A path the root
   `.gitignore` ignores is not checked; a doc names a deleted file as ~~`path`~~. `pnpm test:guards` runs their tests.
-- **Pre-commit hook** — Prettier on staged files, then `pnpm guards`. The pre-push hook and `pnpm verify` run
-  `pnpm guards` and `pnpm test:guards` too.
+  The convention gate (`guard:conventions`, `tools/guards/convention-gate.mjs`) holds the text rules no spec holds
+  yet (`throw new Error(` on an HTTP path, an empty catch, `process.env` outside config and bootstrap, a raw
+  `<button>` or `<input>`, file size) against `convention-gate.baseline.json`: a count may only fall, a new hit fails.
+  Regenerate the baseline with `node tools/guards/convention-gate.mjs --update-baseline`, never by hand.
+- **Pre-commit hook** — Prettier on staged files and the convention gate on staged `.ts`/`.tsx` files (`lint-staged`),
+  then `pnpm guards`. The pre-push hook and `pnpm verify` run `pnpm guards`, `pnpm test:guards` and
+  `pnpm test:hooks` too.
+- **Claude Code hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`) — the protected-paths hook blocks an
+  edit to a generated file, a real env file or an applied migration; the convention gate and the drift reminder
+  (`.claude/hooks/hotspots/*.json`, and any skill or doc whose `sources:` name the file) advise after an edit.
+  `pnpm test:hooks` runs their fixture tests. The settings also deny reading real env and key files and declare
+  the `superpowers` plugin.
