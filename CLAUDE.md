@@ -350,6 +350,6 @@ success + error toasts; every loading state shows a Skeleton.
   `pnpm test:hooks` too.
 - **Claude Code hooks** (`.claude/settings.json`, scripts in `.claude/hooks/`) — the protected-paths hook blocks an
   edit to a generated file, a real env file or an applied migration; the convention gate and the drift reminder
-  (`.claude/hooks/hotspots/*.json`, and any skill or doc whose `sources:` name the file) advise after an edit.
+  (`.claude/hooks/hotspots/*.json`, and any skill or doc whose `sources:` name the file by path or glob, not by folder) advise after an edit.
   `pnpm test:hooks` runs their fixture tests. The settings also deny reading real env and key files and declare
   the `superpowers` plugin.

@@ -7,8 +7,11 @@
  *      paths whose change makes something else untrue: { "hotspots": [{ "paths": [globs], "say": "...",
  *      "docs": [repo paths] }] }. A hotspot's docs are named only while they exist; the skills guard fails on a
  *      path in these files that does not exist.
- *   2. Reverse lookup. When a skill, agent or doc lists the edited file in its `sources:` frontmatter, it names that
- *      file, so it is re-read and corrected in the same pull request.
+ *   2. Reverse lookup. When a skill, agent or doc lists the edited file in its `sources:` frontmatter (by its path,
+ *      a glob or a `path#Symbol` anchor), it names that file, so it is re-read and corrected in the same pull
+ *      request. A bare folder entry (`packages/appshore`) is skipped: a map that cites whole folders would otherwise
+ *      be named on nearly every edit, and a reminder that always fires gets ignored. Name the file, or a glob, to be
+ *      reminded.
  *
  * Root: the git toplevel of the edited file; without git, $CLAUDE_PROJECT_DIR, then the hook's cwd. Node built-ins
  * only. Tested by .claude/hooks/tests/hooks.test.mjs.
@@ -26,6 +29,14 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees']);
 const matchesPath = (pattern, rel) => {
   const p = pattern.replace(/#.*$/, '').replace(/\/$/, '');
   return /[*?{]/.test(p) ? globToRegExp(p).test(rel) : rel === p || rel.startsWith(p + '/');
+};
+
+/** Whether a `sources:` entry names `rel`: its exact path (anchor dropped) or a glob. A folder entry never does. */
+const sourceNames = (entry, rel) => {
+  if (typeof entry !== 'string') return false;
+  const p = entry.replace(/#.*$/, '');
+  if (/[*?{]/.test(p)) return globToRegExp(p.replace(/\/$/, '')).test(rel);
+  return !p.endsWith('/') && p === rel;
 };
 
 /** The hotspot lines for `rel`, from every file under .claude/hooks/hotspots. */
@@ -67,7 +78,7 @@ function* markdownFiles(root, rel) {
   }
 }
 
-/** The skills, agents and docs whose `sources:` name `rel` (a path, a folder, a glob or a `path#Symbol`). */
+/** The skills, agents and docs whose `sources:` name `rel` (its path, a glob or a `path#Symbol`; not a folder). */
 export function sourcesCiting(root, rel) {
   const plans = workflowConfig(root).plans?.folder;
   const out = [];
@@ -76,7 +87,7 @@ export function sourcesCiting(root, rel) {
       if (doc === rel || (plans && doc.startsWith(plans + '/'))) continue;
       const { fm } = parseFrontmatter(fs.readFileSync(path.join(root, doc), 'utf8'));
       const sources = Array.isArray(fm?.sources) ? fm.sources : fm?.sources ? [fm.sources] : [];
-      if (sources.some((s) => matchesPath(s, rel))) out.push(doc);
+      if (sources.some((s) => sourceNames(s, rel))) out.push(doc);
     }
   return out;
 }

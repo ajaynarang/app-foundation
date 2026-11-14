@@ -325,6 +325,25 @@ test('drift-reminder: a skill or doc whose sources: name the file is named for a
   assert.doesNotMatch(ctx, /unrelated/);
 });
 
+test('drift-reminder: a folder in sources: does not name the doc for every edit inside that folder', () => {
+  const dir = withHotspots();
+  write(dir, 'packages/lib/src/deep/a.ts', 'export {};\n');
+  write(dir, 'packages/lib/src/index.ts', 'export {};\n');
+  write(
+    dir,
+    'docs/map.md',
+    '---\nsources:\n  - packages/lib\n  - packages/lib/src/\n  - packages/lib/src/index.ts\n---\n# Map\n',
+  );
+  silent(run(HOOK.drift, { file: path.join(dir, 'packages/lib/src/deep/a.ts'), env: { CLAUDE_PROJECT_DIR: dir } }));
+  assert.match(
+    contextOf(
+      run(HOOK.drift, { file: path.join(dir, 'packages/lib/src/index.ts'), env: { CLAUDE_PROJECT_DIR: dir } }),
+      'PostToolUse',
+    ),
+    /docs\/map\.md describes this file/,
+  );
+});
+
 test('drift-reminder: an edit no hotspot or source names prints nothing, with or without git', () => {
   const dir = withHotspots();
   write(dir, 'README.md', 'x\n');
