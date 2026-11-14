@@ -72,6 +72,16 @@
       "reason": "The architecture spec that keeps the AI domain from importing Desk names the Desk folder it guards. It must stay in a product without Desk, so a later change cannot make AI depend on Desk again."
     },
     {
+      "file": "tools/guards/skills-guard.mjs",
+      "match": "domains/desk",
+      "reason": "FEATURE_FOLDERS names the Desk folder: the skills guard fails on a requires: desk skill, reference or hotspot file when that folder is absent, which is how a product without Desk catches a returning Desk file."
+    },
+    {
+      "file": ".claude/workflow.json",
+      "match": "inngest",
+      "reason": "reservedNames lists <name>-inngest, the container name init-app renames, so no skill or agent name may start with it. Every product keeps the list, Desk or not."
+    },
+    {
       "file": "apps/backend/src/architecture/feature-key-coverage.spec.ts",
       "match": "domains/desk",
       "reason": "Counts the desk feature key as covered when the Desk folder does not exist, so the spec passes in a product scaffolded without Desk (design item 17)."
