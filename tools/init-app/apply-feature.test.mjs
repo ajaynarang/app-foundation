@@ -7,7 +7,6 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  featureKept,
   featurePresence,
   findMarkerBlocks,
   listFeature,
@@ -189,7 +188,8 @@ test('loadManifest takes the name from the file and refuses an unknown key', () 
   assert.throws(() => loadManifest('nope', dir), /No manifest for feature "nope"/);
 });
 
-test('a manifest may say where its feature lives (presentWhen), and featureKept reads that path', () => {
+// Whether the feature is kept is read from that path by isKept in optional-features.scan.ts, held by its spec.
+test('a manifest may say where its feature lives (presentWhen), and it must be a repo-relative path', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-present-'));
   fs.writeFileSync(
     path.join(dir, 'gadget.json'),
@@ -199,12 +199,6 @@ test('a manifest may say where its feature lives (presentWhen), and featureKept 
   const manifest = loadManifest('gadget', dir);
   assert.equal(manifest.presentWhen, 'apps/gadget');
   assert.throws(() => loadManifest('bad', dir), /presentWhen must be a repo-relative path/);
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-present-root-'));
-  assert.equal(featureKept(root, manifest), false);
-  fs.mkdirSync(path.join(root, 'apps/gadget'), { recursive: true });
-  assert.equal(featureKept(root, manifest), true);
-  // Without the key, the state is the seam's to say: featureKept has no answer.
-  assert.equal(featureKept(root, { name: 'demo', paths: ['apps/demo'] }), null);
 });
 
 test('mobile is removed through its manifest: the app, its CI job, its scripts and its marked lines', () => {

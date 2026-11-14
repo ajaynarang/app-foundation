@@ -70,12 +70,6 @@ export function loadManifest(name, featuresDir = FEATURES_DIR) {
   return manifest;
 }
 
-/** For a manifest with `presentWhen`: whether its path exists under `root`. Without the key: null (the seam says). */
-export function featureKept(root, manifest) {
-  if (!manifest.presentWhen) return null;
-  return fs.existsSync(path.join(root, manifest.presentWhen));
-}
-
 export function markerTokens(name) {
   return { start: `feature:${name}:start`, end: `feature:${name}:end` };
 }
