@@ -35,7 +35,10 @@ the contract for "consistent". Give it `owner: foundation` (or `product`) frontm
 inventories and `guards:` for what already holds part of it, and link it from the Rubrics line below so the skills guard
 keeps it true. Each check in it names the reference section it applies and the guard, if any, that already holds it.
 
-**Rubrics** (one line per area, each a link): none yet.
+**Rubrics** (one line per area, each a link):
+
+- [`api`](areas/api.md): the HTTP contract, errors, lists, access for people and agents, events and webhooks on the
+  wire.
 
 ## The evidence rule
 
