@@ -3,7 +3,7 @@
 #
 # CI in this repo is manual-only, so this script is what holds the rules: format check, lint, schema lint,
 # type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), the
-# repository guards (`pnpm guards`) and their tests, the ops
+# repository guards (`pnpm guards`) and their tests, the Claude Code hook tests, the ops
 # checks (`pnpm check:ops`: the Grafana-as-code catalog, ops shell tests, Terraform), the RBAC gap audit, build.
 # It stops at the first step that fails and always ends with one result line (tools/verify/result-line.sh):
 #
@@ -53,6 +53,8 @@ run "init-app tool tests" pnpm test:init-app
 # The repository guards (tools/guards): skills, docs and source comments cite only what exists; CI stays manual.
 run "guards" pnpm guards
 run "guard tests" pnpm test:guards
+# The Claude Code hooks: fixture tests that pipe sample hook input into each hook (pnpm test:hooks).
+run "hook tests" pnpm test:hooks
 # The operations files that are not Jest specs: the Grafana-as-code catalog, ops shell tests, Terraform.
 run "ops checks" pnpm check:ops
 # Every controller route declares @Roles() or @Public(); the same audit the manual CI run fails on.

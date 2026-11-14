@@ -2,13 +2,14 @@
 # The local gates hold what CI would (CI is manual-only), so their steps must not drop out unnoticed: this checks
 # that `pnpm verify` (tools/verify/verify.sh) still runs each of its steps and ends with result-line.sh, and that
 # the pre-push hook still runs the architecture specs, the ops checks and the repository guards, and the pre-commit
-# hook the guards. Reads files only. Run by `pnpm check:ops`.
+# hook lint-staged (which runs the convention gate on staged files) and the guards. Reads files only. Run by `pnpm check:ops`.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VERIFY="$ROOT/tools/verify/verify.sh"
 PRE_PUSH="$ROOT/.husky/pre-push"
 PRE_COMMIT="$ROOT/.husky/pre-commit"
+PACKAGE="$ROOT/package.json"
 fails=0
 
 has() { # <file> <fixed string> <name>
@@ -36,6 +37,11 @@ has "$PRE_PUSH" 'pnpm check:ops' "pre-push runs check:ops"
 has "$PRE_PUSH" 'tools/verify/push-touches-ops.sh' "pre-push runs check:ops only when the push touches what it checks"
 has "$PRE_PUSH" 'pnpm guards' "pre-push runs the repository guards"
 has "$PRE_PUSH" 'pnpm test:guards' "pre-push runs the guards' own tests"
+has "$VERIFY" 'run "hook tests" pnpm test:hooks' "verify runs the Claude Code hook tests"
+has "$PRE_PUSH" 'pnpm test:hooks' "pre-push runs the Claude Code hook tests"
 has "$PRE_COMMIT" 'pnpm guards' "pre-commit runs the repository guards"
+has "$PRE_COMMIT" 'pnpm exec lint-staged' "pre-commit runs lint-staged"
+has "$PACKAGE" '"node tools/guards/convention-gate.mjs --files"' "lint-staged runs the convention gate on staged files"
+has "$PACKAGE" 'node tools/guards/convention-gate.mjs"' "pnpm guards runs the convention gate"
 
 [ "$fails" -eq 0 ] || exit 1

@@ -4,7 +4,8 @@
 # The triggers target main. Fails if a repository guard or its tests fail.
 #
 # Runs the same commands as the pre-commit and pre-push hooks and `pnpm verify`: the skills guard (skills, agents,
-# docs and source comments cite only what exists), the CI-triggers guard, and the guards' own tests. Node only: no
+# docs and source comments cite only what exists), the CI-triggers guard, the convention gate against its baseline,
+# the guards' own tests and the Claude Code hook fixture tests. Node only: no
 # install, no database, no secrets. `npm run` reads the root scripts without installing anything.
 
 name: Guards
@@ -37,3 +38,6 @@ jobs:
 
       - name: Guard tests
         run: npm run test:guards
+
+      - name: Claude Code hook tests
+        run: npm run test:hooks
