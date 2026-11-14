@@ -13,6 +13,7 @@ sources:
   - packages/appshore/platform/src/auth/decorators/public.decorator.ts
   - packages/appshore/platform/src/auth/decorators/current-user.decorator.ts
   - packages/appshore/platform/src/auth/decorators/tenant-db-id.decorator.ts
+  - packages/appshore/platform/src/auth/strategies/jwt.strategy.ts#JwtStrategy
   - packages/appshore/platform/src/auth/auth.service.ts
   - packages/appshore/platform/src/auth/identity-resolver.service.ts#IdentityResolverService
   - packages/appshore/platform/src/auth/email-uniqueness.check.ts#EMAIL_UNIQUENESS_UNENFORCED_EVENT
@@ -54,7 +55,6 @@ guards:
   - agent-principal.spec.ts
 examples:
   - assigneeId
-  - userDbId
 ---
 
 # Auth and access: identity, sessions, the guard chain, roles, record checks, machine principals
@@ -122,7 +122,8 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
 - A super-admin route declares what it reads: `@SystemScope('super-admin')` beside `@Roles(UserRole.SUPER_ADMIN)`, or
   `@TargetTenant` (see `apps/backend/src/domains/support/support.controller.ts`). [guard: rls-context-coverage.spec.ts]
 - A role says "may this person call this route", not "may this person see this record". An owned resource (a task
-  assigned to a member, a person's own profile) also checks the record (`task.assigneeId === user.userDbId`).
+  assigned to a member, a person's own profile) also checks the record against `user.dbId`, the numeric user id
+  (`task.assigneeId === user.dbId`).
   [review-only: ownership is domain knowledge]
 - A role refusal is 403; another tenant's record is 404, so existence never leaks. [guard: api-contract.spec.ts]
 
@@ -149,11 +150,16 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
 @Roles(UserRole.OWNER, UserRole.ADMIN) // who may call it; the chain is already global
 export class ReportsController {
   @Get(':report_id')
-  async get(@CurrentUser() user: AuthUser, @Param('report_id') reportId: string) {
-    return this.reports.getForTenant(user.tenantDbId, reportId); // 404 when it is another tenant's
+  async get(@TenantDbId() tenantDbId: number, @Param('report_id') reportId: string) {
+    return this.reports.getForTenant(tenantDbId, reportId); // 404 when it is another tenant's
   }
 }
 ```
+
+`@CurrentUser()` returns the object `JwtStrategy.validate` builds in
+`packages/appshore/platform/src/auth/strategies/jwt.strategy.ts`: `dbId` (the numeric user id), `userId`, `email`,
+`role`, `tenantId`, `tenantDbId`. No exported type describes it. Do not type it as `SessionUser` from `jwt.service.ts`:
+that is the token-issuing input, and its numeric id is `id`, not `dbId`.
 
 The service filters by `tenantId` ([`tenancy.md`](tenancy.md)) and, for an owned record, checks the owner. A plan
 gate is one more decorator ([`plans-and-entitlements.md`](plans-and-entitlements.md)). A route a machine calls is

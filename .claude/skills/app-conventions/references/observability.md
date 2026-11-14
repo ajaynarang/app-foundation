@@ -148,7 +148,7 @@ A cron wraps its run in `CronRun`, as `packages/appshore/platform/src/auth/token
 ```ts
 async run(_job: Job<JobEnvelope<unknown>>): Promise<{ swept: number }> {
   const cron = new CronRun(this.logger, APP_JOB_NAMES.BULK_OPS.INVOICE_SWEEP);
-  await forEachTenant('cron.invoice-sweep', () => this.tenants.listActive(), async (tenant) => {
+  await forEachTenant(APP_SYSTEM_REASONS.INVOICE_SWEEP, () => this.tenants.listActive(), async (tenant) => {
     try { await this.sweep(tenant.id); cron.succeeded(); }
     catch (err) { cron.failed(tenant.id, err, tenant.tenantId); }   // logs and reports the tenant
   });
@@ -156,8 +156,8 @@ async run(_job: Job<JobEnvelope<unknown>>): Promise<{ swept: number }> {
 }
 ```
 
-Then add the job's file and names to `cron-run-coverage.spec.ts`'s list, declare its tenant context
-([`tenancy.md`](tenancy.md)), and give it a schedule ([`jobs-and-deadlines.md`](jobs-and-deadlines.md)).
+Then add the job's file and names to `cron-run-coverage.spec.ts`'s list, declare its tenant context and register
+its reason in `APP_SYSTEM_REASONS` ([`tenancy.md`](tenancy.md)), and give it a schedule ([`jobs-and-deadlines.md`](jobs-and-deadlines.md)).
 
 ## Recipe: report an error
 
