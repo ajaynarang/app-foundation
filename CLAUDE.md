@@ -299,8 +299,13 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
 - **Unit:** co-located `**/*.spec.ts` in `apps/backend/src` AND `packages/appshore/*/src`
   (Jest per package). Run `pnpm test` (turbo runs all). Platform test fixtures (prisma/cache/queue
   mocks, tenant/user factories) come from `@appshore/platform/test/*`.
-- **Mobile:** `cd apps/mobile && flutter analyze && flutter test`.
 - **E2E / smoke / RBAC:** `tests/` (`@app/qa`, Playwright). Run `pnpm test:qa`.
+
+<!-- feature:mobile:start -->
+
+**Mobile:** `cd apps/mobile && flutter analyze && flutter test` (`pnpm mobile:test`).
+
+<!-- feature:mobile:end -->
 
 ### Gates (CI is manual-only, so these run locally)
 

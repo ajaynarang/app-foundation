@@ -7,6 +7,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
+  featureKept,
   featurePresence,
   findMarkerBlocks,
   listFeature,
@@ -186,6 +187,48 @@ test('loadManifest takes the name from the file and refuses an unknown key', () 
   });
   assert.throws(() => loadManifest('bad', dir), /unknown key "path"/);
   assert.throws(() => loadManifest('nope', dir), /No manifest for feature "nope"/);
+});
+
+test('a manifest may say where its feature lives (presentWhen), and featureKept reads that path', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-present-'));
+  fs.writeFileSync(
+    path.join(dir, 'gadget.json'),
+    JSON.stringify({ presentWhen: 'apps/gadget', paths: ['apps/gadget'] }),
+  );
+  fs.writeFileSync(path.join(dir, 'bad.json'), JSON.stringify({ presentWhen: ['apps/gadget'] }));
+  const manifest = loadManifest('gadget', dir);
+  assert.equal(manifest.presentWhen, 'apps/gadget');
+  assert.throws(() => loadManifest('bad', dir), /presentWhen must be a repo-relative path/);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-present-root-'));
+  assert.equal(featureKept(root, manifest), false);
+  fs.mkdirSync(path.join(root, 'apps/gadget'), { recursive: true });
+  assert.equal(featureKept(root, manifest), true);
+  // Without the key, the state is the seam's to say: featureKept has no answer.
+  assert.equal(featureKept(root, { name: 'demo', paths: ['apps/demo'] }), null);
+});
+
+test('mobile is removed through its manifest: the app, its CI job, its scripts and its marked lines', () => {
+  const root = path.resolve(HERE, '..', '..');
+  const manifest = loadManifest('mobile');
+  assert.equal(manifest.presentWhen, 'apps/mobile');
+  assert.deepEqual(manifest.paths, ['apps/mobile']);
+  assert.ok(manifest.markers.includes('.github/workflows/ci.yml'));
+  assert.ok(manifest.jsonEntries.some((e) => e.file === 'package.json' && e.path[1] === 'mobile:test'));
+  // The template keeps mobile, so every part of the manifest is present.
+  const { missing } = featurePresence(root, manifest);
+  assert.deepEqual([...missing.paths, ...missing.markers, ...missing.jsonEntries], []);
+  // Removing it from a copy of the files it names leaves none of it behind.
+  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-mobile-'));
+  for (const rel of [...manifest.markers, 'package.json', 'apps/mobile/pubspec.yaml']) {
+    fs.mkdirSync(path.dirname(path.join(copy, rel)), { recursive: true });
+    fs.copyFileSync(path.join(root, rel), path.join(copy, rel));
+  }
+  removeFeature(copy, manifest);
+  const { present } = featurePresence(copy, manifest);
+  assert.deepEqual([...present.paths, ...present.markers, ...present.jsonEntries], []);
+  const ci = fs.readFileSync(path.join(copy, '.github/workflows/ci.yml'), 'utf8');
+  assert.doesNotMatch(ci, /flutter/i);
+  assert.match(ci, /workflow_dispatch/);
 });
 
 test('the shipped manifests load, and every block they name is balanced in this repo', () => {

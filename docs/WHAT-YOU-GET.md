@@ -179,8 +179,13 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 4. **Your web features** — `apps/web/src/features/<your-domain>/` (TanStack Query +
    `apiClient` from `@appshore/web-core`, shadcn/ui components). Replace the landing page
    (`apps/web/src/app/page.tsx`) and the legal placeholder copy.
-5. **Your mobile screens** — `apps/mobile/lib/features/<your-domain>/`.
-6. **Your AI surface** — `@Tool` providers in `domains/ai/mcp/mcp-tools.module.ts`, knowledge-base content, search
+   <!-- feature:mobile:start -->
+
+   Your mobile screens go in `apps/mobile/lib/features/<your-domain>/`.
+
+   <!-- feature:mobile:end -->
+
+5. **Your AI surface** — `@Tool` providers in `domains/ai/mcp/mcp-tools.module.ts`, knowledge-base content, search
    providers for @-mentions.
    <!-- feature:desk:start -->
 
@@ -188,9 +193,9 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 
    <!-- feature:desk:end -->
 
-7. **Your integrations** — connectors in `domains/integrations/` `VENDOR_REGISTRY`
+6. **Your integrations** — connectors in `domains/integrations/` `VENDOR_REGISTRY`
    (QuickBooks sample shows the pattern).
-8. **Branding** — `init-app` does the renames; you bring logo, colors (tailwind preset in
+7. **Branding** — `init-app` does the renames; you bring logo, colors (tailwind preset in
    `packages/ui`), and real legal pages.
 
 ### Your first domain, end to end (~an hour)

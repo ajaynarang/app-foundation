@@ -80,7 +80,11 @@ holds the arrows.
 | `features/auth/`, `features/ai/`, `features/billing/`, `features/notifications/`, `features/webhooks/` | Auth state, agent activity, billing hooks, notification hooks, webhook management                                       |
 | `shared/`                                                                                              | Components, providers, hooks, config shared by every feature                                                            |
 
+<!-- feature:mobile:start -->
+
 `apps/mobile/` is the Flutter companion app (auth and status scaffold). It talks to the backend over the same API.
+
+<!-- feature:mobile:end -->
 
 ## Your product
 

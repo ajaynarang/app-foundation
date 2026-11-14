@@ -250,6 +250,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
           NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
 
+  # feature:mobile:start
   # ─────────────────────────────────────────────────────────────
   # Mobile CI (Flutter) — independent of the node jobs
   # ─────────────────────────────────────────────────────────────
@@ -278,6 +279,7 @@ jobs:
       - name: Test
         run: flutter test
 
+  # feature:mobile:end
   # ─────────────────────────────────────────────────────────────
   # Scaffold variants: scaffolds the repo with and without each optional feature
   # (Desk) and proves each copy installs, type-checks and passes the backend specs,
