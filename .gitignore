@@ -26,6 +26,9 @@ firebase-admin-sdk.json
 *.tfvars
 !*.tfvars.example
 
+# Database dumps (tools/db/pull-staging.sh): a staging copy can hold real people's data
+tools/.dumps/
+
 # Misc
 .DS_Store
 *.log
