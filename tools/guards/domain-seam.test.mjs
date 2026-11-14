@@ -57,7 +57,11 @@ test('each domain reference is product-owned, says whether it is filled, and is 
 test('the four consumers read the seam', () => {
   const cite = (ref) => `${DOMAIN}/references/${ref}`;
   // 1. The reviewer's domain dimension reads the domain review checks.
-  assert.ok(read(`.claude/agents/${P}-reviewer.md`).includes(cite('review-checks.md')), `${P}-reviewer`);
+  // Each consumer also treats `filled: false` as absent, so an empty template never yields an invented check or persona.
+  const unfilled = (rel, text) => assert.ok(text.includes('`filled: false`'), `${rel} does not handle filled: false`);
+  const reviewer = read(`.claude/agents/${P}-reviewer.md`);
+  assert.ok(reviewer.includes(cite('review-checks.md')), `${P}-reviewer`);
+  unfilled(`${P}-reviewer`, reviewer);
   // 2. Test notes, the QA runner and the persona read the personas and the test preconditions.
   for (const rel of [
     `.claude/skills/${P}-test-notes/SKILL.md`,
@@ -66,6 +70,7 @@ test('the four consumers read the seam', () => {
   ]) {
     const text = read(rel);
     for (const ref of ['personas.md', 'test-preconditions.md']) assert.ok(text.includes(cite(ref)), `${rel} → ${ref}`);
+    unfilled(rel, text);
   }
   // 3. The drift reminder reads the product's hotspot file, and the domain skill sends the product there.
   read('.claude/hooks/hotspots/product.json');
