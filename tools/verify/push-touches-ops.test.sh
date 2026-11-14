@@ -7,7 +7,11 @@ SCRIPT="$(cd "$(dirname "$0")" && pwd)/push-touches-ops.sh"
 ZERO=0000000000000000000000000000000000000000
 # No global or system git config: no hooks, signing or templates of the machine running it.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-work=$(mktemp -d)
+# Run from a git hook (pre-push runs check:ops), git exports GIT_DIR and friends pointing at the real
+# repository; every git command below would then act on it. Clear them so only the throwaway repos change.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
+work=$(cd "$(mktemp -d)" && pwd -P)
 trap 'rm -rf "$work"' EXIT
 fails=0
 
@@ -21,6 +25,8 @@ expect() { # <want: yes|no> <name> [stdin]
 git init -q --bare "$work/remote.git"
 git init -q "$work/repo"
 cd "$work/repo"
+# Refuse to go on unless git now resolves to the throwaway repository.
+case "$(git rev-parse --absolute-git-dir)" in "$work"/*) ;; *) echo "FAIL git resolves outside the scratch dir" >&2; exit 1 ;; esac
 git config user.email test@example.com
 git config user.name test
 git config commit.gpgsign false

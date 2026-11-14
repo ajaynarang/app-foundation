@@ -56,7 +56,11 @@ if [ -z "$shell_tests" ]; then
   echo "── check:ops: hermetic shell tests ──"
   echo "none yet"
 else
-  while IFS= read -r t; do run "shell test ${t}" bash "$t"; done <<<"$shell_tests"
+  # Inside a git hook, git exports GIT_DIR (and friends) pointing at this repository. A hermetic test
+  # that builds its own throwaway repository would then write to this one instead: `git init --bare`
+  # sets core.bare and `git config user.*` lands in .git/config. Each test runs with them cleared.
+  # shellcheck disable=SC2046
+  while IFS= read -r t; do run "shell test ${t}" env $(git rev-parse --local-env-vars | sed 's/^/-u /') bash "$t"; done <<<"$shell_tests"
 fi
 
 if command -v terraform >/dev/null 2>&1; then
