@@ -86,15 +86,32 @@ export function readsTokenUsage(raw: string): boolean {
   return /\.\s*(?:inputTokens|outputTokens|cachedInputTokens)\b/.test(stripComments(raw));
 }
 
-/** `assertBudget(` calls with no `payer === 'PLATFORM'` check in the 300 characters before them. */
+const PLATFORM_PAYER = /\bpayer\s*===\s*['"]PLATFORM['"]/;
+
+/**
+ * `assertBudget(` calls (method or destructured; not the definition) not guarded by the nearest `if` before them,
+ * where guarded means: that `if`'s condition tests `payer === 'PLATFORM'`, and the call is its single statement or the
+ * first statement of its block (no `;` or brace between the condition and the call). It is deliberately strict: a
+ * guard that sits further up (an outer `if`, a statement before the call in the block, a ternary) counts as missing.
+ */
 export function unguardedBudgetChecks(raw: string): number {
   const source = stripComments(raw);
   let count = 0;
-  for (const match of source.matchAll(/\.assertBudget\s*\(/g)) {
-    const before = source.slice(Math.max(0, (match.index ?? 0) - 300), match.index);
-    if (!/\bpayer\s*===\s*['"]PLATFORM['"]/.test(before)) count++;
+  for (const match of source.matchAll(/(?<![\w$])assertBudget\s*\(/g)) {
+    const idx = match.index ?? 0;
+    if (/\b(?:async|function)\s+$/.test(source.slice(Math.max(0, idx - 20), idx))) continue;
+    if (!guardedByPlatformIf(source, idx)) count++;
   }
   return count;
+}
+
+function guardedByPlatformIf(source: string, callIdx: number): boolean {
+  const ifStart = source.slice(0, callIdx).search(/\bif\s*\((?![\s\S]*\bif\s*\()/);
+  if (ifStart < 0) return false;
+  const open = source.indexOf('(', ifStart);
+  const condition = callArguments(source, open);
+  const gap = source.slice(open + condition.length + 2, callIdx);
+  return PLATFORM_PAYER.test(condition) && /^\s*\{?[^;{}]*$/.test(gap);
 }
 
 describe('AI call paths', () => {
@@ -127,6 +144,30 @@ describe('AI call paths', () => {
       expect(
         unguardedBudgetChecks(`if (route.payer === 'PLATFORM') await this.aiTelemetry.assertBudget(tenantId);`),
       ).toBe(0);
+      expect(
+        unguardedBudgetChecks(
+          `if (options.enforceBudget && route.payer === 'PLATFORM') {\n  await this.aiTelemetry.assertBudget(id);\n}`,
+        ),
+      ).toBe(0);
+    });
+
+    it('does not take a payer check that guards some other statement', () => {
+      expect(
+        unguardedBudgetChecks(`if (route.payer === 'PLATFORM') log(); await this.aiTelemetry.assertBudget(tenantId);`),
+      ).toBe(1);
+      expect(
+        unguardedBudgetChecks(
+          `if (route.payer === 'PLATFORM') { note(); } else { await this.aiTelemetry.assertBudget(tenantId); }`,
+        ),
+      ).toBe(1);
+      expect(
+        unguardedBudgetChecks(`const ok = route.payer === 'PLATFORM';\nawait this.aiTelemetry.assertBudget(t);`),
+      ).toBe(1);
+    });
+
+    it('sees a destructured budget check, and not the method definition', () => {
+      expect(unguardedBudgetChecks(`const { assertBudget } = this.aiTelemetry; await assertBudget(tenantId);`)).toBe(1);
+      expect(unguardedBudgetChecks(`async assertBudget(tenantId: number) { return x; }`)).toBe(0);
     });
   });
 
