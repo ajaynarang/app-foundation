@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { captureError } from '@appshore/web-core/shared/lib/sentry';
 
 /**
  * Root error boundary — catches errors that escape ALL other boundaries,
@@ -12,10 +14,11 @@ import Link from 'next/link';
  * intentional here — no CSS variables or theme tokens are available.
  */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  // captureError is not imported here to avoid dependency failures when root layout is broken.
-  // Log directly to console — Sentry's global handler will pick it up if configured.
-  // eslint-disable-next-line no-console
-  console.error('[GlobalError]', error);
+  // A render error that reaches this boundary is caught by React, so no global handler sees it: report it here.
+  // captureError depends on the Sentry SDK only (a no-op without NEXT_PUBLIC_SENTRY_DSN) and logs to the console.
+  useEffect(() => {
+    captureError(error, { source: 'GlobalError' });
+  }, [error]);
 
   return (
     <html lang="en">

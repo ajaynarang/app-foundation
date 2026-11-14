@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { AiCredentialStatus } from '@appshore/db';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { APP_JOB_NAMES } from '../../../../../platform-glue/queue/job-names';
 import {
   AiCredentialRevalidationHandler,
@@ -119,5 +120,28 @@ describe('AiCredentialRevalidationHandler (the daily sweep)', () => {
     await handler.run(job());
     expect(prisma.aiCredential.findMany).not.toHaveBeenCalled();
     expect(connect.validate).not.toHaveBeenCalled();
+  });
+
+  it('lists credentials as declared cross-tenant work and tests each one as its own workspace', async () => {
+    const { handler, prisma, connect, job } = setup(rows(3), { probeMs: 10 });
+    const listed: unknown[] = [];
+    const tested: Array<[number, unknown]> = [];
+    const list = prisma.aiCredential.findMany.getMockImplementation();
+    prisma.aiCredential.findMany.mockImplementation(async (args: any) => {
+      listed.push(currentRls());
+      return list(args);
+    });
+    connect.validate.mockImplementation((async (tenantId: number) => {
+      tested.push([tenantId, currentRls()]);
+      return { probe: { ok: true } };
+    }) as never);
+    await handler.run(job());
+    expect(listed).toEqual([{ kind: 'system', reason: 'cron.ai-credential-revalidate' }]);
+    expect(tested).toEqual(
+      [7, 8, 9].map((tenantId) => [
+        tenantId,
+        { kind: 'tenant', tenantId, source: 'cron:cron.ai-credential-revalidate' },
+      ]),
+    );
   });
 });

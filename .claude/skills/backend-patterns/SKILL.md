@@ -9,6 +9,8 @@ Authoritative reference for all backend conventions. Every new domain, service, 
 
 Examples below use a neutral demo domain (projects / tasks / notifications). Substitute your own entities — the patterns are what matter.
 
+Logging, metrics and error reporting follow `docs/standards/observability.md` (held by `log-hygiene.spec.ts`).
+
 ---
 
 ## 0. Code Quality Principles (read first — override defaults, apply to ALL backend code)
@@ -854,13 +856,18 @@ Creating a parent with children (a project with tasks and members) follows three
 
 **Deleting:** children first, parent last. Order matters because of FK constraints.
 
+**Interactive transactions only.** Always `$transaction(async (tx) => …)` with the callback written inline, and every
+query inside it on `tx`, never `this.prisma`. The array form `$transaction([...])` is banned: once the tenant setting
+is applied per transaction, two tenants' array transactions in the same tick share the first one's context
+(`apps/backend/src/architecture/rls-no-array-transaction.spec.ts` fails `pnpm test` on one).
+
 ```typescript
 // FK-safe delete — leaf tables before referenced tables
-await this.prisma.$transaction([
-  this.prisma.taskComment.deleteMany({ where: { projectId, tenantId } }),
-  this.prisma.task.deleteMany({ where: { projectId, tenantId } }),
-  this.prisma.project.delete({ where: { id: projectId } }),
-]);
+await this.prisma.$transaction(async (tx) => {
+  await tx.taskComment.deleteMany({ where: { projectId, tenantId } });
+  await tx.task.deleteMany({ where: { projectId, tenantId } });
+  await tx.project.delete({ where: { id: projectId } });
+});
 ```
 
 **Don't put external API calls inside `$transaction`.** They hold row locks, can hang on network, and rollback doesn't undo the external side effect. Sequence:
@@ -1266,7 +1273,7 @@ text (`errors/no-internals-in-messages`): log it, and say what happened in plain
 `NOT_FOUND`, 409 → `INVALID_STATE`). Use a factory when the code is not the status default. The shared codes are
 `ApiErrorCode` in `@app/shared-types`: `VALIDATION_FAILED, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND,
 METHOD_NOT_ALLOWED, INVALID_STATE, STALE, DUPLICATE, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_KEY_IN_USE,
-PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL, UNAVAILABLE, INTERNAL` (the two idempotency codes: section 2.5). A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
+PAYLOAD_TOO_LARGE, RATE_LIMITED, UNSAFE_WEBHOOK_URL, WORKSPACE_SELECTION_REQUIRED, UNAVAILABLE, INTERNAL` (the two idempotency codes: section 2.5). A domain may add its own by throwing `{ code: 'MY_CODE', detail: '…' }`
 (`FEATURE_DISABLED`, `PASSWORD_NOT_SET`); it passes through unchanged. Add a code to `ApiErrorCode` only when every
 domain shares it.
 
@@ -1333,7 +1340,8 @@ Every error body is one shape, written in one place (`writeErrorEnvelope` in
 }
 ```
 
-- These eight keys and **no others**. `fieldErrors` only on a 400. `debugDetail` only in development. There is no
+- These eight keys and **no others**, plus one optional `workspaces` that only the login's 409
+  `WORKSPACE_SELECTION_REQUIRED` carries. `fieldErrors` only on a 400. `debugDetail` only in development. There is no
   `message` and no `error` key. Anything else a thrower attaches is dropped, so do not invent a key: put the fact
   in `code` or `detail`.
 - Prisma: P2002 → 409 `DUPLICATE`; P2025 → 404 `NOT_FOUND`; P2003 and P2014 → 409 `INVALID_STATE`; P2007 → 400.

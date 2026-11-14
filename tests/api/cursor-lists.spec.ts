@@ -35,6 +35,7 @@ test.describe('Lists are cursor lists @api', () => {
     '/support/admin/tickets',
     '/support/admin/tenants',
     '/super-admin/login-activity?from=2026-01-01&to=2026-01-31',
+    '/super-admin/outbound/held-back',
   ];
 
   for (const path of MEMBER_LISTS) {

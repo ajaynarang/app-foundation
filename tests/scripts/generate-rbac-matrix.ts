@@ -26,6 +26,23 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** `FEATURE_KEYS.X` constant name → value, read from the shared-types source so the scan resolves either spelling. */
+const FEATURE_KEY_VALUES: Record<string, string> = Object.fromEntries(
+  [
+    ...fs
+      .readFileSync(path.resolve(__dirname, '../../packages/shared-types/src/platform/feature-keys.ts'), 'utf8')
+      .matchAll(/^\s+([A-Z_]+): '([a-z_]+)',/gm),
+  ].map((m) => [m[1], m[2]]),
+);
+
+/** The feature a `@RequireFeature('x')` or `@RequireFeature(FEATURE_KEYS.X)` on this line names, if any. */
+function requiredFeatureOf(line: string): string | undefined {
+  const literal = line.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
+  if (literal) return literal[1];
+  const constant = line.match(/@RequireFeature\(FEATURE_KEYS\.(\w+)\)/);
+  return constant ? FEATURE_KEY_VALUES[constant[1]] : undefined;
+}
 // Resolved from tests/scripts/ (two levels up = repo root).
 const BACKEND_SRC = process.env.BACKEND_SRC || path.resolve(__dirname, '../../apps/backend/src');
 // Platform controllers moved into the foundation packages — scan those too.
@@ -145,9 +162,9 @@ function parseController(filePath: string): EndpointInfo[] {
           if (roles.length > 0) classRoles = roles;
         }
 
-        const featureMatch = prevLine.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
-        if (featureMatch) {
-          classFeatureGate = featureMatch[1];
+        const classFeature = requiredFeatureOf(prevLine);
+        if (classFeature) {
+          classFeatureGate = classFeature;
         }
       }
       break; // Found the class — stop scanning for class-level decorators
@@ -213,9 +230,9 @@ function parseController(filePath: string): EndpointInfo[] {
           if (roles.length > 0) methodRoles = roles;
         }
 
-        const featureMatch = nearby.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
-        if (featureMatch && j !== i) {
-          methodFeatureGate = featureMatch[1];
+        const methodFeature = requiredFeatureOf(nearby);
+        if (methodFeature && j !== i) {
+          methodFeatureGate = methodFeature;
         }
       }
 

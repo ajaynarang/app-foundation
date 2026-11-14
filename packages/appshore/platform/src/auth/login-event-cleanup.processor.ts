@@ -4,6 +4,8 @@ import type { JobEnvelope } from '@app/shared-types';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 /**
  * Owns `login-events-cleanup` on the `bulk-ops` queue. A plain handler — the
@@ -17,7 +19,11 @@ export class LoginEventCleanupJobHandler implements QueueJobHandler {
   constructor(private readonly prisma: PrismaService) {}
 
   async run(_job: Job<JobEnvelope<unknown>>): Promise<unknown> {
-    return this.cleanupLoginEvents();
+    const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP);
+    // Login events of every tenant: declared cross-tenant work.
+    const result = await systemScope('sweep.login-events-cleanup', () => this.cleanupLoginEvents());
+    cron.complete(result);
+    return result;
   }
 
   private async cleanupLoginEvents(): Promise<{ deleted: number }> {

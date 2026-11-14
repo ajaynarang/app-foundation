@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '@appshore/web-core/shared/lib/firebase';
 import { getCookieDomain, isLocalhost } from '@appshore/web-core/shared/lib/tenant-url';
+import { readWorkspaceSelection } from './workspace-selection';
 
 interface User {
   dbId?: number; // Numeric DB id — used by UI permission checks (e.g. agent supervisor match)
@@ -40,7 +41,11 @@ interface AuthState {
   isInitialized: boolean;
 
   // Actions
-  signIn: (email: string, password: string) => Promise<User | null>;
+  /**
+   * `tenantId` is the workspace hint: the tenant's public id, sent from a tenant subdomain or after the user picked a
+   * workspace. Throws `WorkspaceSelectionRequiredError` when the password matches accounts in several workspaces.
+   */
+  signIn: (email: string, password: string, tenantId?: string) => Promise<User | null>;
   setHasHydrated: (state: boolean) => void;
   setInitialized: (state: boolean) => void;
   signUp: (email: string, password: string) => Promise<FirebaseUser>;
@@ -94,7 +99,7 @@ export const useAuthStore = create<AuthState>()(
       // Sign in with email/password. First-party backend login is the primary
       // path (works with zero external services); Firebase is the fallback for
       // accounts that were created there (error code PASSWORD_NOT_SET).
-      signIn: async (email: string, password: string) => {
+      signIn: async (email: string, password: string, tenantId?: string) => {
         set({ isLoading: true });
         try {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -102,7 +107,7 @@ export const useAuthStore = create<AuthState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify(tenantId ? { email, password, tenantId } : { email, password }),
           });
           if (response.ok) {
             const data = await response.json();
@@ -117,6 +122,8 @@ export const useAuthStore = create<AuthState>()(
             return get().user;
           }
           const error = await response.json().catch(() => ({}));
+          const selection = readWorkspaceSelection(error);
+          if (selection) throw selection;
           if (error?.code === 'PASSWORD_NOT_SET' && isFirebaseConfigured) {
             // Account authenticates via Firebase — fall back.
             const userCredential = await signInWithEmailAndPassword(auth, email, password);

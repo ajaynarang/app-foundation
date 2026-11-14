@@ -76,7 +76,7 @@ Grab `x-request-id` from browser Network tab → Response headers.
 {service="app-backend"} | json | jobName=~".*cleanup.*" | level="50"
 
 # Heavy-hitter processors (filter out noise)
-{service="app-backend"} | json | jobName=~"data-retention|job-cleanup|uploads-cleanup"
+{service="app-backend"} | json | jobName=~"data-retention|job-cleanup|tokens-cleanup"
 
 # Logs from ANY job (BullMQ work), not HTTP
 {service="app-backend"} | json | jobName!=""

@@ -1,4 +1,4 @@
-// node --test tools/init-app/   (root script: pnpm test:init-app, run by pnpm verify)
+// node --test tools/init-app/*.test.mjs   (root script: pnpm test:init-app, run by pnpm verify)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

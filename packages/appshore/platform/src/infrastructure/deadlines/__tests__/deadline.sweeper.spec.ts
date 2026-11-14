@@ -1,4 +1,8 @@
 import type { Job } from 'bullmq';
+import { Logger } from '@nestjs/common';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
+import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { currentRls, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { DeadlineHandlerRegistry } from '../deadline-handler.registry';
 import {
@@ -104,6 +108,55 @@ describe('DeadlineSweeper', () => {
     expect(limit).toBe(DEADLINE_SWEEP_BATCH_SIZE);
   });
 
+  describe('tenant context', () => {
+    it('claims in the deadline-sweep system scope', async () => {
+      const scopes: unknown[] = [];
+      prisma.$queryRaw.mockImplementation(async () => {
+        scopes.push(currentRls());
+        return [];
+      });
+
+      await sweeper.sweep();
+
+      expect(scopes).toEqual([{ kind: 'system', reason: 'deadline-sweep' }]);
+    });
+
+    it("runs each handler as its row's tenant, and records the outcome back in the system scope", async () => {
+      const seen: unknown[] = [];
+      registry.register({
+        kind: 'TEST_KIND',
+        fire: jest.fn(async () => {
+          await new Promise((resolve) => setImmediate(resolve));
+          seen.push(currentRls());
+          return { outcome: 'fired' as const };
+        }),
+      });
+      const stampScopes: unknown[] = [];
+      prisma.deadline.updateMany.mockImplementation(async () => {
+        stampScopes.push(currentRls());
+        return { count: 1 };
+      });
+      prisma.$queryRaw.mockResolvedValueOnce([
+        claimed({ id: 'dl-1', tenantId: 4 }),
+        claimed({ id: 'dl-2', tenantId: 9 }),
+      ]);
+
+      await sweeper.sweep();
+
+      expect(seen).toEqual([
+        { kind: 'tenant', tenantId: 4, source: 'deadline:TEST_KIND' },
+        { kind: 'tenant', tenantId: 9, source: 'deadline:TEST_KIND' },
+      ]);
+      expect(new Set(stampScopes.map((s) => JSON.stringify(s)))).toEqual(
+        new Set([JSON.stringify({ kind: 'system', reason: 'deadline-sweep' })]),
+      );
+    });
+
+    it('refuses to run inside a tenant request (strict mode)', async () => {
+      await expect(runAsTenant(7, 'jwt', () => sweeper.sweep())).rejects.toThrow(/system scope \(deadline-sweep\)/);
+    });
+  });
+
   it('stamps firedAt and releases the lease when the handler fires', async () => {
     const handler = handlerReturning('TEST_KIND', { outcome: 'fired' });
     registry.register(handler);
@@ -202,6 +255,40 @@ describe('DeadlineSweeper', () => {
     expect(delay).toBeGreaterThanOrEqual(deadlineBackoffMs(3));
     expect(delay).toBeLessThan(deadlineBackoffMs(3) + 1_000);
     expect(summary.failed).toBe(1);
+  });
+
+  it('reports a throwing handler to the tracker with the sweep job name, so the runbook finds it', async () => {
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const failure = new Error('database hiccup');
+    registry.register(handlerReturning('TEST_KIND', failure));
+    prisma.$queryRaw.mockResolvedValueOnce([claimed({ tenantId: 7 })]);
+
+    await sweeper.sweep();
+
+    expect(reportSpy).toHaveBeenCalledWith(failure, {
+      jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP,
+      tenantId: 7,
+      source: errorTracking.ERROR_SOURCE.JOB,
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: expect.stringContaining('TEST_KIND'), err: expect.any(Object) }),
+    );
+    reportSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('reports a kind with no handler too: it can never fire until the code changes', async () => {
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+    prisma.$queryRaw.mockResolvedValueOnce([claimed({ kind: 'MYSTERY' })]);
+
+    await sweeper.sweep();
+
+    expect(reportSpy).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP, source: errorTracking.ERROR_SOURCE.JOB }),
+    );
+    reportSpy.mockRestore();
   });
 
   it('records a non-Error throw as text and cuts lastError to the column width', async () => {

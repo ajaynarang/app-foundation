@@ -61,15 +61,15 @@ export class LoginActivityService {
       ...(scope.isSuperAdmin ? { tenant: { select: { id: true, companyName: true } } } : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.loginEvent.findMany({
+    const [rows, total] = await this.prisma.$transaction(async (tx) => {
+      const found = await tx.loginEvent.findMany({
         where: keyset ? { AND: [where, keyset] } : where,
         include,
         orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
         take: take + 1,
-      }),
-      this.prisma.loginEvent.count({ where }),
-    ]);
+      });
+      return [found, await tx.loginEvent.count({ where })] as const;
+    });
 
     const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.publicId));
     return {

@@ -130,9 +130,7 @@ export class BillingAdminService {
 
       // If custom price differs from catalog, update locally
       if (customPriceCents && customPriceCents !== planConfig.pricePerUnitCents) {
-        this.logger.log(
-          `Custom price set for tenant ${tenantDbId}: $${(customPriceCents / 100).toFixed(2)}/unit (catalog: $${(planConfig.pricePerUnitCents / 100).toFixed(2)})`,
-        );
+        this.logger.log(`Custom price set for tenant ${tenantDbId}, differing from the catalog price`);
       }
 
       // Assign plan to tenant
@@ -219,7 +217,7 @@ export class BillingAdminService {
    */
   async addWalletCredit(tenantDbId: number, amountCents: number, reason: string, adminUserId: string): Promise<void> {
     await this.walletService.addCredit(tenantDbId, amountCents, reason, adminUserId);
-    this.logger.log(`Admin ${adminUserId} added $${(amountCents / 100).toFixed(2)} credit to tenant ${tenantDbId}`);
+    this.logger.log(`Admin ${adminUserId} added credit to tenant ${tenantDbId}`);
   }
 
   /**
@@ -291,7 +289,7 @@ export class BillingAdminService {
       data: { unitPriceCents },
     });
 
-    this.logger.log(`Price overridden for tenant ${tenantDbId}: $${(unitPriceCents / 100).toFixed(2)}/unit`);
+    this.logger.log(`Price overridden for tenant ${tenantDbId}`);
   }
 
   /**

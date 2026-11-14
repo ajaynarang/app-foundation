@@ -40,7 +40,8 @@ endpoint.
   subscriptions/invoices, credit wallet, trials, dunning.
 - **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
   realtime + outbound webhooks, multi-channel notifications (in-app/push/SMS/email), S3
-  file storage, OpenTelemetry + Grafana stack, health endpoints.
+  file storage, OpenTelemetry traces and metrics (off until an OTLP endpoint is set; a local
+  Loki/Tempo/Prometheus/Grafana profile for laptops), health endpoints.
 - **Three apps** — NestJS API, Next.js product app (tenant Settings and the super-admin
   screens included), and a Flutter mobile companion.
 - **Delivery** — docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache),
@@ -146,13 +147,13 @@ guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what tha
 
 ## Tech stack
 
-| Layer    | Tech                                                                                |
-| -------- | ----------------------------------------------------------------------------------- |
-| Backend  | NestJS 11 · TypeScript 5.9 · Prisma 7 · PostgreSQL 16 (pgvector) · Redis 7 · BullMQ |
-| Frontend | Next.js 15 (App Router) · Tailwind · shadcn/ui · TanStack Query · Zustand           |
-| Mobile   | Flutter 3                                                                           |
-| AI       | Anthropic · AI SDK · Mastra · MCP · Langfuse                                        |
-| Infra    | Docker Compose (dev) · Terraform + AWS ECS (prod) · Loki/Tempo/Grafana              |
+| Layer    | Tech                                                                                  |
+| -------- | ------------------------------------------------------------------------------------- |
+| Backend  | NestJS 11 · TypeScript 5.9 · Prisma 7 · PostgreSQL 16 (pgvector) · Redis 7 · BullMQ   |
+| Frontend | Next.js 15 (App Router) · Tailwind · shadcn/ui · TanStack Query · Zustand             |
+| Mobile   | Flutter 3                                                                             |
+| AI       | Anthropic · AI SDK · Mastra · MCP · Langfuse                                          |
+| Infra    | Docker Compose (dev) · Terraform + AWS ECS (prod) · OTLP + Sentry, off until keys set |
 
 ---
 
@@ -164,6 +165,10 @@ guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) decides what tha
   repo is optimized for AI-assisted development).
 - **[init-app](tools/init-app/README.md)** — the one-command rename tool.
 - **[Doppler secrets guide](docs/doppler.md)** — production-grade env management.
+- **[Operations](docs/operations.md)** — deploys, migrations, the maintenance and outbound switches, tenant reset,
+  staging data on a laptop, and why CI is manual.
+- **[Observability](docs/observability.md)** — where errors, logs, traces and metrics go, and the keys that switch
+  each one on.
 
 ## Contributing & license
 

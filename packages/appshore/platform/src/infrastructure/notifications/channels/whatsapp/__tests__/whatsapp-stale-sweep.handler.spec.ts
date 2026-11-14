@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { DeliveryLedgerService } from '../../../pipeline/delivery-ledger.service';
@@ -37,5 +38,19 @@ describe('WhatsAppStaleSweepHandler', () => {
     ledger.staleQueued.mockResolvedValue([]);
     await expect(handler.run(job)).resolves.toEqual({ unclaimed: 0, claimed: 0 });
     expect(ledger.markQueueLost).not.toHaveBeenCalled();
+  });
+
+  it('runs the sweep as declared cross-tenant work (sweep.whatsapp-stale)', async () => {
+    const seen: unknown[] = [];
+    ledger.staleQueued.mockImplementation(async () => {
+      seen.push(currentRls());
+      return [{ id: 'a' }];
+    });
+    ledger.markQueueLost.mockImplementation(async () => {
+      seen.push(currentRls());
+      return 1;
+    });
+    await handler.run(job);
+    expect(seen).toEqual(Array(3).fill({ kind: 'system', reason: 'sweep.whatsapp-stale' }));
   });
 });

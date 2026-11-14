@@ -1,0 +1,57 @@
+# .github/workflows/grafana-as-code.yml
+# Manual by default: run it from the Actions tab (or `gh workflow run grafana-as-code.yml`).
+# To run it on every push to main and every PR that touches these paths, uncomment the two triggers below.
+#
+# Runs `pnpm check:ops`, the same script `pnpm verify` and the pre-push hook run: the generated Grafana alerting and
+# dashboard files match the catalog, the catalog validates (labels, runbook links and anchors, names checked against
+# the code), the ops shell tests and Terraform fmt / validate / test (the AWS provider is mocked). It never talks to
+# Grafana; applying is grafana-apply.mjs, by hand. Its own file because a job inside ci.yml cannot carry a path filter.
+
+name: Grafana as code
+
+on:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'infra/observability/grafana-cloud/**'
+  #     - 'docs/runbooks/**'
+  #     - 'tools/init-app/**'
+  #     - '.github/workflows/grafana-as-code.yml'
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'infra/observability/grafana-cloud/**'
+  #     - 'docs/runbooks/**'
+  #     - 'tools/init-app/**'
+  #     - '.github/workflows/grafana-as-code.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-ops:
+    name: Ops checks (Grafana catalog, ops shell tests, Terraform)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The scripts are plain Node and bash: no install step.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: check:ops
+        run: bash tools/verify/check-ops.sh
+
+      # init-app renames the catalog and regenerates it; this proves a scaffolded copy still passes.
+      - name: Scaffolded catalog
+        run: node tools/init-app/check-scaffold-observability.mjs

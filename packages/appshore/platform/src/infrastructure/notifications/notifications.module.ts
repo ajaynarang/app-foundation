@@ -8,7 +8,7 @@ import { jobHandlersToken, type QueueJobHandler } from '@appshore/kernel/infrast
 import { PrismaModule } from '../database/prisma.module';
 import { SmsModule } from '../sms/sms.module';
 import { FeatureFlagsModule } from '../../domains/feature-flags/feature-flags.module';
-import { PlansModule } from '../../domains/plans/plans.module';
+import { EntitlementsModule } from '../../domains/entitlements/entitlements.module';
 import { NotificationPolicyRegistry } from './notification-policy.registry';
 import { ChannelResolutionService } from './pipeline/channel-resolution.service';
 import { NotificationDeliveryService } from './pipeline/delivery.service';
@@ -52,7 +52,7 @@ import {
     PrismaModule,
     SmsModule,
     FeatureFlagsModule,
-    PlansModule,
+    EntitlementsModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.WHATSAPP }),
   ],
   controllers: [

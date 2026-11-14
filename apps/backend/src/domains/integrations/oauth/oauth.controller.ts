@@ -34,9 +34,13 @@ import {
 } from '@nestjs/swagger';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { IntegrationOAuthConnectResponse } from '../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { NoFeatureGate } from '@appshore/platform/auth/decorators/no-feature-gate.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 @ApiTags('Integrations')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.INTEGRATIONS)
 @Controller('integrations/oauth')
 export class OAuthController extends BaseTenantController {
   private readonly logger = new Logger(OAuthController.name);
@@ -82,6 +86,8 @@ export class OAuthController extends BaseTenantController {
   // A browser redirect whose query the vendor writes: not part of the published contract.
   @ApiExcludeEndpoint()
   @Public()
+  // The vendor's redirect carries no signed-in user; the connect step that started it was already plan-gated.
+  @NoFeatureGate()
   async callback(@Query('code') code: string, @Query('state') state: string, @Req() req: any, @Res() res: Response) {
     // The browser returns to the web app: APP_URL is the origin every other web link uses.
     const appUrl = (this.config.get<string>('APP_URL') || 'http://localhost:3000').replace(/\/$/, '');

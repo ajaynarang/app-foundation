@@ -21,6 +21,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as crypto from 'crypto';
 import { USER_LIFECYCLE_HOOKS, type UserLifecycleHooks } from '../platform-hooks';
+import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
 
 const USER_KEYSET = { field: 'createdAt', idField: 'userId', kind: 'date', direction: 'desc' } as const;
 
@@ -53,6 +54,7 @@ export class UsersService {
 
   constructor(
     private prisma: PrismaService,
+    private readonly entitlements: TenantEntitlementsService,
     @Optional() @Inject(USER_LIFECYCLE_HOOKS) private readonly lifecycleHooks?: UserLifecycleHooks,
   ) {}
 
@@ -144,6 +146,8 @@ export class UsersService {
         throw new NotFoundException('Tenant not found');
       }
       tenantDbId = tenant.id;
+      // A new user takes a seat in the workspace's plan.
+      await this.entitlements.assertUserSeatAvailable(tenantDbId, { route: 'POST /users' });
     }
 
     // Generate unique user ID
@@ -324,6 +328,11 @@ export class UsersService {
     // ADMIN cannot deactivate other ADMINs (only OWNER can)
     if (user.role === 'ADMIN' && currentUser?.role !== 'OWNER') {
       throw new ForbiddenException('Only the tenant owner can deactivate admin users');
+    }
+
+    // Reactivating a user takes a seat again; deactivating frees one and is never refused.
+    if (isActive && !user.isActive && user.tenantId) {
+      await this.entitlements.assertUserSeatAvailable(user.tenantId, { route: 'POST /users/:user_id/activate' });
     }
 
     await this.prisma.user.update({

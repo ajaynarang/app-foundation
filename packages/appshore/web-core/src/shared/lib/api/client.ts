@@ -8,15 +8,18 @@
  */
 
 import { getSessionStore } from '@appshore/web-core/auth/session-bridge';
+import { resolveRequestId } from '../request-id';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export class ApiError extends Error {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(
     public status: number,
     message: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public data?: any,
+    /** The id the backend logged this request under (`x-request-id`); tagged on the Sentry event to find its logs. */
+    public requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -102,7 +105,7 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
-    throw new ApiError(401, 'Session expired. Please login again.');
+    throw new ApiError(401, 'Session expired. Please login again.', undefined, resolveRequestId(response));
   }
 
   // Handle other errors
@@ -114,6 +117,7 @@ export async function apiClient<T = any>(url: string, options: ApiClientOptions 
       response.status,
       error.detail || 'Request failed', // the error envelope's copy is `detail`; there is no `message`
       error, // Full response object — includes fieldErrors, debugDetail (dev), etc.
+      resolveRequestId(response),
     );
   }
 

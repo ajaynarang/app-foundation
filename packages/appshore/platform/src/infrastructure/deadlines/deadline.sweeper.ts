@@ -3,7 +3,11 @@ import type { Job } from 'bullmq';
 import type { Deadline, Prisma } from '@appshore/db';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { RLS_SOURCE, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 import { PrismaService } from '../database/prisma.service';
 import { DeadlineHandlerRegistry } from './deadline-handler.registry';
 import { DEADLINE_HANDLERS, PENDING_DEADLINE, type DeadlineOutcome } from './deadline.types';
@@ -60,6 +64,9 @@ export function deadlineBackoffMs(attempts: number): number {
  * records its outcome. A handler that throws or times out (or a kind with no handler) leaves
  * `lastError` and a capped backoff; the row is retried until it resolves, because a lapse is never
  * forgiven by a broken handler. Rows are isolated: one failure never blocks another.
+ *
+ * Tenant context: the sweep is declared system work (`deadline-sweep`), because it claims rows of every tenant; each
+ * handler runs as its row's tenant (`runAsTenant`), and the outcome is recorded back in the system scope.
  */
 @Injectable()
 export class DeadlineSweeper implements QueueJobHandler {
@@ -72,10 +79,14 @@ export class DeadlineSweeper implements QueueJobHandler {
   ) {}
 
   run(job: Job): Promise<DeadlineSweepSummary> {
-    return withJobLogContext(job, () => this.sweep());
+    return withJobContext(job, () => this.sweep());
   }
 
-  async sweep(): Promise<DeadlineSweepSummary> {
+  sweep(): Promise<DeadlineSweepSummary> {
+    return systemScope('deadline-sweep', () => this.sweepAll());
+  }
+
+  private async sweepAll(): Promise<DeadlineSweepSummary> {
     const summary: DeadlineSweepSummary = {
       claimed: 0,
       fired: 0,
@@ -125,17 +136,35 @@ export class DeadlineSweeper implements QueueJobHandler {
     const handler = this.handlers.get(row.kind);
     if (!handler) {
       this.logger.warn(`Deadline ${row.id}: no handler for kind "${row.kind}" — backing off`);
+      this.report(new Error(`No deadline handler for kind ${row.kind}`), row);
       return this.recordFailure(row, `no handler for kind ${row.kind}`);
     }
     let outcome: DeadlineOutcome;
     try {
-      outcome = await withTimeout(handler.fire(row), DEADLINE_HANDLER_TIMEOUT_MS);
+      const fire = runAsTenant(row.tenantId, `${RLS_SOURCE.DEADLINE}:${row.kind}`, () => handler.fire(row));
+      outcome = await withTimeout(fire, DEADLINE_HANDLER_TIMEOUT_MS);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Deadline ${row.id} (${row.kind}) handler threw on attempt ${row.attempts}: ${message}`);
+      this.logger.warn({
+        msg: `Deadline ${row.id} (${row.kind}) handler threw on attempt ${row.attempts}`,
+        err: toLoggableError(error),
+      });
+      this.report(error, row);
       return this.recordFailure(row, message);
     }
     return this.recordOutcome(row, outcome);
+  }
+
+  /**
+   * A failing row leaves the `deadline-sweep-late` gauge (it is FAILING on the Timers page and waits out its backoff),
+   * so the tracker is where a handler that keeps failing shows up. Retries repeat the report; Sentry groups them.
+   */
+  private report(error: unknown, row: Deadline): void {
+    reportError(error, {
+      jobName: BULK_OPS_JOB_NAMES.DEADLINE_SWEEP,
+      tenantId: row.tenantId,
+      source: ERROR_SOURCE.JOB,
+    });
   }
 
   /**

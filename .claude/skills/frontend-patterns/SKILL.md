@@ -9,6 +9,8 @@ Authoritative reference for all frontend conventions. Every new feature, page, o
 
 Examples below use a neutral demo domain (projects / tasks). Substitute your own entities — the patterns are what matter.
 
+Logging and error reporting follow `docs/standards/observability.md`.
+
 ---
 
 ## 0. Code Quality Principles (read first — override defaults, apply to ALL frontend code)

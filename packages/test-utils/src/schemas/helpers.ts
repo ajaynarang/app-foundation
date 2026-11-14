@@ -96,7 +96,7 @@ export const stringId = z.string().min(1);
 
 /**
  * The one error envelope every non-protocol route answers (`ApiErrorEnvelope` in `@app/shared-types`):
- * `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing else. There is no
+ * `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing else. There is no
  * `message` and no `error` key. Pass a status to pin it.
  */
 export function apiErrorEnvelope(status?: number) {
@@ -106,6 +106,7 @@ export function apiErrorEnvelope(status?: number) {
       code: z.string().min(1),
       detail: z.string().min(1),
       fieldErrors: z.record(z.string(), z.string()).optional(),
+      workspaces: z.array(z.object({ tenantId: z.string(), name: z.string() }).strict()).optional(),
       timestamp: z.string(),
       path: z.string(),
       method: z.string(),

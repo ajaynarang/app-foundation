@@ -16,11 +16,12 @@ import { Response, Request as ExpressRequest } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiNoContentResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+import { RefreshSessionService, type RefreshSession } from './refresh-session.service';
 import { LoginResponseDto, UserProfileDto } from './dto/login.dto';
 import { PasswordLoginDto, ForgotPasswordDto, ResetPasswordDto, PersonalRegisterDto } from './dto/password-login.dto';
 import { FirebaseExchangeDto } from './dto/firebase-exchange.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyOtpDto, VerifyOtpLoginDto } from './dto/verify-otp.dto';
 import { PhoneLoginDto } from './dto/phone-login.dto';
 import { SetPinDto } from './dto/set-pin.dto';
 import { AddPhoneDto } from './dto/add-phone.dto';
@@ -43,6 +44,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private refreshSessions: RefreshSessionService,
   ) {
     this.isProduction = this.configService.get<string>('environment') === 'production';
   }
@@ -62,10 +64,14 @@ export class AuthController {
   })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'First-party email + password login' })
+  @ApiOperation({
+    summary:
+      'First-party email + password login; 409 WORKSPACE_SELECTION_REQUIRED (with `workspaces`) when the password matches accounts in several workspaces — retry with one `tenantId`',
+  })
   @ApiBody({ type: PasswordLoginDto })
   @ApiResponse({ status: 200, type: LoginResponseDto })
   @ApiResponse({ status: 401 })
+  @ApiResponse({ status: 409, description: 'WORKSPACE_SELECTION_REQUIRED: choose one of `workspaces` and retry' })
   async login(
     @Body() dto: PasswordLoginDto,
     @Req() req: ExpressRequest,
@@ -155,11 +161,14 @@ export class AuthController {
   @UseGuards(RefreshJwtAuthGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiOperation({ summary: 'Refresh access token using refresh token (rotates the refresh cookie)' })
   @ApiResponse({ status: 200, type: LoginResponseDto })
   @ApiResponse({ status: 401 })
-  async refreshToken(@CurrentUser() user: any) {
-    const result = await this.authService.refreshAccessToken(user.userId, user.tokenId);
+  async refreshToken(@CurrentUser() session: RefreshSession, @Res({ passthrough: true }) response: Response) {
+    const result = await this.refreshSessions.refresh(session);
+    // Every refresh rotates: the cookie now holds the successor. The token it replaced stays valid until the
+    // successor is first presented, so a lost response does not log the client out.
+    this.setRefreshTokenCookie(response, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };
   }
 
@@ -219,7 +228,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Send OTP to phone number (always 204, so a number cannot be probed)' })
   @ApiNoContentResponse()
   async sendPhoneOtp(@Body() dto: SendOtpDto): Promise<void> {
-    await this.authService.sendPhoneOtp(dto.phone);
+    await this.authService.sendPhoneOtp(dto.phone, dto.tenantId);
   }
 
   @Public()
@@ -231,7 +240,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify OTP and issue JWT tokens' })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 401 })
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) response: Response) {
+  async verifyOtp(@Body() dto: VerifyOtpLoginDto, @Res({ passthrough: true }) response: Response) {
     const result = await this.authService.loginWithOtp(dto);
     this.setRefreshTokenCookie(response, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };

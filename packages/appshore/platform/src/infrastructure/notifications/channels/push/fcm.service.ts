@@ -1,7 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { initializeFirebase, admin } from '../../../../config/firebase.config';
 import { DevicePlatform } from '@appshore/db';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 export interface FcmPushPayload {
   title: string;
@@ -34,7 +41,10 @@ export class FcmService {
   private readonly enabled: boolean;
   private messaging: admin.messaging.Messaging | null = null;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     this.enabled = Boolean(
       process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY,
     );
@@ -43,6 +53,11 @@ export class FcmService {
     } else {
       this.logger.log('FCM push disabled — Firebase credentials not configured; mobile push will no-op');
     }
+  }
+
+  /** True when Firebase credentials are set, so a send can reach a device. */
+  canSend(): boolean {
+    return this.enabled;
   }
 
   async registerDevice(userDbId: number, tenantDbId: number, token: string, platform: DevicePlatform) {
@@ -67,6 +82,10 @@ export class FcmService {
   /** Returns how many devices were actually reached — zero is not success. */
   async sendToUser(userDbId: number, payload: FcmPushPayload): Promise<number> {
     if (!this.enabled) return 0;
+    // Outside production only allow-listed users get a push; the gate records the rest (ADR "Outbound gate").
+    if (!(await this.outboundGate.allowUser(userDbId, { source: OUTBOUND_SOURCE.PUSH_FCM, subject: payload.title }))) {
+      return 0;
+    }
 
     const devices = await this.prisma.notificationDevice.findMany({
       where: { userId: userDbId },
@@ -82,20 +101,24 @@ export class FcmService {
 
       const result = await messaging.sendEachForMulticast({
         tokens: devices.map((d) => d.token),
-        notification: { title: payload.title, body: payload.body },
+        notification: { title: this.outboundGate.markPushTitle(payload.title), body: payload.body },
         ...(payload.data ? { data: payload.data } : {}),
       });
 
       const deadDeviceIds: number[] = [];
+      let deliveryFailures = 0;
       result.responses.forEach((response, index) => {
         if (response.success) return;
         const code = response.error?.code ?? 'unknown';
         if (DEAD_TOKEN_ERROR_CODES.has(code)) {
           deadDeviceIds.push(devices[index].id);
         } else {
+          deliveryFailures += 1;
           this.logger.warn(`FCM send failed for user ${userDbId}: ${code}`);
         }
       });
+      // A pruned dead token is housekeeping, not a failed send.
+      recordOutboundFailed(OUTBOUND_CHANNEL.PUSH, deliveryFailures);
 
       if (deadDeviceIds.length > 0) {
         await this.prisma.notificationDevice.deleteMany({ where: { id: { in: deadDeviceIds } } });
@@ -103,8 +126,9 @@ export class FcmService {
       }
 
       return result.successCount;
-    } catch (error: any) {
-      this.logger.error(`FCM multicast failed for user ${userDbId}: ${error.message}`);
+    } catch (error) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.PUSH, devices.length);
+      this.logger.error({ msg: `FCM multicast failed for user ${userDbId}`, err: toLoggableError(error) });
       return 0;
     }
   }

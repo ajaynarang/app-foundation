@@ -5,7 +5,9 @@ import { PrismaService } from '../database/prisma.service';
 import { BULK_OPS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-handler.contract';
 import { JobCleanupJob } from './job-cleanup.job';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
+import { systemScope } from '@appshore/kernel/infrastructure/rls/system-scope';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -26,10 +28,20 @@ export class DataRetentionJobHandler implements QueueJobHandler {
   async run(job: Job<JobEnvelope<unknown>>): Promise<unknown> {
     switch (job.name) {
       case BULK_OPS_JOB_NAMES.JOB_CLEANUP:
-        return withJobLogContext(job, () => this.jobCleanupJob.cleanupOldJobs());
+        return withJobContext(job, async () => {
+          const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.JOB_CLEANUP);
+          const result = await systemScope('sweep.job-cleanup', () => this.jobCleanupJob.cleanupOldJobs());
+          cron.complete(result);
+          return result;
+        });
       case BULK_OPS_JOB_NAMES.DATA_RETENTION:
       default:
-        return withJobLogContext(job, () => this.runDataRetention());
+        return withJobContext(job, async () => {
+          const cron = new CronRun(this.logger, BULK_OPS_JOB_NAMES.DATA_RETENTION);
+          const summary = await systemScope('sweep.data-retention', () => this.runDataRetention());
+          cron.complete(summary);
+          return summary;
+        });
     }
   }
 
@@ -42,6 +54,7 @@ export class DataRetentionJobHandler implements QueueJobHandler {
       const completedJobsDeleted = await this.cleanupCompletedJobs();
       const domainEventLogsDeleted = await this.cleanupDomainEventLogs();
       const hitlChallengesDeleted = await this.cleanupHitlChallenges();
+      const outboundSuppressionsDeleted = await this.cleanupOutboundSuppressions();
 
       const summary = {
         loginEventsDeleted,
@@ -49,6 +62,7 @@ export class DataRetentionJobHandler implements QueueJobHandler {
         completedJobsDeleted,
         domainEventLogsDeleted,
         hitlChallengesDeleted,
+        outboundSuppressionsDeleted,
       };
 
       this.logger.log(`Data retention cleanup complete: ${JSON.stringify(summary)}`);
@@ -120,6 +134,22 @@ export class DataRetentionJobHandler implements QueueJobHandler {
     });
 
     this.logger.log(`Domain event logs: deleted ${result.count} records older than 90 days`);
+
+    return result.count;
+  }
+
+  /**
+   * Delete sends the outbound gate held back (`outbound_suppressions`) after 30 days. They are a test environment's
+   * record of who it did not message; a month is enough to notice and allow-list someone.
+   */
+  private async cleanupOutboundSuppressions(): Promise<number> {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const result = await this.prisma.outboundSuppression.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+
+    this.logger.log(`Held-back outbound sends: deleted ${result.count} records older than 30 days`);
 
     return result.count;
   }

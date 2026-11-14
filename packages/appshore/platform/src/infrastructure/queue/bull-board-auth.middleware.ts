@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@appshore/db';
 import { writeErrorEnvelope } from '../../shared/filters/error-envelope';
+import { isDevelopmentEnv } from '@appshore/kernel/shared/utils/env-label';
 
 @Injectable()
 export class BullBoardAuthMiddleware implements NestMiddleware {
@@ -15,10 +16,9 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
   ) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
-    // Dev bypass: set BULL_BOARD_AUTH=false in .env.local to skip auth.
-    // Both checks use process.env directly — this is an intentional debug
-    // flag outside the typed config schema and should never appear in production.
-    if (process.env.NODE_ENV !== 'production' && process.env.BULL_BOARD_AUTH === 'false') {
+    // Dev bypass: set BULL_BOARD_AUTH=false in .env.local to skip auth. A debug flag outside the typed config
+    // schema, honoured only on a developer's machine (ENV_TYPE=development): never on a deployed task.
+    if (isDevelopmentEnv() && process.env.BULL_BOARD_AUTH === 'false') {
       return next();
     }
 

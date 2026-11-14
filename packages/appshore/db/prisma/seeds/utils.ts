@@ -13,6 +13,22 @@ export function detectEnvironment(): Environment {
   return 'local';
 }
 
+/**
+ * The database the seed writes to. Never a default: a fixed local port can belong to another project's container on
+ * the same machine, and the seed would then write into it. `index.ts` loads `apps/backend/.env` first, so a set-up
+ * checkout has it.
+ */
+export function requireDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error(
+      'DATABASE_URL is not set. The seed writes to the database it names and never guesses one. ' +
+        'Set it in apps/backend/.env (see apps/backend/.env.example) or export it, then run the seed again.',
+    );
+  }
+  return url;
+}
+
 export function getDatabaseName(): string {
   const url = process.env.DATABASE_URL || '';
   const match = url.match(/\/([^/?]+)(\?|$)/);

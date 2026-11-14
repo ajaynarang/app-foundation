@@ -11,7 +11,23 @@ name: Deploy All
 #   DOPPLER_TOKEN_STG, DOPPLER_TOKEN_PRD
 #   VERCEL_WEB_DEPLOY_HOOK_STAGING, VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
 #
-# Required GitHub Environments: staging, production (with Required Reviewers)
+# Optional deploy markers (docs/observability.md, "Deploy markers"); each step is a no-op until its values exist:
+#   secrets.SENTRY_AUTH_TOKEN, secrets.SENTRY_ORG, vars.SENTRY_PROJECT_BACKEND   Sentry release + deploy record
+#   vars.GRAFANA_URL, secrets.GRAFANA_SA_TOKEN                                   Grafana deploy and kb-sync-failed annotations
+#   secrets.IRM_WEBHOOK_URL                                                      sev2 notification when the KB sync fails
+#
+# Required GitHub Environments: staging, production
+# Required repo variable: PRODUCTION_DEPLOYERS — comma-separated GitHub logins allowed to deploy production. Unset means
+#   every production deploy fails (.github/scripts/check-production-deployer.sh, in the validate job). Required
+#   reviewers on the production environment, where your GitHub plan offers them, are a second gate on top.
+#
+# Doppler keys the migration jobs read: DATABASE_URL (required); SUPER_ADMIN_PASSWORD (production seeds; without it
+#   no super-admin password is seeded); COHERE_API_KEY (knowledge-base embeddings; without it the sync stores text for
+#   full-text search and warns). The knowledge-base sync runs once per deploy, after the base seeds, and never fails
+#   the deploy.
+#
+# Order (docs/operations.md, "Deploy"): migrations run before the services roll, so for a few minutes the previous
+# release's tasks run against the new schema. A migration must be safe for the code of the release before it.
 
 on:
   workflow_dispatch:
@@ -42,6 +58,26 @@ jobs:
     name: Validate branch
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Hermetic: curl and npx are stubbed, nothing is sent. Every deploy proves the marker script still works.
+      - name: Test the deploy-marker script
+        run: bash .github/scripts/observability-markers.test.sh
+
+      # Hermetic: the deployer check and the jump-host filter (every `aws ecs list-tasks` names the API service).
+      - name: Test the deploy gate scripts
+        run: |
+          bash .github/scripts/check-production-deployer.test.sh
+          bash .github/scripts/check-ecs-service-filter.test.sh
+
+      - name: Enforce the production deployer list (PRODUCTION_DEPLOYERS)
+        env:
+          DEPLOY_ENV: ${{ github.event.inputs.environment }}
+          ACTOR: ${{ github.actor }}
+          PRODUCTION_DEPLOYERS: ${{ vars.PRODUCTION_DEPLOYERS }}
+        run: bash .github/scripts/check-production-deployer.sh
+
       - name: Enforce branch-environment mapping
         run: |
           ENV="${{ github.event.inputs.environment }}"
@@ -63,6 +99,9 @@ jobs:
     name: Build & Push to ECR
     needs: validate
     runs-on: ubuntu-latest
+    # Fail fast instead of hanging: a reclaimed runner otherwise sits in progress until the six-hour default with no
+    # log. A real build and push takes well under this.
+    timeout-minutes: 40
     permissions:
       id-token: write
       contents: read
@@ -73,6 +112,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -109,18 +151,31 @@ jobs:
         id: meta
         run: echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+      # The runner ships with about 14 GB free; the image plus BuildKit's layer store can exhaust it and the runner is
+      # reclaimed mid-build with no log. Removing the preinstalled SDKs this job never uses frees about 25 GB.
+      - name: Free disk space
         run: |
-          docker build \
-            -f apps/backend/Dockerfile \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "--- before ---"; df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          echo "--- after ---"; df -h /
+
+      # BuildKit with the GitHub Actions layer cache, so an unchanged layer is not rebuilt on every deploy. BUILD_SHA
+      # becomes SENTRY_RELEASE in the image, the same version the Sentry deploy marker records.
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          provenance: false
+          build-args: BUILD_SHA=${{ steps.meta.outputs.tag }}
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────────────────────
   # 1.5. Run database migrations via SSM tunnel
@@ -140,6 +195,19 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
+    # A throwaway Redis for the knowledge-base sync: its route resolver caches in Redis, and the environment's own
+    # Redis is private to the VPC. The cache holds nothing the sync needs to share.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout
@@ -162,6 +230,10 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @appshore/db prisma:generate
+
+      # The knowledge-base sync runs the backend's ingestion command, which consumes the foundation packages' dist.
+      - name: Build foundation packages
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -215,19 +287,27 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db-secret.outputs.database_url }}
           RDS_HOST: ${{ steps.db-secret.outputs.rds_host }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+          DEPLOY_ENV: staging
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IRM_WEBHOOK_URL: ${{ secrets.IRM_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           CLUSTER="app-staging-ecs-cluster"
           TUNNEL_PORT=5433
 
-          # Find a running ECS task to use as SSM jump host
+          # A running task of the API service is the SSM jump host. Only that service: the worker's ECS Exec is off,
+          # so a worker task cannot be one (check-ecs-service-filter.sh holds every list-tasks call to this).
           TASK_ARNS=$(aws ecs list-tasks \
             --cluster "$CLUSTER" \
+            --service-name "app-staging-ecs-service-api" \
             --desired-status RUNNING \
             --query 'taskArns[0]' \
             --output text)
 
           if [ -z "$TASK_ARNS" ] || [ "$TASK_ARNS" = "None" ]; then
-            echo "::error::No running tasks in cluster $CLUSTER"
+            echo "::error::No running task in service app-${DEPLOY_ENV}-ecs-service-api (cluster $CLUSTER)"
             exit 1
           fi
 
@@ -309,6 +389,30 @@ jobs:
           DATABASE_URL="$TUNNEL_URL" pnpm exec ts-node prisma/seeds/index.ts
 
           echo "✓ Seeds applied successfully"
+
+          # Knowledge base: sync apps/backend/content into the database, once per deploy, after the base seeds.
+          # Incremental (an unchanged corpus is a no-op) and never fatal: a stale knowledge base must not block a
+          # deploy. The ingestion command reads the environment's own config from Doppler, with the tunnel URL and the
+          # job's throwaway Redis in place of the private hosts.
+          echo "Syncing knowledge base..."
+          if [ -z "$(doppler secrets get COHERE_API_KEY --plain 2>/dev/null || true)" ]; then
+            echo "::warning::COHERE_API_KEY is not set in Doppler: the knowledge base syncs without embeddings, so search is full-text only. Set it and deploy again (or run 'pnpm seed:knowledge') to embed."
+          fi
+          if (cd "$GITHUB_WORKSPACE/apps/backend" &&
+            timeout 900 doppler run -- env DATABASE_URL="$TUNNEL_URL" REDIS_URL="redis://127.0.0.1:6379" pnpm -s seed:knowledge); then
+            echo "✓ Knowledge base synced"
+          else
+            echo "::warning::Knowledge base sync failed on ${DEPLOY_ENV}; the assistant answers from the previous knowledge base"
+            # Non-fatal but not silent: a dashboard line and a sev2 notification (each a no-op until its values exist).
+            "$GITHUB_WORKSPACE/.github/scripts/observability-markers.sh" grafana-annotation \
+              "Knowledge base sync failed on ${DEPLOY_ENV} (${RUN_URL})" \
+              kb-sync-failed "env:${DEPLOY_ENV}" service:backend
+            "$GITHUB_WORKSPACE/.github/scripts/observability-markers.sh" irm-alert \
+              "kb-sync-failed-${DEPLOY_ENV}-${GITHUB_SHA}" \
+              "Knowledge base sync failed (${DEPLOY_ENV})" \
+              "The deploy continued; the assistant answers from the previous knowledge base until the next successful sync. Re-run the deploy or 'pnpm seed:knowledge' against ${DEPLOY_ENV}. Run: ${RUN_URL}" \
+              sev2
+          fi
 
           # Cleanup tunnel
           kill $TUNNEL_PID 2>/dev/null || true
@@ -395,6 +499,29 @@ jobs:
           echo "Staging smoke test failed after 10 attempts"
           exit 1
 
+      # Deploy markers: a Sentry release and deploy whose version is the image's git SHA (the image carries it as
+      # SENTRY_RELEASE), and a Grafana annotation so the boards show the deploy line. Each is a no-op until its
+      # values exist, and a vendor error only warns.
+      - name: Sentry release and deploy marker
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_BACKEND: ${{ vars.SENTRY_PROJECT_BACKEND }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          .github/scripts/observability-markers.sh sentry-release "$SENTRY_PROJECT_BACKEND" "$IMAGE_TAG" staging
+
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy backend ${IMAGE_TAG:0:7} to staging by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:staging service:backend
+
   # ─────────────────────────────────────────────────────────────
   # 2.5. Run database migrations (Production)
   # ─────────────────────────────────────────────────────────────
@@ -407,6 +534,19 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
+    # A throwaway Redis for the knowledge-base sync: its route resolver caches in Redis, and the environment's own
+    # Redis is private to the VPC. The cache holds nothing the sync needs to share.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout
@@ -429,6 +569,10 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm --filter @appshore/db prisma:generate
+
+      # The knowledge-base sync runs the backend's ingestion command, which consumes the foundation packages' dist.
+      - name: Build foundation packages
+        run: pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -482,18 +626,26 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db-secret.outputs.database_url }}
           RDS_HOST: ${{ steps.db-secret.outputs.rds_host }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          DEPLOY_ENV: production
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IRM_WEBHOOK_URL: ${{ secrets.IRM_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           CLUSTER="app-production-ecs-cluster"
           TUNNEL_PORT=5433
 
+          # A running task of the API service is the SSM jump host; the worker's ECS Exec is off.
           TASK_ARNS=$(aws ecs list-tasks \
             --cluster "$CLUSTER" \
+            --service-name "app-production-ecs-service-api" \
             --desired-status RUNNING \
             --query 'taskArns[0]' \
             --output text)
 
           if [ -z "$TASK_ARNS" ] || [ "$TASK_ARNS" = "None" ]; then
-            echo "::error::No running tasks in cluster $CLUSTER"
+            echo "::error::No running task in service app-${DEPLOY_ENV}-ecs-service-api (cluster $CLUSTER)"
             exit 1
           fi
 
@@ -565,11 +717,44 @@ jobs:
 
           echo "✓ Migrations applied successfully"
 
-          # Run base seeds (reference data, plans, flags, etc.)
+          # Run base seeds (reference data, plans, flags, etc.). ENV_TYPE=production: the seeds attach no dev
+          # credential, so a new super-admin gets SUPER_ADMIN_PASSWORD from Doppler or no password at all, never the
+          # shared dev default.
           echo "Running base seeds..."
-          DATABASE_URL="$TUNNEL_URL" pnpm exec ts-node prisma/seeds/index.ts
+          SUPER_ADMIN_PASSWORD="$(doppler secrets get SUPER_ADMIN_PASSWORD --plain 2>/dev/null || true)"
+          if [ -n "$SUPER_ADMIN_PASSWORD" ]; then
+            echo "::add-mask::$SUPER_ADMIN_PASSWORD"
+          else
+            echo "::warning::SUPER_ADMIN_PASSWORD is not set in Doppler: a super-admin created by this seed has no password."
+          fi
+          DATABASE_URL="$TUNNEL_URL" ENV_TYPE=production SUPER_ADMIN_PASSWORD="$SUPER_ADMIN_PASSWORD" \
+            pnpm exec ts-node prisma/seeds/index.ts
 
           echo "✓ Seeds applied successfully"
+
+          # Knowledge base: sync apps/backend/content into the database, once per deploy, after the base seeds.
+          # Incremental (an unchanged corpus is a no-op) and never fatal: a stale knowledge base must not block a
+          # deploy. The ingestion command reads the environment's own config from Doppler, with the tunnel URL and the
+          # job's throwaway Redis in place of the private hosts.
+          echo "Syncing knowledge base..."
+          if [ -z "$(doppler secrets get COHERE_API_KEY --plain 2>/dev/null || true)" ]; then
+            echo "::warning::COHERE_API_KEY is not set in Doppler: the knowledge base syncs without embeddings, so search is full-text only. Set it and deploy again (or run 'pnpm seed:knowledge') to embed."
+          fi
+          if (cd "$GITHUB_WORKSPACE/apps/backend" &&
+            timeout 900 doppler run -- env DATABASE_URL="$TUNNEL_URL" REDIS_URL="redis://127.0.0.1:6379" pnpm -s seed:knowledge); then
+            echo "✓ Knowledge base synced"
+          else
+            echo "::warning::Knowledge base sync failed on ${DEPLOY_ENV}; the assistant answers from the previous knowledge base"
+            # Non-fatal but not silent: a dashboard line and a sev2 notification (each a no-op until its values exist).
+            "$GITHUB_WORKSPACE/.github/scripts/observability-markers.sh" grafana-annotation \
+              "Knowledge base sync failed on ${DEPLOY_ENV} (${RUN_URL})" \
+              kb-sync-failed "env:${DEPLOY_ENV}" service:backend
+            "$GITHUB_WORKSPACE/.github/scripts/observability-markers.sh" irm-alert \
+              "kb-sync-failed-${DEPLOY_ENV}-${GITHUB_SHA}" \
+              "Knowledge base sync failed (${DEPLOY_ENV})" \
+              "The deploy continued; the assistant answers from the previous knowledge base until the next successful sync. Re-run the deploy or 'pnpm seed:knowledge' against ${DEPLOY_ENV}. Run: ${RUN_URL}" \
+              sev2
+          fi
 
           kill $TUNNEL_PID 2>/dev/null || true
 
@@ -652,6 +837,29 @@ jobs:
           echo "Production smoke test failed after 10 attempts"
           exit 1
 
+      # Deploy markers: a Sentry release and deploy whose version is the image's git SHA (the image carries it as
+      # SENTRY_RELEASE), and a Grafana annotation so the boards show the deploy line. Each is a no-op until its
+      # values exist, and a vendor error only warns.
+      - name: Sentry release and deploy marker
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_BACKEND: ${{ vars.SENTRY_PROJECT_BACKEND }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+        run: |
+          .github/scripts/observability-markers.sh sentry-release "$SENTRY_PROJECT_BACKEND" "$IMAGE_TAG" production
+
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy backend ${IMAGE_TAG:0:7} to production by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:production service:backend
+
   # ─────────────────────────────────────────────────────────────
   # 4. Deploy the web app to Vercel (after backend succeeds)
   #    Fires the web deploy hook (fire-and-forget; check the
@@ -670,6 +878,20 @@ jobs:
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_STAGING }}" > /dev/null
           echo "✓ Vercel staging deployment triggered"
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hook only queues the Vercel build, so the line marks when the deploy was asked for, not when it went live.
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy web ${GITHUB_SHA:0:7} to staging by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:staging service:web
+
   deploy-frontend-production:
     name: Deploy Web to Production (Vercel)
     needs: migrate-production
@@ -682,3 +904,17 @@ jobs:
           echo "Triggering web deployment..."
           curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
           echo "✓ Vercel production deployment triggered"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hook only queues the Vercel build, so the line marks when the deploy was asked for, not when it went live.
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy web ${GITHUB_SHA:0:7} to production by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy env:production service:web

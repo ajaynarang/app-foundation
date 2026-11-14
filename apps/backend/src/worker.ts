@@ -21,18 +21,30 @@
  *
  * ECS task definition: command = ["node", "dist/worker.js"]
  */
+// OpenTelemetry first: auto-instrumentation can only patch pg, ioredis and
+// http if it loads before AppModule pulls them in.
+import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
+// Error tracking second, before AppModule loads (a no-op without SENTRY_DSN).
+import '@appshore/kernel/infrastructure/error-tracking/instrument';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';
 import { initializeFirebase } from '@appshore/platform/config/firebase.config';
-import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
+import { setProcessRole } from '@appshore/kernel/shared/utils/process-role';
+import { armBootstrapLogWatchdog } from '@appshore/kernel/infrastructure/logging/bootstrap-log-watchdog';
 
 async function bootstrap() {
+  // Claimed before the app exists, so providers that ask during init see it.
+  setProcessRole('worker');
   initializeFirebase();
 
+  // bufferLogs holds every line until the app exists; if an init hook hangs,
+  // the watchdog releases them and names the stall.
+  const disarmLogWatchdog = armBootstrapLogWatchdog('App Worker');
   const app = await NestFactory.createApplicationContext(AppModule, {
     bufferLogs: true,
   });
+  disarmLogWatchdog();
 
   const logger = app.get(Logger);
   app.useLogger(logger);

@@ -24,14 +24,21 @@ describe('bulk-ops queue wiring', () => {
     [BULK_OPS_JOB_NAMES.JOB_CLEANUP]: `${platform}/infrastructure/queue/data-retention.processor.ts`,
     [BULK_OPS_JOB_NAMES.DATA_RETENTION]: `${platform}/infrastructure/queue/data-retention.processor.ts`,
     [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: `${platform}/auth/login-event-cleanup.processor.ts`,
+    [BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]: `${platform}/auth/tokens-cleanup.processor.ts`,
+    [BULK_OPS_JOB_NAMES.TRIAL_EXPIRY]: `${platform}/domains/plans/trial-expiry.service.ts`,
+    [BULK_OPS_JOB_NAMES.OPS_HEARTBEAT]: `${platform}/infrastructure/queue/ops-heartbeat.job.ts`,
     [BULK_OPS_JOB_NAMES.OUTBOX_RELAY]: `${platform}/infrastructure/events/outbox-relay.handler.ts`,
     [BULK_OPS_JOB_NAMES.DEADLINE_SWEEP]: `${platform}/infrastructure/deadlines/deadline.sweeper.ts`,
     [APP_JOB_NAMES.BULK_OPS.AI_CREDENTIAL_REVALIDATE]:
       '../domains/ai/routing/connect/ai-credential-revalidation.handler.ts',
+    [APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH]: '../domains/integrations/oauth/oauth-refresh.processor.ts',
   };
 
-  /** Named in the constants but claimed by no handler today (foundation leftovers) — listed so a new one cannot hide. */
-  const unclaimed = new Set<string>([BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP, BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]);
+  /**
+   * Named in the constants but claimed by no handler, each with its reason. Empty: every foundation job runs (the
+   * last two leftovers, uploads-cleanup and tokens-cleanup, went in project 4: one deleted, one given a handler).
+   */
+  const unclaimed = new Set<string>([]);
 
   /** Constant expression per bulk-ops job name: the kernel's, then the app's. */
   const constantByJobName = new Map<string, string>([

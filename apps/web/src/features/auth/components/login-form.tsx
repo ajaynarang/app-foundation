@@ -19,9 +19,11 @@ import { authApi } from '../api';
 import { OtpInput } from '@/components/ui/otp-input';
 import { PinInput } from '@/components/ui/pin-input';
 import { useAuthStore } from '@/features/auth/store';
+import type { WorkspaceChoice } from '@app/shared-types';
+import { WorkspaceSelectionRequiredError } from '../workspace-selection';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type LoginStep = 'input' | 'phone-pin' | 'phone-otp' | 'email-password';
+type LoginStep = 'input' | 'phone-pin' | 'phone-otp' | 'email-password' | 'choose-workspace';
 type DetectedMode = 'phone' | 'email' | null;
 
 const passwordSchema = z.object({
@@ -47,6 +49,8 @@ function detectInputMode(value: string): DetectedMode {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface TenantBranding {
+  /** The tenant's public id: sent with every sign-in on this subdomain, so only accounts in this workspace count. */
+  tenantId: string;
   companyName: string;
   logoUrl: string | null;
 }
@@ -63,6 +67,8 @@ export function LoginForm({
   const searchParams = useSearchParams();
   const { signIn } = useAuth();
   const { setTokens, setUser } = useAuthStore();
+  // On a tenant subdomain every sign-in names that workspace.
+  const tenantHint = tenantBranding?.tenantId;
 
   const redirectAfterLogin = (role: string, subdomain?: string) => {
     const redirect = searchParams.get('redirect');
@@ -94,6 +100,7 @@ export function LoginForm({
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [workspaceChoices, setWorkspaceChoices] = useState<WorkspaceChoice[]>([]);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
@@ -101,6 +108,7 @@ export function LoginForm({
     handleSubmit,
     formState: { errors },
     watch,
+    getValues,
   } = useForm<PasswordFormData>({
     resolver: standardSchemaResolver(passwordSchema),
     mode: 'onSubmit',
@@ -179,6 +187,9 @@ export function LoginForm({
     setOtp('');
     if (step === 'phone-otp') {
       setStep('phone-pin');
+    } else if (step === 'choose-workspace') {
+      setWorkspaceChoices([]);
+      setStep('email-password');
     } else {
       setStep('input');
     }
@@ -202,7 +213,7 @@ export function LoginForm({
     setIsLoading(true);
     setError(null);
     try {
-      await authApi.sendPhoneOtp(e164Phone());
+      await authApi.sendPhoneOtp(e164Phone(), tenantHint);
       setStep('phone-otp');
       startCountdown();
     } catch {
@@ -216,7 +227,7 @@ export function LoginForm({
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authApi.phoneLogin(e164Phone(), pin);
+      const response = await authApi.phoneLogin(e164Phone(), pin, tenantHint);
       setTokens(response.accessToken);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setUser(response.user as any);
@@ -233,7 +244,7 @@ export function LoginForm({
     setIsLoading(true);
     setError(null);
     try {
-      const response = await authApi.verifyOtp(e164Phone(), otp);
+      const response = await authApi.verifyOtp(e164Phone(), otp, tenantHint);
       setTokens(response.accessToken);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setUser(response.user as any);
@@ -250,11 +261,16 @@ export function LoginForm({
     }
   };
 
-  const onEmailSubmit = async (data: PasswordFormData) => {
+  const onEmailSubmit = (data: PasswordFormData) => signInWithPassword(data.password, tenantHint);
+
+  // The password matched accounts in several workspaces: sign in again, naming the one the user picked.
+  const onWorkspaceChosen = (tenantId: string) => signInWithPassword(getValues('password'), tenantId);
+
+  const signInWithPassword = async (password: string, tenantId?: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const user = await signIn(identity, data.password);
+      const user = await signIn(identity, password, tenantId);
       if (!user) throw new Error('Sign in failed');
       await new Promise((resolve) => setTimeout(resolve, 100));
       const storage = localStorage.getItem(STORAGE_KEYS.AUTH_STORAGE);
@@ -263,6 +279,12 @@ export function LoginForm({
       }
       redirectAfterLogin(user.role, user.subdomain);
     } catch (err) {
+      if (err instanceof WorkspaceSelectionRequiredError) {
+        setWorkspaceChoices(err.workspaces);
+        setStep('choose-workspace');
+        setIsLoading(false);
+        return;
+      }
       const e = err as { code?: string; message?: string };
       let userMessage = 'Login failed. Please try again.';
       if (
@@ -634,6 +656,37 @@ export function LoginForm({
                   </Link>
                 </div>
               </form>
+            </motion.div>
+          )}
+
+          {/* ── State 5: the password matched accounts in several workspaces ── */}
+          {step === 'choose-workspace' && (
+            <motion.div
+              key="choose-workspace"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              <BackHeader label={identity} />
+              <p className="text-center text-sm text-muted-foreground">
+                This email signs in to more than one workspace. Choose the one you want.
+              </p>
+              <div className="space-y-3">
+                {workspaceChoices.map((workspace) => (
+                  <Button
+                    key={workspace.tenantId}
+                    type="button"
+                    variant="outline"
+                    disabled={isLoading}
+                    onClick={() => onWorkspaceChosen(workspace.tenantId)}
+                    className="w-full justify-start py-4 md:py-6 text-base md:text-lg border-2 border-border hover:border-foreground"
+                  >
+                    {workspace.name}
+                  </Button>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

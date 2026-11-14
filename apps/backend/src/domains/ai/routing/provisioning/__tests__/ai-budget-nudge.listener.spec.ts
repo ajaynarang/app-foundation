@@ -1,3 +1,5 @@
+import { currentRls, RLS_STRICT_CONTEXT_ENV, RlsContextError } from '@appshore/kernel/infrastructure/rls/rls-context';
+import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 import { AiBudgetNudgeListener, budgetReachedClaimKey } from '../ai-budget-nudge.listener';
 
 describe('AiBudgetNudgeListener', () => {
@@ -42,9 +44,31 @@ describe('AiBudgetNudgeListener', () => {
     expect(cache.claim).toHaveBeenCalledWith(budgetReachedClaimKey(7), true, 86_400_000);
   });
 
-  it('ignores an event with no usable workspace id', async () => {
+  it('runs as the workspace the event names, so the notifications it writes carry that tenant context', async () => {
     const { listener, notifications } = makeListener();
-    await listener.onHardBreach(event('not-a-number'));
+    let seen: unknown;
+    notifications.aiBudgetReached.mockImplementation(async () => {
+      seen = currentRls();
+    });
+    await listener.onHardBreach(event('7'));
+    expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: `event:${DOMAIN_EVENTS.AI_BUDGET_HARD_BREACHED}` });
+  });
+
+  it('ignores an event with no usable workspace id (outside strict mode)', async () => {
+    const strict = process.env[RLS_STRICT_CONTEXT_ENV];
+    delete process.env[RLS_STRICT_CONTEXT_ENV];
+    try {
+      const { listener, notifications } = makeListener();
+      await listener.onHardBreach(event('not-a-number'));
+      expect(notifications.aiBudgetReached).not.toHaveBeenCalled();
+    } finally {
+      process.env[RLS_STRICT_CONTEXT_ENV] = strict;
+    }
+  });
+
+  it('reports an event with no usable workspace id as a context error in strict mode (tests, CI)', async () => {
+    const { listener, notifications } = makeListener();
+    await expect(listener.onHardBreach(event('not-a-number'))).rejects.toBeInstanceOf(RlsContextError);
     expect(notifications.aiBudgetReached).not.toHaveBeenCalled();
   });
 

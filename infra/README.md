@@ -35,11 +35,15 @@ infra/
     ├── iam.tf                   ← Permissions (who can do what)
     ├── alb.tf                   ← Load balancer + HTTPS + DNS
     ├── cloudwatch.tf            ← Logs
+    ├── alarms.tf                ← Level 1 alarms (only with alarm_email)
+    ├── budget.tf                ← Monthly cost budget email (only with alarm_email)
+    ├── grafana.tf               ← Read-only role for Grafana's CloudWatch datasource (level 2)
     ├── s3.tf                    ← Document storage bucket (user uploads)
     ├── cdn.tf                   ← S3 + CloudFront for public static assets
     ├── doppler.tf               ← Doppler service token in SSM Parameter Store
     ├── ecs.tf                   ← Where your app actually runs (containers)
-    └── scheduler.tf             ← Auto-shutoff for staging at night (saves money)
+    ├── scheduler.tf             ← Auto-shutoff for staging at night (saves money)
+    └── tests/                   ← Offline `terraform test` files (AWS provider mocked; run by pnpm check:ops)
 ```
 
 ---
@@ -191,6 +195,8 @@ Key settings:
 - **`manage_master_user_password = false`** — Password is set via `TF_VAR_rds_password` env variable. AWS auto-rotation is disabled because our ECS tasks read `DATABASE_URL` from Doppler, which doesn't auto-sync with RDS rotation.
 - **`publicly_accessible = false`** — cannot be reached from the internet, only from inside the VPC
 - **`storage_encrypted = true`** — data on disk is encrypted
+- **Storage autoscaling** — RDS grows the volume when free space runs low, up to `rds_max_allocated_storage`
+  (default 200 GB; `0` turns it off)
 - **Staging:** no final snapshot on destroy (cheap teardowns), 1-day backups, no deletion protection
 - **Production:** final snapshot taken before any destroy, 7-day backups, deletion protection on (Terraform will refuse to delete it without explicit override)
 
@@ -206,7 +212,7 @@ Serverless Redis — you don't provision capacity upfront, it scales automatical
 
 ### `terraform/iam.tf` — Permissions
 
-IAM is AWS's permission system. Three roles are created:
+IAM is AWS's permission system. Four roles are created:
 
 **ECS Execution Role** — used by AWS (not your code) to:
 
@@ -214,16 +220,23 @@ IAM is AWS's permission system. Three roles are created:
 - Inject the Doppler service token from SSM Parameter Store into containers
 - Write logs to CloudWatch
 
-**ECS Task Role** — used by your running app code to:
+**ECS Task Roles** — used by your running app code. The API has `…-iam-role-ecs-task`, the worker its own
+`…-iam-role-ecs-task-worker` (`worker_own_task_role`, default `true`), so a worker-only grant never lands on the API.
+Both may:
 
 - Read/write objects in the S3 documents bucket
-- Use ECS Exec (SSH-like access into a running container for migrations/debugging)
+- Use ECS Exec (SSH-like access into a running container for migrations/debugging) and write its session transcript
+- Invoke Bedrock and assume a workspace's Bedrock role, only when `bedrock_models` / `bedrock_tenant_roles_enabled`
+  are set
 
 **GitHub Deploy Role** — used by GitHub Actions to:
 
 - Push Docker images to ECR
 - Register new task definitions
 - Update ECS services
+
+In production the role trusts only the `main` branch and the `production` GitHub environment; in staging, any ref
+of the repo.
 
 GitHub assumes this role via **OIDC** — no AWS access keys stored in GitHub secrets. GitHub proves its identity via a token that AWS verifies. Much more secure than rotating long-lived keys.
 
@@ -276,16 +289,34 @@ That's it — no Route 53, no DNS migration. Your domain stays at Hostinger.
 
 ### `terraform/cloudwatch.tf` — Logs
 
-Creates two log groups:
+Creates three log groups:
 
 - `/app/staging/api` — everything your API container prints to stdout/stderr
 - `/app/staging/worker` — same for the worker container
+- `/app/staging/ecs-exec` — every ECS Exec session (commands and output); kept 30 days in staging, 365 in production
 
 Staging logs kept 7 days, production 30 days. View them in AWS Console → CloudWatch → Log Groups, or via CLI:
 
 ```bash
 aws logs tail /app/staging/api --follow
 ```
+
+---
+
+### `terraform/alarms.tf`, `budget.tf`, `grafana.tf` — Alerts Without a Vendor, and Grafana's Read Role
+
+Level 1 of [`docs/observability.md`](../docs/observability.md). Nothing here exists until you ask for it:
+
+- `alarm_email` set → an SNS topic emailing that address, ten CloudWatch alarms (load balancer 5xx, unhealthy hosts,
+  RDS CPU/storage/memory/connections, Redis memory, and "service gone" for the API and, while one runs, the worker),
+  and a monthly AWS budget (`monthly_budget_usd`; it measures the whole account).
+- `grafana_cloud_aws_account_id` and `grafana_cloud_external_id` set → a read-only role Grafana Cloud assumes to read
+  CloudWatch metrics (`terraform output grafana_cloudwatch_role_arn`).
+- `grafana_alerting_live = true` → the alarms and their topic are removed once Grafana's rules are live. The budget
+  stays. Production refuses it until the Grafana role exists.
+
+Container Insights is off unless `container_insights = true`. The checks are offline: `terraform test` runs the files
+in `tests/` against a mocked AWS provider, and `pnpm check:ops` runs fmt, validate and test.
 
 ---
 
@@ -325,7 +356,10 @@ Two task definitions:
 
 **Circuit breaker** — if a new deploy fails health checks repeatedly, ECS automatically rolls back to the previous version. You don't have to do anything.
 
-**ECS Exec** — lets you run commands inside a running container (for migrations, debugging). Like SSH but for containers:
+**ECS Exec** — lets you run commands inside a running container (for migrations, debugging). Like SSH but for
+containers. On for the API (`api_enable_exec`; the migration tunnel jumps through it), off for the worker
+(`worker_enable_exec`). Every session is logged to the `ecs-exec` log group. The container runs as the `node` user,
+not root:
 
 ```bash
 aws ecs execute-command \

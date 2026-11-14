@@ -12,6 +12,7 @@ import { ApiNoContentResponse, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
 import { InvitationIssued, InvitationLink, InvitationList } from './openapi.responses';
+import { RLS_SOURCE, runAsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 
 const INVITATION_ID_PARAM = { name: 'invitation_id', description: 'Invitation public id (inv_…)' };
 
@@ -56,7 +57,7 @@ export class UserInvitationsController {
   @ApiOperation({ summary: 'Read a pending invitation by its token (public — the acceptance page)' })
   @ApiParam({ name: 'token', description: 'Invitation acceptance token (from the invite link)' })
   async getInvitationByToken(@Param('token') token: string) {
-    return this.userInvitationsService.getInvitationByToken(token);
+    return this.asInvitationTenant(token, () => this.userInvitationsService.getInvitationByToken(token));
   }
 
   /**
@@ -67,7 +68,9 @@ export class UserInvitationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept an email invitation with a Firebase identity (public)' })
   async acceptInvitation(@Body() dto: AcceptInvitationDto) {
-    return this.userInvitationsService.acceptInvitation(dto.token, dto.firebaseUid);
+    return this.asInvitationTenant(dto.token, () =>
+      this.userInvitationsService.acceptInvitation(dto.token, dto.firebaseUid),
+    );
   }
 
   /**
@@ -120,7 +123,18 @@ export class UserInvitationsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Accept an SMS invitation — verify the OTP, set a PIN, sign in (public)' })
   async acceptPhoneInvitation(@Body() dto: AcceptPhoneInvitationDto) {
-    const user = await this.userInvitationsService.acceptPhoneInvitation(dto);
-    return this.authService.generateTokensForUser(user);
+    return this.asInvitationTenant(dto.token, async () => {
+      const user = await this.userInvitationsService.acceptPhoneInvitation(dto);
+      return this.authService.generateTokensForUser(user);
+    });
+  }
+
+  /**
+   * A public invitation route runs as the invitation's tenant (rls-context.ts) once its token names one. An unknown
+   * token runs with no context, so the service answers it exactly as before.
+   */
+  private async asInvitationTenant<T>(token: string, fn: () => Promise<T>): Promise<T> {
+    const tenantDbId = await this.userInvitationsService.tenantDbIdForToken(token);
+    return tenantDbId === null ? fn() : runAsTenant(tenantDbId, RLS_SOURCE.INVITATION, fn);
   }
 }

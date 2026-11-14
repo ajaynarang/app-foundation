@@ -25,8 +25,11 @@ resource "aws_db_instance" "postgres" {
   # both `password` and `manage_master_user_password = false` are set.
 
   allocated_storage = var.rds_allocated_storage
-  storage_type      = "gp3" # Better price/performance than gp2; no provisioned IOPS needed at this scale
-  storage_encrypted = true  # Always encrypt at rest — required for most compliance frameworks
+  # Storage autoscaling: RDS grows the volume on its own when free space runs low, up to this cap. null
+  # (rds_max_allocated_storage = 0) leaves it off.
+  max_allocated_storage = var.rds_max_allocated_storage > 0 ? var.rds_max_allocated_storage : null
+  storage_type          = "gp3" # Better price/performance than gp2; no provisioned IOPS needed at this scale
+  storage_encrypted     = true  # Always encrypt at rest — required for most compliance frameworks
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.rds.id]

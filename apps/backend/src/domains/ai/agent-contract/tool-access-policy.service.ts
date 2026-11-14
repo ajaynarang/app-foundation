@@ -1,9 +1,7 @@
-import 'reflect-metadata';
-import { ExecutionContext, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import type { UserRole } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
-import { FEATURE_KEY } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { TenantEntitlementsService } from '@appshore/platform/domains/entitlements/tenant-entitlements.service';
 import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 import { ScopeRegistryService } from './scope-registry.service';
 import type { ToolResult } from './tool-executor.service';
@@ -20,7 +18,7 @@ export class ToolAccessPolicyService {
   constructor(
     private readonly registry: ScopeRegistryService,
     private readonly prisma: PrismaService,
-    private readonly planGuard: PlanGuard,
+    private readonly entitlements: TenantEntitlementsService,
   ) {}
 
   /**
@@ -81,9 +79,9 @@ export class ToolAccessPolicyService {
   }
 
   /**
-   * Runs `PlanGuard` itself, not a copy of its rules, against a synthetic request for this workspace, so the REST API
-   * and the agent surface can never disagree. `PlanGuard` reads only `{ tenantId, tenantDbId, role }` from the
-   * request user. Tenant-entitlement plumbing outside HTTP replaces this body later; callers do not change.
+   * The one plan rule (`TenantEntitlementsService.assertFeature`), the same one `PlanGuard` runs for every
+   * `@RequireFeature` route, so the REST API and the agent surface can never disagree. `PLAN_ENFORCEMENT=log`
+   * applies here through the service.
    */
   private async evaluateFeature(
     principal: AgentPrincipal,
@@ -91,38 +89,25 @@ export class ToolAccessPolicyService {
     feature: string,
     role: UserRole | null,
   ): Promise<ToolResult | null> {
-    const tenantKey = await this.tenantKey(principal.tenantId);
-    if (!tenantKey) {
-      return refusal({ status: 'not_on_plan', tool: toolName, feature, message: 'This workspace could not be found.' });
-    }
-
     try {
-      await this.planGuard.canActivate(
-        featureGateContext(feature, { tenantId: tenantKey, tenantDbId: principal.tenantId, role: role ?? undefined }),
-      );
+      await this.entitlements.assertFeature(principal.tenantId, feature, {
+        actor: { role },
+        route: `tool:${toolName}`,
+      });
       return null;
     } catch (err) {
       if (!(err instanceof ForbiddenException)) throw err;
       const body = err.getResponse() as Record<string, unknown>;
-      const reason = [body.code, body.error].find((v): v is string => typeof v === 'string') ?? 'FORBIDDEN';
+      const reason = typeof body.code === 'string' ? body.code : 'FORBIDDEN';
       this.logger.warn(`not_on_plan: tenant ${principal.tenantId} lacks ${feature} for ${toolName} (${reason})`);
       return refusal({
         status: 'not_on_plan',
         reason,
         tool: toolName,
         feature,
-        message: planMessage(reason, body),
+        message: typeof body.detail === 'string' ? body.detail : 'That is not available on this workspace.',
       });
     }
-  }
-
-  /**
-   * The wire tenant id `PlanGuard` looks plans up by. Read each time, not cached: only plan-gated tools reach here,
-   * and a process-wide map keyed by tenant would grow without bound.
-   */
-  private async tenantKey(tenantDbId: number): Promise<string | null> {
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantDbId }, select: { tenantId: true } });
-    return tenant?.tenantId ?? null;
   }
 }
 
@@ -141,48 +126,8 @@ function refusal(payload: Record<string, unknown>): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }] };
 }
 
-function planMessage(reason: string, body: Record<string, unknown>): string {
-  if (reason === 'PLAN_UPGRADE_REQUIRED') {
-    const plan = typeof body.requiredPlan === 'string' ? body.requiredPlan : 'a higher';
-    return `That needs the ${plan} plan or higher. A workspace admin can upgrade from Plan & Billing in the app.`;
-  }
-  return typeof body.message === 'string' ? body.message : 'That is not available on this workspace.';
-}
-
 function describeRoles(roles: readonly string[]): string {
   const names = roles.map((r) => r.toLowerCase().replace(/_/g, ' '));
   const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names[0];
   return /^[aeiou]/.test(list) ? `an ${list}` : `a ${list}`;
-}
-
-/** Per-feature handler carrying `@RequireFeature(feature)` metadata, built once. */
-const featureHandlers = new Map<string, () => void>();
-class ToolFeatureGate {}
-
-function featureGateContext(
-  feature: string,
-  user: { tenantId: string; tenantDbId: number; role?: string },
-): ExecutionContext {
-  let handler = featureHandlers.get(feature);
-  if (!handler) {
-    handler = () => undefined;
-    Reflect.defineMetadata(FEATURE_KEY, feature, handler);
-    featureHandlers.set(feature, handler);
-  }
-  const request = { user };
-  const gateHandler = handler;
-  return {
-    getHandler: () => gateHandler,
-    getClass: () => ToolFeatureGate,
-    getType: () => 'http',
-    getArgs: () => [request],
-    getArgByIndex: (i: number) => (i === 0 ? request : undefined),
-    switchToHttp: () => ({ getRequest: () => request, getResponse: () => undefined, getNext: () => undefined }),
-    switchToRpc: () => {
-      throw new Error('not an RPC context');
-    },
-    switchToWs: () => {
-      throw new Error('not a WS context');
-    },
-  } as unknown as ExecutionContext;
 }

@@ -14,6 +14,7 @@ import {
   FeedbackStatsResponse,
   FeedbackTenantListResponse,
 } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const FEEDBACK_ID_PARAM = { name: 'id', description: 'The feedback’s public id (uuid)' } as const;
 
@@ -21,6 +22,7 @@ const FEEDBACK_ID_PARAM = { name: 'id', description: 'The feedback’s public id
 @Controller('admin/feedback')
 @ApiBearerAuth()
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class FeedbackAdminController {
   constructor(private readonly feedbackService: FeedbackService) {}
 

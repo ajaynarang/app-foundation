@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { buildJobVocabulary, type JobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
 import { JOB_VOCABULARY } from './job-vocabulary.token';
 import { queueByName } from './queue-by-name';
+import { applyJobSchedule, type JobScheduleOutcome } from './job-schedule';
 
 @Injectable()
 export class ScheduleManagerService {
@@ -67,42 +68,23 @@ export class ScheduleManagerService {
     return schedule;
   }
 
-  async reloadSchedule(category: string, jobType: string) {
+  /**
+   * Make the queue match the `job_schedules` row for this job: removed when disabled, one repeatable with the row's
+   * pattern or interval when enabled. A missing row changes nothing. Idempotent (`applyJobSchedule`), so it also runs
+   * at boot for the foundation crons (`FoundationSchedulesRegistrar`) in both the API and the worker.
+   */
+  async reloadSchedule(category: string, jobType: string): Promise<JobScheduleOutcome | undefined> {
     const schedule = await this.prisma.jobSchedule.findUnique({
       where: { category_jobType: { category, jobType } },
     });
-    if (!schedule) return;
+    if (!schedule) return undefined;
 
     const queue = this.getQueueForCategory(category);
-    if (!queue) return;
+    if (!queue) return undefined;
 
-    // Remove existing repeatables for this job type
-    const repeatables = await queue.getRepeatableJobs();
-    for (const r of repeatables) {
-      if (r.name === jobType) {
-        await queue.removeRepeatableByKey(r.key);
-      }
-    }
-
-    if (!schedule.isEnabled) {
-      this.logger.log(`Schedule disabled: ${category}/${jobType}`);
-      return;
-    }
-
-    // System-wide repeatable job.
-    const repeatOpts =
-      schedule.scheduleType === 'cron' ? { pattern: schedule.pattern } : { every: schedule.intervalMs };
-
-    await queue.add(
-      jobType,
-      {},
-      {
-        repeat: repeatOpts,
-        jobId: `${category}-${jobType}`,
-      },
-    );
-
-    this.logger.log(`Reloaded schedule: ${category}/${jobType}`);
+    const outcome = await applyJobSchedule(queue, schedule);
+    if (outcome !== 'unchanged') this.logger.log(`Schedule ${outcome}: ${category}/${jobType}`);
+    return outcome;
   }
 
   async getSchedule(category: string, jobType: string) {

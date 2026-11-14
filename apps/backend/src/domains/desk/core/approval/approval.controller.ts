@@ -24,6 +24,8 @@ import { DecideApprovalDto } from './dto/decide-approval.dto';
 import { ApprovalListQueryDto } from './dto/approval-list-query.dto';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { DeskApprovalListResponse, DeskApprovalResponse, DeskHandoffCountsResponse } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for Desk approvals. Consumed by the Desk UI's
@@ -35,6 +37,7 @@ import { DeskApprovalListResponse, DeskApprovalResponse, DeskHandoffCountsRespon
  */
 @ApiTags('Desk — Approvals')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/approvals')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class ApprovalController extends BaseTenantController {

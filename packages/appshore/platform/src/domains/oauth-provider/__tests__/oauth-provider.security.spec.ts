@@ -70,7 +70,10 @@ describe('OAuthProviderService security', () => {
         update: jest.fn().mockResolvedValue({}),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      $transaction: jest.fn((arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma))),
+      $transaction: jest.fn((fn: any) => {
+        if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+        return fn(prisma);
+      }),
     };
     service = new OAuthProviderService(prisma, jwt, configWith() as never);
   });

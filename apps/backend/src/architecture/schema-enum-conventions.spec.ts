@@ -98,6 +98,10 @@ const ALLOWED_STRING_COLUMNS = new Map<string, string>([
     'app-owned registry (DEADLINE_KINDS in platform-glue/deadlines/deadline-kinds.ts), like event names; a product adds a kind with its handler, never a foundation schema change',
   ],
   [
+    'OutboundSuppression.channel',
+    'value space is the kernel constant OUTBOUND_CHANNEL (@appshore/kernel/infrastructure/outbound/outbound-channel), shared with app_outbound_failed{channel}; the Prisma schema cannot import a kernel constant, so it is a string like the ledger reason column (ADR "Outbound gate")',
+  ],
+  [
     'Notification.type',
     'app-owned registry: PLATFORM_NOTIFICATION_TYPES in @app/shared-types plus the app\'s list in platform-glue/notifications/notification-types.ts; a product adds a type with its policy, never a foundation schema change (owner decision, ADR "API contract" upgrade note)',
   ],

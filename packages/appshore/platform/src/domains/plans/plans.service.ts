@@ -3,7 +3,11 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { TenantPlan } from '@appshore/db';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_WARM_5M, CACHE_TTL_COLD_10M } from '@appshore/kernel/constants/cache.constants';
+import {
+  CACHE_TTL_WARM_5M,
+  CACHE_TTL_COLD_10M,
+  CACHE_TTL_FROZEN_24H,
+} from '@appshore/kernel/constants/cache.constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
 
@@ -59,6 +63,24 @@ export class PlansService {
     );
   }
 
+  /**
+   * The plan of a tenant known by its numeric key (jobs, the tool pipeline, seat checks), or null when no such tenant
+   * exists. Goes through {@link getTenantPlan}, so it shares that cache and its invalidation; the key-to-id mapping
+   * never changes and is cached on its own.
+   */
+  async getTenantPlanByDbId(tenantDbId: number): Promise<TenantPlan | null> {
+    const key = buildKey('app:plans', 'tenant-wire-id', String(tenantDbId));
+    let tenantId = await this.cache.get<string>(key);
+    if (typeof tenantId !== 'string') {
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantDbId }, select: { tenantId: true } });
+      // A miss is not cached: a tenant created after the lookup must not read as missing for a day.
+      if (!tenant) return null;
+      tenantId = tenant.tenantId;
+      await this.cache.set(key, tenantId, CACHE_TTL_FROZEN_24H);
+    }
+    return tenantId ? this.getTenantPlan(tenantId) : null;
+  }
+
   async isFeatureEnabled(plan: TenantPlan, feature: string): Promise<boolean> {
     if (plan === TenantPlan.ENTERPRISE) return true;
     if (plan === TenantPlan.TRIAL_EXPIRED || plan === TenantPlan.SUSPENDED) return false;
@@ -100,16 +122,16 @@ export class PlansService {
       select: { id: true, plan: true },
     });
 
-    const result = await this.prisma.$transaction([
-      this.prisma.tenant.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.tenant.update({
         where: { tenantId },
         data: {
           plan: newPlan,
           planAssignedAt: new Date(),
           planAssignedBy: assignedBy,
         },
-      }),
-      this.prisma.tenantPlanEvent.create({
+      });
+      await tx.tenantPlanEvent.create({
         data: {
           id: generateUuidV7(),
           tenantId: tenant.id,
@@ -118,8 +140,9 @@ export class PlansService {
           changedBy: assignedBy,
           reason: reason ?? null,
         },
-      }),
-    ]);
+      });
+      return row;
+    });
 
     await this.cache.del(buildKey('app:plans', 'tenant-plan', tenantId));
 
@@ -131,7 +154,7 @@ export class PlansService {
       this.logger.warn(`planAssigned hook failed for tenant ${tenant.id}: ${(err as Error).message}`);
     }
 
-    return result[0];
+    return updated;
   }
 
   async updateProviderPriceId(plan: TenantPlan, providerPriceId: string | null) {

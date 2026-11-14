@@ -8,6 +8,7 @@ import { LangfuseExporter } from '@mastra/langfuse';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { LanguageModel } from 'ai';
 import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+import { PiiMaskingSpanOutputProcessor } from '../../infrastructure/telemetry/pii-masking-span-output-processor';
 
 /**
  * Per-request model: agents own no model. Every call site resolves the tenant's route
@@ -36,7 +37,7 @@ const BASE_ASSISTANT =
  *
  * Creates a Mastra instance with:
  * - ONE generic `assistant` agent (extend by registering more agents here)
- * - LangFuse observability via @mastra/langfuse
+ * - LangFuse observability via @mastra/langfuse, with phones and emails masked before export
  * - Shared Memory with PostgresStore
  *
  * Agents own no model: each takes the one its caller resolved for the tenant (`perRequestModel`).
@@ -100,6 +101,8 @@ export class MastraProvider implements OnModuleInit, OnModuleDestroy {
         configs: {
           langfuse: {
             serviceName: process.env.OTEL_SERVICE_NAME ?? 'app-backend',
+            // Rule 12: no phones or emails leave in agent spans (docs/standards/observability.md).
+            spanOutputProcessors: [new PiiMaskingSpanOutputProcessor()],
             exporters: [
               new LangfuseExporter({
                 publicKey: process.env.LANGFUSE_PUBLIC_KEY,
@@ -122,12 +125,21 @@ export class MastraProvider implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Mastra initialized with ${Object.keys(agents).length} agents`);
   }
 
+  /**
+   * `Mastra.shutdown()` closes the storage it was given, which ends the store's pg pool. Closing the store again
+   * makes pg throw "Called end on pool more than once", so the store is closed here only when no Mastra instance
+   * owns it (initialisation failed after the store was built). Safe to call twice.
+   */
   async onModuleDestroy() {
-    if (this.mastra) {
-      await this.mastra.shutdown();
+    const { mastra, store } = this;
+    this.mastra = null;
+    this.store = null;
+    if (mastra) {
+      await mastra.shutdown();
       this.logger.log('Mastra shut down');
+      return;
     }
-    await this.store?.close();
+    await store?.close();
   }
 
   getMastra(): Mastra {

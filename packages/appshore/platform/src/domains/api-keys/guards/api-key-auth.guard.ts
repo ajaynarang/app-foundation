@@ -5,6 +5,7 @@ import { fromApiKey } from '../../../auth/agent-principal';
 import { clientIp } from '../../../auth/throttle/client-ip';
 import type { AgentPrincipal } from '../../../auth/agent-principal';
 import type { AgentScope } from '@app/shared-types';
+import { RLS_SOURCE, isRlsTenantId, setRlsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 
 interface AgentPrincipalRequest extends Request {
   agentPrincipal?: AgentPrincipal;
@@ -32,9 +33,13 @@ export class ApiKeyAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid, expired, or IP-blocked API key');
     }
 
+    // The request runs as the key owner's tenant (rls-context.ts).
+    const tenantId = (apiKey.user as { tenantId: number }).tenantId;
+    if (isRlsTenantId(tenantId)) setRlsTenant(tenantId, RLS_SOURCE.API_KEY);
+
     req.agentPrincipal = fromApiKey({
       apiKeyId: apiKey.id,
-      tenantId: (apiKey.user as { tenantId: number }).tenantId,
+      tenantId,
       userId: apiKey.userId,
       scopes: apiKey.scopes as AgentScope[],
       ipAllowlist: apiKey.ipAllowlist.length > 0 ? apiKey.ipAllowlist : undefined,

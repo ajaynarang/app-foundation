@@ -61,7 +61,7 @@ describe('DeadlinesModule', () => {
     expect(moduleRef.get(DeadlineHandlerRegistry).kinds()).toEqual(['TEST_KIND']);
     expect(moduleRef.get(DEADLINE_HANDLERS)).toBe(moduleRef.get(DeadlineHandlerRegistry));
 
-    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'dl-test', kind: 'TEST_KIND', attempts: 1 }]);
+    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'dl-test', tenantId: 1, kind: 'TEST_KIND', attempts: 1 }]);
     const summary = await moduleRef.get(DeadlineSweeper).sweep();
 
     expect(summary.fired).toBe(1);

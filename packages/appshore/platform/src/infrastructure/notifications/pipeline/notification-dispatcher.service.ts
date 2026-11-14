@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DeliveryChannel, type NotificationCategory } from '@appshore/db';
 import { FEATURE_KEYS } from '@app/shared-types';
 import { PrismaService } from '../../database/prisma.service';
-import { PlansService } from '../../../domains/plans/plans.service';
+import { TenantEntitlementsService } from '../../../domains/entitlements/tenant-entitlements.service';
 import { FeatureFlagsService } from '../../../domains/feature-flags/feature-flags.service';
 import { NotificationPolicyRegistry } from '../notification-policy.registry';
 import { ChannelResolutionService, type ResolvedChannels } from './channel-resolution.service';
@@ -26,7 +26,7 @@ export class NotificationDispatcherService {
     private readonly prisma: PrismaService,
     private readonly channelResolution: ChannelResolutionService,
     private readonly deliveryService: NotificationDeliveryService,
-    private readonly plansService: PlansService,
+    private readonly entitlements: TenantEntitlementsService,
     private readonly ledger: DeliveryLedgerService,
     private readonly featureFlags: FeatureFlagsService,
     private readonly whatsappDispatch: WhatsAppDispatchService,
@@ -51,14 +51,19 @@ export class NotificationDispatcherService {
     }
   }
 
-  /** The tenant's plan, read once per trigger. No slug or a failed lookup is "no" — never fail open here. */
-  private async isWhatsAppEntitled(tenantSlug: string | undefined): Promise<boolean> {
-    if (!tenantSlug) return false;
+  /**
+   * The tenant's plan, by the one plan rule (`TenantEntitlementsService`), read once per trigger. Strict: this check
+   * was enforced before `PLAN_ENFORCEMENT` existed, so log mode never sends a paid message to a tenant without the
+   * feature. A failed lookup is "no" — never fail open here.
+   */
+  private async isWhatsAppEntitled(tenantDbId: number): Promise<boolean> {
     try {
-      const plan = await this.plansService.getTenantPlan(tenantSlug);
-      return await this.plansService.isFeatureEnabled(plan, FEATURE_KEYS.WHATSAPP_NOTIFICATIONS);
+      return await this.entitlements.hasFeature(tenantDbId, FEATURE_KEYS.WHATSAPP_NOTIFICATIONS, {
+        strict: true,
+        route: 'notification-dispatch',
+      });
     } catch (err: any) {
-      this.logger.warn(`Could not read the WhatsApp entitlement for ${tenantSlug}: ${err.message}`);
+      this.logger.warn(`Could not read the WhatsApp entitlement for tenant ${tenantDbId}: ${err.message}`);
       return false;
     }
   }
@@ -87,7 +92,7 @@ export class NotificationDispatcherService {
         this.resolveTenant(params.tenantId),
         this.isWhatsAppEnabled(),
       ]);
-      const whatsappEntitled = whatsappEnabled ? await this.isWhatsAppEntitled(tenant.slug) : false;
+      const whatsappEntitled = whatsappEnabled ? await this.isWhatsAppEntitled(params.tenantId) : false;
 
       // Two queries for the whole audience. A resolution failure loses the WHOLE
       // audience, so it is a total failure: let it propagate to the sweep's

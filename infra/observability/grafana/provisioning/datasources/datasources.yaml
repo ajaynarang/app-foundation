@@ -35,3 +35,14 @@ datasources:
         hide: false
       nodeGraph:
         enabled: true
+
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo-uid

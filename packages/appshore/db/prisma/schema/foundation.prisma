@@ -181,6 +181,7 @@ model Tenant {
 
   users                       User[]
   loginEvents                 LoginEvent[]
+  refreshTokens               RefreshToken[]
   integrationConfigs          IntegrationConfig[]
   invitations                 UserInvitation[]
   notifications               Notification[]
@@ -201,6 +202,7 @@ model Tenant {
   members                     WorkspaceMember[]
   feedback                    Feedback[]
   deadlines                   Deadline[]
+  outboundSuppressions        OutboundSuppression[]
 
   // Billing & wallet
   billingCustomer      BillingCustomer?
@@ -299,8 +301,12 @@ model User {
   deskSuppressionsUnset   DeskEntitySuppression[]  @relation("DeskSuppressionUnset")
   deskMemoriesAuthored    DeskMemory[]             @relation("DeskMemoryAuthoredBy")
   aiInvocations           AiInvocation[]
+  outboundAllowEntries    OutboundAllowEntry[]     @relation("OutboundAllowEntryCreatedBy")
 
   @@unique([tenantId, email])
+  // NOTE: one live account per email is enforced by the partial unique index users_email_live_key on
+  // lower(email) WHERE deleted_at IS NULL, created in raw SQL (migration users_email_unique_live, which skips it
+  // while duplicates exist; pnpm accounts:enforce-unique-email creates it later). Prisma cannot express it.
   @@index([tenantId])
   @@index([email])
   @@index([phone])
@@ -352,19 +358,37 @@ model SuperAdminPreferences {
   @@map("super_admin_preferences")
 }
 
+/// One refresh token. Every refresh issues a successor in the same family (the session), and the presented token is
+/// retired the first time its successor is presented. Presenting a retired token again revokes the whole family.
 model RefreshToken {
-  id        Int       @id @default(autoincrement())
-  tokenId   String    @unique @map("token_id") @db.VarChar(50)
-  userId    Int       @map("user_id")
-  token     String    @db.VarChar(500)
-  expiresAt DateTime  @map("expires_at") @db.Timestamptz
-  isRevoked Boolean   @default(false) @map("is_revoked")
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  id              Int       @id @default(autoincrement())
+  tokenId         String    @unique @map("token_id") @db.VarChar(50)
+  userId          Int       @map("user_id")
+  /// SHA-256 of the signed token; the presented token must match it.
+  token           String    @db.VarChar(500)
+  /// The session id: the first token's id, constant across rotations. The access token's `sid` claim.
+  familyId        String    @map("family_id") @db.VarChar(50)
+  /// When the session began; the family's absolute lifetime (`jwt.sessionMaxAge`) is measured from here.
+  familyStartedAt DateTime  @map("family_started_at") @db.Timestamptz
+  /// The session's active workspace. Null for a super-admin, or for a session whose user had no tenant.
+  tenantId        Int?      @map("tenant_id")
+  /// The token this one replaced. Null for the first token of a family.
+  previousTokenId String?   @map("previous_token_id") @db.VarChar(50)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz
+  isRevoked       Boolean   @default(false) @map("is_revoked")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz
+  /// Set when a successor was presented and this token was retired. Presenting it again is reuse.
+  rotatedAt       DateTime? @map("rotated_at") @db.Timestamptz
+  /// When this token was last presented to refresh.
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([familyId])
+  @@index([tenantId])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
@@ -398,6 +422,8 @@ enum LoginFailReason {
   INVALID_TOKEN
   INVALID_CREDENTIALS
   USER_NOT_FOUND
+  /// A retired refresh token was presented again; its whole session was revoked.
+  REFRESH_REUSE
   OTHER
 
   @@map("login_fail_reason")
@@ -857,6 +883,57 @@ model NotificationDelivery {
   /// Retention sweep and per-day status counts.
   @@index([createdAt])
   @@map("notification_deliveries")
+}
+
+/// What an outbound allow-list entry matches (ADR "Outbound gate"). The kernel mirrors these values as
+/// OUTBOUND_ALLOW_KIND; a parity spec in platform holds the two together.
+enum OutboundAllowKind {
+  EMAIL
+  EMAIL_DOMAIN
+  PHONE
+  HOST
+}
+
+/// A recipient a non-production environment may still message (ADR "Outbound gate"). With OUTBOUND_MODE=allowlist
+/// every other recipient is held back; an empty list (and no OUTBOUND_ALLOWLIST_BOOTSTRAP) sends nothing.
+/// Platform-level, not tenant-scoped; managed by super-admins at /admin/outbound.
+model OutboundAllowEntry {
+  /// App-generated UUIDv7 via generateUuidV7(): the entry's public id. No Prisma @default.
+  id          String            @id @db.Uuid
+  kind        OutboundAllowKind
+  /// Normalized: lowercased email, domain or host; a phone as + and digits.
+  value       String            @db.VarChar(255)
+  note        String?           @db.VarChar(200)
+  createdById Int?              @map("created_by_id")
+  createdBy   User?             @relation("OutboundAllowEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([kind, value])
+  @@index([createdById])
+  @@map("outbound_allow_entries")
+}
+
+/// A send the outbound gate held back that has no delivery-ledger row (sign-in codes, invitations, password resets,
+/// customer webhooks). Pipeline sends are in notification_deliveries as SKIPPED with reason GATED instead. The
+/// recipient is masked (an email as its first letter and domain, a phone as its last four digits, a URL as its host)
+/// and the subject is a redacted preview: codes and links removed. Deleted after 30 days by data-retention.
+model OutboundSuppression {
+  /// App-generated UUIDv7 via generateUuidV7(): time-sortable, safe in a list cursor. No Prisma @default.
+  id        String   @id @db.Uuid
+  /// An OUTBOUND_CHANNEL value (kernel constant): a string, like the ledger's reason column, because the Prisma
+  /// schema cannot import the kernel vocabulary.
+  channel   String   @db.VarChar(20)
+  recipient String   @db.VarChar(255)
+  subject   String?  @db.VarChar(200)
+  source    String   @db.VarChar(80)
+  tenantId  Int?     @map("tenant_id")
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  /// The held-back list (newest first) and the retention sweep.
+  @@index([createdAt])
+  @@index([tenantId])
+  @@map("outbound_suppressions")
 }
 
 enum WhatsAppConsentSource {

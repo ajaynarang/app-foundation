@@ -31,12 +31,15 @@ export const APP_JOB_NAMES = {
   BULK_OPS: {
     /** The daily re-test of every workspace AI credential (`domains/ai/routing/connect`), sliced to share the lane. */
     AI_CREDENTIAL_REVALIDATE: 'ai-credential-revalidate',
+    /** One integration's OAuth token refresh (`domains/integrations/oauth`), repeated per tenant and vendor. */
+    OAUTH_REFRESH: 'oauth-refresh',
   },
 } as const satisfies Record<string, Record<string, string>>;
 
 /** Friendly labels for the app's job types on the super-admin Jobs screens, keyed by job name. */
 export const APP_JOB_DISPLAY_NAMES = {
   'ai-credential-revalidate': 'AI Key Revalidation',
+  'oauth-refresh': 'OAuth Token Refresh',
 } as const satisfies Record<string, string>;
 
 /** App job categories (what a `jobs` row's `category` may hold beside the kernel's). */

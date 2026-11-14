@@ -2,11 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from '../auth.controller';
 import { AuthService } from '../auth.service';
+import { RefreshSessionService } from '../refresh-session.service';
 
 const mockAuthService = {
   lookupUser: jest.fn(),
   exchangeFirebaseToken: jest.fn(),
-  refreshAccessToken: jest.fn(),
   logout: jest.fn(),
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
@@ -17,6 +17,10 @@ const mockAuthService = {
   setPin: jest.fn(),
   addPhone: jest.fn(),
   verifyAndAddPhone: jest.fn(),
+};
+
+const mockRefreshSessions = {
+  refresh: jest.fn(),
 };
 
 const defaultConfig = (key: string) => (key === 'environment' ? 'development' : undefined);
@@ -35,6 +39,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: RefreshSessionService, useValue: mockRefreshSessions },
       ],
     }).compile();
 
@@ -103,19 +108,28 @@ describe('AuthController', () => {
   });
 
   describe('refreshToken', () => {
-    it('should return new access token', async () => {
-      const user = { userId: 'USR-001', tokenId: 'rt_1' };
-      mockAuthService.refreshAccessToken.mockResolvedValue({
+    it('returns the new access token and sets the rotated refresh token as the host-only cookie', async () => {
+      const session = { userId: 'USR-001', tokenId: 'rt_1', familyId: 'rt_0' } as any;
+      const res = { cookie: jest.fn(), clearCookie: jest.fn() } as any;
+      mockRefreshSessions.refresh.mockResolvedValue({
         accessToken: 'new-at',
+        refreshToken: 'successor-rt',
         user: { userId: 'USR-001' },
       });
 
-      const result = await controller.refreshToken(user);
+      const result = await controller.refreshToken(session, res);
 
+      expect(mockRefreshSessions.refresh).toHaveBeenCalledWith(session);
       expect(result).toEqual({
         accessToken: 'new-at',
         user: { userId: 'USR-001' },
       });
+      // The successor replaces the cookie; the response body never carries a refresh token.
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refreshToken',
+        'successor-rt',
+        expect.not.objectContaining({ domain: expect.anything() }),
+      );
     });
   });
 
@@ -194,7 +208,13 @@ describe('AuthController', () => {
       });
 
       expect(result).toBeUndefined();
-      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234');
+      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234', undefined);
+    });
+
+    it('passes the workspace hint through', async () => {
+      mockAuthService.sendPhoneOtp.mockResolvedValue(undefined);
+      await controller.sendPhoneOtp({ phone: '+12025551234', tenantId: 'ten_a' });
+      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234', 'ten_a');
     });
   });
 

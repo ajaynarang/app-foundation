@@ -4,7 +4,7 @@ import { Inter, Space_Grotesk, Sora, Outfit } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { LayoutClient } from './layout-client';
-import { ThemeProvider, DevBanner, DevSwitcher } from '@/shared/components/common';
+import { ThemeProvider, DevBanner, DevSwitcher, StagingMarker } from '@/shared/components/common';
 import { Toaster } from 'sonner';
 import { CookieConsentBanner } from '@/shared/components/cookie-consent';
 import { NetworkStatusBanner } from '@/shared/components/common/network-status-banner';
@@ -107,6 +107,7 @@ export default function RootLayout({
       <body className={`${inter.className} ${spaceGrotesk.variable} ${sora.variable} ${outfit.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <Providers>
+            <StagingMarker />
             <Suspense>
               <DevBanner />
               <DevSwitcher />

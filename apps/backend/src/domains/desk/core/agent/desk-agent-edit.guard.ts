@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/commo
 import { UserRole } from '@appshore/db';
 
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 const BYPASS_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
 
@@ -62,7 +63,7 @@ export class DeskAgentEditGuard implements CanActivate {
     const allow = lookup.supervisorUserId === user.dbId;
     if (!allow) {
       this.logger.warn(
-        `desk-agent-edit: denied user=${user.dbId} role=${user.role} route=${req.method} ${req.route?.path ?? req.url}`,
+        `desk-agent-edit: denied user=${user.dbId} role=${user.role} route=${req.method} ${req.route?.path ?? stripQueryString(req.url)}`,
       );
     }
     return allow;

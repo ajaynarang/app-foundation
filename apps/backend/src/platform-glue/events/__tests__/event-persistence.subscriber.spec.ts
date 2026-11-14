@@ -3,6 +3,7 @@ import { EventPersistenceSubscriber } from '../event-persistence.subscriber';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { TenantIdResolver } from '@appshore/platform/infrastructure/events/tenant-id-resolver.service';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 
 describe('EventPersistenceSubscriber', () => {
   let subscriber: EventPersistenceSubscriber;
@@ -34,6 +35,22 @@ describe('EventPersistenceSubscriber', () => {
   function getUpsertCreate(): Record<string, any> {
     return prisma.domainEventLog.upsert.mock.calls[0][0].create;
   }
+
+  it('reports a failed persist to the error tracker and does not throw', async () => {
+    const err = new Error('db down');
+    prisma.domainEventLog.upsert.mockRejectedValue(err);
+    const reportSpy = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+    const event = new DomainEvent('app.load.created', 'demo-acme-2026', { entityId: 'LD-1' });
+
+    await expect(subscriber.persistEvent(event)).resolves.toBeUndefined();
+
+    expect(reportSpy).toHaveBeenCalledWith(err, {
+      tenantId: 'demo-acme-2026',
+      jobName: 'app.load.created',
+      source: 'event',
+    });
+    reportSpy.mockRestore();
+  });
 
   it('persists tenantId as Int FK to Tenant.id', async () => {
     tenantResolver.resolveToDbId.mockResolvedValue(42);

@@ -21,6 +21,8 @@ export const DELIVERY_SKIP_REASONS = {
   /** Meta's unpublished per-user marketing cap (error 131049) — never retried. */
   MARKETING_CAP: 'MARKETING_CAP',
   PROVIDER_ERROR: 'PROVIDER_ERROR',
+  /** Held back by the outbound gate: outside production the recipient is not on the allow-list (ADR "Outbound gate"). */
+  GATED: 'GATED',
   DROPPED_TEST_MARKER: 'DROPPED_TEST_MARKER',
   /** The type's policy does not offer this channel. */
   POLICY_NEVER: 'POLICY_NEVER',

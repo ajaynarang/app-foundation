@@ -1,112 +1,41 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { PlansService } from '../../domains/plans/plans.service';
-import { FeatureFlagsService } from '../../domains/feature-flags/feature-flags.service';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 import { FEATURE_KEY } from '../decorators/require-feature.decorator';
-import { TenantPlan } from '@appshore/db';
+import { NO_FEATURE_GATE_KEY } from '../decorators/no-feature-gate.decorator';
+import { TenantEntitlementsService } from '../../domains/entitlements/tenant-entitlements.service';
 
+/**
+ * The last guard in the global chain: a route carrying `@RequireFeature(key)` (on the handler, else the class) runs
+ * only for a workspace whose plan includes `key`. The rule itself is `TenantEntitlementsService`, shared with jobs,
+ * handlers and the AI tool pipeline, so the API and every other surface cannot disagree.
+ */
 @Injectable()
 export class PlanGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly plansService: PlansService,
-    private readonly featureFlagsService: FeatureFlagsService,
-    private readonly configService: ConfigService,
+    private readonly entitlements: TenantEntitlementsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // An explicit per-route opt-out beats the controller's gate. Read first and from the handler only (`get`, not
+    // `getAllAndOverride`): `getAllAndOverride` treats an undefined handler value as "not set", so no decorator can
+    // un-set a class gate by writing undefined over it, and a controller cannot opt its whole surface out.
+    if (this.reflector.get<boolean>(NO_FEATURE_GATE_KEY, context.getHandler())) return true;
+
     const requiredFeature = this.reflector.getAllAndOverride<string>(FEATURE_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-
     if (!requiredFeature) return true;
-
-    // 1. Check global feature flag (kill-switch)
-    const flagEnabled = await this.featureFlagsService.isEnabled(requiredFeature);
-    if (!flagEnabled) {
-      throw new ForbiddenException({
-        code: 'FEATURE_DISABLED',
-        feature: requiredFeature,
-        message: 'This feature is currently unavailable.',
-      });
-    }
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-
-    // 2. SUPER_ADMIN bypasses plan checks
-    if (user?.role === 'SUPER_ADMIN') return true;
-
-    // Single-tenant mode: the implicit tenant is treated as top tier, so all
-    // entitlement checks pass.
-    const multiTenancy = this.configService.get('multiTenancy', { infer: true });
-    if (multiTenancy?.enabled === false) return true;
-
-    if (!user?.tenantDbId) {
-      throw new ForbiddenException({
-        code: 'NO_TENANT',
-        message: 'Tenant context required for feature access',
-      });
-    }
-
-    if (!user?.tenantId) {
-      throw new ForbiddenException({
-        code: 'NO_TENANT',
-        message: 'No tenant context found',
-      });
-    }
-
-    const plan = await this.plansService.getTenantPlan(user.tenantId);
-
-    // 3. ENTERPRISE gets everything
-    if (plan === TenantPlan.ENTERPRISE) return true;
-
-    if (plan === TenantPlan.TRIAL_EXPIRED) {
-      throw new ForbiddenException({
-        code: 'TRIAL_EXPIRED',
-        message: 'Your trial has ended. Please contact sales to continue.',
-      });
-    }
-
-    if (plan === TenantPlan.SUSPENDED) {
-      throw new ForbiddenException({
-        code: 'ACCOUNT_SUSPENDED',
-        message: 'Your account has been suspended. Please contact support.',
-      });
-    }
-
-    // 4. Check plan entitlement
-    const allowed = await this.plansService.isFeatureEnabled(plan, requiredFeature);
-
-    if (allowed) return true;
-
-    // Not allowed — determine which plan is required
-    const requiredPlan = await this.getRequiredPlan(requiredFeature);
-    throw new ForbiddenException({
-      statusCode: 403,
-      error: 'PLAN_UPGRADE_REQUIRED',
-      featureKey: requiredFeature,
-      requiredPlan,
-      message: `This feature requires the ${requiredPlan} plan or higher`,
+    const tenantDbId = user?.tenantDbId && user?.tenantId ? (user.tenantDbId as number) : null;
+    await this.entitlements.assertFeature(tenantDbId, requiredFeature, {
+      actor: { role: user?.role },
+      route: `${request.method} ${request.route?.path ?? stripQueryString(request.url ?? '')}`,
     });
-  }
-
-  private async getRequiredPlan(feature: string): Promise<string> {
-    const plans = [TenantPlan.STARTER, TenantPlan.PROFESSIONAL, TenantPlan.ENTERPRISE];
-    const displayNames: Record<string, string> = {
-      STARTER: 'Starter',
-      PROFESSIONAL: 'Professional',
-      ENTERPRISE: 'Enterprise',
-      TRIAL: 'Starter',
-      TRIAL_EXPIRED: 'Starter',
-      SUSPENDED: 'Starter',
-    };
-    for (const plan of plans) {
-      const enabled = await this.plansService.isFeatureEnabled(plan, feature);
-      if (enabled) return displayNames[plan] ?? 'Enterprise';
-    }
-    return 'Enterprise';
+    return true;
   }
 }

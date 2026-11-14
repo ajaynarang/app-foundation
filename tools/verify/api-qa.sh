@@ -6,11 +6,13 @@
 # `api` project against it (smoke, the RBAC matrix, and anything under tests/api/), then stops the backend.
 # The unit suites cannot see a status that moved while a QA caller still expects the old one. This can.
 #
-# It needs Postgres and Redis. By default it uses the local compose ones (`docker compose up -d postgres redis`).
-# A CI job, or a machine where those ports are taken, points it elsewhere:
+# It needs Postgres and Redis, and it migrates and seeds the database it is given. So it never guesses them: a
+# default port can belong to another project's container on the same machine. Both must be set, or it stops before
+# doing anything. For the local compose ones (`docker compose up -d postgres redis`), export the two values from
+# apps/backend/.env.example.
 #
-#   DATABASE_URL   default postgresql://postgres:postgres@localhost:5499/app?schema=public
-#   REDIS_URL      default redis://localhost:6399
+#   DATABASE_URL   required. The Postgres this run migrates, seeds and tests against.
+#   REDIS_URL      required. The Redis the backend uses for this run.
 #   API_QA_PORT    default 8000. The port the backend listens on for this run.
 #   TENANT_ID      default demo (the seeded tenant)
 #   DEV_AUTH_SECRET  default: a random value made for this run. The QA suite signs in through /dev/switch with it.
@@ -20,8 +22,16 @@ set -uo pipefail
 
 cd "$(dirname "$0")/../.."
 
-export DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5499/app?schema=public}"
-export REDIS_URL="${REDIS_URL:-redis://localhost:6399}"
+missing=()
+[ -n "${DATABASE_URL:-}" ] || missing+=(DATABASE_URL)
+[ -n "${REDIS_URL:-}" ] || missing+=(REDIS_URL)
+if [ "${#missing[@]}" -gt 0 ]; then
+  names=$(IFS=,; echo "${missing[*]}" | sed 's/,/, /g')
+  echo "verify:api: ${names} not set. This run migrates and seeds the database it is given, so it never guesses one." >&2
+  echo "Export both (the local compose values are in apps/backend/.env.example) and run it again." >&2
+  exit 2
+fi
+export DATABASE_URL REDIS_URL
 export DEV_AUTH_SECRET="${DEV_AUTH_SECRET:-$(node -e "process.stdout.write(require('crypto').randomBytes(24).toString('hex'))")}"
 export TENANT_ID="${TENANT_ID:-demo}"
 port="${API_QA_PORT:-8000}"
