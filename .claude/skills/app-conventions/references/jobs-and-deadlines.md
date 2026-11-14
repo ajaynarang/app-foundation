@@ -1,20 +1,23 @@
 ---
 owner: foundation
-status: interim
-pending: F2
 sources:
   - docs/adr/0003-outbox-and-deadlines.md
   - packages/appshore/kernel/src/infrastructure/queue/queue.constants.ts#bullJobIdFromDbId
-  - packages/appshore/kernel/src/infrastructure/queue/job-handler.contract.ts
+  - packages/appshore/kernel/src/infrastructure/queue/job-handler.contract.ts#QueueJobHandler
+  - packages/appshore/kernel/src/infrastructure/queue/job-envelope.helper.ts#buildJobEnvelope
   - packages/appshore/kernel/src/infrastructure/queue/queue-processing-mode.ts#applyQueueProcessingMode
   - apps/backend/src/platform-glue/queue/job-names.ts#APP_JOB_NAMES
   - apps/backend/src/platform-glue/queue/queue.module.ts
-  - apps/backend/src/platform-glue/queue/dispatchers
-  - apps/backend/src/platform-glue/queue/job-context.ts
+  - apps/backend/src/platform-glue/queue/dispatchers/bulk-ops-queue.module.ts#BulkOpsQueueModule
+  - apps/backend/src/platform-glue/queue/job-context.ts#APP_JOB_CONTEXT
+  - apps/backend/src/domains/integrations/oauth/oauth-refresh.processor.ts#OAuthRefreshJobHandler
+  - packages/appshore/platform/src/infrastructure/deadlines/deadline.types.ts#DeadlineHandler
+  - packages/appshore/platform/src/infrastructure/deadlines/deadline.sweeper.ts#DEADLINE_HANDLER_TIMEOUT_MS
   - packages/appshore/platform/src/infrastructure/deadlines/deadline.service.ts#DeadlineService
   - apps/backend/src/platform-glue/deadlines/deadline-kinds.ts#DEADLINE_KINDS
   - apps/backend/src/platform-glue/deadlines/__tests__/deadlines.integration.spec.ts
   - apps/backend/src/main.ts
+  - apps/backend/src/worker.ts
 guards:
   - foundation-vocabulary.spec.ts
   - no-competing-queue-workers.spec.ts
@@ -25,6 +28,10 @@ guards:
   - deadline.service.spec.ts
   - deadline.sweeper.spec.ts
   - cron-run-coverage.spec.ts
+  - queue-processing-mode.spec.ts
+  - deadlines.module.spec.ts
+  - deadline-sweep.scheduler.spec.ts
+  - schema-enum-conventions.spec.ts
 examples:
   - REPORTS
   - offerNumber
@@ -32,8 +39,10 @@ examples:
 
 # Jobs and deadlines: BullMQ topology, job ids, idempotent handlers, deadlines as rows, API and worker roles, shutdown
 
-Moved from the old backend skill; condensed with its recipe in its finish pull request. The decision for timers is
-the ADR "Outbox and deadlines", `docs/adr/0003-outbox-and-deadlines.md`.
+Work that does not answer a request runs on BullMQ; a timer tied to a write is a Postgres row. The decision for timers
+is the ADR "Outbox and deadlines", `docs/adr/0003-outbox-and-deadlines.md`; why state stays in Postgres while an
+engine only orchestrates is the ADR "State lives in Postgres; the workflow engine only orchestrates",
+`docs/adr/0017-state-lives-in-postgres.md`. Events are in [`events-and-outbox.md`](events-and-outbox.md).
 
 | Tier                            | Queue            | Purpose                                            |
 | ------------------------------- | ---------------- | -------------------------------------------------- |
@@ -59,21 +68,25 @@ The source of truth is `packages/appshore/kernel/src/infrastructure/queue/queue.
   dispatcher: a `WorkerHost` under `apps/backend/src/platform-glue/queue/dispatchers/` extending
   `BaseQueueDispatcher`, which routes by `job.name`. Two `@Processor` classes on one queue compete and drop jobs.
   [guard: no-competing-queue-workers.spec.ts]
-- Domain code implements `QueueJobHandler` (`jobNames`, `handle(job)`; throw to retry) and is provided under
-  `jobHandlersToken(queueName)`. Never add a `@Processor` to an existing queue. [guard: no-competing-queue-workers.spec.ts]
+- Domain code implements `QueueJobHandler`: `jobNames` (the names it owns) and `run(job)` (throw to retry). The
+  queue's dispatcher module assembles its handlers into `jobHandlersToken(queueName)` with an explicit factory, so the
+  owning module exports the handler. Never add a `@Processor` to an existing queue.
+  [guard: no-competing-queue-workers.spec.ts]
 - Every handler is wired, or its jobs complete as silent no-ops: on `bulk-ops` the handlers are listed in the factory
   of `platform-glue/queue/dispatchers/bulk-ops-queue.module.ts`, and every `BULK_OPS_JOB_NAMES` and
   `APP_JOB_NAMES.BULK_OPS` entry maps to its handler. [guard: bulk-ops-handlers.spec.ts]
 - A custom job id is built with `bullJobIdFromDbId(category, dbId)` (BullMQ rejects a pure integer).
   [guard: bullmq-job-id-conventions.spec.ts]
-- Default job options: 3 attempts, exponential backoff, removed on complete after 24 hours and on fail after 7 days;
-  a job past its retries goes to `DeadLetterService`. [review-only: options at a call site need reading]
+- Default job options, set once in `queue.module.ts`: 3 attempts, exponential backoff from 10 seconds, removed on
+  complete after 24 hours and on fail after 7 days; a dispatcher hands a job past its retries to `DeadLetterService`.
+  A call site that overrides them says why. [review-only: options at a call site need reading]
 - Every job name declares its tenant context in `apps/backend/src/platform-glue/queue/job-context.ts`, and each job
   runs inside `withJobContext`. [guard: rls-job-context-coverage.spec.ts]
 - A handler is idempotent: delivery is at least once, so a second run of the same job changes nothing. Never mint a
   fresh id inside a retryable handler. [review-only: needs a run-twice test, see testing.md]
-- The request's `requestId` is forwarded into the job payload as `correlationId`, from `requestContextStorage`, so the
-  worker's log lines join the request's. [review-only: needs reading]
+- A job's data is a `JobEnvelope` built with `buildJobEnvelope(payload, { tenantId, source })`: it takes the
+  request's id from `requestContextStorage` as `correlationId` (a fresh one outside a request), so the worker's log
+  lines join the request's. [review-only: the envelope at a call site needs reading]
 - A periodic task is a repeatable job or a `@Cron`; every cron run is covered by the run log.
   [guard: cron-run-coverage.spec.ts]
 
@@ -112,9 +125,83 @@ The source of truth is `packages/appshore/kernel/src/infrastructure/queue/queue.
 
 ### Graceful shutdown
 
-- `main.ts` enables shutdown hooks. On SIGTERM: stop accepting connections, drain in-flight requests (`app.close()`),
-  drain the BullMQ workers, flush telemetry, close Prisma and Redis through `OnModuleDestroy`. Never `process.exit()` in
-  a shutdown path. [review-only: shutdown order is read, not tested]
+- `main.ts` and `worker.ts` enable shutdown hooks. On SIGTERM each awaits `app.close()` (in-flight requests drain;
+  the destroy hooks close the BullMQ workers and Prisma, `PrismaService.onModuleDestroy`), then `shutdownTelemetry()`,
+  and only then exits. The shared Redis client has no hook and ends with the process. A new resource closes in
+  `OnModuleDestroy`; nothing exits before `app.close()` returns. [review-only: shutdown order is read, not tested]
+
+## Recipe: add a job
+
+Copied from `apps/backend/src/domains/integrations/oauth/oauth-refresh.processor.ts` (one tenant's run, on
+`bulk-ops`):
+
+```typescript
+@Injectable()
+export class OAuthRefreshJobHandler implements QueueJobHandler {
+  readonly jobNames = [APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH];
+
+  async run(bullJob: Job<JobEnvelope<OAuthRefreshJobData>>): Promise<void> {
+    const { tenantId, integrationId, vendor } = bullJob.data.payload;
+    const cron = new CronRun(this.logger, OAUTH_REFRESH_JOB_NAME); // every run, skipped or not, completes it
+    const config = await this.prisma.integrationConfig.findFirst({ where: { integrationId, tenantId } });
+    if (!config) {
+      cron.complete({ vendor, skipped: 'integration not found' }); // re-read state: a second run changes nothing
+      return;
+    }
+    // ... the work; a retryable failure is thrown back to BullMQ
+  }
+}
+```
+
+1. Name it in `apps/backend/src/platform-glue/queue/job-names.ts`: `APP_JOB_NAMES.<QUEUE>.<NAME>` and its label in
+   `APP_JOB_DISPLAY_NAMES` (a new queue: `APP_QUEUE_NAMES` and one dispatcher under `dispatchers/`).
+2. Declare its tenant context in `job-context.ts` (`APP_JOB_CONTEXT`): `{ tenant: true }` when the payload names the
+   tenant, `forEachTenant` or `system` with a reason in `APP_SYSTEM_REASONS`.
+3. Write the handler: `jobNames`, `run(job)`, idempotent, a `CronRun` if it repeats; export it from its module.
+4. Wire it: add it to the factory and `inject` list in the queue's dispatcher module (`bulk-ops-queue.module.ts`).
+5. Enqueue with `buildJobEnvelope` and, for a custom id, `bullJobIdFromDbId`; a repeatable registers on module init,
+   as `ai-credential-revalidation.job.ts` does.
+6. Run `pnpm verify:arch`: the vocabulary, wiring, job-id, tenant-context and cron specs fail on a step left out.
+
+## Recipe: add a deadline
+
+There is no production kind in the starter. The shape is the header of
+`apps/backend/src/platform-glue/deadlines/deadline-kinds.ts`, and `deadlines.integration.spec.ts` beside it runs a test
+kind end to end on a real Postgres:
+
+```typescript
+export const DEADLINE_KINDS = { INVOICE_REMINDER: 'INVOICE_REMINDER' } as const;
+
+@Injectable()
+export class InvoiceReminderHandler implements DeadlineHandler, OnModuleInit {
+  readonly kind = DEADLINE_KINDS.INVOICE_REMINDER;
+  constructor(@Inject(DEADLINE_HANDLERS) private readonly handlers: DeadlineHandlerRegistry) {}
+  onModuleInit() {
+    this.handlers.register(this);
+  }
+  async fire(deadline: Deadline): Promise<DeadlineOutcome> {
+    /* re-read, act, return { outcome: 'fired' } */
+  }
+}
+
+// In the write that needs the timer, on the same transaction:
+await this.deadlines.schedule(tx, {
+  tenantId,
+  kind: DEADLINE_KINDS.INVOICE_REMINDER,
+  subjectType: 'invoice',
+  subjectId: invoice.publicId,
+  dedupeKey: `invoice:${invoice.publicId}:remind`,
+  dueAt,
+});
+```
+
+1. Add the kind to `DEADLINE_KINDS`.
+2. Write the handler: `kind`, register in `onModuleInit`, `fire` re-reads Postgres and returns `fired`, `cancelled`
+   with a reason, or `reschedule`; its writes and events go through `OutboxService.transaction`.
+3. Import `DeadlinesModule` in the owning module and provide the handler.
+4. Call `schedule(tx, …)` inside the write's transaction (the outbox callback's `tx` works), and `cancel(tx, …)` in
+   every write that makes the timer moot.
+5. Test the handler twice over the same row; it must change nothing the second time. Watch it on `/admin/timers`.
 
 ## Flag in review
 
