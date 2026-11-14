@@ -139,7 +139,7 @@ const mutation = useMutation({
     showSuccess('API key created — copy the secret before closing');
     setCreated(data);
   },
-  onError: (err: Error) => showError(extractErrorMessage(err) || "Couldn't create the key"),
+  onError: (err: Error) => showError("Couldn't create the key", extractErrorMessage(err)),
 });
 
 const canSubmit = name.trim().length > 0 && scopes.length > 0 && !needsIpAllowlist && !mutation.isPending;
