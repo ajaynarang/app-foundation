@@ -6,15 +6,16 @@
  *   skills  (.claude/**)  skill and agent names (folder, prefix, reserved names), relative links, backticked repo
  *                         paths and globs, `<prefix>-<name>` tokens, home paths, GitHub project node ids, the vault
  *                         word, versioned Claude model ids, the paths in hooks/hotspots/*.json and settings.json.
- *                         Files that carry the new frontmatter (owner, sources, guards, requires, status, pending,
- *                         examples) also get: owner, sources and `path#Symbol` anchors, guards, `status: interim` with
+ *                         Every skill and agent also gets (the frontmatter is mandatory): the prefix, owner, sources
+ *                         and `path#Symbol` anchors, guards, `status: interim` with
  *                         `pending: F<n>`, a link from the skill's SKILL.md to each of its references, the size budget, a guard tag or
  *                         review-only on every rule, requires: against the feature folders, inline code in a rules
  *                         section resolving to a source word or an examples entry, and the origin of a long example.
  *   docs                  CLAUDE.md, README.md, docs/** (not the plans folder), tools/**\/README.md, .github/*.md:
  *                         links, backticked repo paths, and sources: where a doc has them.
  *   source                apps, packages, infra, tests and tools (not tools/guards, tools/init-app): no comment cites
- *                         a path under .claude/, and no file names a skill, current or retired (`*-patterns`).
+ *                         a path under .claude/ or a current skill or agent name, and no file names a retired
+ *                         `*-patterns` skill anywhere.
  *
  *   node tools/guards/skills-guard.mjs [--target skills|docs|source] [--root <dir>]
  *
@@ -32,15 +33,9 @@ import { isEntryModule, loadWorkflowConfig, repoRootOf, WORKFLOW_FILE } from './
 
 /** Optional features and the folder whose presence means the feature is in this product. */
 export const FEATURE_FOLDERS = { mobile: 'apps/mobile', desk: 'apps/backend/src/domains/desk' };
-/**
- * Until every skill carries the new frontmatter, the prefix, owner and budget checks apply only to the files that do.
- * The pull request that converts the last old skill sets this to true.
- */
-export const FRONTMATTER_REQUIRED = false;
 export const TARGETS = ['skills', 'docs', 'source'];
 
 const ROOT_FOLDERS = ['apps/', 'packages/', 'infra/', 'tools/', 'tests/', 'docs/', '.github/', '.claude/'];
-const NEW_KEYS = ['owner', 'sources', 'guards', 'requires', 'status', 'pending', 'examples'];
 // A reference that is moved text its finish pull request has not condensed yet: `status: interim`, `pending: F<n>`.
 const PENDING = /^F[1-9]$/;
 const BUDGET = { skill: 200, reference: 450 };
@@ -173,7 +168,6 @@ export function parseFrontmatter(text) {
 const unquote = (s) => s.trim().replace(/^(['"])(.*)\1$/, '$2');
 const splitList = (s) => s.split(',').map(unquote).filter(Boolean);
 const listOf = (v) => (Array.isArray(v) ? v : v ? [v] : []);
-const hasNewFrontmatter = (fm) => !!fm && NEW_KEYS.some((k) => k in fm);
 
 /** Lines of a markdown body with fenced blocks marked, so link and code-span scans skip them. */
 function scanLines(body) {
@@ -352,9 +346,8 @@ function checkSkills(ctx, add) {
   const agents = ctx.agentNames();
   const known = new Set([...skills, ...agents, ...cfg.reservedNames]);
 
-  const checkName = (rel, name, expected, fm) => {
+  const checkName = (rel, name, expected) => {
     if (name !== expected) add(rel, 1, 'name-folder', `name "${name ?? ''}" must equal "${expected}"`);
-    if (!(FRONTMATTER_REQUIRED || hasNewFrontmatter(fm))) return;
     if (!expected.startsWith(prefix)) add(rel, 1, 'name-prefix', `"${expected}" must start with "${prefix}"`);
     const reserved = cfg.reservedNames.find((r) => expected === r || expected.startsWith(`${r}-`));
     if (reserved) add(rel, 1, 'name-reserved', `"${expected}" starts with the reserved name "${reserved}"`);
@@ -367,12 +360,12 @@ function checkSkills(ctx, add) {
       add(`.claude/skills/${name}`, 1, 'name-folder', 'a skill folder needs a SKILL.md');
       continue;
     }
-    checkName(rel, parseFrontmatter(text).fm?.name, name, parseFrontmatter(text).fm);
+    checkName(rel, parseFrontmatter(text).fm?.name, name);
   }
   for (const name of agents) {
     const rel = `.claude/agents/${name}.md`;
     const { fm } = parseFrontmatter(readText(root, rel) ?? '');
-    checkName(rel, fm?.name, name, fm);
+    checkName(rel, fm?.name, name);
   }
 
   for (const rel of ctx.files().filter((f) => f.startsWith('.claude/'))) {
@@ -405,8 +398,7 @@ function checkSkills(ctx, add) {
     });
 
     const isSkillDoc = rel.startsWith('.claude/skills/') || rel.startsWith('.claude/agents/');
-    if (isSkillDoc && (FRONTMATTER_REQUIRED || hasNewFrontmatter(fm)))
-      checkNewFrontmatter(ctx, rel, fm ?? {}, body, offset, add);
+    if (isSkillDoc) checkNewFrontmatter(ctx, rel, fm ?? {}, body, offset, add);
   }
 }
 
@@ -569,19 +561,28 @@ function checkDocs(ctx, add) {
 
 function checkSource(ctx, add) {
   const current = [...ctx.skillNames(), ...ctx.agentNames()].filter((n) => n.includes('-'));
-  const tokens = new RegExp(
-    `(?<![\\w/.-])(?:[a-z][a-z0-9]*-)*[a-z0-9]+-patterns(?![\\w-])${current.map((n) => `|(?<![\\w/.-])${n.replace(/[.-]/g, '\\$&')}(?![\\w-])`).join('')}`,
-  );
+  // A retired `*-patterns` name is a citation wherever it appears. A current name is one only inside a comment: a
+  // runtime identifier may share its spelling (a workflow engine's app id), and code that uses it cites nothing.
+  const retired = /(?<![\w/.-])(?:[a-z][a-z0-9]*-)*[a-z0-9]+-patterns(?![\w-])/;
+  const currentRe = current.length
+    ? new RegExp(current.map((n) => `(?<![\\w/.-])${n.replace(/[.-]/g, '\\$&')}(?![\\w-])`).join('|'))
+    : null;
+  // The text of a line from its first comment marker on (a whole `*` line inside a block comment), or ''.
+  const commentOf = (line) => {
+    if (/^\s*\*/.test(line)) return line;
+    const m = line.match(/(^|\s)(\/\/|#|\/\*|<!--|--)/);
+    return m ? line.slice(m.index) : '';
+  };
   for (const rel of ctx.files()) {
     if (!/^(apps|packages|infra|tests|tools)\//.test(rel)) continue;
     if (rel.startsWith('tools/guards/') || rel.startsWith('tools/init-app/') || rel.endsWith('.md')) continue;
     const text = readText(ctx.root, rel);
     if (text === null) continue;
     text.split('\n').forEach((line, i) => {
-      const at = line.indexOf('.claude/');
-      if (at > -1 && (/(^|\s)(\/\/|#|\/\*|<!--|--)/.test(line.slice(0, at)) || /^\s*\*/.test(line)))
+      const comment = commentOf(line);
+      if (comment.includes('.claude/'))
         add(rel, i + 1, 'cites-claude', 'a comment cites a path under .claude/; cite the guard or a file under docs/');
-      const m = line.match(tokens);
+      const m = line.match(retired) ?? (currentRe && comment.match(currentRe));
       if (m) add(rel, i + 1, 'cites-skill', `names the skill "${m[0]}"; cite the guard or a file under docs/`);
     });
   }

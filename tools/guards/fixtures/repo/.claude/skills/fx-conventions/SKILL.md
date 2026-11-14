@@ -10,7 +10,7 @@ guards:
 
 # Conventions
 
-Working on the API: read [the API reference](references/api.md). The legacy skill is `legacy`; the explorer is
+Working on the API: read [the API reference](references/api.md). The notes skill is `fx-notes`; the explorer is
 `/fx-explorer`. Container names such as `fx-postgres` are reserved.
 
 ## Non-negotiables

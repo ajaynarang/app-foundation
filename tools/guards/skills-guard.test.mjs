@@ -31,7 +31,7 @@ const edit = (dir, rel, from, to) => {
 const rulesOf = (dir, targets) => checkRepo(dir, { targets }).map((f) => `${f.file}:${f.rule}`);
 const INDEX = '.claude/skills/fx-conventions/SKILL.md';
 const REF = '.claude/skills/fx-conventions/references/api.md';
-const LEGACY = '.claude/skills/legacy/SKILL.md';
+const NOTES = '.claude/skills/fx-notes/SKILL.md';
 
 test('the fixture repo passes every target', () => {
   assert.deepEqual(rulesOf(copy()), []);
@@ -48,8 +48,8 @@ test('the repository itself passes every target', () => {
 
 test('a skill whose name differs from its folder fails', () => {
   const dir = copy();
-  edit(dir, LEGACY, 'name: legacy', 'name: older');
-  assert.ok(rulesOf(dir, ['skills']).includes(`${LEGACY}:name-folder`));
+  edit(dir, NOTES, 'name: fx-notes', 'name: fx-older');
+  assert.ok(rulesOf(dir, ['skills']).includes(`${NOTES}:name-folder`));
 });
 
 test('a skill folder without SKILL.md fails', () => {
@@ -87,29 +87,29 @@ test('a relative link that does not resolve fails', () => {
 
 test('a backticked repo path that does not exist fails, and a glob must match a file', () => {
   const dir = copy();
-  edit(dir, LEGACY, '`tools/hook.mjs`', '`tools/gone.mjs` and `apps/api/src/*.dart`');
-  const found = rulesOf(dir, ['skills']).filter((r) => r === `${LEGACY}:path`);
+  edit(dir, NOTES, '`tools/hook.mjs`', '`tools/gone.mjs` and `apps/api/src/*.dart`');
+  const found = rulesOf(dir, ['skills']).filter((r) => r === `${NOTES}:path`);
   assert.equal(found.length, 2);
 });
 
 test('placeholders and paths under an untracked plans folder are skipped', () => {
   const dir = copy();
-  edit(dir, LEGACY, '`tools/hook.mjs`', '`tools/hook.mjs`, `apps/<your-app>/src/x.ts`, `docs/plans/2026-01-01-x.md`');
+  edit(dir, NOTES, '`tools/hook.mjs`', '`tools/hook.mjs`, `apps/<your-app>/src/x.ts`, `docs/plans/2026-01-01-x.md`');
   assert.deepEqual(rulesOf(dir, ['skills']), []);
 });
 
 test('a brace glob that names folders resolves when one branch matches, and fails when none does', () => {
   const dir = copy();
-  edit(dir, LEGACY, '`tools/hook.mjs`', '`tools/hook.mjs` and `apps/{api,web}/src/`');
+  edit(dir, NOTES, '`tools/hook.mjs`', '`tools/hook.mjs` and `apps/{api,web}/src/`');
   assert.deepEqual(rulesOf(dir, ['skills']), []);
-  edit(dir, LEGACY, '`apps/{api,web}/src/`', '`apps/{web,mobile}/`');
-  assert.deepEqual(rulesOf(dir, ['skills']), [`${LEGACY}:path`]);
+  edit(dir, NOTES, '`apps/{api,web}/src/`', '`apps/{web,mobile}/`');
+  assert.deepEqual(rulesOf(dir, ['skills']), [`${NOTES}:path`]);
 });
 
 test('a backticked <prefix>-<name> token that is no skill, agent or reserved name fails', () => {
   const dir = copy();
-  edit(dir, LEGACY, '# Legacy', '# Legacy\n\nRead `fx-backend-patterns` and `/fx-gone` first.');
-  const found = rulesOf(dir, ['skills']).filter((r) => r === `${LEGACY}:skill-token`);
+  edit(dir, NOTES, '# Notes', '# Notes\n\nRead `fx-backend-patterns` and `/fx-gone` first.');
+  const found = rulesOf(dir, ['skills']).filter((r) => r === `${NOTES}:skill-token`);
   assert.equal(found.length, 2);
 });
 
@@ -117,19 +117,19 @@ test('a home path, a GitHub project node id and the vault word fail', () => {
   const dir = copy();
   edit(
     dir,
-    LEGACY,
-    '# Legacy',
-    ['# Legacy', '', 'Open /Users/someone/code/x.', 'Board PVT_kwDOAbCdEf12.', 'Notes live in Obsidian.'].join('\n'),
+    NOTES,
+    '# Notes',
+    ['# Notes', '', 'Open /Users/someone/code/x.', 'Board PVT_kwDOAbCdEf12.', 'Notes live in Obsidian.'].join('\n'),
   );
   const found = rulesOf(dir, ['skills']);
-  for (const rule of ['home-path', 'project-id', 'vault']) assert.ok(found.includes(`${LEGACY}:${rule}`), rule);
+  for (const rule of ['home-path', 'project-id', 'vault']) assert.ok(found.includes(`${NOTES}:${rule}`), rule);
 });
 
 test('a versioned Claude model id fails; the aliases do not', () => {
   const dir = copy();
-  edit(dir, LEGACY, '# Legacy', '# Legacy\n\nUse `standard` (or opus), never claude-sonnet-9-9.');
+  edit(dir, NOTES, '# Notes', '# Notes\n\nUse `standard` (or opus), never claude-sonnet-9-9.');
   const found = rulesOf(dir, ['skills']);
-  assert.deepEqual(found, [`${LEGACY}:model-id`]);
+  assert.deepEqual(found, [`${NOTES}:model-id`]);
 });
 
 test('a path named in a hotspot file or settings.json that does not exist fails', () => {
@@ -178,10 +178,20 @@ test('an index over 200 lines and a reference over 450 lines fail', () => {
   assert.ok(found.includes(`${REF}:size`));
 });
 
-test('the size budget does not apply to a skill without the new frontmatter', () => {
+test('a workflow skill over 200 lines fails, though it carries no sources, guards or status', () => {
   const dir = copy();
-  fs.appendFileSync(path.join(dir, LEGACY), '\nfiller\n'.repeat(300));
-  assert.deepEqual(rulesOf(dir, ['skills']), []);
+  fs.appendFileSync(path.join(dir, NOTES), '\nfiller\n'.repeat(120));
+  assert.deepEqual(rulesOf(dir, ['skills']), [`${NOTES}:size`]);
+});
+
+test('frontmatter is mandatory: a skill or agent with only name and description needs the prefix and an owner', () => {
+  const dir = copy();
+  write(dir, '.claude/skills/notes/SKILL.md', '---\nname: notes\ndescription: An old-style skill.\n---\n\n# Notes\n');
+  edit(dir, '.claude/agents/fx-explorer.md', 'owner: foundation\n', '');
+  const found = rulesOf(dir, ['skills']);
+  assert.ok(found.includes('.claude/skills/notes/SKILL.md:name-prefix'));
+  assert.ok(found.includes('.claude/skills/notes/SKILL.md:owner'));
+  assert.ok(found.includes('.claude/agents/fx-explorer.md:owner'));
 });
 
 test('a rule without a guard tag or review-only fails, and review-only needs a reason', () => {
@@ -304,6 +314,15 @@ test('source: a retired *-patterns name or a current hyphenated skill name fails
   const dir = copy();
   write(dir, 'apps/api/src/a.ts', '// per fx-backend-patterns §3\n// and fx-conventions\nexport const a = 1;\n');
   assert.equal(rulesOf(dir, ['source']).filter((r) => r === 'apps/api/src/a.ts:cites-skill').length, 2);
+});
+
+test('source: a current skill name used as a value in code is not a citation; in a comment it is', () => {
+  // A runtime identifier can share a skill's spelling (an engine's app id such as 'fx-notes'); only a comment cites.
+  const dir = copy();
+  write(dir, 'apps/api/src/b.ts', "export const client = { id: 'fx-notes' };\n");
+  assert.deepEqual(rulesOf(dir, ['source']), []);
+  write(dir, 'apps/api/src/b.ts', "// see fx-notes\nexport const client = { id: 'fx-notes' };\n");
+  assert.deepEqual(rulesOf(dir, ['source']), ['apps/api/src/b.ts:cites-skill']);
 });
 
 test('an invalid workflow.json fails every target', () => {
