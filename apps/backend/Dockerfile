@@ -92,13 +92,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y curl gnupg && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
+# The container runs as the unprivileged `node` user of the base image, never root. Every file is copied in already
+# owned by `node` (COPY --chown): a `RUN chown -R` after the copies would write a second layer holding a copy of every
+# file. Only /app itself (made by WORKDIR, empty) is chowned here. Doppler's fallback file goes to /tmp, which any user
+# may write.
+RUN chown node:node /app
+
 # Copy the self-contained production bundle
-COPY --from=builder /production/node_modules ./node_modules
-COPY --from=builder /workspace/apps/backend/dist ./dist
-COPY --from=builder /workspace/apps/backend/content ./content
-COPY --from=builder /workspace/packages/appshore/db/prisma ./prisma
-COPY --from=builder /workspace/packages/appshore/db/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /workspace/apps/backend/package.json ./
+COPY --chown=node:node --from=builder /production/node_modules ./node_modules
+COPY --chown=node:node --from=builder /workspace/apps/backend/dist ./dist
+COPY --chown=node:node --from=builder /workspace/apps/backend/content ./content
+COPY --chown=node:node --from=builder /workspace/packages/appshore/db/prisma ./prisma
+COPY --chown=node:node --from=builder /workspace/packages/appshore/db/prisma.config.ts ./prisma.config.ts
+COPY --chown=node:node --from=builder /workspace/apps/backend/package.json ./
+
+USER node
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
