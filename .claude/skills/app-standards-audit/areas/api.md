@@ -88,7 +88,7 @@ The rules are in `.claude/skills/app-conventions/references/lists-and-pagination
 | --- | --------------------------------------------------------------------------------------- | ----------------- | ---------------------------------------------- |
 | C1  | Every growing list is a `CursorList`; each `BOUNDED_LISTS` entry's reason is still true | Rules             | `api-contract.spec.ts` (held); reasons: review |
 | C2  | Every other read behind a GET is bounded; no rows loaded to count                       | Rules             | `api-contract.spec.ts` (held)                  |
-| C3  | Tiebreak is a public id; scope and keyset joined with `AND`; `total` ignores the cursor | Rules             | `id-boundary.spec.ts`; the rest: review        |
+| C3  | Tiebreak is a public id; scope and keyset joined with `AND`; `total` ignores the cursor | Rules             | review                                         |
 | C4  | A keyset index backs each list                                                          | Rules             | review                                         |
 | C5  | Each list has a page-walking test with ties and a foreign cursor                        | Rules             | review                                         |
 

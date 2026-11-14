@@ -16,7 +16,6 @@ sources:
 guards:
   - api-contract.spec.ts
   - cursor-pagination.spec.ts
-  - id-boundary.spec.ts
   - list-query.spec.ts
 ---
 
@@ -44,7 +43,8 @@ Every list that can grow answers one envelope, `CursorList<T>` from `@app/shared
   `kind: 'text'`; a number or key is `kind: 'value'`. [guard: cursor-pagination.spec.ts]
 - The tiebreak is a public identifier, never an `Int` primary key: the table's string id, its human number
   (`ticketNumber`) or a `publicId`. The two API key lists are the one exception (ADR "ID boundary").
-  [guard: id-boundary.spec.ts]
+  [review-only: no spec reads a keyset's `idField`; `id-boundary.spec.ts` covers DTOs, route params and Zod schemas,
+  not cursors]
 - Fetch `take + 1` rows (the probe row says whether a next page exists) and build the page with
   `buildCursorPage(rows, take, encode)`. [guard: cursor-pagination.spec.ts]
 - Join scope and keyset as `AND: [scope, keyset]`, never by spreading both into one object: each may carry an `OR`,
