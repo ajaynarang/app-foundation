@@ -207,7 +207,9 @@ The pre-push hook runs `apps/web/src/features/__tests__/ui-grammar-guard.test.ts
 ## Recipe: a page's chrome and a table row's actions
 
 A page with no tabs, so the one primary action sits in `PageHeader actions`; a status as a tone; one destructive row
-action that confirms, carries a reason when disabled and names its record for assistive tech. Trimmed from
+action that confirms, carries a reason when disabled and names its record for assistive tech. The invite button
+drops its text below `sm`, so it carries an `aria-label` that repeats the visible text (a phone still hears its
+name). Trimmed from
 `apps/web/src/app/settings/members/page.tsx`:
 
 ```tsx
@@ -215,7 +217,7 @@ action that confirms, carries a reason when disabled and names its record for as
   title="Members"
   subtitle="Who's on your team and what they can do"
   actions={
-    <Button onClick={() => setInviteOpen(true)} size="sm">
+    <Button onClick={() => setInviteOpen(true)} size="sm" aria-label="Invite Staff Member">
       <UserPlus className="h-4 w-4 sm:mr-2" />
       <span className="hidden sm:inline">Invite Staff Member</span>
     </Button>

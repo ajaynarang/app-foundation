@@ -233,7 +233,7 @@ export default function MembersPage() {
         title="Members"
         subtitle="Who's on your team and what they can do"
         actions={
-          <Button onClick={() => setInviteOpen(true)} size="sm">
+          <Button onClick={() => setInviteOpen(true)} size="sm" aria-label="Invite Staff Member">
             <UserPlus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Invite Staff Member</span>
           </Button>
