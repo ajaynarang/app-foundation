@@ -5,8 +5,7 @@
     "apps/backend/src/platform-glue/features/desk.feature.ts",
     "packages/appshore/db/prisma/seeds/07-desk.seed.ts",
     "packages/test-utils/src/factories/desk.ts",
-    "packages/test-utils/src/schemas/desk.ts",
-    ".claude/skills/desk-patterns"
+    "packages/test-utils/src/schemas/desk.ts"
   ],
   "markers": [
     "apps/backend/src/platform-glue/features/index.ts",
@@ -30,7 +29,8 @@
     "docs/upgrade-notes/operations.md",
     "docs/operations.md",
     "docs/domain-map.md",
-    "docs/module-map.md"
+    "docs/module-map.md",
+    "docs/how-we-build.md"
   ],
   "jsonEntries": [
     { "file": "package.json", "path": ["scripts", "// — Inngest (Desk durable workflow engine — local dev)"] },

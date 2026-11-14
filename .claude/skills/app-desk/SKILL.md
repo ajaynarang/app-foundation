@@ -1,15 +1,17 @@
 ---
-name: desk-patterns
-description: Use when planning or building a NEW Desk responsibility (an autonomous AI duty on the Inngest workflow engine at apps/backend/src/domains/desk) — e.g. "add a Desk responsibility for X", "automate this recurring duty", or promoting a COMING_SOON stub to AVAILABLE. Encodes the proven research→plan→execute→review pipeline and the hard-won conventions so a new responsibility ships consistently.
+name: app-desk
+description: Use when planning or building a NEW Desk responsibility (an autonomous AI duty on the Inngest workflow engine at apps/backend/src/domains/desk) — e.g. "add a Desk responsibility for X", "automate this recurring duty", or promoting a COMING_SOON stub to AVAILABLE. Encodes the research, plan, execute, review pipeline and the hard-won conventions so a new responsibility ships consistently.
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, Skill
+owner: foundation
+requires: desk
 ---
 
-# Desk Patterns — add a new Desk responsibility
+# Desk — add a new Desk responsibility
 
 The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engine: autonomous "responsibilities" run as Inngest-orchestrated episodes with human-in-the-loop approval, trust levels, and memory. The starter ships ONE no-op example (`welcome`) and an **empty registry** — this skill turns a responsibility idea into a shipped, reviewed PR.
 
-**Announce at start:** "Using desk-patterns to plan and ship the `<key>` responsibility."
+**Announce at start:** "Using app-desk to plan and ship the `<key>` responsibility."
 
 > Vocabulary (NON-NEGOTIABLE): **responsibility / episode / step**. An **agent** is the AI employee persona; a **responsibility** is one duty it owns. An **episode** is one run of a responsibility against one entity. A **step** is a discrete durable operation inside the episode. `COMING_SOON` is a real definition with `lifecycle: 'COMING_SOON'`, not a stub of missing code.
 
@@ -17,6 +19,8 @@ The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engi
 
 ## 0. Read the canon first
 
+- [`references/building-a-responsibility.md`](references/building-a-responsibility.md) — the folder layout, the
+  task spine, the registration touchpoints and the hard-won gotchas. The plan and the executor both need it.
 - The **`app-conventions`** skill for every backend rule a responsibility's code follows (its index, then the
   reference for the area you touch), plus the Desk rules and the full architecture below.
 - `apps/backend/src/domains/desk/responsibilities/index.ts` — the registry, with the `welcome` example and the add-a-responsibility checklist in its doc comment.
@@ -53,41 +57,6 @@ Desk is chosen at scaffold time and reached only through `apps/backend/src/platf
 - `pnpm verify:scaffold` proves both scaffolds (`--desk no`, `--desk yes`) still install, type-check and pass. Run it
   before a pull request that touches `tools/init-app/`, `platform-glue/features/`, a file the manifest names, or a Desk
   file outside the Desk folder. The Desk tables stay in the schema either way, empty without Desk.
-
-### Domain structure
-
-```
-domains/desk/
-├── desk.module.ts
-├── core/                                  ← generic Desk infrastructure (don't fork it)
-│   ├── inngest/                           ← Inngest client (typed DeskEvents) + event controller
-│   ├── episode/                           ← step writer, episode lifecycle
-│   ├── approval/                          ← approval service + enrichment + decision webhook
-│   ├── gate/                              ← gate.algorithm (pure decision logic)
-│   ├── memory/                            ← memory store + reinforcer
-│   ├── agent/                             ← agent registry
-│   ├── responsibility/                    ← API + responsibility metadata
-│   ├── scheduler/                         ← heartbeat → cron-due runs (tenant master switch)
-│   ├── trigger/                           ← fan-out + domain-event bridge
-│   ├── suppression/                       ← delivery suppression
-│   └── types/                             ← enums, TrustLevel, TRUST_LEVEL_CONFIDENCE_THRESHOLDS
-│
-├── shared-steps/                          ← reusable step handlers
-│   ├── gate.step.ts                       ← decision gating before every action
-│   ├── execute.step.ts                    ← tool invocation via the pipeline
-│   ├── close.step.ts                      ← episode closure + memory write
-│   ├── _llm-step.helper.ts                ← runStructuredLlmStep() — structured LLM wrapper
-│   ├── step.types.ts                      ← shared hydrate/preflight shapes
-│   └── outcomes.ts                        ← DESK_OUTCOMES + TERMINAL_STATUS_BY_OUTCOME
-│
-└── responsibilities/                      ← one folder per responsibility (YOUR extension point)
-    ├── definition.types.ts                ← ResponsibilityDefinition interface
-    ├── index.ts                           ← RESPONSIBILITY_REGISTRY (code-authored)
-    ├── coming-soon.ts                     ← COMING_SOON stubs (UI only)
-    ├── desk-bootstrap.service.ts          ← seeds desk_responsibilities rows per tenant
-    ├── desk-prompt.registrar.ts           ← prompt registration
-    └── <your-key>/                        ← definition, steps/, workflow/, prompts/, adapters
-```
 
 ### The step pipeline
 
@@ -151,84 +120,28 @@ Sensor/actuator is the law: existing engines and services DETECT; the responsibi
 
 - **An existing detection/monitoring engine's findings or alert rows** — ride them; mind staleness (trigger a fresh scan if the latest run is old) and verify which fields are actually persisted (you may need to reconstruct derived values).
 - **Entity columns** — due dates, overdue flags, unassigned records: a cheap tenant-scoped Prisma query.
-- **A domain service** — hydrate can resolve any service from the root Nest container (see §6 gotcha) and call it directly.
+- **A domain service** — hydrate can resolve any service from the root Nest container (see the gotchas in [the build reference](references/building-a-responsibility.md)) and call it directly.
 
 **Dispatch an Explore agent** to map the sensor: its exact output shape, freshness, the MCP tools that read it, and any gap. This research step pays for itself every time.
 
 ---
 
-## 3. Plan via the `plan` skill
+## 3. Plan via `app-plan`
 
-Invoke the **`plan`** skill with the responsibility brief + the research findings. The plan MUST:
+Invoke **`app-plan`** with the responsibility brief + the research findings. The plan MUST:
 
 - Name the reference responsibility (or the `welcome` example) to mirror file-for-file.
 - Contain **complete code for the novel files** (schemas, fan-out, conditions-evaluator, definition) and **exact deltas + reference pointers** for the template-mirroring files (steps, workflow, adapters, registration).
 - Flag every **verification read** (Prisma field names, tool param names, service signatures) the executor must do before writing.
-- List the **registration touchpoints** (§5).
-- Use the **task spine** in §4.
-
----
-
-## 4. The task spine (every responsibility has these)
-
-0. Worktree + baseline (off the CURRENT default-branch tip; `pnpm install`; `pnpm prisma:generate` + `pnpm --filter @app/shared-types build`; baseline desk suite green).
-1. Schemas — the responsibility's conditions schema + conditions UI spec, perceive/decide/draft Zod output schemas (confidence = plain `z.number()` — structured-output providers can reject min/max constraints on numbers), outcomes.
-   - **(1.5) If the act needs a new MCP tool** — build it first: the `@Tool` wrapper over the existing domain service, scope registration, `mcp-tools.module.ts` registration, spec.
-2. Outcome vocabulary — add to `DESK_OUTCOMES` + `TERMINAL_STATUS_BY_OUTCOME` in `shared-steps/outcomes.ts` (or reuse an existing outcome).
-3. Fan-out (TDD) — a pure tenant-scoped Prisma query returning the work items. Cheap; per-item enrichment happens in hydrate.
-4. step.types + conditions-evaluator (TDD) + reinforcement-judge (TDD) — the judge is a decision table mapping memory polarity × closing transition → CONFIRM/CONTRADICT/NEUTRAL.
-5. Prompts — perceive/decide/draft prompt files + `PROMPT_NAMES` entries (`domains/prompting/prompting.types.ts`) + registrar wiring (`desk-prompt.registrar.ts`).
-6. Steps — hydrate (load entity + memory + preflight; resolve recipient/contact; **pin recipient/entity id**) + perceive(`fast`)/decide(`standard`)/draft(`standard`) via `runStructuredLlmStep()`.
-7. Workflow + spec — the Inngest function covering all terminal paths (preflight abort/skip, no-action, gate→execute→close, approve/edited/reject/expired/retry-cap, auto-escalate). Add the typed `DeskEvents['app/desk.<key>.run']` entry in `core/inngest/inngest.client.ts`.
-8. Approval adapter (TDD) — the decision-sheet payload (artifact, header, summary, context bullets, confidence) built from episode steps, so the approval UI renders it without responsibility-specific UI code.
-9. Registration (§5).
-10. Verification + PR.
-
-TDD the pure units (fan-out, evaluator, judge, adapter, any new MCP tool) and the workflow spec. Target ≥90% on changed files. **Commit after every task** — interruptions must leave recoverable, green progress.
-
----
-
-## 5. Registration touchpoints (the files every responsibility edits)
-
-These are the additive, keep-both-on-conflict files. Edit all that apply:
-
-1. `desk/responsibilities/<key>/definition.ts` (new) + `desk/responsibilities/index.ts` (registry array — order = UI card order).
-2. `desk/responsibilities/coming-soon.ts` — remove the stub if promoting one.
-3. `desk/shared-steps/outcomes.ts` — new outcome (if any).
-4. `desk/core/inngest/inngest.controller.ts` — register the workflow function.
-5. `desk/core/inngest/inngest.client.ts` — typed `DeskEvents['app/desk.<key>.run']` entry.
-6. `desk/core/trigger/trigger.service.ts` — `run<Key>ForTenant` method + `runByKey` case + the fan-out import.
-7. `desk/core/approval/approval-enrichment.service.ts` — the enrich() branch.
-8. `desk/responsibilities/desk-prompt.registrar.ts` + `domains/prompting/prompting.types.ts` `PROMPT_NAMES`.
-9. Shared types export if the schemas live in `@app/shared-types`.
-
-> Because every responsibility touches the same registration files, **concurrent PRs conflict additively (keep-both)**. Ship one at a time, or note it in the PR and rebase keep-both.
-
----
-
-## 6. Hard-won gotchas (don't relearn them)
-
-- **Pin the recipient / entity id from hydrate, never from the LLM draft.** A SUPERVISED gate hides this today, but it becomes a live misroute the day trust flips to ASSISTED/AUTONOMOUS (the no-approval branch executes the args verbatim). The workflow spec should assert a hallucinated `draft.to`/name is ignored.
-- **hydrate resolves domain services via the root Nest container** (see `core/inngest/nest-context.ts`) — this works WITHOUT importing that service's module into DeskModule, because the root `INestApplication` searches the whole DI graph for any exported provider.
-- **After adding a responsibility key, outcome or event, run `pnpm build`.** An exhaustive `Record<Key, …>` over a key union (`Record<TrustLevel, …>` in `core/types/enums.ts` is one; a responsibility often adds its own), a typed `DeskEvents` payload and the `ResponsibilityDefinition` contract are checked only by the compiler. Jest will not catch a missing entry or a wrong shape: ts-jest runs with `diagnostics: false` and `isolatedModules: true` (`apps/backend/package.json`), so specs pass while the map is incomplete. Only the build type-checks it.
-- **Calendar dates** (`@db.Date`): never `new Date(dateOnlyString)` (off-by-one across timezones). Format the raw string or use a UTC-safe helper.
-- **Desk steps run in Inngest workers, not HTTP** — throw plain `Error`, not NestJS exceptions. MCP tools return `{ error }`, never throw.
-- **Auto-escalate terminal failures to a distinct close step** — Inngest memoizes completed steps, so reusing the same step id for the failure path can silently suppress human review.
-- **Registry-shape specs** may hardcode the AVAILABLE-responsibility count or use a COMING_SOON key as a "no-evaluator" example — update those; it's an expected change, not a regression.
-- **Bootstrap lifecycle flip:** existing tenants' rows go COMING_SOON → AVAILABLE via the bootstrap upsert; they stay `enabled: false` (operator must toggle the card on). No migration.
-- **After ANY rebase, re-run `pnpm prisma:generate` + shared-types build** in the worktree — otherwise you chase phantom type errors from other merged PRs (a stale generated client looks exactly like a real failure).
-- **Conditions gate BEFORE LLM cost.** The gate runs the evaluator on hydrate output; execute never re-checks conditions.
-- **The gate is job-blind.** New responsibility = zero edits to `gate.step.ts`; the evaluator rides in on the definition.
-- **Reinforcement is best-effort** — memory write/reinforce failures log and continue; they never block episode close. Episode status is the source of truth.
-- **Memory entityRef is responsibility-owned** — each responsibility picks its scoping level (entity vs relationship); the close step copies the ref from hydrate without knowing the shape.
-- **COMING_SOON degrades gracefully** — lifecycle skips prompt registration + tool provisioning; the orchestrator no-ops when the judge is absent.
+- List the **registration touchpoints** and use the **task spine**, both in
+  [`references/building-a-responsibility.md`](references/building-a-responsibility.md).
 
 ---
 
 ## 7. Execute → review → fix → PR
 
-1. **Execute** via the `execute` skill (or a background `Agent` per the plan if running several in parallel). Hand the executor the plan path + the §6 gotchas + the recovery rule (commit per task).
-2. **Review** the resulting PR via the `review` skill (a fresh agent). Watch especially: tenant scoping on every query, recipient/id pinning, the act-tool contract match, sensor reconstruction correctness, and the Desk conventions above.
+1. **Execute** via `app-execute` (or a background `Agent` per the plan if running several in parallel). Hand the executor the plan path, the gotchas in the build reference and the recovery rule (commit per task).
+2. **Review** the resulting PR via `app-review` (a fresh agent). Watch especially: tenant scoping on every query, recipient/id pinning, the act-tool contract match, sensor reconstruction correctness, and the Desk conventions above.
 3. **Apply review fixes** (approve-with-fixes is the norm — the fixes are usually small). Push.
 4. **PR body** states: the sensor→act wiring, the trigger cadence + the disabled-by-default note (automation off until enabled + armed + master switch), the merge-conflict note vs sibling open PRs, and test evidence.
 
@@ -243,7 +156,7 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 - A new domain enum/status hand-written instead of added to the Prisma schema (see the `app-conventions` database
   reference, [`database.md`](../app-conventions/references/database.md), "Enums").
 - Trust thresholds inlined instead of imported from `TRUST_LEVEL_CONFIDENCE_THRESHOLDS`.
-- Skipping the `plan` or `review` skills — this skill wraps them, it doesn't replace them.
+- Skipping `app-plan` or `app-review` — this skill wraps them, it doesn't replace them.
 
 ## What NOT to do
 
