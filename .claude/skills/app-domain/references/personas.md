@@ -14,7 +14,7 @@ back to a generic "user".
 
 ## How to write one
 
-One `##` section per persona, named by a first name and a role ("Priya, the dispatcher"), with these lines:
+One `##` section per persona, named by a first name and a role ("Priya, the account manager"), with these lines:
 
 - **Role and login.** The `UserRole` (or the product's finer role) and the seeded account to sign in as. A persona
   with no login cannot be played; add the account to the product's seed (`SEED_LIST` in
