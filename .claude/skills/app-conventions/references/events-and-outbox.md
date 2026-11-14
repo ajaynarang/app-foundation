@@ -1,7 +1,5 @@
 ---
 owner: foundation
-status: interim
-pending: F2
 sources:
   - docs/adr/0003-outbox-and-deadlines.md
   - docs/adr/0013-outbound-webhooks.md
@@ -12,10 +10,14 @@ sources:
   - apps/backend/src/architecture/no-direct-emit.allowlist.json
   - apps/backend/src/platform-glue/events/__tests__/double-delivery.spec.ts
   - apps/backend/src/platform-glue/cache/cache-invalidation.subscriber.ts
-  - apps/backend/src/platform-glue/sse/domain-event-sse-bridge.service.ts
+  - apps/backend/src/platform-glue/sse/domain-event-sse-bridge.service.ts#DOMAIN_TO_SSE
+  - packages/shared-types/src/infrastructure/sse-events.ts#SSE_EVENTS
+  - apps/backend/src/domains/ai/routing/connect/ai-credential-connect.service.ts#emitCredentialEvent
+  - docs/event-vocabulary.md
   - packages/appshore/web-core/src/shared/realtime/invalidation-map.ts
   - apps/backend/src/platform-glue/webhooks
 guards:
+  - event-vocabulary.spec.ts
   - no-direct-emit.spec.ts
   - double-delivery.spec.ts
   - outbox.service.spec.ts
@@ -23,41 +25,41 @@ guards:
   - domain-event-sse-bridge.service.spec.ts
   - sse-role-fanout.spec.ts
   - api-contract.spec.ts
+  - sse.service.spec.ts
+  - webhook-url.validator.spec.ts
 examples:
   - DOMAIN_EVENTS.PROJECT_CREATED
 ---
 
 # Events and the outbox: the registry and naming, emit through the outbox, SSE scope, webhooks
 
-Moved from the old backend skill; condensed with its recipe in its finish pull request. The decision is the ADR
-"Outbox and deadlines", `docs/adr/0003-outbox-and-deadlines.md`; the event names a product uses are listed in
+A domain event exists if and only if the write behind it committed, and every consumer survives a second delivery.
+The decision is the ADR "Outbox and deadlines", `docs/adr/0003-outbox-and-deadlines.md`; the event names are listed in
 `docs/event-vocabulary.md`. Timers are in [`jobs-and-deadlines.md`](jobs-and-deadlines.md).
-
-The shape of a write that raises an event (short, the real calls are in the services that use `OutboxService`):
-
-```typescript
-const row = await this.outbox.transaction(async (tx, emit) => {
-  const updated = await tx.project.update({ where: { id }, data: { status } });
-  await emit(DOMAIN_EVENTS.PROJECT_UPDATED, tenantId, { projectNumber: updated.projectNumber }, actor);
-  return updated;
-}); // published here, after the commit; a rollback publishes nothing
-```
 
 ## Rules
 
 ### The registry
 
-- An event name is `app.<aggregate>.<past-tense-action>` (`app.project.created`), a fact in the past tense, and is
-  listed verbatim in `docs/event-vocabulary.md`. [guard: event-registry.spec.ts]
+- An event key is `app.<aggregate>.<action>` in kebab-case, every key and constant name unique.
+  [guard: event-registry.spec.ts]
+- The action is a fact in the past tense (`app.ai.credential-connected`, `app.api-key.revoked`), never a command.
+  [review-only: tense needs reading]
+- Every registered key is listed verbatim, in backticks, in `docs/event-vocabulary.md`, with what it means.
+  [guard: event-vocabulary.spec.ts]
 - A product's events are entries in `APP_EVENT_REGISTRY` (`apps/backend/src/platform-glue/events/event-registry.ts`):
-  `key`, `constantName`, `label`, `description`, `category`, `visibility`. `DOMAIN_EVENTS` derives from it, so
-  `DOMAIN_EVENTS.PROJECT_CREATED` is the literal type of its key. The foundation's own catalog is in `@appshore/kernel`
-  (`foundation-events`). [guard: event-registry.spec.ts]
+  `key`, `constantName`, `label`, `description`, `category`, `visibility`, `aggregateType`. `DOMAIN_EVENTS` derives
+  from it, so `DOMAIN_EVENTS.PROJECT_CREATED` is the literal type of its key. The foundation's own catalog is in
+  `@appshore/kernel` (`foundation-events`); a product never adds to it. [guard: event-registry.spec.ts]
+- A payload carries public ids (`credentialPublicId`), never an `Int` key, and never a secret. The API key events
+  still carry the key's numeric id (the API key exception the ADR "ID boundary" records).
+  [review-only: `id-boundary.spec.ts` reads DTOs, route params, tools and shared schemas, not payloads]
 - Only `visibility: 'external'` events appear in the webhook subscription catalog. [guard: event-registry.spec.ts]
 - A new event that should reach the web updates, in the same pull request: the registry, the cache-invalidation
-  subscriber (`apps/backend/src/platform-glue/cache/cache-invalidation.subscriber.ts`), the SSE bridge
-  (`apps/backend/src/platform-glue/sse/domain-event-sse-bridge.service.ts`), the SSE event type in
-  `packages/shared-types`, and the query keys in `packages/appshore/web-core/src/shared/realtime/invalidation-map.ts`.
+  subscriber (`apps/backend/src/platform-glue/cache/cache-invalidation.subscriber.ts`), the bridge's `DOMAIN_TO_SSE`
+  (`apps/backend/src/platform-glue/sse/domain-event-sse-bridge.service.ts`), the SSE type in `SSE_EVENTS`
+  (`packages/shared-types/src/infrastructure/sse-events.ts`), and its query keys in
+  `packages/appshore/web-core/src/shared/realtime/invalidation-map.ts`.
   [guard: domain-event-sse-bridge.service.spec.ts]
 
 ### The outbox
@@ -113,6 +115,50 @@ const row = await this.outbox.transaction(async (tx, emit) => {
   guard: the URL and every resolved address must be public, checked on save and on the delivery's own connection, no
   redirects. The decision is `docs/adr/0013-outbound-webhooks.md`. [guard: webhook-url.validator.spec.ts]
 
+## Recipe: emit an event
+
+Copied from `apps/backend/src/domains/ai/routing/connect/ai-credential-connect.service.ts` (`connectKey`): the row
+and its two events commit together, and the payload names the credential by its public id.
+
+```typescript
+const row = await this.outbox.transaction(async (tx, emit) => {
+  const saved = await tx.aiCredential.create({
+    data: { publicId, tenantId, type, status: AiCredentialStatus.ACTIVE /* ... */ },
+  });
+  await emitCredentialEvent(emit, DOMAIN_EVENTS.AI_CREDENTIAL_CONNECTED, saved, actor);
+  await emitCredentialEvent(emit, DOMAIN_EVENTS.AI_CREDENTIAL_VALIDATED, saved, actor);
+  return saved;
+}); // published after the commit; a rollback publishes nothing
+
+function emitCredentialEvent(emit: OutboxEmit, event: string, row: AiCredential, actor: EventActor): Promise<void> {
+  return emit(event, row.tenantId, { credentialPublicId: row.publicId, type: row.type }, actor);
+}
+```
+
+Its registry entry (in the foundation catalog; a product's goes in `APP_EVENT_REGISTRY`), from
+`packages/appshore/kernel/src/infrastructure/events/foundation-events.ts`:
+
+```typescript
+{
+  key: 'app.ai.credential-connected',
+  constantName: 'AI_CREDENTIAL_CONNECTED',
+  label: 'AI Credential Connected',
+  description: "A workspace connected its own AI provider key: a test call passed and the key is stored encrypted. Carries the credential's public id and type, never the key.",
+  category: 'AI',
+  visibility: 'external' as const,
+  aggregateType: 'ai-credential',
+},
+```
+
+1. Add the entry to `APP_EVENT_REGISTRY`; decide `visibility` (external is a public wire change: it reaches webhooks).
+2. Add its row to `docs/event-vocabulary.md` under "Your product": the key, the visibility, what it means.
+3. Inject `OutboxService`; do the write and `emit` inside `this.outbox.transaction((tx, emit) => …)`, every write on
+   `tx`, no outside call in the callback; cache busts and notifications after it returns.
+4. If the web must refresh: map it in `DOMAIN_TO_SSE` (tenant or user scope), add the `SSE_EVENTS` type, the query keys
+   in the invalidation map, and the cache keys in the cache-invalidation subscriber.
+5. A new consumer keys on `event.id` and gets a case in `double-delivery.spec.ts`.
+6. In the service spec, use `createMockOutbox(prisma)` and assert what was published; run `pnpm verify:arch`.
+
 ## Flag in review
 
 - An event emitted after the commit, or with `EventEmitter2`.
@@ -120,4 +166,5 @@ const row = await this.outbox.transaction(async (tx, emit) => {
 - A new allowlist entry in `no-direct-emit.allowlist.json` for a change, not a signal.
 - A consumer that would act twice on a second delivery.
 - A tenant-scoped SSE event carrying personal data.
+- A new event with no row in `docs/event-vocabulary.md`, or an `Int` key in a payload.
 - An inbound webhook without signature verification, or with `@SkipThrottle()`.
