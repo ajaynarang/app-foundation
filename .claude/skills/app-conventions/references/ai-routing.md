@@ -79,7 +79,8 @@ nothing left the call is `ZeroRetentionUnavailable` (400).
 - The resolver is the only way to get a model: `AiRouteResolver.resolve(tenantId, need)` builds the single-payer pool
   and fails closed with a typed error: `AiNotConfigured` (503, nothing serves the need), `ZeroRetentionUnavailable`
   (400), `AiCredentialFailing` (503), and, from `languageModel(alias)`, `AiModelNotOnRoute` (503, no id for that alias
-  on that route). Never catch one to try another provider. `resolvePlatform(need)` is only for platform-owned content
+  on that route) and `ZeroRetentionUnavailable` (a zero-retention workspace asking for an alias `MODEL_CATALOG` does
+  not mark `zdrCapable`). Never catch one to try another provider. `resolvePlatform(need)` is only for platform-owned content
   with no tenant (the global knowledge base). [guard: ai-route-resolver.service.spec.ts,
   ai-route-resolver.payer-boundary.spec.ts]
 - Provider packages (`@ai-sdk/<provider>`, `@openrouter/*`, `openai`) and `createGateway` are imported only under
@@ -127,6 +128,23 @@ route)`. On a workspace key it is also recorded on the credential (`reportCredit
   after the write, not awaited (the seeder and the admin AI spend service do). [review-only: no spec finds every writer]
 
 ### Workspace credentials (bring your own key)
+
+The credential types a workspace can connect, from `TENANT_CREDENTIAL_CAPABILITIES` in
+`apps/backend/src/domains/ai/routing/route-registry.ts`. Each is the workspace's own account, so the workspace pays
+its provider and no platform cap applies:
+
+| `AiCredentialType`   | Serves              | Retention                                                     | Connected by                                                                      |
+| -------------------- | ------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `ANTHROPIC_KEY`      | language            | zero retention if the owner attests it per key, else standard | pasting a key (`POST /ai-settings/credentials`)                                   |
+| `OPENROUTER_KEY`     | language            | standard, always                                              | pasting a key                                                                     |
+| `VERCEL_GATEWAY_KEY` | language            | standard, always (the gateway is pinned to Anthropic)         | pasting a key                                                                     |
+| `BEDROCK_ROLE`       | language, embedding | zero retention                                                | the role flow (`credentials/bedrock/begin`, then `complete`); no secret is stored |
+
+An `OPENROUTER_KEY` credential is OpenRouter on the workspace's own key: pool TENANT, paid by the workspace, its
+ledger rows carry `credentialType` `OPENROUTER_KEY`. That is not the platform sub-key above, which is also an
+OpenRouter key per workspace but is provisioned by the platform under its master key, stays on the
+`platform-openrouter` route, is paid by the platform and is capped at the workspace's budget.
+[guard: route-registry.parity.spec.ts, ai-route-resolver.payer-boundary.spec.ts]
 
 - Whether bring-your-own-key is on is `CredentialCryptoService.isConfigured()` (the `AI_CREDENTIALS_KEY` switch);
   there is no other flag and no fallback key. Off, the connect routes answer 404. [guard: credential-crypto.service.spec.ts,
@@ -199,7 +217,8 @@ When a workspace owner connects a key (`POST /ai-settings/credentials`, owner on
   applies, and the ledger row's `credentialType` is the key's type, so the spend is not counted against the budget.
 - A need the key does not serve (embeddings, for a language key) stays on the platform pool.
 - If the key starts failing, those needs are refused with `AiCredentialFailing` until the owner fixes or removes it.
-  Removing it (or disabling it) moves the need back to the platform; nothing falls back on its own.
+  Removing it (`DELETE /ai-settings/credentials/:credential_id`) moves the need back to the platform; nothing falls
+  back on its own. The API has no route that disables a credential: `DISABLED` is set only outside it.
 - The settings page shows who pays per need (`describePayers`): `platform`, the credential's public id, or `none`.
 
 ## Flag in review
