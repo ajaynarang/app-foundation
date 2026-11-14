@@ -1,5 +1,5 @@
 // node --test tools/init-app/*.test.mjs   (root script: pnpm test:init-app, run by pnpm verify)
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,6 +14,17 @@ import {
   loadManifest,
   removeFeature,
 } from './apply-feature.mjs';
+
+// Every temp folder a test makes is removed once the file's tests are done, so runs do not pile up in the temp dir.
+const temps = [];
+const tempDir = (prefix) => {
+  const dir = fs.mkdtempSync(prefix);
+  temps.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
+});
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +42,7 @@ const MANIFEST = {
 };
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-'));
+  const root = tempDir(path.join(os.tmpdir(), 'apply-feature-'));
   const write = (rel, text) => {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), text);
@@ -172,7 +183,7 @@ test('--list prints each block and allowlist entry', () => {
 });
 
 test('loadManifest takes the name from the file and refuses an unknown key', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-manifests-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'apply-feature-manifests-'));
   fs.writeFileSync(path.join(dir, 'demo.json'), JSON.stringify({ paths: ['a'] }));
   fs.writeFileSync(path.join(dir, 'demo.residue.json'), '[]');
   fs.writeFileSync(path.join(dir, 'bad.json'), JSON.stringify({ path: ['a'] }));
@@ -190,7 +201,7 @@ test('loadManifest takes the name from the file and refuses an unknown key', () 
 
 // Whether the feature is kept is read from that path by isKept in optional-features.scan.ts, held by its spec.
 test('a manifest may say where its feature lives (presentWhen), and it must be a repo-relative path', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-present-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'apply-feature-present-'));
   fs.writeFileSync(
     path.join(dir, 'gadget.json'),
     JSON.stringify({ presentWhen: 'apps/gadget', paths: ['apps/gadget'] }),
@@ -212,7 +223,7 @@ test('mobile is removed through its manifest: the app, its CI job, its scripts a
   const { missing } = featurePresence(root, manifest);
   assert.deepEqual([...missing.paths, ...missing.markers, ...missing.jsonEntries], []);
   // Removing it from a copy of the files it names leaves none of it behind.
-  const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'apply-feature-mobile-'));
+  const copy = tempDir(path.join(os.tmpdir(), 'apply-feature-mobile-'));
   for (const rel of [...manifest.markers, 'package.json', 'apps/mobile/pubspec.yaml']) {
     fs.mkdirSync(path.dirname(path.join(copy, rel)), { recursive: true });
     fs.copyFileSync(path.join(root, rel), path.join(copy, rel));

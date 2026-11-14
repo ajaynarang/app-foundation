@@ -1,6 +1,6 @@
 // Tests for prune-requires.mjs: after the feature manifests run, init-app deletes every skill, reference, agent and
 // hotspot file that requires a feature whose folder is gone, and the index rows that linked to a deleted file.
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,8 +9,19 @@ import { fileURLToPath } from 'node:url';
 import { pruneRequires } from './prune-requires.mjs';
 import { FEATURE_FOLDERS } from '../guards/skills-guard.mjs';
 
+// Every temp folder a test makes is removed once the file's tests are done, so runs do not pile up in the temp dir.
+const temps = [];
+const tempDir = (prefix) => {
+  const dir = fs.mkdtempSync(prefix);
+  temps.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 function repo(files) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-requires-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'prune-requires-'));
   for (const [rel, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     if (text !== null) fs.writeFileSync(path.join(dir, rel), text);
@@ -101,7 +112,7 @@ test("the template's own Desk skill and the index's Desk row, and only those, go
   // The Desk skill is not a manifest path; it carries `requires: desk`, so the prune step deletes it, and with it the
   // index row that linked it. Every other row stays.
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-requires-real-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'prune-requires-real-'));
   for (const top of ['.claude', 'docs']) fs.cpSync(path.join(root, top), path.join(dir, top), { recursive: true });
   // Mobile stays in this scaffold, so its reference and row must stay too.
   fs.mkdirSync(path.join(dir, FEATURE_FOLDERS.mobile), { recursive: true });
@@ -123,7 +134,7 @@ test("the template's own Desk skill and the index's Desk row, and only those, go
 test("the template's own conventions index loses its mobile row and the mobile reference, and only those, when mobile is removed", () => {
   // The real .claude and docs folders, as `--mobile no` leaves them: apps/mobile is gone, Desk stays.
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-requires-mobile-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'prune-requires-mobile-'));
   for (const top of ['.claude', 'docs']) fs.cpSync(path.join(root, top), path.join(dir, top), { recursive: true });
   fs.mkdirSync(path.join(dir, FEATURE_FOLDERS.desk), { recursive: true });
   const indexRel = '.claude/skills/app-conventions/SKILL.md';

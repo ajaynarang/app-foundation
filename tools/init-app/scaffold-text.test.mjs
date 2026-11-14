@@ -1,5 +1,5 @@
 // node --test tools/init-app/*.test.mjs   (root script: pnpm test:init-app, run by pnpm verify)
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -17,10 +17,21 @@ import {
 } from './scaffold-text.mjs';
 import { validateWorkflowConfig } from '../guards/workflow-config.mjs';
 
+// Every temp folder a test makes is removed once the file's tests are done, so runs do not pile up in the temp dir.
+const temps = [];
+const tempDir = (prefix) => {
+  const dir = fs.mkdtempSync(prefix);
+  temps.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 function tree(files) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scaffold-text-'));
+  const root = tempDir(path.join(os.tmpdir(), 'scaffold-text-'));
   for (const [rel, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), text);

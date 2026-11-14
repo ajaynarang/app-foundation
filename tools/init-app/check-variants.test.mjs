@@ -1,5 +1,5 @@
 // node --test tools/init-app/*.test.mjs   (root script: pnpm test:init-app, run by pnpm verify)
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,6 +20,17 @@ import {
 } from './check-variants.mjs';
 import { INIT_OPTIONS } from './scaffold-text.mjs';
 
+// Every temp folder a test makes is removed once the file's tests are done, so runs do not pile up in the temp dir.
+const temps = [];
+const tempDir = (prefix) => {
+  const dir = fs.mkdtempSync(prefix);
+  temps.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // These tests create git repositories. Run from a git hook (a pre-push hook in a linked worktree exports GIT_DIR), git
@@ -31,7 +42,7 @@ for (const k of execFileSync('git', ['rev-parse', '--local-env-vars'], { encodin
   delete process.env[k];
 
 function tree(files) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-variants-'));
+  const root = tempDir(path.join(os.tmpdir(), 'check-variants-'));
   for (const [rel, text] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
     fs.writeFileSync(path.join(root, rel), text);
@@ -75,7 +86,7 @@ test('a hit not on the list fails, and so does an entry that no longer matches',
 });
 
 test('a residue entry names a file, one bare search string and a reason', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'residue-'));
+  const dir = tempDir(path.join(os.tmpdir(), 'residue-'));
   const write = (entries) => {
     fs.writeFileSync(path.join(dir, 'r.json'), JSON.stringify({ entries }));
     return path.join(dir, 'r.json');
@@ -123,10 +134,10 @@ test('isolatedGitEnv drops every repository-local git variable, keeps the rest, 
 // The incident this guards against: a hook exported GIT_DIR, a test ran `git init` and `git config`, and the real
 // repository's config was rewritten. Here a decoy repository plays the real one.
 test('a git init in a scaffold copy under the isolated env stays in the copy, even with GIT_DIR exported', () => {
-  const decoy = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'decoy-')));
+  const decoy = fs.realpathSync(tempDir(path.join(os.tmpdir(), 'decoy-')));
   execFileSync('git', ['init', '-q', decoy]);
   const before = fs.readFileSync(path.join(decoy, '.git/config'), 'utf8');
-  const copy = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'copy-')));
+  const copy = fs.realpathSync(tempDir(path.join(os.tmpdir(), 'copy-')));
   const hookEnv = { ...process.env, GIT_DIR: path.join(decoy, '.git') };
   const gitDir = (env) => {
     try {
