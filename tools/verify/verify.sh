@@ -3,9 +3,15 @@
 #
 # CI in this repo is manual-only, so this script is what holds the rules: format check, lint, schema lint,
 # type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), the ops
-# checks (`pnpm check:ops`: the Grafana-as-code catalog, ops shell tests, Terraform), build.
-# It stops at the first step that fails and always ends with one result line. Paste that line into the pull
-# request body.
+# checks (`pnpm check:ops`: the Grafana-as-code catalog, ops shell tests, Terraform), the RBAC gap audit, build.
+# It stops at the first step that fails and always ends with one result line (tools/verify/result-line.sh):
+#
+#   verify: PASS 1a2b3c4 (512s)
+#   verify: FAIL at "lint" 1a2b3c4+dirty (40s)
+#
+# The sha is the commit the run started on; `+dirty` means the tree had uncommitted changes, so the line does not
+# vouch for that commit alone. Paste the line into the pull request body; a reviewer checks the sha against the pull
+# request's head commit.
 #
 # The backend and platform integration specs read DATABASE_URL and REDIS_URL. Start the local stack first
 # (`docker compose up -d postgres redis`) or export both to point somewhere else.
@@ -15,16 +21,13 @@ cd "$(dirname "$0")/../.."
 
 step=""
 started=$(date +%s)
+read -r start_sha start_dirty <<<"$(bash tools/verify/result-line.sh --state)"
 
 finish() {
   local code=$?
   local elapsed=$(( $(date +%s) - started ))
   echo
-  if [ "$code" -eq 0 ]; then
-    echo "verify: PASS (${elapsed}s)"
-  else
-    echo "verify: FAIL at \"${step}\" (${elapsed}s)"
-  fi
+  bash tools/verify/result-line.sh verify "$code" "$step" "$elapsed" "$start_sha" "$start_dirty"
   exit "$code"
 }
 trap finish EXIT
@@ -48,4 +51,6 @@ run "unit tests" pnpm exec turbo run test --filter=!@app/qa
 run "init-app tool tests" pnpm test:init-app
 # The operations files that are not Jest specs: the Grafana-as-code catalog, ops shell tests, Terraform.
 run "ops checks" pnpm check:ops
+# Every controller route declares @Roles() or @Public(); the same audit the manual CI run fails on.
+run "rbac audit" pnpm audit:rbac
 run "build" pnpm build
