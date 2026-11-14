@@ -574,3 +574,49 @@ the worker loses ECS Exec, a migration job that still picks any running task can
 unused). `worker_enable_exec = true` turns Exec on the worker back on. `rds_max_allocated_storage = 0` turns storage
 autoscaling off. The production trust has no switch; revert the `github_deploy_subjects` local in `iam.tf` to widen
 it. To run the container as root again, remove the `USER node` line (`check:ops` then fails, on purpose).
+
+## 2026-11-14: refresh rotation is atomic; provider errors, relay and timer failures are logged and reported as the runbooks say
+
+**What changed.**
+
+- **A refresh is one locked transaction.** `JwtTokenService.rotateRefreshToken` takes a per-user advisory lock
+  (`pg_advisory_xact_lock(SESSION_LOCK_NAMESPACE, userId)`), checks that the presented token is still live, retires
+  the rows it makes stale and issues the successor, all before it commits. `revokeFamily` and the workspace switch
+  take the same lock. Before, a token validated a moment earlier could still get a live successor after a reuse or a
+  logout had revoked its family, and a token retired as a sibling while it was being refreshed started a chain no
+  later retire reached. Both now get a plain 401.
+- **Presenting a token retires every older live row of its session**, not only its predecessor and siblings. A
+  workspace switch rotates from the session's newest live row, which is not always the token the client holds; the
+  token the client held is now retired when the switch's successor is first presented, so it no longer stays valid
+  in the old workspace until it expires. The token's own successors are kept, so a lost response still does not log
+  the client out.
+- **A retired token re-sent after the session was fully revoked** (after a logout, or after an earlier reuse) is a
+  plain 401. It writes no `REFRESH_REUSE` login event and reports nothing; there was nothing left to revoke.
+- **Notification provider errors are logged as an `err` field** (`{ msg: 'Email delivery failed', err }`), on the
+  email, SMS, push, in-app and WhatsApp paths. The log serializer masks addresses and numbers in `err`; it never saw
+  the message text, where the provider's error used to go, so a rejected recipient's address reached the log.
+- **The outbox relay and the deadline sweep report failures to Sentry** with `jobName` (`outbox-relay`,
+  `deadline-sweep`), the row's tenant and `source: job`: one report per failed event or failed timer run (a kind
+  with no handler included). The warning lines stay at warn level, now with an `err` field. The `outbox-backlog` and
+  `deadline-sweep-late` runbooks search for warn as well as error, and the `deadline-sweep-late` rule description no
+  longer says a failing handler trips it (failing timers are left out of its gauge; they show as FAILING on
+  `/admin/timers` and in Sentry).
+- **Shutdown no longer logs `Called end on pool more than once`.** `Mastra.shutdown()` closes the store it was
+  given; `MastraProvider` closed it a second time.
+- **`pnpm verify:api` and the seed need the database named.** `tools/verify/api-qa.sh` stops when `DATABASE_URL` or
+  `REDIS_URL` is unset, and `prisma/seeds/index.ts` stops when `DATABASE_URL` is unset. Both used to fall back to
+  the local compose ports, which on a shared machine can belong to another project's container.
+
+**Who notices.**
+
+- Code that calls the token service directly: `rotateRefreshToken` now takes the presented token's
+  `previousTokenId` and returns `null` when that token is no longer live (answer 401); `retirePredecessor` is gone
+  (the rotation does it); `revokeFamily(familyId, userId)` takes the user and returns how many rows it revoked; the
+  workspace switch calls `issueSwitchSuccessor`.
+- Anyone running `pnpm verify:api` or `pnpm db:seed` without an `apps/backend/.env`: export the two values from
+  `apps/backend/.env.example` first.
+- Sentry projects see a new issue per failing outbox event or timer kind, repeated on each retry (grouped).
+
+**What to set first.** Nothing.
+
+**How to turn it back.** Deploy the previous release. No schema or data change.
