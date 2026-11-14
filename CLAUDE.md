@@ -46,7 +46,7 @@ removed. Everything cross-cutting remains and works:
 These docs are the architecture of record. Before planning, designing or building a product feature, read the ones
 it touches; they override improvisation. In the starter they are skeletons: each has a filled "Foundation (already
 here)" part where the starter already decides something, and an empty "Your product" part to fill in the product's
-first days. `docs/README.md` indexes every other doc.
+first days (`/app-runway` walks them in order). `docs/README.md` indexes every other doc.
 
 | Doc                                 | What it binds                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------------- |
@@ -158,7 +158,8 @@ bind to app implementations.
 
 - **New domain:** add a module under `apps/backend/src/domains/<your-domain>/`, a feature under
   `apps/web/src/features/<your-domain>/`, and models in
-  `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma).
+  `packages/appshore/db/prisma/schema/app.prisma` (composed with foundation.prisma). What the workflow must know
+  about it (vocabulary, personas, review checks) goes in the domain skill (`docs/adding-your-domain.md`).
 - **Domain events:** add entries to `APP_EVENT_REGISTRY` in
   `apps/backend/src/platform-glue/events/event-registry.ts` — DOMAIN_EVENTS constants derive
   automatically. The foundation's own catalog lives in `@appshore/kernel` (foundation-events). Raise an event
@@ -270,7 +271,12 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   is the loop for a feature; `app-epic` drives an epic from `docs/epics.md` slice by slice; `app-dev-docs` (`slice`,
   `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
   running app; `app-test-notes` writes a hand-testing script; `app-standards-audit` audits an area and files each gap
-  with its guard. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+  with its guard; `app-runway` fills the binding docs and the domain skill in a product's first days. They wrap the
+  `superpowers` plugin, declared in `.claude/settings.json`.
+- **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
+  vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
+  each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
+  foundation skill is edited to add a domain (`docs/adding-your-domain.md`).
 - **Agents** (`.claude/agents/`): `app-explorer` (read-only search), `app-reviewer` (one review dimension per run),
   `app-qa-runner` (drives the app, reports what it saw), `app-persona` (plays one of the product's personas).
 - **Guards before prose.** Every rule in a skill names its guard or says review-only; `pnpm guards` fails when a skill,

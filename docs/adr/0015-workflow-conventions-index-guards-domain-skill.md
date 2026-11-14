@@ -57,3 +57,14 @@ product adds its own knowledge only in its own domain skill.**
   keep it closed.
 - Left out on purpose: a shared plugin that pushes skill updates into scaffolded products (files carry `owner:` so one
   can be built later), a note vault, and a docs site.
+
+### Amendment — 2026-11-14: the domain skill ships, and a test holds the seam
+
+The domain skill now ships with its template: `.claude/skills/app-domain/` (`SKILL.md` and the references
+`personas.md`, `review-checks.md`, `test-preconditions.md`), every file `owner: product` and `filled: false` until the
+product writes it. A reader treats a `filled: false` file as absent and never invents its content. `app-runway` fills
+it, after the binding docs, in a product's first days. The seam is held by `tools/guards/domain-seam.test.mjs` (in
+`pnpm test:guards`): it fails when the reviewer's domain dimension, test notes, the QA runner or the persona agent
+stops citing its file, when the conventions index stops linking "Where this product differs" or that heading is
+renamed, or when the domain files lose `owner: product`. What a product writes inside the skill stays review only.
+How a product uses it is `docs/adding-your-domain.md`.

@@ -26,8 +26,10 @@ that holds it, or says "review-only" and why (ADR [Workflow](adr/0015-workflow-c
 | A feature | One vertical slice: schema, endpoint, event, job, web | `/app-brainstorm`, `/app-plan`, `/app-execute`                            |
 | An epic   | Several slices from `docs/epics.md`, ending demoable  | `/app-epic`, which runs the feature loop once per slice                   |
 
-A product's first days are their own size: fill the binding docs in the order `docs/README.md` gives (vision, domain
-map, lifecycles and invariants, the first ADRs, event vocabulary, module map, epics), then build epic E1.
+A product's first days are their own size, the runway: `/app-runway` interviews the owner and fills the binding docs
+in the order `docs/README.md` gives (vision, domain map, lifecycles and invariants, the first ADRs, event vocabulary,
+module map, epics), one at a time with the owner's yes on each, then fills the product's domain skill from them. Then
+build epic E1. How the domain skill reaches the rest of the workflow is [Adding your domain](adding-your-domain.md).
 
 ## The loop
 
@@ -89,7 +91,8 @@ routes to; it wraps the same plan, execute and review loop.
 Deviating from a binding doc, an ADR or a convention is allowed only as an amendment in the same pull request as the
 code: change the doc (and the ADR it rests on, or the reference that states the convention), and say so in the pull
 request (`.github/pull_request_template.md` asks). A product changes a foundation rule only in its own domain skill,
-under "Where this product differs", with a link to the ADR that records why. Never drift silently.
+under "Where this product differs", with a link to the ADR that records why
+([Adding your domain](adding-your-domain.md)). Never drift silently.
 
 ## The gates
 

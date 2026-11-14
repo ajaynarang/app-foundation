@@ -20,7 +20,7 @@ and each "Your product" section says how to fill it during the product's first d
 | [`adr/`](adr/README.md)                                        | The decisions that are expensive to change, and why       |
 
 Fill them in this order: vision, domain map, lifecycles and invariants, the first ADRs, event vocabulary, module map,
-epics.
+epics. The `app-runway` skill (`/app-runway`) walks the order with the owner, then fills the product's domain skill.
 
 ## Decisions
 
@@ -34,6 +34,8 @@ epics.
 
 - [`how-we-build.md`](how-we-build.md): the playbook: the three sizes of work, the loop and the skills that run it,
   the agents, who does what, the local gates, and the three steps that turn CI on.
+- [`adding-your-domain.md`](adding-your-domain.md): the domain seam: the one skill where a product writes its own
+  vocabulary, personas, review checks and exceptions, and the four places the workflow reads it.
 
 ## Standards
 
