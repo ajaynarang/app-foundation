@@ -88,6 +88,8 @@ platform feature; `app.prisma` is the product's extension point. Backend code im
 - No external call (HTTP, AI, a queue add) inside a transaction: it holds row locks and a rollback cannot undo it.
   Commit, then call; a crash between is retryable, not corrupt. [review-only: no spec scans transaction bodies]
 - Find-then-create is racy: use `upsert` on a unique key. [review-only: needs reading]
+- A financial write (a payment, an invoice, a wallet movement) checks for a duplicate before it creates: a unique key,
+  or the request's idempotency key. [review-only: needs reading]
 - No N+1: batch creates with `createMany`, batch updates with `updateMany` or one SQL statement, load relations with
   `include` or `select`. [review-only: needs reading]
 - Composing a parent with children has three phases: resolve references and numbers outside the transaction, write

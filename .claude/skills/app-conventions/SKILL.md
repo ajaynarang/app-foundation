@@ -64,8 +64,10 @@ the logging standard is `docs/standards/observability.md`. The binding docs and 
 ## Non-negotiables (every layer)
 
 - **camelCase on the wire.** API responses, request bodies, DTOs, service params and frontend types are camelCase.
-  The only snake_case: Prisma `where`, `data`, `select`, `include` and `orderBy` blocks, URL params (`:tenant_id`) and
-  query keys on the wire (`@QueryString({ name: 'tenant_id' }) tenantId`). [guard: api-contract.spec.ts]
+  [review-only: no spec reads body and response keys]
+- **snake_case only where the wire fixes it**: Prisma `where`, `data`, `select`, `include` and `orderBy` blocks, URL
+  params (`:tenant_id`) and query keys (`@QueryString({ name: 'tenant_id' }) tenantId`, a camelCase property).
+  [guard: api-contract.spec.ts]
 - **Enums have one source: the Prisma schema.** The backend imports enums and the client from `@appshore/db`, never
   `@prisma/client`; the web and shared-types import the generated mirror. A DTO references the generated schema's
   `.options`, never a copied array. An app-owned vocabulary (events, jobs, deadline kinds, notification types) is a
@@ -80,7 +82,8 @@ the logging standard is `docs/standards/observability.md`. The binding docs and 
   prose; `'asc'`, `'desc'` and HTTP verbs are framework primitives. [review-only: only the status half is
   spec-checked, by status-call-sites.spec.ts]
 - **Every query scopes by tenant.** A role says "may you call this route", not "may you see this record": an owned
-  record also gets a record-level check. A role refusal is 403; another tenant's record is 404, never 403.
+  record also gets a record-level check. [review-only: scoping is manual and the database does not enforce it]
+- **Another tenant's record is 404**, the same answer as a missing one, never 403; a role refusal is 403.
   [guard: api-contract.spec.ts]
 - **No `Int` key crosses the API**: not in a URL, query, body, response, event that leaves the process, tool input or
   cursor. Resolve a public id on the way in, serialize on the way out. [guard: id-boundary.spec.ts]
@@ -104,9 +107,10 @@ the logging standard is `docs/standards/observability.md`. The binding docs and 
   the OpenAPI documents; add a new migration. [guard: .claude/hooks/protected-paths.mjs,
   swagger-completeness.spec.ts]
 - **The UI uses the one component set and theme tokens.** shadcn components from `@app/ui` only, no raw `<button>` or
-  `<input>`; theme tokens, never a light-only colour; dates through `useFormatters()`. Every mutation shows a success
-  and an error toast; every loading state shows a skeleton. [guard: gate:raw-control, ui-grammar-guard.test.ts,
-  single-component-set.test.ts, lint:no-restricted-syntax]
+  `<input>`; theme tokens, never a light-only colour; dates through `useFormatters()`. [guard: gate:raw-control,
+  ui-grammar-guard.test.ts, single-component-set.test.ts, lint:no-restricted-syntax]
+- **Every mutation shows a success and an error toast; every loading state shows a skeleton.**
+  [review-only: no spec follows a mutation to its toast]
 - **Layers point one way**: `kernel ← db ← platform ← apps`, `kernel ← web-core ← web`; a domain imports another only
   along an allowed arrow. [guard: foundation-boundaries.spec.ts, domain-boundaries.spec.ts]
 - **A source comment never cites a skill or a path under `.claude/`**; it names the guard or a file under `docs/`.
