@@ -46,7 +46,7 @@ test('a prefix is 2 to 12 lowercase letters or digits, and never a reserved name
   assert.match(skillPrefixProblems('thirteenchars', reserved, names).join(), /2 to 12/);
   assert.match(skillPrefixProblems('1ab', reserved, names).join(), /2 to 12/);
   // A prefix that equals a reserved name is refused.
-  assert.match(skillPrefixProblems('acmex', ['acmex'], names).join(), /reserved/);
+  assert.ok(skillPrefixProblems('acmex', ['acmex'], names).includes('"acmex" is a reserved name'));
   // So is one under which a skill would start with a reserved name (acme-backend is a Doppler project).
   assert.match(skillPrefixProblems('acme', ['acme-backend'], ['app-backend-notes']).join(), /acme-backend/);
 });
