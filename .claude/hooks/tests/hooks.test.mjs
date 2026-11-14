@@ -418,6 +418,45 @@ test('settings.json denies reading real env and key files, and leaves .env.examp
     assert.ok(!denied(rel), `${rel} should stay readable`);
 });
 
+// The env names the protected-paths hook blocks from editing must also be denied for reading. A deny rule cannot
+// exempt .env.example, so settings.json lists names one by one; a name added here needs a line there.
+const COMMON_ENV_NAMES = [
+  '.env',
+  '.env.local',
+  '.env.dev',
+  '.env.dev.local',
+  '.env.development',
+  '.env.development.local',
+  '.env.test',
+  '.env.test.local',
+  '.env.ci',
+  '.env.qa',
+  '.env.uat',
+  '.env.preview',
+  '.env.preview.local',
+  '.env.staging',
+  '.env.staging.local',
+  '.env.prod',
+  '.env.prod.local',
+  '.env.production',
+  '.env.production.local',
+];
+
+test('settings.json denies reading every common env name the protected-paths hook treats as real', () => {
+  const deny = (settings.permissions?.deny ?? [])
+    .map((p) => p.match(/^Read\((.+)\)$/)?.[1])
+    .filter(Boolean)
+    .map((g) => globToRegExp(g));
+  for (const name of COMMON_ENV_NAMES) {
+    const rel = `apps/backend/${name}`;
+    assert.ok(isRealEnvFile(rel), `${name} is a real env file to the hook`);
+    assert.ok(
+      deny.some((re) => re.test(rel)),
+      `${name} is blocked from editing, so reading it is denied too`,
+    );
+  }
+});
+
 test('settings.json declares the superpowers plugin and its marketplace', () => {
   const [plugin] = Object.keys(settings.enabledPlugins ?? {}).filter((k) => k.startsWith('superpowers@'));
   assert.ok(plugin, 'superpowers is enabled');
