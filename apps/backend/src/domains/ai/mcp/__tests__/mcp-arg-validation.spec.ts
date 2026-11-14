@@ -13,6 +13,11 @@ import { discoverTools, toolFiles } from './discover-tools';
  * structured `VALIDATION_FAILED` with `fieldErrors`, never a stack trace from deep in a service. Runs over EVERY
  * `@Tool` on disk, through the real pipeline and the real scope registry, so a new tool is covered the day it ships.
  */
+/** Schema keys a caller could use to claim an identity: any `_` key, and any tenant or user field. */
+function identityFields(keys: string[]): string[] {
+  return keys.filter((key) => key.startsWith('_') || /^(tenant|user)(Id|DbId|PublicId)?$/i.test(key));
+}
+
 describe('tool arguments are validated before execution, for every tool on disk', () => {
   const tools = discoverTools();
   const executor = { execute: jest.fn() };
@@ -78,6 +83,20 @@ describe('tool arguments are validated before execution, for every tool on disk'
       expect(auditLogger.writePending).not.toHaveBeenCalled();
     },
   );
+
+  it('no tool schema declares an identity field: `_` keys, tenant and user come from the server', () => {
+    expect(identityFields(['subject', '_tenantId', 'tenantId', 'userId', 'cursor'])).toEqual([
+      '_tenantId',
+      'tenantId',
+      'userId',
+    ]);
+    const offenders = tools.flatMap((tool) =>
+      identityFields(Object.keys((tool.parameters as ZodObject<ZodRawShape>).shape)).map(
+        (key) => `${tool.toolName}.${key}`,
+      ),
+    );
+    expect(offenders).toEqual([]);
+  });
 
   it('no tool hands a caller a raw error message (throw, or use toolFailure)', () => {
     const raw = /return\s*\{\s*error:\s*\(?\s*\w+(\s+as\s+\w+)?\s*\)?\.message/;
