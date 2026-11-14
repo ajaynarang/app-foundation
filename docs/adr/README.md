@@ -64,3 +64,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | [0015](0015-workflow-conventions-index-guards-domain-skill.md) | Workflow: a conventions index, guards before prose, the product's own domain skill                            | Adopted |
 | [0016](0016-planning-artifacts-tracked-in-products.md)         | Planning artifacts: untracked in the template, tracked by default in a product                                | Adopted |
 | [0017](0017-state-lives-in-postgres.md)                        | State lives in Postgres; the workflow engine only orchestrates                                                | Adopted |
+| [0018](0018-observability-open-protocols.md)                   | Observability: open protocols; Grafana Cloud and Sentry pre-wired and off without keys; CloudWatch fallback   | Adopted |
