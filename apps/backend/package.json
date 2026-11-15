@@ -42,6 +42,7 @@
     "setup:reset": "pnpm --filter @appshore/db setup:reset",
     "setup:status": "pnpm --filter @appshore/db setup:status",
     "// — AI Seeding (knowledge base, LLM prompts, model pricing)": "",
+    "search:rebuild": "ts-node src/domains/ai/search-index/rebuild/search-rebuild.command.ts",
     "seed:knowledge": "ts-node src/domains/ai/knowledge-base/ingestion.command.ts",
     "kb:eval": "ts-node src/domains/ai/knowledge-base/eval/kb-eval.command.ts",
     "ai:reembed-desk-memory": "ts-node src/domains/desk/core/memory/reembed/reembed-desk-memory.command.ts",

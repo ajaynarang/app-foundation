@@ -18,20 +18,3 @@ export class AiInteractivePlaceholderProcessor extends WorkerHost {
     );
   }
 }
-
-/**
- * RESERVED — autonomous AI work that's queue-shaped (not workflow-shaped).
- * Use this queue only when a job has at-least-once semantics, retries, and no
- * pause/resume needs. Replace this placeholder when the first BullMQ-shaped
- * agent job lands.
- */
-@Processor(QUEUE_NAMES.AI_BACKGROUND, { concurrency: 2 })
-export class AiBackgroundPlaceholderProcessor extends WorkerHost {
-  private readonly logger = new Logger(AiBackgroundPlaceholderProcessor.name);
-  async process(job: Job): Promise<void> {
-    this.logger.warn(
-      `Reserved queue 'ai-background' received job '${job.name}' (id=${job.id}); ` +
-        `no real handler is registered yet.`,
-    );
-  }
-}

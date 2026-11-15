@@ -975,6 +975,29 @@ migration log when other databases on the server still grant to the role; that i
 **Rollback.** Re-create the role only if you roll back past section 2 (the old code needs it): re-run sections 1
 and 2 of `20260611000001_ai_reader_rls`. Otherwise nothing uses the role and there is nothing to restore.
 
+## 22. Search over tenant records: migration `search_chunks`, a worker on `ai-background`, the `search-records` tool
+
+**What changed.** A new table, `search_chunks`, holds a derived search index over tenant records. A product
+registers what is searchable in `apps/backend/src/platform-glue/search/search-subjects.module.ts`; with nothing
+registered the table stays empty. The decision is ADR-0020.
+
+- **Migration `20261116020000_search_chunks`** creates the table with an HNSW vector index and a GIN full-text
+  index. It adds no column to any existing table and backfills nothing.
+- **The `ai-background` queue has a real dispatcher** (`ai-background-queue.module.ts`), two jobs at a time, with
+  one job: `search-index`. `AiBackgroundPlaceholderProcessor` is removed. A product that added its own `@Processor`
+  on `ai-background` must move its jobs into handlers on this dispatcher (`no-competing-queue-workers.spec.ts` fails
+  otherwise).
+- **The assistant has a new read tool, `search-records`** (scope `platform:read`). An API key or OAuth client that
+  already holds `platform:read` can call it. It answers an empty list until a subject is registered.
+- **`search_chunks` is in the tenant reset registry** and classed `tenant` in the RLS registry.
+
+**What to do.** Nothing to keep the current behaviour. To make a kind of record searchable: implement
+`SearchSubject`, return it from the seam file, deploy, then run `pnpm search:rebuild` once. Embeddings are billed to
+each tenant; a tenant with no embedding route is indexed for full-text only.
+
+**To turn it back.** Return an empty list from the seam file and run `pnpm search:rebuild`: it deletes every row of
+a type that is no longer registered.
+
 ## Deploy order for `ai_reader`
 
 Section 21's migration, `drop_ai_reader_role`, revokes the role's grants and drops it. Tasks on code from before

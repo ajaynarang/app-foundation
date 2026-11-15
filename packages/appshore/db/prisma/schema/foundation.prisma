@@ -225,6 +225,7 @@ model Tenant {
   aiBudget               TenantAiBudget?
   aiCredentials          AiCredential[]
   aiSubKey               TenantAiSubKey?
+  searchChunks SearchChunk[]
 
   @@index([status])
   // Serves the every-minute scheduler heartbeat scan for tenants with the
@@ -1132,6 +1133,36 @@ model KnowledgeDocument {
   @@index([category])
   @@index([sourcePath])
   @@map("knowledge_documents")
+}
+
+/// The search index over tenant records (apps/backend/src/domains/ai/search-index): one row per chunk of a record a product
+/// registered as a search subject. Derived data: `pnpm search:rebuild` writes it again from the records, so it is
+/// never the source of truth and never edited by hand. `content_tsv` is a generated column; `embedding` is null
+/// until the chunk is embedded (full-text search still finds it).
+model SearchChunk {
+  id       Int    @id @default(autoincrement())
+  tenantId Int    @map("tenant_id")
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// The registered subject's `type` (lower-case kebab) and the record's public id.
+  subjectType String @map("subject_type") @db.VarChar(50)
+  subjectId   String @map("subject_id") @db.VarChar(100)
+  chunkIx     Int    @map("chunk_ix")
+
+  title      String                   @db.VarChar(500)
+  href       String?                  @db.VarChar(500)
+  section    String?                  @db.VarChar(255)
+  content    String                   @db.Text
+  contentTsv Unsupported("tsvector")? @map("content_tsv")
+
+  embeddingModel String?                      @map("embedding_model") @db.VarChar(100)
+  embedding      Unsupported("vector(1536)")?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([tenantId, subjectType, subjectId, chunkIx])
+  @@index([tenantId, subjectType])
+  @@map("search_chunks")
 }
 
 // ============================================================================

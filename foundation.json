@@ -71,7 +71,8 @@
     "apps/backend/src/domains/desk/responsibilities/coming-soon.ts",
     "tools/guards/convention-gate.baseline.json",
     ".claude/skills/app-domain/**",
-    "docs/adr/README.md"
+    "docs/adr/README.md",
+    "apps/backend/src/platform-glue/search/search-subjects.module.ts"
   ],
   "base": null,
   "scaffold": null

@@ -90,6 +90,8 @@ export const REGISTRY: readonly RegistryEntry[] = Object.freeze([
   entry('ai_invocations', 'aiInvocation', AI, 'wipe'),
   entry('agent_invocation_logs', 'agentInvocationLog', AI, 'wipe'),
   entry('hitl_challenges', 'hitlChallenge', AI, 'wipe'),
+  // Derived from the tenant's records: wiped with them, and `pnpm search:rebuild` writes it again.
+  entry('search_chunks', 'searchChunk', AI, 'wipe'),
 
   // ── Support and feedback: tickets point at conversations, so they go first ───────────────────────────────────
   entry('support_ticket_messages', 'supportTicketMessage', SUPPORT, 'wipe', (ctx) => ({

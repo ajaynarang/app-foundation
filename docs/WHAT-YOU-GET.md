@@ -78,7 +78,10 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
   files are re-embedded); hybrid search by rank fusion; `pnpm kb:eval` measures retrieval against a golden set.
 - Per-tenant **AI budgets** (soft/hard caps), model-pricing spend ledger, moderation,
   human-in-the-loop approval for risky agent actions, Langfuse tracing.
-- **MCP server** with two sample tools (health, knowledge search) — add `@Tool` providers
+- **Search over your tenants' records**: register a `SearchSubject` per kind of record and the index follows it
+  through its events; `retrieve()` for code, the `search-records` tool for the assistant, `pnpm search:rebuild` to
+  write it again. Empty until you register a subject.
+- **MCP server** with sample tools (health, knowledge search, record search) — add `@Tool` providers
   and your app is callable from Claude.
 
 <!-- feature:desk:start -->

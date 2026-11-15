@@ -130,16 +130,16 @@ tests/         — Playwright QA suite (@app/qa)
 
 ### Backend domains (`apps/backend/src/domains/`)
 
-| Domain           | What it does (all domain-free / generic)                                                     |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| `billing/`       | Stripe subscriptions, wallet, dunning                                                        |
-| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                      |
-| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                       |
-| `support/`       | Ticketing                                                                                    |
-| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                  |
-| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                     |
-| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + voice |
-| `prompting/`     | Prompt management (one generic assistant fallback)                                           |
+| Domain           | What it does (all domain-free / generic)                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `billing/`       | Stripe subscriptions, wallet, dunning                                                                                                                                                 |
+| `integrations/`  | Integration framework (vendor registry **empty** — add your connectors)                                                                                                               |
+| `notifications/` | Multi-channel dispatcher (in-app / push / SMS / email)                                                                                                                                |
+| `support/`       | Ticketing                                                                                                                                                                             |
+| `admin/`         | Super-admin infra routes (jobs, events, cache, schedules, AI spend, timers)                                                                                                           |
+| `feedback/`      | In-app feedback with AI summarization (AI-coupled, so it lives app-side)                                                                                                              |
+| `ai/`            | Chat assistant + agent runtime + **empty MCP toolset** + MCP server + knowledge base + search over tenant records (`search-index/`, empty until a product registers subjects) + voice |
+| `prompting/`     | Prompt management (one generic assistant fallback)                                                                                                                                    |
 
 <!-- feature:desk:start -->
 
@@ -202,6 +202,14 @@ bind to app implementations.
 <!-- feature:desk:end -->
 
 - **Integration connectors:** add to `VENDOR_REGISTRY` in `apps/backend/src/domains/integrations/`.
+- **Searchable records:** implement `SearchSubject` (`apps/backend/src/domains/ai/search-index/search-subject.ts`)
+  for a kind of record (its type, the events that change it, one record as text, all its ids) and return it from
+  `apps/backend/src/platform-glue/search/search-subjects.module.ts`. The index (`search_chunks`) then follows the
+  records through their events on the `ai-background` queue. Code reads it with
+  `SearchQueryService.retrieve(tenantId, query)`; the assistant reads it through the `search-records` tool.
+  `pnpm search:rebuild` writes the index again from the records (run it once after adding a subject). A subject
+  answers `null` for a record not every member of the workspace may read. The decision is the ADR "Search over
+  tenant records".
 - **Knowledge base:** drop Markdown under `apps/backend/content/knowledge-base/`, run `pnpm seed:knowledge` (incremental;
   `--force` re-embeds all). Measure retrieval with `pnpm kb:eval` against `apps/backend/content/kb-eval/golden.json`.
 
