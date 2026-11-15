@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CursorList } from '@app/shared-types';
-import type { InvitationStatus, Prisma } from '@appshore/db';
+import { Prisma, type InvitationStatus, type UserRole } from '@appshore/db';
 import {
   buildCursorPage,
   clampCursorLimit,
@@ -33,9 +33,14 @@ import { InviteUserDto, AcceptPhoneInvitationDto } from './dto/invite-user.dto';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
-import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
+import { duplicate, fieldError, invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
 import { hashToken } from '../../auth/token-hash';
+import * as bcrypt from 'bcrypt';
+import { ApiErrorCode, AuthErrorCode } from '@app/shared-types';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { FirebaseAuthService } from '../../auth/firebase-auth.service';
+import { EmailVerificationService } from '../../auth/email-verification.service';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
 
@@ -60,6 +65,42 @@ const sameEmail = (email: string) => ({ equals: email, mode: 'insensitive' as co
 
 const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: 'date', direction: 'desc' } as const;
 
+/** The same cost as `AuthService`: one rule for every password the platform stores. */
+const PASSWORD_SALT_ROUNDS = 12;
+
+/** The error envelope's body for a domain code (`AuthErrorCode`), as the `api-errors` factories build theirs. */
+const errorBody = (code: string, detail: string) => ({ code, detail, message: detail });
+
+/** 409 SIGN_IN_TO_ACCEPT: the address has an account, and only that account, signed in, can accept. */
+const signInToAccept = () =>
+  new ConflictException(
+    errorBody(AuthErrorCode.SIGN_IN_TO_ACCEPT, 'An account already uses this email. Sign in to accept the invitation.'),
+  );
+
+const isUniqueViolation = (err: unknown): boolean =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+
+/** `POST /invitations/accept`. Exactly one of `password` and `firebaseIdToken`. */
+export interface AcceptInvitationInput {
+  token: string;
+  password?: string;
+  firebaseIdToken?: string;
+}
+
+/** The account an accept created, with its tenant, for the controller to sign in. */
+export type AcceptedAccount = Prisma.UserGetPayload<{ include: { tenant: true } }>;
+
+/** `POST /invitations/join`: the workspace joined, by public id, and the caller's role in it. */
+export interface InvitationJoined {
+  workspace: { tenantId: string; name: string };
+  role: UserRole;
+}
+
+const toJoined = (tenant: { tenantId: string; companyName: string }, role: UserRole): InvitationJoined => ({
+  workspace: { tenantId: tenant.tenantId, name: tenant.companyName },
+  role,
+});
+
 /** `GET /invitations`. */
 export interface InvitationListQuery {
   /** The statuses to show; omitted: every status. */
@@ -80,6 +121,8 @@ export class UserInvitationsService {
     private pinService: PinService,
     private configService: ConfigService,
     private entitlements: TenantEntitlementsService,
+    private firebaseAuth: FirebaseAuthService,
+    private emailVerification: EmailVerificationService,
   ) {}
 
   /**
@@ -286,7 +329,7 @@ export class UserInvitationsService {
   private async movePending(
     tx: InvitationTx,
     invitation: { id: number; tokenHash: string },
-    data: Prisma.UserInvitationUpdateManyMutationInput,
+    data: Prisma.UserInvitationUncheckedUpdateManyInput,
     detail = 'This invitation is no longer valid',
   ): Promise<void> {
     const { count } = await tx.userInvitation.updateMany({
@@ -303,72 +346,182 @@ export class UserInvitationsService {
   }
 
   /**
-   * Accept invitation and create user
+   * `POST /invitations/accept` (public): a NEW account from an email invitation, signed in by the controller. The
+   * token proves the inviter's chosen address only when it travelled by email alone (`linkSharedAt` null), so only
+   * then does the account start verified; a copied link makes an unverified account, which is emailed a verification
+   * link after the commit. The credential is a password or a verified Firebase ID token: the uid comes from the
+   * token, never the body. An email that already has a live account is 409 SIGN_IN_TO_ACCEPT and nothing is written:
+   * a token alone never attaches an existing account (that is `joinInvitation`, signed in).
    */
-  async acceptInvitation(token: string, firebaseUid: string) {
-    const invitation = token
-      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(token) } })
-      : null;
-
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found or invalid');
+  async acceptInvitation(input: AcceptInvitationInput): Promise<AcceptedAccount> {
+    if (Boolean(input.password) === Boolean(input.firebaseIdToken)) {
+      throw fieldError('password', 'Send a password or a firebaseIdToken, not both');
     }
 
-    if (invitation.status !== 'PENDING') {
-      throw invalidState('This invitation is no longer valid');
+    const invitation = await this.findPendingByToken(input.token);
+
+    if (invitation.inviteChannel !== 'EMAIL' || !invitation.email) {
+      throw invalidState('Accept this invitation with the code sent to your phone');
+    }
+    const email = invitation.email;
+
+    if (await this.liveAccountWithEmail(this.prisma, email)) throw signInToAccept();
+
+    let firebaseUid: string | null = null;
+    let passwordHash: string | null = null;
+    if (input.firebaseIdToken) {
+      const decoded = await this.firebaseAuth.verifyFirebaseToken(input.firebaseIdToken);
+      if (decoded.email?.toLowerCase().trim() !== email.toLowerCase().trim()) {
+        throw new ForbiddenException(
+          errorBody(
+            AuthErrorCode.INVITATION_EMAIL_MISMATCH,
+            'This sign-in is for a different email than the invitation.',
+          ),
+        );
+      }
+      const linked = await this.prisma.user.findUnique({ where: { firebaseUid: decoded.uid }, select: { id: true } });
+      if (linked) throw duplicate('This Firebase account is already linked to another account');
+      firebaseUid = decoded.uid;
+    } else {
+      passwordHash = await bcrypt.hash(input.password as string, PASSWORD_SALT_ROUNDS);
     }
 
-    if (invitation.expiresAt < new Date()) {
-      throw invalidState('This invitation has expired — ask for a new one');
-    }
+    // Proof of the mailbox only when no one but the invitee has seen this token.
+    const emailVerified = invitation.linkSharedAt === null;
 
-    return this.prisma.$transaction(async (tx) => {
-      // Claimed first: a second accept of the same token waits on this row, then finds it no longer pending.
-      await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
+    let user: AcceptedAccount;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        // Claimed first: a second accept of the same token waits on this row, then finds it no longer pending.
+        await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
 
-      // Workspace model: an existing user accepting an invite JOINS the
-      // workspace (new membership) instead of erroring.
-      const existingUser = invitation.email
-        ? await tx.user.findFirst({
-            where: { email: sameEmail(invitation.email), deletedAt: null },
-            include: { tenant: true },
-          })
-        : null;
-
-      const user =
-        existingUser ??
-        (await tx.user.create({
+        const created = await tx.user.create({
           data: {
             userId: generateId('user'),
             tenantId: invitation.tenantId,
-            email: invitation.email,
+            email,
             firstName: invitation.firstName,
             lastName: invitation.lastName,
             role: invitation.role,
+            passwordHash,
             firebaseUid,
-            emailVerified: true,
+            emailVerified,
             isActive: true,
           },
-          include: {
-            tenant: true,
-          },
-        }));
-
-      await tx.workspaceMember.upsert({
-        where: { userId_tenantId: { userId: user.id, tenantId: invitation.tenantId } },
-        update: { role: invitation.role },
-        create: {
-          userId: user.id,
-          tenantId: invitation.tenantId,
-          role: invitation.role,
-          isDefault: !existingUser,
-        },
+          include: { tenant: true },
+        });
+        await tx.workspaceMember.create({
+          data: { userId: created.id, tenantId: invitation.tenantId, role: invitation.role, isDefault: true },
+        });
+        await tx.userPreferences.create({ data: { userId: created.id } });
+        await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: created.id } });
+        return created;
       });
+    } catch (err) {
+      // An account with this email appeared after the check above (the live-email index refused the insert).
+      if (isUniqueViolation(err) && (await this.liveAccountWithEmail(this.prisma, email))) throw signInToAccept();
+      throw err;
+    }
 
-      await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: user.id } });
+    if (!user.emailVerified) await this.issueVerification(user);
+    return user;
+  }
 
-      return user;
+  /**
+   * `POST /invitations/join` (signed in, JWT session only): the caller's OWN account joins the invitation's
+   * workspace. Every check reads the user row, never the JWT claims (which can be 15 minutes old): a super admin
+   * never joins (403 FORBIDDEN); the account's email must be the invitation's (403 INVITATION_EMAIL_MISMATCH, naming
+   * neither address) and verified (403 EMAIL_NOT_VERIFIED). A member keeps their role. A retry by the account that
+   * already accepted answers the same body, so a lost response is safe to retry. Runs as the invitation's tenant
+   * (`runAsInvitationTenant`, set by the controller).
+   */
+  async joinInvitation(token: string, callerDbId: number): Promise<InvitationJoined> {
+    const found = token
+      ? await this.prisma.userInvitation.findUnique({
+          where: { tokenHash: hashToken(token) },
+          include: { tenant: { select: { tenantId: true, companyName: true } } },
+        })
+      : null;
+    if (!found) throw new NotFoundException('Invitation not found or invalid');
+
+    if (found.status === 'ACCEPTED' && found.acceptedByUserId === callerDbId) {
+      const membership = await this.prisma.workspaceMember.findUnique({
+        where: { userId_tenantId: { userId: callerDbId, tenantId: found.tenantId } },
+        select: { role: true },
+      });
+      if (membership) return toJoined(found.tenant, membership.role);
+    }
+    this.assertPending(found);
+
+    const caller = await this.prisma.user.findUnique({
+      where: { id: callerDbId },
+      select: { id: true, email: true, emailVerified: true, deletedAt: true, role: true },
     });
+    if (!caller || caller.deletedAt) throw new UnauthorizedException('Sign in again to accept this invitation');
+    if (caller.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(errorBody(ApiErrorCode.FORBIDDEN, 'Super admins do not join workspaces'));
+    }
+    if (!found.email || !caller.email || caller.email.toLowerCase().trim() !== found.email.toLowerCase().trim()) {
+      throw new ForbiddenException(
+        errorBody(
+          AuthErrorCode.INVITATION_EMAIL_MISMATCH,
+          'This invitation is for a different email. Sign in with that account.',
+        ),
+      );
+    }
+    if (!caller.emailVerified) {
+      throw new ForbiddenException(
+        errorBody(AuthErrorCode.EMAIL_NOT_VERIFIED, 'Verify your email, then accept the invitation.'),
+      );
+    }
+
+    const role = await this.prisma.$transaction(async (tx) => {
+      await this.movePending(tx, found, { status: 'ACCEPTED', acceptedAt: new Date(), acceptedByUserId: caller.id });
+      // An existing member keeps the role they have: an invitation never changes it.
+      const membership = await tx.workspaceMember.upsert({
+        where: { userId_tenantId: { userId: caller.id, tenantId: found.tenantId } },
+        update: {},
+        create: { userId: caller.id, tenantId: found.tenantId, role: found.role, isDefault: false },
+        select: { role: true },
+      });
+      return membership.role;
+    });
+
+    return toJoined(found.tenant, role);
+  }
+
+  /** The pending, unexpired invitation a raw token names. Unknown: 404; no longer pending or expired: 409. */
+  private async findPendingByToken(token: string) {
+    const invitation = token
+      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(token) } })
+      : null;
+    if (!invitation) throw new NotFoundException('Invitation not found or invalid');
+    this.assertPending(invitation);
+    return invitation;
+  }
+
+  private assertPending(invitation: { status: InvitationStatus; expiresAt: Date }): void {
+    if (invitation.status !== 'PENDING') throw invalidState('This invitation is no longer valid');
+    if (invitation.expiresAt < new Date()) throw invalidState('This invitation has expired — ask for a new one');
+  }
+
+  private async liveAccountWithEmail(db: Pick<PrismaService, 'user'>, email: string): Promise<boolean> {
+    const row = await db.user.findFirst({ where: { email: sameEmail(email), deletedAt: null }, select: { id: true } });
+    return row !== null;
+  }
+
+  /** After the commit. A send failure is logged inside `issue`; nothing here may fail the accept. */
+  private async issueVerification(user: {
+    id: number;
+    email: string | null;
+    firstName: string;
+    emailVerified: boolean;
+  }) {
+    try {
+      await this.emailVerification.issue(user, { reason: 'invitation' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued on invitation accept', err: toLoggableError(err) });
+    }
   }
 
   /**
@@ -398,7 +551,7 @@ export class UserInvitationsService {
     // Hash PIN
     const pinHash = await this.pinService.hashPin(dto.pin);
 
-    return this.prisma.$transaction(async (tx) => {
+    const user = await this.prisma.$transaction(async (tx) => {
       await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
 
       // The phone path signs the caller in as the account it returns, so it never joins an existing account: that
@@ -441,6 +594,11 @@ export class UserInvitationsService {
 
       return user;
     });
+
+    // The inviter chose the email, so it starts unverified; the person is signed in by this accept and can use the
+    // link. Its accept already refused an email that belongs to a live account.
+    if (user.email && !user.emailVerified) await this.issueVerification(user);
+    return user;
   }
 
   /**

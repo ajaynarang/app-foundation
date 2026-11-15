@@ -75,6 +75,8 @@ describe('Invitation token storage', () => {
         {} as any,
         { get: () => 'https://app.example.com' } as any,
         { assertUserSeatAvailable: async () => undefined } as any,
+        {} as any,
+        { issue: async () => undefined } as any,
       );
       prisma.tenant.findUnique.mockResolvedValue({ id: 1, tenantId: 'ten_1' });
       prisma.user.findUnique.mockResolvedValue({ id: 1 });
@@ -120,7 +122,8 @@ describe('Invitation token storage', () => {
     it.each([
       ['tenantDbIdForToken', (raw: string) => service.tenantDbIdForToken(raw)],
       ['previewInvitation', (raw: string) => service.previewInvitation(raw)],
-      ['acceptInvitation', (raw: string) => service.acceptInvitation(raw, 'fb')],
+      ['acceptInvitation', (raw: string) => service.acceptInvitation({ token: raw, password: 'Password123!' })],
+      ['joinInvitation', (raw: string) => service.joinInvitation(raw, 1)],
       [
         'acceptPhoneInvitation',
         (raw: string) => service.acceptPhoneInvitation({ token: raw, phone: '+15551234567', otp: '1', pin: '1234' }),

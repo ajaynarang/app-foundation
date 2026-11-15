@@ -135,3 +135,21 @@ export class InvitationPreview {
   @ApiProperty({ type: InvitationPreviewInviter })
   invitedBy: InvitationPreviewInviter;
 }
+
+/** The workspace a join added the caller to, by its public id. */
+export class InvitationJoinedWorkspace {
+  @ApiProperty({ description: 'Workspace (tenant) public id; send it to POST /workspaces/switch' })
+  tenantId: string;
+
+  @ApiProperty()
+  name: string;
+}
+
+/** `POST /invitations/join`: the workspace joined and the caller's role in it (kept, when already a member). */
+export class InvitationJoined {
+  @ApiProperty({ type: InvitationJoinedWorkspace })
+  workspace: InvitationJoinedWorkspace;
+
+  @ApiProperty({ enum: UserRole })
+  role: UserRole;
+}

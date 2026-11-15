@@ -10,6 +10,10 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { TenantEntitlementsService } from '../../entitlements/tenant-entitlements.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 import { hashToken } from '../../../auth/token-hash';
+import { FirebaseAuthService } from '../../../auth/firebase-auth.service';
+import { EmailVerificationService } from '../../../auth/email-verification.service';
+import { Prisma } from '@appshore/db';
+import * as bcrypt from 'bcrypt';
 
 /** The raw token in a link the service built (emailed, texted or returned). */
 const tokenInLink = (link: string) => new URL(link).searchParams.get('token') as string;
@@ -20,7 +24,12 @@ describe('UserInvitationsService', () => {
   const mockPrismaService = {
     workspaceMember: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
       upsert: jest.fn(),
+    },
+    userPreferences: {
+      create: jest.fn(),
     },
     userInvitation: {
       findFirst: jest.fn(),
@@ -68,6 +77,10 @@ describe('UserInvitationsService', () => {
 
   const mockEntitlements = { assertUserSeatAvailable: jest.fn() };
 
+  const mockFirebaseAuth = { verifyFirebaseToken: jest.fn() };
+
+  const mockEmailVerification = { issue: jest.fn() };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -97,6 +110,8 @@ describe('UserInvitationsService', () => {
           useValue: mockConfigService,
         },
         { provide: TenantEntitlementsService, useValue: mockEntitlements },
+        { provide: FirebaseAuthService, useValue: mockFirebaseAuth },
+        { provide: EmailVerificationService, useValue: mockEmailVerification },
       ],
     }).compile();
 
@@ -231,85 +246,318 @@ describe('UserInvitationsService', () => {
     });
   });
 
-  describe('acceptInvitation', () => {
-    it('should accept valid invitation and create user', async () => {
-      const token = 'valid-token';
-      const firebaseUid = 'firebase-uid-123';
+  describe('acceptInvitation: a new account only, never an existing one', () => {
+    const pending = (over: Record<string, unknown> = {}) => ({
+      id: 1,
+      invitationId: 'inv_abc',
+      tokenHash: hashToken('valid-token-0123456789'),
+      email: 'newuser@example.com',
+      phone: null,
+      inviteChannel: 'EMAIL',
+      firstName: 'John',
+      lastName: 'Doe',
+      role: 'MEMBER',
+      tenantId: 1,
+      status: 'PENDING',
+      linkSharedAt: null,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      ...over,
+    });
+    const created = (data: Record<string, unknown>) => ({ id: 9, userId: 'user_new', tenant: { id: 1 }, ...data });
 
-      const mockInvitation = {
-        id: 1,
-        invitationId: 'inv_abc',
-        email: 'newuser@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-        role: 'MEMBER',
-        tenantId: 1,
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      };
-
-      const mockUser = {
-        id: 1,
-        userId: 'user_abc123',
-        email: mockInvitation.email,
-      };
-
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue(mockInvitation);
-      mockPrismaService.user.findFirst.mockResolvedValue(null); // no existing account — invite creates one
-      mockPrismaService.user.create.mockResolvedValue(mockUser);
-      mockPrismaService.userInvitation.update.mockResolvedValue({
-        ...mockInvitation,
-        status: 'ACCEPTED',
-      });
-
-      const result = await service.acceptInvitation(token, firebaseUid);
-
-      expect(result).toEqual(mockUser);
-      // Looked up by the token's hash: the raw token is never a query value.
-      expect(mockPrismaService.userInvitation.findUnique).toHaveBeenCalledWith({
-        where: { tokenHash: hashToken(token) },
-      });
+    beforeEach(() => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(pending());
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.create.mockImplementation(async ({ data }) => created(data));
     });
 
-    it('is single use under a race: the loser of the conditional move is a 409 and creates nobody', async () => {
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue({
-        id: 1,
-        tokenHash: hashToken('raced-token'),
-        email: 'new@example.com',
-        tenantId: 1,
-        role: 'MEMBER',
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() + 60_000),
-      });
-      // Both requests read PENDING before either transaction ran; the other one moved the row first.
-      mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 0 });
+    it('an email that already has a live account is 409 SIGN_IN_TO_ACCEPT, and nothing is written', async () => {
+      mockPrismaService.user.findFirst.mockResolvedValue({ id: 3 });
 
-      await expect(service.acceptInvitation('raced-token', 'fb')).rejects.toMatchObject({
-        status: 409,
-        response: { code: 'INVALID_STATE' },
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'SIGN_IN_TO_ACCEPT' } });
+      // Looked up in any case, live accounts only.
+      expect(mockPrismaService.user.findFirst).toHaveBeenCalledWith({
+        where: { email: { equals: 'newuser@example.com', mode: 'insensitive' }, deletedAt: null },
+        select: { id: true },
       });
-      expect(mockPrismaService.userInvitation.updateMany).toHaveBeenCalledWith({
-        where: { id: 1, tokenHash: hashToken('raced-token'), status: 'PENDING' },
-        data: expect.objectContaining({ status: 'ACCEPTED' }),
-      });
-      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.userInvitation.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.workspaceMember.create).not.toHaveBeenCalled();
       expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
     });
 
-    it('answers 409 INVALID_STATE if the invitation expired', async () => {
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue({
-        id: 1,
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    it('creates the account with a bcrypt password hash, its membership and preferences, and claims the token', async () => {
+      const user = await service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' });
+
+      expect(mockPrismaService.userInvitation.findUnique).toHaveBeenCalledWith({
+        where: { tokenHash: hashToken('valid-token-0123456789') },
+      });
+      const data = mockPrismaService.user.create.mock.calls[0][0].data;
+      expect(await bcrypt.compare('Password123!', data.passwordHash)).toBe(true);
+      expect(data.passwordHash).toMatch(/^\$2[aby]\$12\$/);
+      expect(data).toMatchObject({ email: 'newuser@example.com', role: 'MEMBER', tenantId: 1, firebaseUid: null });
+      expect(mockPrismaService.workspaceMember.create).toHaveBeenCalledWith({
+        data: { userId: 9, tenantId: 1, role: 'MEMBER', isDefault: true },
+      });
+      expect(mockPrismaService.userPreferences.create).toHaveBeenCalledWith({ data: { userId: 9 } });
+      expect(mockPrismaService.userInvitation.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, tokenHash: hashToken('valid-token-0123456789'), status: 'PENDING' },
+        data: expect.objectContaining({ status: 'ACCEPTED' }),
+      });
+      expect(user.id).toBe(9);
+    });
+
+    it('is verified only for an email token nobody else saw: a shared link makes an unverified account, emailed a link', async () => {
+      await service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' });
+      expect(mockPrismaService.user.create.mock.calls[0][0].data.emailVerified).toBe(true);
+      expect(mockEmailVerification.issue).not.toHaveBeenCalled();
+
+      mockPrismaService.user.create.mockClear();
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(pending({ linkSharedAt: new Date() }));
+      await service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' });
+      expect(mockPrismaService.user.create.mock.calls[0][0].data.emailVerified).toBe(false);
+      expect(mockEmailVerification.issue).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }), {
+        reason: 'invitation',
+      });
+    });
+
+    it('an SMS invitation, or one without an email, is 409 INVALID_STATE: it is accepted with the phone code', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(
+        pending({ inviteChannel: 'SMS', phone: '+15551234567' }),
+      );
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE', detail: expect.stringMatching(/phone/) },
       });
 
-      await expect(service.acceptInvitation('token', 'firebase-uid')).rejects.toMatchObject({
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(pending({ email: null }));
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+    });
+
+    it('takes the Firebase uid from the verified token only, and refuses a token for another email with 403', async () => {
+      mockFirebaseAuth.verifyFirebaseToken.mockResolvedValue({ uid: 'fb_verified', email: 'NewUser@Example.com' });
+      await service.acceptInvitation({ token: 'valid-token-0123456789', firebaseIdToken: 'id-token' });
+      expect(mockFirebaseAuth.verifyFirebaseToken).toHaveBeenCalledWith('id-token');
+      expect(mockPrismaService.user.create.mock.calls[0][0].data).toMatchObject({
+        firebaseUid: 'fb_verified',
+        passwordHash: null,
+      });
+
+      mockPrismaService.user.create.mockClear();
+      mockFirebaseAuth.verifyFirebaseToken.mockResolvedValue({ uid: 'fb_other', email: 'someone@else.com' });
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', firebaseIdToken: 'id-token' }),
+      ).rejects.toMatchObject({ status: 403, response: { code: 'INVITATION_EMAIL_MISMATCH' } });
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+    });
+
+    it('a Firebase uid already linked to an account is 409 DUPLICATE', async () => {
+      mockFirebaseAuth.verifyFirebaseToken.mockResolvedValue({ uid: 'fb_taken', email: 'newuser@example.com' });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 4 });
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', firebaseIdToken: 'id-token' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'DUPLICATE' } });
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+    });
+
+    it('wants exactly one credential: both, or neither, is 400 VALIDATION_FAILED', async () => {
+      for (const input of [
+        { token: 'valid-token-0123456789' },
+        { token: 'valid-token-0123456789', password: 'Password123!', firebaseIdToken: 'id-token' },
+      ]) {
+        await expect(service.acceptInvitation(input)).rejects.toMatchObject({
+          status: 400,
+          response: { code: 'VALIDATION_FAILED' },
+        });
+      }
+      expect(mockPrismaService.userInvitation.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('an account with the email created during the accept (the live-email index refuses it) is SIGN_IN_TO_ACCEPT', async () => {
+      mockPrismaService.user.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }),
+      );
+      // Free when checked, taken by the time the insert ran.
+      mockPrismaService.user.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 5 });
+
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'SIGN_IN_TO_ACCEPT' } });
+    });
+
+    it('is single use under a race: the loser of the conditional move is a 409 and creates nobody', async () => {
+      mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.workspaceMember.create).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an unknown token and 409 INVALID_STATE for one no longer pending or expired', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
+      await expect(
+        service.acceptInvitation({ token: 'bad-token-0123456789', password: 'Password123!' }),
+      ).rejects.toThrow(NotFoundException);
+
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(pending({ status: 'CANCELLED' }));
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toThrow('no longer valid');
+
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(
+        pending({ expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) }),
+      );
+      await expect(
+        service.acceptInvitation({ token: 'valid-token-0123456789', password: 'Password123!' }),
+      ).rejects.toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
+    });
+  });
+
+  describe('joinInvitation: the signed-in owner of a verified, matching email', () => {
+    const TOKEN = 'join-token-0123456789';
+    const invitation = (over: Record<string, unknown> = {}) => ({
+      id: 1,
+      tokenHash: hashToken(TOKEN),
+      email: 'Jane@Example.com',
+      inviteChannel: 'EMAIL',
+      role: 'ADMIN',
+      tenantId: 2,
+      status: 'PENDING',
+      acceptedByUserId: null,
+      expiresAt: new Date(Date.now() + 60_000),
+      tenant: { tenantId: 'ten_two', companyName: 'Two' },
+      ...over,
+    });
+    // `user.factory.ts` defaults emailVerified to true: every refusal below sets the row it means explicitly.
+    const caller = (over: Record<string, unknown> = {}) => ({
+      id: 7,
+      email: 'jane@example.com',
+      emailVerified: true,
+      deletedAt: null,
+      role: 'MEMBER',
+      ...over,
+    });
+
+    beforeEach(() => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(invitation());
+      mockPrismaService.user.findUnique.mockResolvedValue(caller());
+      mockPrismaService.workspaceMember.upsert.mockResolvedValue({ role: 'ADMIN' });
+    });
+
+    it('adds a membership in the invitation tenant, not the default, and marks the invitation accepted by the caller', async () => {
+      await expect(service.joinInvitation(TOKEN, 7)).resolves.toEqual({
+        workspace: { tenantId: 'ten_two', name: 'Two' },
+        role: 'ADMIN',
+      });
+      expect(mockPrismaService.userInvitation.updateMany).toHaveBeenCalledWith({
+        where: { id: 1, tokenHash: hashToken(TOKEN), status: 'PENDING' },
+        data: expect.objectContaining({ status: 'ACCEPTED', acceptedByUserId: 7 }),
+      });
+      expect(mockPrismaService.workspaceMember.upsert).toHaveBeenCalledWith({
+        where: { userId_tenantId: { userId: 7, tenantId: 2 } },
+        update: {},
+        create: { userId: 7, tenantId: 2, role: 'ADMIN', isDefault: false },
+        select: { role: true },
+      });
+    });
+
+    it('reads the caller from the database, never the JWT: a since-unverified row is refused', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'EMAIL_NOT_VERIFIED' },
+      });
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 7 },
+        select: { id: true, email: true, emailVerified: true, deletedAt: true, role: true },
+      });
+      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+      expect(mockPrismaService.userInvitation.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('another email is 403 INVITATION_EMAIL_MISMATCH and names neither address', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ email: 'other@example.com', emailVerified: false }));
+      const err = await service.joinInvitation(TOKEN, 7).catch((e) => e);
+      expect(err).toMatchObject({ status: 403, response: { code: 'INVITATION_EMAIL_MISMATCH' } });
+      expect(JSON.stringify(err.response)).not.toMatch(/example\.com/i);
+      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+    });
+
+    it('an invitation with no email (a phone one) never matches', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(invitation({ email: null }));
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'INVITATION_EMAIL_MISMATCH' },
+      });
+    });
+
+    it('a super admin is 403 FORBIDDEN: super admins do not join workspaces', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ role: 'SUPER_ADMIN' }));
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
+        status: 403,
+        response: { code: 'FORBIDDEN' },
+      });
+      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+    });
+
+    it('a soft-deleted caller is refused', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ deletedAt: new Date() }));
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 401 });
+    });
+
+    it('an existing member keeps their role (the upsert changes nothing) and the answer says which', async () => {
+      mockPrismaService.workspaceMember.upsert.mockResolvedValue({ role: 'OWNER' });
+      await expect(service.joinInvitation(TOKEN, 7)).resolves.toMatchObject({ role: 'OWNER' });
+      expect(mockPrismaService.workspaceMember.upsert.mock.calls[0][0].update).toEqual({});
+    });
+
+    it('a replay by the account that accepted is 200 with the same body; by anyone else it is 409', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(
+        invitation({ status: 'ACCEPTED', acceptedByUserId: 7 }),
+      );
+      mockPrismaService.workspaceMember.findUnique.mockResolvedValue({ role: 'ADMIN' });
+      await expect(service.joinInvitation(TOKEN, 7)).resolves.toEqual({
+        workspace: { tenantId: 'ten_two', name: 'Two' },
+        role: 'ADMIN',
+      });
+      expect(mockPrismaService.userInvitation.updateMany).not.toHaveBeenCalled();
+
+      await expect(service.joinInvitation(TOKEN, 8)).rejects.toMatchObject({
         status: 409,
         response: { code: 'INVALID_STATE' },
       });
     });
-  });
 
+    it('two concurrent joins of one token: the loser of the conditional move is a 409 and adds no membership', async () => {
+      mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
+      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+    });
+
+    it('an unknown token is 404; an expired or cancelled one 409', async () => {
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toThrow(NotFoundException);
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(
+        invitation({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 409 });
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(invitation({ status: 'CANCELLED' }));
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 409 });
+    });
+  });
   describe('listInvitations: a cursor list, newest first', () => {
     // A bulk invite writes several rows in one millisecond.
     const stamps = tiedTimestamps(7);
@@ -897,24 +1145,6 @@ describe('UserInvitationsService', () => {
     });
   });
 
-  describe('acceptInvitation — not found', () => {
-    it('should throw when invitation not found', async () => {
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue(null);
-
-      await expect(service.acceptInvitation('bad-token', 'uid')).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw when invitation is not PENDING', async () => {
-      mockPrismaService.userInvitation.findUnique.mockResolvedValue({
-        id: 1,
-        status: 'CANCELLED',
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      });
-
-      await expect(service.acceptInvitation('token', 'uid')).rejects.toThrow('no longer valid');
-    });
-  });
-
   describe('acceptPhoneInvitation', () => {
     it('should verify OTP, hash PIN, create user and accept invitation', async () => {
       const mockInvitation = {
@@ -983,6 +1213,40 @@ describe('UserInvitationsService', () => {
         data: expect.objectContaining({ status: 'ACCEPTED' }),
       });
       expect(mockPrismaService.user.create).not.toHaveBeenCalled();
+    });
+
+    it('a phone invitation that carries an email makes an unverified account and emails it a verification link', async () => {
+      const phoneInvitation = {
+        id: 1,
+        tokenHash: hashToken('phone-token'),
+        phone: '+15551234567',
+        email: 'mike@example.com',
+        firstName: 'Mike',
+        lastName: 'Rivera',
+        role: 'MEMBER',
+        tenantId: 1,
+        status: 'PENDING',
+        expiresAt: new Date(Date.now() + 60_000),
+      };
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue(phoneInvitation);
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockTwilioVerifyService.checkVerification.mockResolvedValue(true);
+      mockPinService.hashPin.mockResolvedValue('hashed-pin');
+      mockPrismaService.user.create.mockImplementation(async ({ data }) => ({ id: 2, emailVerified: false, ...data }));
+
+      await service.acceptPhoneInvitation({ token: 'phone-token', phone: '+15551234567', otp: '123456', pin: '1234' });
+
+      expect(mockPrismaService.user.create.mock.calls[0][0].data).not.toHaveProperty('emailVerified', true);
+      expect(mockEmailVerification.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 2, email: 'mike@example.com' }),
+        { reason: 'invitation' },
+      );
+
+      mockEmailVerification.issue.mockClear();
+      mockPrismaService.userInvitation.findUnique.mockResolvedValue({ ...phoneInvitation, email: null });
+      mockPrismaService.user.create.mockImplementation(async ({ data }) => ({ id: 3, email: null, ...data }));
+      await service.acceptPhoneInvitation({ token: 'phone-token', phone: '+15551234567', otp: '123456', pin: '1234' });
+      expect(mockEmailVerification.issue).not.toHaveBeenCalled();
     });
 
     it('answers 409 INVALID_STATE for an invalid or expired invitation', async () => {

@@ -14,6 +14,13 @@ export const AUTH_THROTTLE_LIMIT_STRICT = 5;
 /** Max attempts for OTP send (slightly relaxed for resend scenarios) */
 export const AUTH_THROTTLE_LIMIT_OTP_SEND = 10;
 
+/**
+ * Max calls per client IP for the public invitation token routes (`preview`, `accept`). A token is about 165 bits, so
+ * this bounds a client, not a guesser; it leaves room for a person who reloads the acceptance page and for two runs
+ * of the API QA suite inside one window.
+ */
+export const AUTH_THROTTLE_LIMIT_TOKEN = 20;
+
 // ─── Token / cookie durations ───────────────────────────────────────────────────
 
 /** 7 days in milliseconds — refresh token cookie maxAge */

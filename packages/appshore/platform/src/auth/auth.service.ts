@@ -664,6 +664,44 @@ export class AuthService {
     });
   }
 
+  /**
+   * Sign in an account a public flow just created or proved (an invitation accept): a session the same way login
+   * makes one (a refresh-token family, `lastLoginAt`, a login event). The controller puts the refresh token in the
+   * host-only cookie and answers `{ accessToken, user }`; the refresh token never goes in a body.
+   */
+  async startSession(
+    userDbId: number,
+    authMethod: AuthMethod,
+    meta: { ip: string | null; userAgent: string | null },
+  ): Promise<{ accessToken: string; refreshToken: string; user: UserProfileDto }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userDbId }, include: { tenant: true } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
+      {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
+      },
+      authMethod,
+    );
+    await this.loginEventService.recordSuccess({
+      userId: user.id,
+      tenantId: user.tenant?.id ?? null,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      sessionId: refreshTokenId,
+    });
+    return { accessToken, refreshToken, user: this.toUserProfile(user) };
+  }
+
+  /**
+   * Tokens with the refresh token in the body, and no login event. Only the dev switcher calls it (`DevModule`, never
+   * loaded in production, behind `DevAuthGuard`); a product route signs in through `startSession` and the cookie.
+   */
   async generateTokensForUser(user: any): Promise<any> {
     const fullUser = await this.prisma.user.findUnique({
       where: { id: user.id },
