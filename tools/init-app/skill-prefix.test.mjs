@@ -152,6 +152,13 @@ test('the old-name search finds a mention the rename missed, in scope only', () 
     'CLAUDE.md': 'Run `app-plan`.\n',
     'docs/a.md': 'nothing\n',
     'apps/backend/src/x.ts': "id: 'app-plan'\n",
+    // The manifest's globs keep template names in every product, and the rename leaves them alone.
+    'foundation.json': '{ "seams": [".claude/skills/app-plan/**"] }\n',
   });
   assert.deepEqual(oldSkillNameHits(root, ['app-plan']), ['CLAUDE.md:1: app-plan']);
+  renameSkills(root, { from: 'app', to: 'zz' });
+  assert.equal(
+    fs.readFileSync(path.join(root, 'foundation.json'), 'utf8'),
+    '{ "seams": [".claude/skills/app-plan/**"] }\n',
+  );
 });
