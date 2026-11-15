@@ -6,6 +6,7 @@
  *   pnpm foundation:status                       # fetch the base from the template repository
  *   pnpm foundation:status --from ../app-foundation   # read the template from a local clone
  *   pnpm foundation:status --json
+ *   pnpm foundation:status --owned <path>...     # which of these paths the template owns; no fetch, no rebuild
  *
  * Read-only: nothing in the working tree changes. Exit 0 whatever it finds; 1 only when it cannot run.
  */
@@ -122,11 +123,23 @@ export function report({ manifest, ref, result }) {
 }
 
 function main() {
-  const { values } = parseArgs({
-    options: { from: { type: 'string' }, json: { type: 'boolean', default: false }, root: { type: 'string' } },
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: {
+      from: { type: 'string' },
+      json: { type: 'boolean', default: false },
+      root: { type: 'string' },
+      owned: { type: 'boolean', default: false },
+    },
   });
   const root = path.resolve(values.root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
   const manifest = loadManifest(root);
+  if (values.owned) {
+    const classify = classifierFor(manifest);
+    const owned = positionals.filter((rel) => rel !== MANIFEST_FILE && classify(rel) === CLASS.OWNED);
+    console.log(values.json ? JSON.stringify(owned) : owned.join('\n'));
+    return;
+  }
   if (manifest.base === null) {
     const message = `foundation: this is the template (v${manifest.version}). A product records its base in ${MANIFEST_FILE}; there is nothing to compare here.`;
     console.log(values.json ? JSON.stringify({ template: true, version: manifest.version }) : message);

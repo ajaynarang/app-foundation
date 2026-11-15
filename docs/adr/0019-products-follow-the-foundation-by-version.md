@@ -59,6 +59,15 @@ was scaffolded from, and is compared with that base as rebuilt by init-app itsel
   dirty tree, plans everything before it writes, and then records the target as the new base. Held by
   `tools/foundation/pull.test.mjs`.
 
+- **A product's change to an owned file can be offered back, and is never required to be** (amendment,
+  2026-11-15). In a product, the `foundation-touched` hook prints `FOUNDATION TOUCHED` once per file per session when
+  an owned file is edited; it never blocks. `pnpm foundation:push --to <checkout>` (`tools/foundation/push.mjs`)
+  merges the chosen files three ways into a clean checkout of the template on a branch of its own: the template's
+  file now, the product's base, the product's file. Lines the product did not change keep the template's text, which
+  undoes init-app's renames without a second copy of its rules. It commits nothing, never sends a delete, and
+  reports a changed line that names the product. `.claude/settings.json` joins `owned`, so the hook's wiring reaches
+  a product on its next pull. Held by `tools/foundation/push.test.mjs` and `.claude/hooks/tests/hooks.test.mjs`.
+
 ## Consequences
 
 - A product knows where it stands in seconds, without the template checked out beside it.

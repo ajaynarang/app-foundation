@@ -273,7 +273,8 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
   running app; `app-deploy` starts a deploy workflow and watches it; `app-test-notes` writes a hand-testing script;
   `app-standards-audit` audits an area and files each gap with its guard; `app-runway` fills the binding docs and the
-  domain skill in a product's first days; `app-pull-foundation` takes a newer template version into a product. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+  domain skill in a product's first days; `app-pull-foundation` takes a newer template version into a product and
+  `app-push-foundation` offers a product's change to shared files back to the template. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
 - **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
   vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
   each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
@@ -336,6 +337,13 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   lines, and moves `base` in `foundation.json`. It never writes a seam or anything outside `owned`: what the
   template changed there is listed, with the upgrade notes to read. It refuses a dirty tree; `--dry-run` writes
   nothing; `--keep` leaves both rebuilt trees to compare against. Exit 2 means conflicts are left. The `app-pull-foundation` skill runs it end to end.
+- **`pnpm foundation:push --to <template checkout> [paths]`** — in a product, offers its changes to owned files back.
+  It merges each chosen file three ways into a clean checkout of the template that is on a branch of its own, so
+  untouched lines keep the template's names, and it commits nothing. It refuses the template's default branch and a
+  dirty checkout, never sends a delete, and reports a changed line that names the product. The
+  `app-push-foundation` skill runs it end to end. A product is reminded by the `foundation-touched` hook
+  (`.claude/hooks/`): an edit to an owned file prints `FOUNDATION TOUCHED` once per file per session. It never
+  blocks, and it is silent in this template.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
   residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo
