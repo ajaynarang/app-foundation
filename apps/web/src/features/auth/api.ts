@@ -130,6 +130,27 @@ export const authApi = {
     });
   },
 
+  // ─── Invitations ──────────────────────────────────────────────────────────
+
+  /**
+   * Accept an email invitation as a NEW account with a password, and sign in (the refresh token lands in its
+   * cookie). 409 `SIGN_IN_TO_ACCEPT` when the email already has an account: sign in, then `joinInvitation`.
+   */
+  acceptInvitation: async (token: string, password: string): Promise<LoginResponse> => {
+    return apiClient<LoginResponse>('/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  /**
+   * Join the invitation's workspace as the signed-in account. 403 `INVITATION_EMAIL_MISMATCH` for another email,
+   * 403 `EMAIL_NOT_VERIFIED` until the account's email is verified. Then switch with `POST /workspaces/switch`.
+   */
+  joinInvitation: async (token: string): Promise<{ workspace: { tenantId: string; name: string }; role: string }> => {
+    return apiClient('/invitations/join', { method: 'POST', body: JSON.stringify({ token }) });
+  },
+
   /**
    * Accept phone-channel invitation (OTP + PIN setup)
    */

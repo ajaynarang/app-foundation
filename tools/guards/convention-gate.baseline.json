@@ -98,8 +98,7 @@
       "raw-control": 1
     },
     "apps/web/src/features/auth/components/accept-invitation-form.tsx": {
-      "process-env": 1,
-      "file-size": 387
+      "process-env": 1
     },
     "apps/web/src/features/auth/components/login-form.tsx": {
       "file-size": 718

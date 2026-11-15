@@ -56,6 +56,12 @@ interface AuthState {
   setUser: (user: User | null) => void;
   setFirebaseUser: (firebaseUser: FirebaseUser | null) => void;
   setTokens: (accessToken: string) => void;
+  /**
+   * Take a sign-in answer from a route other than `/auth/login` (an invitation accept), the way `signIn` does: the
+   * access token and profile into the store and the presence cookie. The refresh token is already in its httpOnly
+   * cookie.
+   */
+  setSession: (data: { accessToken: string; user: User }) => void;
   clearAuth: () => void;
 }
 
@@ -227,6 +233,10 @@ export const useAuthStore = create<AuthState>()(
       },
       setFirebaseUser: (firebaseUser) => set({ firebaseUser }),
       setTokens: (accessToken) => set({ accessToken }),
+      setSession: (data) => {
+        set({ user: data.user, accessToken: data.accessToken, isAuthenticated: true, isInitialized: true });
+        setAuthCookie(true, data.user?.role);
+      },
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       setInitialized: (state) => set({ isInitialized: state }),
       clearAuth: () => {
