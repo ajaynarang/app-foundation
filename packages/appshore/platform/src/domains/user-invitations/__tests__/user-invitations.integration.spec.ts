@@ -28,6 +28,9 @@ import { EmailVerificationService } from '../../../auth/email-verification.servi
 // No default: the spec writes rows, so it runs only against a database someone named.
 const DATABASE_URL = process.env.DATABASE_URL;
 
+/** The cases that hash real passwords (bcrypt, 12 rounds) a few times: seconds under a full parallel test run. */
+const BCRYPT_CASE_TIMEOUT_MS = 30_000;
+
 describe('Invitations and one live account per email (Postgres)', () => {
   let pool: pg.Pool;
   let lockClient: pg.Client | undefined;
@@ -260,41 +263,45 @@ describe('Invitations and one live account per email (Postgres)', () => {
     });
   });
 
-  it('the reclaim: the owner resets, verifies and joins; the squatter phone PIN no longer signs in', async () => {
-    if (!ready) return;
-    const squatterHome = await makeTenant();
-    const workspace = await makeTenant();
-    const inviter = await makeMember(workspace.id, `boss9-${suffix}@example.com`);
-    const email = `reclaim-${suffix}@example.com`;
-    const phone = `+1555${String(parseInt(suffix, 16) % 10_000_000).padStart(7, '0')}`;
-    const squatter = await makeMember(squatterHome.id, email, {
-      emailVerified: false,
-      passwordHash: await bcrypt.hash('attacker-knows-this', 4),
-      phone,
-      phoneVerified: true,
-      pinHash: await pins.hashPin('4321'),
-    });
-    // A second credential, as an attacker would add: the phone PIN works before the reset.
-    await expect(auth.loginWithPhone({ phone, pin: '4321' } as any)).resolves.toMatchObject({
-      user: { userId: squatter.userId },
-    });
-    const invitation = await makeInvitation(workspace.id, inviter.id, { email });
+  it(
+    'the reclaim: the owner resets, verifies and joins; the squatter phone PIN no longer signs in',
+    async () => {
+      if (!ready) return;
+      const squatterHome = await makeTenant();
+      const workspace = await makeTenant();
+      const inviter = await makeMember(workspace.id, `boss9-${suffix}@example.com`);
+      const email = `reclaim-${suffix}@example.com`;
+      const phone = `+1555${String(parseInt(suffix, 16) % 10_000_000).padStart(7, '0')}`;
+      const squatter = await makeMember(squatterHome.id, email, {
+        emailVerified: false,
+        passwordHash: await bcrypt.hash('attacker-knows-this', 4),
+        phone,
+        phoneVerified: true,
+        pinHash: await pins.hashPin('4321'),
+      });
+      // A second credential, as an attacker would add: the phone PIN works before the reset.
+      await expect(auth.loginWithPhone({ phone, pin: '4321' } as any)).resolves.toMatchObject({
+        user: { userId: squatter.userId },
+      });
+      const invitation = await makeInvitation(workspace.id, inviter.id, { email });
 
-    // The real owner takes the address back with a reset (the link proves the mailbox).
-    await auth.forgotPassword({ email } as any);
-    await auth.resetPassword({ token: linkTokenIn(email, '/reset-password'), newPassword: 'OwnerPassword1!' });
-    expect(await prisma.user.findUniqueOrThrow({ where: { id: squatter.id } })).toMatchObject({
-      emailVerified: true,
-      phone: null,
-      pinHash: null,
-    });
+      // The real owner takes the address back with a reset (the link proves the mailbox).
+      await auth.forgotPassword({ email } as any);
+      await auth.resetPassword({ token: linkTokenIn(email, '/reset-password'), newPassword: 'OwnerPassword1!' });
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: squatter.id } })).toMatchObject({
+        emailVerified: true,
+        phone: null,
+        pinHash: null,
+      });
 
-    await expect(joinAs(squatterHome.id, squatter.id, invitation.token)).resolves.toMatchObject({ role: 'MEMBER' });
-    expect(await memberships(squatter.id, workspace.id)).toBe(1);
+      await expect(joinAs(squatterHome.id, squatter.id, invitation.token)).resolves.toMatchObject({ role: 'MEMBER' });
+      expect(await memberships(squatter.id, workspace.id)).toBe(1);
 
-    // The squatter's phone PIN no longer reaches the account, or the workspace it just joined.
-    await expect(auth.loginWithPhone({ phone, pin: '4321' } as any)).rejects.toBeInstanceOf(UnauthorizedException);
-  });
+      // The squatter's phone PIN no longer reaches the account, or the workspace it just joined.
+      await expect(auth.loginWithPhone({ phone, pin: '4321' } as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    },
+    BCRYPT_CASE_TIMEOUT_MS,
+  );
 
   it('join refuses another email (403 INVITATION_EMAIL_MISMATCH) and writes nothing', async () => {
     if (!ready) return;
@@ -311,44 +318,48 @@ describe('Invitations and one live account per email (Postgres)', () => {
     expect(await memberships(bob.id, other.id)).toBe(0);
   });
 
-  it('a new account from an emailed-only token starts verified; from a shared link, unverified with a link emailed', async () => {
-    if (!ready) return;
-    const tenant = await makeTenant();
-    const inviter = await makeMember(tenant.id, `boss11-${suffix}@example.com`);
+  it(
+    'a new account from an emailed-only token starts verified; from a shared link, unverified with a link emailed',
+    async () => {
+      if (!ready) return;
+      const tenant = await makeTenant();
+      const inviter = await makeMember(tenant.id, `boss11-${suffix}@example.com`);
 
-    const emailed = await makeInvitation(tenant.id, inviter.id, { email: `fresh-${suffix}@example.com` });
-    const viaEmail = await service.acceptInvitation({ token: emailed.token, password: 'Password123!' });
-    expect(viaEmail).toMatchObject({ emailVerified: true, firebaseUid: null, tenantId: tenant.id });
-    expect(await bcrypt.compare('Password123!', viaEmail.passwordHash as string)).toBe(true);
-    expect(await prisma.userPreferences.count({ where: { userId: viaEmail.id } })).toBe(1);
-    expect(
-      await prisma.workspaceMember.findUnique({
-        where: { userId_tenantId: { userId: viaEmail.id, tenantId: tenant.id } },
-      }),
-    ).toMatchObject({ isDefault: true, role: 'MEMBER' });
+      const emailed = await makeInvitation(tenant.id, inviter.id, { email: `fresh-${suffix}@example.com` });
+      const viaEmail = await service.acceptInvitation({ token: emailed.token, password: 'Password123!' });
+      expect(viaEmail).toMatchObject({ emailVerified: true, firebaseUid: null, tenantId: tenant.id });
+      expect(await bcrypt.compare('Password123!', viaEmail.passwordHash as string)).toBe(true);
+      expect(await prisma.userPreferences.count({ where: { userId: viaEmail.id } })).toBe(1);
+      expect(
+        await prisma.workspaceMember.findUnique({
+          where: { userId_tenantId: { userId: viaEmail.id, tenantId: tenant.id } },
+        }),
+      ).toMatchObject({ isDefault: true, role: 'MEMBER' });
 
-    const shared = await makeInvitation(tenant.id, inviter.id, { email: `copied-${suffix}@example.com` });
-    const { inviteLink } = await service.rotateInvitationLink(shared.invitationId, tenant.tenantId);
-    const viaLink = await service.acceptInvitation({
-      token: new URL(inviteLink).searchParams.get('token') as string,
-      password: 'Password123!',
-    });
-    expect(viaLink.emailVerified).toBe(false);
-    expect(await prisma.emailVerificationToken.count({ where: { userId: viaLink.id, usedAt: null } })).toBe(1);
-    expect(linkTokenIn(`copied-${suffix}@example.com`, '/verify-email')).toMatch(/^[0-9a-f]{64}$/);
+      const shared = await makeInvitation(tenant.id, inviter.id, { email: `copied-${suffix}@example.com` });
+      const { inviteLink } = await service.rotateInvitationLink(shared.invitationId, tenant.tenantId);
+      const viaLink = await service.acceptInvitation({
+        token: new URL(inviteLink).searchParams.get('token') as string,
+        password: 'Password123!',
+      });
+      expect(viaLink.emailVerified).toBe(false);
+      expect(await prisma.emailVerificationToken.count({ where: { userId: viaLink.id, usedAt: null } })).toBe(1);
+      expect(linkTokenIn(`copied-${suffix}@example.com`, '/verify-email')).toMatch(/^[0-9a-f]{64}$/);
 
-    // The session the controller issues for it: the cookie, no refresh token in the body.
-    const response = { cookie: jest.fn(), clearCookie: jest.fn() };
-    const third = await makeInvitation(tenant.id, inviter.id, { email: `session-${suffix}@example.com` });
-    const answer = await controller.acceptInvitation(
-      { token: third.token, password: 'Password123!' },
-      { ip: '203.0.113.1', headers: {} } as any,
-      response as any,
-    );
-    expect(answer.user).toMatchObject({ email: `session-${suffix}@example.com`, tenantId: tenant.tenantId });
-    expect(answer).not.toHaveProperty('refreshToken');
-    expect(response.cookie).toHaveBeenCalledTimes(1);
-  });
+      // The session the controller issues for it: the cookie, no refresh token in the body.
+      const response = { cookie: jest.fn(), clearCookie: jest.fn() };
+      const third = await makeInvitation(tenant.id, inviter.id, { email: `session-${suffix}@example.com` });
+      const answer = await controller.acceptInvitation(
+        { token: third.token, password: 'Password123!' },
+        { ip: '203.0.113.1', headers: {} } as any,
+        response as any,
+      );
+      expect(answer.user).toMatchObject({ email: `session-${suffix}@example.com`, tenantId: tenant.tenantId });
+      expect(answer).not.toHaveProperty('refreshToken');
+      expect(response.cookie).toHaveBeenCalledTimes(1);
+    },
+    BCRYPT_CASE_TIMEOUT_MS,
+  );
 
   it('a phone invite carrying the email of a live account elsewhere is refused with a clear 409, nothing written', async () => {
     if (!ready) return;
@@ -446,22 +457,26 @@ describe('Invitations and one live account per email (Postgres)', () => {
     expect(row.tokenHash).toBe(hashToken(fresh));
   });
 
-  it('two concurrent accepts of one token: exactly one wins, the other is a 409, and one account exists', async () => {
-    if (!ready) return;
-    const tenant = await makeTenant();
-    const inviter = await makeMember(tenant.id, `boss7-${suffix}@example.com`);
-    const email = `raced-${suffix}@example.com`;
-    const invitation = await makeInvitation(tenant.id, inviter.id, { email });
+  it(
+    'two concurrent accepts of one token: exactly one wins, the other is a 409, and one account exists',
+    async () => {
+      if (!ready) return;
+      const tenant = await makeTenant();
+      const inviter = await makeMember(tenant.id, `boss7-${suffix}@example.com`);
+      const email = `raced-${suffix}@example.com`;
+      const invitation = await makeInvitation(tenant.id, inviter.id, { email });
 
-    const results = await Promise.allSettled([
-      service.acceptInvitation({ token: invitation.token, password: 'Password123!' }),
-      service.acceptInvitation({ token: invitation.token, password: 'Password123!' }),
-    ]);
+      const results = await Promise.allSettled([
+        service.acceptInvitation({ token: invitation.token, password: 'Password123!' }),
+        service.acceptInvitation({ token: invitation.token, password: 'Password123!' }),
+      ]);
 
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    const [lost] = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
-    expect(lost.reason).toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
-    expect(await liveAccounts(email)).toBe(1);
-    expect(await prisma.workspaceMember.count({ where: { tenantId: tenant.id, user: { email } } })).toBe(1);
-  });
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const [lost] = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(lost.reason).toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
+      expect(await liveAccounts(email)).toBe(1);
+      expect(await prisma.workspaceMember.count({ where: { tenantId: tenant.id, user: { email } } })).toBe(1);
+    },
+    BCRYPT_CASE_TIMEOUT_MS,
+  );
 });
