@@ -9,6 +9,7 @@ import { TwilioVerifyService } from '../../infrastructure/sms/twilio-verify.serv
 import { LoginEventService } from '../login-event.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { ConfigService } from '@nestjs/config';
+import { EmailVerificationService } from '../email-verification.service';
 import { IdentityResolverService } from '../identity-resolver.service';
 
 const mockLoginEventService = {
@@ -75,6 +76,7 @@ describe('AuthService - Phone Auth', () => {
         { provide: TwilioVerifyService, useValue: mockTwilioVerifyService },
         { provide: LoginEventService, useValue: mockLoginEventService },
         { provide: EmailService, useValue: { sendEmail: jest.fn() } },
+        { provide: EmailVerificationService, useValue: { issue: jest.fn(), verify: jest.fn(), resend: jest.fn() } },
         IdentityResolverService,
         { provide: ConfigService, useValue: { get: () => undefined } },
       ],
@@ -656,6 +658,55 @@ describe('AuthService - Phone Auth', () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
       await expect(service.generateTokensForUser({ id: 999 })).rejects.toThrow('User not found');
+    });
+  });
+
+  describe('startSession (an invitation accept signs in like login)', () => {
+    const row = {
+      id: 9,
+      userId: 'user_9',
+      email: 'jane@example.com',
+      emailVerified: false,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      role: 'MEMBER',
+      isActive: true,
+      passwordHash: '$2b$12$secret',
+      pinHash: null,
+      firebaseUid: 'fb_uid',
+      tenantId: 3,
+      tenant: { id: 3, tenantId: 'ten_abc', companyName: 'Acme' },
+    };
+
+    it("issues a session in the account's workspace, records the login, and answers the public profile", async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(row);
+      mockJwtTokenService.generateTokenPair.mockResolvedValue({
+        accessToken: 'jwt',
+        refreshToken: 'refresh',
+        refreshTokenId: 'fam_1',
+      });
+
+      const result = await service.startSession(9, 'email_password', { ip: '203.0.113.9', userAgent: 'ua' });
+
+      expect(mockJwtTokenService.generateTokenPair).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 9, userId: 'user_9', tenantId: 'ten_abc', tenantDbId: 3, role: 'MEMBER' }),
+        'email_password',
+      );
+      expect(mockLoginEventService.recordSuccess).toHaveBeenCalledWith({
+        userId: 9,
+        tenantId: 3,
+        ip: '203.0.113.9',
+        userAgent: 'ua',
+        sessionId: 'fam_1',
+      });
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 9 },
+        data: { lastLoginAt: expect.any(Date) },
+      });
+      expect(result).toMatchObject({ accessToken: 'jwt', refreshToken: 'refresh' });
+      expect(result.user).toMatchObject({ userId: 'user_9', tenantId: 'ten_abc', emailVerified: false });
+      for (const key of ['passwordHash', 'pinHash', 'firebaseUid', 'tenant', 'id'])
+        expect(result.user).not.toHaveProperty(key);
     });
   });
 });

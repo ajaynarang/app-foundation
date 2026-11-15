@@ -5,6 +5,10 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS } from '../../platform-hooks';
+import { FirebaseAuthService } from '../../../auth/firebase-auth.service';
+import { RegisterTenantDto } from '../dto/register-tenant.dto';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { EmailVerificationService } from '../../../auth/email-verification.service';
 import { fixtureModel, walkCursorList } from '../../../test/helpers';
 
 const mockPrisma = {
@@ -40,6 +44,10 @@ const mockNotification = {
   sendTenantReactivationNotification: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockEmailVerification = { issue: jest.fn().mockResolvedValue(undefined) };
+
+const mockFirebaseAuth = { verifyFirebaseToken: jest.fn() };
+
 const mockDeskBootstrap = {
   tenantApproved: jest.fn().mockResolvedValue(undefined),
   sweepActiveTenants: jest.fn().mockResolvedValue({
@@ -61,6 +69,8 @@ describe('TenantsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AppCacheService, useValue: mockCache },
         { provide: NotificationService, useValue: mockNotification },
+        { provide: EmailVerificationService, useValue: mockEmailVerification },
+        { provide: FirebaseAuthService, useValue: mockFirebaseAuth },
         { provide: TENANT_PROVISION_HOOKS, useValue: mockDeskBootstrap },
       ],
     }).compile();
@@ -126,8 +136,52 @@ describe('TenantsService', () => {
       phone: '+12025551234',
       firstName: 'John',
       lastName: 'Doe',
-      firebaseUid: 'firebase-123',
+      password: 'Password123!',
     };
+
+    describe('a Firebase owner: the uid comes only from a verified token for this email', () => {
+      beforeEach(() => {
+        mockPrisma.tenant.findUnique.mockResolvedValue(null);
+        mockPrisma.user.findFirst.mockResolvedValue(null);
+        mockPrisma.tenant.create.mockResolvedValue({ id: 1, tenantId: 'TNT-001', status: 'PENDING_APPROVAL' });
+        mockPrisma.user.create.mockResolvedValue({ id: 1, userId: 'USR-001' });
+        mockPrisma.tenantPlanEvent.create.mockResolvedValue({});
+      });
+
+      it('a firebaseUid in the body is refused as an unknown property (400 VALIDATION_FAILED)', async () => {
+        const raw = { ...dto, password: undefined, firebaseUid: 'someone-elses-uid' };
+        expect(await fieldErrorsOf(readBodyDto(RegisterTenantDto, raw))).toHaveProperty('firebaseUid');
+      });
+
+      it("stores the verified token's uid, not anything from the body", async () => {
+        mockFirebaseAuth.verifyFirebaseToken.mockResolvedValue({ uid: 'fb_verified', email: 'Owner@Acme.com' });
+
+        await service.registerTenant({ ...dto, password: undefined, firebaseIdToken: 'id-token' });
+
+        expect(mockFirebaseAuth.verifyFirebaseToken).toHaveBeenCalledWith('id-token');
+        expect(mockPrisma.user.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ firebaseUid: 'fb_verified', passwordHash: undefined }),
+        });
+      });
+
+      it('a token for another email is 400 naming firebaseIdToken, and nothing is created', async () => {
+        mockFirebaseAuth.verifyFirebaseToken.mockResolvedValue({ uid: 'fb_other', email: 'someone@else.com' });
+
+        const errors = await fieldErrorsOf(
+          service.registerTenant({ ...dto, password: undefined, firebaseIdToken: 'id-token' }),
+        );
+
+        expect(errors).toHaveProperty('firebaseIdToken');
+        expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+        expect(mockPrisma.user.create).not.toHaveBeenCalled();
+      });
+
+      it('a password owner never touches Firebase and stores no uid', async () => {
+        await service.registerTenant(dto);
+        expect(mockFirebaseAuth.verifyFirebaseToken).not.toHaveBeenCalled();
+        expect(mockPrisma.user.create).toHaveBeenCalledWith({ data: expect.objectContaining({ firebaseUid: null }) });
+      });
+    });
 
     it('should throw ConflictException for taken subdomain', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({ id: 1 });
@@ -187,6 +241,48 @@ describe('TenantsService', () => {
         'John',
         'Acme Inc',
       );
+    });
+
+    function registrable() {
+      mockPrisma.tenant.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+      mockPrisma.tenant.create.mockResolvedValue({ id: 1, tenantId: 'TNT-001', companyName: 'Acme Inc' });
+      mockPrisma.user.create.mockResolvedValue({
+        id: 9,
+        email: 'owner@acme.com',
+        firstName: 'John',
+        emailVerified: false,
+      });
+      mockPrisma.tenantPlanEvent.create.mockResolvedValue({});
+    }
+
+    it('issues a verification token for the owner after the registration committed', async () => {
+      registrable();
+      const order: string[] = [];
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: any) => {
+        const out = await cb(mockPrisma);
+        order.push('commit');
+        return out;
+      });
+      mockEmailVerification.issue.mockImplementationOnce(async () => {
+        order.push('issue');
+      });
+
+      await service.registerTenant({ ...dto, password: 'Password123!' } as any);
+
+      expect(mockEmailVerification.issue).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }), {
+        reason: 'signup',
+      });
+      expect(order).toEqual(['commit', 'issue']);
+    });
+
+    it('a failing verification issue never fails the registration', async () => {
+      registrable();
+      mockEmailVerification.issue.mockRejectedValueOnce(new Error('db blip'));
+
+      await expect(service.registerTenant({ ...dto, password: 'Password123!' } as any)).resolves.toMatchObject({
+        tenantId: 'TNT-001',
+      });
     });
   });
 

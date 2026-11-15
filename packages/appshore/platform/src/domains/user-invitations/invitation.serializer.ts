@@ -59,3 +59,51 @@ export function toPublicInvitation(row: InvitationListRow): InvitationListItem {
       : null,
   };
 }
+
+/**
+ * What `POST /invitations/preview` reads: the public acceptance page's view of an invitation. Never the token hash,
+ * no Int id, and the inviter by name only (their email is not the invitee's business).
+ */
+export const INVITATION_PREVIEW_SELECT = {
+  invitationId: true,
+  email: true,
+  phone: true,
+  inviteChannel: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  status: true,
+  expiresAt: true,
+  tenant: { select: { tenantId: true, companyName: true, subdomain: true } },
+  invitedByUser: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.UserInvitationSelect;
+
+type InvitationPreviewRow = Prisma.UserInvitationGetPayload<{ select: typeof INVITATION_PREVIEW_SELECT }>;
+
+export interface InvitationPreviewItem {
+  invitationId: string;
+  email: string | null;
+  phone: string | null;
+  inviteChannel: InvitationChannel;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  expiresAt: Date;
+  tenant: { tenantId: string; companyName: string; subdomain: string | null };
+  invitedBy: { firstName: string; lastName: string };
+}
+
+export function toInvitationPreview(row: InvitationPreviewRow): InvitationPreviewItem {
+  return {
+    invitationId: row.invitationId,
+    email: row.email,
+    phone: row.phone,
+    inviteChannel: row.inviteChannel,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    role: row.role,
+    expiresAt: row.expiresAt,
+    tenant: { tenantId: row.tenant.tenantId, companyName: row.tenant.companyName, subdomain: row.tenant.subdomain },
+    invitedBy: { firstName: row.invitedByUser.firstName, lastName: row.invitedByUser.lastName },
+  };
+}

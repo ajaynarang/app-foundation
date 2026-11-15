@@ -25,7 +25,10 @@ import {
 } from '@app/shared-types';
 import { NotificationService } from '../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
-import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { EmailVerificationService } from '../../auth/email-verification.service';
+import { FirebaseAuthService } from '../../auth/firebase-auth.service';
 import {
   buildCursorPage,
   clampCursorLimit,
@@ -71,6 +74,8 @@ export class TenantsService {
     private prisma: PrismaService,
     private notificationService: NotificationService,
     private readonly cache: AppCacheService,
+    private readonly emailVerification: EmailVerificationService,
+    private readonly firebaseAuth: FirebaseAuthService,
     @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
@@ -129,18 +134,26 @@ export class TenantsService {
       throw new ConflictException('Subdomain is already taken or reserved');
     }
 
-    if (!dto.password && !dto.firebaseUid) {
+    if (!dto.password && !dto.firebaseIdToken) {
       throw new BadRequestException('A password (or Firebase account) is required');
+    }
+
+    // The uid comes only from a token the server verified, and that token must be for the address being registered:
+    // a uid from the body would let anyone bind someone else's Firebase sign-in to this workspace.
+    let firebaseUid: string | null = null;
+    if (dto.firebaseIdToken) {
+      const decoded = await this.firebaseAuth.verifyFirebaseToken(dto.firebaseIdToken);
+      if (decoded.email?.toLowerCase().trim() !== dto.email.toLowerCase().trim()) {
+        throw fieldError('firebaseIdToken', 'This Firebase sign-in is for a different email');
+      }
+      firebaseUid = decoded.uid;
     }
 
     // Check if email already registered (across all tenants), in any case: the database holds one live account per
     // lower(email) (index users_email_live_key), so an exact-case lookup would miss it and the insert be refused.
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email: { equals: dto.email, mode: 'insensitive' } },
-          ...(dto.firebaseUid ? [{ firebaseUid: dto.firebaseUid }] : []),
-        ],
+        OR: [{ email: { equals: dto.email, mode: 'insensitive' } }, ...(firebaseUid ? [{ firebaseUid }] : [])],
       },
     });
 
@@ -179,7 +192,7 @@ export class TenantsService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           role: 'OWNER', // Owner role - created during registration, cannot be deleted
-          firebaseUid: dto.firebaseUid ?? null,
+          firebaseUid,
           passwordHash,
           emailVerified: false,
           isActive: false, // Inactive until tenant approved
@@ -215,6 +228,14 @@ export class TenantsService {
       dto.firstName,
       result.tenant.companyName,
     );
+
+    // After the commit: the owner verifies their email once the workspace is approved and they can sign in (the link
+    // needs a session; the banner resends one). A failure here never fails the registration.
+    try {
+      await this.emailVerification.issue(result.ownerUser, { reason: 'signup' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued at tenant registration', err: toLoggableError(err) });
+    }
 
     return {
       tenantId: result.tenant.tenantId,

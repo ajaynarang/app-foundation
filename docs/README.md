@@ -60,7 +60,8 @@ epics. The `app-runway` skill (`/app-runway`) walks the order with the owner, th
 - [`upgrade-notes/`](upgrade-notes/contract-v1.md): what changed, for a product scaffolded before a change and pulling
   it now. [Contract v1](upgrade-notes/contract-v1.md): the wire. [AI platform](upgrade-notes/ai-platform.md): AI
   behaviour, env and schema. [Operations](upgrade-notes/operations.md): sessions, logging, error tracking, telemetry,
-  alerts, safety gates and deploy.
+  alerts, safety gates and deploy. [Identity and invitations](upgrade-notes/identity-and-invitations.md): invitation
+  tokens, links and accept.
 
 ## What the starter ships
 

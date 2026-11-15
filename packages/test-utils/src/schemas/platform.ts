@@ -381,40 +381,27 @@ export const UserUpdateResponseSchema = z
   })
   .strict();
 
-// ── USER INVITATIONS (Phase 4 Group 4d) ─────────────────────────────
+// ── USER INVITATIONS ────────────────────────────────────────────────
 //
-// The controller mounts seven invitation endpoints. Response shapes
-// (per the platform controllers/services):
+// The invitation routes and what they answer. An invitation token is a bearer secret: it is stored only as a hash
+// and no answer carries it, except the one route that rotates it to show a shareable link once.
 //
-//   POST   /invitations                         → InvitationCreatedSchema
-//     — full Prisma row + `tenant` (TenantRowSchema) + `invitedByUser`
-//       (full Prisma user row) + `inviteLink: string`.
+//   POST   /invitations                         → UserInvitationCreateResponseSchema (the public invitation)
+//   GET    /invitations                         → cursor list of UserInvitationListItemSchema
+//   POST   /invitations/preview (PUBLIC)        → InvitationPreviewSchema (body `{ token }`; never in the path)
+//   POST   /invitations/accept (PUBLIC)         → AcceptInvitationResponseSchema (a sign-in: `{ accessToken, user }`)
+//   POST   /invitations/join (signed in)        → InvitationJoinedSchema
+//   POST   /invitations/:id/resend              → UserInvitationResendResponseSchema (the public invitation)
+//   POST   /invitations/:id/link (OWNER/ADMIN)  → UserInvitationLinkSchema `{ inviteLink }`, shown once
+//   DELETE /invitations/:id                     → 204
 //
-//   GET    /invitations                         → InvitationListItemSchema[]
-//     — full Prisma row + `invitedByUser` (thin projection). NO `tenant`.
-//
-//   GET    /invitations/by-token/:token (PUBLIC) → PublicInvitationLookupSchema
-//     — full Prisma row + `tenant` (thin projection: tenantId/companyName/subdomain)
-//       + `invitedByUser` (thin projection: firstName/lastName/email).
-//
-//   POST   /invitations/accept (PUBLIC)         → AcceptInvitationResponseSchema
-//     — full Prisma user row + `tenant` (TenantRowSchema).
-//
-//   POST   /invitations/:id/resend              → InvitationResendSchema
-//     — full Prisma row + `inviteLink`. No relations.
-//
-//   GET    /invitations/:id/link                → InvitationLinkSchema `{ inviteLink }`
-//
-//   DELETE /invitations/:id                     → InvitationRowSchema
-//     — full Prisma row (no relations, no inviteLink).
-//
-// There is NO `GET /invitations/:id` detail endpoint. The `/link` route
-// is the closest thing to "get by id" and returns only the link string.
+// There is NO `GET /invitations/:id` detail endpoint, no `GET /invitations/:id/link` and no
+// `GET /invitations/by-token/:token`: a token never travels in a URL path.
 //
 // Shared-types `@app/shared-types/platform/user.schema.ts::InviteUserSchema`
 // covers only the request-side body (4 fields); no response schemas exist.
 
-/** Core Prisma row — shared by every invitation response. */
+/** Core Prisma row: never on the wire, kept to describe what the table holds (a hash, never the token). */
 const UserInvitationPrismaRowProjection = {
   id: dbId,
   invitationId: stringId,
@@ -425,8 +412,9 @@ const UserInvitationPrismaRowProjection = {
   firstName: z.string(),
   lastName: z.string(),
   role: z.string(),
-  token: z.string(),
+  tokenHash: z.string().regex(/^[0-9a-f]{64}$/),
   expiresAt: isoDateString,
+  linkSharedAt: isoDateString.nullable(),
   invitedBy: dbId,
   status: z.enum(['PENDING', 'ACCEPTED', 'CANCELLED', 'EXPIRED']),
   acceptedAt: isoDateString.nullable(),
@@ -436,150 +424,112 @@ const UserInvitationPrismaRowProjection = {
   createdAt: isoDateString,
 };
 
-/** Bare Prisma row — returned by DELETE /invitations/:id (cancel). */
+/** The bare Prisma row. No route answers it. */
 export const UserInvitationRowSchema = z.object(UserInvitationPrismaRowProjection).strict();
 
-/**
- * `POST /invitations` response — Prisma row + two relation includes +
- * the service-synthesised `inviteLink`. The `invitedByUser` include is
- * the FULL Prisma user row (every nullable auth field); we model the
- * outer object `.strict()` but the nested user row `.passthrough()`-free
- * by typing every observed key explicitly.
- */
-const InvitedByUserFullSchema = z
+/** The inviter, by public id. */
+const InvitedByProjectionSchema = z
   .object({
-    id: dbId,
     userId: stringId,
-    tenantId: dbId.nullable(),
     email: z.string().nullable(),
-    passwordHash: z.string().nullable(),
+    firstName: z.string(),
+    lastName: z.string(),
+  })
+  .strict();
+
+/**
+ * The public invitation (`toPublicInvitation`): what the list, create and resend answer. No numeric ids, no token,
+ * no hash and no link.
+ */
+const UserInvitationPublicSchema = z
+  .object({
+    invitationId: stringId,
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+    inviteChannel: z.enum(['EMAIL', 'SMS']),
+    firstName: z.string(),
+    lastName: z.string(),
+    role: z.string(),
+    status: z.enum(['PENDING', 'ACCEPTED', 'CANCELLED', 'EXPIRED']),
+    expiresAt: isoDateString,
+    acceptedAt: isoDateString.nullable(),
+    cancelledAt: isoDateString.nullable(),
+    createdAt: isoDateString,
+    invitedBy: InvitedByProjectionSchema.nullable(),
+  })
+  .strict();
+
+/** `POST /invitations` (201): the public invitation. The link goes to the invitee only, never back to the inviter. */
+export const UserInvitationCreateResponseSchema = UserInvitationPublicSchema;
+
+/** `GET /invitations` list row. */
+export const UserInvitationListItemSchema = UserInvitationPublicSchema;
+
+/**
+ * `POST /invitations/preview` (public): what the acceptance page shows. The workspace by its public id, the inviter
+ * by name only.
+ */
+export const InvitationPreviewSchema = z
+  .object({
+    invitationId: stringId,
+    email: z.string().nullable(),
+    phone: z.string().nullable(),
+    inviteChannel: z.enum(['EMAIL', 'SMS']),
+    firstName: z.string(),
+    lastName: z.string(),
+    role: z.string(),
+    expiresAt: isoDateString,
+    tenant: z
+      .object({
+        tenantId: stringId,
+        companyName: z.string(),
+        subdomain: z.string().nullable(),
+      })
+      .strict(),
+    invitedBy: z.object({ firstName: z.string(), lastName: z.string() }).strict(),
+  })
+  .strict();
+
+/** The signed-in profile the auth routes answer (`toUserProfile`): no hash, no row; `dbId` is the web's one Int. */
+export const AuthUserProfileSchema = z
+  .object({
+    dbId: dbId,
+    userId: stringId,
+    email: z.string().nullable(),
+    emailVerified: z.boolean(),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
     role: z.string(),
-    firebaseUid: z.string().nullable(),
-    emailVerified: z.boolean(),
+    tenantId: z.string().optional(),
+    tenantName: z.string().optional(),
+    tenantTimezone: z.string().optional(),
+    subdomain: z.string().optional(),
+    isActive: z.boolean(),
     phone: z.string().nullable(),
     phoneVerified: z.boolean(),
-    pinHash: z.string().nullable(),
-    isActive: z.boolean(),
-    lastLoginAt: isoDateString.nullable(),
-    passwordChangedAt: isoDateString.nullable(),
-    deletedAt: isoDateString.nullable(),
-    deletedBy: dbId.nullable(),
-    deletionReason: z.string().nullable(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
+    hasPinSet: z.boolean(),
+    createdAt: isoDateString.optional(),
+    lastLoginAt: isoDateString.optional(),
   })
   .strict();
 
-export const UserInvitationCreateResponseSchema = z
-  .object({
-    ...UserInvitationPrismaRowProjection,
-    tenant: TenantRowSchema,
-    invitedByUser: InvitedByUserFullSchema,
-    inviteLink: z.string(),
-  })
-  .strict();
-
-/**
- * `GET /invitations` list-row — Prisma row + thin `invitedByUser` include.
- * No `tenant`. No `inviteLink`.
- */
-const InvitedByUserListProjectionSchema = z
-  .object({
-    userId: stringId,
-    email: z.string().nullable(),
-    firstName: z.string().nullable(),
-    lastName: z.string().nullable(),
-  })
-  .strict();
-
-export const UserInvitationListItemSchema = z
-  .object({
-    ...UserInvitationPrismaRowProjection,
-    invitedByUser: InvitedByUserListProjectionSchema,
-  })
-  .strict();
-
-/**
- * `GET /invitations/by-token/:token` public lookup — Prisma row + thin
- * `tenant` projection + thin `invitedByUser` projection. Lists the
- * tenantId/companyName/subdomain needed by the accept page so the user
- * knows which org they're joining.
- */
-const PublicInvitationTenantProjectionSchema = z
-  .object({
-    tenantId: stringId,
-    companyName: z.string(),
-    subdomain: z.string(),
-  })
-  .strict();
-
-const PublicInvitationInvitedByProjectionSchema = z
-  .object({
-    firstName: z.string().nullable(),
-    lastName: z.string().nullable(),
-    email: z.string().nullable(),
-  })
-  .strict();
-
-export const PublicInvitationLookupSchema = z
-  .object({
-    ...UserInvitationPrismaRowProjection,
-    tenant: PublicInvitationTenantProjectionSchema,
-    invitedByUser: PublicInvitationInvitedByProjectionSchema,
-  })
-  .strict();
-
-/**
- * `POST /invitations/accept` — full Prisma user row + `tenant`
- * (TenantRowSchema). The response is the newly-created User row — distinct
- * from the admin UserDetailSchema because it uses the raw Prisma-row field
- * set (numeric `id`, `tenantId`, `passwordHash`, `firebaseUid`, etc.).
- * Model the outer object `.strict()` and enumerate every observed field.
- */
+/** `POST /invitations/accept` / `accept-phone`: `{ accessToken, user }`; the refresh token is only in the cookie. */
 export const AcceptInvitationResponseSchema = z
-  .object({
-    id: dbId,
-    userId: stringId,
-    tenantId: dbId.nullable(),
-    email: z.string().nullable(),
-    passwordHash: z.string().nullable(),
-    firstName: z.string().nullable(),
-    lastName: z.string().nullable(),
-    role: z.string(),
-    firebaseUid: z.string().nullable(),
-    emailVerified: z.boolean(),
-    phone: z.string().nullable(),
-    phoneVerified: z.boolean(),
-    pinHash: z.string().nullable(),
-    isActive: z.boolean(),
-    lastLoginAt: isoDateString.nullable(),
-    passwordChangedAt: isoDateString.nullable(),
-    deletedAt: isoDateString.nullable(),
-    deletedBy: dbId.nullable(),
-    deletionReason: z.string().nullable(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
-    tenant: TenantRowSchema.nullable(),
-  })
+  .object({ accessToken: z.string().min(1), user: AuthUserProfileSchema })
   .strict();
 
-/**
- * `POST /invitations/:id/resend` — Prisma row + `inviteLink`. No
- * relations (service doesn't re-include them after the update).
- */
-export const UserInvitationResendResponseSchema = z
-  .object({
-    ...UserInvitationPrismaRowProjection,
-    inviteLink: z.string(),
-  })
+/** `POST /invitations/join` (signed in): the workspace joined, by public id, and the caller's role in it. */
+export const InvitationJoinedSchema = z
+  .object({ workspace: z.object({ tenantId: stringId, name: z.string() }).strict(), role: z.string() })
   .strict();
 
-/** `GET /invitations/:id/link` — single-field `{inviteLink}` envelope. */
+/** `POST /invitations/:id/resend` (200): the public invitation. The new link goes to the invitee only. */
+export const UserInvitationResendResponseSchema = UserInvitationPublicSchema;
+
+/** `POST /invitations/:id/link` (OWNER/ADMIN): the new acceptance link, shown once. */
 export const UserInvitationLinkSchema = z
   .object({
-    inviteLink: z.string(),
+    inviteLink: z.string().url(),
   })
   .strict();
 

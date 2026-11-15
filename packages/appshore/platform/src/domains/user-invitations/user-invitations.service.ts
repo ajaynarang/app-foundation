@@ -9,14 +9,21 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CursorList } from '@app/shared-types';
-import type { InvitationStatus, Prisma } from '@appshore/db';
+import { Prisma, type InvitationStatus, type UserRole } from '@appshore/db';
 import {
   buildCursorPage,
   clampCursorLimit,
   encodeCursor,
   keysetWhere,
 } from '@appshore/kernel/shared/utils/cursor-pagination';
-import { INVITATION_LIST_SELECT, toPublicInvitation, type InvitationListItem } from './invitation.serializer';
+import {
+  INVITATION_LIST_SELECT,
+  INVITATION_PREVIEW_SELECT,
+  toInvitationPreview,
+  toPublicInvitation,
+  type InvitationListItem,
+  type InvitationPreviewItem,
+} from './invitation.serializer';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
@@ -26,10 +33,28 @@ import { InviteUserDto, AcceptPhoneInvitationDto } from './dto/invite-user.dto';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
-import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
+import { duplicate, fieldError, invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
+import { hashToken } from '../../auth/token-hash';
+import * as bcrypt from 'bcrypt';
+import { ApiErrorCode, AuthErrorCode } from '@app/shared-types';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { FirebaseAuthService } from '../../auth/firebase-auth.service';
+import { EmailVerificationService } from '../../auth/email-verification.service';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+
+/**
+ * A fresh acceptance token (32 characters over 36, about 165 bits). The raw value goes only into the link that is
+ * emailed, texted or shown once; the row stores its hash (ADR-0012, "Recognised, so hashed").
+ */
+function newInvitationToken(): { raw: string; tokenHash: string } {
+  const raw = nanoid();
+  return { raw, tokenHash: hashToken(raw) };
+}
+
+/** Prisma's transaction client, as the conditional move below receives it. */
+type InvitationTx = Pick<Prisma.TransactionClient, 'userInvitation'>;
 
 /**
  * The same address in any case. The database holds one live account per `lower(email)` (index
@@ -39,6 +64,42 @@ const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
 const sameEmail = (email: string) => ({ equals: email, mode: 'insensitive' as const });
 
 const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: 'date', direction: 'desc' } as const;
+
+/** The same cost as `AuthService`: one rule for every password the platform stores. */
+const PASSWORD_SALT_ROUNDS = 12;
+
+/** The error envelope's body for a domain code (`AuthErrorCode`), as the `api-errors` factories build theirs. */
+const errorBody = (code: string, detail: string) => ({ code, detail, message: detail });
+
+/** 409 SIGN_IN_TO_ACCEPT: the address has an account, and only that account, signed in, can accept. */
+const signInToAccept = () =>
+  new ConflictException(
+    errorBody(AuthErrorCode.SIGN_IN_TO_ACCEPT, 'An account already uses this email. Sign in to accept the invitation.'),
+  );
+
+const isUniqueViolation = (err: unknown): boolean =>
+  err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+
+/** `POST /invitations/accept`. Exactly one of `password` and `firebaseIdToken`. */
+export interface AcceptInvitationInput {
+  token: string;
+  password?: string;
+  firebaseIdToken?: string;
+}
+
+/** The account an accept created, with its tenant, for the controller to sign in. */
+export type AcceptedAccount = Prisma.UserGetPayload<{ include: { tenant: true } }>;
+
+/** `POST /invitations/join`: the workspace joined, by public id, and the caller's role in it. */
+export interface InvitationJoined {
+  workspace: { tenantId: string; name: string };
+  role: UserRole;
+}
+
+const toJoined = (tenant: { tenantId: string; companyName: string }, role: UserRole): InvitationJoined => ({
+  workspace: { tenantId: tenant.tenantId, name: tenant.companyName },
+  role,
+});
 
 /** `GET /invitations`. */
 export interface InvitationListQuery {
@@ -60,6 +121,8 @@ export class UserInvitationsService {
     private pinService: PinService,
     private configService: ConfigService,
     private entitlements: TenantEntitlementsService,
+    private firebaseAuth: FirebaseAuthService,
+    private emailVerification: EmailVerificationService,
   ) {}
 
   /**
@@ -156,8 +219,8 @@ export class UserInvitationsService {
     // A pending invitation takes a seat: refused once the plan's user limit is in use.
     await this.entitlements.assertUserSeatAvailable(tenantId, { route: 'POST /invitations' });
 
-    // Create invitation
-    const token = nanoid();
+    // Create invitation: only the token's hash is stored.
+    const token = newInvitationToken();
     const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
 
     // Determine channel: SMS if phone provided without email
@@ -178,7 +241,7 @@ export class UserInvitationsService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         role: dto.role,
-        token,
+        tokenHash: token.tokenHash,
         status: 'PENDING',
         expiresAt,
       },
@@ -189,14 +252,11 @@ export class UserInvitationsService {
       },
     });
 
-    // Build invite link
-    const frontendUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${frontendUrl}/accept-invitation?token=${token}`;
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
 
-    // Send via appropriate channel
+    // Send via appropriate channel. The link travels only to the invitee: the answer below never carries it.
     if (inviteChannel === 'SMS' && dto.phone) {
-      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${this.inviteLinkFor(token.raw)}`;
       await this.smsService.sendSms(dto.phone, smsBody);
     } else if (dto.email) {
       await this.emailService.sendUserInvitation(
@@ -205,11 +265,11 @@ export class UserInvitationsService {
         invitation.lastName,
         invitedByName,
         invitation.tenant.companyName,
-        token,
+        token.raw,
       );
     }
 
-    return { ...toPublicInvitation(invitation), inviteLink };
+    return toPublicInvitation(invitation);
   }
 
   /**
@@ -254,91 +314,240 @@ export class UserInvitationsService {
    */
   async tenantDbIdForToken(token: string): Promise<number | null> {
     if (!token) return null;
-    const row = await this.prisma.userInvitation.findUnique({ where: { token }, select: { tenantId: true } });
+    const row = await this.prisma.userInvitation.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { tenantId: true },
+    });
     return row?.tenantId ?? null;
   }
 
   /**
-   * Accept invitation and create user
+   * Moves a pending invitation only while it is still the row the caller read: the same token and still `PENDING`.
+   * Two accepts of one token, or a rotate that lands during an accept, both pass the checks read before the
+   * transaction; the row lock this update takes lets exactly one of them through, and the other is a 409.
    */
-  async acceptInvitation(token: string, firebaseUid: string) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token },
+  private async movePending(
+    tx: InvitationTx,
+    invitation: { id: number; tokenHash: string },
+    data: Prisma.UserInvitationUncheckedUpdateManyInput,
+    detail = 'This invitation is no longer valid',
+  ): Promise<void> {
+    const { count } = await tx.userInvitation.updateMany({
+      where: { id: invitation.id, tokenHash: invitation.tokenHash, status: 'PENDING' },
+      data,
     });
+    if (count !== 1) throw invalidState(detail);
+  }
 
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found or invalid');
+  /** The acceptance link for a raw token. Built only to email, text or show it once; never stored or logged. */
+  private inviteLinkFor(rawToken: string): string {
+    const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    return `${appUrl}/accept-invitation?token=${rawToken}`;
+  }
+
+  /**
+   * `POST /invitations/accept` (public): a NEW account from an email invitation, signed in by the controller. The
+   * token proves the inviter's chosen address only when it travelled by email alone (`linkSharedAt` null), so only
+   * then does the account start verified; a copied link makes an unverified account, which is emailed a verification
+   * link after the commit. The credential is a password or a verified Firebase ID token: the uid comes from the
+   * token, never the body. An email that already has a live account is 409 SIGN_IN_TO_ACCEPT and nothing is written:
+   * a token alone never attaches an existing account (that is `joinInvitation`, signed in).
+   */
+  async acceptInvitation(input: AcceptInvitationInput): Promise<AcceptedAccount> {
+    if (Boolean(input.password) === Boolean(input.firebaseIdToken)) {
+      throw fieldError('password', 'Send a password or a firebaseIdToken, not both');
     }
 
-    if (invitation.status !== 'PENDING') {
-      throw invalidState('This invitation is no longer valid');
+    const invitation = await this.findPendingByToken(input.token);
+
+    if (invitation.inviteChannel !== 'EMAIL' || !invitation.email) {
+      throw invalidState('Accept this invitation with the code sent to your phone');
+    }
+    const email = invitation.email;
+
+    if (await this.liveAccountWithEmail(this.prisma, email)) throw signInToAccept();
+
+    let firebaseUid: string | null = null;
+    let passwordHash: string | null = null;
+    if (input.firebaseIdToken) {
+      const decoded = await this.firebaseAuth.verifyFirebaseToken(input.firebaseIdToken);
+      if (decoded.email?.toLowerCase().trim() !== email.toLowerCase().trim()) {
+        throw new ForbiddenException(
+          errorBody(
+            AuthErrorCode.INVITATION_EMAIL_MISMATCH,
+            'This sign-in is for a different email than the invitation.',
+          ),
+        );
+      }
+      const linked = await this.prisma.user.findUnique({ where: { firebaseUid: decoded.uid }, select: { id: true } });
+      if (linked) throw duplicate('This Firebase account is already linked to another account');
+      firebaseUid = decoded.uid;
+    } else {
+      passwordHash = await bcrypt.hash(input.password as string, PASSWORD_SALT_ROUNDS);
     }
 
-    if (invitation.expiresAt < new Date()) {
-      throw invalidState('This invitation has expired — ask for a new one');
-    }
+    // Proof of the mailbox only when no one but the invitee has seen this token.
+    const emailVerified = invitation.linkSharedAt === null;
 
-    return this.prisma.$transaction(async (tx) => {
-      // Workspace model: an existing user accepting an invite JOINS the
-      // workspace (new membership) instead of erroring.
-      const existingUser = invitation.email
-        ? await tx.user.findFirst({
-            where: { email: sameEmail(invitation.email), deletedAt: null },
-            include: { tenant: true },
-          })
-        : null;
+    let user: AcceptedAccount;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        // Claimed first: a second accept of the same token waits on this row, then finds it no longer pending.
+        await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
 
-      const user =
-        existingUser ??
-        (await tx.user.create({
+        const created = await tx.user.create({
           data: {
             userId: generateId('user'),
             tenantId: invitation.tenantId,
-            email: invitation.email,
+            email,
             firstName: invitation.firstName,
             lastName: invitation.lastName,
             role: invitation.role,
+            passwordHash,
             firebaseUid,
-            emailVerified: true,
+            emailVerified,
             isActive: true,
           },
-          include: {
-            tenant: true,
-          },
-        }));
-
-      await tx.workspaceMember.upsert({
-        where: { userId_tenantId: { userId: user.id, tenantId: invitation.tenantId } },
-        update: { role: invitation.role },
-        create: {
-          userId: user.id,
-          tenantId: invitation.tenantId,
-          role: invitation.role,
-          isDefault: !existingUser,
-        },
+          include: { tenant: true },
+        });
+        await tx.workspaceMember.create({
+          data: { userId: created.id, tenantId: invitation.tenantId, role: invitation.role, isDefault: true },
+        });
+        await tx.userPreferences.create({ data: { userId: created.id } });
+        await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: created.id } });
+        return created;
       });
+    } catch (err) {
+      // An account with this email appeared after the check above (the live-email index refused the insert).
+      if (isUniqueViolation(err) && (await this.liveAccountWithEmail(this.prisma, email))) throw signInToAccept();
+      throw err;
+    }
 
-      // Update invitation status
-      await tx.userInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: 'ACCEPTED',
-          acceptedAt: new Date(),
-          acceptedByUserId: user.id,
-        },
+    if (!user.emailVerified) await this.issueVerification(user);
+    return user;
+  }
+
+  /**
+   * `POST /invitations/join` (signed in, JWT session only): the caller's OWN account joins the invitation's
+   * workspace in one step (D10). Every check reads the user row, never the JWT claims (which can be 15 minutes old):
+   * a super admin never joins (403 FORBIDDEN), and the account's email must be the invitation's (403
+   * INVITATION_EMAIL_MISMATCH, naming neither address). An unverified account still joins: when the token travelled
+   * by email alone (`linkSharedAt` null), holding it proves the mailbox, so the join also verifies the email and uses
+   * up the account's verification links, in the same transaction; a shared link proves nothing, so the account
+   * joins and stays unverified (its banner offers a resend). This is safe against a pre-hijack: an attacker who
+   * registered the victim's address first cannot hold an unshared emailed token without the victim's inbox, and the
+   * victim cannot sign in to the attacker's account, so they take it back with a reset (D9). A copied link that
+   * reaches the attacker lets them join unverified, the same accepted risk as a new account from a shared link. A
+   * member keeps their role. A retry by the account that already accepted answers the same body, so a lost response
+   * is safe to retry. Runs as the invitation's tenant (`runAsInvitationTenant`, set by the controller).
+   */
+  async joinInvitation(token: string, callerDbId: number): Promise<InvitationJoined> {
+    const found = token
+      ? await this.prisma.userInvitation.findUnique({
+          where: { tokenHash: hashToken(token) },
+          include: { tenant: { select: { tenantId: true, companyName: true } } },
+        })
+      : null;
+    if (!found) throw new NotFoundException('Invitation not found or invalid');
+
+    if (found.status === 'ACCEPTED' && found.acceptedByUserId === callerDbId) {
+      const membership = await this.prisma.workspaceMember.findUnique({
+        where: { userId_tenantId: { userId: callerDbId, tenantId: found.tenantId } },
+        select: { role: true },
       });
+      if (membership) return toJoined(found.tenant, membership.role);
+    }
+    this.assertPending(found);
 
-      return user;
+    const caller = await this.prisma.user.findUnique({
+      where: { id: callerDbId },
+      select: { id: true, email: true, emailVerified: true, deletedAt: true, role: true },
     });
+    if (!caller || caller.deletedAt) throw new UnauthorizedException('Sign in again to accept this invitation');
+    if (caller.role === 'SUPER_ADMIN') {
+      throw new ForbiddenException(errorBody(ApiErrorCode.FORBIDDEN, 'Super admins do not join workspaces'));
+    }
+    if (!found.email || !caller.email || caller.email.toLowerCase().trim() !== found.email.toLowerCase().trim()) {
+      throw new ForbiddenException(
+        errorBody(
+          AuthErrorCode.INVITATION_EMAIL_MISMATCH,
+          'This invitation is for a different email. Sign in with that account.',
+        ),
+      );
+    }
+    // Proof of the mailbox only when no one but the invitee has seen this token (the rule `acceptInvitation` uses).
+    const verifiesEmail = !caller.emailVerified && found.inviteChannel === 'EMAIL' && found.linkSharedAt === null;
+
+    const role = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      await this.movePending(tx, found, { status: 'ACCEPTED', acceptedAt: now, acceptedByUserId: caller.id });
+      if (verifiesEmail) {
+        // Verify the address that was checked above, not just the account: if the email changed since, the
+        // token proves nothing about the new one, so the whole join rolls back.
+        const { count } = await tx.user.updateMany({
+          where: { id: caller.id, email: caller.email, deletedAt: null },
+          data: { emailVerified: true },
+        });
+        if (count !== 1) throw invalidState('Your account changed while joining. Sign in again and retry.');
+        await tx.emailVerificationToken.updateMany({
+          where: { userId: caller.id, usedAt: null },
+          data: { usedAt: now },
+        });
+      }
+      // An existing member keeps the role they have: an invitation never changes it.
+      const membership = await tx.workspaceMember.upsert({
+        where: { userId_tenantId: { userId: caller.id, tenantId: found.tenantId } },
+        update: {},
+        create: { userId: caller.id, tenantId: found.tenantId, role: found.role, isDefault: false },
+        select: { role: true },
+      });
+      return membership.role;
+    });
+
+    return toJoined(found.tenant, role);
+  }
+
+  /** The pending, unexpired invitation a raw token names. Unknown: 404; no longer pending or expired: 409. */
+  private async findPendingByToken(token: string) {
+    const invitation = token
+      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(token) } })
+      : null;
+    if (!invitation) throw new NotFoundException('Invitation not found or invalid');
+    this.assertPending(invitation);
+    return invitation;
+  }
+
+  private assertPending(invitation: { status: InvitationStatus; expiresAt: Date }): void {
+    if (invitation.status !== 'PENDING') throw invalidState('This invitation is no longer valid');
+    if (invitation.expiresAt < new Date()) throw invalidState('This invitation has expired — ask for a new one');
+  }
+
+  private async liveAccountWithEmail(db: Pick<PrismaService, 'user'>, email: string): Promise<boolean> {
+    const row = await db.user.findFirst({ where: { email: sameEmail(email), deletedAt: null }, select: { id: true } });
+    return row !== null;
+  }
+
+  /** After the commit. A send failure is logged inside `issue`; nothing here may fail the accept. */
+  private async issueVerification(user: {
+    id: number;
+    email: string | null;
+    firstName: string;
+    emailVerified: boolean;
+  }) {
+    try {
+      await this.emailVerification.issue(user, { reason: 'invitation' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued on invitation accept', err: toLoggableError(err) });
+    }
   }
 
   /**
    * Accept phone-channel invitation: verify OTP, set PIN, create user
    */
   async acceptPhoneInvitation(dto: AcceptPhoneInvitationDto) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token: dto.token },
-    });
+    const invitation = dto.token
+      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(dto.token) } })
+      : null;
 
     if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
       throw invalidState('This invitation is invalid or has expired — ask for a new one');
@@ -359,7 +568,9 @@ export class UserInvitationsService {
     // Hash PIN
     const pinHash = await this.pinService.hashPin(dto.pin);
 
-    return this.prisma.$transaction(async (tx) => {
+    const user = await this.prisma.$transaction(async (tx) => {
+      await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
+
       // The phone path signs the caller in as the account it returns, so it never joins an existing account: that
       // would hand whoever holds the phone a session on someone else's email account. The email link does the join.
       if (invitation.email) {
@@ -396,17 +607,15 @@ export class UserInvitationsService {
         create: { userId: user.id, tenantId: invitation.tenantId, role: invitation.role, isDefault: true },
       });
 
-      await tx.userInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: 'ACCEPTED',
-          acceptedAt: new Date(),
-          acceptedByUserId: user.id,
-        },
-      });
+      await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: user.id } });
 
       return user;
     });
+
+    // The inviter chose the email, so it starts unverified; the person is signed in by this accept and can use the
+    // link. Its accept already refused an email that belongs to a live account.
+    if (user.email && !user.emailVerified) await this.issueVerification(user);
+    return user;
   }
 
   /**
@@ -454,56 +663,35 @@ export class UserInvitationsService {
   }
 
   /**
-   * Resend invitation with new token and reset expiry
+   * Resend: rotates the token (the old link stops working), resets the expiry and sends the new link to the invitee
+   * only. The new token has travelled by email or SMS alone, so `linkSharedAt` is cleared. The answer is the public
+   * invitation, never the link.
    */
-  async resendInvitation(invitationId: string, tenantIdString: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { tenantId: tenantIdString },
+  async resendInvitation(invitationId: string, tenantIdString: string): Promise<InvitationListItem> {
+    const invitation = await this.findTenantInvitation(invitationId, tenantIdString, {
+      tenant: { select: { companyName: true } },
+      invitedByUser: { select: { firstName: true, lastName: true } },
     });
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { invitationId },
-      include: {
-        tenant: { select: { companyName: true } },
-        invitedByUser: { select: { firstName: true, lastName: true } },
-      },
-    });
-
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
-
-    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
-    if (invitation.tenantId !== tenant.id) {
-      throw new NotFoundException('Invitation not found');
-    }
 
     if (invitation.status !== 'PENDING') {
       throw invalidState(`An invitation that is ${stateLabel(invitation.status)} cannot be resent`);
     }
 
-    const newToken = nanoid();
-    const newExpiry = new Date(Date.now() + INVITATION_EXPIRY_MS);
-
-    const updatedInvitation = await this.prisma.userInvitation.update({
-      where: { invitationId },
-      data: {
-        token: newToken,
-        expiresAt: newExpiry,
-      },
-      select: INVITATION_LIST_SELECT,
+    const token = newInvitationToken();
+    const updatedInvitation = await this.prisma.$transaction(async (tx) => {
+      await this.movePending(
+        tx,
+        invitation,
+        { tokenHash: token.tokenHash, expiresAt: new Date(Date.now() + INVITATION_EXPIRY_MS), linkSharedAt: null },
+        'This invitation changed while it was being resent. Reload and try again.',
+      );
+      return tx.userInvitation.findUniqueOrThrow({ where: { id: invitation.id }, select: INVITATION_LIST_SELECT });
     });
 
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
-    const frontendUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${frontendUrl}/accept-invitation?token=${newToken}`;
 
     if (invitation.inviteChannel === 'SMS' && invitation.phone) {
-      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${this.inviteLinkFor(token.raw)}`;
       await this.smsService.sendSms(invitation.phone, smsBody);
     } else if (invitation.email) {
       await this.emailService.sendUserInvitation(
@@ -512,71 +700,50 @@ export class UserInvitationsService {
         invitation.lastName,
         invitedByName,
         invitation.tenant.companyName,
-        newToken,
+        token.raw,
       );
     }
 
-    return { ...toPublicInvitation(updatedInvitation), inviteLink };
+    return toPublicInvitation(updatedInvitation);
   }
 
   /**
-   * Get the invite link for an existing pending invitation without regenerating the token
+   * `POST /invitations/:invitation_id/link` (OWNER/ADMIN): the only way to get a shareable link. The stored token is
+   * only a hash, so a link cannot be read back; this rotates the token (the emailed link stops working), stamps
+   * `linkSharedAt` (the token is no longer proof of the mailbox) and returns the new link once. Nothing is sent.
    */
-  async getInvitationLink(invitationId: string, tenantIdString: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { tenantId: tenantIdString },
-    });
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { invitationId },
-    });
-
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
-
-    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
-    if (invitation.tenantId !== tenant.id) {
-      throw new NotFoundException('Invitation not found');
-    }
+  async rotateInvitationLink(invitationId: string, tenantIdString: string): Promise<{ inviteLink: string }> {
+    const invitation = await this.findTenantInvitation(invitationId, tenantIdString);
 
     if (invitation.status !== 'PENDING') {
       throw invalidState(`An invitation that is ${stateLabel(invitation.status)} has no link to share`);
     }
 
-    const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${appUrl}/accept-invitation?token=${invitation.token}`;
+    const token = newInvitationToken();
+    await this.prisma.$transaction((tx) =>
+      this.movePending(
+        tx,
+        invitation,
+        { tokenHash: token.tokenHash, linkSharedAt: new Date() },
+        'This invitation changed while its link was being made. Reload and try again.',
+      ),
+    );
 
-    return { inviteLink };
+    return { inviteLink: this.inviteLinkFor(token.raw) };
   }
 
   /**
-   * Get invitation by token (for public acceptance page)
+   * `POST /invitations/preview` (public, the acceptance page): what the invitee needs to decide, by the token in the
+   * body. Never the token or its hash, no Int id, and the inviter by name only. Unknown token: 404; no longer
+   * pending or expired: 409.
    */
-  async getInvitationByToken(token: string) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token },
-      include: {
-        tenant: {
-          select: {
-            tenantId: true,
-            companyName: true,
-            subdomain: true,
-          },
-        },
-        invitedByUser: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
+  async previewInvitation(token: string): Promise<InvitationPreviewItem> {
+    const invitation = token
+      ? await this.prisma.userInvitation.findUnique({
+          where: { tokenHash: hashToken(token) },
+          select: INVITATION_PREVIEW_SELECT,
+        })
+      : null;
 
     if (!invitation) {
       throw new NotFoundException('Invitation not found');
@@ -588,6 +755,33 @@ export class UserInvitationsService {
 
     if (invitation.expiresAt < new Date()) {
       throw invalidState('This invitation has expired — ask for a new one');
+    }
+
+    return toInvitationPreview(invitation);
+  }
+
+  /** The caller's workspace's invitation, or 404: another tenant's invitation answers the same as a missing one. */
+  private async findTenantInvitation<I extends Prisma.UserInvitationInclude = Record<string, never>>(
+    invitationId: string,
+    tenantIdString: string,
+    include?: I,
+  ): Promise<Prisma.UserInvitationGetPayload<{ include: I }>> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { tenantId: tenantIdString },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const invitation = (await this.prisma.userInvitation.findUnique({
+      where: { invitationId },
+      ...(include && { include }),
+    })) as Prisma.UserInvitationGetPayload<{ include: I }> | null;
+
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
+    if (!invitation || invitation.tenantId !== tenant.id) {
+      throw new NotFoundException('Invitation not found');
     }
 
     return invitation;

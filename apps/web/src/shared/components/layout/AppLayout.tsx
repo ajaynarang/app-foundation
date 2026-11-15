@@ -15,6 +15,7 @@ import { CommandPalette } from '@/shared/components/command-palette/CommandPalet
 import { useRecents } from '@/shared/components/command-palette/use-recents';
 import { useAppHotkeys } from '@/shared/hooks/use-app-hotkeys';
 import { HotkeyIntroToast } from './HotkeyIntroToast';
+import { EmailUnverifiedBanner } from '@/shared/components/common/email-unverified-banner';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -96,6 +97,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* Trial Banner (warning when ≤7 days) */}
           <TrialBanner />
+
+          {/* Email not verified: resend the link */}
+          <EmailUnverifiedBanner />
 
           {/* Blocked screen — trial expired or suspended (account pages exempted so user can upgrade) */}
           {isBlocked && !isAccountPage ? (

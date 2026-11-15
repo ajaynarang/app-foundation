@@ -146,7 +146,7 @@ export function buildSuperAdminPreferences(overrides: Record<string, unknown> = 
  * token that always passes verification) AND gate the test with
  * `@requires:data-tenant-register-bypass`.
  *
- * Safe-by-default: the subdomain / email / firebaseUid carry fresh unique
+ * Safe-by-default: the subdomain / email carry fresh unique
  * suffixes so even if Turnstile ever fails-open in dev, two simultaneous
  * test runs can't collide on the unique indexes.
  */
@@ -158,7 +158,7 @@ export function buildTenantRegistration(overrides: Record<string, unknown> = {})
     firstName: 'QA',
     lastName: 'Probe',
     email: `qa-test-${nonce}@test.example.com`,
-    firebaseUid: `qa-test-fb-${nonce}`,
+    password: `Qa-${nonce}-Password1!`,
     phone: '5555550100',
     ...overrides,
   };
@@ -247,22 +247,16 @@ export function buildUserUpdate(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * POST /invitations/accept body — matches `AcceptInvitationDto`.
- *
- * Both fields are `@IsNotEmpty()`. `token` is opaque (32-char nanoid);
- * `firebaseUid` is an opaque string the backend stores as-is (Firebase
- * Admin SDK is NOT invoked during the accept flow, verified on the dev
- * env 2026-04-20 — `acceptInvitation` in `user-invitations.service.ts`
- * writes the uid directly to the new User row without verification).
- * Caller MUST pass the token from the prior create response; factory
- * emits a fresh pseudo-firebaseUid so each accept lands a distinct row.
+ * POST /invitations/accept body — matches `AcceptInvitationDto`: the token from a link (`POST /invitations/:id/link`
+ * as OWNER, since the QA suite reads no email) and a password for the NEW account. The DTO takes exactly one of
+ * `password` and `firebaseIdToken`, and never a `firebaseUid` (a body uid is 400 VALIDATION_FAILED).
  */
 export function buildInvitationAccept(overrides: Record<string, unknown> = {}) {
   return {
     // The caller always overrides `token` — declared here with a placeholder
-    // so the shape is the same `{token, firebaseUid}` type every caller sees.
+    // so the shape is the same `{token, password}` type every caller sees.
     token: overrides.token ?? 'OVERRIDE-ME',
-    firebaseUid: `qa-fb-${unique('fb')}`,
+    password: `Qa-${unique('pw')}-Password1!`,
     ...overrides,
   };
 }

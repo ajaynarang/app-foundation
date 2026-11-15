@@ -121,6 +121,7 @@ export const FOUNDATION_RLS_REGISTRY: Readonly<Record<string, RlsTableEntry>> = 
   whatsapp_consents: identity,
 
   // ── identity_system: tokens and credentials ───────────────────────────────
+  email_verification_tokens: identitySystem,
   oauth_access_tokens: identitySystem,
   oauth_authorization_codes: identitySystem,
   oauth_refresh_tokens: identitySystem,

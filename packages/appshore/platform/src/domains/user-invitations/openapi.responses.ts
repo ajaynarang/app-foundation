@@ -70,17 +70,86 @@ export class InvitationList {
   total: number;
 }
 
-/** `GET /invitations/:invitation_id/link` — the shareable acceptance link of a pending invitation. */
+/**
+ * `POST /invitations/:invitation_id/link` — a new acceptance link, shown once. Making it rotates the token, so the link
+ * in the invitation email stops working.
+ */
 export class InvitationLink {
-  @ApiProperty({ description: 'Acceptance URL (carries the invitation token)' })
+  @ApiProperty({ description: 'Acceptance URL (carries the new invitation token; shown once, never stored)' })
   inviteLink: string;
 }
 
+/** The workspace an invitation is for, by its public id. */
+export class InvitationPreviewTenant {
+  @ApiProperty({ description: 'Workspace public id' })
+  tenantId: string;
+
+  @ApiProperty()
+  companyName: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  subdomain: string | null;
+}
+
+/** Who sent the invitation, by name only. */
+export class InvitationPreviewInviter {
+  @ApiProperty()
+  firstName: string;
+
+  @ApiProperty()
+  lastName: string;
+}
+
 /**
- * `POST /invitations` (201) and `POST /invitations/:invitation_id/resend` (200) — the serialized invitation (as in the
- * list: no numeric ids, no token field) plus the acceptance link to share.
+ * `POST /invitations/preview` (public) — what the acceptance page shows. Never the token, no numeric ids, and no
+ * inviter email.
  */
-export class InvitationIssued extends InvitationListEntry {
-  @ApiProperty({ description: 'Acceptance URL (carries the invitation token — share it only with the invitee)' })
-  inviteLink: string;
+export class InvitationPreview {
+  @ApiProperty({ description: 'Invitation public id' })
+  invitationId: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  email: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  phone: string | null;
+
+  @ApiProperty({ enum: InvitationChannel })
+  inviteChannel: InvitationChannel;
+
+  @ApiProperty()
+  firstName: string;
+
+  @ApiProperty()
+  lastName: string;
+
+  @ApiProperty({ enum: UserRole })
+  role: UserRole;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  expiresAt: string;
+
+  @ApiProperty({ type: InvitationPreviewTenant })
+  tenant: InvitationPreviewTenant;
+
+  @ApiProperty({ type: InvitationPreviewInviter })
+  invitedBy: InvitationPreviewInviter;
+}
+
+/** The workspace a join added the caller to, by its public id. */
+export class InvitationJoinedWorkspace {
+  @ApiProperty({ description: 'Workspace (tenant) public id; send it to POST /workspaces/switch' })
+  tenantId: string;
+
+  @ApiProperty()
+  name: string;
+}
+
+/** `POST /invitations/join`: the workspace joined and the caller's role in it (kept, when already a member). */
+export class InvitationJoined {
+  @ApiProperty({ type: InvitationJoinedWorkspace })
+  workspace: InvitationJoinedWorkspace;
+
+  @ApiProperty({ enum: UserRole })
+  role: UserRole;
 }

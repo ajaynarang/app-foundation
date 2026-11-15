@@ -27,15 +27,15 @@ describe('useCopyInviteLink', () => {
     Object.assign(navigator, { clipboard: { writeText } });
   });
 
-  it("reads the pending invitation's link and puts it on the clipboard", async () => {
+  it('asks for a new link with a POST (the server rotates the token) and puts it on the clipboard', async () => {
     request.mockResolvedValue({ inviteLink: INVITE_LINK });
     writeText.mockResolvedValue(undefined);
     const { result } = renderHook(() => useCopyInviteLink(), { wrapper });
 
     act(() => result.current.mutate(INVITATION_ID));
 
-    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('Invite link copied'));
-    expect(request).toHaveBeenCalledWith(`/invitations/${INVITATION_ID}/link`);
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('New invite link copied'));
+    expect(request).toHaveBeenCalledWith(`/invitations/${INVITATION_ID}/link`, { method: 'POST' });
     expect(writeText).toHaveBeenCalledWith(INVITE_LINK);
     expect(showError).not.toHaveBeenCalled();
   });

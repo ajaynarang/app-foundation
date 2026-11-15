@@ -14,6 +14,7 @@ const PUBLIC_PREFIXES = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/verify-email',
   '/accept-invitation',
   '/oauth',
   '/maintenance',

@@ -96,6 +96,8 @@ export default function InvitationsPage() {
 
   const copyInviteLink = useCopyInviteLink();
   const [cancelling, setCancelling] = useState<Invitation | null>(null);
+  // A new link replaces the emailed one, so copying asks first.
+  const [copying, setCopying] = useState<Invitation | null>(null);
 
   const activeInvitations = invitations.items;
 
@@ -168,7 +170,7 @@ export default function InvitationsPage() {
                                 {
                                   label: 'Copy link',
                                   ariaLabel: `Copy the invitation link for ${name}`,
-                                  onSelect: () => copyInviteLink.mutate(inv.invitationId),
+                                  onSelect: () => setCopying(inv),
                                 },
                                 {
                                   label: 'Cancel invitation…',
@@ -199,6 +201,27 @@ export default function InvitationsPage() {
           loadMoreFailed={invitations.isLoadMoreError}
         />
       )}
+
+      <AlertDialog open={copying !== null} onOpenChange={(open) => !open && setCopying(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create a new invite link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This creates a new link. The link in the invitation email stops working, and whoever opens the new one is
+              asked to verify their email.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the emailed link</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => copying && copyInviteLink.mutate(copying.invitationId)}
+              disabled={copyInviteLink.isPending}
+            >
+              Create and copy link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={cancelling !== null} onOpenChange={(open) => !open && setCancelling(null)}>
         <AlertDialogContent>
