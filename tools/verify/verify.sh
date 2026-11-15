@@ -50,6 +50,8 @@ run "type-check" pnpm type-check
 run "unit tests" pnpm exec turbo run test --filter=!@app/qa
 # The scaffold tools (init-app, apply-feature, check-variants) live outside every workspace package.
 run "init-app tool tests" pnpm test:init-app
+# foundation.json and `pnpm foundation:status` (tools/foundation): the manifest still points at real paths.
+run "foundation tool tests" pnpm test:foundation
 # The repository guards (tools/guards): skills, docs and source comments cite only what exists; CI stays manual.
 run "guards" pnpm guards
 run "guard tests" pnpm test:guards

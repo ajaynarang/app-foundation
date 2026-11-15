@@ -29,6 +29,8 @@
  *   4. The rename rules below.
  *   5. `.claude/workflow.json` is written for the product (prefix, reserved names, plans), `--plans tracked` drops the
  *      plans folder from .gitignore, and every `verified:` line leaves the docs (scaffold-text.mjs).
+ *   6. `foundation.json` records the base: the template version and commit this product came from, and the answers
+ *      given here, so `pnpm foundation:status` can rebuild that base later (tools/foundation).
  *
  * `--describe` prints every option as JSON (name, question, choices, default) and changes nothing.
  *
@@ -66,6 +68,7 @@ import {
   setObservabilityConstants,
 } from './observability-constants.mjs';
 import { walkRepo } from './repo-walk.mjs';
+import { loadManifest as loadFoundationManifest, productManifest, writeManifest } from '../foundation/manifest.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -160,6 +163,14 @@ function titleCase(kebab) {
 let TEMPLATE_WORKFLOW;
 try {
   TEMPLATE_WORKFLOW = loadWorkflowConfig(ROOT);
+} catch (e) {
+  fail(e.message);
+}
+
+// Read before any rename: the template URL in it holds the template's name, which the rename rules would rewrite.
+let TEMPLATE_MANIFEST;
+try {
+  TEMPLATE_MANIFEST = loadFoundationManifest(ROOT);
 } catch (e) {
   fail(e.message);
 }
@@ -507,6 +518,27 @@ console.log(`\n  ${dryRun ? 'Would touch' : 'Touched'} ${touched} file(s).`);
   const cleared = clearVerifiedLines(ROOT, { dryRun });
   if (cleared.length)
     console.log(`  ${dryRun ? 'Would clear' : 'Cleared'} the template's verified: line in ${cleared.length} doc(s).`);
+}
+
+// The base this product came from. The commit is recorded only when this checkout still has the template's history
+// (a plain clone); a fresh `git init` or no repository leaves it null and the version's tag is the base.
+{
+  let commit = null;
+  try {
+    commit = execFileSync('git', ['rev-parse', '--verify', '-q', 'HEAD'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    commit = null;
+  }
+  if (!dryRun) writeManifest(ROOT, productManifest(TEMPLATE_MANIFEST, { scaffold: cfg, commit: commit || null }));
+  console.log(
+    `  ${dryRun ? 'Would record' : 'Recorded'} the base in foundation.json (template v${TEMPLATE_MANIFEST.version}${
+      commit ? ` @ ${commit.slice(0, 7)}` : ''
+    }).`,
+  );
 }
 
 // The alert and dashboard files are generated from the constants just set. generate.mjs is plain Node, so this runs

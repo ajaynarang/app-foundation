@@ -19,6 +19,8 @@ import {
   variantDir,
 } from './check-variants.mjs';
 import { INIT_OPTIONS } from './scaffold-text.mjs';
+import { loadManifest } from '../foundation/manifest.mjs';
+import { compareTrees } from '../foundation/status.mjs';
 
 // Every temp folder a test makes is removed once the file's tests are done, so runs do not pile up in the temp dir.
 const temps = [];
@@ -194,6 +196,23 @@ for (const name of Object.keys(VARIANTS)) {
       prepareVariant(name, dir, { quiet: true });
       assert.deepEqual(scaffoldProblems(dir, VARIANTS[name]), []);
       assert.deepEqual(runwayStarterCheck(dir, VARIANTS[name].name), []);
+      // A second scaffold with the same answers is this product's base: a fresh product is in step with it, and
+      // one edit to a foundation file is the one thing listed.
+      const base = variantDir(`${name}-base`);
+      try {
+        prepareVariant(name, base, { quiet: true });
+        const manifest = loadManifest(dir);
+        const fresh = compareTrees({ baseDir: base, productDir: dir, manifest });
+        assert.deepEqual([fresh.changed, fresh.deleted, fresh.added], [[], [], []]);
+        assert.ok(fresh.owned > 1000, `only ${fresh.owned} foundation files were compared`);
+        fs.appendFileSync(path.join(dir, 'packages/appshore/kernel/package.json'), '\n');
+        fs.appendFileSync(path.join(dir, 'packages/appshore/db/prisma/schema/app.prisma'), '\n// a product model\n');
+        fs.appendFileSync(path.join(dir, 'README.md'), '\nmine\n');
+        const edited = compareTrees({ baseDir: base, productDir: dir, manifest });
+        assert.deepEqual(edited.changed, ['packages/appshore/kernel/package.json']);
+      } finally {
+        fs.rmSync(base, { recursive: true, force: true });
+      }
       assert.equal(
         gitToplevel(dir, isolatedGitEnv(process.env, { ceiling: path.dirname(dir) })),
         VARIANTS[name].git ? dir : null,
@@ -219,6 +238,15 @@ test('scaffoldProblems names a wrong prefix, a kept verified: line, the plans li
     assert.match(problems, /docs\/x\.md: still carries/);
     assert.match(problems, /\.gitignore: still ignores docs\/superpowers/);
     assert.match(problems, /dropped mobile, but apps\/mobile is left/);
+    const manifestFile = path.join(dir, 'foundation.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    fs.writeFileSync(
+      manifestFile,
+      JSON.stringify({ ...manifest, template: 'git@example.com:acme/scaffoldcheck.git', base: null }),
+    );
+    const record = scaffoldProblems(dir, VARIANTS.lean).join('\n');
+    assert.match(record, /foundation\.json: base and scaffold are both null/);
+    assert.match(record, /foundation\.json: template is .* the rename reached it/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

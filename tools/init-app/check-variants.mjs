@@ -46,6 +46,7 @@ import { checkScaffoldObservability } from './check-scaffold-observability.mjs';
 import { oldSkillNameHits, workflowSkillNames } from './skill-prefix.mjs';
 import { verifiedLineFiles } from './scaffold-text.mjs';
 import { validateWorkflowConfig } from '../guards/workflow-config.mjs';
+import { validateManifest } from '../foundation/manifest.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -173,6 +174,27 @@ export function scaffoldProblems(dir, variant, { manifestsDir } = {}) {
       .some((l) => l.trim().replace(/^\/|\/$/g, '') === cfg.plans.folder);
     if (ignoresPlans === expect.plansTracked)
       problems.push(`.gitignore: ${ignoresPlans ? 'still ignores' : 'no longer ignores'} ${cfg.plans.folder}`);
+  }
+  // foundation.json: the base is recorded, with the template's own URL and globs (not renamed) and the answers given.
+  let foundation = null;
+  try {
+    foundation = JSON.parse(read('foundation.json'));
+  } catch (e) {
+    problems.push(`foundation.json: ${e.message}`);
+  }
+  if (foundation) {
+    const template = JSON.parse(fs.readFileSync(path.join(ROOT, 'foundation.json'), 'utf8'));
+    for (const e of validateManifest(foundation)) problems.push(`foundation.json: ${e}`);
+    if (foundation.base?.version !== template.version)
+      problems.push(`foundation.json: base.version is ${foundation.base?.version}, expected ${template.version}`);
+    if (foundation.template !== template.template)
+      problems.push(`foundation.json: template is "${foundation.template}", the rename reached it`);
+    if (JSON.stringify(foundation.owned) !== JSON.stringify(template.owned))
+      problems.push('foundation.json: the owned globs changed during the scaffold');
+    if (foundation.scaffold?.name !== name || foundation.scaffold?.skillPrefix !== expect.prefix)
+      problems.push(
+        `foundation.json: scaffold records ${foundation.scaffold?.name} / ${foundation.scaffold?.skillPrefix}, expected ${name} / ${expect.prefix}`,
+      );
   }
   for (const rel of verifiedLineFiles(dir)) problems.push(`${rel}: still carries the template's verified: line`);
   const mode = (read('apps/backend/.env.example') ?? '').match(/^TENANCY_MODE=(.*)$/m)?.[1];
