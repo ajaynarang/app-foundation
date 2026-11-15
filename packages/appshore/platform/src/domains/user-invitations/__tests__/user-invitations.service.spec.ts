@@ -51,6 +51,7 @@ describe('UserInvitationsService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     emailVerificationToken: {
       updateMany: jest.fn(),
@@ -463,6 +464,7 @@ describe('UserInvitationsService', () => {
     beforeEach(() => {
       mockPrismaService.userInvitation.findUnique.mockResolvedValue(invitation());
       mockPrismaService.user.findUnique.mockResolvedValue(caller());
+      mockPrismaService.user.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.workspaceMember.upsert.mockResolvedValue({ role: 'ADMIN' });
     });
 
@@ -489,7 +491,7 @@ describe('UserInvitationsService', () => {
         where: { id: 7 },
         select: { id: true, email: true, emailVerified: true, deletedAt: true, role: true },
       });
-      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
@@ -499,7 +501,10 @@ describe('UserInvitationsService', () => {
       await expect(service.joinInvitation(TOKEN, 7)).resolves.toMatchObject({ role: 'ADMIN' });
 
       expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
-      expect(mockPrismaService.user.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { emailVerified: true } });
+      expect(mockPrismaService.user.updateMany).toHaveBeenCalledWith({
+        where: { id: 7, email: caller().email, deletedAt: null },
+        data: { emailVerified: true },
+      });
       expect(mockPrismaService.emailVerificationToken.updateMany).toHaveBeenCalledWith({
         where: { userId: 7, usedAt: null },
         data: { usedAt: expect.any(Date) },
@@ -514,15 +519,23 @@ describe('UserInvitationsService', () => {
         await expect(service.joinInvitation(TOKEN, 7)).resolves.toMatchObject({ role: 'ADMIN' });
       }
       expect(mockPrismaService.workspaceMember.upsert).toHaveBeenCalledTimes(2);
-      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('an email changed since the check verifies nothing: the join rolls back with 409', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
+      mockPrismaService.user.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 409 });
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
     });
 
     it('a lost race verifies nothing: the conditional move fails before the account is written', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
       mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 0 });
       await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 409 });
-      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
@@ -532,7 +545,7 @@ describe('UserInvitationsService', () => {
       expect(err).toMatchObject({ status: 403, response: { code: 'INVITATION_EMAIL_MISMATCH' } });
       expect(JSON.stringify(err.response)).not.toMatch(/example\.com/i);
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
-      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
@@ -551,7 +564,7 @@ describe('UserInvitationsService', () => {
         response: { code: 'FORBIDDEN' },
       });
       expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
-      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.updateMany).not.toHaveBeenCalled();
       expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 

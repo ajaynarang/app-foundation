@@ -482,7 +482,13 @@ export class UserInvitationsService {
       const now = new Date();
       await this.movePending(tx, found, { status: 'ACCEPTED', acceptedAt: now, acceptedByUserId: caller.id });
       if (verifiesEmail) {
-        await tx.user.update({ where: { id: caller.id }, data: { emailVerified: true } });
+        // Verify the address that was checked above, not just the account: if the email changed since, the
+        // token proves nothing about the new one, so the whole join rolls back.
+        const { count } = await tx.user.updateMany({
+          where: { id: caller.id, email: caller.email, deletedAt: null },
+          data: { emailVerified: true },
+        });
+        if (count !== 1) throw invalidState('Your account changed while joining. Sign in again and retry.');
         await tx.emailVerificationToken.updateMany({
           where: { userId: caller.id, usedAt: null },
           data: { usedAt: now },
