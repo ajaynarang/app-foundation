@@ -26,8 +26,9 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
 import { toUserProfile } from './user-profile';
 import { hashToken } from './token-hash';
+import { EmailVerificationService } from './email-verification.service';
 import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
-import { ApiErrorCode, type WorkspaceChoice } from '@app/shared-types';
+import { ApiErrorCode, AuthErrorCode, type WorkspaceChoice } from '@app/shared-types';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 
 @Injectable()
@@ -43,6 +44,7 @@ export class AuthService {
     private loginEventService: LoginEventService,
     private emailService: EmailService,
     private identityResolver: IdentityResolverService,
+    private emailVerification: EmailVerificationService,
     @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
@@ -161,7 +163,7 @@ export class AuthService {
       // uses this code to fall back to the Firebase flow when configured.
       throw new UnauthorizedException({
         message: 'This account does not use password sign-in.',
-        code: 'PASSWORD_NOT_SET',
+        code: AuthErrorCode.PASSWORD_NOT_SET,
       });
     }
 
@@ -299,7 +301,15 @@ export class AuthService {
     }
   }
 
-  /** Complete a password reset: consumes the one-time token, revokes all sessions. */
+  /**
+   * Complete a password reset: consumes the one-time token, revokes all sessions and marks the email verified (the
+   * reset link proves the mailbox). Every other unused reset and verification token of the user is used up.
+   *
+   * When the email was not yet verified, the reset is also a reclaim (D9): whoever created the account may not own
+   * the mailbox (a pre-hijack), so every other way in that they could have attached goes too: the phone and PIN, the
+   * Firebase link, API keys, and OAuth access and refresh tokens. After the commit the owner gets a notice naming
+   * what was removed. A reset of a verified account changes none of these.
+   */
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
     const tokenHash = hashToken(dto.token);
     const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
@@ -307,20 +317,82 @@ export class AuthService {
       throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
     }
     const passwordHash = await bcrypt.hash(dto.newPassword, AuthService.PASSWORD_SALT_ROUNDS);
-    await this.prisma.$transaction(async (tx) => {
+    const reclaim = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      // Conditional: two concurrent resets with one link cannot both win.
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { id: record.id, usedAt: null },
+        data: { usedAt: now },
+      });
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
+      }
+      const before = await tx.user.findUnique({
+        where: { id: record.userId },
+        select: { email: true, firstName: true, emailVerified: true, phone: true, pinHash: true, firebaseUid: true },
+      });
+      if (!before)
+        throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
+      const isReclaim = !before.emailVerified;
       await tx.user.update({
         where: { id: record.userId },
-        data: { passwordHash, passwordChangedAt: new Date() },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          emailVerified: true,
+          ...(isReclaim ? { phone: null, phoneVerified: false, pinHash: null, firebaseUid: null } : {}),
+        },
       });
-      await tx.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
+      await tx.passwordResetToken.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      await tx.emailVerificationToken.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
       });
       await tx.refreshToken.updateMany({
         where: { userId: record.userId, isRevoked: false },
-        data: { isRevoked: true, revokedAt: new Date() },
+        data: { isRevoked: true, revokedAt: now },
       });
+      if (!isReclaim) return null;
+
+      const apiKeys = await tx.apiKey.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now, isActive: false },
+      });
+      const oauthAccess = await tx.oAuthAccessToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      const oauthRefresh = await tx.oAuthRefreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      const removed: string[] = [];
+      if (before.phone || before.pinHash) removed.push('phone number and PIN sign-in');
+      if (before.firebaseUid) removed.push('linked sign-in provider (Firebase)');
+      if (apiKeys.count > 0) removed.push(`${apiKeys.count} API key${apiKeys.count === 1 ? '' : 's'}`);
+      if (oauthAccess.count + oauthRefresh.count > 0) removed.push('access for connected apps (OAuth)');
+      return { email: before.email, firstName: before.firstName, removed };
     });
+
+    if (reclaim?.email) await this.sendReclaimNotice(reclaim.email, reclaim.firstName, reclaim.removed);
+  }
+
+  /** After a reclaim: tell the owner what was removed. A send failure is logged, never thrown (the reset is done). */
+  private async sendReclaimNotice(email: string, firstName: string, removed: string[]): Promise<void> {
+    const list = removed.length > 0 ? removed.join(', ') : 'none';
+    try {
+      await this.emailService.sendEmail({
+        to: email,
+        subject: 'Your password was reset',
+        html: `<p>Hi ${firstName},</p><p>Your password was reset and your email address is now verified. Sign-in methods we removed: ${list}.</p><p>Your account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.</p>`,
+        text: `Hi ${firstName},\n\nYour password was reset and your email address is now verified. Sign-in methods we removed: ${list}.\n\nYour account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.`,
+      });
+    } catch (err) {
+      this.logger.warn({ msg: 'Password reset notice was not sent', err: toLoggableError(err) });
+    }
   }
 
   /**
@@ -382,6 +454,13 @@ export class AuthService {
           `tenantApproved hook failed for personal workspace ${user.tenantId}: ${(err as Error).message}`,
         );
       }
+    }
+
+    // After the commit. `issue` never throws on a send failure, and nothing else here may fail the signup.
+    try {
+      await this.emailVerification.issue(user, { reason: 'signup' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued at signup', err: toLoggableError(err) });
     }
 
     const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(

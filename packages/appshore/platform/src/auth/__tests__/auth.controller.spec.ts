@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { AuthController } from '../auth.controller';
 import { AuthService } from '../auth.service';
 import { RefreshSessionService } from '../refresh-session.service';
+import { EmailVerificationService, VerificationResendCooldownException } from '../email-verification.service';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { AUTH_THROTTLE_LIMIT_OTP_SEND, AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_TTL_MS } from '../../constants';
 
 const mockAuthService = {
   lookupUser: jest.fn(),
@@ -23,6 +26,11 @@ const mockRefreshSessions = {
   refresh: jest.fn(),
 };
 
+const mockEmailVerification = {
+  verify: jest.fn(),
+  resend: jest.fn(),
+};
+
 const defaultConfig = (key: string) => (key === 'environment' ? 'development' : undefined);
 const mockConfigService = {
   get: jest.fn(defaultConfig),
@@ -40,6 +48,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RefreshSessionService, useValue: mockRefreshSessions },
+        { provide: EmailVerificationService, useValue: mockEmailVerification },
       ],
     }).compile();
 
@@ -246,6 +255,45 @@ describe('AuthController', () => {
       const result = await controller.setPin(user, { pin: '5678' });
       expect(result).toBeUndefined();
       expect(mockAuthService.setPin).toHaveBeenCalledWith('USR-001', '5678');
+    });
+  });
+
+  /**
+   * D8: the verify link only works for the signed-in owner of the account. If the route were public, the mailbox
+   * owner's click would verify an account someone else created and holds the password for.
+   */
+  describe('email verification routes', () => {
+    const proto = AuthController.prototype as unknown as Record<string, object>;
+
+    it('POST /auth/verify-email is not @Public() and has the STRICT throttle', () => {
+      expect(Reflect.getMetadata(IS_PUBLIC_KEY, proto.verifyEmail)).toBeUndefined();
+      expect(Reflect.getMetadata('THROTTLER:LIMITdefault', proto.verifyEmail)).toBe(AUTH_THROTTLE_LIMIT_STRICT);
+      expect(Reflect.getMetadata('THROTTLER:TTLdefault', proto.verifyEmail)).toBe(AUTH_THROTTLE_TTL_MS);
+    });
+
+    it('POST /auth/verify-email/resend is not @Public() and has the OTP_SEND throttle', () => {
+      expect(Reflect.getMetadata(IS_PUBLIC_KEY, proto.resendVerification)).toBeUndefined();
+      expect(Reflect.getMetadata('THROTTLER:LIMITdefault', proto.resendVerification)).toBe(
+        AUTH_THROTTLE_LIMIT_OTP_SEND,
+      );
+    });
+
+    it("verify passes the caller's own database id, so the service can refuse another user's token", async () => {
+      mockEmailVerification.verify.mockResolvedValue(undefined);
+      await expect(
+        controller.verifyEmail({ dbId: 42, userId: 'user_x' }, { token: 't'.repeat(64) }),
+      ).resolves.toBeUndefined();
+      expect(mockEmailVerification.verify).toHaveBeenCalledWith('t'.repeat(64), 42);
+    });
+
+    it('resend inside the cooldown answers 429 with a Retry-After header', async () => {
+      mockEmailVerification.resend.mockRejectedValue(new VerificationResendCooldownException(37));
+      const res = { setHeader: jest.fn() } as any;
+
+      await expect(controller.resendVerification({ dbId: 42 }, res)).rejects.toBeInstanceOf(
+        VerificationResendCooldownException,
+      );
+      expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '37');
     });
   });
 });

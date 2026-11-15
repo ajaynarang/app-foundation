@@ -5,6 +5,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { NotificationService } from '../../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS } from '../../platform-hooks';
+import { EmailVerificationService } from '../../../auth/email-verification.service';
 import { fixtureModel, walkCursorList } from '../../../test/helpers';
 
 const mockPrisma = {
@@ -40,6 +41,8 @@ const mockNotification = {
   sendTenantReactivationNotification: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockEmailVerification = { issue: jest.fn().mockResolvedValue(undefined) };
+
 const mockDeskBootstrap = {
   tenantApproved: jest.fn().mockResolvedValue(undefined),
   sweepActiveTenants: jest.fn().mockResolvedValue({
@@ -61,6 +64,7 @@ describe('TenantsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AppCacheService, useValue: mockCache },
         { provide: NotificationService, useValue: mockNotification },
+        { provide: EmailVerificationService, useValue: mockEmailVerification },
         { provide: TENANT_PROVISION_HOOKS, useValue: mockDeskBootstrap },
       ],
     }).compile();
@@ -187,6 +191,48 @@ describe('TenantsService', () => {
         'John',
         'Acme Inc',
       );
+    });
+
+    function registrable() {
+      mockPrisma.tenant.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findFirst.mockResolvedValue(null);
+      mockPrisma.tenant.create.mockResolvedValue({ id: 1, tenantId: 'TNT-001', companyName: 'Acme Inc' });
+      mockPrisma.user.create.mockResolvedValue({
+        id: 9,
+        email: 'owner@acme.com',
+        firstName: 'John',
+        emailVerified: false,
+      });
+      mockPrisma.tenantPlanEvent.create.mockResolvedValue({});
+    }
+
+    it('issues a verification token for the owner after the registration committed', async () => {
+      registrable();
+      const order: string[] = [];
+      mockPrisma.$transaction.mockImplementationOnce(async (cb: any) => {
+        const out = await cb(mockPrisma);
+        order.push('commit');
+        return out;
+      });
+      mockEmailVerification.issue.mockImplementationOnce(async () => {
+        order.push('issue');
+      });
+
+      await service.registerTenant({ ...dto, password: 'Password123!' } as any);
+
+      expect(mockEmailVerification.issue).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }), {
+        reason: 'signup',
+      });
+      expect(order).toEqual(['commit', 'issue']);
+    });
+
+    it('a failing verification issue never fails the registration', async () => {
+      registrable();
+      mockEmailVerification.issue.mockRejectedValueOnce(new Error('db blip'));
+
+      await expect(service.registerTenant({ ...dto, password: 'Password123!' } as any)).resolves.toMatchObject({
+        tenantId: 'TNT-001',
+      });
     });
   });
 

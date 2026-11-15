@@ -25,6 +25,14 @@ export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken';
 /** Cookie path for auth endpoints */
 export const REFRESH_TOKEN_COOKIE_PATH = '/api/v1/auth';
 
+// ─── Email verification ─────────────────────────────────────────────────────────
+
+/** 24 hours in milliseconds — how long an emailed verification link works */
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** 60 seconds in milliseconds — the least time between two verification emails for one account */
+export const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
+
 // ─── Invitation ────────────────────────────────────────────────────────────────
 
 /** 7 days in milliseconds — user invitation expiry */

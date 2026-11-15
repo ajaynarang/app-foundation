@@ -114,6 +114,7 @@ describe('One live account per email (Postgres)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
     const err = await auth
@@ -129,7 +130,7 @@ describe('One live account per email (Postgres)', () => {
   it('workspace registration in another case on a live account is refused as already registered', async () => {
     if (!ready) return;
     await makeUser('owner', await makeTenant('o'), `Owner-${suffix}@Example.com`);
-    const tenants = new TenantsService(prisma as any, {} as any, {} as any);
+    const tenants = new TenantsService(prisma as any, {} as any, {} as any, {} as any);
 
     const err = await tenants
       .registerTenant({

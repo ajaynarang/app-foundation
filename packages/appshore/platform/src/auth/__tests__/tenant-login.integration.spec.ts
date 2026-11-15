@@ -152,6 +152,7 @@ describe('Tenant-aware login (Postgres)', () => {
       new LoginEventService(prisma as any),
       { sendEmail: async () => undefined } as any,
       new IdentityResolverService(prisma as any, configService),
+      { issue: async () => undefined } as any,
     );
   }, 60_000);
 

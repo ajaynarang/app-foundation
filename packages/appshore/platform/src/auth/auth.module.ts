@@ -16,6 +16,7 @@ import { PrismaModule } from '../infrastructure/database/prisma.module';
 import { LoginEventService } from './login-event.service';
 import { LoginEventCleanupJobHandler } from './login-event-cleanup.processor';
 import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
+import { EmailVerificationModule } from './email-verification.module';
 
 /**
  * The login-events-cleanup and tokens-cleanup crons are scheduled from their `job_schedules` rows by
@@ -24,6 +25,7 @@ import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
 @Module({
   imports: [
     PrismaModule,
+    EmailVerificationModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -54,6 +56,7 @@ import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
     TokensCleanupJobHandler,
   ],
   exports: [
+    EmailVerificationModule,
     AuthService,
     JwtTokenService,
     FirebaseAuthService,

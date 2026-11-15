@@ -85,6 +85,7 @@ function build(state: { users: Row[]; memberships?: Row[]; multiTenancy?: { enab
     loginEvents as any,
     email as any,
     resolver,
+    { issue: jest.fn() } as any,
   );
   return { service, prisma, jwt, loginEvents, email, twilio };
 }

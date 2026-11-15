@@ -26,6 +26,8 @@ import {
 import { NotificationService } from '../../infrastructure/notification/notification.service';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../platform-hooks';
 import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { EmailVerificationService } from '../../auth/email-verification.service';
 import {
   buildCursorPage,
   clampCursorLimit,
@@ -71,6 +73,7 @@ export class TenantsService {
     private prisma: PrismaService,
     private notificationService: NotificationService,
     private readonly cache: AppCacheService,
+    private readonly emailVerification: EmailVerificationService,
     @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
@@ -215,6 +218,14 @@ export class TenantsService {
       dto.firstName,
       result.tenant.companyName,
     );
+
+    // After the commit: the owner verifies their email once the workspace is approved and they can sign in (the link
+    // needs a session; the banner resends one). A failure here never fails the registration.
+    try {
+      await this.emailVerification.issue(result.ownerUser, { reason: 'signup' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued at tenant registration', err: toLoggableError(err) });
+    }
 
     return {
       tenantId: result.tenant.tenantId,
