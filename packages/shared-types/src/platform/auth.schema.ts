@@ -10,8 +10,6 @@ export const AuthErrorCode = {
   PASSWORD_NOT_SET: 'PASSWORD_NOT_SET',
   /** 400 — the verification link is unknown, used, expired, for an address the account no longer has, or another account's. */
   VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
-  /** 403 — the action needs a verified email; the web offers to resend the verification email. */
-  EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   /** 409 — an account already uses the invitation's email; sign in as it to accept. */
   SIGN_IN_TO_ACCEPT: 'SIGN_IN_TO_ACCEPT',
   /** 403 — the invitation is for a different email than the signed-in account's. */

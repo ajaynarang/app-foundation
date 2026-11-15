@@ -27,7 +27,6 @@ jest.mock('../../api', () => ({
     acceptInvitation: jest.fn(),
     joinInvitation: jest.fn(),
     getProfile: jest.fn(),
-    resendVerification: jest.fn(),
   },
 }));
 jest.mock('@/features/platform/workspaces/api', () => ({ workspacesApi: { switch: jest.fn() } }));
@@ -165,18 +164,5 @@ describe('AcceptInvitationForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out and continue' }));
     await waitFor(() => expect(mockAuthState.signOut).toHaveBeenCalled());
     expect(workspacesApi.switch).not.toHaveBeenCalled();
-  });
-
-  it('an unverified email offers to resend the verification email', async () => {
-    mockAuthState.isAuthenticated = true;
-    mockAuthState.user = { email: 'invitee@example.com' };
-    authApi.joinInvitation.mockRejectedValue(apiError(403, 'EMAIL_NOT_VERIFIED'));
-    render(<AcceptInvitationForm />);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Join Acme as MEMBER' }));
-
-    expect(await screen.findByText('Check your inbox, then come back to this page.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Resend verification email' }));
-    await waitFor(() => expect(authApi.resendVerification).toHaveBeenCalled());
   });
 });

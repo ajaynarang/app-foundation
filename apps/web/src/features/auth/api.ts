@@ -144,8 +144,8 @@ export const authApi = {
   },
 
   /**
-   * Join the invitation's workspace as the signed-in account. 403 `INVITATION_EMAIL_MISMATCH` for another email,
-   * 403 `EMAIL_NOT_VERIFIED` until the account's email is verified. Then switch with `POST /workspaces/switch`.
+   * Join the invitation's workspace as the signed-in account, verified or not (an emailed-only link also verifies the
+   * email). 403 `INVITATION_EMAIL_MISMATCH` for another email. Then switch with `POST /workspaces/switch`.
    */
   joinInvitation: async (token: string): Promise<{ workspace: { tenantId: string; name: string }; role: string }> => {
     return apiClient('/invitations/join', { method: 'POST', body: JSON.stringify({ token }) });

@@ -12,17 +12,17 @@ import { workspacesApi } from '@/features/platform/workspaces/api';
 import { authApi } from '../../api';
 import { goToWorkspace, type InvitationDetails } from './types';
 
-type JoinProblem = 'mismatch' | 'unverified' | 'other' | null;
+type JoinProblem = 'mismatch' | 'other' | null;
 
 /**
- * Signed in: the account joins the invitation's workspace (`POST /invitations/join`), then switches to it. The
- * backend checks that the account's verified email is the invitation's; this page explains each refusal.
+ * Signed in: the account joins the invitation's workspace (`POST /invitations/join`) in one step, then switches to it.
+ * The backend checks that the account's email is the invitation's (an emailed link also verifies it; the fresh
+ * profile below carries the answer); this page explains each refusal.
  */
 export function JoinPanel({ invitation, token }: { invitation: InvitationDetails; token: string }) {
   const router = useRouter();
   const { user, setTokens, setUser, signOut } = useAuthStore();
   const [joining, setJoining] = useState(false);
-  const [resending, setResending] = useState(false);
   const [problem, setProblem] = useState<JoinProblem>(null);
   const [detail, setDetail] = useState<string | null>(null);
 
@@ -40,31 +40,9 @@ export function JoinPanel({ invitation, token }: { invitation: InvitationDetails
     } catch (err) {
       setJoining(false);
       const code = err instanceof ApiError ? err.data?.code : undefined;
-      setProblem(
-        code === AuthErrorCode.INVITATION_EMAIL_MISMATCH
-          ? 'mismatch'
-          : code === AuthErrorCode.EMAIL_NOT_VERIFIED
-            ? 'unverified'
-            : 'other',
-      );
+      setProblem(code === AuthErrorCode.INVITATION_EMAIL_MISMATCH ? 'mismatch' : 'other');
       setDetail(err instanceof ApiError ? (err.data?.detail ?? null) : null);
       showError('Could not join the workspace');
-    }
-  };
-
-  const handleResend = async () => {
-    setResending(true);
-    try {
-      await authApi.resendVerification();
-      showSuccess('Verification email sent');
-    } catch (err) {
-      showError(
-        err instanceof ApiError && err.status === 429
-          ? 'Wait a minute before asking again'
-          : 'Could not send the verification email. Please try again.',
-      );
-    } finally {
-      setResending(false);
     }
   };
 
@@ -83,11 +61,6 @@ export function JoinPanel({ invitation, token }: { invitation: InvitationDetails
           </AlertDescription>
         </Alert>
       )}
-      {problem === 'unverified' && (
-        <Alert>
-          <AlertDescription>Check your inbox, then come back to this page.</AlertDescription>
-        </Alert>
-      )}
       {problem === 'other' && (
         <Alert variant="destructive">
           <AlertDescription>{detail || 'Could not join the workspace. Please try again.'}</AlertDescription>
@@ -97,10 +70,6 @@ export function JoinPanel({ invitation, token }: { invitation: InvitationDetails
       {problem === 'mismatch' ? (
         <Button className="w-full" variant="outline" onClick={handleSignOut}>
           Sign out and continue
-        </Button>
-      ) : problem === 'unverified' ? (
-        <Button className="w-full" onClick={handleResend} loading={resending} disabled={resending}>
-          Resend verification email
         </Button>
       ) : (
         <Button className="w-full" onClick={handleJoin} loading={joining} disabled={joining}>

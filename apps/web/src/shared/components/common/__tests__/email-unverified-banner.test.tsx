@@ -18,7 +18,7 @@ const { authApi } = require('@/features/auth/api') as { authApi: { resendVerific
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const toast = require('@appshore/web-core/shared/lib/toast') as { showSuccess: jest.Mock; showError: jest.Mock };
 
-const COPY = 'Verify your email to join other workspaces.';
+const COPY = 'Verify your email address.';
 
 describe('EmailUnverifiedBanner', () => {
   beforeEach(() => {

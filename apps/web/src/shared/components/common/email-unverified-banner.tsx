@@ -64,7 +64,7 @@ export function EmailUnverifiedBanner() {
     <Alert className="rounded-none border-x-0 border-t-0 border-b border-caution/20 bg-caution/10">
       <MailWarning className="h-4 w-4 text-caution-text" />
       <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <span className="text-caution-text font-medium">Verify your email to join other workspaces.</span>
+        <span className="text-caution-text font-medium">Verify your email address.</span>
         <div className="flex items-center gap-2 shrink-0">
           <Button size="sm" variant="outline" onClick={handleResend} loading={isSending} disabled={isSending}>
             Resend email
