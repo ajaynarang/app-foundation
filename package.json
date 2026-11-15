@@ -39,6 +39,7 @@
     "test:hooks": "node --test .claude/hooks/tests/*.test.mjs",
     "// — Foundation (tools/foundation): which template version this repo is on, and what differs from it": "",
     "foundation:status": "node tools/foundation/status.mjs",
+    "foundation:pull": "node tools/foundation/pull.mjs",
     "test:foundation": "node --test tools/foundation/*.test.mjs",
     "verify:arch": "turbo run build --filter=@app/backend^... --output-logs=errors-only && pnpm --filter @app/backend exec jest src/architecture && pnpm --filter @app/web exec jest src/shared/components/__tests__/single-component-set.test.ts src/shared/components/page-chrome/__tests__/theme-tokens.test.ts src/features/__tests__/ui-grammar-guard.test.ts",
     "// — Backend shortcuts": "",

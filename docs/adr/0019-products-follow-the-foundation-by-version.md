@@ -49,6 +49,16 @@ was scaffolded from, and is compared with that base as rebuilt by init-app itsel
 - **A release is a version bump in `foundation.json` and `package.json`, an entry under `docs/upgrade-notes/` when a
   product must act, and a tag `v<version>` on the merge commit.** Review only: a tag is pushed by the owner.
 
+- **`pnpm foundation:pull [version]` is how a product takes a newer version** (amendment, 2026-11-15).
+  `tools/foundation/pull.mjs` rebuilds two trees with the product's recorded answers, the base and the target, and
+  merges every owned file three ways with `git merge-file`. A change on one side is taken; a change on both sides is
+  merged, with conflict markers where the same lines moved; a delete against a change is never settled silently. Seams
+  and starter content are never written: what the template changed there is listed for a person, with the upgrade
+  notes that are new or gained entries. The one exception is a seam file the product never had, which is added. Paths
+  are classified with the target's lists, so an area a newer version starts to own is pulled. The pull refuses a
+  dirty tree, plans everything before it writes, and then records the target as the new base. Held by
+  `tools/foundation/pull.test.mjs`.
+
 ## Consequences
 
 - A product knows where it stands in seconds, without the template checked out beside it.

@@ -273,7 +273,7 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
   running app; `app-deploy` starts a deploy workflow and watches it; `app-test-notes` writes a hand-testing script;
   `app-standards-audit` audits an area and files each gap with its guard; `app-runway` fills the binding docs and the
-  domain skill in a product's first days. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+  domain skill in a product's first days; `app-pull-foundation` takes a newer template version into a product. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
 - **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
   vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
   each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
@@ -330,6 +330,12 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   foundation should keep in step across products is added to `owned` in the same pull request
   (`tools/foundation/foundation-json.test.mjs` fails on a glob that matches nothing). The decision is the ADR
   "Products follow the foundation by version".
+- **`pnpm foundation:pull [version]`** — in a product, brings the owned files to a newer template version (a tag
+  `v<version>`, `--ref <ref>`, or the default branch). It rebuilds the base and the target with the product's
+  recorded answers, merges each owned file three ways, leaves conflict markers where both sides changed the same
+  lines, and moves `base` in `foundation.json`. It never writes a seam or anything outside `owned`: what the
+  template changed there is listed, with the upgrade notes to read. It refuses a dirty tree; `--dry-run` writes
+  nothing. Exit 2 means conflicts are left. The `app-pull-foundation` skill runs it end to end.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
   residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo
