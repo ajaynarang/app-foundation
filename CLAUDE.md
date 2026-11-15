@@ -335,7 +335,7 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   recorded answers, merges each owned file three ways, leaves conflict markers where both sides changed the same
   lines, and moves `base` in `foundation.json`. It never writes a seam or anything outside `owned`: what the
   template changed there is listed, with the upgrade notes to read. It refuses a dirty tree; `--dry-run` writes
-  nothing. Exit 2 means conflicts are left. The `app-pull-foundation` skill runs it end to end.
+  nothing; `--keep` leaves both rebuilt trees to compare against. Exit 2 means conflicts are left. The `app-pull-foundation` skill runs it end to end.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
   residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo

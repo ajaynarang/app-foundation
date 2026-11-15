@@ -7,6 +7,7 @@
  *   pnpm foundation:pull 0.3.0           # the tag v0.3.0
  *   pnpm foundation:pull --ref <ref>     # any branch, tag or commit of the template
  *   pnpm foundation:pull --from ../app-foundation --dry-run
+ *   pnpm foundation:pull --keep          # leave the rebuilt base and target on disk, to compare seams by hand
  *
  * Both sides are rebuilt with this repository's recorded answers (see base.mjs): the base it is on and the target.
  * Each owned file is then merged three ways. Seams and starter content are never rewritten; what the template
@@ -263,6 +264,7 @@ function main() {
       json: { type: 'boolean', default: false },
       'dry-run': { type: 'boolean', default: false },
       'allow-dirty': { type: 'boolean', default: false },
+      keep: { type: 'boolean', default: false },
     },
   });
   const root = path.resolve(values.root ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
@@ -319,10 +321,16 @@ function main() {
       applyPull({ plan, targetDir: target.dir, productDir: root });
       writeManifest(root, next);
     }
+    const kept = values.keep ? { base: base.dir, target: target.dir } : null;
     if (values.json) {
       const actions = plan.actions.map(({ rel, kind }) => ({ rel, kind }));
-      console.log(JSON.stringify({ from, to, dryRun, ...plan, actions }, null, 2));
-    } else console.log(report({ from, to, plan, dryRun }));
+      console.log(JSON.stringify({ from, to, dryRun, ...plan, actions, kept }, null, 2));
+    } else {
+      console.log(report({ from, to, plan, dryRun }));
+      if (kept)
+        console.log(`\nKept for comparing (remove when done):\n  base    ${kept.base}\n  target  ${kept.target}`);
+    }
+    if (kept) temps.length = 0;
     return plan.conflicts.length ? 2 : 0;
   } finally {
     for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });

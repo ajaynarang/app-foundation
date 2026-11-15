@@ -152,11 +152,19 @@ test('with no recorded commit the version tag is the base', () => {
 
 test('a base that cannot be fetched fails with the way out, and leaves no temp folder behind', () => {
   const { template } = fixture();
-  const before = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('foundation-base-')).length;
   const manifest = manifestFor({ version: '9.9.9', commit: 'f'.repeat(40) });
-  assert.throws(() => rebuildBase({ manifest, source: template }), /could not fetch the base[\s\S]*--from/);
-  assert.throws(() => rebuildBase({ manifest: { ...manifest, base: null, scaffold: null } }), /this is the template/);
-  assert.equal(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('foundation-base-')).length, before);
+  // A temp folder of this test's own: other test files make and remove theirs in the shared one at the same time.
+  const own = tmp('tmpdir');
+  const shared = process.env.TMPDIR;
+  process.env.TMPDIR = own;
+  try {
+    assert.throws(() => rebuildBase({ manifest, source: template }), /could not fetch the base[\s\S]*--from/);
+    assert.throws(() => rebuildBase({ manifest: { ...manifest, base: null, scaffold: null } }), /this is the template/);
+    assert.deepEqual(fs.readdirSync(own), []);
+  } finally {
+    if (shared === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = shared;
+  }
 });
 
 test('the command line: the template says there is nothing to compare; a product gets its lists as JSON', () => {

@@ -28,7 +28,8 @@ Run this in a product. In the template itself there is no base and the command s
 2. `pnpm foundation:status` — what this product already changed in owned files. These are the files that can
    conflict.
 3. `pnpm foundation:pull <version> --dry-run` — what the pull would do. It writes nothing. When the template cannot
-   be fetched, pass `--from <path or url>` (a local clone works).
+   be fetched, pass `--from <path or url>` (a local clone works). A product whose `package.json` has no such script
+   yet runs the file: `node tools/foundation/pull.mjs`, or the template's copy with `--root <this repo>`.
 
 Stop and ask when the dry run lists more conflicts than a person can review in one sitting: pull an earlier
 version first.
@@ -36,8 +37,11 @@ version first.
 ## Step 2 — Pull
 
 ```bash
-pnpm foundation:pull <version>     # exit 0 clean, 2 when conflicts are left, 1 when it could not run
+pnpm foundation:pull <version> --keep    # exit 0 clean, 2 when conflicts are left, 1 when it could not run
 ```
+
+`--keep` leaves the rebuilt base and target on disk and prints both paths: Step 3 compares against them. Remove both
+folders when the work is done.
 
 It rewrites owned files only, merges the product's edits three ways, and moves `base` in `foundation.json` to the
 new version. One commit undoes it: `git checkout . && git clean -fd` before committing.
@@ -50,10 +54,12 @@ Work through the report top to bottom.
    template. Keep the product's intent and the template's fix. Read the template's commit or its upgrade note when
    the reason for its change is not obvious. A file "removed in the foundation, changed here" is kept: delete it
    only when nothing imports it. A file "deleted here" stays deleted unless the newer code needs it.
-2. **Seams.** Never written by a pull. For each one listed, compare with the template's copy and add what is new
-   (a registry entry, a model, an allowlist line). The product's own entries stay.
-3. **Outside the foundation.** Root `package.json`, the lockfile, compose files, workflows. Take new or raised
-   dependencies and new scripts the pulled code needs; leave the product's own values.
+2. **Seams.** Never written by a pull. For each one listed, `diff <base>/<file> <target>/<file>` shows what the
+   template changed: add that to the product's file (a registry entry, a model, an allowlist line). The product's
+   own entries stay.
+3. **Outside the foundation.** Root `package.json`, the lockfile, compose files, workflows. The same diff shows the
+   template's change. Take new or raised dependencies and new scripts the pulled code needs; leave the product's
+   own values.
 4. **Upgrade notes.** Read each one listed and do what it says before the gates: an env key to set, a migration to
    expect, a behaviour that changed.
 

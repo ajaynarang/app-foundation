@@ -279,8 +279,12 @@ const run = (product, template, ...args) =>
 test('the command: a dry run writes nothing; a pull merges, renames, records the new base, and is then up to date', () => {
   const { template, product, head } = fixture();
 
-  const dry = run(product, template, '0.3.0', '--dry-run');
+  const dry = run(product, template, '0.3.0', '--dry-run', '--keep');
   assert.equal(dry.status, 0, dry.stderr);
+  const [, baseDir, targetDir] = dry.stdout.match(/Kept for comparing[^\n]*\n {2}base {4}(\S+)\n {2}target {2}(\S+)/);
+  temps.push(baseDir, targetDir);
+  assert.equal(text(baseDir, 'package.json'), '{"version":"0.2.0"}\n', 'the base as this product received it');
+  assert.equal(text(targetDir, 'package.json'), '{"version":"0.3.0"}\n');
   assert.match(dry.stdout, /dry run, nothing written\. 5 file\(s\) would change, 0 conflict\(s\)\./);
   assert.equal(git(product, 'status', '--porcelain'), '');
 
@@ -341,9 +345,13 @@ test('the command: conflicts exit 2 with markers in the file; a dirty tree, the 
   assert.equal(back.status, 1);
   assert.match(back.stderr, /the target is v0\.3\.0, older than the base v0\.4\.0\. A pull only goes forward\./);
 
-  const before = fs.readdirSync(os.tmpdir()).filter((n) => /^foundation-(base|merge)-/.test(n)).length;
-  const missing = run(product, template, '9.9.9', '--allow-dirty');
+  // A temp folder of this run's own: other test files make and remove theirs in the shared one at the same time.
+  const own = tmp('tmpdir');
+  const missing = spawnSync(process.execPath, [PULL, '--root', product, '--from', template, '9.9.9', '--allow-dirty'], {
+    encoding: 'utf8',
+    env: { ...process.env, TMPDIR: own },
+  });
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /could not fetch the target/);
-  assert.equal(fs.readdirSync(os.tmpdir()).filter((n) => /^foundation-(base|merge)-/.test(n)).length, before);
+  assert.deepEqual(fs.readdirSync(own), [], 'a failed pull leaves no temp folder behind');
 });
