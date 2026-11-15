@@ -307,8 +307,9 @@ export class AuthService {
    *
    * When the email was not yet verified, the reset is also a reclaim (D9): whoever created the account may not own
    * the mailbox (a pre-hijack), so every other way in that they could have attached goes too: the phone and PIN, the
-   * Firebase link, API keys, and OAuth access and refresh tokens. After the commit the owner gets a notice naming
-   * what was removed. A reset of a verified account changes none of these.
+   * Firebase link, API keys, OAuth access and refresh tokens and unexchanged authorization codes, and the push
+   * channels (web push subscriptions and mobile devices) that would keep delivering the owner's notifications. After
+   * the commit the owner gets a notice naming what was removed. A reset of a verified account changes none of these.
    */
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
     const tokenHash = hashToken(dto.token);
@@ -369,11 +370,21 @@ export class AuthService {
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: now },
       });
+      // A code got just before the reset could still be exchanged for new tokens within its life.
+      const oauthCodes = await tx.oAuthAuthorizationCode.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      // Push is sent by userId alone: the creator's browser or phone would keep getting the owner's notifications.
+      const webPush = await tx.pushSubscription.deleteMany({ where: { userId: record.userId } });
+      const devices = await tx.notificationDevice.deleteMany({ where: { userId: record.userId } });
       const removed: string[] = [];
       if (before.phone || before.pinHash) removed.push('phone number and PIN sign-in');
       if (before.firebaseUid) removed.push('linked sign-in provider (Firebase)');
       if (apiKeys.count > 0) removed.push(`${apiKeys.count} API key${apiKeys.count === 1 ? '' : 's'}`);
-      if (oauthAccess.count + oauthRefresh.count > 0) removed.push('access for connected apps (OAuth)');
+      if (oauthAccess.count + oauthRefresh.count + oauthCodes.count > 0)
+        removed.push('access for connected apps (OAuth)');
+      if (webPush.count + devices.count > 0) removed.push('push notifications on other devices');
       return { email: before.email, firstName: before.firstName, removed };
     });
 

@@ -28,6 +28,9 @@ describe('AuthService.resetPassword', () => {
     apiKey: { updateMany: jest.fn() },
     oAuthAccessToken: { updateMany: jest.fn() },
     oAuthRefreshToken: { updateMany: jest.fn() },
+    oAuthAuthorizationCode: { updateMany: jest.fn() },
+    pushSubscription: { deleteMany: jest.fn() },
+    notificationDevice: { deleteMany: jest.fn() },
   };
   const prisma = {
     passwordResetToken: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
@@ -57,6 +60,9 @@ describe('AuthService.resetPassword', () => {
     tx.apiKey.updateMany.mockResolvedValue({ count: 2 });
     tx.oAuthAccessToken.updateMany.mockResolvedValue({ count: 1 });
     tx.oAuthRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+    tx.oAuthAuthorizationCode.updateMany.mockResolvedValue({ count: 0 });
+    tx.pushSubscription.deleteMany.mockResolvedValue({ count: 1 });
+    tx.notificationDevice.deleteMany.mockResolvedValue({ count: 1 });
     tx.user.findUnique.mockResolvedValue(verifiedUser);
     prisma.passwordResetToken.findUnique.mockResolvedValue({
       id: 7,
@@ -121,7 +127,7 @@ describe('AuthService.resetPassword', () => {
     });
   });
 
-  it('a reset of a verified account leaves its phone, PIN, Firebase link, API keys and OAuth tokens alone', async () => {
+  it('a reset of a verified account leaves its phone, PIN, Firebase link, API keys, OAuth and push devices alone', async () => {
     await service.resetPassword({ token: 'reset-token', newPassword: 'N3w-Password!' });
 
     const data = tx.user.update.mock.calls[0][0].data;
@@ -131,6 +137,9 @@ describe('AuthService.resetPassword', () => {
     expect(tx.apiKey.updateMany).not.toHaveBeenCalled();
     expect(tx.oAuthAccessToken.updateMany).not.toHaveBeenCalled();
     expect(tx.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
+    expect(tx.oAuthAuthorizationCode.updateMany).not.toHaveBeenCalled();
+    expect(tx.pushSubscription.deleteMany).not.toHaveBeenCalled();
+    expect(tx.notificationDevice.deleteMany).not.toHaveBeenCalled();
     expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
 
@@ -163,6 +172,14 @@ describe('AuthService.resetPassword', () => {
       where: { userId: 42, revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    // A code got just before the reset could still be exchanged for fresh tokens within its 10-minute life.
+    expect(tx.oAuthAuthorizationCode.updateMany).toHaveBeenCalledWith({
+      where: { userId: 42, usedAt: null },
+      data: { usedAt: expect.any(Date) },
+    });
+    // Push goes to every device of the user: the creator's browser or phone must stop getting the owner's alerts.
+    expect(tx.pushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: 42 } });
+    expect(tx.notificationDevice.deleteMany).toHaveBeenCalledWith({ where: { userId: 42 } });
     expect(prisma.apiKey.updateMany).not.toHaveBeenCalled();
 
     expect(emailService.sendEmail).toHaveBeenCalledTimes(1);
@@ -173,6 +190,22 @@ describe('AuthService.resetPassword', () => {
     expect(notice.text).toContain('Firebase');
     expect(notice.text).toContain('2 API keys');
     expect(notice.text).toContain('connected apps (OAuth)');
+    expect(notice.text).toContain('push notifications on other devices');
+  });
+
+  it('a reclaim counts an unexchanged OAuth code as connected-app access', async () => {
+    tx.user.findUnique.mockResolvedValue({ ...verifiedUser, emailVerified: false });
+    tx.oAuthAccessToken.updateMany.mockResolvedValue({ count: 0 });
+    tx.oAuthRefreshToken.updateMany.mockResolvedValue({ count: 0 });
+    tx.oAuthAuthorizationCode.updateMany.mockResolvedValue({ count: 1 });
+    tx.pushSubscription.deleteMany.mockResolvedValue({ count: 0 });
+    tx.notificationDevice.deleteMany.mockResolvedValue({ count: 0 });
+
+    await service.resetPassword({ token: 'reset-token', newPassword: 'N3w-Password!' });
+
+    const notice = emailService.sendEmail.mock.calls[0][0];
+    expect(notice.text).toContain('connected apps (OAuth)');
+    expect(notice.text).not.toContain('push notifications');
   });
 
   it('the reclaim notice is sent after the commit, and a send failure does not fail the reset', async () => {

@@ -86,7 +86,9 @@ and no route set it. Now an address is proven by a link the account's signed-in 
   have no password yet, and their first reset verifies them.
 - `POST /auth/reset-password` now also sets `emailVerified = true` and uses up the account's other reset and
   verification links. **When the account was not verified, the reset is a reclaim:** it also clears the phone, PIN
-  and Firebase uid, revokes the account's API keys and OAuth access and refresh tokens, and emails "Your password
+  and Firebase uid, revokes the account's API keys and OAuth access and refresh tokens, uses up its unexchanged OAuth
+  authorization codes, deletes its web push subscriptions and mobile notification devices (otherwise the creator's
+  browser or phone keeps getting the owner's notifications), and emails "Your password
   was reset. Sign-in methods we removed: …". This is how the real owner of an address takes back an account someone
   else created with it. A reset of a verified account changes none of these.
 - `tokens-cleanup` now also deletes reset and verification tokens that expired or were used more than 7 days ago
@@ -137,4 +139,5 @@ else's address.
 
 **How to turn it back.** Deploy the previous release. The table can stay (nothing else reads it) or be dropped with
 `DROP TABLE email_verification_tokens;`. Accounts verified meanwhile stay verified, and a reclaim that already ran
-cannot be undone: the removed phone, Firebase link and keys must be added again.
+cannot be undone: the removed phone, Firebase link and keys must be added again, and push must be turned on again on
+each device.

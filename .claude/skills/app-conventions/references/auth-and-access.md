@@ -123,8 +123,9 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
   [guard: auth.service.personal-provision.spec.ts, tenants.service.spec.ts, users.service.spec.ts, seeds-verified.spec.ts]
 - A password reset marks the email verified and uses up the account's other reset and verification tokens. A reset
   of an account that was **not** verified is a reclaim: in the same transaction it clears the phone, PIN and Firebase
-  uid and revokes the account's API keys and OAuth access and refresh tokens (as well as every refresh token), then
-  emails a notice naming what it removed. A reset of a verified account touches none of them.
+  uid, revokes the account's API keys and OAuth access and refresh tokens (as well as every refresh token), uses up
+  its unexchanged OAuth authorization codes, and deletes its web push subscriptions and mobile notification devices
+  (push goes to every device of the user), then emails a notice naming what it removed. A reset of a verified account touches none of them.
   [guard: auth.service.reset-password.spec.ts]
 - `tokens-cleanup` deletes reset and verification tokens that expired or were used more than 7 days ago.
   [guard: tokens-cleanup.processor.spec.ts]
