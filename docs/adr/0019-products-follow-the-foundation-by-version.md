@@ -17,7 +17,7 @@ Two facts rule out the obvious answers:
   template reports all of that as change.
 
 Publishing the foundation as versioned packages would cover `packages/appshore/*` only. Half of what the foundation
-keeps in step is application code a package cannot hold: `apps/backend/src/domains/ai`, `domains/desk`,
+keeps in step is application code a package cannot hold: the AI and Desk domains under `apps/backend/src/domains/`,
 `platform-glue`, the web app's shared layer, the skills, the guards. And `@appshore/db` holds each product's own
 `app.prisma` and migrations.
 

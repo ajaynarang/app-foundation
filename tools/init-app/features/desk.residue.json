@@ -80,6 +80,11 @@
       "file": "apps/backend/src/architecture/feature-key-coverage.spec.ts",
       "match": "domains/desk",
       "reason": "Counts the desk feature key as covered when the Desk folder does not exist, so the spec passes in a product scaffolded without Desk (design item 17)."
+    },
+    {
+      "file": "foundation.json",
+      "match": "domains/desk",
+      "reason": "The template's list of foundation-owned paths, kept whole in every product so a later pull knows what the foundation owns; the Desk globs match nothing here (ADR \"Products follow the foundation by version\")."
     }
   ]
 }
