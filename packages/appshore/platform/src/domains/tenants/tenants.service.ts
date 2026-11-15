@@ -597,7 +597,7 @@ export class TenantsService {
    * Maps ONLY the editable profile fields and writes the TENANT contact
    * directly — it never rewrites the owner User login email (that's the
    * super-admin `updateTenant` path's concern). Lifecycle/billing fields are
-   * not editable here. Invalidates the `me-settings` cache so the dispatcher
+   * not editable here. Invalidates the `me-settings` cache so the
    * settings surfaces pick up the change.
    */
   async updateMyOrganizationProfile(

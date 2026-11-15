@@ -51,7 +51,7 @@ describe('ApiKeyAuthGuard', () => {
     service.validateKey.mockResolvedValue({
       id: 1,
       userId: 42,
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
       ipAllowlist: ['1.2.3.4'],
       user: { id: 42, tenantId: 7 },
     });
@@ -67,7 +67,7 @@ describe('ApiKeyAuthGuard', () => {
         apiKeyId: 1,
         tenantId: 7,
         userId: 42,
-        scopes: ['fleet:read'],
+        scopes: ['platform:read'],
         ipAllowlist: ['1.2.3.4'],
         auditId: 'apikey:1',
       }),
@@ -82,7 +82,7 @@ describe('ApiKeyAuthGuard', () => {
     service.validateKey.mockResolvedValue({
       id: 2,
       userId: 42,
-      scopes: ['fleet:read'],
+      scopes: ['platform:read'],
       ipAllowlist: [],
       user: { id: 42, tenantId: 7 },
     });

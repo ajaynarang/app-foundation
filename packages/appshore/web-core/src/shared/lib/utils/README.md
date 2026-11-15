@@ -140,22 +140,6 @@ formatTemperature(72, 'F'); // "72.0°F"
 formatTemperature(72, 'C'); // "22.2°C"
 ```
 
-### Fuel Formatting
-
-#### `formatFuelVolume(gallons: number, system?: 'US' | 'METRIC'): string`
-
-```typescript
-formatFuelVolume(50, 'US'); // "50.0 gal"
-formatFuelVolume(50, 'METRIC'); // "189.3 L"
-```
-
-#### `formatFuelPrice(pricePerGallon: number, currency?: string, system?: 'US' | 'METRIC'): string`
-
-```typescript
-formatFuelPrice(3.5, 'USD', 'US'); // "$3.50/gal"
-formatFuelPrice(3.5, 'USD', 'METRIC'); // "$0.92/L"
-```
-
 ### Percentage Formatting
 
 #### `formatPercentage(value: number, decimals?: number): string`

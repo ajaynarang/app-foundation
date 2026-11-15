@@ -10,7 +10,7 @@ describe('KnowledgeTool', () => {
       hybridSearch: jest.fn().mockResolvedValue([
         {
           documentId: 'doc_001',
-          title: 'Route Planning',
+          title: 'Audit Log',
           content: 'The platform optimizes your workflows...',
           documentType: 'feature',
           audience: 'prospect',
@@ -47,16 +47,16 @@ describe('KnowledgeTool', () => {
   describe('searchKB', () => {
     it('should search knowledge base and return formatted results', async () => {
       const result = await tool.searchKB({
-        query: 'How does route planning work?',
+        query: 'How does the audit log work?',
         audience: 'prospect',
       });
 
       expect(mockKbService.hybridSearch).toHaveBeenCalledWith(
-        'How does route planning work?',
+        'How does the audit log work?',
         expect.objectContaining({ audience: 'prospect', limit: 5 }),
       );
       expect(result.results).toHaveLength(2);
-      expect(result.results[0].title).toBe('Route Planning');
+      expect(result.results[0].title).toBe('Audit Log');
       expect(result.results[0].relevance).toBe(0.89);
     });
 

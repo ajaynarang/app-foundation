@@ -81,7 +81,7 @@ describe('lint-schema', () => {
 
     it('does not flag FKs that reference id', () => {
       const schema = `
-        model Load {
+        model Project {
           id       Int  @id @default(autoincrement())
           tenantId Int
           tenant   Tenant @relation(fields: [tenantId], references: [id])
@@ -95,7 +95,7 @@ describe('lint-schema', () => {
   describe('rule: no-embedded-token', () => {
     it('flags token columns on operational entity rows', () => {
       const schema = `
-        model Load {
+        model Project {
           id            Int     @id @default(autoincrement())
           tenantId      Int
           trackingToken String? @unique @map("tracking_token")
@@ -107,10 +107,9 @@ describe('lint-schema', () => {
 
     it('does NOT flag token columns on dedicated token tables', () => {
       const schema = `
-        model LoadShareLink {
-          id       Int    @id @default(autoincrement())
-          tenantId Int
-          token    String @unique
+        model PasswordResetToken {
+          id         Int    @id @default(autoincrement())
+          resetToken String @unique
         }
       `;
       const violations = lintSchema(schema);
@@ -301,9 +300,9 @@ describe('lint-schema', () => {
 
     it('does not crash on enum or empty blocks', () => {
       const schema = `
-        enum LoadStatus {
+        enum ProjectStatus {
           PENDING
-          IN_TRANSIT
+          IN_PROGRESS
         }
         model Foo {
           id Int @id @default(autoincrement())

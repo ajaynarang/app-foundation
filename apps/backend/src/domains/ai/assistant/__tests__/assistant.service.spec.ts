@@ -179,7 +179,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: 'Test',
       });
 
@@ -195,7 +195,7 @@ describe('AssistantAiService', () => {
 
       await service.streamMessage('conv_test', 'bad content', 'text', 'user_1', 1, mockReq, mockRes);
 
-      expect(mockModeration.moderate).toHaveBeenCalledWith('bad content', 'input', 'dispatcher');
+      expect(mockModeration.moderate).toHaveBeenCalledWith('bad content', 'input', 'member');
       expect(mockRes.write).toHaveBeenCalled();
       expect(mockRes.end).toHaveBeenCalled();
     });
@@ -211,7 +211,7 @@ describe('AssistantAiService', () => {
         conversationId: 'conv_test',
         userId: 1,
         tenantId: 1,
-        userMode: 'dispatcher',
+        userMode: 'member',
         title: 'Test',
       });
 
@@ -226,12 +226,12 @@ describe('AssistantAiService', () => {
       } as any;
 
       try {
-        await service.streamMessage('conv_test', 'What loads are available?', 'text', 'user_1', 1, mockReq, mockRes);
+        await service.streamMessage('conv_test', 'What tasks are open?', 'text', 'user_1', 1, mockReq, mockRes);
       } catch {
         // Expected: agent.stream is not mocked
       }
 
-      expect(mockModeration.moderate).toHaveBeenCalledWith('What loads are available?', 'input', 'dispatcher');
+      expect(mockModeration.moderate).toHaveBeenCalledWith('What tasks are open?', 'input', 'member');
       expect(mockMcpTools.getToolsetsForPersona).toHaveBeenCalled();
     });
   });

@@ -53,7 +53,7 @@ describe('DeskAgentEditGuard', () => {
     await expect(guard.canActivate(ctx)).resolves.toBe(false);
   });
 
-  it('denies DISPATCHER without tenantId', async () => {
+  it('denies MEMBER without tenantId', async () => {
     const ctx = makeCtx({
       user: { dbId: 99, role: UserRole.MEMBER },
       route: { path: '/desk/agents/:key' },
@@ -77,9 +77,9 @@ describe('DeskAgentEditGuard', () => {
     });
   });
 
-  // ─── Dispatcher + agents route ──────────────────────────────────
+  // ─── Member + agents route ──────────────────────────────────
 
-  describe('DISPATCHER on /desk/agents/:key', () => {
+  describe('MEMBER on /desk/agents/:key', () => {
     beforeEach(() => {
       prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     });
@@ -94,7 +94,7 @@ describe('DeskAgentEditGuard', () => {
       await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });
 
-    it('denies when user is a different dispatcher', async () => {
+    it('denies when user is a different member', async () => {
       prisma.deskAgent.findUnique.mockResolvedValue({ supervisorUserId: 42 });
       const ctx = makeCtx({
         user: { dbId: 99, role: UserRole.MEMBER, tenantId: 't1' },
@@ -151,9 +151,9 @@ describe('DeskAgentEditGuard', () => {
     });
   });
 
-  // ─── Dispatcher + responsibilities route ─────────────────────────
+  // ─── Member + responsibilities route ─────────────────────────
 
-  describe('DISPATCHER on /desk/responsibilities/:key', () => {
+  describe('MEMBER on /desk/responsibilities/:key', () => {
     beforeEach(() => {
       prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     });
@@ -207,9 +207,9 @@ describe('DeskAgentEditGuard', () => {
     });
   });
 
-  // ─── Dispatcher + memories route ────────────────────────────────
+  // ─── Member + memories route ────────────────────────────────
 
-  describe('DISPATCHER on /desk/memories/:id', () => {
+  describe('MEMBER on /desk/memories/:id', () => {
     beforeEach(() => {
       prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     });
@@ -266,7 +266,7 @@ describe('DeskAgentEditGuard', () => {
 
   // ─── Unknown route ──────────────────────────────────────────────
 
-  it('denies DISPATCHER on an unknown route shape', async () => {
+  it('denies MEMBER on an unknown route shape', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: 10 });
     const ctx = makeCtx({
       user: { dbId: 1, role: UserRole.MEMBER, tenantId: 't1' },

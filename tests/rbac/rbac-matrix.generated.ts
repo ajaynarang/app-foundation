@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-07-03T16:43:04.084Z
- * Source: 0 domains, 87 endpoints
- * Controllers scanned: 262 total endpoints across all controllers
+ * Generated: 2026-11-11T12:16:43.802Z
+ * Source: 22 domains, 91 endpoints
+ * Controllers scanned: 268 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -439,11 +439,18 @@ export const RBAC_MATRIX: RbacEntry[] = [
   // OTHER
   // ═══════════════════════════════════════════════════════
   {
-    method: 'GET', path: '/drivers',
-    description: 'DriversController: GET /drivers',
+    method: 'GET', path: '/notifications/preferences/options',
+    description: 'NotificationPreferenceOptionsController: GET /notifications/preferences/options',
     domain: 'other',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/notifications/whatsapp-consent',
+    description: 'WhatsAppConsentController: GET /notifications/whatsapp-consent',
+    domain: 'other',
+    featureGate: null,
+    expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/push/vapid-key',
@@ -465,6 +472,27 @@ export const RBAC_MATRIX: RbacEntry[] = [
     domain: 'other',
     featureGate: null,
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'POST', path: '/notifications/devices',
+    description: 'NotificationDevicesController: POST /notifications/devices',
+    domain: 'other',
+    featureGate: null,
+    expectations: { MEMBER: null, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'DELETE', path: '/notifications/devices',
+    description: 'NotificationDevicesController: DELETE /notifications/devices',
+    domain: 'other',
+    featureGate: null,
+    expectations: { MEMBER: null, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
+  },
+  {
+    method: 'PATCH', path: '/notifications/whatsapp-consent',
+    description: 'WhatsAppConsentController: PATCH /notifications/whatsapp-consent',
+    domain: 'other',
+    featureGate: null,
+    expectations: { MEMBER: null, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
   },
   {
     method: 'POST', path: '/webhooks',

@@ -142,7 +142,7 @@ describe('TenantsService', () => {
       mockPrisma.tenant.create.mockResolvedValue({
         id: 1,
         tenantId: 'TNT-001',
-        companyName: 'Acme Freight',
+        companyName: 'Acme Inc',
         status: 'PENDING_APPROVAL',
       });
       mockPrisma.user.create.mockResolvedValue({ id: 1, userId: 'USR-001' });
@@ -167,7 +167,7 @@ describe('TenantsService', () => {
       mockPrisma.tenant.create.mockResolvedValue({
         id: 1,
         tenantId: 'TNT-001',
-        companyName: 'Acme Freight',
+        companyName: 'Acme Inc',
         status: 'PENDING_APPROVAL',
       });
       mockPrisma.user.create.mockResolvedValue({ id: 1 });
@@ -179,7 +179,7 @@ describe('TenantsService', () => {
         'TNT-001',
         'owner@acme.com',
         'John',
-        'Acme Freight',
+        'Acme Inc',
       );
     });
   });

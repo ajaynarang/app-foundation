@@ -25,7 +25,7 @@ describe('ContentModerationService', () => {
         ],
       });
 
-      const result = await service.check('What loads are available today?');
+      const result = await service.check('What tasks are open today?');
       expect(result.flagged).toBe(false);
       expect(result.categories).toEqual([]);
     });

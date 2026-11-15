@@ -107,11 +107,11 @@ describe('FcmService', () => {
       ]);
       sendEachForMulticast.mockResolvedValue({ responses: [{ success: true }, { success: true }] });
 
-      await service.sendToUser(USER_DB_ID, { title: 'Match scheduled', body: 'Court 1', data: { type: 'X' } });
+      await service.sendToUser(USER_DB_ID, { title: 'Meeting scheduled', body: 'Room 1', data: { type: 'X' } });
 
       expect(sendEachForMulticast).toHaveBeenCalledWith({
         tokens: ['tok-1', 'tok-2'],
-        notification: { title: 'Match scheduled', body: 'Court 1' },
+        notification: { title: 'Meeting scheduled', body: 'Room 1' },
         data: { type: 'X' },
       });
     });

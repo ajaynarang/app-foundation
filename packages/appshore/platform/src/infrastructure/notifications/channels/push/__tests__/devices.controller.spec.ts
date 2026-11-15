@@ -41,7 +41,7 @@ describe('NotificationDevicesController', () => {
     expect(result).toEqual({ message: 'Device removed' });
   });
 
-  it('is open to every workspace role — players register their own phones', () => {
+  it('is open to every workspace role — members register their own phones', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, NotificationDevicesController);
 
     expect(roles).toEqual([UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER]);

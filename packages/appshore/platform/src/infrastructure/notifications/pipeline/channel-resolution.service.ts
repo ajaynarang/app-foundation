@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { DeliveryChannel, UserRole, type NotificationType } from '@appshore/db';
+import { DeliveryChannel, type NotificationType } from '@appshore/db';
 import { PrismaService } from '../../database/prisma.service';
 import { DEFAULT_PLATFORM_TIMEZONE, PLATFORM_TIMEZONE } from '../../../config/platform-timezone';
 import { WhatsAppConsentService } from '../channels/whatsapp/whatsapp-consent.service';
@@ -44,16 +44,11 @@ export type ChannelDefaults = Record<ChannelPrefKey, boolean>;
 type StoredChannelPrefs = Partial<Record<ChannelPrefKey, boolean>>;
 
 /**
- * Channel defaults when the user has expressed no preference for that channel.
- * They sit UNDER the type's policy: a policy `never` cannot be defaulted on, and a
- * policy `optIn` needs an explicit stored yes regardless of the role.
- *
- * MEMBERs are players: they live in the mobile app and have no route to the web
- * settings page, so whatever lands here is what they get for good. Staff
- * (OWNER/ADMIN) can reach settings and turn off what they don't want.
+ * Channel defaults when the user has expressed no preference for that channel,
+ * the same for every role. They sit UNDER the type's policy: a policy `never`
+ * cannot be defaulted on, and a policy `optIn` needs an explicit stored yes.
  */
-const PLAYER_CHANNEL_DEFAULTS: ChannelDefaults = { inApp: true, push: true, email: false, sms: false, whatsapp: true };
-const STAFF_CHANNEL_DEFAULTS: ChannelDefaults = { inApp: true, push: true, email: true, sms: true, whatsapp: true };
+export const CHANNEL_DEFAULTS: ChannelDefaults = { inApp: true, push: true, email: true, sms: true, whatsapp: true };
 
 @Injectable()
 export class ChannelResolutionService {
@@ -67,68 +62,40 @@ export class ChannelResolutionService {
     @Optional() @Inject(PLATFORM_TIMEZONE) private readonly platformTimezone: string = DEFAULT_PLATFORM_TIMEZONE,
   ) {}
 
-  async resolveForNotification(params: {
-    userId: number;
-    /** Scopes the role lookup. A user is staff in their own club and a plain player in someone else's. */
-    tenantId: number;
-    type: NotificationType;
-  }): Promise<ResolvedChannels> {
+  async resolveForNotification(params: { userId: number; type: NotificationType }): Promise<ResolvedChannels> {
     const policy = this.policies.get(params.type);
-    const [userPrefs, defaults, consented] = await Promise.all([
+    const [userPrefs, consented] = await Promise.all([
       this.prisma.userPreferences.findUnique({ where: { userId: params.userId } }),
-      this.resolveDefaults(params.userId, params.tenantId),
       this.whatsappConsent.consentedUserIds([params.userId], this.templates.consentKind(params.type)),
     ]);
 
-    return this.resolveChannels(policy, userPrefs, defaults, consented.has(params.userId));
+    return this.resolveChannels(policy, userPrefs, consented.has(params.userId));
   }
 
   /**
-   * Resolve for a whole audience in two queries instead of two per recipient.
-   * A draw published to a 200-entrant category ran the single-user path inside a
-   * serial loop — 400 round trips before the first message left.
+   * Resolve for a whole audience in two queries instead of two per recipient,
+   * so a 200-recipient dispatch is not 400 round trips before the first message leaves.
    */
   async resolveForAudience(params: {
     userIds: number[];
-    tenantId: number;
     type: NotificationType;
   }): Promise<Map<number, ResolvedChannels>> {
     const resolved = new Map<number, ResolvedChannels>();
     if (params.userIds.length === 0) return resolved;
 
     const policy = this.policies.get(params.type);
-    const [allPrefs, consented, memberships] = await Promise.all([
+    const [allPrefs, consented] = await Promise.all([
       this.prisma.userPreferences.findMany({ where: { userId: { in: params.userIds } } }),
       this.whatsappConsent.consentedUserIds(params.userIds, this.templates.consentKind(params.type)),
-      this.prisma.workspaceMember
-        .findMany({
-          where: { userId: { in: params.userIds }, tenantId: params.tenantId },
-          select: { userId: true, role: true },
-        })
-        .catch((err: any) => {
-          this.logger.warn(`Could not resolve roles for tenant ${params.tenantId}: ${err.message}`);
-          return [] as { userId: number; role: string }[];
-        }),
     ]);
 
     const prefsByUser = new Map(allPrefs.map((p) => [p.userId, p] as const));
-    const roleByUser = new Map(memberships.map((m) => [m.userId, m.role] as const));
 
     for (const userId of params.userIds) {
-      // Absent membership falls open to staff defaults, exactly as the single-user path does.
-      const defaults = roleByUser.get(userId) === UserRole.MEMBER ? PLAYER_CHANNEL_DEFAULTS : STAFF_CHANNEL_DEFAULTS;
-      resolved.set(
-        userId,
-        this.resolveChannels(policy, prefsByUser.get(userId) ?? null, defaults, consented.has(userId)),
-      );
+      resolved.set(userId, this.resolveChannels(policy, prefsByUser.get(userId) ?? null, consented.has(userId)));
     }
 
     return resolved;
-  }
-
-  /** The channel defaults a role starts from — what a settings toggle shows before the user has chosen. */
-  defaultsForRole(role: UserRole | string | undefined): ChannelDefaults {
-    return role === UserRole.MEMBER ? PLAYER_CHANNEL_DEFAULTS : STAFF_CHANNEL_DEFAULTS;
   }
 
   /**
@@ -136,12 +103,7 @@ export class ChannelResolutionService {
    * `never` beats a stored yes; `always` beats a stored no; quiet hours hold
    * back the interruptive channels unless the type is critical; consent is law.
    */
-  private resolveChannels(
-    policy: NotificationPolicy,
-    userPrefs: any,
-    defaults: ChannelDefaults,
-    whatsappConsented: boolean,
-  ): ResolvedChannels {
+  private resolveChannels(policy: NotificationPolicy, userPrefs: any, whatsappConsented: boolean): ResolvedChannels {
     const stored: StoredChannelPrefs | undefined = userPrefs?.notificationPreferences?.[policy.category.toLowerCase()];
     const inQuietHours = userPrefs ? this.isInQuietHours(userPrefs) : false;
     const piercesQuietHours = policy.urgency === NOTIFICATION_URGENCIES.CRITICAL;
@@ -159,7 +121,6 @@ export class ChannelResolutionService {
         rule,
         channel,
         stored,
-        defaults,
         whatsappConsented,
         inQuietHours && !piercesQuietHours,
       );
@@ -176,38 +137,18 @@ export class ChannelResolutionService {
     rule: ChannelRule,
     channel: DeliveryChannel,
     stored: StoredChannelPrefs | undefined,
-    defaults: ChannelDefaults,
     whatsappConsented: boolean,
     quiet: boolean,
   ): DeliverySkipReason | null {
     if (rule === CHANNEL_RULES.NEVER) return DELIVERY_SKIP_REASONS.POLICY_NEVER;
     if (rule !== CHANNEL_RULES.ALWAYS) {
       const key = CHANNEL_PREF_KEYS[channel];
-      const enabled = rule === CHANNEL_RULES.OPT_IN ? stored?.[key] === true : (stored?.[key] ?? defaults[key]);
+      const enabled = rule === CHANNEL_RULES.OPT_IN ? stored?.[key] === true : (stored?.[key] ?? CHANNEL_DEFAULTS[key]);
       if (!enabled) return DELIVERY_SKIP_REASONS.USER_OPT_OUT;
     }
     if (channel === DeliveryChannel.WHATSAPP && !whatsappConsented) return DELIVERY_SKIP_REASONS.NO_CONSENT;
     if (quiet && INTERRUPTIVE.has(channel)) return DELIVERY_SKIP_REASONS.QUIET_HOURS;
     return null;
-  }
-
-  /**
-   * Fails open to staff defaults. A missing membership row means we cannot prove
-   * this user is a player, and silently dropping someone to in-app-only on the
-   * strength of a failed lookup is the worse error: they would never learn their
-   * match had moved.
-   */
-  private async resolveDefaults(userId: number, tenantId: number): Promise<ChannelDefaults> {
-    try {
-      const membership = await this.prisma.workspaceMember.findUnique({
-        where: { userId_tenantId: { userId, tenantId } },
-        select: { role: true },
-      });
-      return membership?.role === UserRole.MEMBER ? PLAYER_CHANNEL_DEFAULTS : STAFF_CHANNEL_DEFAULTS;
-    } catch (err: any) {
-      this.logger.warn(`Could not resolve role for user ${userId} in tenant ${tenantId}: ${err.message}`);
-      return STAFF_CHANNEL_DEFAULTS;
-    }
   }
 
   private isInQuietHours(prefs: any): boolean {

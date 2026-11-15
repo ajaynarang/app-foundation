@@ -172,7 +172,7 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
   if (!webhook) return null;
 
   // View-mode footer: overflow menu on the left, Edit + Delete on the right.
-  // Driver/Load-sheet convention — surfaces read mode actions without clutter.
+  // Detail-sheet convention — surfaces read mode actions without clutter.
   const viewFooter = (
     <>
       <DropdownMenu>

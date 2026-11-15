@@ -23,7 +23,7 @@ describe('ApprovalController.listPending', () => {
     (controller as any).getTenantDbId = jest.fn().mockResolvedValue(7);
   });
 
-  it('dispatcher default → scope=mine with currentUserId', async () => {
+  it('member default → scope=mine with currentUserId', async () => {
     await controller.listPending({ role: UserRole.MEMBER, dbId: 42 });
     expect(approvals.listPending).toHaveBeenCalledWith(7, {
       limit: 50,
@@ -37,7 +37,7 @@ describe('ApprovalController.listPending', () => {
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ scope: 'all' }));
   });
 
-  it('explicit scope=all wins over dispatcher default', async () => {
+  it('explicit scope=all wins over member default', async () => {
     await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, undefined, 'all');
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ scope: 'all' }));
   });

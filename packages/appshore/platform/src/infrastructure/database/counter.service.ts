@@ -5,7 +5,7 @@ import { PrismaService } from './prisma.service';
  * Atomic counter service using Postgres UPSERT + RETURNING.
  *
  * Guarantees unique sequential values even under concurrent access
- * (e.g. 3 BullMQ workers creating loads simultaneously).
+ * (e.g. 3 BullMQ workers creating records simultaneously).
  *
  * Uses ON CONFLICT ... DO UPDATE SET value = value + 1 RETURNING value
  * which is atomic in a single SQL statement — no locks, no retries.

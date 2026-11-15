@@ -21,7 +21,7 @@ const toView = (row: ConsentRow | null): WhatsAppConsent => ({
 });
 
 /**
- * Per person, not per club. Meta requires the business to hold the opt-in;
+ * Per person, not per tenant. Meta requires the business to hold the opt-in;
  * this is where it is held, and absence means no.
  */
 @Injectable()

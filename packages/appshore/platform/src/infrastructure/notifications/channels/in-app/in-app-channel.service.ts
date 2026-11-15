@@ -17,7 +17,7 @@ export interface InAppNotificationParams {
   actionLabel?: string;
   iconType?: string;
   metadata?: Record<string, any>;
-  /** Rows of one type only merge within one scope — two tournaments never share a row. */
+  /** Rows of one type only merge within one scope — two projects never share a row. */
   groupScope?: string;
 }
 
@@ -40,7 +40,7 @@ export class InAppChannelService {
 
   /** Null means dropped (a test-marker string) — the caller records SKIPPED rather than SENT. */
   async create(params: InAppNotificationParams): Promise<Notification | null> {
-    // A marker string on the internal path is always seeded/dev junk (E57-5). Drop it rather than
+    // A marker string on the internal path is always seeded/dev junk. Drop it rather than
     // throw: this is a hot, fire-and-forget path, and a throw would 500 a legitimate flow.
     if (isTestMarker(params.title) || isTestMarker(params.message)) {
       this.logger.warn(`Dropped a notification with a test-marker string (type ${params.type})`);
@@ -54,7 +54,7 @@ export class InAppChannelService {
         const groupKey = this.buildGroupKey(params, now);
 
         // Match on the key itself, not merely "has one": a lookup on type+user+tenant alone
-        // merged two tournaments' approvals into one row carrying the first one's metadata.
+        // merged two scopes' approvals into one row carrying the first one's metadata.
         const existingGroup = await tx.notification.findFirst({
           where: {
             type: params.type,

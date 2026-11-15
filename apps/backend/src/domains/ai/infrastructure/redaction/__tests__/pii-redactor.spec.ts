@@ -23,10 +23,10 @@ describe('redactPii', () => {
   });
 
   it('recurses into nested objects', () => {
-    const input = { driver: { name: 'Jo', ssn: '111-22-3333' }, ok: true };
+    const input = { contact: { name: 'Jo', ssn: '111-22-3333' }, ok: true };
     const out = redactPii(input) as any;
-    expect(out.driver.ssn).toBe('[REDACTED]');
-    expect(out.driver.name).toBe('Jo');
+    expect(out.contact.ssn).toBe('[REDACTED]');
+    expect(out.contact.name).toBe('Jo');
     expect(out.ok).toBe(true);
   });
 

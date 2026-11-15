@@ -7,7 +7,7 @@ import { WhatsAppDispatchService } from '../whatsapp-dispatch.service';
 describe('WhatsAppDispatchService', () => {
   let service: WhatsAppDispatchService;
   const queue = { addBulk: jest.fn().mockResolvedValue([]) };
-  const send = { templateName: 'tx_draw_published_v1', languageCode: 'en', bodyValues: ['x', 'c'] };
+  const send = { templateName: 'sync_completed_v1', languageCode: 'en', bodyValues: ['x', 'c'] };
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({

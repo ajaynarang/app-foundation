@@ -71,7 +71,7 @@ Before finalizing, run these explicit challenges and document the answers:
 
 ### Step 4 — Produce the brainstorm artifact
 
-Write the design to `docs/plans/YYYY-MM-DD-<slug>-design.md` (create `docs/plans/` if it doesn't exist yet). Suffix convention:
+Write the design to `docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md` (create the folder if it doesn't exist yet). `docs/superpowers/` is gitignored: specs and plans are local working artifacts and are never committed. Suffix convention:
 
 - `-design` — architecture/design (why + what)
 - `-implementation` — implementation plan (how) — produced later by the `plan` skill

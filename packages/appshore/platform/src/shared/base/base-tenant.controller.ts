@@ -8,19 +8,19 @@ import { Tenant } from '@appshore/db';
  *
  * Usage:
  * ```typescript
- * @Controller('drivers')
- * export class DriversController extends BaseTenantController {
+ * @Controller('projects')
+ * export class ProjectsController extends BaseTenantController {
  *   constructor(
  *     prisma: PrismaService,
- *     private readonly driversService: DriversService,
+ *     private readonly projectsService: ProjectsService,
  *   ) {
  *     super(prisma);
  *   }
  *
  *   @Get()
- *   async listDrivers(@CurrentUser() user: any) {
+ *   async listProjects(@CurrentUser() user: any) {
  *     const tenantDbId = await this.getTenantDbId(user);
- *     return this.driversService.findAll(tenantDbId);
+ *     return this.projectsService.findAll(tenantDbId);
  *   }
  * }
  * ```

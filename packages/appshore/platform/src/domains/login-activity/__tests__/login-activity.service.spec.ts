@@ -109,9 +109,9 @@ describe('LoginActivityService', () => {
 
     it('roles → joined user.role in [...]', async () => {
       stubListReturning([]);
-      await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, roles: ['DISPATCHER', 'ADMIN'] });
+      await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, roles: ['MEMBER', 'ADMIN'] });
       const where = prisma.loginEvent.findMany.mock.calls[0][0].where;
-      expect(where.user.is.role).toEqual({ in: ['DISPATCHER', 'ADMIN'] });
+      expect(where.user.is.role).toEqual({ in: ['MEMBER', 'ADMIN'] });
     });
 
     it('excludeSuperAdmin=true adds a role-not-SUPER_ADMIN constraint to the where clause', async () => {
@@ -211,7 +211,7 @@ describe('LoginActivityService', () => {
         failReason: null,
         userId: 42,
         tenantId: TENANT_ID,
-        user: { id: 42, email: 'a@b.com', firstName: 'A', lastName: 'B', role: 'DISPATCHER' },
+        user: { id: 42, email: 'a@b.com', firstName: 'A', lastName: 'B', role: 'MEMBER' },
       };
       stubListReturning([row], 1);
 
@@ -410,7 +410,7 @@ describe('LoginActivityService', () => {
       prisma.loginEvent.findMany.mockResolvedValue([]);
       prisma.user.findMany.mockResolvedValue([]);
 
-      await service.summary({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, roles: ['ADMIN', 'DISPATCHER'] });
+      await service.summary({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, roles: ['ADMIN', 'MEMBER'] });
 
       expect(cache.getOrSet).toHaveBeenCalledTimes(1);
       const [keyArg, , ttlArg] = cache.getOrSet.mock.calls[0];
@@ -419,7 +419,7 @@ describe('LoginActivityService', () => {
           tenantId: TENANT_ID,
           from: RANGE.from,
           to: RANGE.to,
-          rolesKey: rolesKey(['ADMIN', 'DISPATCHER']),
+          rolesKey: rolesKey(['ADMIN', 'MEMBER']),
           excludeSuperAdmin: false,
         }),
       );

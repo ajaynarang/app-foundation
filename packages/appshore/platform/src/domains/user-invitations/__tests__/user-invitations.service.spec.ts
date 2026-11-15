@@ -390,7 +390,7 @@ describe('UserInvitationsService', () => {
         tenant: {
           tenantId: 'tnt-1',
           companyName: 'Acme Co',
-          subdomain: 'fleet',
+          subdomain: 'acme',
         },
         invitedByUser: {
           firstName: 'Admin',

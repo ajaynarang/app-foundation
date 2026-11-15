@@ -54,13 +54,12 @@ export default tseslint.config(
       //
       // 1. Bridge-only — domain code MUST emit DomainEvents and let
       //    DomainEventSseBridge route them. Direct SseService usage is
-      //    unblocked inside infrastructure/sse/ (the override below).
+      //    unblocked inside platform-glue/sse/ (the override below).
       //
       // 2. Cache facade — `@nestjs/cache-manager` and the legacy
       //    cache-manager adapter packages are banned. Every cache read/write
       //    must go through the platformCacheService (which sits on a single ioredis
-      //    client). See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md
-      //    for the incident that motivated this guard. Plans drift; lint doesn't.
+      //    client). Plans drift; lint doesn't.
       'no-restricted-imports': [
         'error',
         {
@@ -68,12 +67,12 @@ export default tseslint.config(
             {
               name: '@nestjs/cache-manager',
               message:
-                'Banned. Inject the platformCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
+                'Banned. Inject the platformCacheService instead.',
             },
             {
               name: 'cache-manager',
               message:
-                'Banned. Inject the platformCacheService instead. See .docs/plans/10-platform/2026-05-27-cache-unify-on-ioredis.md',
+                'Banned. Inject the platformCacheService instead.',
             },
             {
               name: 'cache-manager-redis-yet',
@@ -89,7 +88,7 @@ export default tseslint.config(
               group: ['**/infrastructure/sse/sse.service'],
               importNames: ['SseService'],
               message:
-                'SseService is bridge-internal. Emit a DomainEvent via EventEmitter2 and let DomainEventSseBridge route it. See infrastructure/sse/domain-event-sse-bridge.service.ts.',
+                'SseService is bridge-internal. Emit a DomainEvent via EventEmitter2 and let DomainEventSseBridge route it. See platform-glue/sse/domain-event-sse-bridge.service.ts.',
             },
           ],
         },
@@ -98,20 +97,7 @@ export default tseslint.config(
   },
   // Bridge implementation needs to import SseService — turn the rule off here.
   {
-    files: ['src/infrastructure/sse/**/*.ts'],
-    rules: {
-      'no-restricted-imports': 'off',
-    },
-  },
-  // Tower SSE subscriber is the documented complex-formatting counterpart to
-  // DomainEventSseBridge: it consumes domain events and emits formatted
-  // WireItems — formatting the 1:1 bridge can't do — so it reaches SseService
-  // directly. See the file header for why it lives in the domain.
-  {
-    files: [
-      'src/domains/operations/command-center/services/tower-sse.subscriber.ts',
-      'src/domains/operations/command-center/services/__tests__/tower-sse.subscriber.spec.ts',
-    ],
+    files: ['src/platform-glue/sse/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },

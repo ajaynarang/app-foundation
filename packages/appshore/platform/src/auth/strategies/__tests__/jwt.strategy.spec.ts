@@ -54,8 +54,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      driver: null,
-      customer: null,
     });
 
     const result = await strategy.validate(basePayload);
@@ -77,8 +75,6 @@ describe('JwtStrategy', () => {
       userId: 'USR-001',
       isActive: false,
       tenant: null,
-      driver: null,
-      customer: null,
     });
 
     await expect(strategy.validate(basePayload)).rejects.toThrow(UnauthorizedException);
@@ -95,8 +91,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: false,
       },
-      driver: null,
-      customer: null,
     });
 
     await expect(strategy.validate(basePayload)).rejects.toThrow('Tenant is inactive');
@@ -110,8 +104,6 @@ describe('JwtStrategy', () => {
       role: 'SUPER_ADMIN',
       isActive: true,
       tenant: null,
-      driver: null,
-      customer: null,
     });
 
     const result = await strategy.validate({
@@ -136,8 +128,6 @@ describe('JwtStrategy', () => {
         companyName: 'ACME',
         isActive: true,
       },
-      driver: null,
-      customer: null,
     });
 
     const result = await strategy.validate({

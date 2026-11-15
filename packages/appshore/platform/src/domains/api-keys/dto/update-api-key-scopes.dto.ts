@@ -13,7 +13,7 @@ const CIDR_REGEX = /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/;
 export class UpdateApiKeyScopesDto {
   @ApiProperty({
     type: [String],
-    example: ['fleet:read', 'loads:write'],
+    example: ['platform:read', 'documents:write'],
     description: 'New scope set (replaces the existing list)',
   })
   @IsArray()

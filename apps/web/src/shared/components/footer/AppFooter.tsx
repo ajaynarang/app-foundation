@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 
 /**
- * Minimal centered footer for authenticated pages (dispatcher, admin, console).
+ * Minimal centered footer for authenticated pages (app, admin, console).
  * Dot-separated: © Platform · Privacy · Terms · Cookie Preferences
  */
 export function AppFooter() {

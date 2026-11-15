@@ -17,8 +17,8 @@ describe('McpRootController', () => {
       const oauthUser = {
         userId: 'user_1',
         tenantDbId: 1,
-        role: 'DISPATCHER',
-        scopes: ['fleet:read'],
+        role: 'MEMBER',
+        scopes: ['platform:read'],
         clientId: 'client_1',
       };
       const req = { oauthUser } as any;

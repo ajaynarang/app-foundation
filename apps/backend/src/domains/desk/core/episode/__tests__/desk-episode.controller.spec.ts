@@ -25,7 +25,7 @@ function makeController() {
 
 describe('DeskEpisodeController', () => {
   describe('list (legacy episodes)', () => {
-    it('resolves scope via role → DISPATCHER defaults to mine', async () => {
+    it('resolves scope via role → MEMBER defaults to mine', async () => {
       const { controller, service } = makeController();
       await controller.list({ role: UserRole.MEMBER, dbId: 42 });
       expect(service.listForTenant).toHaveBeenCalledWith(10, expect.objectContaining({ scope: 'mine' }), {
@@ -106,7 +106,7 @@ describe('DeskEpisodeController', () => {
       );
     });
 
-    it('defaults scope by role when missing — DISPATCHER → mine', async () => {
+    it('defaults scope by role when missing — MEMBER → mine', async () => {
       const { controller, service } = makeController();
       await controller.listHandled({ role: UserRole.MEMBER, dbId: 42 });
       expect(service.listHandled).toHaveBeenCalledWith(

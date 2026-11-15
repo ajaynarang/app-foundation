@@ -11,7 +11,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor(private configService: ConfigService) {
     const connectionString =
-      configService.get<string>('DATABASE_URL') || 'postgresql://app_user:app_password@localhost:5432/app';
+      configService.get<string>('DATABASE_URL') || 'postgresql://postgres:postgres@localhost:5499/app?schema=public';
 
     const pool = new pg.Pool({
       connectionString,

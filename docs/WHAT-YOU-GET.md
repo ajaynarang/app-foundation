@@ -45,7 +45,8 @@ Open `http://localhost:3000/login`, sign in as the owner, and you're inside a li
 - First-party **email + password** auth (bcrypt, forgot/reset password, change password,
   session revocation) — works with zero external services.
 - Phone **OTP** and **PIN** login; **Firebase** token exchange as an optional alternative.
-- JWT access + rotating refresh tokens (hashed at rest, httpOnly cookie), login-event history.
+- JWT access + refresh tokens (hashed at rest, httpOnly cookie, revocable; not rotated on use),
+  login-event history.
 - Roles (`OWNER / ADMIN / MEMBER / SUPER_ADMIN`), invitations (email/SMS), **API keys**
   with scopes/rotation, and a full **OAuth 2.1 provider** (PKCE — your app can be
   "Sign in with X" for MCP clients like Claude).

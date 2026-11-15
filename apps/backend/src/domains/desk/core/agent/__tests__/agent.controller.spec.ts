@@ -78,14 +78,14 @@ describe('DeskAgentController', () => {
       expect(agents.updateAgent).toHaveBeenCalled();
     });
 
-    it('forbids DISPATCHER from reassigning supervisor', async () => {
+    it('forbids MEMBER from reassigning supervisor', async () => {
       await expect(
         controller.update({ role: UserRole.MEMBER, dbId: 42 }, 'assistant', { supervisorUserId: 99 }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(agents.updateAgent).not.toHaveBeenCalled();
     });
 
-    it('allows DISPATCHER to toggle enabled without supervisor field', async () => {
+    it('allows MEMBER to toggle enabled without supervisor field', async () => {
       await controller.update({ role: UserRole.MEMBER, dbId: 42 }, 'assistant', { enabled: false });
       expect(agents.updateAgent).toHaveBeenCalledWith(7, 'assistant', {
         enabled: false,
@@ -93,7 +93,7 @@ describe('DeskAgentController', () => {
       });
     });
 
-    it('forbids DISPATCHER from clearing supervisor (null is a reassign)', async () => {
+    it('forbids MEMBER from clearing supervisor (null is a reassign)', async () => {
       await expect(
         controller.update({ role: UserRole.MEMBER, dbId: 42 }, 'assistant', { supervisorUserId: null }),
       ).rejects.toBeInstanceOf(ForbiddenException);

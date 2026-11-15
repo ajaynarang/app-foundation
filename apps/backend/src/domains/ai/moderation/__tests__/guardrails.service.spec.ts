@@ -55,12 +55,12 @@ describe('GuardrailsService', () => {
   });
 
   describe('checkInjection', () => {
-    it('should pass clean fleet operations text', async () => {
+    it('should pass clean product text', async () => {
       mockEngineRun.mockResolvedValue({
         messages: [
           {
             role: 'user',
-            content: 'What loads are available for driver John?',
+            content: 'Which projects are assigned to John?',
           },
         ],
         messagesWithGuardResult: [
@@ -72,7 +72,7 @@ describe('GuardrailsService', () => {
                 passed: true,
                 message: {
                   role: 'user',
-                  content: 'What loads are available for driver John?',
+                  content: 'Which projects are assigned to John?',
                 },
               },
             ],
@@ -80,7 +80,7 @@ describe('GuardrailsService', () => {
         ],
       });
 
-      const result = await service.checkInjection('What loads are available for driver John?');
+      const result = await service.checkInjection('Which projects are assigned to John?');
       expect(result.flagged).toBe(false);
     });
 
@@ -114,7 +114,7 @@ describe('GuardrailsService', () => {
   describe('checkSecrets', () => {
     it('should pass normal text', async () => {
       mockEngineRun.mockResolvedValue({
-        messages: [{ role: 'user', content: 'What is driver 42 HOS status?' }],
+        messages: [{ role: 'user', content: 'What is the status of project 42?' }],
         messagesWithGuardResult: [
           {
             guardId: 'secret',
@@ -124,7 +124,7 @@ describe('GuardrailsService', () => {
                 passed: true,
                 message: {
                   role: 'user',
-                  content: 'What is driver 42 HOS status?',
+                  content: 'What is the status of project 42?',
                 },
               },
             ],
@@ -132,7 +132,7 @@ describe('GuardrailsService', () => {
         ],
       });
 
-      const result = await service.checkSecrets('What is driver 42 HOS status?');
+      const result = await service.checkSecrets('What is the status of project 42?');
       expect(result.flagged).toBe(false);
     });
 
@@ -188,7 +188,7 @@ describe('GuardrailsService', () => {
       expect(result.detected).toBe(true);
     });
 
-    it('should not flag fleet operations text', async () => {
+    it('should not flag ordinary product text', async () => {
       mockEngineRun.mockResolvedValue({
         messages: [{ role: 'user', content: 'Show me load 12345 status' }],
         messagesWithGuardResult: [

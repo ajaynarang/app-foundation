@@ -508,7 +508,7 @@ export class AssistantAiService {
 
   /**
    * Inject an async job result into a conversation as an assistant message.
-   * Used by background workers (e.g., route planning, Shield audits) to push
+   * Used by background workers (e.g., report generation, document processing) to push
    * follow-up results into the chat after the original request completes.
    */
   async injectAsyncResult(conversationId: string, result: { text: string; card?: Record<string, unknown> }) {

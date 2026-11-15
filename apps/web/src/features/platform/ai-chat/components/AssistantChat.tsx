@@ -60,7 +60,7 @@ export function AssistantChat({ embedded = false }: AssistantChatProps) {
       {/* Messages area with subtle dot grid */}
       <ScrollArea className="flex-1">
         <div className="relative">
-          {/* Command center dot grid */}
+          {/* Dot grid */}
           <div
             className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"
             style={{

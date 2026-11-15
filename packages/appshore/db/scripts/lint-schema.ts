@@ -1,7 +1,7 @@
 /**
  * Schema linter — enforces APP ID + column naming convention.
- * See .claude/skills/app-backend-patterns/id-convention.md
- *     .claude/skills/app-backend-patterns/column-naming.md
+ * See .claude/skills/backend-patterns/id-convention.md
+ *     .claude/skills/backend-patterns/column-naming.md
  */
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
@@ -39,8 +39,7 @@ const KNOWN_TOKEN_TABLES = new Set([
   'OAuthAccessToken',
   'OAuthRefreshToken',
   'ApiKey',
-  'PasswordReset',
-  'LoadShareLink',
+  'PasswordResetToken',
   'ConversationSession',
 ]);
 
@@ -50,8 +49,6 @@ const TENANT_SCOPING_EXEMPT = new Set([
   'PlanConfig',
   'PlanEntitlement',
   'FeatureFlag',
-  'FuelCardType',
-  'BrandFuelCardAcceptance',
   // ModelPricing holds provider/model rates that apply globally — same rate
   // for every tenant. Per-tenant routing or per-tenant pricing would belong
   // on a separate join table, not on the pricing snapshot itself.

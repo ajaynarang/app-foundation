@@ -11,7 +11,7 @@ import type { AgentScope } from '@app/shared-types';
 export class UpdateOAuthClientScopesDto {
   @ApiProperty({
     type: [String],
-    example: ['fleet:read', 'loads:read'],
+    example: ['platform:read', 'documents:read'],
     description: 'New scope set (replaces the existing list)',
   })
   @IsArray()

@@ -1,8 +1,8 @@
 /**
  * Escape a value for interpolation into an HTML body.
  *
- * Notification titles and messages carry organizer- and coach-authored free
- * text (a cancellation reason, an announcement, a club name), and the email
+ * Notification titles and messages carry user-authored free
+ * text (a cancellation reason, an announcement, a workspace name), and the email
  * body interpolates them into markup. Ampersand goes first — escaping it after
  * the others would double-encode the entities they just produced.
  */

@@ -274,7 +274,7 @@ describe('DeliveryLedgerService', () => {
       expect(prisma.notificationDelivery.updateMany).not.toHaveBeenCalled();
     });
   });
-  describe('stranded rows (E95-5)', () => {
+  describe('stranded rows', () => {
     it('staleQueued ages a never-ran row from creation and a claimed row from the claim', async () => {
       const olderThan = new Date('2026-08-31T11:45:00Z');
       await service.staleQueued({ olderThan, claimed: false });

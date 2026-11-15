@@ -1,6 +1,6 @@
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 
-/** Platform kill switch. Seeded off; the sell-switch is the E95-3 entitlement. */
+/** Platform kill switch. Seeded off; the sell-switch is the plan entitlement. */
 export const WHATSAPP_FEATURE_FLAG = 'whatsapp_channel';
 
 /**

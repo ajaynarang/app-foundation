@@ -21,11 +21,7 @@ function walk(dir: string): string[] {
  * Add to this list ONLY with a justification (vendor spec, regulatory cite,
  * etc.) — the goal is to keep the list short and the convention loud.
  */
-const REGULATORY_LOWERCASE_ALLOWLIST = new Set<string>([
-  // FMCSA Electronic Logging Device (ELD) duty status codes — matches
-  // Samsara's `currentDutyStatus` and the FMCSA 49 CFR 395 §11(c)(2) values.
-  'HosStatusSchema',
-]);
+const REGULATORY_LOWERCASE_ALLOWLIST = new Set<string>([]);
 
 describe('Shared-types status enum conventions', () => {
   const files = walk(SRC_DIR);

@@ -15,26 +15,26 @@ const templates: WhatsAppTemplateMap = {
     languageCode: 'en',
     category: 'UTILITY',
     body: 'You are invited: {{1}} — {{2}}.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.message), requiredParam(ctx.tenantName)),
   },
   [NotificationType.TENANT_APPROVED]: {
     name: 'promo_v1',
     languageCode: 'en',
     category: 'MARKETING',
     body: 'News from {{1}}. Reply STOP to opt out.',
-    bodyValues: (ctx) => allParams(requiredParam(ctx.clubName)),
+    bodyValues: (ctx) => allParams(requiredParam(ctx.tenantName)),
   },
 };
 
 describe('WhatsAppTemplateRegistry', () => {
   const registry = new WhatsAppTemplateRegistry(templates);
-  const ctx = { title: 't', message: 'Come play', clubName: 'Smash Club' };
+  const ctx = { title: 't', message: 'Come play', tenantName: 'Acme Inc' };
 
   it('renders a registered template with its cleaned values', () => {
     expect(registry.resolve(NotificationType.USER_INVITATION, ctx)).toEqual({
       templateName: 'invite_v1',
       languageCode: 'en',
-      bodyValues: ['Come play', 'Smash Club'],
+      bodyValues: ['Come play', 'Acme Inc'],
     });
   });
 
@@ -44,7 +44,7 @@ describe('WhatsAppTemplateRegistry', () => {
   });
 
   it('resolves null when a required parameter is empty — never a half-filled send', () => {
-    expect(registry.resolve(NotificationType.USER_INVITATION, { ...ctx, clubName: '  ' })).toBeNull();
+    expect(registry.resolve(NotificationType.USER_INVITATION, { ...ctx, tenantName: '  ' })).toBeNull();
   });
 
   it('consentKind is marketing only for MARKETING templates; unknown types are utility', () => {

@@ -8,7 +8,7 @@ import type { AiBudgetState } from '@app/shared-types';
  * hooks) catch it and run their surface-specific fallback.
  *
  * The `detail` is intentionally vague about exact dollar figures — those are
- * internal margin numbers, not something a tenant's dispatcher should see in
+ * internal margin numbers, not something a tenant's users should see in
  * a toast. The super-admin view shows the real numbers.
  */
 export class AiBudgetExceededError extends HttpException {

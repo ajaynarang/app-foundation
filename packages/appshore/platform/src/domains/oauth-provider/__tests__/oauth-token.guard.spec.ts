@@ -76,7 +76,7 @@ describe('OAuthTokenGuard', () => {
     const payload = {
       sub: '1',
       tenantId: 1,
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       scopes: ['documents:read', 'platform:write'],
       clientId: 'client-abc',
     };
@@ -91,7 +91,7 @@ describe('OAuthTokenGuard', () => {
     expect(request.oauthUser).toEqual({
       userId: '1',
       tenantDbId: 1,
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       scopes: ['documents:read', 'platform:write'],
       clientId: 'client-abc',
     });
@@ -101,7 +101,7 @@ describe('OAuthTokenGuard', () => {
     const payload = {
       sub: '99',
       tenantId: 7,
-      role: 'DISPATCHER',
+      role: 'MEMBER',
       scopes: ['platform:read', 'documents:read'],
       clientId: 'gpt-abc',
     };

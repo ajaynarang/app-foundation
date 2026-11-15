@@ -10,14 +10,14 @@ describe('withJobLogContext', () => {
   it('sets jobName, jobId, and tenantId (from job.data) on the store', async () => {
     const job = makeJob({
       id: 'job-42',
-      name: 'samsara-sync',
+      name: 'vendor-sync',
       data: { tenantId: 7 },
     });
 
     await withJobLogContext(job, async () => {
       const ctx = requestContextStorage.getStore();
       expect(ctx).toMatchObject({
-        jobName: 'samsara-sync',
+        jobName: 'vendor-sync',
         jobId: 'job-42',
         tenantId: '7',
       });

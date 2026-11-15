@@ -52,7 +52,7 @@ export class ApiKeysService {
     // never a silent any-IP default. Matches Phase B plan exit criterion #4.
     if (writeEnabled && ipAllowlist.length === 0) {
       throw new BadRequestException(
-        'IP allowlist is required when a key has any write-tier scope (fleet:write, loads:write, comms:send, etc.). Use 0.0.0.0/0 to explicitly allow any IP.',
+        'IP allowlist is required when a key has any write-tier scope (platform:write, documents:write, comms:send, etc.). Use 0.0.0.0/0 to explicitly allow any IP.',
       );
     }
 
@@ -241,7 +241,7 @@ export class ApiKeysService {
 
     if (writeEnabled && nextIpAllowlist.length === 0) {
       throw new BadRequestException(
-        'IP allowlist is required when a key has any write-tier scope (fleet:write, loads:write, comms:send, etc.). Use 0.0.0.0/0 to explicitly allow any IP.',
+        'IP allowlist is required when a key has any write-tier scope (platform:write, documents:write, comms:send, etc.). Use 0.0.0.0/0 to explicitly allow any IP.',
       );
     }
 

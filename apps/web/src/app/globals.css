@@ -38,19 +38,6 @@
   }
 
   /* Custom animations */
-  @keyframes route-draw {
-    0% {
-      stroke-dashoffset: 1000;
-    }
-    100% {
-      stroke-dashoffset: 0;
-    }
-  }
-
-  .animate-route-draw {
-    animation: route-draw 3s ease-out forwards;
-  }
-
   @keyframes shake {
     0%,
     100% {

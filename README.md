@@ -20,7 +20,7 @@ endpoint.
 ## What you get on day one
 
 - **Auth that just works** — email+password out of the box (zero external services),
-  phone OTP/PIN, optional Firebase; JWT + rotating refresh tokens; full **OAuth 2.1
+  phone OTP/PIN, optional Firebase; JWT + revocable refresh tokens; full **OAuth 2.1
   provider** (PKCE) so MCP clients like Claude can "Sign in with _your app_".
 - **Four tenancy models, one env var** — classic multi-tenant, Slack-style
   workspaces (one user ↔ many workspaces with a role in each), dedicated single-tenant,
@@ -54,7 +54,9 @@ pnpm docker:up         # Postgres 16 (pgvector) + Redis 7
 cd apps/backend && cp .env.example .env && cd ../..
 cp apps/web/.env.example apps/web/.env.local
 
+pnpm --filter @app/shared-types build
 pnpm backend:prisma:generate
+pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
 cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed && cd ../..
 pnpm dev               # backend :8000 · web :3000 · console :3002
 ```

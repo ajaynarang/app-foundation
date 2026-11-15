@@ -102,19 +102,12 @@ describe('EmailService', () => {
     });
 
     it('should include accept URL with invitation token', async () => {
-      await service.sendUserInvitation(
-        'user@example.com',
-        'John',
-        'Doe',
-        'Admin User',
-        'Acme Freight',
-        'token-abc-123',
-      );
+      await service.sendUserInvitation('user@example.com', 'John', 'Doe', 'Admin User', 'Acme Inc', 'token-abc-123');
 
       expect(sendSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'user@example.com',
-          subject: expect.stringContaining('Acme Freight'),
+          subject: expect.stringContaining('Acme Inc'),
         }),
       );
 
@@ -149,7 +142,7 @@ describe('EmailService', () => {
     });
 
     it('should generate subdomain-based login URL', async () => {
-      await service.sendTenantApprovalEmail('owner@acme.com', 'John', 'Acme Freight', 'acme');
+      await service.sendTenantApprovalEmail('owner@acme.com', 'John', 'Acme Inc', 'acme');
 
       const html = sendSpy.mock.calls[0][0].html;
       expect(html).toContain('acme.app.appshore.in');

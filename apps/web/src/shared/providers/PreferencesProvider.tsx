@@ -76,8 +76,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   }, [user, loadAllPreferences]);
 
   const formatters = useMemo<Formatters>(() => {
-    // `distanceUnit` was a trucking-era preference; the generic preferences
-    // shape no longer carries it, so the formatter defaults to MILES.
+    // The preferences shape carries no distance unit, so the formatter defaults to MILES.
     const du: 'MILES' | 'KILOMETERS' = 'MILES';
     const tf = (userPreferences?.timeFormat as '12H' | '24H') || '12H';
     const df = userPreferences?.dateFormat || 'MM/DD/YYYY';

@@ -580,7 +580,7 @@ export function TenantPlanBillingTab({
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Trucks</Label>
+                  <Label className="text-xs">Seats</Label>
                   <Input
                     type="number"
                     min="1"
@@ -615,7 +615,7 @@ export function TenantPlanBillingTab({
                     <AlertDialogDescription>
                       This will create a Stripe subscription for this tenant on the{' '}
                       <strong>{SUBSCRIBABLE_PLANS.find((p) => p.value === subPlan)?.label ?? subPlan}</strong> plan with{' '}
-                      {subQuantity} truck
+                      {subQuantity} seat
                       {parseInt(subQuantity) !== 1 ? 's' : ''}.
                       {subCustomPrice && ` Custom price: $${parseFloat(subCustomPrice).toFixed(2)}/unit/mo.`} The tenant
                       will be billed immediately.
@@ -652,7 +652,7 @@ export function TenantPlanBillingTab({
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Trucks</Label>
+                <Label className="text-xs">Seats</Label>
                 <Input
                   type="number"
                   min="1"
@@ -687,7 +687,7 @@ export function TenantPlanBillingTab({
                   <AlertDialogDescription>
                     This will create a Stripe subscription for this tenant on the{' '}
                     <strong>{SUBSCRIBABLE_PLANS.find((p) => p.value === subPlan)?.label ?? subPlan}</strong> plan with{' '}
-                    {subQuantity} truck
+                    {subQuantity} seat
                     {parseInt(subQuantity) !== 1 ? 's' : ''}.
                     {subCustomPrice && ` Custom price: $${parseFloat(subCustomPrice).toFixed(2)}/unit/mo.`} The tenant
                     will be billed immediately.

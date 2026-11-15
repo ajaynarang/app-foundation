@@ -52,8 +52,8 @@ describe('DeadLetterService', () => {
     };
     return {
       id: 'bull-job-99',
-      name: 'sync-fleet',
-      queueName: 'fleet-pipeline',
+      name: 'sync-records',
+      queueName: 'sync-pipeline',
       attemptsMade: 3,
       data: envelope,
       ...overrides,
@@ -74,8 +74,8 @@ describe('DeadLetterService', () => {
     expect(createArg.data.id).toMatch(UUID_V7_REGEX);
     expect(createArg.data).toMatchObject({
       tenantId: 42,
-      queueName: 'fleet-pipeline',
-      jobName: 'sync-fleet',
+      queueName: 'sync-pipeline',
+      jobName: 'sync-records',
       bullJobId: 'bull-job-99',
       correlationId: 'corr-1',
       causationId: 'cause-1',

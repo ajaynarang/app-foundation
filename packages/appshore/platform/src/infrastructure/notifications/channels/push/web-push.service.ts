@@ -40,8 +40,8 @@ export class PushService {
   async saveSubscription(userId: number, tenantId: number, subscription: PushSubscriptionInput) {
     // An endpoint identifies a BROWSER, not a person, and a browser has exactly
     // one owner at a time. If someone else still claims this endpoint they signed
-    // out of it — leaving their row in place would push their draws and match
-    // times to whoever is sitting at this machine now.
+    // out of it — leaving their row in place would push their notifications to
+    // whoever is sitting at this machine now.
     await this.prisma.pushSubscription.deleteMany({
       where: { endpoint: subscription.endpoint, userId: { not: userId } },
     });

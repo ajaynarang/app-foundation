@@ -12,7 +12,7 @@ describe('KnowledgeBaseService', () => {
       $queryRawUnsafe: jest.fn().mockResolvedValue([
         {
           document_id: 'doc_001',
-          title: 'Route Planning',
+          title: 'Audit Log',
           content: 'The platform optimizes your workflows...',
           document_type: 'feature',
           audience: 'user',
@@ -36,12 +36,12 @@ describe('KnowledgeBaseService', () => {
 
   describe('hybridSearch', () => {
     it('should return documents matching the query', async () => {
-      const results = await service.hybridSearch('How does route planning work?', {
+      const results = await service.hybridSearch('How does the audit log work?', {
         audience: 'user',
         limit: 5,
       });
 
-      expect(mockEmbedding.embedText).toHaveBeenCalledWith('How does route planning work?');
+      expect(mockEmbedding.embedText).toHaveBeenCalledWith('How does the audit log work?');
       expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalled();
       expect(results).toHaveLength(1);
       expect(results[0].documentId).toBe('doc_001');

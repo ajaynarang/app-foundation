@@ -6,10 +6,10 @@ describe('FeatureFlagsController', () => {
 
   beforeEach(() => {
     service = {
-      getAllFlags: jest.fn().mockResolvedValue([{ key: 'shield', enabled: true }]),
-      getFlagByKey: jest.fn().mockResolvedValue({ key: 'shield', enabled: true }),
+      getAllFlags: jest.fn().mockResolvedValue([{ key: 'reports', enabled: true }]),
+      getFlagByKey: jest.fn().mockResolvedValue({ key: 'reports', enabled: true }),
       isEnabled: jest.fn().mockResolvedValue(true),
-      toggleFlag: jest.fn().mockResolvedValue({ key: 'shield', enabled: false }),
+      toggleFlag: jest.fn().mockResolvedValue({ key: 'reports', enabled: false }),
     };
     controller = new FeatureFlagsController(service);
   });
@@ -20,8 +20,8 @@ describe('FeatureFlagsController', () => {
   });
 
   it('getFlagByKey returns flag', async () => {
-    const result = await controller.getFlagByKey('shield');
-    expect(result.key).toBe('shield');
+    const result = await controller.getFlagByKey('reports');
+    expect(result.key).toBe('reports');
   });
 
   it('getFlagByKey throws when not found', async () => {
@@ -30,15 +30,15 @@ describe('FeatureFlagsController', () => {
   });
 
   it('isEnabled returns key and enabled status', async () => {
-    const result = await controller.isEnabled('shield');
-    expect(result).toEqual({ key: 'shield', enabled: true });
+    const result = await controller.isEnabled('reports');
+    expect(result).toEqual({ key: 'reports', enabled: true });
   });
 
   it('updateFlag delegates to service', async () => {
-    const result = await controller.updateFlag('shield', {
+    const result = await controller.updateFlag('reports', {
       enabled: false,
     });
-    expect(service.toggleFlag).toHaveBeenCalledWith('shield', false);
+    expect(service.toggleFlag).toHaveBeenCalledWith('reports', false);
     expect(result.enabled).toBe(false);
   });
 });

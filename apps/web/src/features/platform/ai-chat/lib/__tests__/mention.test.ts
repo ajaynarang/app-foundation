@@ -23,7 +23,7 @@ describe('getMentionFragment', () => {
     expect(getMentionFragment('@wal more', 4)).toEqual({ at: 0, query: 'wal' });
   });
   it('returns null when there is no @', () => {
-    expect(at('show me loads')).toBeNull();
+    expect(at('show me projects')).toBeNull();
   });
 });
 

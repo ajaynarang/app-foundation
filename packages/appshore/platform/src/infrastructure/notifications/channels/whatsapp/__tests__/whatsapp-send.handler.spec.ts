@@ -32,7 +32,7 @@ describe('WhatsAppSendHandler', () => {
     deliveryId: 'd1',
     userId: 7,
     type: NotificationType.INTEGRATION_SYNC_COMPLETED,
-    send: { templateName: 'tx_draw_published_v1', languageCode: 'en', bodyValues: ['x', 'c'] },
+    send: { templateName: 'sync_completed_v1', languageCode: 'en', bodyValues: ['x', 'c'] },
   };
   const job = (attemptsMade = 0, attempts = 5): Job<JobEnvelope<WhatsAppSendJobPayload>> =>
     ({
@@ -76,7 +76,7 @@ describe('WhatsAppSendHandler', () => {
 
     expect(whatsapp.sendTemplate).toHaveBeenCalledWith({
       to: '+919876543210',
-      templateName: 'tx_draw_published_v1',
+      templateName: 'sync_completed_v1',
       languageCode: 'en',
       bodyValues: ['x', 'c'],
       callbackData: 'd1',
