@@ -10,7 +10,7 @@ import { RefreshJwtStrategy } from './strategies/refresh-jwt.strategy';
 import { RefreshSessionService } from './refresh-session.service';
 import { IdentityResolverService } from './identity-resolver.service';
 import { EmailUniquenessCheck } from './email-uniqueness.check';
-import { FirebaseAuthService } from './firebase-auth.service';
+import { FirebaseAuthModule } from './firebase-auth.module';
 import { PinService } from './pin.service';
 import { PrismaModule } from '../infrastructure/database/prisma.module';
 import { LoginEventService } from './login-event.service';
@@ -26,6 +26,7 @@ import { EmailVerificationModule } from './email-verification.module';
   imports: [
     PrismaModule,
     EmailVerificationModule,
+    FirebaseAuthModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -49,7 +50,6 @@ import { EmailVerificationModule } from './email-verification.module';
     EmailUniquenessCheck,
     JwtStrategy,
     RefreshJwtStrategy,
-    FirebaseAuthService,
     PinService,
     LoginEventService,
     LoginEventCleanupJobHandler,
@@ -59,7 +59,7 @@ import { EmailVerificationModule } from './email-verification.module';
     EmailVerificationModule,
     AuthService,
     JwtTokenService,
-    FirebaseAuthService,
+    FirebaseAuthModule,
     PinService,
     LoginEventService,
     LoginEventCleanupJobHandler,

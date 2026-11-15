@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 
+import { FirebaseAuthService } from '../../../auth/firebase-auth.service';
 import { EmailVerificationService } from '../../../auth/email-verification.service';
 import { TenantsService } from '../tenants.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
@@ -30,6 +31,7 @@ describe('TenantsService — organization profile', () => {
         { provide: AppCacheService, useValue: cache },
         { provide: NotificationService, useValue: {} },
         { provide: EmailVerificationService, useValue: {} },
+        { provide: FirebaseAuthService, useValue: {} },
         { provide: TENANT_PROVISION_HOOKS, useValue: {} },
       ],
     }).compile();
