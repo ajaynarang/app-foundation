@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
@@ -42,7 +41,6 @@ import {
   type SubPanelId,
   type UserRole,
 } from '@appshore/web-core/shared/lib/navigation';
-import { openDocs } from '@appshore/web-core/shared/lib/console-url';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 import { ThemeToggle } from './ThemeToggle';
 import { FontSizeControl } from './FontSizeControl';
@@ -450,23 +448,14 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                 {/* Links — hide tenant-facing items for super admin */}
                 <div className="p-1">
                   {user?.role !== 'SUPER_ADMIN' && (
-                    <>
-                      <Link
-                        href="/settings/support"
-                        onClick={() => setPopoverOpen(false)}
-                        className="flex items-center gap-3 w-full px-3 py-1.5 rounded-md text-xs hover:bg-muted transition-colors text-muted-foreground"
-                      >
-                        <Headset className="h-3.5 w-3.5" />
-                        <span>Support</span>
-                      </Link>
-                      <button
-                        onClick={() => openDocs()}
-                        className="flex items-center gap-3 w-full px-3 py-1.5 rounded-md text-xs hover:bg-muted transition-colors text-muted-foreground"
-                      >
-                        <BookOpen className="h-3.5 w-3.5" />
-                        <span>Documentation</span>
-                      </button>
-                    </>
+                    <Link
+                      href="/settings/support"
+                      onClick={() => setPopoverOpen(false)}
+                      className="flex items-center gap-3 w-full px-3 py-1.5 rounded-md text-xs hover:bg-muted transition-colors text-muted-foreground"
+                    >
+                      <Headset className="h-3.5 w-3.5" />
+                      <span>Support</span>
+                    </Link>
                   )}
                   <Link
                     href="/legal/privacy"

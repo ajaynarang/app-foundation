@@ -32,7 +32,7 @@ export function AppAIProvider() {
   // The assistant is an authenticated-only surface in the starter.
   if (!isAuthenticated) return null;
 
-  // Platform super-admins manage the console, not end-user chat.
+  // Platform super-admins manage the platform (/admin), not end-user chat.
   if (user?.role === 'SUPER_ADMIN') return null;
 
   return <AssistantStrip />;

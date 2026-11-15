@@ -5,7 +5,7 @@ export interface OnboardingItem {
   complete: boolean;
   statusText: string;
   actionLink: string;
-  actionType: 'link' | 'chat' | 'sheet' | 'console';
+  actionType: 'link' | 'chat' | 'sheet';
 }
 
 export interface MilestoneStatus {

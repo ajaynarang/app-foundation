@@ -34,8 +34,8 @@ export class OnboardingService {
         description: 'Add admins and members to your workspace',
         complete: teamResult.count > 1,
         statusText: teamResult.count > 1 ? `${teamResult.count} team members` : 'Just you',
-        actionLink: '/settings/users',
-        actionType: 'console',
+        actionLink: '/settings/members',
+        actionType: 'link',
       },
     ];
 
@@ -46,8 +46,9 @@ export class OnboardingService {
         description: 'Link an external system to sync data automatically',
         complete: integrationResult.connected,
         statusText: integrationResult.connected ? `${integrationResult.connectedSystem} connected` : 'Not connected',
-        actionLink: '/settings/integrations',
-        actionType: 'console',
+        // The template ships no integrations screen; point this at yours when the product adds one.
+        actionLink: '/settings',
+        actionType: 'link',
       },
     ];
 

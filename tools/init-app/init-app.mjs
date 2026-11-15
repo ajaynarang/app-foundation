@@ -7,13 +7,13 @@
  *
  * What it renames (discovered by scanning the repo — see RULES below):
  *   - `app-foundation`            → <name>            (package names, README, CLAUDE.md, landing page)
- *   - `app-backend|frontend|console` → <name>-*       (Doppler projects via doppler.yaml + scripts,
+ *   - `app-backend|frontend`      → <name>-*          (Doppler projects via doppler.yaml + scripts,
  *                                                      OTel/Grafana service names, compose services)
  *   - `app-postgres|redis|loki|tempo|grafana|inngest` → <name>-*  (docker container names)
  *   - `__PROJECT__`               → <name>            (Terraform state bucket in infra/)
  *   - terraform var.project default `"app"` → <name>
  *   - postgres db `app` (DATABASE_URL + POSTGRES_DB)  → <db>
- *   - branding string `Platform`  → <display-name>    (targeted files only — web/console layout
+ *   - branding string `Platform`  → <display-name>    (targeted files only — web layout
  *                                                      metadata, login, PublicLayout, landing page)
  *   - PROJECT_NAME / MULTI_TENANT / NEXT_PUBLIC_MULTI_TENANT in .env.example files
  *   - `@app/` workspace scope     → <scope>/          (only when --scope is not @app)
@@ -168,7 +168,6 @@ const BRANDING_FILES = [
   'apps/web/src/app/page.tsx',
   'apps/web/src/features/auth/components/login-form.tsx',
   'apps/web/src/shared/components/layout/PublicLayout.tsx',
-  'apps/console/src/app/layout.tsx',
   'apps/mobile/lib/core/app_config.dart',
 ];
 
@@ -183,8 +182,8 @@ function buildRules(cfg) {
       apply: (s) => s.replaceAll(TEMPLATE_NAME, name),
     },
     {
-      id: `app-{backend,frontend,console} → ${name}-*`,
-      apply: (s) => s.replace(/\bapp-(backend|frontend|console)\b/g, `${name}-$1`),
+      id: `app-{backend,frontend} → ${name}-*`,
+      apply: (s) => s.replace(/\bapp-(backend|frontend)\b/g, `${name}-$1`),
     },
     {
       id: `app-{postgres,redis,loki,tempo,grafana,inngest} → ${name}-*`,
@@ -341,7 +340,7 @@ if (!dryRun) {
     1. pnpm install                       # refresh the lockfile (required after a scope rename)
     2. Secrets: see docs/doppler.md       # or: cp apps/backend/.env.example apps/backend/.env
                                           #     cp apps/web/.env.example apps/web/.env.local
-       Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend, ${cfg.name}-console
+       Doppler projects to create: ${cfg.name}-backend, ${cfg.name}-frontend
     3. pnpm docker:up
     4. cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed
     5. pnpm dev                           # web :3000, backend :8000${cfg.mobile === 'yes' ? `

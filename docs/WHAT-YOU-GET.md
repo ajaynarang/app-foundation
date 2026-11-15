@@ -2,7 +2,7 @@
 
 This repo is the **AppShore Platform Starter** — the golden path for new AppShore products.
 Clone it, run one command, and you have a working product skeleton: backend API, web app,
-admin console, and a mobile app, with the hard cross-cutting work already done, tested, and
+and a mobile app, with the hard cross-cutting work already done, tested, and
 wired together. **There is no business logic in here** — no "orders", no "projects". That
 empty space is yours.
 
@@ -22,7 +22,7 @@ cd apps/backend && cp .env.example .env && cd ../..
 cp apps/web/.env.example apps/web/.env.local
 pnpm backend:prisma:generate
 cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed && cd ../..
-pnpm dev                                       # backend :8000 · web :3000 · console :3002
+pnpm dev                                       # backend :8000 · web :3000
 ```
 
 The seed prints ready-to-use **dev credentials** (non-production only):
@@ -95,13 +95,12 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 - OpenTelemetry traces, structured pino logs, Loki/Tempo/Grafana docker profile, health
   endpoints (`/api/v1/health/live`, `/health/ready`).
 
-**Four apps**
+**Three apps**
 
 | App            | What it is                                                                            |
 | -------------- | ------------------------------------------------------------------------------------- |
 | `apps/backend` | NestJS 11 API — your domains go in `src/domains/`                                     |
 | `apps/web`     | Next.js 15 product app — login, registration, settings (15 pages), AI chat, admin     |
-| `apps/console` | Next.js 15 super-admin/ops hub + API docs playground                                  |
 | `apps/mobile`  | Flutter companion — status screen + phone sign-in, your screens go in `lib/features/` |
 
 **Delivery**
@@ -115,8 +114,8 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 ## 🔔 Notifications (in-app, email, web push, FCM, SMS, WhatsApp)
 
 One pipeline, every channel, policy-driven. `PlatformNotificationsModule` (in `@appshore/platform`)
-resolves _who gets what, where_ and writes a per-channel delivery ledger you can query from the
-console. Your app contributes three things, all bound in `apps/backend/src/platform-glue/hooks.module.ts`:
+resolves _who gets what, where_ and writes a per-channel delivery ledger you can query. Your
+app contributes three things, all bound in `apps/backend/src/platform-glue/hooks.module.ts`:
 
 | Token                   | What you bind                                                                                                                                                                                                 | Default                                                                                |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |

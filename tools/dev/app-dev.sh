@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
-# app-dev.sh — run backend + web + console side-by-side with custom ports.
+# app-dev.sh — run backend + web side-by-side with custom ports.
 #
-# Opens iTerm2 with 3 tabs (backend / web / console), each running its
-# app under Doppler. Env vars are auto-wired so the frontends call the
-# right backend and CORS allows the chosen frontend ports.
+# Opens iTerm2 with 2 tabs (backend / web), each running its app under
+# Doppler. Env vars are auto-wired so the web app calls the right backend
+# and CORS allows the chosen web port.
 #
 # Usage:
-#   tools/dev/app-dev.sh                          # defaults: 8001 / 3001 / 3002
-#   tools/dev/app-dev.sh --offset 3               # shifts all three by +3
-#   tools/dev/app-dev.sh --backend 8004 --web 3010 --console 3012
-#   tools/dev/app-dev.sh --backend 8004 --web 3010 --no-console
+#   tools/dev/app-dev.sh                          # defaults: 8001 / 3001
+#   tools/dev/app-dev.sh --offset 3               # shifts both by +3
+#   tools/dev/app-dev.sh --backend 8004 --web 3010
 #   tools/dev/app-dev.sh --stop                   # kill whatever is on default ports
-#   tools/dev/app-dev.sh --stop --backend 8004 --web 3010 --console 3012
+#   tools/dev/app-dev.sh --stop --backend 8004 --web 3010
 #
 # Flags:
 #   --backend <port>   backend port (default 8001)
 #   --web <port>       web port (default 3001)
-#   --console <port>   console port (default 3002)
 #   --offset <n>       shift defaults by n
 #   --no-backend       skip backend
 #   --no-web           skip web
-#   --no-console       skip console
 #   --stop             kill processes listening on the specified ports and exit
 #   -h, --help         show this help
 
@@ -29,19 +26,17 @@ set -euo pipefail
 # ---- defaults ----
 BACKEND_PORT=8001
 WEB_PORT=3001
-CONSOLE_PORT=3002
 RUN_BACKEND=1
 RUN_WEB=1
-RUN_CONSOLE=1
 OFFSET=0
 STOP_MODE=0
 
 # ---- colors ----
 if [ -t 1 ]; then
   C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_GRN=$'\033[32m'; C_YLW=$'\033[33m'
-  C_BLU=$'\033[34m'; C_MAG=$'\033[35m'; C_RED=$'\033[31m'; C_RST=$'\033[0m'
+  C_BLU=$'\033[34m'; C_RED=$'\033[31m'; C_RST=$'\033[0m'
 else
-  C_BOLD=''; C_DIM=''; C_GRN=''; C_YLW=''; C_BLU=''; C_MAG=''; C_RED=''; C_RST=''
+  C_BOLD=''; C_DIM=''; C_GRN=''; C_YLW=''; C_BLU=''; C_RED=''; C_RST=''
 fi
 
 usage() {
@@ -54,11 +49,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --backend)    BACKEND_PORT="$2"; shift 2 ;;
     --web)        WEB_PORT="$2"; shift 2 ;;
-    --console)    CONSOLE_PORT="$2"; shift 2 ;;
     --offset)     OFFSET="$2"; shift 2 ;;
     --no-backend) RUN_BACKEND=0; shift ;;
     --no-web)     RUN_WEB=0; shift ;;
-    --no-console) RUN_CONSOLE=0; shift ;;
     --stop)       STOP_MODE=1; shift ;;
     -h|--help)    usage ;;
     *)            echo "${C_RED}Unknown flag: $1${C_RST}"; usage ;;
@@ -68,7 +61,6 @@ done
 if [[ "$OFFSET" != "0" ]]; then
   BACKEND_PORT=$((BACKEND_PORT + OFFSET))
   WEB_PORT=$((WEB_PORT + OFFSET))
-  CONSOLE_PORT=$((CONSOLE_PORT + OFFSET))
 fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -97,7 +89,6 @@ if [[ $STOP_MODE -eq 1 ]]; then
   }
   [[ $RUN_BACKEND -eq 1 ]] && kill_port "$BACKEND_PORT" backend
   [[ $RUN_WEB     -eq 1 ]] && kill_port "$WEB_PORT"     web
-  [[ $RUN_CONSOLE -eq 1 ]] && kill_port "$CONSOLE_PORT" console
   exit 0
 fi
 
@@ -126,7 +117,6 @@ check_port() {
 any_err=0
 [[ $RUN_BACKEND -eq 1 ]] && { check_port "$BACKEND_PORT" backend || any_err=1; }
 [[ $RUN_WEB     -eq 1 ]] && { check_port "$WEB_PORT"     web     || any_err=1; }
-[[ $RUN_CONSOLE -eq 1 ]] && { check_port "$CONSOLE_PORT" console || any_err=1; }
 [[ $any_err -ne 0 ]] && exit 1
 
 API_URL="http://localhost:${BACKEND_PORT}/api/v1"
@@ -134,7 +124,6 @@ API_URL="http://localhost:${BACKEND_PORT}/api/v1"
 # Exact CORS origins for this run (option B — explicit allowlist).
 cors_parts=()
 [[ $RUN_WEB     -eq 1 ]] && cors_parts+=("http://localhost:${WEB_PORT}")
-[[ $RUN_CONSOLE -eq 1 ]] && cors_parts+=("http://localhost:${CONSOLE_PORT}")
 CORS_ORIGINS_VALUE=$(IFS=, ; echo "${cors_parts[*]}")
 
 # ---- banner ----
@@ -143,8 +132,7 @@ echo "${C_BOLD}App dev — side-by-side stack${C_RST}"
 echo "${C_DIM}─────────────────────────────────${C_RST}"
 [[ $RUN_BACKEND -eq 1 ]] && echo "  ${C_BLU}backend${C_RST}  http://localhost:${C_BOLD}${BACKEND_PORT}${C_RST}"
 [[ $RUN_WEB     -eq 1 ]] && echo "  ${C_GRN}web    ${C_RST}  http://localhost:${C_BOLD}${WEB_PORT}${C_RST}"
-[[ $RUN_CONSOLE -eq 1 ]] && echo "  ${C_MAG}console${C_RST}  http://localhost:${C_BOLD}${CONSOLE_PORT}${C_RST}"
-echo "${C_DIM}  API URL for frontends: ${API_URL}${C_RST}"
+echo "${C_DIM}  API URL for the web app: ${API_URL}${C_RST}"
 echo "${C_DIM}  CORS origins:          ${CORS_ORIGINS_VALUE:-<none>}${C_RST}"
 echo "${C_DIM}─────────────────────────────────${C_RST}"
 echo "${C_DIM}Opening iTerm2 tabs…${C_RST}"
@@ -245,13 +233,6 @@ if [[ $RUN_WEB -eq 1 ]]; then
     "$(make_banner 'app-web    ' "$WEB_PORT" "$C_GRN")"
 fi
 
-# Console: its package.json dev script hardcodes `-p 3002`, so we bypass it.
-if [[ $RUN_CONSOLE -eq 1 ]]; then
-  open_tab "console :${CONSOLE_PORT} [${GIT_BRANCH}]" "$REPO_ROOT/apps/console" \
-    "env NEXT_PUBLIC_API_URL='${API_URL}' doppler run ${DOPPLER_PRESERVE} -- pnpm exec next dev -p ${CONSOLE_PORT}" \
-    "$(make_banner 'app-console' "$CONSOLE_PORT" "$C_MAG")"
-fi
-
 echo "${C_GRN}Done.${C_RST} Tabs opened in iTerm2."
 echo "${C_DIM}Stop everything later with:${C_RST}"
-echo "  ${C_BOLD}./tools/dev/app-dev.sh --stop --backend ${BACKEND_PORT} --web ${WEB_PORT} --console ${CONSOLE_PORT}${C_RST}"
+echo "  ${C_BOLD}./tools/dev/app-dev.sh --stop --backend ${BACKEND_PORT} --web ${WEB_PORT}${C_RST}"

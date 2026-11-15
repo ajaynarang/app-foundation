@@ -1,14 +1,15 @@
 # .github/workflows/ci.yml
-# Runs on every push to main and every PR targeting it.
-# Blocks merge if lint, type-check, test, or build fails.
+# Manual by default: run it from the Actions tab (or `gh workflow run ci.yml`).
+# To run on every push to main and every PR targeting it, uncomment the two
+# triggers below. Fails if lint, type-check, test, or build fails.
 
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -143,48 +144,6 @@ jobs:
 
       - name: Build (verify compilation)
         run: pnpm --filter=@app/web build
-        env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-placeholder.firebasestorage.app
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
-          NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
-
-  # ─────────────────────────────────────────────────────────────
-  # Console CI
-  # ─────────────────────────────────────────────────────────────
-  console:
-    name: Console — Lint, Type-check, Build
-    runs-on: ubuntu-latest # runs-on: self-hosted
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared packages
-        run: pnpm --filter=shared-types build
-
-      - name: Lint
-        run: pnpm --filter=@app/console lint
-
-      - name: Type-check
-        run: pnpm --filter=@app/console type-check
-
-      - name: Build (verify compilation)
-        run: pnpm --filter=@app/console build
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCI-PLACEHOLDER-KEY
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com

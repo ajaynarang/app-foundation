@@ -6,15 +6,8 @@ import { Button } from '@app/ui/components/ui/button';
 import { mailto } from '@appshore/web-core/shared/lib/contacts';
 import { openCookiePreferences } from '@/shared/components/cookie-consent';
 
-const consoleUrl = process.env.NEXT_PUBLIC_CONSOLE_URL || 'http://localhost:3002';
-
 const linkGroups: { label: string; href: string; external?: boolean }[][] = [
   [
-    {
-      label: 'API Docs',
-      href: `${consoleUrl}/docs`,
-      external: true,
-    },
     {
       label: 'Contact',
       href: mailto('app'),

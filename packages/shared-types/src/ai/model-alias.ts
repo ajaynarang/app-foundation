@@ -10,7 +10,7 @@ import { z } from 'zod';
  *   standard → Sonnet tier  — reasoning, extraction, structured outputs
  *   powerful → Opus tier    — complex extraction, critical-path fallbacks
  *
- * Kept in shared-types so backend services and future console/UI code use the
+ * Kept in shared-types so backend services and UI code use the
  * same vocabulary.
  */
 export const MODEL_ALIASES = ['fast', 'standard', 'powerful'] as const;

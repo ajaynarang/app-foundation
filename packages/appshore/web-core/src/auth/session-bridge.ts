@@ -2,7 +2,7 @@
  * Session bridge — the ONLY seam between @appshore/web-core and the app's
  * auth feature. web-core never imports app code; instead the app registers
  * its Zustand auth store here (see features/auth), and core modules (api
- * client, SSE provider, console-url) read the session through this bridge.
+ * client, SSE provider) read the session through this bridge.
  */
 
 export interface SessionUser {

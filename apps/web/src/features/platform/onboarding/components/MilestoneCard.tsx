@@ -7,7 +7,6 @@ import { Badge } from '@app/ui/components/ui/badge';
 import { Button } from '@app/ui/components/ui/button';
 import { cn } from '@app/ui';
 import { useRouter } from 'next/navigation';
-import { openConsole } from '@appshore/web-core/shared/lib/console-url';
 import type { MilestoneStatus, OnboardingItem, OnboardingPath } from '../types';
 
 interface MilestoneCardProps {
@@ -27,10 +26,6 @@ export function MilestoneCard({ milestone, milestoneNumber, defaultExpanded = fa
     if (item.complete) return;
     if (item.actionType === 'chat' && onOpenChat) {
       onOpenChat();
-      return;
-    }
-    if (item.actionType === 'console' && item.actionLink) {
-      openConsole(item.actionLink);
       return;
     }
     if (item.actionLink) {
@@ -93,9 +88,7 @@ export function MilestoneCard({ milestone, milestoneNumber, defaultExpanded = fa
                   <Button
                     key={path.id}
                     variant="outline"
-                    onClick={() =>
-                      path.actionType === 'console' ? openConsole(path.actionLink) : router.push(path.actionLink)
-                    }
+                    onClick={() => router.push(path.actionLink)}
                     className="h-auto flex-col items-start gap-1 p-4 text-left"
                   >
                     <span className="text-sm font-semibold text-foreground">{path.title}</span>

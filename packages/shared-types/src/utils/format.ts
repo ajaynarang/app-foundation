@@ -1,6 +1,6 @@
 /**
  * Shared formatting utilities for pricing and plan display.
- * Used across web, console, and backend apps.
+ * Used across the web and backend apps.
  */
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {

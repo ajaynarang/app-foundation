@@ -67,5 +67,17 @@ describe('OnboardingService', () => {
       const integrationItem = result.milestones[1].items.find((i) => i.id === 'integrations');
       expect(integrationItem.statusText).toBe('QUICKBOOKS connected');
     });
+
+    it('sends every action to a web-app route: inviting the team opens Settings › Members', async () => {
+      setupDefaults();
+      const result = await service.getOnboardingStatus(1);
+      const items = result.milestones.flatMap((m) => m.items);
+
+      expect(items.find((i) => i.id === 'team').actionLink).toBe('/settings/members');
+      for (const item of items) {
+        expect(['link', 'chat', 'sheet']).toContain(item.actionType);
+        if (item.actionType === 'link') expect(item.actionLink).toMatch(/^\/(settings|onboarding|ai)(\/|$)/);
+      }
+    });
   });
 });

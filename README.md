@@ -33,8 +33,8 @@ endpoint.
 - **The plumbing** — BullMQ jobs with dead-letter handling, typed domain events → SSE
   realtime + outbound webhooks, multi-channel notifications (in-app/push/SMS/email), S3
   file storage, OpenTelemetry + Grafana stack, health endpoints.
-- **Four apps** — NestJS API, Next.js product app, Next.js admin console, and a
-  Flutter mobile companion.
+- **Three apps** — NestJS API, Next.js product app (tenant Settings and the super-admin
+  screens included), and a Flutter mobile companion.
 - **Delivery** — docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache),
   GitHub Actions CI, Playwright QA suite that runs on a fresh clone.
 
@@ -58,7 +58,7 @@ pnpm --filter @app/shared-types build
 pnpm backend:prisma:generate
 pnpm --filter @appshore/kernel --filter @appshore/db --filter @appshore/platform build
 cd apps/backend && pnpm prisma:migrate:deploy && pnpm db:seed && cd ../..
-pnpm dev               # backend :8000 · web :3000 · console :3002
+pnpm dev               # backend :8000 · web :3000
 ```
 
 The seed prints **ready-to-use dev credentials** (non-production only):
@@ -90,13 +90,11 @@ flowchart TB
     subgraph yours["your product"]
         backend["apps/backend<br/><i>your domains + platform-glue</i>"]
         web["apps/web<br/><i>your features</i>"]
-        console["apps/console<br/><i>ops hub</i>"]
         mobile["apps/mobile<br/><i>Flutter companion</i>"]
     end
 
     kernel --> db --> plat --> backend
     kernel --> webcore --> web
-    plat --> console
     backend -.REST + SSE.-> web
     backend -.REST.-> mobile
 ```

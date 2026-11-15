@@ -57,10 +57,10 @@ describe('NotificationTriggersService', () => {
   it.each([
     ['integrationSyncCompleted', NotificationType.INTEGRATION_SYNC_COMPLETED, 'Sync Complete'],
     ['integrationSyncFailed', NotificationType.INTEGRATION_SYNC_FAILED, 'Sync Failed'],
-  ] as const)('%s deep-links staff to the connections page', async (method, type, titleTail) => {
+  ] as const)('%s links staff to a web-app route, not the retired console', async (method, type, titleTail) => {
     await (service as any)[method](7, 'HubSpot', 'details');
     expect(dispatcher.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: 'console:/integrations/connections' }),
+      expect.objectContaining({ type, title: `HubSpot ${titleTail}`, actionUrl: '/settings' }),
     );
   });
 

@@ -158,27 +158,21 @@ export function useDevSwitcher() {
         await new Promise((r) => setTimeout(r, 50));
         const redirect = searchParams.get('redirect');
         const returnTo = searchParams.get('returnTo');
-        const { url, isExternal } = resolvePostLoginRedirect({
+        const url = resolvePostLoginRedirect({
           redirect,
           returnTo,
           role: result.user.role,
         });
-        if (isExternal) {
-          const hash = `#token=${encodeURIComponent(result.accessToken)}&user=${encodeURIComponent(JSON.stringify(result.user))}`;
-          const separator = url.includes('?') ? '&' : '?';
-          window.location.href = url + separator + 'sso=1' + hash;
-        } else {
-          // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
-          const subdomain = result.user.subdomain;
-          if (subdomain) {
-            const relayUrl = buildTenantRedirectUrl(subdomain, url, result.accessToken, result.user);
-            if (relayUrl) {
-              window.location.href = relayUrl;
-              return;
-            }
+        // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
+        const subdomain = result.user.subdomain;
+        if (subdomain) {
+          const relayUrl = buildTenantRedirectUrl(subdomain, url, result.accessToken, result.user);
+          if (relayUrl) {
+            window.location.href = relayUrl;
+            return;
           }
-          router.push(url);
         }
+        router.push(url);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('[DevSwitcher] Switch failed:', err);

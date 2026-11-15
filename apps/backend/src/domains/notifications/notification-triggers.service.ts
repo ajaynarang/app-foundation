@@ -3,6 +3,7 @@ import { NotificationType, UserRole } from '@appshore/db';
 import { NotificationDispatcherService } from '@appshore/platform/infrastructure/notifications/pipeline/notification-dispatcher.service';
 import { RecipientResolutionService } from '@appshore/platform/infrastructure/notifications/pipeline/recipient-resolution.service';
 import type { DispatchRecipient } from '@appshore/platform/infrastructure/notifications/pipeline/dispatch.types';
+import { INTEGRATIONS_WEB_PATH } from '../../shared/web-routes';
 
 interface TriggerParams {
   tenantId: number;
@@ -70,8 +71,8 @@ export class NotificationTriggersService {
       type: NotificationType.INTEGRATION_SYNC_COMPLETED,
       title: `${integrationName} Sync Complete`,
       message: summary,
-      actionUrl: 'console:/integrations/connections',
-      actionLabel: 'View Integrations',
+      actionUrl: INTEGRATIONS_WEB_PATH,
+      actionLabel: 'Open Settings',
       iconType: 'integration',
       recipientRoles: STAFF,
     });
@@ -83,8 +84,8 @@ export class NotificationTriggersService {
       type: NotificationType.INTEGRATION_SYNC_FAILED,
       title: `${integrationName} Sync Failed`,
       message: error,
-      actionUrl: 'console:/integrations/connections',
-      actionLabel: 'View Integrations',
+      actionUrl: INTEGRATIONS_WEB_PATH,
+      actionLabel: 'Open Settings',
       iconType: 'integration',
       recipientRoles: STAFF,
     });

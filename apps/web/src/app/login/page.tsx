@@ -55,26 +55,21 @@ function LoginPageInner() {
         window.location.hash = '';
 
         const redirect = searchParams.get('redirect');
-        const { url, isExternal } = resolvePostLoginRedirect({
+        const url = resolvePostLoginRedirect({
           redirect,
           returnTo,
           role: devUser.role,
         });
 
-        if (isExternal) {
-          const relayHash = `#token=${encodeURIComponent(accessToken)}&user=${encodeURIComponent(JSON.stringify(devUser))}`;
-          window.location.href = url + relayHash;
-        } else {
-          // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
-          if (devUser.subdomain) {
-            const relayUrl = buildTenantRedirectUrl(devUser.subdomain, url, accessToken, devUser);
-            if (relayUrl) {
-              window.location.href = relayUrl;
-              return;
-            }
+        // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
+        if (devUser.subdomain) {
+          const relayUrl = buildTenantRedirectUrl(devUser.subdomain, url, accessToken, devUser);
+          if (relayUrl) {
+            window.location.href = relayUrl;
+            return;
           }
-          router.replace(url);
         }
+        router.replace(url);
       }
     } catch {
       // Invalid dev-switch hash — ignore, show normal login
@@ -96,27 +91,21 @@ function LoginPageInner() {
       }
 
       const redirect = searchParams.get('redirect');
-      const { url, isExternal } = resolvePostLoginRedirect({
+      const url = resolvePostLoginRedirect({
         redirect,
         returnTo,
         role: user.role,
       });
 
-      if (isExternal) {
-        const hash = `#token=${encodeURIComponent(validToken)}&user=${encodeURIComponent(JSON.stringify(user))}`;
-        const separator = url.includes('?') ? '&' : '?';
-        window.location.href = url + separator + 'sso=1' + hash;
-      } else {
-        // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
-        if (user.subdomain) {
-          const relayUrl = buildTenantRedirectUrl(user.subdomain, url, validToken, user);
-          if (relayUrl) {
-            window.location.href = relayUrl;
-            return;
-          }
+      // Redirect to tenant subdomain with auth relay (localStorage is origin-scoped)
+      if (user.subdomain) {
+        const relayUrl = buildTenantRedirectUrl(user.subdomain, url, validToken, user);
+        if (relayUrl) {
+          window.location.href = relayUrl;
+          return;
         }
-        router.push(url);
       }
+      router.push(url);
     }
   }, [_hasHydrated, isAuthenticated, user, router, searchParams, returnTo]);
 

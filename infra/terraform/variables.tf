@@ -123,7 +123,7 @@ variable "github_repo" {
 }
 
 # S3
-# Note: app-level URLs (FRONTEND_URL, CONSOLE_URL, CORS_ORIGINS, LiveKit/voice
+# Note: app-level URLs (FRONTEND_URL, CORS_ORIGINS, LiveKit/voice
 # settings, etc.) are NOT Terraform variables — they are injected at runtime
 # via Doppler (see doppler.tf and ecs.tf).
 variable "s3_cors_origins" {
