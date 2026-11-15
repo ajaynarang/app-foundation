@@ -29,6 +29,11 @@ secret.**
     `linkSharedAt`), and the link is shown once. A token never goes in a URL path, where the request log would keep
     it: the public routes take it in the body (`POST /invitations/preview`). Amended 2026-11-15. Held by
     `packages/appshore/platform/src/domains/user-invitations/__tests__/invitation-token-storage.spec.ts`.
+  - Email verification tokens: the sha256 `EmailVerificationToken.tokenHash` (`hashToken`), with the address it
+    proves; lookup is by hash, the raw token travels only in the emailed link, and a send failure is logged without
+    it. The link works only for the signed-in owner of the account. Used and expired rows are deleted after 7 days by
+    `tokens-cleanup`. Amended 2026-11-15. Held by
+    `packages/appshore/platform/src/auth/__tests__/email-verification.service.spec.ts`.
 - **Used, so encrypted.**
   - Integration credentials: `CredentialsService`
     (`apps/backend/src/domains/integrations/credentials/credentials.service.ts`) writes AES-256-GCM as

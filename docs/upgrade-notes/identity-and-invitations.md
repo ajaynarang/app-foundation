@@ -66,3 +66,75 @@ mailbox (a later entry uses `link_shared_at` for that), resend it: a resend rota
 **How to turn it back.** Deploy the previous release and restore the `token` column from a backup taken before the
 migration. The plain tokens cannot be recovered from their hashes, so without that backup every pending invitation
 must be resent after the rollback (each resend issues a new token), the same as the API-key hash migration.
+
+## 2026-11-15: email verification, and a reset of an unverified account is a reclaim
+
+**What changed.** Nothing used to verify an email: every account outside the seeds stayed `email_verified = false`,
+and no route set it. Now an address is proven by a link the account's signed-in owner opens, or by a password reset.
+
+- A new table, `email_verification_tokens`, stores only `sha256(token)` and the address the token proves. A token
+  works for 24 hours, once.
+- `POST /auth/verify-email` `{ token }` (**signed in**, STRICT throttle) answers 204 and sets `emailVerified`. The
+  token must belong to the caller: the person who clicks must also hold a credential for the account. Otherwise
+  someone who signs up as `victim@x.com` would get their account verified the moment the real owner clicks the
+  "Verify your email" message. Every refusal (unknown, used, expired, another address, another account) is one
+  400 `VERIFICATION_LINK_INVALID`. Not 401: the web reads a 401 as an expired session.
+- `POST /auth/verify-email/resend` (signed in, OTP_SEND throttle) answers 204, a no-op when already verified, and
+  429 `RATE_LIMITED` with `Retry-After` within 60 seconds of the last email.
+- Personal signup (`POST /auth/register`) and workspace registration (`POST /tenants/register`) send a verification
+  email after the signup commits. A send failure never fails the signup. A user an admin creates gets none: they
+  have no password yet, and their first reset verifies them.
+- `POST /auth/reset-password` now also sets `emailVerified = true` and uses up the account's other reset and
+  verification links. **When the account was not verified, the reset is a reclaim:** it also clears the phone, PIN
+  and Firebase uid, revokes the account's API keys and OAuth access and refresh tokens, and emails "Your password
+  was reset. Sign-in methods we removed: …". This is how the real owner of an address takes back an account someone
+  else created with it. A reset of a verified account changes none of these.
+- `tokens-cleanup` now also deletes reset and verification tokens that expired or were used more than 7 days ago
+  (reset tokens were never deleted before).
+- The web has a `/verify-email` page (public, so a signed-out click lands there and is sent to sign in first), a
+  banner "Verify your email to join other workspaces" with a resend button when `emailVerified === false`, and the
+  profile shows "Verified" only when the flag is `true` (it used to treat a missing flag as verified).
+- `AuthErrorCode` in `@app/shared-types` holds the auth domain codes: `PASSWORD_NOT_SET`,
+  `VERIFICATION_LINK_INVALID`, `EMAIL_NOT_VERIFIED`, `SIGN_IN_TO_ACCEPT`, `INVITATION_EMAIL_MISMATCH` (the last three
+  are answered once the safe accept lands).
+
+Nothing reads `emailVerified` yet. Sign-in works unverified, as before.
+
+**Who notices.**
+
+- **Every existing user is unverified.** There is no backfill: marking existing accounts verified would bless any
+  account created with someone else's address. They keep signing in and using their own workspace; the banner asks
+  them to verify. Once the safe invitation accept lands, an unverified account cannot join another workspace.
+- **A first-party reset of an existing (so unverified) account removes its phone PIN, Firebase link, API keys and
+  OAuth tokens**, and the notice email says so. If that is wrong for your product, run the verify-existing-users
+  statement below first.
+- Users of a workspace that is still pending approval cannot sign in, so their signup link may expire before they
+  can use it; the banner resends one once they can sign in.
+- A product web app that reads `emailVerified !== false` as "verified" should read `=== true`.
+
+**Wire changes.**
+
+| Before                                                  | After                                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| (none)                                                  | `POST /auth/verify-email` `{ token }`, signed in → 204; 400 `VERIFICATION_LINK_INVALID` |
+| (none)                                                  | `POST /auth/verify-email/resend`, signed in → 204; 429 `RATE_LIMITED`                   |
+| `POST /auth/reset-password` kept every other credential | same answer; also verifies, and reclaims an unverified account                          |
+
+**Schema.** One forward migration, `20261116010000_email_verification_tokens`, creates the table. No existing row
+changes.
+
+**What to do first.** If your product can prove ownership another way (for example, every account came from a
+Google sign-in that checks the mailbox), mark those accounts verified with your own predicate, so they skip the
+banner and a later reset does not reclaim them:
+
+```sql
+-- Product-owned, never run by the template: only rows whose address you can prove some other way.
+UPDATE users SET email_verified = true WHERE deleted_at IS NULL AND <your proof>;
+```
+
+The template does not run it, because it cannot tell an account its owner created from one created with someone
+else's address.
+
+**How to turn it back.** Deploy the previous release. The table can stay (nothing else reads it) or be dropped with
+`DROP TABLE email_verification_tokens;`. Accounts verified meanwhile stay verified, and a reclaim that already ran
+cannot be undone: the removed phone, Firebase link and keys must be added again.

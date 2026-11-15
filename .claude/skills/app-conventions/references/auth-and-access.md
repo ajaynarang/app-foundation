@@ -29,6 +29,10 @@ sources:
   - packages/appshore/platform/src/domains/oauth-provider/oauth-token.guard.ts#OAuthTokenGuard
   - packages/appshore/platform/src/auth/agent-principal.ts#AgentPrincipal
   - packages/appshore/platform/src/auth/token-hash.ts#hashToken
+  - packages/appshore/platform/src/auth/email-verification.service.ts#EmailVerificationService
+  - packages/appshore/platform/src/auth/auth.service.ts#resetPassword
+  - packages/appshore/platform/src/auth/tokens-cleanup.processor.ts#TokensCleanupJobHandler
+  - packages/appshore/db/prisma/migrations/20261116010000_email_verification_tokens/migration.sql
   - packages/appshore/platform/src/domains/user-invitations/user-invitations.service.ts#UserInvitationsService
   - packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts#UserInvitationsController
   - packages/appshore/db/prisma/migrations/20261116000000_invitation_token_hash/migration.sql
@@ -58,6 +62,14 @@ guards:
   - oauth-provider.security.spec.ts
   - agent-principal.spec.ts
   - token-hash.spec.ts
+  - email-verification.service.spec.ts
+  - auth.controller.spec.ts
+  - auth.service.reset-password.spec.ts
+  - auth.service.personal-provision.spec.ts
+  - tenants.service.spec.ts
+  - users.service.spec.ts
+  - tokens-cleanup.processor.spec.ts
+  - seeds-verified.spec.ts
   - invitation-token-storage.spec.ts
   - user-invitations.controller.spec.ts
   - user-invitations.service.spec.ts
@@ -93,6 +105,29 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
   that workspace only with a membership there. A password that matches accounts in several workspaces with no hint
   is a 409 `WORKSPACE_SELECTION_REQUIRED` naming them. Every miss is the same generic 401.
   [guard: auth.service.tenant-login.spec.ts, tenant-login.integration.spec.ts]
+
+### Email verification
+
+- An email address counts as proven only by: the verify link (`POST /auth/verify-email`) used by the **signed-in**
+  owner of the account the token was issued for; a completed password reset; or (once the safe accept lands) an
+  emailed invitation whose link was never shared. A token alone proves nothing: the mailbox owner may not be the
+  person who created the account. [guard: email-verification.service.spec.ts, auth.controller.spec.ts]
+- A verification token is stored only as `hashToken(token)` (`EmailVerificationToken.tokenHash`), with the address it
+  proves, for 24 hours, single use under a race (conditional update). Every refusal (unknown, used, expired, another
+  address, another account, a deleted user) is the one 400 `VERIFICATION_LINK_INVALID`, never a 401, because the web
+  treats a 401 as an expired session. A send failure is logged without the link.
+  [guard: email-verification.service.spec.ts]
+- Personal and tenant signup issue a token after the commit, and a send failure never fails the signup. An
+  admin-created account gets none (it has no credential to sign in with; its first reset verifies it). Resend is
+  signed in, with a 60-second cooldown (429 `RATE_LIMITED` with `Retry-After`). Seeded users are verified.
+  [guard: auth.service.personal-provision.spec.ts, tenants.service.spec.ts, users.service.spec.ts, seeds-verified.spec.ts]
+- A password reset marks the email verified and uses up the account's other reset and verification tokens. A reset
+  of an account that was **not** verified is a reclaim: in the same transaction it clears the phone, PIN and Firebase
+  uid and revokes the account's API keys and OAuth access and refresh tokens (as well as every refresh token), then
+  emails a notice naming what it removed. A reset of a verified account touches none of them.
+  [guard: auth.service.reset-password.spec.ts]
+- `tokens-cleanup` deletes reset and verification tokens that expired or were used more than 7 days ago.
+  [guard: tokens-cleanup.processor.spec.ts]
 
 ### Invitation tokens
 
@@ -201,8 +236,10 @@ reached through the tool pipeline, not by opening a REST route to API keys.
 
 - A route with no `@Roles` and no `@Public()`.
 - A role check standing in for a record-level check on an owned resource.
+- A public (`@Public()`) route that marks an email verified from a token alone, or an `emailVerified` read from a JWT
+  claim instead of the user row.
 - A 403 for another tenant's record.
 - `@UseGuards(ThrottlerGuard)`, or `@SkipThrottle()` outside health and SSE.
-- A refresh token, API key, OAuth secret or invitation token written to a log, a URL path, a response after
+- A refresh token, API key, OAuth secret, invitation or verification token written to a log, a URL path, a response after
   creation, or an error message.
 - Domain code that reads the workspace from the request body or branches on `TENANCY_MODE`.
