@@ -169,7 +169,9 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
 - An existing account joins another workspace only through `POST /invitations/join`: signed in with a JWT session
   (never an OAuth access token or an API key: neither guard is on the route), any role, STRICT throttle. It reads the
   account row: a super admin is 403 `FORBIDDEN`, another email 403 `INVITATION_EMAIL_MISMATCH` (naming neither
-  address), an unverified one 403 `EMAIL_NOT_VERIFIED`. An existing member keeps their role. A replay by the account
+  address). An unverified account joins in the same step: a token that travelled by email alone (`linkSharedAt`
+  null) also verifies the email and uses up its verification links in the join's transaction; a shared link proves
+  nothing, so the account joins and stays unverified. An existing member keeps their role. A replay by the account
   that joined is 200 with the same body; it issues no session (the client switches). It runs as the invitation's
   tenant through `runAsInvitationTenant`, never a plain `runAsTenant` inside the pinned session tenant.
   [guard: user-invitations.service.spec.ts, user-invitations.controller.spec.ts, user-invitations.integration.spec.ts, rls-context.spec.ts]
@@ -178,7 +180,7 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
   Tenant registration takes a verified `firebaseIdToken` for its own `email`, never a `firebaseUid`.
   [guard: user-invitations.controller.spec.ts, tenants.service.spec.ts, auth.service.spec.ts]
 - The web accept page has no Firebase import: signed out it creates an account or sends the person to
-  `/login?redirect=…` back to the page; signed in it joins and explains a mismatch or an unverified email.
+  `/login?redirect=…` back to the page; signed in it joins in one step and explains a mismatch.
   [guard: accept-invitation-form.test.tsx]
 
 ### Sessions
@@ -279,7 +281,8 @@ reached through the tool pipeline, not by opening a REST route to API keys.
   claim instead of the user row.
 - A 403 for another tenant's record.
 - A flow that writes a `WorkspaceMember` row into a workspace the caller is not in, from a token alone or without a
-  verified matching email; a body field that names a Firebase uid.
+  signed-in session whose account row has the invitation's email; a flow that marks an email verified from a shared
+  invitation link; a body field that names a Firebase uid.
 - `@UseGuards(ThrottlerGuard)`, or `@SkipThrottle()` outside health and SSE.
 - A refresh token, API key, OAuth secret, invitation or verification token written to a log, a URL path, a response after
   creation, or an error message.

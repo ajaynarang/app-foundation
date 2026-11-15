@@ -33,12 +33,16 @@ request, job and event handler runs in a declared tenant context.**
   where and with what role. One user may belong to many workspaces. The session's active workspace is stored on its
   refresh token row (`RefreshToken.tenantId`) and carried in the access token, so two sessions of the same user can
   be in two workspaces. Switching is `POST /workspaces/switch`.
-- **A person joins a workspace that is not theirs only signed in, as themselves, with a verified matching email**
-  (amended 2026-11-15). The one route is `POST /invitations/join`: a JWT session only (no OAuth or API-key guard),
-  and the account row, read from the database, must not be a super admin, must have the invitation's email and must
-  have it verified (`emailVerified`, which only a signed-in verify link, a password reset or an emailed-only
-  invitation sets; see ADR-0012). A token alone, through the public `POST /invitations/accept`, only ever creates a
-  **new** account, and refuses an email that already has one with 409 `SIGN_IN_TO_ACCEPT`. The join is the one
+- **A person joins a workspace that is not theirs only signed in, as themselves, with a matching email** (amended
+  2026-11-15, and again the same day for the one-step join). The one route is `POST /invitations/join`: a JWT
+  session only (no OAuth or API-key guard), and the account row, read from the database, must not be a super admin
+  and must have the invitation's email. An unverified account joins in the same step: a token that travelled by email
+  alone (`linkSharedAt` null) proves the mailbox, so the join's transaction also sets `emailVerified` and uses up the
+  account's verification links; a shared link proves nothing, so the account joins and stays unverified. A squatter
+  who registered the address first never holds an unshared emailed token, and the owner, unable to sign in to the
+  squatter's account, takes it back with a password reset (a reclaim); a copied link that reaches the squatter lets
+  it join unverified, the accepted shared-link risk. A token alone, through the public `POST /invitations/accept`,
+  only ever creates a **new** account, and refuses an email that already has one with 409 `SIGN_IN_TO_ACCEPT`. The join is the one
   request that writes into a tenant other than its session's, so it runs as the invitation's tenant through
   `runAsInvitationTenant` (`packages/appshore/kernel/src/infrastructure/rls/rls-context.ts`), the one sanctioned way
   out of a pinned tenant. Held by `user-invitations.service.spec.ts`, `user-invitations.controller.spec.ts`,

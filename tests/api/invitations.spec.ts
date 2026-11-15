@@ -12,6 +12,10 @@ import { buildInvitationAccept } from '@app/test-utils/factories';
  * refuses an email that has an account (409 SIGN_IN_TO_ACCEPT), the signed-in join refuses another email, and an
  * accept signs the new account in by cookie.
  *
+ * The join of an unverified account (one step: an emailed-only token also verifies it, a shared link leaves it
+ * unverified) is held by the service and integration specs: every token this suite can get is a rotated, shared one,
+ * and it has no second workspace for an existing account to join.
+ *
  * The suite has no database access, so each case gets its token from `POST /invitations/:invitation_id/link` as
  * OWNER, uses a fresh `qa-<uuid>@example.com` address, and cancels what it created. The one case that accepts
  * deletes the account it made, so its seat is free again.

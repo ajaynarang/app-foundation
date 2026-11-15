@@ -12,8 +12,9 @@
 - A tenant never sees another tenant's record; it answers 404. Review only (ADR [Tenancy](adr/0009-tenancy.md)).
 - One live account per email: the `users_email_live_key` index (ADR [Tenancy](adr/0009-tenancy.md)).
 - A `WorkspaceMember` row in a workspace the account was not already in comes only from a new account's own accept,
-  or from a signed-in `POST /invitations/join` whose account has the invitation's email, verified; a token alone never
-  attaches an existing account: `user-invitations.service.spec.ts` and `user-invitations.integration.spec.ts`
+  or from a signed-in `POST /invitations/join` whose account has the invitation's email; a token alone never
+  attaches an existing account, and only a token that travelled by email alone (never a shared link) marks the email
+  verified on the way: `user-invitations.service.spec.ts` and `user-invitations.integration.spec.ts`
   (ADR [Tenancy](adr/0009-tenancy.md)).
 - Every request, job and event handler runs in a declared tenant context: the `rls-*` specs in
   `apps/backend/src/architecture/` (ADR [Tenancy](adr/0009-tenancy.md)).

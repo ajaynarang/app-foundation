@@ -1,8 +1,8 @@
 /**
  * Every seeded user is created with a verified email (D3). Seeded addresses are the template's own
- * (`@example.com`), so there is no mailbox to prove, and the dev logins must be able to join a second workspace,
- * which needs a verified email. Nothing in the template marks any other account verified: an account proves its
- * address with the verify link, a password reset, or an invitation that only travelled by email.
+ * (`@example.com`), so there is no mailbox to prove, and the dev logins must not be treated as unproven (no banner, and
+ * a reset is not a reclaim). Nothing in the template marks any other account verified: an account proves its address
+ * with the verify link, a password reset, or an invitation (accept or join) whose token only travelled by email.
  *
  * The Prisma client is a hand-made fake that records every user write, so this needs no database.
  */

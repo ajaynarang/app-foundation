@@ -94,11 +94,11 @@ and no route set it. Now an address is proven by a link the account's signed-in 
 - `tokens-cleanup` now also deletes reset and verification tokens that expired or were used more than 7 days ago
   (reset tokens were never deleted before).
 - The web has a `/verify-email` page (public, so a signed-out click lands there and is sent to sign in first), a
-  banner "Verify your email to join other workspaces" with a resend button when `emailVerified === false`, and the
+  banner "Verify your email address." with a resend button when `emailVerified === false`, and the
   profile shows "Verified" only when the flag is `true` (it used to treat a missing flag as verified).
 - `AuthErrorCode` in `@app/shared-types` holds the auth domain codes: `PASSWORD_NOT_SET`,
-  `VERIFICATION_LINK_INVALID`, `EMAIL_NOT_VERIFIED`, `SIGN_IN_TO_ACCEPT`, `INVITATION_EMAIL_MISMATCH` (the last three
-  are answered once the safe accept lands).
+  `VERIFICATION_LINK_INVALID`, `SIGN_IN_TO_ACCEPT`, `INVITATION_EMAIL_MISMATCH` (the last two are answered once the
+  safe accept lands).
 
 Nothing reads `emailVerified` yet. Sign-in works unverified, as before.
 
@@ -106,7 +106,8 @@ Nothing reads `emailVerified` yet. Sign-in works unverified, as before.
 
 - **Every existing user is unverified.** There is no backfill: marking existing accounts verified would bless any
   account created with someone else's address. They keep signing in and using their own workspace; the banner asks
-  them to verify. Once the safe invitation accept lands, an unverified account cannot join another workspace.
+  them to verify. Once the safe invitation accept lands, an unverified account still joins another workspace signed
+  in; an emailed invitation link verifies it on the way (next entry).
 - **A first-party reset of an existing (so unverified) account removes its phone PIN, Firebase link, API keys and
   OAuth tokens**, and the notice email says so. If that is wrong for your product, run the verify-existing-users
   statement below first.
@@ -147,7 +148,7 @@ each device.
 **What changed.** Anyone holding an invitation token could attach any existing account with that email to the
 inviting workspace, or create an account for any email, marked verified and bound to a Firebase uid the caller made
 up. Now a token alone only ever creates a **new** account; an existing account joins only signed in, as itself, with
-a verified email that matches the invitation.
+an email that matches the invitation.
 
 - `POST /invitations/accept` (public) takes `{ token, password }` or `{ token, firebaseIdToken }`, exactly one of the
   two. A body `firebaseUid` is 400 `VALIDATION_FAILED` (an unknown property). A Firebase ID token is verified on the
@@ -164,10 +165,12 @@ a verified email that matches the invitation.
   `{ accessToken, user }` (as `POST /auth/login`), and a login event is recorded.
 - `POST /invitations/join` (new; signed in, any role, STRICT throttle counted per user) `{ token }` joins the
   invitation's workspace as the signed-in account. It reads the account row, never the JWT: a super admin is 403
-  `FORBIDDEN`, another email is 403 `INVITATION_EMAIL_MISMATCH` (naming neither address), an unverified email is 403
-  `EMAIL_NOT_VERIFIED`. An existing member keeps their role (the old accept overwrote it). A retry by the account that
-  already joined answers 200 with the same body. The answer is `{ workspace: { tenantId, name }, role }`; the client
-  then calls `POST /workspaces/switch`. It takes a JWT session only: no OAuth or API-key guard sits on it, so an agent
+  `FORBIDDEN`, another email is 403 `INVITATION_EMAIL_MISMATCH` (naming neither address). An unverified account
+  joins in the same one step: when the token travelled by email alone (`link_shared_at` null) the join also marks the
+  email verified and uses up the account's verification links, in the same transaction; from a copied link it joins
+  and stays unverified (the banner offers a resend). An existing member keeps their role (the old accept overwrote
+  it). A retry by the account that already joined answers 200 with the same body. The answer is
+  `{ workspace: { tenantId, name }, role }`; the client then calls `POST /workspaces/switch`. It takes a JWT session only: no OAuth or API-key guard sits on it, so an agent
   never joins a workspace for a user. It runs as the invitation's tenant through `runAsInvitationTenant`
   (`rls-context.ts`), the one sanctioned way out of a session's pinned tenant.
 - `POST /invitations/accept-phone` sets the refresh cookie and answers `{ accessToken, user }`, with a login event;
@@ -180,16 +183,18 @@ a verified email that matches the invitation.
 - The web accept page has three paths: signed out, "Create your account" (a password, min 8) with "Already have an
   account? Sign in to accept"; on 409 `SIGN_IN_TO_ACCEPT` it switches to sign-in, which sends the person to
   `/login?redirect=/accept-invitation?token=…`; signed in, "Join {company} as {role}", which explains a mismatch
-  (with "Sign out and continue") or an unverified email (with a resend button). It no longer imports Firebase.
+  (with "Sign out and continue"). It no longer imports Firebase.
 
 **Who notices.**
 
 - **The pre-hijack is closed.** Someone who signed up first as `victim@x.com` cannot get into a workspace that
-  invites the victim: the public accept is 409, and their join is 403 `EMAIL_NOT_VERIFIED`, because nothing they hold
-  verifies the address. The victim takes the address back with a password reset (the previous entry's reclaim),
-  verifies, and joins.
-- **Existing users are unverified** (previous entry), so until they verify from the banner they cannot accept an
-  invitation into another workspace. The verify-existing-users statement in the previous entry applies.
+  invites the victim: the public accept is 409, and the join needs the invitation's token, which went only to the
+  victim's inbox. The victim cannot sign in to the squatter's account, so they take the address back with a password
+  reset (the previous entry's reclaim) and join. A copied link (`POST /invitations/:id/link`) is not proof: whoever
+  holds it and signs in with the invited address joins, unverified. That is the same accepted risk as a new account
+  from a copied link; the inviter chose to share it.
+- **Existing users are unverified** (previous entry). They still join from an invitation: an emailed link verifies
+  them as they join; a copied link (every invitation pending at upgrade, below) leaves them unverified.
 - **Pending invitations** keep working. The first entry marked each one `link_shared_at`, so accepting one creates
   an unverified account that is emailed a link. Resend an invitation first if you want its accept to create a verified
   account.
@@ -201,13 +206,13 @@ a verified email that matches the invitation.
 
 **Wire changes.**
 
-| Before                                                                   | After                                                                                            |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `POST /invitations/accept` `{ token, firebaseUid }` → profile            | `{ token, password \| firebaseIdToken }` → `{ accessToken, user }` + refresh cookie              |
-| accept for an email with an account → 200, account attached              | 409 `SIGN_IN_TO_ACCEPT`, nothing written                                                         |
-| (none)                                                                   | `POST /invitations/join` `{ token }`, signed in → `{ workspace, role }`; 403 mismatch/unverified |
-| `POST /invitations/accept-phone` → `{ accessToken, refreshToken, user }` | `{ accessToken, user }` + refresh cookie                                                         |
-| `POST /tenants/register` `{ …, firebaseUid }`                            | `{ …, firebaseIdToken }`, verified; `firebaseUid` is 400                                         |
+| Before                                                                   | After                                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `POST /invitations/accept` `{ token, firebaseUid }` → profile            | `{ token, password \| firebaseIdToken }` → `{ accessToken, user }` + refresh cookie   |
+| accept for an email with an account → 200, account attached              | 409 `SIGN_IN_TO_ACCEPT`, nothing written                                              |
+| (none)                                                                   | `POST /invitations/join` `{ token }`, signed in → `{ workspace, role }`; 403 mismatch |
+| `POST /invitations/accept-phone` → `{ accessToken, refreshToken, user }` | `{ accessToken, user }` + refresh cookie                                              |
+| `POST /tenants/register` `{ …, firebaseUid }`                            | `{ …, firebaseIdToken }`, verified; `firebaseUid` is 400                              |
 
 **Schema.** None. The verified-on-accept rule reads `link_shared_at`, which the first entry's migration added and
 has been stamping since.
