@@ -192,7 +192,7 @@ const KNOWN_SECRET_BEARING_SCHEMAS = [
   'OAuthClientSecretRotated',
   'WebhookSubscriptionCreated',
   'WebhookSubscriptionWithSecret',
-  'InvitationIssued',
+  'InvitationLink',
   'VoiceToken',
 ];
 

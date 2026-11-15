@@ -25,7 +25,8 @@ public id (ADR [ID boundary](adr/0002-id-boundary.md); `docs/standards/` holds t
 - **`WorkspaceMember`**: user ↔ tenant, with the user's role in that workspace. The source of truth for membership.
 - **`UserInvitation`**: a pending invitation into a workspace.
 - **`RefreshToken`**: one session's rotating refresh token; carries the session's active workspace (`tenantId`).
-- **`PasswordResetToken`**, **`LoginEvent`**: reset links (hashed) and the login history.
+- **`PasswordResetToken`**, **`EmailVerificationToken`**, **`LoginEvent`**: reset and email-verification links
+  (hashed) and the login history.
 - **`UserPreferences`**, **`SuperAdminPreferences`**: per-user settings.
 
 ### Machine access

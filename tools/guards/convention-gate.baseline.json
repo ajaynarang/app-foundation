@@ -85,7 +85,7 @@
       "file-size": 374
     },
     "apps/web/src/app/settings/profile/page.tsx": {
-      "file-size": 393
+      "file-size": 382
     },
     "apps/web/src/app/settings/subscription/page.tsx": {
       "raw-control": 1,
@@ -98,8 +98,7 @@
       "raw-control": 1
     },
     "apps/web/src/features/auth/components/accept-invitation-form.tsx": {
-      "process-env": 1,
-      "file-size": 388
+      "process-env": 1
     },
     "apps/web/src/features/auth/components/login-form.tsx": {
       "file-size": 718
@@ -283,7 +282,7 @@
       "process-env": 1
     },
     "packages/test-utils/src/schemas/platform.ts": {
-      "file-size": 1113
+      "file-size": 1063
     }
   }
 }

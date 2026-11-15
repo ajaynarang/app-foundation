@@ -31,6 +31,8 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshJwtAuthGuard } from './guards/refresh-jwt-auth.guard';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { EmailVerificationService, VerificationResendCooldownException } from './email-verification.service';
 import { Throttle } from '@nestjs/throttler';
 import { AUTH_THROTTLE_TTL_MS, AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_LIMIT_OTP_SEND } from '../constants';
 import { clearRefreshTokenCookie, setRefreshTokenCookie, type RefreshTokenCookieContext } from './refresh-token-cookie';
@@ -45,6 +47,7 @@ export class AuthController {
     private authService: AuthService,
     private configService: ConfigService,
     private refreshSessions: RefreshSessionService,
+    private emailVerification: EmailVerificationService,
   ) {
     this.isProduction = this.configService.get<string>('environment') === 'production';
   }
@@ -136,6 +139,53 @@ export class AuthController {
   @ApiResponse({ status: 401 })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.authService.resetPassword(dto);
+  }
+
+  /**
+   * Not `@Public()` (D8): the token must belong to the signed-in caller, so the mailbox owner cannot verify an
+   * account someone else created and holds the password for. Every refusal is 400, never 401: the web treats a 401
+   * as an expired session.
+   */
+  @ApiBearerAuth()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT },
+  })
+  @Post('verify-email')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary:
+      "Verify the signed-in user's email with the one-time token from the emailed link; 400 VERIFICATION_LINK_INVALID when it is invalid, used, expired or another account's",
+  })
+  @ApiBody({ type: VerifyEmailDto })
+  @ApiNoContentResponse()
+  @ApiResponse({ status: 400, description: 'VALIDATION_FAILED, or VERIFICATION_LINK_INVALID' })
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  async verifyEmail(@CurrentUser() user: any, @Body() dto: VerifyEmailDto): Promise<void> {
+    await this.emailVerification.verify(dto.token, user.dbId);
+  }
+
+  @ApiBearerAuth()
+  @Throttle({
+    default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_OTP_SEND },
+  })
+  @Post('verify-email/resend')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary:
+      'Email the signed-in user a new verification link (a no-op when already verified); 429 RATE_LIMITED with Retry-After within a minute of the last one',
+  })
+  @ApiNoContentResponse()
+  @ApiResponse({ status: 401, description: 'Not signed in' })
+  @ApiResponse({ status: 429, description: 'RATE_LIMITED: throttled, or a link was sent less than a minute ago' })
+  async resendVerification(@CurrentUser() user: any, @Res({ passthrough: true }) response: Response): Promise<void> {
+    try {
+      await this.emailVerification.resend(user.dbId);
+    } catch (err) {
+      if (err instanceof VerificationResendCooldownException) {
+        response.setHeader('Retry-After', String(err.retryAfterSeconds));
+      }
+      throw err;
+    }
   }
 
   @Public()

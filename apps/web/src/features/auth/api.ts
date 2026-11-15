@@ -42,6 +42,24 @@ export const authApi = {
     });
   },
 
+  // ─── Email verification ───────────────────────────────────────────────────
+
+  /**
+   * Verify the signed-in user's email with the token from the emailed link. 204 on success; 400
+   * `VERIFICATION_LINK_INVALID` when the link is invalid, used, expired or another account's.
+   */
+  verifyEmail: async (token: string): Promise<void> => {
+    return apiClient<void>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  /** Email the signed-in user a new verification link. 429 `RATE_LIMITED` within a minute of the last one. */
+  resendVerification: async (): Promise<void> => {
+    return apiClient<void>('/auth/verify-email/resend', { method: 'POST' });
+  },
+
   // ─── Phone Authentication ─────────────────────────────────────────────────
 
   /**
@@ -110,6 +128,27 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ phone, code }),
     });
+  },
+
+  // ─── Invitations ──────────────────────────────────────────────────────────
+
+  /**
+   * Accept an email invitation as a NEW account with a password, and sign in (the refresh token lands in its
+   * cookie). 409 `SIGN_IN_TO_ACCEPT` when the email already has an account: sign in, then `joinInvitation`.
+   */
+  acceptInvitation: async (token: string, password: string): Promise<LoginResponse> => {
+    return apiClient<LoginResponse>('/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  /**
+   * Join the invitation's workspace as the signed-in account, verified or not (an emailed-only link also verifies the
+   * email). 403 `INVITATION_EMAIL_MISMATCH` for another email. Then switch with `POST /workspaces/switch`.
+   */
+  joinInvitation: async (token: string): Promise<{ workspace: { tenantId: string; name: string }; role: string }> => {
+    return apiClient('/invitations/join', { method: 'POST', body: JSON.stringify({ token }) });
   },
 
   /**

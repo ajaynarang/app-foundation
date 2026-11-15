@@ -19,8 +19,16 @@ describe('AuthService.registerPersonal: the tenant-provision hook', () => {
     isActive: true,
   };
 
-  function makeService(hooks?: TenantProvisionHooks) {
+  function makeService(hooks?: TenantProvisionHooks, issue?: jest.Mock | 'track') {
     const order: string[] = [];
+    const verification = {
+      issue:
+        issue === 'track'
+          ? jest.fn(async () => {
+              order.push('issue');
+            })
+          : (issue ?? jest.fn()),
+    };
     const tx = {
       tenant: { create: jest.fn().mockResolvedValue({ id: 42 }) },
       user: { create: jest.fn().mockResolvedValue(created) },
@@ -48,9 +56,10 @@ describe('AuthService.registerPersonal: the tenant-provision hook', () => {
       loginEvents as never,
       {} as never,
       {} as never,
+      verification as never,
       hooks,
     );
-    return { service, order, prisma };
+    return { service, order, prisma, verification };
   }
 
   const dto = { email: 'pat@example.com', password: 'Password123!', firstName: 'Pat', lastName: 'Lee' };
@@ -79,5 +88,17 @@ describe('AuthService.registerPersonal: the tenant-provision hook', () => {
     await expect(makeService(undefined).service.registerPersonal(dto, meta)).resolves.toMatchObject({
       refreshToken: 'r',
     });
+  });
+
+  it('issues a verification token for the new account, after the signup committed', async () => {
+    const made = makeService(undefined, 'track');
+    await made.service.registerPersonal(dto, meta);
+    expect(made.verification.issue).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), { reason: 'signup' });
+    expect(made.order).toEqual(['commit', 'issue']);
+  });
+
+  it('a failing verification issue never fails the signup', async () => {
+    const made = makeService(undefined, jest.fn().mockRejectedValue(new Error('db blip')));
+    await expect(made.service.registerPersonal(dto, meta)).resolves.toMatchObject({ accessToken: 'a' });
   });
 });

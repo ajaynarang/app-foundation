@@ -10,12 +10,13 @@ import { RefreshJwtStrategy } from './strategies/refresh-jwt.strategy';
 import { RefreshSessionService } from './refresh-session.service';
 import { IdentityResolverService } from './identity-resolver.service';
 import { EmailUniquenessCheck } from './email-uniqueness.check';
-import { FirebaseAuthService } from './firebase-auth.service';
+import { FirebaseAuthModule } from './firebase-auth.module';
 import { PinService } from './pin.service';
 import { PrismaModule } from '../infrastructure/database/prisma.module';
 import { LoginEventService } from './login-event.service';
 import { LoginEventCleanupJobHandler } from './login-event-cleanup.processor';
 import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
+import { EmailVerificationModule } from './email-verification.module';
 
 /**
  * The login-events-cleanup and tokens-cleanup crons are scheduled from their `job_schedules` rows by
@@ -24,6 +25,8 @@ import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
 @Module({
   imports: [
     PrismaModule,
+    EmailVerificationModule,
+    FirebaseAuthModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -47,16 +50,16 @@ import { TokensCleanupJobHandler } from './tokens-cleanup.processor';
     EmailUniquenessCheck,
     JwtStrategy,
     RefreshJwtStrategy,
-    FirebaseAuthService,
     PinService,
     LoginEventService,
     LoginEventCleanupJobHandler,
     TokensCleanupJobHandler,
   ],
   exports: [
+    EmailVerificationModule,
     AuthService,
     JwtTokenService,
-    FirebaseAuthService,
+    FirebaseAuthModule,
     PinService,
     LoginEventService,
     LoginEventCleanupJobHandler,

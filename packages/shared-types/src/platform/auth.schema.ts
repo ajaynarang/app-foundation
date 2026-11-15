@@ -1,5 +1,22 @@
 import { z } from 'zod';
 
+/**
+ * Error codes the identity routes answer, beside the cross-cutting `ApiErrorCode`s (a domain adds its own,
+ * `api-error.ts`). The web imports these instead of copying strings. Every one travels in the usual envelope
+ * (`statusCode`, `code`, `detail`).
+ */
+export const AuthErrorCode = {
+  /** 401 — the account exists but signs in another way (Firebase, phone); the web may fall back to Firebase. */
+  PASSWORD_NOT_SET: 'PASSWORD_NOT_SET',
+  /** 400 — the verification link is unknown, used, expired, for an address the account no longer has, or another account's. */
+  VERIFICATION_LINK_INVALID: 'VERIFICATION_LINK_INVALID',
+  /** 409 — an account already uses the invitation's email; sign in as it to accept. */
+  SIGN_IN_TO_ACCEPT: 'SIGN_IN_TO_ACCEPT',
+  /** 403 — the invitation is for a different email than the signed-in account's. */
+  INVITATION_EMAIL_MISMATCH: 'INVITATION_EMAIL_MISMATCH',
+} as const;
+export type AuthErrorCode = (typeof AuthErrorCode)[keyof typeof AuthErrorCode];
+
 export const LoginSchema = z.object({
   tenantId: z.string().optional(),
   userId: z.string().min(1),

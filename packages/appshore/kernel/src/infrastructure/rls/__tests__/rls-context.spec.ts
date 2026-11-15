@@ -4,6 +4,7 @@ import {
   isRlsStrict,
   isRlsTenantId,
   rlsStorage,
+  runAsInvitationTenant,
   runAsPublic,
   runAsTenant,
   runInEventScope,
@@ -252,6 +253,43 @@ describe('rls-context', () => {
 
     it('rejects an invalid tenant id', async () => {
       await expect(runInJobScope(-3, 'job', async () => 'never')).rejects.toThrow(RlsContextError);
+    });
+  });
+
+  describe('runAsInvitationTenant (a signed-in join)', () => {
+    it("leaves the session's tenant for the invitation's, in strict mode, and restores it after", async () => {
+      expect(isRlsStrict()).toBe(true);
+      await runAsTenant(7, 'jwt', async () => {
+        // The plain runAsTenant is a conflict here: that is why the join needs its own, named helper.
+        await expect(runAsTenant(8, 'invitation', async () => 'never')).rejects.toThrow(RlsContextError);
+        expect(await runAsInvitationTenant(8, async () => currentRls())).toEqual({
+          kind: 'tenant',
+          tenantId: 8,
+          source: 'invitation',
+        });
+        expect(currentRls()).toEqual({ kind: 'tenant', tenantId: 7, source: 'jwt' });
+      });
+    });
+
+    it('runs as the invitation tenant with no context open (single-tenant, a unit test)', async () => {
+      expect(await runAsInvitationTenant(8, async () => currentRls())).toEqual({
+        kind: 'tenant',
+        tenantId: 8,
+        source: 'invitation',
+      });
+    });
+
+    it('refuses a public or system scope: only a signed-in session joins', async () => {
+      await runAsPublic('anon', async () => {
+        await expect(runAsInvitationTenant(8, async () => 'never')).rejects.toThrow(RlsContextError);
+      });
+      await rlsStorage.run({ ctx: { kind: 'system', reason: 'test' } }, async () => {
+        await expect(runAsInvitationTenant(8, async () => 'never')).rejects.toThrow(RlsContextError);
+      });
+    });
+
+    it('rejects an invalid tenant id', async () => {
+      await expect(runAsInvitationTenant(0, async () => 'never')).rejects.toThrow(RlsContextError);
     });
   });
 

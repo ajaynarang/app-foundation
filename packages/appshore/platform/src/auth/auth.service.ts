@@ -25,9 +25,12 @@ import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
 import { toUserProfile } from './user-profile';
+import { hashToken } from './token-hash';
+import { EmailVerificationService } from './email-verification.service';
 import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
-import { ApiErrorCode, type WorkspaceChoice } from '@app/shared-types';
+import { ApiErrorCode, AuthErrorCode, type WorkspaceChoice } from '@app/shared-types';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 
 @Injectable()
 export class AuthService {
@@ -42,6 +45,7 @@ export class AuthService {
     private loginEventService: LoginEventService,
     private emailService: EmailService,
     private identityResolver: IdentityResolverService,
+    private emailVerification: EmailVerificationService,
     @Optional() @Inject(TENANT_PROVISION_HOOKS) private readonly provisionHooks?: TenantProvisionHooks,
   ) {}
 
@@ -160,7 +164,7 @@ export class AuthService {
       // uses this code to fall back to the Firebase flow when configured.
       throw new UnauthorizedException({
         message: 'This account does not use password sign-in.',
-        code: 'PASSWORD_NOT_SET',
+        code: AuthErrorCode.PASSWORD_NOT_SET,
       });
     }
 
@@ -273,7 +277,7 @@ export class AuthService {
 
   private async sendPasswordReset(user: { id: number; firstName: string }, email: string, workspace?: string) {
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = hashToken(rawToken);
     await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
@@ -284,11 +288,13 @@ export class AuthService {
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
     const forAccount = workspace ? ` in the ${workspace} workspace` : '';
+    // The name and the workspace are user-chosen: escaped in the HTML so neither can add a link or markup.
+    const htmlForAccount = workspace ? ` in the ${escapeHtml(workspace)} workspace` : '';
     try {
       await this.emailService.sendEmail({
         to: email,
         subject: workspace ? `Reset your password for ${workspace}` : 'Reset your password',
-        html: `<p>Hi ${user.firstName},</p><p>Someone requested a password reset for your account${forAccount}. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
+        html: `<p>Hi ${escapeHtml(user.firstName)},</p><p>Someone requested a password reset for your account${htmlForAccount}. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
         text: `Hi ${user.firstName},\n\nReset your password for your account${forAccount} (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
       });
     } catch (err) {
@@ -298,28 +304,109 @@ export class AuthService {
     }
   }
 
-  /** Complete a password reset: consumes the one-time token, revokes all sessions. */
+  /**
+   * Complete a password reset: consumes the one-time token, revokes all sessions and marks the email verified (the
+   * reset link proves the mailbox). Every other unused reset and verification token of the user is used up.
+   *
+   * When the email was not yet verified, the reset is also a reclaim (D9): whoever created the account may not own
+   * the mailbox (a pre-hijack), so every other way in that they could have attached goes too: the phone and PIN, the
+   * Firebase link, API keys, OAuth access and refresh tokens and unexchanged authorization codes, and the push
+   * channels (web push subscriptions and mobile devices) that would keep delivering the owner's notifications. After
+   * the commit the owner gets a notice naming what was removed. A reset of a verified account changes none of these.
+   */
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
-    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const tokenHash = hashToken(dto.token);
     const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
     }
     const passwordHash = await bcrypt.hash(dto.newPassword, AuthService.PASSWORD_SALT_ROUNDS);
-    await this.prisma.$transaction(async (tx) => {
+    const reclaim = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      // Conditional: two concurrent resets with one link cannot both win.
+      const consumed = await tx.passwordResetToken.updateMany({
+        where: { id: record.id, usedAt: null },
+        data: { usedAt: now },
+      });
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
+      }
+      const before = await tx.user.findUnique({
+        where: { id: record.userId },
+        select: { email: true, firstName: true, emailVerified: true, phone: true, pinHash: true, firebaseUid: true },
+      });
+      if (!before)
+        throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
+      const isReclaim = !before.emailVerified;
       await tx.user.update({
         where: { id: record.userId },
-        data: { passwordHash, passwordChangedAt: new Date() },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          emailVerified: true,
+          ...(isReclaim ? { phone: null, phoneVerified: false, pinHash: null, firebaseUid: null } : {}),
+        },
       });
-      await tx.passwordResetToken.update({
-        where: { id: record.id },
-        data: { usedAt: new Date() },
+      await tx.passwordResetToken.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      await tx.emailVerificationToken.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
       });
       await tx.refreshToken.updateMany({
         where: { userId: record.userId, isRevoked: false },
-        data: { isRevoked: true, revokedAt: new Date() },
+        data: { isRevoked: true, revokedAt: now },
       });
+      if (!isReclaim) return null;
+
+      const apiKeys = await tx.apiKey.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now, isActive: false },
+      });
+      const oauthAccess = await tx.oAuthAccessToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      const oauthRefresh = await tx.oAuthRefreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      // A code got just before the reset could still be exchanged for new tokens within its life.
+      const oauthCodes = await tx.oAuthAuthorizationCode.updateMany({
+        where: { userId: record.userId, usedAt: null },
+        data: { usedAt: now },
+      });
+      // Push is sent by userId alone: the creator's browser or phone would keep getting the owner's notifications.
+      const webPush = await tx.pushSubscription.deleteMany({ where: { userId: record.userId } });
+      const devices = await tx.notificationDevice.deleteMany({ where: { userId: record.userId } });
+      const removed: string[] = [];
+      if (before.phone || before.pinHash) removed.push('phone number and PIN sign-in');
+      if (before.firebaseUid) removed.push('linked sign-in provider (Firebase)');
+      if (apiKeys.count > 0) removed.push(`${apiKeys.count} API key${apiKeys.count === 1 ? '' : 's'}`);
+      if (oauthAccess.count + oauthRefresh.count + oauthCodes.count > 0)
+        removed.push('access for connected apps (OAuth)');
+      if (webPush.count + devices.count > 0) removed.push('push notifications on other devices');
+      return { email: before.email, firstName: before.firstName, removed };
     });
+
+    if (reclaim?.email) await this.sendReclaimNotice(reclaim.email, reclaim.firstName, reclaim.removed);
+  }
+
+  /** After a reclaim: tell the owner what was removed. A send failure is logged, never thrown (the reset is done). */
+  private async sendReclaimNotice(email: string, firstName: string, removed: string[]): Promise<void> {
+    const list = removed.length > 0 ? removed.join(', ') : 'none';
+    try {
+      await this.emailService.sendEmail({
+        to: email,
+        subject: 'Your password was reset',
+        html: `<p>Hi ${escapeHtml(firstName)},</p><p>Your password was reset and your email address is now verified. Sign-in methods we removed: ${list}.</p><p>Your account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.</p>`,
+        text: `Hi ${firstName},\n\nYour password was reset and your email address is now verified. Sign-in methods we removed: ${list}.\n\nYour account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.`,
+      });
+    } catch (err) {
+      this.logger.warn({ msg: 'Password reset notice was not sent', err: toLoggableError(err) });
+    }
   }
 
   /**
@@ -381,6 +468,13 @@ export class AuthService {
           `tenantApproved hook failed for personal workspace ${user.tenantId}: ${(err as Error).message}`,
         );
       }
+    }
+
+    // After the commit. `issue` never throws on a send failure, and nothing else here may fail the signup.
+    try {
+      await this.emailVerification.issue(user, { reason: 'signup' });
+    } catch (err) {
+      this.logger.warn({ msg: 'Verification token was not issued at signup', err: toLoggableError(err) });
     }
 
     const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
@@ -570,6 +664,44 @@ export class AuthService {
     });
   }
 
+  /**
+   * Sign in an account a public flow just created or proved (an invitation accept): a session the same way login
+   * makes one (a refresh-token family, `lastLoginAt`, a login event). The controller puts the refresh token in the
+   * host-only cookie and answers `{ accessToken, user }`; the refresh token never goes in a body.
+   */
+  async startSession(
+    userDbId: number,
+    authMethod: AuthMethod,
+    meta: { ip: string | null; userAgent: string | null },
+  ): Promise<{ accessToken: string; refreshToken: string; user: UserProfileDto }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userDbId }, include: { tenant: true } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const { accessToken, refreshToken, refreshTokenId } = await this.jwtTokenService.generateTokenPair(
+      {
+        id: user.id,
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant?.tenantId,
+        tenantDbId: user.tenant?.id ?? null,
+      },
+      authMethod,
+    );
+    await this.loginEventService.recordSuccess({
+      userId: user.id,
+      tenantId: user.tenant?.id ?? null,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      sessionId: refreshTokenId,
+    });
+    return { accessToken, refreshToken, user: this.toUserProfile(user) };
+  }
+
+  /**
+   * Tokens with the refresh token in the body, and no login event. Only the dev switcher calls it (`DevModule`, never
+   * loaded in production, behind `DevAuthGuard`); a product route signs in through `startSession` and the cookie.
+   */
   async generateTokensForUser(user: any): Promise<any> {
     const fullUser = await this.prisma.user.findUnique({
       where: { id: user.id },

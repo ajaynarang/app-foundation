@@ -13,6 +13,7 @@ import { OtpInput } from '@/components/ui/otp-input';
 import { PinInput } from '@/components/ui/pin-input';
 import { CheckCircle2, AlertCircle, Mail, Phone, Shield } from 'lucide-react';
 import { ChangePasswordDialog } from '@/features/auth/components/change-password-dialog';
+import { EmailVerificationStatus } from '@/features/auth/components/email-verification-status';
 import { PhoneInput } from '@app/ui/components/ui/phone-input';
 import { formatPhone } from '@app/ui/lib/phone';
 import { showSuccess, showError } from '@app/ui';
@@ -93,19 +94,7 @@ function EmailCard() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm text-foreground">{user.email}</span>
-              <Badge variant="outline" className="text-xs">
-                {user.emailVerified !== false ? (
-                  <>
-                    <CheckCircle2 className="h-3 w-3 mr-1 text-muted-foreground" />
-                    Verified
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-3 w-3 mr-1 text-caution-text" />
-                    Unverified
-                  </>
-                )}
-              </Badge>
+              <EmailVerificationStatus emailVerified={user.emailVerified} />
             </div>
           </div>
         ) : (

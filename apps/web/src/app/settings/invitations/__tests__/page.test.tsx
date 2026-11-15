@@ -65,7 +65,7 @@ describe('Settings › Invitations', () => {
     request.mockResolvedValue({});
   });
 
-  it("copies a pending invitation's link, asking for it by the invitation's public id", async () => {
+  it("copying a link confirms first (it replaces the emailed one), then POSTs by the invitation's public id", async () => {
     get.mockResolvedValue(page([PENDING]));
     request.mockResolvedValue({ inviteLink: 'https://app.example.com/accept-invitation?token=t' });
     renderPage();
@@ -74,8 +74,27 @@ describe('Settings › Invitations', () => {
     openRowMenu();
     fireEvent.click(await screen.findByRole('menuitem', { name: /Copy the invitation link/ }));
 
+    // Nothing is rotated until the dialog says so: the dialog says the emailed link stops working.
+    expect(await screen.findByText(/The link in the invitation email stops working/)).toBeTruthy();
+    expect(request).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create and copy link' }));
+
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://app.example.com/accept-invitation?token=t'));
-    expect(request).toHaveBeenCalledWith(`/invitations/${PENDING.invitationId}/link`);
+    expect(request).toHaveBeenCalledWith(`/invitations/${PENDING.invitationId}/link`, { method: 'POST' });
+  });
+
+  it('keeping the emailed link rotates nothing', async () => {
+    get.mockResolvedValue(page([PENDING]));
+    renderPage();
+
+    await screen.findByRole('button', { name: /^Resend/ });
+    openRowMenu();
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Copy the invitation link/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep the emailed link' }));
+
+    await waitFor(() => expect(screen.queryByText(/The link in the invitation email stops working/)).toBeNull());
+    expect(request).not.toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('offers no link for an expired invitation: its token no longer works', async () => {

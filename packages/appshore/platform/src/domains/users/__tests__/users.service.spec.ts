@@ -37,6 +37,7 @@ describe('UsersService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      emailVerificationToken: { create: jest.fn() },
     };
 
     notificationTriggers = {
@@ -208,6 +209,24 @@ describe('UsersService', () => {
       expect(result.email).toBe('john@example.com');
       expect(prisma.user.create).toHaveBeenCalled();
       expect(notificationTriggers.userJoined).toHaveBeenCalledWith(1, 'John Doe', 'MEMBER');
+    });
+
+    /**
+     * An admin-created account has no credential yet, so its owner could not sign in to use a verification link
+     * (the link needs a session). It starts unverified and gets no token; its first password comes from a reset,
+     * and the reset verifies it.
+     */
+    it('creates the account unverified and issues no verification token', async () => {
+      prisma.tenant.findUnique.mockResolvedValue(mockTenant);
+      prisma.user.create.mockResolvedValue(mockUser);
+
+      await service.createUser(
+        { email: 'new@example.com', firstName: 'N', lastName: 'U', role: 'MEMBER' },
+        'tenant_abc',
+      );
+
+      expect(prisma.user.create.mock.calls[0][0].data).toMatchObject({ emailVerified: false });
+      expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for non-super-admin without tenant', async () => {

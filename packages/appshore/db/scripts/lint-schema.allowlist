@@ -5,8 +5,8 @@
 # Convention in docs/standards/id-convention.md
 #
 # tenant-scoping-missing entries are tables scoped through a parent row (a user,
-# a subscription, a conversation) or platform-wide by design. PasswordResetToken
-# and WhatsAppConsent belong to a person, not a tenant. OutboundAllowEntry is the platform's outbound
+# a subscription, a conversation) or platform-wide by design. PasswordResetToken,
+# EmailVerificationToken and WhatsAppConsent belong to a person, not a tenant. OutboundAllowEntry is the platform's outbound
 # allow-list (ADR "Outbound gate"), one list for the whole environment.
 #
 # WebhookSubscription.previousSecret sits on the row beside the signing secret it
@@ -27,6 +27,7 @@ ConversationMessage:tenant-scoping-missing
 DeskApproval:tenant-scoping-missing
 DeskEntitySuppression.suppressUntil:datetime-suffix
 DeskEpisodeStep:tenant-scoping-missing
+EmailVerificationToken:tenant-scoping-missing
 JobSchedule:tenant-scoping-missing
 KnowledgeDocument:tenant-scoping-missing
 Notification.notificationId:no-cuid

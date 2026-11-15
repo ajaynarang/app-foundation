@@ -22,6 +22,18 @@ secret.**
   - Refresh tokens (`RefreshToken.token`, SHA-256 of the signed token), password-reset tokens
     (`PasswordResetToken.tokenHash`), OAuth access tokens (`OAuthAccessToken.tokenHash`) and OAuth client secrets
     (bcrypt in `OAuthClient.clientSecret`).
+  - Invitation tokens: the sha256 `UserInvitation.tokenHash` (`hashToken` in
+    `packages/appshore/platform/src/auth/token-hash.ts`); lookup is by hash. The raw token travels only in the link
+    sent to the invitee. No answer to the inviter carries it: only OWNER and ADMIN can get a shareable link, only by
+    rotating the token (`POST /invitations/:invitation_id/link`, which kills the emailed link and stamps
+    `linkSharedAt`), and the link is shown once. A token never goes in a URL path, where the request log would keep
+    it: the public routes take it in the body (`POST /invitations/preview`). Amended 2026-11-15. Held by
+    `packages/appshore/platform/src/domains/user-invitations/__tests__/invitation-token-storage.spec.ts`.
+  - Email verification tokens: the sha256 `EmailVerificationToken.tokenHash` (`hashToken`), with the address it
+    proves; lookup is by hash, the raw token travels only in the emailed link, and a send failure is logged without
+    it. The link works only for the signed-in owner of the account. Used and expired rows are deleted after 7 days by
+    `tokens-cleanup`. Amended 2026-11-15. Held by
+    `packages/appshore/platform/src/auth/__tests__/email-verification.service.spec.ts`.
 - **Used, so encrypted.**
   - Integration credentials: `CredentialsService`
     (`apps/backend/src/domains/integrations/credentials/credentials.service.ts`) writes AES-256-GCM as

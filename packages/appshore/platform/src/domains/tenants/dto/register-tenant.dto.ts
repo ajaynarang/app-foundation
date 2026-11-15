@@ -32,18 +32,20 @@ export class RegisterTenantDto {
   email: string;
 
   // Primary credential: first-party password (min 8 chars). Either password
-  // or firebaseUid must be provided.
+  // or firebaseIdToken must be provided.
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MinLength(8)
   password?: string;
 
-  // Optional alternative: pre-created Firebase account
-  @ApiPropertyOptional()
+  // Optional alternative: a Firebase ID token for `email`, verified on the server. The owner's uid comes only from
+  // the verified token, never from the body.
+  @ApiPropertyOptional({ description: 'A Firebase ID token for `email`, verified on the server; or send password' })
   @IsOptional()
   @IsString()
-  firebaseUid?: string;
+  @IsNotEmpty()
+  firebaseIdToken?: string;
 
   // Contact information
   @ApiProperty()

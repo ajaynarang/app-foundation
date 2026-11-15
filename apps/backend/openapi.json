@@ -3,16 +3,21 @@
     "schemas": {
       "AcceptInvitationDto": {
         "properties": {
-          "firebaseUid": {
+          "firebaseIdToken": {
+            "description": "A Firebase ID token for the invited email, verified on the server; or send password",
+            "type": "string"
+          },
+          "password": {
+            "description": "The new account's password (at least 8 characters); or send firebaseIdToken",
             "type": "string"
           },
           "token": {
+            "description": "Invitation acceptance token (from the invite link)",
             "type": "string"
           }
         },
         "required": [
-          "token",
-          "firebaseUid"
+          "token"
         ],
         "type": "object"
       },
@@ -9121,63 +9126,8 @@
         ],
         "type": "object"
       },
-      "InvitationIssued": {
+      "InvitationJoined": {
         "properties": {
-          "acceptedAt": {
-            "format": "date-time",
-            "nullable": true,
-            "type": "string"
-          },
-          "cancelledAt": {
-            "format": "date-time",
-            "nullable": true,
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "email": {
-            "nullable": true,
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "invitationId": {
-            "description": "Invitation public id (inv_…)",
-            "type": "string"
-          },
-          "inviteChannel": {
-            "enum": [
-              "EMAIL",
-              "SMS"
-            ],
-            "type": "string"
-          },
-          "inviteLink": {
-            "description": "Acceptance URL (carries the invitation token — share it only with the invitee)",
-            "type": "string"
-          },
-          "invitedBy": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/InvitationInviter"
-              }
-            ],
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "phone": {
-            "nullable": true,
-            "type": "string"
-          },
           "role": {
             "enum": [
               "OWNER",
@@ -9187,38 +9137,36 @@
             ],
             "type": "string"
           },
-          "status": {
-            "enum": [
-              "PENDING",
-              "ACCEPTED",
-              "CANCELLED",
-              "EXPIRED"
-            ],
+          "workspace": {
+            "$ref": "#/components/schemas/InvitationJoinedWorkspace"
+          }
+        },
+        "required": [
+          "workspace",
+          "role"
+        ],
+        "type": "object"
+      },
+      "InvitationJoinedWorkspace": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "Workspace (tenant) public id; send it to POST /workspaces/switch",
             "type": "string"
           }
         },
         "required": [
-          "invitationId",
-          "email",
-          "phone",
-          "inviteChannel",
-          "firstName",
-          "lastName",
-          "role",
-          "status",
-          "expiresAt",
-          "acceptedAt",
-          "cancelledAt",
-          "createdAt",
-          "invitedBy",
-          "inviteLink"
+          "tenantId",
+          "name"
         ],
         "type": "object"
       },
       "InvitationLink": {
         "properties": {
           "inviteLink": {
-            "description": "Acceptance URL (carries the invitation token)",
+            "description": "Acceptance URL (carries the new invitation token; shown once, never stored)",
             "type": "string"
           }
         },
@@ -9341,6 +9289,103 @@
         ],
         "type": "object"
       },
+      "InvitationPreview": {
+        "properties": {
+          "email": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "invitationId": {
+            "description": "Invitation public id",
+            "type": "string"
+          },
+          "inviteChannel": {
+            "enum": [
+              "EMAIL",
+              "SMS"
+            ],
+            "type": "string"
+          },
+          "invitedBy": {
+            "$ref": "#/components/schemas/InvitationPreviewInviter"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER",
+              "SUPER_ADMIN"
+            ],
+            "type": "string"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/InvitationPreviewTenant"
+          }
+        },
+        "required": [
+          "invitationId",
+          "email",
+          "phone",
+          "inviteChannel",
+          "firstName",
+          "lastName",
+          "role",
+          "expiresAt",
+          "tenant",
+          "invitedBy"
+        ],
+        "type": "object"
+      },
+      "InvitationPreviewInviter": {
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName"
+        ],
+        "type": "object"
+      },
+      "InvitationPreviewTenant": {
+        "properties": {
+          "companyName": {
+            "type": "string"
+          },
+          "subdomain": {
+            "nullable": true,
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "Workspace public id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "companyName",
+          "subdomain"
+        ],
+        "type": "object"
+      },
       "InviteUserDto": {
         "properties": {
           "email": {
@@ -9392,6 +9437,18 @@
         },
         "required": [
           "paymentId"
+        ],
+        "type": "object"
+      },
+      "JoinInvitationDto": {
+        "properties": {
+          "token": {
+            "description": "Invitation acceptance token (from the invite link)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
         ],
         "type": "object"
       },
@@ -10867,6 +10924,18 @@
         ],
         "type": "object"
       },
+      "PreviewInvitationDto": {
+        "properties": {
+          "token": {
+            "description": "Invitation acceptance token (from the invite link)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
       "PushSubscriptionJsonDto": {
         "properties": {
           "endpoint": {
@@ -11000,7 +11069,8 @@
           "email": {
             "type": "string"
           },
-          "firebaseUid": {
+          "firebaseIdToken": {
+            "description": "A Firebase ID token for `email`, verified on the server; or send password",
             "type": "string"
           },
           "firstName": {
@@ -14503,6 +14573,18 @@
           "role",
           "isActive",
           "tenant"
+        ],
+        "type": "object"
+      },
+      "VerifyEmailDto": {
+        "properties": {
+          "token": {
+            "description": "Raw token from the verification link",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
         ],
         "type": "object"
       },
@@ -20263,6 +20345,116 @@
         ]
       }
     },
+    "/api/v1/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED, or VERIFICATION_LINK_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verify the signed-in user's email with the one-time token from the emailed link; 400 VERIFICATION_LINK_INVALID when it is invalid, used, expired or another account's",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/verify-email/resend": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not signed in"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "RATE_LIMITED: throttled, or a link was sent less than a minute ago"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Email the signed-in user a new verification link (a no-op when already verified); 429 RATE_LIMITED with Retry-After within a minute of the last one",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/api/v1/billing/cancel": {
       "post": {
         "operationId": "BillingController_cancelSubscription",
@@ -24459,7 +24651,18 @@
       },
       "post": {
         "operationId": "UserInvitationsController_inviteUser",
-        "parameters": [],
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -24475,7 +24678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvitationIssued"
+                  "$ref": "#/components/schemas/InvitationListEntry"
                 }
               }
             },
@@ -24492,7 +24695,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Invite a person to the workspace by email or SMS; answers the invitation and its link",
+        "summary": "Invite a person to the workspace by email or SMS; answers the invitation (the link goes to the invitee only)",
         "tags": [
           "UserInvitations"
         ]
@@ -24514,7 +24717,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -24527,7 +24737,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Accept an email invitation with a Firebase identity (public)",
+        "summary": "Accept an email invitation as a new account with a password or a Firebase ID token, and sign in (public); 409 SIGN_IN_TO_ACCEPT when the email already has an account",
         "tags": [
           "UserInvitations"
         ]
@@ -24549,7 +24759,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -24568,23 +24785,30 @@
         ]
       }
     },
-    "/api/v1/invitations/by-token/{token}": {
-      "get": {
-        "operationId": "UserInvitationsController_getInvitationByToken",
-        "parameters": [
-          {
-            "description": "Invitation acceptance token (from the invite link)",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "type": "string"
+    "/api/v1/invitations/join": {
+      "post": {
+        "operationId": "UserInvitationsController_joinInvitation",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinInvitationDto"
+              }
             }
-          }
-        ],
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationJoined"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -24597,7 +24821,49 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Read a pending invitation by its token (public — the acceptance page)",
+        "summary": "Join the invitation's workspace as the signed-in account; its email must be the invitation's (403 INVITATION_EMAIL_MISMATCH). An emailed-only token also verifies the email",
+        "tags": [
+          "UserInvitations"
+        ]
+      }
+    },
+    "/api/v1/invitations/preview": {
+      "post": {
+        "operationId": "UserInvitationsController_previewInvitation",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInvitationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPreview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "summary": "Read a pending invitation by its token, sent in the body (public — the acceptance page)",
         "tags": [
           "UserInvitations"
         ]
@@ -24649,8 +24915,8 @@
       }
     },
     "/api/v1/invitations/{invitation_id}/link": {
-      "get": {
-        "operationId": "UserInvitationsController_getInvitationLink",
+      "post": {
+        "operationId": "UserInvitationsController_rotateInvitationLink",
         "parameters": [
           {
             "description": "Invitation public id (inv_…)",
@@ -24684,7 +24950,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Get the shareable link of a pending invitation (token unchanged)",
+        "summary": "Make a new shareable link for a pending invitation, shown once; the emailed link stops working (OWNER/ADMIN)",
         "tags": [
           "UserInvitations"
         ]
@@ -24709,7 +24975,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvitationIssued"
+                  "$ref": "#/components/schemas/InvitationListEntry"
                 }
               }
             },

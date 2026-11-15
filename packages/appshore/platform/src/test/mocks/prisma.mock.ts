@@ -62,6 +62,7 @@ const MODEL_NAMES = [
   'refreshToken',
   'whatsAppConsent',
   'passwordResetToken',
+  'emailVerificationToken',
   'superAdminPreferences',
   'supportTicket',
   'supportTicketMessage',
