@@ -69,6 +69,16 @@ describe('EmailVerificationService', () => {
       expect(sent.html).toContain(`https://app.example.com/verify-email?token=${rawToken}`);
     });
 
+    it('escapes the first name in the HTML body: whoever signs up picks it, and the email goes to any address', async () => {
+      const { service, emailService } = setup();
+
+      await service.issue({ ...USER, firstName: '<a href="https://evil.example">Pat</a>' }, { reason: 'signup' });
+
+      const sent = emailService.sendEmail.mock.calls[0][0];
+      expect(sent.html).not.toContain('<a href="https://evil.example">');
+      expect(sent.html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;Pat&lt;/a&gt;');
+    });
+
     it('is a no-op for a verified user or a user with no email', async () => {
       const { service, prisma, emailService } = setup();
       await service.issue({ ...USER, emailVerified: true }, { reason: 'signup' });

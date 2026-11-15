@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { ApiErrorCode, AuthErrorCode } from '@app/shared-types';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { EmailService } from '../infrastructure/notification/services/email.service';
 import { EMAIL_VERIFICATION_RESEND_COOLDOWN_MS, EMAIL_VERIFICATION_TTL_MS } from '../constants';
@@ -76,7 +77,7 @@ export class EmailVerificationService {
       await this.emailService.sendEmail({
         to: email,
         subject: 'Verify your email',
-        html: `<p>Hi ${user.firstName},</p><p>${intro} Confirm it is yours (the link works for 24 hours; sign in first if you are asked to):</p><p><a href="${verifyUrl}">Verify your email</a></p><p>If you did not create this account, ignore this email. To take the address back, use "Forgot password" on the sign-in page.</p>`,
+        html: `<p>Hi ${escapeHtml(user.firstName)},</p><p>${intro} Confirm it is yours (the link works for 24 hours; sign in first if you are asked to):</p><p><a href="${verifyUrl}">Verify your email</a></p><p>If you did not create this account, ignore this email. To take the address back, use "Forgot password" on the sign-in page.</p>`,
         text: `Hi ${user.firstName},\n\n${intro} Verify your email (works for 24 hours; sign in first if asked): ${verifyUrl}\n\nIf you did not create this account, ignore this email. To take the address back, use "Forgot password".`,
       });
     } catch (err) {

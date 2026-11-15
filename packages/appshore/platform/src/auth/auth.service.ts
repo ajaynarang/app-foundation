@@ -30,6 +30,7 @@ import { EmailVerificationService } from './email-verification.service';
 import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
 import { ApiErrorCode, AuthErrorCode, type WorkspaceChoice } from '@app/shared-types';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 
 @Injectable()
 export class AuthService {
@@ -287,11 +288,13 @@ export class AuthService {
     const appUrl = process.env.APP_URL || 'http://localhost:3000';
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
     const forAccount = workspace ? ` in the ${workspace} workspace` : '';
+    // The name and the workspace are user-chosen: escaped in the HTML so neither can add a link or markup.
+    const htmlForAccount = workspace ? ` in the ${escapeHtml(workspace)} workspace` : '';
     try {
       await this.emailService.sendEmail({
         to: email,
         subject: workspace ? `Reset your password for ${workspace}` : 'Reset your password',
-        html: `<p>Hi ${user.firstName},</p><p>Someone requested a password reset for your account${forAccount}. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
+        html: `<p>Hi ${escapeHtml(user.firstName)},</p><p>Someone requested a password reset for your account${htmlForAccount}. This link expires in 1 hour:</p><p><a href="${resetUrl}">Reset your password</a></p><p>If this wasn't you, you can safely ignore this email.</p>`,
         text: `Hi ${user.firstName},\n\nReset your password for your account${forAccount} (expires in 1 hour): ${resetUrl}\n\nIf this wasn't you, ignore this email.`,
       });
     } catch (err) {
@@ -398,7 +401,7 @@ export class AuthService {
       await this.emailService.sendEmail({
         to: email,
         subject: 'Your password was reset',
-        html: `<p>Hi ${firstName},</p><p>Your password was reset and your email address is now verified. Sign-in methods we removed: ${list}.</p><p>Your account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.</p>`,
+        html: `<p>Hi ${escapeHtml(firstName)},</p><p>Your password was reset and your email address is now verified. Sign-in methods we removed: ${list}.</p><p>Your account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.</p>`,
         text: `Hi ${firstName},\n\nYour password was reset and your email address is now verified. Sign-in methods we removed: ${list}.\n\nYour account had not been verified yet, so we removed every other way to sign in to it. Add them again from your profile if they were yours.`,
       });
     } catch (err) {

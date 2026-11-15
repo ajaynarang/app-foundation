@@ -33,7 +33,7 @@ describe('AuthService.resetPassword', () => {
     notificationDevice: { deleteMany: jest.fn() },
   };
   const prisma = {
-    passwordResetToken: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+    passwordResetToken: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
     user: { update: jest.fn() },
     refreshToken: { updateMany: jest.fn() },
     apiKey: { updateMany: jest.fn() },
@@ -206,6 +206,37 @@ describe('AuthService.resetPassword', () => {
     const notice = emailService.sendEmail.mock.calls[0][0];
     expect(notice.text).toContain('connected apps (OAuth)');
     expect(notice.text).not.toContain('push notifications');
+  });
+
+  it('escapes the first name in the HTML of the reclaim notice', async () => {
+    const firstName = '<a href="https://evil.example">Pat</a>';
+    tx.user.findUnique.mockResolvedValue({ ...verifiedUser, firstName, emailVerified: false });
+
+    await service.resetPassword({ token: 'reset-token', newPassword: 'N3w-Password!' });
+
+    const notice = emailService.sendEmail.mock.calls[0][0];
+    expect(notice.html).not.toContain('<a href="https://evil.example">');
+    expect(notice.html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;Pat&lt;/a&gt;');
+  });
+
+  it('escapes the first name and the workspace name in the HTML of the reset email', async () => {
+    const send = (
+      service as unknown as {
+        sendPasswordReset: (
+          user: { id: number; firstName: string },
+          email: string,
+          workspace?: string,
+        ) => Promise<void>;
+      }
+    ).sendPasswordReset.bind(service);
+
+    await send({ id: 42, firstName: '<a href="https://evil.example">Pat</a>' }, 'pat@example.com', '<b>Acme</b>');
+
+    const sent = emailService.sendEmail.mock.calls[0][0];
+    expect(sent.html).not.toContain('<a href="https://evil.example">');
+    expect(sent.html).not.toContain('<b>Acme</b>');
+    expect(sent.html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;Pat&lt;/a&gt;');
+    expect(sent.html).toContain('&lt;b&gt;Acme&lt;/b&gt;');
   });
 
   it('the reclaim notice is sent after the commit, and a send failure does not fail the reset', async () => {
