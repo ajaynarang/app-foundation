@@ -24821,7 +24821,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Join the invitation's workspace as the signed-in account; its verified email must be the invitation's (403 INVITATION_EMAIL_MISMATCH, EMAIL_NOT_VERIFIED)",
+        "summary": "Join the invitation's workspace as the signed-in account; its email must be the invitation's (403 INVITATION_EMAIL_MISMATCH). An emailed-only token also verifies the email",
         "tags": [
           "UserInvitations"
         ]

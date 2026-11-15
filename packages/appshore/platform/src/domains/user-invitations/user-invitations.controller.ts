@@ -124,15 +124,15 @@ export class UserInvitationsController {
 
   /**
    * Join the invitation's workspace as the signed-in account (any role). JWT session only: no OAuth or API-key guard
-   * sits on this route, so an agent never joins a workspace for a user. The account's verified email must be the
-   * invitation's. Issues no session: the client switches with `POST /workspaces/switch`.
+   * sits on this route, so an agent never joins a workspace for a user. The account's email must be the invitation's;
+   * an unverified one joins too, and is verified when the token travelled by email alone. Issues no session: the client switches with `POST /workspaces/switch`.
    */
   @Throttle(JOIN_THROTTLE)
   @Post('join')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      "Join the invitation's workspace as the signed-in account; its verified email must be the invitation's (403 INVITATION_EMAIL_MISMATCH, EMAIL_NOT_VERIFIED)",
+      "Join the invitation's workspace as the signed-in account; its email must be the invitation's (403 INVITATION_EMAIL_MISMATCH). An emailed-only token also verifies the email",
   })
   @ApiResult(InvitationJoined)
   async joinInvitation(@Body() dto: JoinInvitationDto, @CurrentUser() currentUser: any) {

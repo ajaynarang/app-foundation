@@ -429,11 +429,17 @@ export class UserInvitationsService {
 
   /**
    * `POST /invitations/join` (signed in, JWT session only): the caller's OWN account joins the invitation's
-   * workspace. Every check reads the user row, never the JWT claims (which can be 15 minutes old): a super admin
-   * never joins (403 FORBIDDEN); the account's email must be the invitation's (403 INVITATION_EMAIL_MISMATCH, naming
-   * neither address) and verified (403 EMAIL_NOT_VERIFIED). A member keeps their role. A retry by the account that
-   * already accepted answers the same body, so a lost response is safe to retry. Runs as the invitation's tenant
-   * (`runAsInvitationTenant`, set by the controller).
+   * workspace in one step (D10). Every check reads the user row, never the JWT claims (which can be 15 minutes old):
+   * a super admin never joins (403 FORBIDDEN), and the account's email must be the invitation's (403
+   * INVITATION_EMAIL_MISMATCH, naming neither address). An unverified account still joins: when the token travelled
+   * by email alone (`linkSharedAt` null), holding it proves the mailbox, so the join also verifies the email and uses
+   * up the account's verification links, in the same transaction; a shared link proves nothing, so the account
+   * joins and stays unverified (its banner offers a resend). This is safe against a pre-hijack: an attacker who
+   * registered the victim's address first cannot hold an unshared emailed token without the victim's inbox, and the
+   * victim cannot sign in to the attacker's account, so they take it back with a reset (D9). A copied link that
+   * reaches the attacker lets them join unverified, the same accepted risk as a new account from a shared link. A
+   * member keeps their role. A retry by the account that already accepted answers the same body, so a lost response
+   * is safe to retry. Runs as the invitation's tenant (`runAsInvitationTenant`, set by the controller).
    */
   async joinInvitation(token: string, callerDbId: number): Promise<InvitationJoined> {
     const found = token
@@ -469,14 +475,19 @@ export class UserInvitationsService {
         ),
       );
     }
-    if (!caller.emailVerified) {
-      throw new ForbiddenException(
-        errorBody(AuthErrorCode.EMAIL_NOT_VERIFIED, 'Verify your email, then accept the invitation.'),
-      );
-    }
+    // Proof of the mailbox only when no one but the invitee has seen this token (the rule `acceptInvitation` uses).
+    const verifiesEmail = !caller.emailVerified && found.inviteChannel === 'EMAIL' && found.linkSharedAt === null;
 
     const role = await this.prisma.$transaction(async (tx) => {
-      await this.movePending(tx, found, { status: 'ACCEPTED', acceptedAt: new Date(), acceptedByUserId: caller.id });
+      const now = new Date();
+      await this.movePending(tx, found, { status: 'ACCEPTED', acceptedAt: now, acceptedByUserId: caller.id });
+      if (verifiesEmail) {
+        await tx.user.update({ where: { id: caller.id }, data: { emailVerified: true } });
+        await tx.emailVerificationToken.updateMany({
+          where: { userId: caller.id, usedAt: null },
+          data: { usedAt: now },
+        });
+      }
       // An existing member keeps the role they have: an invitation never changes it.
       const membership = await tx.workspaceMember.upsert({
         where: { userId_tenantId: { userId: caller.id, tenantId: found.tenantId } },

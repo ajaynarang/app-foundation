@@ -235,7 +235,7 @@ describe('Invitations and one live account per email (Postgres)', () => {
     await expect(joinAs(home.id, jane.id, invitation.token)).resolves.toMatchObject({ role: 'MEMBER' });
   });
 
-  it('the pre-hijack: an unverified account with the invitee email is refused by accept and by join, no membership', async () => {
+  it('the pre-hijack: a squatter on the invitee email never holds the emailed token, so it joins nothing', async () => {
     if (!ready) return;
     const attackerHome = await makeTenant();
     const victimWorkspace = await makeTenant();
@@ -247,20 +247,63 @@ describe('Invitations and one live account per email (Postgres)', () => {
     });
     const invitation = await makeInvitation(victimWorkspace.id, inviter.id, { email: `victim-${suffix}@example.com` });
 
+    // The victim, holding the emailed link, cannot make an account (and cannot sign in to the squatter's): they
+    // reclaim the address with a reset (next case).
     await expect(service.acceptInvitation({ token: invitation.token, password: 'Password123!' })).rejects.toMatchObject(
       {
         status: 409,
         response: { code: 'SIGN_IN_TO_ACCEPT' },
       },
     );
-    await expect(joinAs(attackerHome.id, squatter.id, invitation.token)).rejects.toMatchObject({
-      status: 403,
-      response: { code: 'EMAIL_NOT_VERIFIED' },
-    });
+    // The squatter never sees the emailed token: any token it can produce is unknown.
+    await expect(joinAs(attackerHome.id, squatter.id, `tok_guess_${suffix}`)).rejects.toBeInstanceOf(NotFoundException);
     expect(await memberships(squatter.id, victimWorkspace.id)).toBe(0);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: squatter.id } })).toMatchObject({
+      emailVerified: false,
+    });
     expect(await prisma.userInvitation.findUnique({ where: { id: invitation.id } })).toMatchObject({
       status: 'PENDING',
     });
+  });
+
+  it('a copied link that reaches the squatter lets it join unverified: the accepted shared-link risk, never a proof', async () => {
+    if (!ready) return;
+    const attackerHome = await makeTenant();
+    const workspace = await makeTenant();
+    const inviter = await makeMember(workspace.id, `boss8b-${suffix}@example.com`);
+    const squatter = await makeMember(attackerHome.id, `squatlink-${suffix}@example.com`, { emailVerified: false });
+    const invitation = await makeInvitation(workspace.id, inviter.id, { email: `squatlink-${suffix}@example.com` });
+    const { inviteLink } = await service.rotateInvitationLink(invitation.invitationId, workspace.tenantId);
+
+    await expect(
+      joinAs(attackerHome.id, squatter.id, new URL(inviteLink).searchParams.get('token') as string),
+    ).resolves.toMatchObject({ role: 'MEMBER' });
+    expect(await memberships(squatter.id, workspace.id)).toBe(1);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: squatter.id } })).toMatchObject({
+      emailVerified: false,
+    });
+  });
+
+  it('an unverified owner with the emailed-only token joins in one step: verified, its verification links used up', async () => {
+    if (!ready) return;
+    const home = await makeTenant();
+    const workspace = await makeTenant();
+    const inviter = await makeMember(workspace.id, `boss8c-${suffix}@example.com`);
+    const owner = await makeMember(home.id, `unverified-${suffix}@example.com`, { emailVerified: false });
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId: owner.id,
+        email: `unverified-${suffix}@example.com`,
+        tokenHash: hashToken(`ev_${suffix}`),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    const invitation = await makeInvitation(workspace.id, inviter.id, { email: `unverified-${suffix}@example.com` });
+
+    await expect(joinAs(home.id, owner.id, invitation.token)).resolves.toMatchObject({ role: 'MEMBER' });
+    expect(await memberships(owner.id, workspace.id)).toBe(1);
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: owner.id } })).toMatchObject({ emailVerified: true });
+    expect(await prisma.emailVerificationToken.count({ where: { userId: owner.id, usedAt: null } })).toBe(0);
   });
 
   it(

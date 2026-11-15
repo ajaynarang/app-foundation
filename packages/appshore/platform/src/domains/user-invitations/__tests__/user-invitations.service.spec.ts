@@ -50,6 +50,10 @@ describe('UserInvitationsService', () => {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+    },
+    emailVerificationToken: {
+      updateMany: jest.fn(),
     },
     tenant: {
       findUnique: jest.fn(),
@@ -430,7 +434,7 @@ describe('UserInvitationsService', () => {
     });
   });
 
-  describe('joinInvitation: the signed-in owner of a verified, matching email', () => {
+  describe('joinInvitation: the signed-in owner of the matching email, in one step', () => {
     const TOKEN = 'join-token-0123456789';
     const invitation = (over: Record<string, unknown> = {}) => ({
       id: 1,
@@ -441,6 +445,7 @@ describe('UserInvitationsService', () => {
       tenantId: 2,
       status: 'PENDING',
       acceptedByUserId: null,
+      linkSharedAt: null,
       expiresAt: new Date(Date.now() + 60_000),
       tenant: { tenantId: 'ten_two', companyName: 'Two' },
       ...over,
@@ -478,18 +483,47 @@ describe('UserInvitationsService', () => {
       });
     });
 
-    it('reads the caller from the database, never the JWT: a since-unverified row is refused', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
-      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
-        status: 403,
-        response: { code: 'EMAIL_NOT_VERIFIED' },
-      });
+    it('a verified account joins and its account row is not written', async () => {
+      await service.joinInvitation(TOKEN, 7);
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 7 },
         select: { id: true, email: true, emailVerified: true, deletedAt: true, role: true },
       });
-      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
-      expect(mockPrismaService.userInvitation.updateMany).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('unverified, with a token that travelled by email alone: joins, and the same transaction verifies the email and uses up its links', async () => {
+      // Read from the row, never the JWT: the claims may still say verified, or not.
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
+      await expect(service.joinInvitation(TOKEN, 7)).resolves.toMatchObject({ role: 'ADMIN' });
+
+      expect(mockPrismaService.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { emailVerified: true } });
+      expect(mockPrismaService.emailVerificationToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 7, usedAt: null },
+        data: { usedAt: expect.any(Date) },
+      });
+      expect(mockPrismaService.workspaceMember.upsert).toHaveBeenCalled();
+    });
+
+    it('unverified, with a shared link or a non-email invitation: joins and stays unverified', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
+      for (const over of [{ linkSharedAt: new Date() }, { inviteChannel: 'SMS' }]) {
+        mockPrismaService.userInvitation.findUnique.mockResolvedValue(invitation(over));
+        await expect(service.joinInvitation(TOKEN, 7)).resolves.toMatchObject({ role: 'ADMIN' });
+      }
+      expect(mockPrismaService.workspaceMember.upsert).toHaveBeenCalledTimes(2);
+      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('a lost race verifies nothing: the conditional move fails before the account is written', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ emailVerified: false }));
+      mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({ status: 409 });
+      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
     it('another email is 403 INVITATION_EMAIL_MISMATCH and names neither address', async () => {
@@ -497,7 +531,9 @@ describe('UserInvitationsService', () => {
       const err = await service.joinInvitation(TOKEN, 7).catch((e) => e);
       expect(err).toMatchObject({ status: 403, response: { code: 'INVITATION_EMAIL_MISMATCH' } });
       expect(JSON.stringify(err.response)).not.toMatch(/example\.com/i);
-      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
     it('an invitation with no email (a phone one) never matches', async () => {
@@ -509,12 +545,14 @@ describe('UserInvitationsService', () => {
     });
 
     it('a super admin is 403 FORBIDDEN: super admins do not join workspaces', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(caller({ role: 'SUPER_ADMIN' }));
+      mockPrismaService.user.findUnique.mockResolvedValue(caller({ role: 'SUPER_ADMIN', emailVerified: false }));
       await expect(service.joinInvitation(TOKEN, 7)).rejects.toMatchObject({
         status: 403,
         response: { code: 'FORBIDDEN' },
       });
-      expect(mockPrismaService.workspaceMember.upsert).not.toHaveBeenCalled();
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      expect(mockPrismaService.user.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.emailVerificationToken.updateMany).not.toHaveBeenCalled();
     });
 
     it('a soft-deleted caller is refused', async () => {
