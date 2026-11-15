@@ -15,6 +15,11 @@ import { EmailVerificationService } from '../../../auth/email-verification.servi
 import { Prisma } from '@appshore/db';
 import * as bcrypt from 'bcrypt';
 
+// The real bcrypt at its lowest cost (set in beforeEach): the service asks for 12 rounds (asserted below), which
+// takes seconds per case under a full parallel run and timed the bcrypt-heavy cases out.
+jest.mock('bcrypt', () => ({ ...jest.requireActual('bcrypt'), hash: jest.fn() }));
+const realBcrypt = jest.requireActual<typeof import('bcrypt')>('bcrypt');
+
 /** The raw token in a link the service built (emailed, texted or returned). */
 const tokenInLink = (link: string) => new URL(link).searchParams.get('token') as string;
 
@@ -117,7 +122,9 @@ describe('UserInvitationsService', () => {
 
     service = module.get<UserInvitationsService>(UserInvitationsService);
 
-    jest.clearAllMocks();
+    // Reset, not clear: a value queued with mockResolvedValueOnce that a test did not use must not reach the next.
+    jest.resetAllMocks();
+    jest.mocked(bcrypt.hash).mockImplementation((data: string | Buffer) => realBcrypt.hash(data, 4));
     mockEntitlements.assertUserSeatAvailable.mockResolvedValue(undefined);
     // The conditional move wins unless a test says another request got there first.
     mockPrismaService.userInvitation.updateMany.mockResolvedValue({ count: 1 });
@@ -297,7 +304,7 @@ describe('UserInvitationsService', () => {
       });
       const data = mockPrismaService.user.create.mock.calls[0][0].data;
       expect(await bcrypt.compare('Password123!', data.passwordHash)).toBe(true);
-      expect(data.passwordHash).toMatch(/^\$2[aby]\$12\$/);
+      expect(bcrypt.hash).toHaveBeenCalledWith('Password123!', 12);
       expect(data).toMatchObject({ email: 'newuser@example.com', role: 'MEMBER', tenantId: 1, firebaseUid: null });
       expect(mockPrismaService.workspaceMember.create).toHaveBeenCalledWith({
         data: { userId: 9, tenantId: 1, role: 'MEMBER', isDefault: true },

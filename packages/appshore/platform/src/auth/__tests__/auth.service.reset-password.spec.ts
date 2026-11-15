@@ -13,6 +13,9 @@ import { EmailService } from '../../infrastructure/notification/services/email.s
 import { IdentityResolverService } from '../identity-resolver.service';
 import { EmailVerificationService } from '../email-verification.service';
 
+// The hash is not under test here, and 12 real bcrypt rounds per case timed cases out under a full parallel run.
+jest.mock('bcrypt', () => ({ ...jest.requireActual('bcrypt'), hash: jest.fn(async () => 'new-password-hash') }));
+
 /**
  * `resetPassword` writes the new hash, consumes the token, marks the email verified and revokes every session in one
  * interactive transaction: every write goes through the `tx` client the callback receives, never the root client
