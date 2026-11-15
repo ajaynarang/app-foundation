@@ -49,7 +49,35 @@ export function repoFiles(root) {
 }
 
 /**
- * Compares the owned files of the rebuilt base with the product: `changed` (both have it, bytes differ), `deleted`
+ * A Markdown table row with its padding removed. init-app's skill rename changes the width of a table cell, and the
+ * product's Prettier then realigns the whole table: every row changes, the content does not.
+ */
+const tableRow = (line) =>
+  line
+    .split('|')
+    .map((cell) => cell.trim().replace(/^(:?)-+(:?)$/, '$1-$2'))
+    .join('|');
+
+/**
+ * Markdown as Prettier would settle it, for comparing only: table rows unpadded and runs of blank lines collapsed
+ * (init-app leaves two blank lines where it strips an optional feature's block; Prettier makes them one).
+ */
+export function settleMarkdown(markdown) {
+  return markdown
+    .split('\n')
+    .map((line) => (line.trimStart().startsWith('|') ? tableRow(line.trim()) : line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+/** Same bytes, or (for Markdown) the same text once Prettier's table alignment and blank lines are set aside. */
+export function sameContent(rel, a, b) {
+  if (a.equals(b)) return true;
+  return rel.endsWith('.md') && settleMarkdown(a.toString('utf8')) === settleMarkdown(b.toString('utf8'));
+}
+
+/**
+ * Compares the owned files of the rebuilt base with the product: `changed` (both have it, content differs), `deleted`
  * (the base has it, the product does not) and `added` (the product has a file in an owned area the base lacks).
  * Seams and starter content are never listed.
  */
@@ -63,7 +91,7 @@ export function compareTrees({ baseDir, productDir, manifest, productFiles = rep
   for (const rel of baseOwned) {
     const mine = path.join(productDir, rel);
     if (!fs.existsSync(mine)) deleted.push(rel);
-    else if (!fs.readFileSync(path.join(baseDir, rel)).equals(fs.readFileSync(mine))) changed.push(rel);
+    else if (!sameContent(rel, fs.readFileSync(path.join(baseDir, rel)), fs.readFileSync(mine))) changed.push(rel);
   }
   const added = productFiles.filter((rel) => isOwned(rel) && !inBase.has(rel));
   return { owned: baseOwned.length, changed: changed.sort(), deleted: deleted.sort(), added: added.sort() };

@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { baseRefs, initAppArgs, rebuildBase } from './base.mjs';
-import { compareTrees, report } from './status.mjs';
+import { compareTrees, report, sameContent } from './status.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tmp = (name) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `foundation-${name}-`)));
@@ -113,6 +113,22 @@ test('only changes to owned files are listed', () => {
   assert.deepEqual(result.added, ['packages/appshore/new-helper.ts']);
   const text = report({ manifest, ref, result });
   assert.match(text, /3 of 3 foundation files differ from the base \(1 changed, 1 deleted, 1 added\)/);
+});
+
+test('a realigned Markdown table or a doubled blank line is not a change; a changed cell is', () => {
+  const md = (text) => Buffer.from(text);
+  const before = md('Intro\n\n| Skill | Use |\n| ----- | --- |\n| `ac-plan` | plan |\n\n  indented | not a table\n');
+  const realigned = md(
+    'Intro\n\n| Skill     | Use  |\n| --------- | ---- |\n| `ac-plan` | plan |\n\n  indented | not a table\n',
+  );
+  const reworded = md(
+    'Intro\n\n| Skill     | Use  |\n| --------- | ---- |\n| `ac-plan` | plot |\n\n  indented | not a table\n',
+  );
+  assert.ok(sameContent('docs/x.md', before, realigned));
+  assert.ok(!sameContent('docs/x.md', before, reworded));
+  assert.ok(sameContent('docs/x.md', md('a\n\n\n- b\n'), md('a\n\n- b\n')), 'a doubled blank line is not a change');
+  assert.ok(!sameContent('src/x.ts', before, realigned), 'only Markdown is compared this way');
+  assert.ok(!sameContent('docs/x.md', md('a  b\n'), md('a b\n')), 'prose spacing still counts');
 });
 
 test('with no recorded commit the version tag is the base', () => {

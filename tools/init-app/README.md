@@ -71,6 +71,11 @@ gives `nor`). The interactive run offers it and accepts another.
    leaves `.gitignore`. Every `verified: <sha>` line leaves the docs' frontmatter: the template's commits are not in
    your history, and a doc with no `verified:` line counts as never verified until `/<prefix>-dev-docs audit` checks it.
 
+6. `foundation.json` records the base: the template version, the commit (when the checkout still has the template's
+   history) and the answers above. `pnpm foundation:status` rebuilds that base later and lists every foundation
+   file you have changed since (`tools/foundation/`, and the ADR "Products follow the foundation by version"). If you
+   later change the app name, the scope or the skill prefix by hand, change them in `foundation.json` too.
+
 Renaming skills can leave a Markdown table out of alignment; run `pnpm exec prettier --write .claude docs` after
 `pnpm install`.
 

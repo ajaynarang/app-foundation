@@ -65,3 +65,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | [0016](0016-planning-artifacts-tracked-in-products.md)         | Planning artifacts: untracked in the template, tracked by default in a product                                | Adopted |
 | [0017](0017-state-lives-in-postgres.md)                        | State lives in Postgres; the workflow engine only orchestrates                                                | Adopted |
 | [0018](0018-observability-open-protocols.md)                   | Observability: open protocols; Grafana Cloud and Sentry pre-wired and off without keys; CloudWatch fallback   | Adopted |
+| [0019](0019-products-follow-the-foundation-by-version.md)      | Products follow the foundation by version: a manifest of owned paths, the base recorded at scaffold time      | Adopted |

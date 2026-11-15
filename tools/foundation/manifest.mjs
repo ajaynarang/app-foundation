@@ -93,8 +93,8 @@ export function loadManifest(root) {
 }
 
 /**
- * A product's path as the template names it. init-app renames skill folders and agent files to the product's prefix
- * (`.claude/skills/tl-plan` was `.claude/skills/app-plan`); the manifest's globs are written in template names.
+ * A product's path as the template names it. init-app renames each skill folder and agent file to the product's
+ * prefix (`<prefix>-<name>` where the template has `app-<name>`); the manifest's globs use template names.
  */
 export function toTemplatePath(rel, scaffold, templatePrefix = 'app') {
   const prefix = scaffold?.skillPrefix;

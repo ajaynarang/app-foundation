@@ -4,15 +4,16 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ## Layout
 
-| Folder      | Purpose                                               |
-| ----------- | ----------------------------------------------------- |
-| `init-app/` | One-time template rename (see `init-app/README.md`)   |
-| `db/`       | Database tunnel, migrations, staging pull             |
-| `ops/`      | Operator switches (maintenance mode)                  |
-| `dev/`      | Local dev environment helpers                         |
-| `verify/`   | The local gates a branch passes before a pull request |
-| `guards/`   | The repository guards (`pnpm guards`)                 |
-| `.dumps/`   | Saved DB dumps (gitignored)                           |
+| Folder        | Purpose                                                    |
+| ------------- | ---------------------------------------------------------- |
+| `init-app/`   | One-time template rename (see `init-app/README.md`)        |
+| `db/`         | Database tunnel, migrations, staging pull                  |
+| `ops/`        | Operator switches (maintenance mode)                       |
+| `dev/`        | Local dev environment helpers                              |
+| `verify/`     | The local gates a branch passes before a pull request      |
+| `guards/`     | The repository guards (`pnpm guards`)                      |
+| `foundation/` | Which template version this repo is on (`foundation.json`) |
+| `.dumps/`     | Saved DB dumps (gitignored)                                |
 
 ## Scripts
 
@@ -105,3 +106,15 @@ pnpm dev:side:stop
 Claude Code hook fixture tests (`.claude/hooks/tests/`). All three run in the pre-push hook and `pnpm verify`;
 `pnpm guards` also runs in the pre-commit hook. The manual workflow `.github/workflows/guards.yml` runs the same three
 commands.
+
+### `foundation/`
+
+| Script                                | What it does                                                                                                                                                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `foundation/manifest.mjs`             | Reads and validates `foundation.json`: the version, the globs the foundation owns, the seams a product fills in, and (in a product) the base it was scaffolded from. Classifies a path as owned, seam or starter. |
+| `foundation/base.mjs`                 | Rebuilds the base a product came from: fetches the recorded commit (or the tag `v<version>`) into a temp folder and runs that version's init-app with the recorded answers.                                       |
+| `foundation/status.mjs`               | `pnpm foundation:status`: the owned files this repo changed, deleted or added since its base. Read-only. `--from <path or url>` reads the template from a local clone, `--json` prints the lists as JSON.         |
+| `foundation/foundation-json.test.mjs` | Holds the manifest in the template: every glob matches a tracked file, every seam sits inside an owned glob, the version equals `package.json`'s.                                                                 |
+
+`pnpm test:foundation` runs their tests; it is a step of `pnpm verify`. The decision is the ADR "Products follow the
+foundation by version" (`docs/adr/`).

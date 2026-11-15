@@ -323,6 +323,13 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
   third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
   so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
+- **`pnpm foundation:status`** — `foundation.json` at the root says which paths the foundation owns (`owned`), which
+  files inside them a product fills in (`seams`), and, in a product, the template version and commit it was
+  scaffolded from (`base`) with the answers init-app was given (`scaffold`). The command rebuilds that base and lists
+  the owned files that differ; it writes nothing. In this template there is no base, so it says so. A new folder the
+  foundation should keep in step across products is added to `owned` in the same pull request
+  (`tools/foundation/foundation-json.test.mjs` fails on a glob that matches nothing). The decision is the ADR
+  "Products follow the foundation by version".
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
   residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo
