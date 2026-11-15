@@ -31,7 +31,7 @@ is redacted, as the moderation pipeline always intended. Check your assistant's 
 
 **What changed.** Every tool call from chat, MCP or Desk ran inside a transaction that set
 `SET LOCAL ROLE ai_reader`. No tool used that transaction's client, so the role's row-level policies applied to
-nothing, and each call held a second pooled connection. The wrapper (`apps/backend/src/domains/ai/rls/`) is
+nothing, and each call held a second pooled connection. The wrapper (~~`apps/backend/src/domains/ai/rls/`~~) is
 deleted. Tools are called directly; tenant isolation is, as before, each tool's own `_tenantId` filter.
 
 Migration `20261112200000_drop_dead_ai_rls` drops the two policies (`tenant_isolation_conversation`,
@@ -192,7 +192,7 @@ the change with a data step.
   It re-embeds Desk memories with no vector, tenant by tenant, on each tenant's own route (so the right payer and
   retention apply, with a ledger row per batch). A tenant its route refuses is skipped and named; it exits 1 only
   when a tenant failed for another reason. Safe to re-run. A product scaffolded without Desk does not have it.
-- Removed: `apps/backend/src/domains/ai/infrastructure/providers/ai-provider.ts` (`ai`, `aiDirect`, `aiEmbedding`,
+- Removed: ~~`apps/backend/src/domains/ai/infrastructure/providers/ai-provider.ts`~~ (`ai`, `aiDirect`, `aiEmbedding`,
   `isAiConfigured`, `getRequiredAiEnvVar`, `ZDR_ELIGIBLE_TIERS`), the catalog's `LEGACY_EMBEDDING`, and the config
   key `anthropicApiKey`. `AI_PROVIDER`, `AI_GATEWAY_API_KEY` and `ANTHROPIC_API_KEY` are no longer read; each one
   still set logs one warning at boot. `ANTHROPIC_API_KEY` stays in `.env.example` as a developer's test key (the

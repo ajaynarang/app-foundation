@@ -39,5 +39,10 @@ test-results/
 packages/appshore/db/generated/
 .playwright-mcp/
 
+# Git worktrees (other checkouts of this repo) and Claude Code's per-machine settings
+.worktrees/
+.claude/worktrees/
+.claude/settings.local.json
+
 # Local AI planning artifacts (specs/plans) — kept out of the public repo
 docs/superpowers/

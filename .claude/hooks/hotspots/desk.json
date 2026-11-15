@@ -1,0 +1,11 @@
+{
+  "$comment": "Drift hotspots of Desk, the optional workflow engine, read by .claude/hooks/drift-reminder.mjs. init-app deletes this file when the Desk folder is absent after a scaffold, and the skills guard fails while it exists without that folder.",
+  "requires": "desk",
+  "hotspots": [
+    {
+      "paths": ["apps/backend/src/domains/desk/**", "apps/backend/src/platform-glue/features/desk.feature.ts"],
+      "say": "Desk changed: nothing outside the seam (apps/backend/src/platform-glue/features/) imports Desk code; a Desk-only line outside the Desk folder sits between feature:desk markers and is registered in tools/init-app/features/desk.json in this pull request; run pnpm verify:scaffold before the pull request.",
+      "docs": ["docs/adr/0004-optional-features-desk-opt-in.md", "tools/init-app/features/desk.json"]
+    }
+  ]
+}

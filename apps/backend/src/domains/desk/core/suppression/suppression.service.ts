@@ -168,7 +168,7 @@ export class SuppressionService {
   async unsnooze(suppressionId: string, tenantId: number, userId: number) {
     // Tenant-scoped lookup — the id alone is not a capability. UUIDs leak
     // through logs / SSE / webhooks, and every service-layer read MUST
-    // include tenantId per app-backend-patterns §3. Cross-tenant clear
+    // include tenantId (docs/adr/0009-tenancy.md). Cross-tenant clear
     // is treated identically to missing (same 404) so we don't signal
     // existence to a caller outside the owning tenant.
     const row = await this.prisma.deskEntitySuppression.findFirst({

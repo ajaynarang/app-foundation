@@ -12,3 +12,10 @@ pnpm verify:arch
 if bash tools/verify/push-touches-ops.sh; then
   pnpm check:ops
 fi
+
+# The repository guards (tools/guards, Node only, seconds): skills, agents, docs and source comments cite only files,
+# symbols, skills and guards that exist, every workflow keeps CI manual (.claude/workflow.json), and the convention
+# gate holds its baseline. Then their tests, and the fixture tests of the Claude Code hooks (.claude/hooks).
+pnpm guards
+pnpm test:guards
+pnpm test:hooks

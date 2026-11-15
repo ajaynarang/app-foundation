@@ -20,6 +20,8 @@ export interface FeatureManifest {
   markers: string[];
   jsonEntries: JsonEntry[];
   allowlistPrefixes: { prefix: string; files: string[] }[];
+  /** A feature with no backend seam (mobile): kept while this repo-relative path exists. */
+  presentWhen?: string;
 }
 
 export const FEATURES_DIR_REL = 'tools/init-app/features';
@@ -36,10 +38,17 @@ export function listManifests(root: string): FeatureManifest[] {
     .map((f) => {
       const raw = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Record<string, unknown>;
       const unknown = Object.keys(raw).filter(
-        (k) => !k.startsWith('$') && !(MANIFEST_KEYS as readonly string[]).includes(k),
+        (k) => !k.startsWith('$') && k !== 'presentWhen' && !(MANIFEST_KEYS as readonly string[]).includes(k),
       );
       if (unknown.length > 0) throw new Error(`${FEATURES_DIR_REL}/${f}: unknown key(s) ${unknown.join(', ')}`);
+      const presentWhen = raw.presentWhen;
+      if (
+        presentWhen !== undefined &&
+        (typeof presentWhen !== 'string' || presentWhen === '' || path.isAbsolute(presentWhen))
+      )
+        throw new Error(`${FEATURES_DIR_REL}/${f}: presentWhen must be a repo-relative path`);
       return {
+        ...(typeof presentWhen === 'string' ? { presentWhen } : {}),
         name: f.slice(0, -'.json'.length),
         paths: (raw.paths as string[]) ?? [],
         markers: (raw.markers as string[]) ?? [],
@@ -54,6 +63,15 @@ export function keptFeatures(root: string): string[] {
   const index = path.join(root, SEAM_DIR_REL, 'index.ts');
   const text = fs.readFileSync(index, 'utf8');
   return [...text.matchAll(/from\s+'\.\/([a-z0-9-]+)\.feature'/g)].map((m) => m[1]).sort();
+}
+
+/**
+ * Whether the product kept a feature. A manifest with `presentWhen` is kept while that path exists; any other is kept
+ * when the seam's `index.ts` imports it (`kept`, from `keptFeatures`).
+ */
+export function isKept(root: string, manifest: FeatureManifest, kept: string[]): boolean {
+  if (manifest.presentWhen !== undefined) return fs.existsSync(path.join(root, manifest.presentWhen));
+  return kept.includes(manifest.name);
 }
 
 function escapeRegExp(s: string) {

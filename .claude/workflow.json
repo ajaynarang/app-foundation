@@ -1,0 +1,21 @@
+{
+  "$comment": "What the workflow guards and skills read that cannot be read from disk. tools/guards/workflow-config.mjs validates it; init-app rewrites it for a product. skillPrefix: every skill and agent is <skillPrefix>-<name>. reservedNames: names init-app rewrites, which no skill or agent may start with. plans: where plans, specs and test notes live, and whether git tracks them. ci: manual (every workflow runs only by hand) or on-push (the check workflows' triggers are uncommented). manualAlways: workflows that never carry a push or pull_request trigger, live or commented, in any mode. githubProject: the GitHub Projects number, or null to keep state in issues alone.",
+  "skillPrefix": "app",
+  "reservedNames": [
+    "app-foundation",
+    "app-backend",
+    "app-frontend",
+    "app-postgres",
+    "app-redis",
+    "app-minio",
+    "app-loki",
+    "app-tempo",
+    "app-grafana",
+    "app-inngest"
+  ],
+  "defaultBranch": "main",
+  "plans": { "folder": "docs/superpowers", "tracked": false },
+  "ci": "manual",
+  "manualAlways": ["deploy-all.yml", "deploy-frontend.yml", "quality-gate.yml", "grafana-apply.yml"],
+  "githubProject": null
+}

@@ -18,9 +18,11 @@
  * Usage:
  *   npx tsx scripts/audit-rbac-gaps.ts              # Print report
  *   npx tsx scripts/audit-rbac-gaps.ts --json        # JSON output
- *   npx tsx scripts/audit-rbac-gaps.ts --ci          # Exit code 1 if gaps found
+ *   npx tsx scripts/audit-rbac-gaps.ts --ci          # Exit code 1 if critical gaps found
  *
- * Run this in CI to catch newly added endpoints that forgot @Roles().
+ * Root script: `pnpm audit:rbac` (the --ci form). It runs in `pnpm verify` and in the manual CI workflow, and fails
+ * the run when a mutation route has neither @Roles() nor @Public(). BACKEND_SRC, TESTS_API and RBAC_REPORT_DIR
+ * override the folders it reads and writes; its hermetic test is tools/verify/rbac-audit.test.sh.
  */
 
 import * as fs from 'fs';
@@ -115,6 +117,29 @@ function inferDomain(filePath: string): string {
   return 'other';
 }
 
+/** The method signature that ends a decorator block: `name(`, optionally `async`, an access modifier or `static`. */
+const METHOD_SIGNATURE = /^(?:(?:public|private|protected|static|async)\s+)*[A-Za-z_$][\w$]*\s*\(/;
+
+/**
+ * The first and last line of the decorator block that holds the route decorator on line `i`: back to the end of the
+ * previous member (a line that is `}`, or ends with `{`, `{}` or `;`), forward to the method signature.
+ */
+function decoratorBlockOf(lines: string[], i: number): [number, number] {
+  let start = i;
+  for (let j = i - 1; j >= 0; j--) {
+    const t = lines[j].trim();
+    if (t === '}' || t.endsWith('{') || t.endsWith('{}') || t.endsWith(';')) break;
+    start = j;
+  }
+  let end = i;
+  for (let j = i + 1; j < lines.length; j++) {
+    const t = lines[j].trim();
+    end = j;
+    if (METHOD_SIGNATURE.test(t)) break;
+  }
+  return [start, end];
+}
+
 function parseControllerForAudit(filePath: string): EndpointAudit[] {
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split('\n');
@@ -186,10 +211,14 @@ function parseControllerForAudit(filePath: string): EndpointAudit[] {
       let isPublic = classIsPublic;
       let methodFeatureGate: string | null = null;
 
-      for (let j = Math.max(0, i - 6); j <= Math.min(lines.length - 1, i + 1); j++) {
+      // Every decorator of this route, wherever it sits in the block: @Roles() and @Public() may come before or
+      // after the route decorator, with other decorators between them.
+      const [blockStart, blockEnd] = decoratorBlockOf(lines, i);
+      for (let j = blockStart; j <= blockEnd; j++) {
+        if (j === i) continue;
         const nearby = lines[j].trim();
         if (nearby === '@Public()') isPublic = true;
-        if (nearby.startsWith('@Roles(') && j !== i) {
+        if (nearby.startsWith('@Roles(')) {
           const roles: string[] = [];
           let roleBlock = nearby;
           if (!nearby.includes(')')) {
@@ -206,7 +235,7 @@ function parseControllerForAudit(filePath: string): EndpointAudit[] {
           if (roles.length > 0) methodRoles = roles;
         }
         const methodFeature = requiredFeatureOf(nearby);
-        if (methodFeature && j !== i) methodFeatureGate = methodFeature;
+        if (methodFeature) methodFeatureGate = methodFeature;
       }
 
       const effectiveRoles = methodRoles.length > 0 ? methodRoles : classRoles;
@@ -448,7 +477,7 @@ async function main(): Promise<void> {
   const report = detectGaps(allEndpoints, testedRoutes);
 
   // Save JSON report
-  const reportDir = path.join(__dirname, '..', 'reports');
+  const reportDir = process.env.RBAC_REPORT_DIR || path.join(__dirname, '..', 'reports');
   if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
   fs.writeFileSync(path.join(reportDir, 'rbac-audit.json'), JSON.stringify(report, null, 2));
 
@@ -464,4 +493,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(console.error);
+// A gate that cannot run must fail the run, not pass it.
+main().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

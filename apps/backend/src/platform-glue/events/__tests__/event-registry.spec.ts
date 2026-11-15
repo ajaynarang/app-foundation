@@ -4,7 +4,7 @@ import { DOMAIN_EVENTS } from '../domain-events.constants';
 describe('EventRegistry', () => {
   it('every registry entry has required fields', () => {
     for (const def of EVENT_REGISTRY) {
-      expect(def.key).toMatch(/^app\.[\w-]+\.[\w-]+$/);
+      expect(def.key).toMatch(/^app\.[a-z0-9-]+\.[a-z0-9-]+$/);
       expect(def.constantName).toBeTruthy();
       expect(def.label).toBeTruthy();
       expect(def.description).toBeTruthy();

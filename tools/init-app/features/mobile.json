@@ -1,0 +1,11 @@
+{
+  "$comment": "The Flutter companion app. `node tools/init-app/apply-feature.mjs --remove mobile` (what `pnpm init-app --mobile no` runs) deletes `paths`, strips the feature:mobile blocks in `markers` and removes `jsonEntries`. Mobile has no backend seam, so `presentWhen` says how its state is read: kept while apps/mobile exists (held by apps/backend/src/architecture/optional-features.spec.ts). Its skill reference carries `requires: mobile` and is removed by the prune step, not listed here.",
+  "presentWhen": "apps/mobile",
+  "paths": ["apps/mobile"],
+  "markers": [".github/workflows/ci.yml", "CLAUDE.md", "docs/module-map.md", "docs/WHAT-YOU-GET.md"],
+  "jsonEntries": [
+    { "file": "package.json", "path": ["scripts", "// — Mobile (Flutter companion app)"] },
+    { "file": "package.json", "path": ["scripts", "mobile:dev"] },
+    { "file": "package.json", "path": ["scripts", "mobile:test"] }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "$comment": "The allowed import arrows between backend domains (apps/backend/src/domains/<name>), keyed by the importing domain. Held by domain-boundaries.spec.ts: an import along an arrow not listed here fails, and so does a listed arrow nothing uses. A new arrow is a deliberate edit reviewed with the code; prefer a domain event to a sideways import. Optional-feature keys are dropped by tools/init-app/apply-feature.mjs (allowlistPrefixes in tools/init-app/features/<name>.json).",
+  "admin": ["ai"],
+  "ai": ["notifications", "prompting", "support"],
+  "desk": ["ai", "prompting"],
+  "feedback": ["ai", "prompting"]
+}

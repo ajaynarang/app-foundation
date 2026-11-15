@@ -85,4 +85,76 @@ describe('FormSheet', () => {
     renderSheet({ entityType: 'budget' });
     expect(screen.queryByRole('button', { name: 'Half screen' })).toBeNull();
   });
+
+  describe('edit and view behaviour', () => {
+    // Radix registers its outside-pointer listener on the next tick after the sheet mounts.
+    async function pointerDownOutside() {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      fireEvent.pointerDown(document.body);
+    }
+
+    it('an edit sheet ignores a click outside, so typed input is never lost', async () => {
+      const onOpenChange = jest.fn();
+      renderSheet({ mode: 'edit', pinnable: false, onOpenChange });
+      await pointerDownOutside();
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
+
+    it('a view sheet closes on a click outside', async () => {
+      const onOpenChange = jest.fn();
+      renderSheet({ mode: 'view', onSubmit: undefined, onOpenChange });
+      await pointerDownOutside();
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
+    it('Cmd+Enter and Ctrl+Enter submit an edit sheet', () => {
+      const onSubmit = jest.fn();
+      renderSheet({ onSubmit });
+      const sheet = screen.getByRole('dialog');
+      fireEvent.keyDown(sheet, { key: 'Enter', metaKey: true });
+      fireEvent.keyDown(sheet, { key: 'Enter', ctrlKey: true });
+      expect(onSubmit).toHaveBeenCalledTimes(2);
+    });
+
+    it('Cmd+Enter does not submit while saving, while disabled, or in a view sheet', () => {
+      const onSubmit = jest.fn();
+      const { unmount } = renderSheet({ onSubmit, isSubmitting: true });
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter', metaKey: true });
+      unmount();
+      const second = renderSheet({ onSubmit, submitDisabled: true });
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter', metaKey: true });
+      second.unmount();
+      renderSheet({ onSubmit, mode: 'view' });
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter', metaKey: true });
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('an edit sheet focuses its first field on open', () => {
+      jest.useFakeTimers();
+      try {
+        render(
+          <TooltipProvider>
+            <FormSheet
+              open
+              onOpenChange={() => undefined}
+              title="New key"
+              description="Name it"
+              onSubmit={() => undefined}
+            >
+              <input aria-label="Name" />
+              <input aria-label="Scope" />
+            </FormSheet>
+          </TooltipProvider>,
+        );
+        act(() => {
+          jest.advanceTimersByTime(150);
+        });
+        expect(document.activeElement).toBe(screen.getByLabelText('Name'));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });

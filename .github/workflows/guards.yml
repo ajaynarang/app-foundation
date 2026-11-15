@@ -1,0 +1,43 @@
+# .github/workflows/guards.yml
+# Manual by default: run it from the Actions tab (or `gh workflow run guards.yml`).
+# To run on every push and pull request, uncomment the two triggers below and set `ci` to `on-push` in `.claude/workflow.json`.
+# The triggers target main. Fails if a repository guard or its tests fail.
+#
+# Runs the same commands as the pre-commit and pre-push hooks and `pnpm verify`: the skills guard (skills, agents,
+# docs and source comments cite only what exists), the CI-triggers guard, the convention gate against its baseline,
+# the guards' own tests and the Claude Code hook fixture tests. Node only: no
+# install, no database, no secrets. `npm run` reads the root scripts without installing anything.
+
+name: Guards
+
+on:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-guards:
+    name: Repository guards — skills, docs, source, CI triggers
+    runs-on: ubuntu-latest # runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Guards
+        run: npm run guards
+
+      - name: Guard tests
+        run: npm run test:guards
+
+      - name: Claude Code hook tests
+        run: npm run test:hooks

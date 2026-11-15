@@ -1,0 +1,3 @@
+{
+  "hotspots": [{ "pattern": "apps/api/src/*.ts", "docs": ["docs/README.md"], "message": "Check the docs index." }]
+}

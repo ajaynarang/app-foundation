@@ -1,0 +1,118 @@
+{
+  "$comment": "Drift hotspots of the foundation, read by .claude/hooks/drift-reminder.mjs after every edit. paths: repo-relative globs. say: what the change makes untrue. docs: files to re-check, named only while they exist. The skills guard fails on a path here that does not exist. A product's own hotspots go in product.json; an optional feature's in <feature>.json.",
+  "hotspots": [
+    {
+      "paths": ["packages/appshore/db/prisma/schema/*.prisma"],
+      "say": "Prisma schema changed: regenerate the client and the enum mirror (pnpm --filter @appshore/db prisma:generate), add a forward migration that keeps existing rows (pnpm --filter @appshore/db prisma:migrate --create-only), run pnpm lint:schema, and amend the binding docs in this pull request if the model changed.",
+      "docs": ["docs/domain-map.md", "docs/lifecycles-and-invariants.md"]
+    },
+    {
+      "paths": [
+        "apps/backend/src/platform-glue/events/event-registry.ts",
+        "packages/appshore/kernel/src/infrastructure/events/foundation-events.ts"
+      ],
+      "say": "The event registry changed: event names match the vocabulary doc verbatim, and an event is raised through the outbox (OutboxService.transaction).",
+      "docs": ["docs/event-vocabulary.md", "docs/adr/0003-outbox-and-deadlines.md"]
+    },
+    {
+      "paths": [
+        "apps/backend/src/**/*.controller.ts",
+        "packages/appshore/platform/src/**/*.controller.ts",
+        "apps/backend/src/**/*.dto.ts",
+        "apps/backend/src/**/*.serializer.ts"
+      ],
+      "say": "A route, DTO or serializer changed: regenerate and commit the OpenAPI documents (pnpm --filter @app/backend openapi:generate), and run pnpm verify:api before the pull request.",
+      "docs": ["docs/adr/0001-api-contract.md"]
+    },
+    {
+      "paths": ["apps/backend/src/config/configuration.ts", "apps/backend/.env.example", "apps/web/.env.example"],
+      "say": "Configuration changed: a new or renamed variable goes into the config schema, the matching .env.example and the Doppler doc in this pull request.",
+      "docs": ["docs/doppler.md"]
+    },
+    {
+      "paths": [
+        "docs/VISION.md",
+        "docs/domain-map.md",
+        "docs/lifecycles-and-invariants.md",
+        "docs/module-map.md",
+        "docs/event-vocabulary.md",
+        "docs/epics.md",
+        "docs/adr/*.md"
+      ],
+      "say": "A binding doc or ADR changed: that is an amendment, so the code it describes changes in the same pull request, and a changed decision gets a dated amendment in its ADR (the ADR index is docs/adr/README.md).",
+      "docs": ["docs/adr/README.md"]
+    },
+    {
+      "paths": ["apps/backend/src/domains/*/**/*.ts", "apps/backend/src/architecture/domain-boundaries.allowed.json"],
+      "say": "If this adds an import from another backend domain, domain-boundaries.spec.ts fails until the arrow is added to apps/backend/src/architecture/domain-boundaries.allowed.json; prefer a domain event to a sideways import.",
+      "docs": ["docs/module-map.md"]
+    },
+    {
+      "paths": [
+        "apps/backend/src/domains/ai/routing/model-catalog.ts",
+        "apps/backend/src/domains/ai/routing/route-registry.ts"
+      ],
+      "say": "The model catalog or route registry changed: every model call goes through the route resolver; model ids live only in the catalog, never in a skill or doc.",
+      "docs": [
+        "docs/adr/0005-ai-provider-routing-per-tenant.md",
+        ".claude/skills/app-conventions/references/ai-routing.md"
+      ]
+    },
+    {
+      "paths": [
+        "packages/appshore/kernel/src/infrastructure/sms/sms.service.ts",
+        "packages/appshore/platform/src/infrastructure/notification/services/email.service.ts",
+        "packages/appshore/platform/src/infrastructure/notifications/channels/**/*.ts",
+        "apps/backend/src/platform-glue/webhooks/delivery.processor.ts"
+      ],
+      "say": "A send primitive changed: every outbound email, SMS, push, WhatsApp message and webhook goes through the outbound gate (outbound-gate-coverage.spec.ts holds it).",
+      "docs": [
+        "docs/adr/0006-outbound-gate.md",
+        "docs/operations.md",
+        ".claude/skills/app-conventions/references/outbound-gate.md"
+      ]
+    },
+    {
+      "paths": [
+        "packages/appshore/kernel/src/infrastructure/telemetry/metrics.ts",
+        "packages/appshore/kernel/src/infrastructure/queue/job-events.ts",
+        "infra/observability/grafana-cloud/catalog/**/*.mjs"
+      ],
+      "say": "A metric, a structured event or the alert catalog changed: labels stay a closed set, every alert rule has its runbook section, and the generated Grafana files are regenerated, never edited (node infra/observability/grafana-cloud/scripts/generate.mjs, then pnpm check:ops).",
+      "docs": [
+        "docs/observability.md",
+        "docs/standards/observability.md",
+        ".claude/skills/app-conventions/references/observability.md"
+      ]
+    },
+    {
+      "paths": [
+        "packages/shared-types/src/platform/feature-keys.ts",
+        "packages/appshore/db/prisma/seeds/04-plan-entitlements.seed.ts"
+      ],
+      "say": "A plan feature key or its entitlement rows changed: every key has a row on every plan and is enforced somewhere or listed display-only with a reason (feature-key-coverage.spec.ts), and the web upgrade registry has its pitch.",
+      "docs": [".claude/skills/app-conventions/references/plans-and-entitlements.md"]
+    },
+    {
+      "paths": [
+        "apps/backend/src/platform-glue/queue/job-context.ts",
+        "apps/backend/src/platform-glue/database/app-rls-registry.ts",
+        "packages/appshore/kernel/src/infrastructure/rls/*.ts"
+      ],
+      "say": "The tenant context changed: every job name, table, event handler and super-admin route declares its context (the rls-* specs), and a new system reason is a reviewed change.",
+      "docs": ["docs/adr/0009-tenancy.md", ".claude/skills/app-conventions/references/tenancy.md"]
+    },
+    {
+      "paths": [".github/workflows/*.yml"],
+      "say": "A workflow changed: CI is manual-only. workflow_dispatch is the only live trigger; a check workflow keeps its push and pull_request triggers commented out under the two-step note; a workflow on manualAlways in .claude/workflow.json carries none. pnpm guard:ci checks it.",
+      "docs": [
+        "docs/adr/0007-ci-manual-enforcement-local.md",
+        ".claude/skills/app-conventions/references/infra-and-deploy.md"
+      ]
+    },
+    {
+      "paths": ["tools/guards/convention-gate.mjs", "tools/guards/convention-gate.baseline.json"],
+      "say": "The convention gate changed: the baseline is never edited or merged by hand; regenerate it with node tools/guards/convention-gate.mjs --update-baseline, which refuses a higher count (add --allow-moved when hits only moved to a renamed or split file)."
+    }
+  ]
+}

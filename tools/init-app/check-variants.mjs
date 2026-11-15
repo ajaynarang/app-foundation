@@ -1,25 +1,36 @@
 #!/usr/bin/env node
 /**
  * check-variants — prove that a product scaffolded from this template works with and without each optional
- * feature. Root script: `pnpm verify:scaffold`. CI job: `scaffold-variants` in .github/workflows/ci.yml (manual).
+ * feature, under its own skill prefix, with or without git. Root script: `pnpm verify:scaffold`. CI job:
+ * `scaffold-variants` in .github/workflows/ci.yml (manual).
  *
- * For each variant: copy the tree (tracked and untracked, not ignored) to a temp folder; run
- * `init-app --name scaffoldcheck … --yes --force`; check the regenerated alert catalog
- * (check-scaffold-observability.mjs); install; build the foundation packages; regenerate the OpenAPI
+ * For each variant: copy the tree (tracked and untracked, not ignored) to a temp folder; for `defaults`, `git init`
+ * it; run `init-app --name <name> … --yes --force`; check what init-app wrote (scaffoldProblems: the prefix, reserved
+ * names and plans in .claude/workflow.json, the .gitignore plans line, no `verified:` line, each feature manifest
+ * fully kept or fully removed, TENANCY_MODE), the regenerated alert catalog (check-scaffold-observability.mjs) and the
+ * runway's starter check (runwayStarterCheck); install; build the foundation packages; regenerate the OpenAPI
  * documents and the RBAC matrix; type-check the backend, apps/web, packages/test-utils and tests/; migrate; run the
- * backend unit and architecture specs.
+ * backend unit and architecture specs; then `pnpm guards`, `pnpm test:guards` and `pnpm test:hooks`, and search for
+ * every template skill and agent name, read before the rename (none may be left). Without Desk, the copy is also
+ * searched for `inngest` and `domains/desk` (any case): every hit must be on
+ * tools/init-app/features/desk.residue.json, and every entry there must still match.
  *
- *   desk-no   `--desk no --mobile no`. Then search the copy for `inngest` and `domains/desk` (any case): every hit
- *             must be on tools/init-app/features/desk.residue.json, and every entry there must still match.
- *   desk-yes  `--desk yes --mobile no`. Nothing of the Desk manifest may have been removed.
+ *   defaults        `--name scaffold-check`, every default (Desk off, mobile on, prefix sc, plans tracked), inside a
+ *                   fresh `git init` on the default branch, with the scaffold as its first commit.
+ *   lean            `--name scaffoldcheck --mobile no --desk no --tenancy single --skill-prefix zz`, no .git at all.
+ *   desk-untracked  `--name scaffoldcheck --desk yes --plans untracked`: Desk on, a one-word name longer than 8
+ *                   characters (prefix sca), no .git.
  *
- *   node tools/init-app/check-variants.mjs                 # both variants
- *   node tools/init-app/check-variants.mjs --variant desk-no
+ *   node tools/init-app/check-variants.mjs                 # every variant
+ *   node tools/init-app/check-variants.mjs --variant lean
  *   node tools/init-app/check-variants.mjs --keep          # leave the temp copies for a look
  *
+ * Every step runs with git's hook variables (GIT_DIR and the rest of `git rev-parse --local-env-vars`) cleared and
+ * GIT_CEILING_DIRECTORIES set above the copy, so a run from a git hook cannot reach the repository the hook belongs to.
  * The backend specs read DATABASE_URL and REDIS_URL, as in `pnpm verify`. It takes minutes, so it is not in the
  * pre-push hook: run it before a pull request that touches tools/init-app/, apps/backend/src/platform-glue/features/,
- * a file a manifest names, or a Desk file outside the Desk folder, and paste the last line into the pull request.
+ * a skill or agent name, a file a manifest names, the residue list, or a Desk file outside the Desk folder, and paste
+ * the last line into the pull request.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -29,18 +40,161 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { featurePresence, loadManifest } from './apply-feature.mjs';
+import { featurePresence, listFeatureNames, loadManifest } from './apply-feature.mjs';
 import { walkRepo } from './repo-walk.mjs';
 import { checkScaffoldObservability } from './check-scaffold-observability.mjs';
+import { oldSkillNameHits, workflowSkillNames } from './skill-prefix.mjs';
+import { verifiedLineFiles } from './scaffold-text.mjs';
+import { validateWorkflowConfig } from '../guards/workflow-config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
 export const SEARCH_STRINGS = ['inngest', 'domains/desk'];
+const TEMPLATE_DEFAULT_BRANCH = JSON.parse(
+  fs.readFileSync(path.join(ROOT, '.claude/workflow.json'), 'utf8'),
+).defaultBranch;
 
-const VARIANTS = {
-  'desk-no': { args: ['--desk', 'no', '--mobile', 'no'], desk: false },
-  'desk-yes': { args: ['--desk', 'yes', '--mobile', 'no'], desk: true },
+/** `expect` is what the scaffold must hold afterwards; `git` is whether the copy is a fresh git repository. */
+export const VARIANTS = {
+  defaults: {
+    name: 'scaffold-check',
+    args: [],
+    git: true,
+    expect: { desk: false, mobile: true, prefix: 'sc', plansTracked: true, tenancy: 'multi' },
+  },
+  lean: {
+    name: 'scaffoldcheck',
+    args: ['--mobile', 'no', '--desk', 'no', '--tenancy', 'single', '--skill-prefix', 'zz'],
+    git: false,
+    expect: { desk: false, mobile: false, prefix: 'zz', plansTracked: true, tenancy: 'single' },
+  },
+  'desk-untracked': {
+    name: 'scaffoldcheck',
+    args: ['--desk', 'yes', '--plans', 'untracked'],
+    git: false,
+    expect: { desk: true, mobile: true, prefix: 'sca', plansTracked: false, tenancy: 'multi' },
+  },
 };
+
+// git's own list (`git rev-parse --local-env-vars`) is read at run time; this is the floor when git is absent.
+const GIT_LOCAL_ENV_FLOOR = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_CONFIG',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_PARAMETERS',
+  'GIT_DIR',
+  'GIT_GRAFT_FILE',
+  'GIT_IMPLICIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_INTERNAL_SUPER_PREFIX',
+  'GIT_NAMESPACE',
+  'GIT_NO_REPLACE_OBJECTS',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_PREFIX',
+  'GIT_REPLACE_REF_BASE',
+  'GIT_SHALLOW_FILE',
+  'GIT_WORK_TREE',
+];
+
+function gitLocalEnvVars() {
+  try {
+    return execFileSync('git', ['rev-parse', '--local-env-vars'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * `env` without git's repository-local variables, so git inside a scaffold copy never resolves to the repository a
+ * hook was started from (a pre-push hook in a linked worktree exports GIT_DIR). With `ceiling`, git also stops looking
+ * for a repository above that folder.
+ */
+export function isolatedGitEnv(env, { ceiling, localVars = gitLocalEnvVars() } = {}) {
+  const out = { ...env };
+  for (const k of new Set([...GIT_LOCAL_ENV_FLOOR, ...localVars])) delete out[k];
+  if (ceiling) out.GIT_CEILING_DIRECTORIES = ceiling;
+  return out;
+}
+
+/** The git toplevel git resolves from `dir` under `env`, or null when `dir` is in no repository (or git is absent). */
+export function gitToplevel(dir, env) {
+  try {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: dir,
+      env,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What is wrong with a scaffold `dir` made by init-app for `variant`; empty when it holds. Reads the disk only, so it
+ * runs before install.
+ */
+export function scaffoldProblems(dir, variant, { manifestsDir } = {}) {
+  const { name, expect } = variant;
+  const problems = [];
+  const read = (rel) => (fs.existsSync(path.join(dir, rel)) ? fs.readFileSync(path.join(dir, rel), 'utf8') : null);
+
+  let cfg = null;
+  try {
+    cfg = JSON.parse(read('.claude/workflow.json'));
+  } catch (e) {
+    problems.push(`.claude/workflow.json: ${e.message}`);
+  }
+  if (cfg) {
+    for (const e of validateWorkflowConfig(cfg)) problems.push(`.claude/workflow.json: ${e}`);
+    if (cfg.skillPrefix !== expect.prefix)
+      problems.push(`.claude/workflow.json: skillPrefix is "${cfg.skillPrefix}", expected "${expect.prefix}"`);
+    if (cfg.plans?.tracked !== expect.plansTracked)
+      problems.push(`.claude/workflow.json: plans.tracked is ${cfg.plans?.tracked}, expected ${expect.plansTracked}`);
+    for (const r of [`${name}-backend`, `${name}-inngest`])
+      if (!cfg.reservedNames?.includes(r)) problems.push(`.claude/workflow.json: reservedNames lacks ${r}`);
+    if (cfg.reservedNames?.some((r) => r.startsWith('app-')))
+      problems.push('.claude/workflow.json: reservedNames still holds a template name (app-…)');
+    const names = workflowSkillNames(dir, cfg.skillPrefix);
+    const all = [
+      ...fs.readdirSync(path.join(dir, '.claude/skills')),
+      ...fs.readdirSync(path.join(dir, '.claude/agents')).map((f) => f.replace(/\.md$/, '')),
+    ];
+    for (const n of all.filter((n) => !names.includes(n)))
+      problems.push(`.claude: ${n} lacks the prefix ${cfg.skillPrefix}-`);
+    const ignoresPlans = (read('.gitignore') ?? '')
+      .split('\n')
+      .some((l) => l.trim().replace(/^\/|\/$/g, '') === cfg.plans.folder);
+    if (ignoresPlans === expect.plansTracked)
+      problems.push(`.gitignore: ${ignoresPlans ? 'still ignores' : 'no longer ignores'} ${cfg.plans.folder}`);
+  }
+  for (const rel of verifiedLineFiles(dir)) problems.push(`${rel}: still carries the template's verified: line`);
+  const mode = (read('apps/backend/.env.example') ?? '').match(/^TENANCY_MODE=(.*)$/m)?.[1];
+  if (mode !== expect.tenancy)
+    problems.push(`apps/backend/.env.example: TENANCY_MODE=${mode}, expected ${expect.tenancy}`);
+
+  for (const feature of listFeatureNames(manifestsDir)) {
+    if (!(feature in expect)) {
+      problems.push(`variant does not say whether "${feature}" is kept`);
+      continue;
+    }
+    const { present, missing } = featurePresence(dir, loadManifest(feature, manifestsDir));
+    if (expect[feature]) {
+      for (const g of [...missing.paths, ...missing.markers, ...missing.jsonEntries])
+        problems.push(`kept ${feature}, but init-app removed ${g}`);
+    } else {
+      for (const g of [...present.paths, ...present.markers, ...present.jsonEntries, ...present.allowlistKeys])
+        problems.push(`dropped ${feature}, but ${g} is left`);
+    }
+  }
+  return problems;
+}
 
 /** Every (file, search string) pair in the tree, lower-cased match. */
 export function residueHits(root) {
@@ -57,6 +211,29 @@ export function residueHits(root) {
     for (const s of SEARCH_STRINGS) if (lower.includes(s)) hits.push({ file: rel, match: s });
   }
   return hits;
+}
+
+/**
+ * The runway skill refuses to run in the starter. After init-app has renamed the template to the product, that check
+ * must not name the product (it would then refuse the product), and must point at TEMPLATE_NAME in init-app.mjs, which
+ * the rename walker never rewrites. Returns the problems, empty when the check holds.
+ */
+export function runwayStarterCheck(root, name) {
+  const prefix = JSON.parse(fs.readFileSync(path.join(root, '.claude/workflow.json'), 'utf8')).skillPrefix;
+  const rel = `.claude/skills/${prefix}-runway/SKILL.md`;
+  const text = fs.readFileSync(path.join(root, rel), 'utf8');
+  const start = text.indexOf('**Not in the starter itself.**');
+  if (start < 0) return [`${rel}: no "Not in the starter itself" check`];
+  const rest = text.slice(start);
+  const end = rest.search(/\n(?:- \*\*|#)/);
+  const check = end < 0 ? rest : rest.slice(0, end);
+  const problems = [];
+  if (check.includes(name)) problems.push(`${rel}: the starter check names the product "${name}"`);
+  if (!check.includes('`TEMPLATE_NAME`') || !check.includes('`tools/init-app/init-app.mjs`'))
+    problems.push(
+      `${rel}: the starter check does not compare against \`TEMPLATE_NAME\` in tools/init-app/init-app.mjs`,
+    );
+  return problems;
 }
 
 /** Reads the residue list and checks its shape: every entry names a file, one bare search string and a reason. */
@@ -105,15 +282,17 @@ export function copyTree(root, dest) {
   return n;
 }
 
-function makeRunner(variant, cwd) {
+function makeRunner(variant, cwd, env, { quiet = false } = {}) {
   return (step, cmd, args, extraEnv = {}) => {
-    console.log(`\n── ${variant}: ${step} ──\n$ ${[cmd, ...args].join(' ')}`);
+    if (!quiet) console.log(`\n── ${variant}: ${step} ──\n$ ${[cmd, ...args].join(' ')}`);
     const r = spawnSync(cmd, args, {
       cwd,
-      stdio: 'inherit',
-      env: { ...process.env, CI: 'true', HUSKY: '0', ...extraEnv },
+      stdio: quiet ? 'pipe' : 'inherit',
+      encoding: 'utf8',
+      env: { ...env, ...extraEnv },
     });
     if (r.status !== 0) {
+      if (quiet) console.error(`${r.stdout ?? ''}${r.stderr ?? ''}`);
       const err = new Error(`${variant}: ${step}`);
       err.step = `${variant}: ${step}`;
       throw err;
@@ -121,46 +300,82 @@ function makeRunner(variant, cwd) {
   };
 }
 
+const fail = (step, lines = []) => {
+  for (const l of lines) console.error(`  ${l}`);
+  throw Object.assign(new Error(step), { step });
+};
+
+/** A new, empty temp folder for a variant, by its real path (macOS's tmpdir is a symlink). */
+export const variantDir = (name) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `scaffold-${name}-`)));
+
+/**
+ * Copies the repo into `dir`, makes it a fresh git repository when the variant says so, runs init-app and checks what
+ * it wrote. Returns the runner for the later steps.
+ */
+export function prepareVariant(name, dir, { root = ROOT, quiet = false } = {}) {
+  const variant = VARIANTS[name];
+  const env = isolatedGitEnv({ ...process.env, CI: 'true', HUSKY: '0' }, { ceiling: path.dirname(dir) });
+  const run = makeRunner(name, dir, env, { quiet });
+  const log = quiet ? () => {} : console.log;
+  log(`\n══ ${name}: ${dir} ══`);
+  log(`  copied ${copyTree(root, dir)} files`);
+  if (variant.git) {
+    run('git init', 'git', ['init', '-q', '-b', TEMPLATE_DEFAULT_BRANCH]);
+    const top = gitToplevel(dir, env);
+    if (!top || fs.realpathSync(top) !== dir)
+      fail(`${name}: git init`, [`git resolves to ${top}, not the copy ${dir}`]);
+  } else if (gitToplevel(dir, env) !== null) {
+    fail(`${name}: no git`, [`git still finds a repository from ${dir}`]);
+  }
+  run('init-app', process.execPath, [
+    'tools/init-app/init-app.mjs',
+    '--name',
+    variant.name,
+    ...variant.args,
+    '--yes',
+    '--force',
+  ]);
+  if (variant.git) {
+    // A new product's first commit: the hooks and guards then see tracked files and a default branch, as in a product.
+    run('git add', 'git', ['add', '-A']);
+    run('first commit', 'git', [
+      '-c',
+      'user.name=scaffold-check',
+      '-c',
+      'user.email=scaffold-check@example.com',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'Scaffold from the template',
+    ]);
+  }
+  const problems = scaffoldProblems(dir, variant);
+  if (problems.length) fail(`${name}: what init-app wrote`, problems);
+  log(`  init-app wrote the prefix, reserved names, plans choice, tenancy and feature choices the variant asked for.`);
+  return run;
+}
+
 function runVariant(name, { keep }) {
   const variant = VARIANTS[name];
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `scaffold-${name}-`));
-  const run = makeRunner(name, dir);
-  console.log(`\n══ ${name}: ${dir} ══`);
+  // Captured before the rename: the template's own skill and agent names, which must all be gone afterwards.
+  const templatePrefix = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude/workflow.json'), 'utf8')).skillPrefix;
+  const oldNames = workflowSkillNames(ROOT, templatePrefix);
+  const dir = variantDir(name);
   try {
-    console.log(`  copied ${copyTree(ROOT, dir)} files`);
-    run('init-app', process.execPath, [
-      'tools/init-app/init-app.mjs',
-      '--name',
-      'scaffoldcheck',
-      ...variant.args,
-      '--yes',
-      '--force',
-    ]);
+    const run = prepareVariant(name, dir);
 
     // The alert catalog is renamed and regenerated by init-app; its own checks need no install.
     console.log(`\n── ${name}: observability catalog ──`);
-    const observability = checkScaffoldObservability(dir, { name: 'scaffoldcheck' });
-    for (const p of observability) console.error(`  ${p}`);
-    if (observability.length) throw Object.assign(new Error(), { step: `${name}: observability catalog` });
+    const observability = checkScaffoldObservability(dir, { name: variant.name });
+    if (observability.length) fail(`${name}: observability catalog`, observability);
     console.log('  the Grafana-as-code catalog is regenerated in the new name and validates.');
 
-    const manifest = loadManifest('desk');
-    const { present, missing } = featurePresence(dir, manifest);
-    if (variant.desk) {
-      const gone = [...missing.paths, ...missing.markers, ...missing.jsonEntries];
-      if (gone.length > 0) {
-        console.error(`  --desk yes removed part of Desk:\n${gone.map((g) => `    ${g}`).join('\n')}`);
-        throw Object.assign(new Error(), { step: `${name}: nothing removed` });
-      }
-      console.log('  --desk yes kept every path, block and entry of the Desk manifest.');
-    } else {
-      const left = [...present.paths, ...present.markers, ...present.jsonEntries, ...present.allowlistKeys];
-      if (left.length > 0) {
-        console.error(`  --desk no left Desk behind:\n${left.map((g) => `    ${g}`).join('\n')}`);
-        throw Object.assign(new Error(), { step: `${name}: manifest stripped` });
-      }
-      console.log('  --desk no removed every path, block and entry of the Desk manifest.');
-    }
+    const runway = runwayStarterCheck(dir, variant.name);
+    if (runway.length) fail(`${name}: runway starter check`, runway);
+    console.log('  the runway still tells the product from the starter.');
 
     run('install', 'pnpm', ['install', '--no-frozen-lockfile', '--prefer-offline']);
     run('build foundation packages', 'pnpm', [
@@ -183,13 +398,32 @@ function runVariant(name, { keep }) {
     run('migrate', 'pnpm', ['--filter', '@appshore/db', 'prisma:migrate:deploy']);
     run('backend unit and architecture specs', 'pnpm', ['--filter', '@app/backend', 'test']);
 
-    if (!variant.desk) {
+    // The workflow guards, under the product's prefix, with or without git.
+    run('guards', 'pnpm', ['guards']);
+    run('guard tests', 'pnpm', ['test:guards']);
+    run('hook fixture tests', 'pnpm', ['test:hooks']);
+
+    console.log(`\n── ${name}: old skill and agent names ──`);
+    const prefix = JSON.parse(fs.readFileSync(path.join(dir, '.claude/workflow.json'), 'utf8')).skillPrefix;
+    if (prefix !== templatePrefix) {
+      const hits = oldSkillNameHits(dir, oldNames);
+      if (hits.length)
+        fail(
+          `${name}: old skill names`,
+          hits.map((h) => `still names a template skill: ${h}`),
+        );
+      console.log(`  none of the ${oldNames.length} template skill and agent names is left.`);
+    }
+
+    if (!variant.expect.desk) {
       console.log(`\n── ${name}: residue search ──`);
       const entries = loadResidue(path.join(HERE, 'features', 'desk.residue.json'));
       const { unlisted, stale } = compareResidue(residueHits(dir), entries);
-      for (const u of unlisted) console.error(`  not on desk.residue.json: ${u}`);
-      for (const s of stale) console.error(`  stale entry on desk.residue.json (no longer matches): ${s}`);
-      if (unlisted.length || stale.length) throw Object.assign(new Error(), { step: `${name}: residue search` });
+      if (unlisted.length || stale.length)
+        fail(`${name}: residue search`, [
+          ...unlisted.map((u) => `not on desk.residue.json: ${u}`),
+          ...stale.map((s) => `stale entry on desk.residue.json (no longer matches): ${s}`),
+        ]);
       console.log(
         `  ${entries.length} residue entries, all matched; nothing else names ${SEARCH_STRINGS.join(' or ')}.`,
       );

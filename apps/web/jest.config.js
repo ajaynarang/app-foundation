@@ -1,6 +1,7 @@
 module.exports = {
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
+  // @appshore/web-core has no runner of its own: it is source-consumed by this app, so its tests run here.
+  roots: ['<rootDir>/src', '<rootDir>/../../packages/appshore/web-core/src'],
   testMatch: ['**/__tests__/**/*.{js,jsx,ts,tsx}', '**/*.{spec,test}.{js,jsx,ts,tsx}'],
   moduleNameMapper: {
     '^@appshore/web-core/(.*)$': '<rootDir>/../../packages/appshore/web-core/src/$1',

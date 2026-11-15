@@ -19,7 +19,8 @@ export const SKIP_DIRS = new Set([
   '.gradle',
   'generated',
 ]);
-export const SKIP_REL = ['docs/superpowers', 'tools/init-app'];
+// `.worktrees` and `.claude/worktrees` hold git worktrees (other checkouts of this repo): never renamed or searched.
+export const SKIP_REL = ['docs/superpowers', 'tools/init-app', '.worktrees', '.claude/worktrees'];
 export const SKIP_FILES = new Set(['pnpm-lock.yaml']);
 export const BINARY_EXT = new Set([
   '.png',

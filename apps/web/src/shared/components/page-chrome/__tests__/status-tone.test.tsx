@@ -3,7 +3,15 @@
  */
 /* global describe, it, expect */
 import { render, screen } from '@testing-library/react';
-import { STATUS_TONES, STATUS_TONE_ORDER, StatusBadge, toneBadgeClass, type StatusTone } from '@app/ui';
+import {
+  STATUS_TONES,
+  STATUS_TONE_ORDER,
+  StatusBadge,
+  toneBadgeClass,
+  variantOf,
+  type StatusTone,
+  type StatusVariant,
+} from '@app/ui';
 
 describe('toneBadgeClass', () => {
   it('has exactly the six tones, each on theme tokens only', () => {
@@ -49,5 +57,25 @@ describe('StatusBadge', () => {
     expect(badge.getAttribute('data-tone')).toBe('warning');
     expect(badge.className).toContain('text-caution-text');
     expect(badge.className).toContain('bg-caution/15');
+  });
+});
+
+describe('variantOf', () => {
+  const MAP: Record<'OPEN' | 'CLOSED', StatusVariant> = {
+    OPEN: { label: 'Open', tone: 'info' },
+    CLOSED: { label: 'Closed', tone: 'muted' },
+  };
+
+  it('reads a known status from the feature map', () => {
+    expect(variantOf(MAP, 'CLOSED')).toEqual({ label: 'Closed', tone: 'muted' });
+  });
+
+  it('shows a status the map does not know as a neutral label of itself, so a new backend value never breaks the screen', () => {
+    expect(variantOf(MAP, 'ESCALATED')).toEqual({ label: 'ESCALATED', tone: 'neutral' });
+  });
+
+  it('reads a missing status as a neutral Unknown', () => {
+    expect(variantOf(MAP, null)).toEqual({ label: 'Unknown', tone: 'neutral' });
+    expect(variantOf(MAP, undefined)).toEqual({ label: 'Unknown', tone: 'neutral' });
   });
 });
