@@ -389,7 +389,8 @@ export const UserUpdateResponseSchema = z
 //   POST   /invitations                         → UserInvitationCreateResponseSchema (the public invitation)
 //   GET    /invitations                         → cursor list of UserInvitationListItemSchema
 //   POST   /invitations/preview (PUBLIC)        → InvitationPreviewSchema (body `{ token }`; never in the path)
-//   POST   /invitations/accept (PUBLIC)         → AcceptInvitationResponseSchema
+//   POST   /invitations/accept (PUBLIC)         → AcceptInvitationResponseSchema (a sign-in: `{ accessToken, user }`)
+//   POST   /invitations/join (signed in)        → InvitationJoinedSchema
 //   POST   /invitations/:id/resend              → UserInvitationResendResponseSchema (the public invitation)
 //   POST   /invitations/:id/link (OWNER/ADMIN)  → UserInvitationLinkSchema `{ inviteLink }`, shown once
 //   DELETE /invitations/:id                     → 204
@@ -489,38 +490,37 @@ export const InvitationPreviewSchema = z
   })
   .strict();
 
-/**
- * `POST /invitations/accept` — full Prisma user row + `tenant`
- * (TenantRowSchema). The response is the newly-created User row — distinct
- * from the admin UserDetailSchema because it uses the raw Prisma-row field
- * set (numeric `id`, `tenantId`, `passwordHash`, `firebaseUid`, etc.).
- * Model the outer object `.strict()` and enumerate every observed field.
- */
-export const AcceptInvitationResponseSchema = z
+/** The signed-in profile the auth routes answer (`toUserProfile`): no hash, no row; `dbId` is the web's one Int. */
+export const AuthUserProfileSchema = z
   .object({
-    id: dbId,
+    dbId: dbId,
     userId: stringId,
-    tenantId: dbId.nullable(),
     email: z.string().nullable(),
-    passwordHash: z.string().nullable(),
+    emailVerified: z.boolean(),
     firstName: z.string().nullable(),
     lastName: z.string().nullable(),
     role: z.string(),
-    firebaseUid: z.string().nullable(),
-    emailVerified: z.boolean(),
+    tenantId: z.string().optional(),
+    tenantName: z.string().optional(),
+    tenantTimezone: z.string().optional(),
+    subdomain: z.string().optional(),
+    isActive: z.boolean(),
     phone: z.string().nullable(),
     phoneVerified: z.boolean(),
-    pinHash: z.string().nullable(),
-    isActive: z.boolean(),
-    lastLoginAt: isoDateString.nullable(),
-    passwordChangedAt: isoDateString.nullable(),
-    deletedAt: isoDateString.nullable(),
-    deletedBy: dbId.nullable(),
-    deletionReason: z.string().nullable(),
-    createdAt: isoDateString,
-    updatedAt: isoDateString,
-    tenant: TenantRowSchema.nullable(),
+    hasPinSet: z.boolean(),
+    createdAt: isoDateString.optional(),
+    lastLoginAt: isoDateString.optional(),
   })
+  .strict();
+
+/** `POST /invitations/accept` / `accept-phone`: `{ accessToken, user }`; the refresh token is only in the cookie. */
+export const AcceptInvitationResponseSchema = z
+  .object({ accessToken: z.string().min(1), user: AuthUserProfileSchema })
+  .strict();
+
+/** `POST /invitations/join` (signed in): the workspace joined, by public id, and the caller's role in it. */
+export const InvitationJoinedSchema = z
+  .object({ workspace: z.object({ tenantId: stringId, name: z.string() }).strict(), role: z.string() })
   .strict();
 
 /** `POST /invitations/:id/resend` (200): the public invitation. The new link goes to the invitee only. */

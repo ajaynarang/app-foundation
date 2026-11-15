@@ -6,8 +6,8 @@ import { test, expect } from '../fixtures/auth.fixture.js';
  * session (D8), a bad link is a 400 that never signs the caller out, and resend is a signed-in 204.
  *
  * The suite has no database access and every seeded user is verified, so there is no unverified signed-in account
- * to send a real link to here. The cooldown 429 (a second resend inside a minute) needs one: the invitation accept
- * creates one, and its case lands with that change.
+ * to send a real link to here. The cooldown 429 needs one: the invitation accept makes one and emails it a link, so
+ * `invitations.spec.ts` ("used token") holds that a resend right after is 429 RATE_LIMITED.
  *
  * Throttles: verify-email is STRICT (5 per 15 minutes), counted per user when signed in and per IP when not; one run
  * sends it once signed out and twice as MEMBER, so two runs fit in the window. Resend is OTP_SEND (10), counted per

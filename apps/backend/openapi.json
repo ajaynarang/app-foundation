@@ -3,16 +3,21 @@
     "schemas": {
       "AcceptInvitationDto": {
         "properties": {
-          "firebaseUid": {
+          "firebaseIdToken": {
+            "description": "A Firebase ID token for the invited email, verified on the server; or send password",
+            "type": "string"
+          },
+          "password": {
+            "description": "The new account's password (at least 8 characters); or send firebaseIdToken",
             "type": "string"
           },
           "token": {
+            "description": "Invitation acceptance token (from the invite link)",
             "type": "string"
           }
         },
         "required": [
-          "token",
-          "firebaseUid"
+          "token"
         ],
         "type": "object"
       },
@@ -9121,6 +9126,43 @@
         ],
         "type": "object"
       },
+      "InvitationJoined": {
+        "properties": {
+          "role": {
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER",
+              "SUPER_ADMIN"
+            ],
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/InvitationJoinedWorkspace"
+          }
+        },
+        "required": [
+          "workspace",
+          "role"
+        ],
+        "type": "object"
+      },
+      "InvitationJoinedWorkspace": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tenantId": {
+            "description": "Workspace (tenant) public id; send it to POST /workspaces/switch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "name"
+        ],
+        "type": "object"
+      },
       "InvitationLink": {
         "properties": {
           "inviteLink": {
@@ -9395,6 +9437,18 @@
         },
         "required": [
           "paymentId"
+        ],
+        "type": "object"
+      },
+      "JoinInvitationDto": {
+        "properties": {
+          "token": {
+            "description": "Invitation acceptance token (from the invite link)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
         ],
         "type": "object"
       },
@@ -11015,7 +11069,8 @@
           "email": {
             "type": "string"
           },
-          "firebaseUid": {
+          "firebaseIdToken": {
+            "description": "A Firebase ID token for `email`, verified on the server; or send password",
             "type": "string"
           },
           "firstName": {
@@ -24665,7 +24720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfileDto"
+                  "$ref": "#/components/schemas/LoginResponseDto"
                 }
               }
             },
@@ -24682,7 +24737,7 @@
             "description": "An error: the API error envelope; `code` says what happened"
           }
         },
-        "summary": "Accept an email invitation with a Firebase identity (public)",
+        "summary": "Accept an email invitation as a new account with a password or a Firebase ID token, and sign in (public); 409 SIGN_IN_TO_ACCEPT when the email already has an account",
         "tags": [
           "UserInvitations"
         ]
@@ -24704,7 +24759,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            },
+            "description": "OK"
           },
           "default": {
             "content": {
@@ -24718,6 +24780,48 @@
           }
         },
         "summary": "Accept an SMS invitation — verify the OTP, set a PIN, sign in (public)",
+        "tags": [
+          "UserInvitations"
+        ]
+      }
+    },
+    "/api/v1/invitations/join": {
+      "post": {
+        "operationId": "UserInvitationsController_joinInvitation",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinInvitationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationJoined"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "summary": "Join the invitation's workspace as the signed-in account; its verified email must be the invitation's (403 INVITATION_EMAIL_MISMATCH, EMAIL_NOT_VERIFIED)",
         "tags": [
           "UserInvitations"
         ]
