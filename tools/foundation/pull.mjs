@@ -52,7 +52,7 @@ const same = (rel, a, b) => (a === null || b === null ? a === b : sameContent(re
  * `git merge-file` on three versions of one file. Returns the merged bytes and how many conflicts it left in them.
  * `base` null means the file is new on both sides: the common ancestor is an empty file.
  */
-function mergeFile({ ours, base, theirs, labels, scratch }) {
+export function mergeFile({ ours, base, theirs, labels, scratch }) {
   const file = (name, content) => {
     const at = path.join(scratch, name);
     fs.writeFileSync(at, content ?? '');

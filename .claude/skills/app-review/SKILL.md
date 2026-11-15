@@ -33,6 +33,11 @@ The default branch is `defaultBranch` in `.claude/workflow.json`. Classify every
 `tools/`, `docs/runbooks/`), tests (`tests/`), docs and skills (`docs/`, `.claude/`, `CLAUDE.md`). PR mode reviews
 every file in the PR in full; the other modes review changed areas in depth and the rest for critical issues only.
 
+In a product (`foundation.json` records a `base`), also list the changed files the template owns:
+`git diff --name-only <default-branch>...HEAD | xargs node tools/foundation/status.mjs --owned`. Name them in the
+verdict under "Foundation files" and ask whether each change belongs in the template for every product
+(`app-push-foundation`). It is a question for the author, never a finding, and never a reason to hold the change.
+
 ## Phase 2 — Machines first
 
 Run these before any reviewer. Every failure is a finding with the guard's own message; no reviewer re-derives it.

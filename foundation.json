@@ -38,6 +38,7 @@
     "infra/observability/**",
     "tools/**",
     ".husky/**",
+    ".claude/settings.json",
     ".claude/hooks/**",
     ".claude/agents/**",
     ".claude/skills/app-*/**",

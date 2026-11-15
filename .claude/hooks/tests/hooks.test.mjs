@@ -22,6 +22,7 @@ const HOOK = {
   protect: path.join(HOOKS, 'protected-paths.mjs'),
   gate: path.join(HOOKS, 'convention-gate.mjs'),
   drift: path.join(HOOKS, 'drift-reminder.mjs'),
+  touched: path.join(HOOKS, 'foundation-touched.mjs'),
 };
 
 // ── a clean environment: no inherited git repository variables, no user or system git config ────────────────────
@@ -376,6 +377,72 @@ test('drift-reminder: a product hotspot file is read beside the foundation one',
 
 const settings = JSON.parse(fs.readFileSync(path.join(ROOT, '.claude/settings.json'), 'utf8'));
 
+// ── foundation touched ───────────────────────────────────────────────────────────────────────────────────────────
+
+const FOUNDATION = (base) => ({
+  version: '0.2.0',
+  template: 'unused',
+  owned: ['packages/appshore/**', '.claude/skills/app-*/**'],
+  seams: ['packages/appshore/app.prisma'],
+  base,
+  scaffold: base && {
+    name: 'acme',
+    displayName: 'Acme',
+    scope: '@app',
+    db: 'acme',
+    tenancy: 'multi',
+    mobile: 'yes',
+    desk: 'no',
+    skillPrefix: 'ac',
+    plans: 'tracked',
+  },
+});
+/** Runs the hook as one edit of `rel` in `dir` during `session`, remembering what it said under `seen`. */
+const touch = (dir, rel, session, seen) =>
+  run(HOOK.touched, {
+    input: JSON.stringify({
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Edit',
+      session_id: session,
+      tool_input: { file_path: path.join(dir, rel) },
+      cwd: dir,
+    }),
+    env: { TMPDIR: seen },
+  });
+
+test('foundation-touched: in a product, an owned file is named once per session, with the skill to offer it back', () => {
+  const dir = repo({
+    'foundation.json': JSON.stringify(FOUNDATION({ version: '0.2.0', commit: null })),
+    '.claude/workflow.json': JSON.stringify({ skillPrefix: 'ac' }),
+    'packages/appshore/kernel/retry.ts': '',
+    '.claude/skills/ac-plan/SKILL.md': '',
+  });
+  const seen = tmp();
+  const ctx = contextOf(touch(dir, 'packages/appshore/kernel/retry.ts', 's1', seen), 'PostToolUse');
+  assert.match(ctx, /^FOUNDATION TOUCHED: packages\/appshore\/kernel\/retry\.ts\n/);
+  assert.match(ctx, /base v0\.2\.0/);
+  assert.match(ctx, /offer \/ac-push-foundation .* It is optional; never hold this work for it\./);
+  silent(touch(dir, 'packages/appshore/kernel/retry.ts', 's1', seen));
+  contextOf(touch(dir, '.claude/skills/ac-plan/SKILL.md', 's1', seen), 'PostToolUse'); // another file, a renamed skill
+  contextOf(touch(dir, 'packages/appshore/kernel/retry.ts', 's2', seen), 'PostToolUse'); // another session
+  // No session id: nothing can be remembered, so it speaks each time.
+  const anonymous = () => touch(dir, 'packages/appshore/kernel/retry.ts', undefined, seen);
+  contextOf(anonymous(), 'PostToolUse');
+  contextOf(anonymous(), 'PostToolUse');
+});
+
+test("foundation-touched: silent for a seam, the product's own files, the template itself, and no record", () => {
+  const product = repo({ 'foundation.json': JSON.stringify(FOUNDATION({ version: '0.2.0', commit: null })) });
+  const seen = tmp();
+  for (const rel of ['packages/appshore/app.prisma', 'apps/backend/src/domains/orders/x.ts', 'foundation.json'])
+    silent(touch(product, rel, 's1', seen));
+  const template = repo({ 'foundation.json': JSON.stringify(FOUNDATION(null)) });
+  silent(touch(template, 'packages/appshore/kernel/retry.ts', 's1', seen));
+  silent(touch(repo({}), 'packages/appshore/kernel/retry.ts', 's1', seen));
+  silent(touch(repo({ 'foundation.json': 'not json' }), 'packages/appshore/kernel/retry.ts', 's1', seen));
+  assert.deepEqual(fs.readdirSync(seen), [], 'nothing is remembered when nothing was said');
+});
+
 test('settings.json wires each hook through $CLAUDE_PROJECT_DIR on Edit and Write, and each script exists', () => {
   const commands = (event) =>
     (settings.hooks?.[event] ?? []).flatMap((m) => {
@@ -391,7 +458,7 @@ test('settings.json wires each hook through $CLAUDE_PROJECT_DIR on Edit and Writ
   );
   assert.deepEqual(
     post.map((c) => path.basename(c.match(/\/([^/"]+\.mjs)/)[1])),
-    ['convention-gate.mjs', 'drift-reminder.mjs'],
+    ['convention-gate.mjs', 'drift-reminder.mjs', 'foundation-touched.mjs'],
   );
   for (const c of [...pre, ...post]) {
     assert.match(c, /^node "\$CLAUDE_PROJECT_DIR\/\.claude\/hooks\/[a-z-]+\.mjs"$/);
