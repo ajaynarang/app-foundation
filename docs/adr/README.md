@@ -66,3 +66,4 @@ Your product's own decisions go in this folder too, with the same numbering.
 | [0017](0017-state-lives-in-postgres.md)                        | State lives in Postgres; the workflow engine only orchestrates                                                | Adopted |
 | [0018](0018-observability-open-protocols.md)                   | Observability: open protocols; Grafana Cloud and Sentry pre-wired and off without keys; CloudWatch fallback   | Adopted |
 | [0019](0019-products-follow-the-foundation-by-version.md)      | Products follow the foundation by version: a manifest of owned paths, the base recorded at scaffold time      | Adopted |
+| [0020](0020-search-over-tenant-records.md)                     | Search over tenant records: a derived index beside the knowledge base, filled through a subject registry      | Adopted |
