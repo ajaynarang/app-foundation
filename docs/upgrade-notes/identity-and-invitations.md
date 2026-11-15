@@ -141,3 +141,79 @@ else's address.
 `DROP TABLE email_verification_tokens;`. Accounts verified meanwhile stay verified, and a reclaim that already ran
 cannot be undone: the removed phone, Firebase link and keys must be added again, and push must be turned on again on
 each device.
+
+## 2026-11-15: a safe invitation accept, a signed-in join, and no uid from a body
+
+**What changed.** Anyone holding an invitation token could attach any existing account with that email to the
+inviting workspace, or create an account for any email, marked verified and bound to a Firebase uid the caller made
+up. Now a token alone only ever creates a **new** account; an existing account joins only signed in, as itself, with
+a verified email that matches the invitation.
+
+- `POST /invitations/accept` (public) takes `{ token, password }` or `{ token, firebaseIdToken }`, exactly one of the
+  two. A body `firebaseUid` is 400 `VALIDATION_FAILED` (an unknown property). A Firebase ID token is verified on the
+  server; its email must be the invitation's (403 `INVITATION_EMAIL_MISMATCH`), and the uid comes from it. A uid
+  already linked to an account is 409 `DUPLICATE`.
+- An email that already has a live account (any case) is **409 `SIGN_IN_TO_ACCEPT`** and nothing is written. An
+  SMS invitation, or one with no email, is 409 `INVALID_STATE` ("Accept this invitation with the code sent to your
+  phone").
+- The new account starts verified only when the invitation is an email one whose token travelled by email alone
+  (`link_shared_at` is null). An account from a copied link (`POST /invitations/:id/link`) starts unverified and is
+  emailed a verification link at once: the inviter saw that token, so it proves nothing about the mailbox. Accept
+  also creates the account's preferences row, which it used to forget.
+- Accept **signs the new account in**: the refresh token goes in the host-only cookie, the body is
+  `{ accessToken, user }` (as `POST /auth/login`), and a login event is recorded.
+- `POST /invitations/join` (new; signed in, any role, STRICT throttle counted per user) `{ token }` joins the
+  invitation's workspace as the signed-in account. It reads the account row, never the JWT: a super admin is 403
+  `FORBIDDEN`, another email is 403 `INVITATION_EMAIL_MISMATCH` (naming neither address), an unverified email is 403
+  `EMAIL_NOT_VERIFIED`. An existing member keeps their role (the old accept overwrote it). A retry by the account that
+  already joined answers 200 with the same body. The answer is `{ workspace: { tenantId, name }, role }`; the client
+  then calls `POST /workspaces/switch`. It takes a JWT session only: no OAuth or API-key guard sits on it, so an agent
+  never joins a workspace for a user. It runs as the invitation's tenant through `runAsInvitationTenant`
+  (`rls-context.ts`), the one sanctioned way out of a session's pinned tenant.
+- `POST /invitations/accept-phone` sets the refresh cookie and answers `{ accessToken, user }`, with a login event;
+  it used to put `refreshToken` in the body. When the invitation carries an email, the account starts unverified (as
+  before) and is emailed a verification link. `AuthService.generateTokensForUser` (refresh token in the body) is left
+  to the dev switcher, which is never loaded in production.
+- `POST /tenants/register` takes `firebaseIdToken` instead of `firebaseUid`. The token is verified and must be for
+  `email` (400 naming `firebaseIdToken` otherwise). The starter's web form never sent either; only API clients notice.
+- `preview` and `accept` are limited to 20 calls per client IP in 15 minutes (`AUTH_THROTTLE_LIMIT_TOKEN`; was 10).
+- The web accept page has three paths: signed out, "Create your account" (a password, min 8) with "Already have an
+  account? Sign in to accept"; on 409 `SIGN_IN_TO_ACCEPT` it switches to sign-in, which sends the person to
+  `/login?redirect=/accept-invitation?token=…`; signed in, "Join {company} as {role}", which explains a mismatch
+  (with "Sign out and continue") or an unverified email (with a resend button). It no longer imports Firebase.
+
+**Who notices.**
+
+- **The pre-hijack is closed.** Someone who signed up first as `victim@x.com` cannot get into a workspace that
+  invites the victim: the public accept is 409, and their join is 403 `EMAIL_NOT_VERIFIED`, because nothing they hold
+  verifies the address. The victim takes the address back with a password reset (the previous entry's reclaim),
+  verifies, and joins.
+- **Existing users are unverified** (previous entry), so until they verify from the banner they cannot accept an
+  invitation into another workspace. The verify-existing-users statement in the previous entry applies.
+- **Pending invitations** keep working. The first entry marked each one `link_shared_at`, so accepting one creates
+  an unverified account that is emailed a link. Resend an invitation first if you want its accept to create a verified
+  account.
+- **Firebase products:** the starter's accept page no longer creates a Firebase account. An app that needs Firebase
+  identities calls `accept` with `firebaseIdToken` (the ID token of a Firebase account for the invited email).
+- A client that read `refreshToken` from `accept-phone`, sent `firebaseUid` to `accept` or `/tenants/register`, or
+  expected accept to attach an existing account, must change (table below). Accept needs `credentials: 'include'`
+  in a browser, so the refresh cookie is stored.
+
+**Wire changes.**
+
+| Before                                                                   | After                                                                                            |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `POST /invitations/accept` `{ token, firebaseUid }` → profile            | `{ token, password \| firebaseIdToken }` → `{ accessToken, user }` + refresh cookie              |
+| accept for an email with an account → 200, account attached              | 409 `SIGN_IN_TO_ACCEPT`, nothing written                                                         |
+| (none)                                                                   | `POST /invitations/join` `{ token }`, signed in → `{ workspace, role }`; 403 mismatch/unverified |
+| `POST /invitations/accept-phone` → `{ accessToken, refreshToken, user }` | `{ accessToken, user }` + refresh cookie                                                         |
+| `POST /tenants/register` `{ …, firebaseUid }`                            | `{ …, firebaseIdToken }`, verified; `firebaseUid` is 400                                         |
+
+**Schema.** None. The verified-on-accept rule reads `link_shared_at`, which the first entry's migration added and
+has been stamping since.
+
+**What to do first.** Nothing is required. A product whose own clients call `accept`, `accept-phone` or
+`/tenants/register` updates them to the new bodies before it deploys.
+
+**How to turn it back.** Deploy the previous release; nothing in the database changed. That reopens the takeover, so
+do it only as a stopgap.

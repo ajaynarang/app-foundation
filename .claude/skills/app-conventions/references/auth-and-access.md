@@ -36,6 +36,13 @@ sources:
   - packages/appshore/platform/src/domains/user-invitations/user-invitations.service.ts#UserInvitationsService
   - packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts#UserInvitationsController
   - packages/appshore/db/prisma/migrations/20261116000000_invitation_token_hash/migration.sql
+  - packages/appshore/platform/src/domains/user-invitations/user-invitations.service.ts#joinInvitation
+  - packages/appshore/platform/src/domains/user-invitations/dto/invite-user.dto.ts#AcceptInvitationDto
+  - packages/appshore/platform/src/domains/tenants/dto/register-tenant.dto.ts#RegisterTenantDto
+  - packages/appshore/platform/src/auth/firebase-auth.module.ts#FirebaseAuthModule
+  - packages/appshore/platform/src/auth/auth.service.ts#startSession
+  - packages/appshore/kernel/src/infrastructure/rls/rls-context.ts#runAsInvitationTenant
+  - apps/web/src/features/auth/components/accept-invitation-form.tsx
   - packages/appshore/db/prisma/migrations/20261113230000_users_email_unique_live/migration.sql
   - apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts
   - apps/backend/src/domains/support/support.controller.ts
@@ -74,6 +81,9 @@ guards:
   - user-invitations.controller.spec.ts
   - user-invitations.service.spec.ts
   - user-invitations.integration.spec.ts
+  - rls-context.spec.ts
+  - auth.service.spec.ts
+  - accept-invitation-form.test.tsx
 examples:
   - assigneeId
 ---
@@ -109,9 +119,11 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
 ### Email verification
 
 - An email address counts as proven only by: the verify link (`POST /auth/verify-email`) used by the **signed-in**
-  owner of the account the token was issued for; a completed password reset; or (once the safe accept lands) an
-  emailed invitation whose link was never shared. A token alone proves nothing: the mailbox owner may not be the
+  owner of the account the token was issued for; a completed password reset; or a new-account accept of an email
+  invitation whose link was never shared (`linkSharedAt` null). A token alone proves nothing: the mailbox owner may not be the
   person who created the account. [guard: email-verification.service.spec.ts, auth.controller.spec.ts]
+- `emailVerified` is read from the user row, never a JWT claim (which can be 15 minutes old).
+  [guard: user-invitations.service.spec.ts]
 - A verification token is stored only as `hashToken(token)` (`EmailVerificationToken.tokenHash`), with the address it
   proves, for 24 hours, single use under a race (conditional update). Every refusal (unknown, used, expired, another
   address, another account, a deleted user) is the one 400 `VERIFICATION_LINK_INVALID`, never a 401, because the web
@@ -138,11 +150,36 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
   carries a link. [guard: invitation-token-storage.spec.ts, token-hash.spec.ts]
 - Only OWNER and ADMIN get a shareable link, and only by rotating the token (`POST /invitations/:invitation_id/link`):
   the emailed link dies, `linkSharedAt` is stamped, the link is shown once. A token never goes in a URL path (the
-  request log keeps paths); a public token route takes it in the body (`POST /invitations/preview`) under the
-  OTP_SEND throttle. [guard: user-invitations.controller.spec.ts, user-invitations.service.spec.ts]
-- Accept, resend and rotate move the invitation with a conditional update (`id`, `tokenHash` and `PENDING` still
+  request log keeps paths); a public token route takes it in the body (`POST /invitations/preview`, `accept`) under
+  the token-route throttle (`AUTH_THROTTLE_LIMIT_TOKEN`). [guard: user-invitations.controller.spec.ts, user-invitations.service.spec.ts]
+- Accept, join, accept-phone, resend and rotate move the invitation with a conditional update (`id`, `tokenHash` and `PENDING` still
   hold) inside their transaction; the loser of a race is a 409 `INVALID_STATE`.
   [guard: user-invitations.service.spec.ts, user-invitations.integration.spec.ts]
+
+### Invitation accept and join
+
+- A token alone only ever creates a **new** account. `POST /invitations/accept` (public) takes a password or a
+  `firebaseIdToken` the server verifies (its email must be the invitation's, 403 `INVITATION_EMAIL_MISMATCH`; the uid
+  comes only from it), exactly one of the two, and never a uid from the body (400 `VALIDATION_FAILED`). An email that
+  already has a live account, in any case, is 409 `SIGN_IN_TO_ACCEPT` and nothing is written; a race on the live-email
+  index maps to the same answer. The account starts verified only for an EMAIL invitation with `linkSharedAt` null;
+  otherwise it is emailed a verification link after the commit. Accept signs in like login: the refresh token in the
+  cookie, `{ accessToken, user }` in the body, a login event.
+  [guard: user-invitations.service.spec.ts, user-invitations.controller.spec.ts, user-invitations.integration.spec.ts]
+- An existing account joins another workspace only through `POST /invitations/join`: signed in with a JWT session
+  (never an OAuth access token or an API key: neither guard is on the route), any role, STRICT throttle. It reads the
+  account row: a super admin is 403 `FORBIDDEN`, another email 403 `INVITATION_EMAIL_MISMATCH` (naming neither
+  address), an unverified one 403 `EMAIL_NOT_VERIFIED`. An existing member keeps their role. A replay by the account
+  that joined is 200 with the same body; it issues no session (the client switches). It runs as the invitation's
+  tenant through `runAsInvitationTenant`, never a plain `runAsTenant` inside the pinned session tenant.
+  [guard: user-invitations.service.spec.ts, user-invitations.controller.spec.ts, user-invitations.integration.spec.ts, rls-context.spec.ts]
+- A phone accept signs in by cookie too, and emails a verification link when the invitation carries an email. A public
+  product route never answers a refresh token in the body (`AuthService.generateTokensForUser` is the dev switcher's).
+  Tenant registration takes a verified `firebaseIdToken` for its own `email`, never a `firebaseUid`.
+  [guard: user-invitations.controller.spec.ts, tenants.service.spec.ts, auth.service.spec.ts]
+- The web accept page has no Firebase import: signed out it creates an account or sends the person to
+  `/login?redirect=…` back to the page; signed in it joins and explains a mismatch or an unverified email.
+  [guard: accept-invitation-form.test.tsx]
 
 ### Sessions
 
@@ -241,6 +278,8 @@ reached through the tool pipeline, not by opening a REST route to API keys.
 - A public (`@Public()`) route that marks an email verified from a token alone, or an `emailVerified` read from a JWT
   claim instead of the user row.
 - A 403 for another tenant's record.
+- A flow that writes a `WorkspaceMember` row into a workspace the caller is not in, from a token alone or without a
+  verified matching email; a body field that names a Firebase uid.
 - `@UseGuards(ThrottlerGuard)`, or `@SkipThrottle()` outside health and SSE.
 - A refresh token, API key, OAuth secret, invitation or verification token written to a log, a URL path, a response after
   creation, or an error message.

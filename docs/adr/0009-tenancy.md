@@ -10,6 +10,14 @@ own deployment, and a personal app where each user has a private space. Writing 
 places a tenant leak can hide. The starter runs all three from one code path, and makes the tenant of every unit of
 work explicit so a leak is visible.
 
+A `WorkspaceMember` row is the whole authorization to sign in to a workspace: an account can enter any workspace it
+has a row in (`IdentityResolverService`, `POST /workspaces/switch`). The invitation accept used to be the one flow
+that wrote such a row into another person's workspace, and it trusted the token alone. That allowed a
+**pre-hijack**: someone signs up first as `victim@x.com` (no proof of the address is asked), a real workspace later
+invites the victim, the victim clicks the link, and the account whose password the attacker knows is now a member.
+It also let a token holder attach any existing account without its owner knowing, and let an inviter mint a
+"verified" account for an address they do not control (amended 2026-11-15).
+
 ## Decision
 
 **One code path serves every tenancy mode. Data is tenant-scoped by an explicit filter in the service, and every
@@ -25,6 +33,17 @@ request, job and event handler runs in a declared tenant context.**
   where and with what role. One user may belong to many workspaces. The session's active workspace is stored on its
   refresh token row (`RefreshToken.tenantId`) and carried in the access token, so two sessions of the same user can
   be in two workspaces. Switching is `POST /workspaces/switch`.
+- **A person joins a workspace that is not theirs only signed in, as themselves, with a verified matching email**
+  (amended 2026-11-15). The one route is `POST /invitations/join`: a JWT session only (no OAuth or API-key guard),
+  and the account row, read from the database, must not be a super admin, must have the invitation's email and must
+  have it verified (`emailVerified`, which only a signed-in verify link, a password reset or an emailed-only
+  invitation sets; see ADR-0012). A token alone, through the public `POST /invitations/accept`, only ever creates a
+  **new** account, and refuses an email that already has one with 409 `SIGN_IN_TO_ACCEPT`. The join is the one
+  request that writes into a tenant other than its session's, so it runs as the invitation's tenant through
+  `runAsInvitationTenant` (`packages/appshore/kernel/src/infrastructure/rls/rls-context.ts`), the one sanctioned way
+  out of a pinned tenant. Held by `user-invitations.service.spec.ts`, `user-invitations.controller.spec.ts`,
+  `user-invitations.integration.spec.ts` (the pre-hijack and the reclaim against Postgres, in strict mode) in
+  `packages/appshore/platform/src/domains/user-invitations/__tests__/`, and `rls-context.spec.ts`.
 - **One live account per email, enforced by the database.** The partial unique index `users_email_live_key`
   (`lower(email)` where `deleted_at` is null) holds it. Its migration skips the index when a database already holds
   duplicates; then boot logs `auth.email_uniqueness_unenforced`, login offers a workspace picker (409) for a password
@@ -55,3 +74,9 @@ request, job and event handler runs in a declared tenant context.**
 - A new tenant-owned table needs a `tenantId` column, the filter in its service, and its entry in the app RLS
   registry (`apps/backend/src/platform-glue/database/app-rls-registry.ts`); the registry spec fails until it has one.
 - A new job name declares its context in `apps/backend/src/platform-glue/queue/job-context.ts`.
+- A new flow that writes a `WorkspaceMember` row into a workspace the caller is not already in (an SSO link, a
+  domain auto-join) is an amendment to this record: it must prove the account's ownership of the address the same
+  way, or say why it need not.
+- Every account starts unverified, so an account must verify its email before it can join a second workspace. The
+  first-party verify, reset and emailed-invitation paths are the only proofs the starter trusts; a product that can
+  prove ownership another way marks its accounts with its own statement (`docs/upgrade-notes/identity-and-invitations.md`).
