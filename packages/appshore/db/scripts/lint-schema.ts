@@ -40,6 +40,8 @@ const KNOWN_TOKEN_TABLES = new Set([
   'OAuthRefreshToken',
   'ApiKey',
   'PasswordResetToken',
+  // Holds sha256 of the emailed verification token (`tokenHash`), never the token.
+  'EmailVerificationToken',
   // Holds sha256 of the invitation acceptance token (`tokenHash`), never the token.
   'UserInvitation',
   'ConversationSession',
