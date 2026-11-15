@@ -24,7 +24,9 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
 
   const baseRow = {
     id: 'ak0',
-    key: 'sk_live_0',
+    keyHash: 'a'.repeat(64),
+    keyPrefix: 'sk_live_',
+    keyLast4: 'AbCd',
     name: 'bi',
     scopes: ['platform:read'],
     ipAllowlist: [],
@@ -155,7 +157,6 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('validateKey returns null when IP is not in the allowlist', async () => {
     prisma.apiKey.findUnique.mockResolvedValue({
       ...baseRow,
-      key: 'sk_live_x',
       ipAllowlist: ['10.0.0.1'],
       user: { id: 42 },
     });
@@ -166,7 +167,6 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('validateKey allows exact-match IP', async () => {
     prisma.apiKey.findUnique.mockResolvedValue({
       ...baseRow,
-      key: 'sk_live_x',
       ipAllowlist: ['10.0.0.1'],
       user: { id: 42 },
     });
@@ -179,7 +179,6 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('validateKey allows CIDR-match IP', async () => {
     prisma.apiKey.findUnique.mockResolvedValue({
       ...baseRow,
-      key: 'sk_live_x',
       ipAllowlist: ['10.0.0.0/24'],
       user: { id: 42 },
     });
@@ -191,7 +190,6 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('validateKey rejects IP outside a /24 subnet (boundary case)', async () => {
     prisma.apiKey.findUnique.mockResolvedValue({
       ...baseRow,
-      key: 'sk_live_x',
       ipAllowlist: ['10.0.0.0/24'],
       user: { id: 42 },
     });
@@ -202,7 +200,6 @@ describe('ApiKeysService — scoped keys (Phase B)', () => {
   it('validateKey allows any IP when allowlist is empty', async () => {
     prisma.apiKey.findUnique.mockResolvedValue({
       ...baseRow,
-      key: 'sk_live_x',
       ipAllowlist: [],
       user: { id: 42 },
     });

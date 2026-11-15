@@ -25,7 +25,9 @@ import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-enve
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.accessSecret') || 'default-secret',
+        // No fallback: the config schema always supplies a value and refuses the
+        // public development default in production.
+        secret: configService.get<string>('jwt.accessSecret'),
         signOptions: {
           expiresIn: configService.get<string>('jwt.accessExpiry') || '15m',
         } as any,

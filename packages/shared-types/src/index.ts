@@ -42,6 +42,7 @@ export type { FeatureKey } from './platform/feature-keys';
 
 // Infrastructure envelopes
 export * from './infrastructure/webhook.schema';
+export * from './infrastructure/outbound-webhook.schema';
 export * from './infrastructure/sse-events';
 export * from './infrastructure/job-envelope';
 

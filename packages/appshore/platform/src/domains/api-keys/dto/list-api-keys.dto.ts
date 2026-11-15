@@ -2,9 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import type { AgentScope } from '@app/shared-types';
 
 /**
- * Tenant-wide API-key list entry. Never exposes the plaintext key.
- * `keyMasked` is a stable, human-readable substitute so the UI can
- * render a "sk_live_**********" chip.
+ * Tenant-wide API-key list entry. The plaintext key is not stored;
+ * `keyMasked` is the prefix and last four characters ("sk_live_…AbCd")
+ * so a user can tell their keys apart.
  */
 export class TenantApiKeyListItemDto {
   @ApiProperty()
@@ -13,7 +13,7 @@ export class TenantApiKeyListItemDto {
   @ApiProperty()
   name: string;
 
-  @ApiProperty({ description: 'Masked key display for the UI' })
+  @ApiProperty({ example: 'sk_live_…AbCd', description: 'Prefix and last four characters, for display' })
   keyMasked: string;
 
   @ApiProperty()

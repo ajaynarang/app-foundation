@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
+import { createHash } from 'crypto';
 import { nanoid } from 'nanoid';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
@@ -26,6 +27,28 @@ function cidrContains(cidr: string, ip: string): boolean {
 /** Returns true when any scope in the set would allow a write-tier action. */
 function hasWriteScope(scopes: AgentScope[]): boolean {
   return scopes.some((s) => s.includes(':write') || s === 'comms:send' || s === 'comms:send:bulk');
+}
+
+const KEY_PREFIX = 'sk_live_';
+
+/**
+ * An API key is a password: the database holds only this sha256 (lowercase
+ * hex over the UTF-8 bytes). The key itself carries 32 random nanoid
+ * characters, so an unsalted fast hash is enough and allows lookup by index.
+ */
+export function hashApiKey(plaintext: string): string {
+  return createHash('sha256').update(plaintext, 'utf8').digest('hex');
+}
+
+/** Mint a new key. `plaintext` goes to the caller once; the rest is what gets stored. */
+function mintKey(): { plaintext: string; keyHash: string; keyPrefix: string; keyLast4: string } {
+  const plaintext = KEY_PREFIX + nanoid(32);
+  return { plaintext, keyHash: hashApiKey(plaintext), keyPrefix: KEY_PREFIX, keyLast4: plaintext.slice(-4) };
+}
+
+/** Display form for lists, e.g. `sk_live_…AbCd`. */
+function maskKey(row: { keyPrefix: string; keyLast4: string }): string {
+  return `${row.keyPrefix}…${row.keyLast4}`;
 }
 
 export interface ValidateKeyContext {
@@ -56,11 +79,11 @@ export class ApiKeysService {
       );
     }
 
-    const key = 'sk_live_' + nanoid(32);
+    const { plaintext, ...stored } = mintKey();
 
     const apiKey = await this.prisma.apiKey.create({
       data: {
-        key,
+        ...stored,
         name: dto.name,
         userId,
         scopes: dto.scopes,
@@ -72,7 +95,7 @@ export class ApiKeysService {
       },
     });
 
-    return this.toDto(apiKey, { includeSecret: true });
+    return this.toDto(apiKey, plaintext);
   }
 
   async findAll(userId: number): Promise<ApiKeyDto[]> {
@@ -85,7 +108,7 @@ export class ApiKeysService {
 
   /**
    * List every API key in a tenant, scoped via `user.tenantId`. Used by the
-   * the Desk admin view (Phase D). Never returns the plaintext key.
+   * the Desk admin view (Phase D). The plaintext key is not stored, so it cannot be returned.
    */
   async listForTenant(tenantId: number): Promise<TenantApiKeyListItemDto[]> {
     const keys = await this.prisma.apiKey.findMany({
@@ -93,6 +116,8 @@ export class ApiKeysService {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
+        keyPrefix: true,
+        keyLast4: true,
         name: true,
         userId: true,
         scopes: true,
@@ -110,7 +135,7 @@ export class ApiKeysService {
     return keys.map((k) => ({
       id: k.id,
       name: k.name,
-      keyMasked: `sk_live_${'*'.repeat(24)}…`,
+      keyMasked: maskKey(k),
       userId: k.userId,
       scopes: k.scopes as AgentScope[],
       ipAllowlist: k.ipAllowlist,
@@ -190,7 +215,7 @@ export class ApiKeysService {
     if (existing.revokedAt) {
       throw new BadRequestException('Cannot rotate a revoked key');
     }
-    const plaintextKey = 'sk_live_' + nanoid(32);
+    const { plaintext: plaintextKey, ...stored } = mintKey();
 
     const [, created] = await this.prisma.$transaction([
       this.prisma.apiKey.update({
@@ -199,7 +224,7 @@ export class ApiKeysService {
       }),
       this.prisma.apiKey.create({
         data: {
-          key: plaintextKey,
+          ...stored,
           name: existing.name,
           userId: existing.userId,
           scopes: existing.scopes,
@@ -219,7 +244,7 @@ export class ApiKeysService {
     });
 
     return {
-      apiKey: this.toDto(created, { includeSecret: false }),
+      apiKey: this.toDto(created),
       plaintextKey,
     };
   }
@@ -264,9 +289,9 @@ export class ApiKeysService {
     return this.toDto(updated);
   }
 
-  async validateKey(key: string, context: ValidateKeyContext = {}) {
+  async validateKey(plaintext: string, context: ValidateKeyContext = {}) {
     const apiKey = await this.prisma.apiKey.findUnique({
-      where: { key },
+      where: { keyHash: hashApiKey(plaintext) },
       include: { user: true },
     });
     if (!apiKey || !apiKey.isActive || apiKey.revokedAt) return null;
@@ -308,7 +333,8 @@ export class ApiKeysService {
   private toDto(
     apiKey: {
       id: number;
-      key: string;
+      keyPrefix: string;
+      keyLast4: string;
       name: string;
       scopes: string[];
       ipAllowlist: string[];
@@ -320,11 +346,12 @@ export class ApiKeysService {
       createdAt: Date;
       expiresAt: Date | null;
     },
-    options: { includeSecret?: boolean } = {},
+    plaintextKey?: string,
   ): ApiKeyDto {
     return {
       id: apiKey.id,
-      ...(options.includeSecret ? { key: apiKey.key } : {}),
+      ...(plaintextKey ? { key: plaintextKey } : {}),
+      keyMasked: maskKey(apiKey),
       name: apiKey.name,
       scopes: apiKey.scopes as AgentScope[],
       ipAllowlist: apiKey.ipAllowlist,

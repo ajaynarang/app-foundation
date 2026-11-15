@@ -1,10 +1,11 @@
-import { IsUrl, IsArray, IsString, IsOptional, IsBoolean, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsString, IsOptional, IsBoolean, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateWebhookSubscriptionDto {
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsUrl({ protocols: ['https'], require_tld: true, require_protocol: true })
+  @IsString()
+  @MaxLength(2048)
   url?: string;
 
   @ApiProperty({ required: false })

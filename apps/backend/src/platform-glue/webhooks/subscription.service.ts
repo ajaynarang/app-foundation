@@ -1,16 +1,28 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { randomBytes } from 'crypto';
-import { assertSafeWebhookUrl } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
+import { WEBHOOK_SECRET_OVERLAP_DEFAULT_HOURS } from '@app/shared-types';
+import { assertSafeWebhookTarget } from '@appshore/kernel/infrastructure/outbound-webhooks/webhook-url.validator';
 import { getExternalEventsByCategory } from '../events/event-registry';
 import { QUEUE_NAMES, WEBHOOKS_JOB_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { WebhookDeliveryPayload } from './delivery.processor';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { ReplayWebhookDto } from './dto/replay-webhook.dto';
+import { RotateWebhookSecretDto } from './dto/rotate-webhook-secret.dto';
+import { generateWebhookSecret } from './standard-webhooks';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class WebhookSubscriptionService {
@@ -20,7 +32,15 @@ export class WebhookSubscriptionService {
     private readonly prisma: PrismaService,
     @InjectQueue(QUEUE_NAMES.WEBHOOKS)
     private readonly deliveryQueue: Queue,
+    private readonly config: ConfigService,
   ) {}
+
+  /** The URL and every address its host resolves to must be public (the delivery worker checks again on send). */
+  private assertSafeTarget(url: string): Promise<void> {
+    return assertSafeWebhookTarget(url, {
+      allowPrivate: this.config.get<boolean>('webhooks.allowPrivateTargets') === true,
+    });
+  }
 
   async create(
     tenantId: number,
@@ -30,9 +50,9 @@ export class WebhookSubscriptionService {
       description?: string;
     },
   ) {
-    assertSafeWebhookUrl(data.url);
+    await this.assertSafeTarget(data.url);
 
-    const secret = randomBytes(32).toString('hex');
+    const secret = generateWebhookSecret();
 
     const subscription = await this.prisma.webhookSubscription.create({
       data: {
@@ -76,6 +96,7 @@ export class WebhookSubscriptionService {
           description: true,
           createdAt: true,
           updatedAt: true,
+          previousSecretExpiresAt: true,
           _count: { select: { deliveryLogs: true } },
         },
       }),
@@ -96,6 +117,7 @@ export class WebhookSubscriptionService {
         description: true,
         createdAt: true,
         updatedAt: true,
+        previousSecretExpiresAt: true,
         _count: { select: { deliveryLogs: true } },
       },
     });
@@ -115,7 +137,8 @@ export class WebhookSubscriptionService {
     },
   ) {
     await this.findOne(tenantId, id);
-    if (data.url) assertSafeWebhookUrl(data.url);
+    // `!== undefined`, not truthiness: an empty url must reach the guard and be refused, not be saved.
+    if (data.url !== undefined) await this.assertSafeTarget(data.url);
     return this.prisma.webhookSubscription.update({
       where: { id },
       data,
@@ -148,6 +171,35 @@ export class WebhookSubscriptionService {
         updatedAt: true,
       },
     });
+  }
+
+  /**
+   * Issue a new signing secret (shown once). The old one keeps signing alongside it for `overlapHours` (default 24),
+   * so a receiver can deploy the new secret without dropping a delivery; 0 retires it at once.
+   */
+  async rotateSecret(tenantId: number, id: string, dto: RotateWebhookSecretDto) {
+    const current = await this.prisma.webhookSubscription.findFirst({
+      where: { id, tenantId },
+      select: { secret: true },
+    });
+    if (!current) throw new NotFoundException('Webhook subscription not found');
+
+    const overlapHours = dto.overlapHours ?? WEBHOOK_SECRET_OVERLAP_DEFAULT_HOURS;
+    const secret = generateWebhookSecret();
+    const previousSecretExpiresAt = overlapHours > 0 ? new Date(Date.now() + overlapHours * HOUR_MS) : null;
+    // Conditional on the secret just read: of two concurrent rotations only one wins, so nobody is shown a secret
+    // that was overwritten before it ever signed.
+    const updated = await this.prisma.webhookSubscription.updateMany({
+      where: { id, tenantId, secret: current.secret },
+      data: { secret, previousSecret: overlapHours > 0 ? current.secret : null, previousSecretExpiresAt },
+    });
+    if (updated.count === 0) {
+      throw new ConflictException('The secret was just rotated. Refresh and try again.');
+    }
+
+    this.logger.log(`Rotated the signing secret of webhook ${id} (overlap ${overlapHours}h)`);
+    const { _count: _deliveries, ...subscription } = await this.findOne(tenantId, id);
+    return { ...subscription, signingSecret: secret }; // shown once: store securely
   }
 
   async findLogs(

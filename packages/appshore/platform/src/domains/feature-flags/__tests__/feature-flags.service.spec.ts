@@ -27,8 +27,22 @@ describe('FeatureFlagsService', () => {
       },
     };
 
+    // A small in-memory stand-in with the cache service's own semantics:
+    // `get` answers undefined on a miss; `getOrSet` stores what the factory returns.
+    const store = new Map<string, unknown>();
     cache = {
-      getOrSet: jest.fn().mockImplementation((_key: string, factory: () => any) => factory()),
+      store,
+      get: jest.fn((key: string) => Promise.resolve(store.get(key))),
+      set: jest.fn((key: string, value: unknown) => {
+        store.set(key, value);
+        return Promise.resolve();
+      }),
+      getOrSet: jest.fn(async (key: string, factory: () => Promise<unknown>) => {
+        if (store.has(key)) return store.get(key);
+        const value = await factory();
+        store.set(key, value);
+        return value;
+      }),
     };
 
     eventEmitter = {
@@ -79,6 +93,27 @@ describe('FeatureFlagsService', () => {
       prisma.featureFlag.findUnique.mockResolvedValue(null);
       const result = await service.isEnabled('nonexistent');
       expect(result).toBe(false);
+    });
+
+    it('does not cache a missing flag, so a flag added later is seen on the next read', async () => {
+      prisma.featureFlag.findUnique.mockResolvedValue(null);
+      expect(await service.isEnabled('new_feature')).toBe(false);
+      expect(cache.set).not.toHaveBeenCalled();
+      expect(cache.store.size).toBe(0);
+
+      // A seed or migration inserts the row; nothing invalidates the cache.
+      prisma.featureFlag.findUnique.mockResolvedValue({ enabled: true });
+      expect(await service.isEnabled('new_feature')).toBe(true);
+    });
+
+    it('caches a flag that exists, on or off, and answers the next read from the cache', async () => {
+      prisma.featureFlag.findUnique.mockResolvedValue({ enabled: false });
+      expect(await service.isEnabled('reports')).toBe(false);
+      expect(await service.isEnabled('reports')).toBe(false);
+
+      expect(prisma.featureFlag.findUnique).toHaveBeenCalledTimes(1);
+      expect(cache.set).toHaveBeenCalledTimes(1);
+      expect(cache.set).toHaveBeenCalledWith('app:flags:enabled:reports', false, expect.any(Number));
     });
   });
 

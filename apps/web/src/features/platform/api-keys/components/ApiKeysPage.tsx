@@ -67,6 +67,7 @@ export function ApiKeysPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Key</TableHead>
                 <TableHead>Scopes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last used</TableHead>
@@ -77,6 +78,9 @@ export function ApiKeysPage() {
               {data.map((k) => (
                 <TableRow key={k.id} className="cursor-pointer" onClick={() => open(k)}>
                   <TableCell className="font-medium text-foreground">{k.name}</TableCell>
+                  <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                    {k.keyMasked}
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{summariseScopes(k.scopes)}</TableCell>
                   <TableCell>{renderStatus(k)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">

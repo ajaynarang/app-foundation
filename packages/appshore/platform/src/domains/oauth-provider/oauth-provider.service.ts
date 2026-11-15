@@ -7,6 +7,16 @@ import * as bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import { OAUTH_CONFIG } from './constants/oauth.constants';
 import type { AuthorizationRequest, ConsentChallenge } from '@app/shared-types';
+import { resolveOAuthAccessTokenSecret, resolveOAuthConsentSecret, resolveOAuthIssuer } from './oauth-settings';
+
+/** The Prisma delegates token issuance writes through: the client itself, or a transaction. */
+type TokenStore = Pick<PrismaService, 'oAuthAccessToken' | 'oAuthRefreshToken'>;
+
+/** The tenant and role an access token is issued for. */
+interface TokenGrant {
+  tenantId: number;
+  role: string;
+}
 
 /** RFC 6749 Section 5.1 token response (snake_case per spec). */
 export interface OAuthTokenResponse {
@@ -32,6 +42,9 @@ export interface OAuthAccessTokenPayload {
 export class OAuthProviderService {
   private readonly logger = new Logger(OAuthProviderService.name);
   private readonly oauthSecret: string;
+  /** Consent challenges get their own secret so a challenge can never pass as an access token. */
+  private readonly consentSecret: string;
+  /** `iss` of every access token; checked again when a token is validated. */
   private readonly issuer: string;
 
   constructor(
@@ -39,13 +52,10 @@ export class OAuthProviderService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {
-    // Derive OAuth secret from secretKey if OAUTH_JWT_SECRET is not set.
-    // secretKey always has a default in configuration.ts, so this is safe.
-    const explicit = this.configService.get<string>('OAUTH_JWT_SECRET');
-    const baseSecret = this.configService.get<string>('secretKey');
-    this.oauthSecret = explicit || `${baseSecret}-oauth`;
-
-    this.issuer = this.configService.get<string>('OAUTH_ISSUER') || 'https://api.example.com';
+    const read = (key: string) => this.configService.get<string>(key);
+    this.oauthSecret = resolveOAuthAccessTokenSecret(read);
+    this.consentSecret = resolveOAuthConsentSecret(read);
+    this.issuer = resolveOAuthIssuer(read);
   }
 
   /**
@@ -85,7 +95,7 @@ export class OAuthProviderService {
     };
 
     return this.jwtService.sign(challenge, {
-      secret: this.oauthSecret,
+      secret: this.consentSecret,
       expiresIn: '10m',
     } as any);
   }
@@ -99,10 +109,14 @@ export class OAuthProviderService {
     userTenantDbId: number | null,
     selectedScopes?: string[],
   ): Promise<{ redirectUrl: string }> {
+    if (userTenantDbId === null) {
+      throw new BadRequestException('Open a workspace before connecting an app to it');
+    }
+
     let challenge: ConsentChallenge;
     try {
       challenge = this.jwtService.verify(challengeToken, {
-        secret: this.oauthSecret,
+        secret: this.consentSecret,
       });
     } catch {
       throw new BadRequestException('Invalid or expired consent challenge');
@@ -116,16 +130,7 @@ export class OAuthProviderService {
       throw new BadRequestException('Client no longer available');
     }
 
-    // RFC 7591 dynamic client registration creates clients with no tenant
-    // (Claude/ChatGPT can't know which tenant they belong to before any user
-    // logs in). The first authorizing user adopts the client into their
-    // tenant — matches the user's mental model: "I connected it, it's mine."
-    if (client.tenantId === null && userTenantDbId !== null) {
-      await this.prisma.oAuthClient.update({
-        where: { id: client.id },
-        data: { tenantId: userTenantDbId },
-      });
-    }
+    await this.bindClientToTenant(client, userTenantDbId);
 
     // The user may have unchecked some scopes on the consent screen. Intersect
     // their selection with what was actually requested — never widen, only
@@ -237,8 +242,15 @@ export class OAuthProviderService {
       }
     }
 
-    // Issue tokens
-    return this.issueTokens(authCode.user, authCode.client, authCode.scopes);
+    this.assertClientHasTenant(authCode.client);
+    const grant = await this.resolveGrant(authCode.user, authCode.client);
+    if (!grant) {
+      throw new BadRequestException(invalidMsg);
+    }
+
+    return this.prisma.$transaction((tx) =>
+      this.issueTokens(tx, authCode.user, authCode.client, grant, authCode.scopes),
+    );
   }
 
   /**
@@ -290,26 +302,39 @@ export class OAuthProviderService {
       }
     }
 
-    // 90-day absolute cap — if the first token in this chain was issued >90d ago, refuse
+    // 90-day absolute cap from the first token in the chain; past it the client must re-consent.
     this.assertWithinAbsoluteTtl(storedToken.originalIssuedAt);
+    this.assertClientHasTenant(storedToken.client);
+    // Not rotated and not revoked: if the membership comes back, the same token works again.
+    const grant = await this.resolveGrant(storedToken.user, storedToken.client);
+    if (!grant) {
+      throw new UnauthorizedException("The user no longer belongs to this app's workspace");
+    }
 
-    // Revoke entire chain if cap exceeded (handled in assertWithinAbsoluteTtl by throwing;
-    // the controller's exception filter returns 401 and the client must re-consent)
-
-    // Issue new tokens and mark old one as rotated atomically
-    const tokens = await this.issueTokens(storedToken.user, storedToken.client, storedToken.scopes, {
-      originalIssuedAt: storedToken.originalIssuedAt,
+    // The rotation claim and the new tokens commit together. Of two concurrent refreshes with the same token
+    // exactly one claims it (the other is reuse and revokes the chain), and a failure while issuing rolls the
+    // claim back, so the client can simply retry.
+    const tokens = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.oAuthRefreshToken.updateMany({
+        where: { tokenHash: tokenHashValue, rotatedAt: null, revokedAt: null },
+        data: { rotatedAt: new Date() },
+      });
+      if (claimed.count === 0) return null;
+      const issued = await this.issueTokens(tx, storedToken.user, storedToken.client, grant, storedToken.scopes, {
+        originalIssuedAt: storedToken.originalIssuedAt,
+      });
+      await tx.oAuthRefreshToken.update({
+        where: { tokenHash: tokenHashValue },
+        data: { replacedByHash: this.hashToken(issued.refresh_token) },
+      });
+      return issued;
     });
 
-    const newRefreshHash = this.hashToken(tokens.refresh_token);
-    await this.prisma.oAuthRefreshToken.update({
-      where: { tokenHash: tokenHashValue },
-      data: {
-        rotatedAt: new Date(),
-        replacedByHash: newRefreshHash,
-      },
-    });
-
+    if (!tokens) {
+      this.logger.warn(`Concurrent refresh token reuse for client ${clientId}, user ${storedToken.userId}`);
+      await this.revokeAllTokensForUser(storedToken.userId, storedToken.clientId);
+      throw new UnauthorizedException('Refresh token reuse detected — all tokens revoked');
+    }
     return tokens;
   }
 
@@ -354,6 +379,7 @@ export class OAuthProviderService {
     try {
       const payload = this.jwtService.verify<OAuthAccessTokenPayload>(token, {
         secret: this.oauthSecret,
+        issuer: this.issuer,
       });
 
       // Verify it has OAuth-specific claims
@@ -396,9 +422,76 @@ export class OAuthProviderService {
     }
   }
 
+  /**
+   * RFC 7591 dynamic client registration creates clients with no tenant (an MCP client cannot know its tenant
+   * before anyone logs in), so the first tenant to consent takes the client. That is a compare-and-set: of two
+   * tenants consenting at once one takes it and the other is refused. A client that already belongs to a tenant
+   * is never used from another one, because that tenant's admins could neither see nor revoke it.
+   */
+  private async bindClientToTenant(client: { id: number; tenantId: number | null }, tenantDbId: number) {
+    if (client.tenantId === tenantDbId) return;
+    if (client.tenantId === null) {
+      const adopted = await this.prisma.oAuthClient.updateMany({
+        where: { id: client.id, tenantId: null },
+        data: { tenantId: tenantDbId },
+      });
+      if (adopted.count === 1) return;
+      const current = await this.prisma.oAuthClient.findUnique({
+        where: { id: client.id },
+        select: { tenantId: true },
+      });
+      if (current?.tenantId === tenantDbId) return;
+    }
+    throw new BadRequestException('This app is connected to a different workspace');
+  }
+
+  /** No tokens for a client that belongs to no tenant: no admin could see it or revoke it. */
+  private assertClientHasTenant(client: { tenantId: number | null }): void {
+    if (client.tenantId === null) {
+      throw new BadRequestException('This app is not connected to a workspace. Connect it again.');
+    }
+  }
+
+  /**
+   * What a token for this user through this client may carry: the client's tenant, never the tenant the user
+   * row currently points at (that follows every workspace switch, so a client connected in one workspace would
+   * otherwise get tokens for whichever workspace the user opened last, where no admin can see or revoke it), and
+   * the user's role in that tenant. Null when the user is not a member of the client's tenant: no tokens then.
+   */
+  private async resolveGrant(
+    user: { id: number; tenantId: number | null; role: string },
+    client: { tenantId: number | null },
+  ): Promise<TokenGrant | null> {
+    const tenantId = client.tenantId;
+    if (tenantId === null) return null;
+
+    const membership = await this.prisma.workspaceMember.findUnique({
+      where: { userId_tenantId: { userId: user.id, tenantId } },
+      select: { role: true },
+    });
+    if (membership) return { tenantId, role: membership.role };
+
+    // No membership row. The user row still names the user's own workspace and role there (accounts created
+    // before memberships existed), and in single-tenant mode everyone belongs to the one implicit tenant.
+    if (user.tenantId === tenantId) return { tenantId, role: user.role };
+    const multiTenancy = this.configService.get<{ enabled: boolean; implicitTenantId: number }>('multiTenancy');
+    if (
+      multiTenancy?.enabled === false &&
+      user.tenantId === null &&
+      user.role !== 'SUPER_ADMIN' &&
+      tenantId === multiTenancy.implicitTenantId
+    ) {
+      return { tenantId, role: user.role };
+    }
+    return null;
+  }
+
+  /** Signs and stores an access + refresh pair through `store`, so a caller's transaction covers both rows. */
   private async issueTokens(
-    user: any,
-    client: any,
+    store: TokenStore,
+    user: { id: number },
+    client: { id: number; clientId: string },
+    grant: TokenGrant,
     scopes: string[],
     chainContext: { originalIssuedAt?: Date } = {},
   ): Promise<OAuthTokenResponse> {
@@ -412,8 +505,8 @@ export class OAuthProviderService {
     const accessToken = this.jwtService.sign(
       {
         sub: String(user.id),
-        tenantId: user.tenantId,
-        role: user.role,
+        tenantId: grant.tenantId,
+        role: grant.role,
         scopes,
         clientId: client.clientId,
         jti,
@@ -421,6 +514,7 @@ export class OAuthProviderService {
       {
         secret: this.oauthSecret,
         expiresIn: accessTokenTtl,
+        issuer: this.issuer,
       },
     );
 
@@ -435,27 +529,25 @@ export class OAuthProviderService {
       `issueTokens — storing accessHash=${accessHash.substring(0, 12)}..., refreshHash=${refreshHash.substring(0, 12)}..., jti=${jti}, userId=${user.id}, clientDbId=${client.id}`,
     );
 
-    await this.prisma.$transaction([
-      this.prisma.oAuthAccessToken.create({
-        data: {
-          tokenHash: accessHash,
-          clientId: client.id,
-          userId: user.id,
-          scopes,
-          expiresAt: new Date(Date.now() + accessTokenTtl * 1000),
-        },
-      }),
-      this.prisma.oAuthRefreshToken.create({
-        data: {
-          tokenHash: refreshHash,
-          clientId: client.id,
-          userId: user.id,
-          scopes,
-          expiresAt: new Date(Date.now() + refreshTokenTtl * 1000),
-          originalIssuedAt: chainContext.originalIssuedAt ?? new Date(),
-        },
-      }),
-    ]);
+    await store.oAuthAccessToken.create({
+      data: {
+        tokenHash: accessHash,
+        clientId: client.id,
+        userId: user.id,
+        scopes,
+        expiresAt: new Date(Date.now() + accessTokenTtl * 1000),
+      },
+    });
+    await store.oAuthRefreshToken.create({
+      data: {
+        tokenHash: refreshHash,
+        clientId: client.id,
+        userId: user.id,
+        scopes,
+        expiresAt: new Date(Date.now() + refreshTokenTtl * 1000),
+        originalIssuedAt: chainContext.originalIssuedAt ?? new Date(),
+      },
+    });
 
     this.logger.log(`issueTokens — stored successfully, jti=${jti}`);
 

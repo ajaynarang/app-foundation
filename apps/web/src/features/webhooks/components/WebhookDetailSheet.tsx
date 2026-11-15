@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@app/ui/components/ui/alert-dialog';
-import { MoreHorizontal, Play, Pencil, Trash2, RotateCw, FileText } from 'lucide-react';
+import { MoreHorizontal, Play, Pencil, Trash2, RotateCw, FileText, KeyRound } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   useUpdateWebhook,
@@ -38,6 +38,7 @@ import {
   type WebhookDeliveryLog,
 } from '../use-webhooks';
 import { EventPicker } from './event-picker';
+import { RotateWebhookSecretDialog } from './rotate-webhook-secret-dialog';
 import { DateRangeFilter, HISTORY_PRESETS } from '@/shared/components/ui/date-range-filter';
 
 interface Props {
@@ -94,6 +95,7 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
 
   // Delete confirm
   const [showDelete, setShowDelete] = useState(false);
+  const [showRotate, setShowRotate] = useState(false);
 
   const resetEditFromWebhook = () => {
     if (!webhook) return;
@@ -188,6 +190,10 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
           >
             <Play className="h-4 w-4 mr-2" />
             Send test event
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowRotate(true)}>
+            <KeyRound className="h-4 w-4 mr-2" />
+            Rotate signing secret
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowDelete(true)} className="text-destructive">
             <Trash2 className="h-4 w-4 mr-2" />
@@ -432,6 +438,8 @@ export function WebhookDetailSheet({ webhook, open, onOpenChange }: Props) {
           </TabsContent>
         </Tabs>
       </FormSheet>
+
+      <RotateWebhookSecretDialog webhookId={webhook.id} open={showRotate} onOpenChange={setShowRotate} />
 
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
         <AlertDialogContent>

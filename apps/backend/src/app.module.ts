@@ -1,6 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
+import { edgeThrottlerOptions } from './bootstrap/edge-throttle';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { HttpExceptionFilter } from '@appshore/platform/shared/filters/http-exception.filter';
@@ -112,12 +114,11 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     }),
     SharedModule,
     CacheModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+    // Edge rate limit, per principal, counted in Redis: see bootstrap/edge-throttle.ts.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService, AppCacheService],
+      useFactory: edgeThrottlerOptions,
+    }),
     // ScheduleModule removed — all scheduling now uses BullMQ repeatable jobs
     PrismaModule,
     AuthModule,

@@ -416,11 +416,16 @@ model LoginEvent {
 }
 
 model ApiKey {
-  id     Int    @id @default(autoincrement())
-  key    String @unique @db.VarChar(64)
-  name   String @db.VarChar(255)
-  userId Int    @map("user_id")
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        Int    @id @default(autoincrement())
+  // sha256 (hex) of the plaintext key. The plaintext is returned once, when the
+  // key is created or rotated, and is never stored.
+  keyHash   String @unique @map("key_hash") @db.VarChar(64)
+  // Display only: together they render as "sk_live_…AbCd" in lists.
+  keyPrefix String @map("key_prefix") @db.VarChar(16)
+  keyLast4  String @map("key_last4") @db.VarChar(4)
+  name      String @db.VarChar(255)
+  userId    Int    @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Usage tracking
   lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz
@@ -1229,15 +1234,18 @@ model TenantAddOn {
 // ============================================================================
 
 model WebhookSubscription {
-  id          String   @id @default(cuid())
-  tenantId    Int      @map("tenant_id")
-  url         String   @db.VarChar(2048)
-  secret      String   @db.VarChar(255)
-  events      String[]
-  active      Boolean  @default(true)
-  description String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                      String    @id @default(cuid())
+  tenantId                Int       @map("tenant_id")
+  url                     String    @db.VarChar(2048)
+  secret                  String    @db.VarChar(255)
+  /// The secret a rotation replaced; it keeps signing (alongside `secret`) until `previousSecretExpiresAt`.
+  previousSecret          String?   @map("previous_secret") @db.VarChar(255)
+  previousSecretExpiresAt DateTime? @map("previous_secret_expires_at") @db.Timestamptz
+  events                  String[]
+  active                  Boolean   @default(true)
+  description             String?   @db.Text
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant               @relation(fields: [tenantId], references: [id])
   deliveryLogs WebhookDeliveryLog[]

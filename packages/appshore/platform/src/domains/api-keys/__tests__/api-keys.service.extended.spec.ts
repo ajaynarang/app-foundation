@@ -17,7 +17,9 @@ describe('ApiKeysService — Phase D admin surface', () => {
 
   const baseRow = {
     id: 501,
-    key: 'sk_live_old',
+    keyHash: 'a'.repeat(64),
+    keyPrefix: 'sk_live_',
+    keyLast4: 'AbCd',
     name: 'BI script',
     userId: 42,
     scopes: ['platform:read'] as string[],
@@ -55,8 +57,9 @@ describe('ApiKeysService — Phase D admin surface', () => {
         }),
       );
       expect(result).toHaveLength(1);
-      expect(result[0].keyMasked).toMatch(/^sk_live_\*+…$/);
+      expect(result[0].keyMasked).toBe('sk_live_…AbCd');
       expect(result[0]).not.toHaveProperty('key');
+      expect(result[0]).not.toHaveProperty('keyHash');
     });
   });
 
@@ -71,7 +74,7 @@ describe('ApiKeysService — Phase D admin surface', () => {
       };
       prisma.apiKey.findFirst.mockResolvedValue(existing);
       prisma.$transaction.mockImplementation(async (ops: unknown[]) => {
-        return [null, { ...existing, id: 502, key: 'sk_live_new' }];
+        return [null, { ...existing, id: 502, keyLast4: 'WxYz' }];
       });
 
       const result = await svc.rotate(501, 7);

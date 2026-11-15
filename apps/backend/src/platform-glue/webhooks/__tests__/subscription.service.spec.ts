@@ -1,8 +1,23 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import * as dns from 'node:dns';
 import { getQueueToken } from '@nestjs/bullmq';
 import { WebhookSubscriptionService } from '../subscription.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+
+jest.mock('node:dns', () => ({ ...jest.requireActual('node:dns'), lookup: jest.fn() }));
+
+/** Makes every host resolve to these addresses, as `dns.lookup(host, { all: true })` would report them. */
+const resolveTo = (...addresses: string[]) =>
+  (dns.lookup as unknown as jest.Mock).mockImplementation(
+    (_host: string, _options: unknown, callback: (err: Error | null, addresses: unknown) => void) =>
+      callback(
+        null,
+        addresses.map((address) => ({ address, family: address.includes(':') ? 6 : 4 })),
+      ),
+  );
 
 describe('WebhookSubscriptionService', () => {
   let service: WebhookSubscriptionService;
@@ -10,6 +25,7 @@ describe('WebhookSubscriptionService', () => {
   let queue: any;
 
   beforeEach(async () => {
+    (dns.lookup as unknown as jest.Mock).mockReset();
     prisma = {
       webhookSubscription: {
         findUnique: jest.fn(),
@@ -17,6 +33,8 @@ describe('WebhookSubscriptionService', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
       },
       webhookDeliveryLog: {
         findUnique: jest.fn(),
@@ -42,10 +60,158 @@ describe('WebhookSubscriptionService', () => {
         WebhookSubscriptionService,
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(QUEUE_NAMES.WEBHOOKS), useValue: queue },
+        { provide: ConfigService, useValue: { get: () => false } },
       ],
     }).compile();
 
     service = module.get(WebhookSubscriptionService);
+  });
+
+  describe('SSRF guard at registration', () => {
+    const tenantId = 1;
+    const input = (url: string) => ({ url, events: ['*'] });
+
+    beforeEach(() => {
+      prisma.webhookSubscription.create.mockImplementation(({ data }: any) => ({ id: 'sub-new', ...data }));
+      prisma.webhookSubscription.findUnique.mockResolvedValue({ id: 'sub-1', tenantId, active: true });
+      prisma.webhookSubscription.update.mockResolvedValue({ id: 'sub-1' });
+    });
+
+    it('saves a subscription whose host resolves only to public addresses', async () => {
+      resolveTo('93.184.216.34', '2606:2800:220:1::1');
+
+      await service.create(tenantId, input('https://hooks.partner-site.com/in'));
+
+      expect(prisma.webhookSubscription.create).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a private address', '10.0.0.5'],
+      ['loopback', '127.0.0.1'],
+      ['the metadata address', '169.254.169.254'],
+      ['CGNAT', '100.64.0.9'],
+      ['an IPv6-mapped private address', '::ffff:10.0.0.5'],
+    ])('refuses a public-looking host that resolves to %s, on create and on update', async (_label, address) => {
+      resolveTo('93.184.216.34', address);
+
+      await expect(service.create(tenantId, input('https://hooks.partner-site.com/in'))).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.update(tenantId, 'sub-1', { url: 'https://hooks.partner-site.com/in' })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+    });
+
+    it.each([['https://169.254.169.254/latest/meta-data/'], ['https://localhost/hook'], ['http://partner.com/hook']])(
+      'refuses %s before resolving anything',
+      async (url) => {
+        await expect(service.create(tenantId, input(url))).rejects.toThrow(BadRequestException);
+        expect(dns.lookup).not.toHaveBeenCalled();
+        expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses an empty URL on create and on update instead of saving it', async () => {
+      await expect(service.create(tenantId, input(''))).rejects.toThrow(BadRequestException);
+      await expect(service.update(tenantId, 'sub-1', { url: '' })).rejects.toThrow(BadRequestException);
+
+      expect(prisma.webhookSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+    });
+
+    it('does not check the URL when an update leaves it unchanged', async () => {
+      await service.update(tenantId, 'sub-1', { active: false });
+
+      expect(dns.lookup).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('signing secret', () => {
+    const tenantId = 1;
+    const HOUR_MS = 60 * 60 * 1000;
+    const stored = { id: 'sub-1', tenantId, url: 'https://partner.com/hook', events: ['*'], active: true };
+
+    beforeEach(() => {
+      prisma.webhookSubscription.findFirst.mockResolvedValue({ secret: 'old-secret' });
+      prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 1 });
+      prisma.webhookSubscription.findUnique.mockResolvedValue({ ...stored, _count: { deliveryLogs: 3 } });
+    });
+
+    it('issues a whsec_ secret on create and returns it once', async () => {
+      resolveTo('93.184.216.34');
+      prisma.webhookSubscription.create.mockImplementation(({ data }: any) => ({ id: 'sub-new', ...data }));
+
+      const created = await service.create(tenantId, { url: 'https://partner.com/hook', events: ['*'] });
+
+      expect(created.signingSecret).toMatch(/^whsec_[A-Za-z0-9+/]{43}=$/);
+      expect(prisma.webhookSubscription.create.mock.calls[0][0].data.secret).toBe(created.signingSecret);
+    });
+
+    it('rotates: stores a new secret, keeps the old one signing for 24 hours by default, and returns the new one once', async () => {
+      const before = Date.now();
+
+      const rotated = await service.rotateSecret(tenantId, 'sub-1', {});
+
+      const { where, data } = prisma.webhookSubscription.updateMany.mock.calls[0][0];
+      expect(where).toEqual({ id: 'sub-1', tenantId, secret: 'old-secret' });
+      expect(data.secret).toMatch(/^whsec_/);
+      expect(data.previousSecret).toBe('old-secret');
+      expect(data.previousSecretExpiresAt.getTime()).toBeGreaterThanOrEqual(before + 24 * HOUR_MS);
+      expect(data.previousSecretExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 24 * HOUR_MS);
+      expect(rotated.signingSecret).toBe(data.secret);
+      expect(rotated).not.toHaveProperty('secret');
+      expect(rotated).not.toHaveProperty('previousSecret');
+    });
+
+    it('honours the chosen overlap, and an overlap of 0 retires the old secret at once', async () => {
+      await service.rotateSecret(tenantId, 'sub-1', { overlapHours: 2 });
+      const withOverlap = prisma.webhookSubscription.updateMany.mock.calls[0][0].data;
+      expect(withOverlap.previousSecretExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 2 * HOUR_MS);
+      expect(withOverlap.previousSecretExpiresAt.getTime()).toBeGreaterThan(Date.now() + HOUR_MS);
+
+      await service.rotateSecret(tenantId, 'sub-1', { overlapHours: 0 });
+      const immediate = prisma.webhookSubscription.updateMany.mock.calls[1][0].data;
+      expect(immediate.previousSecret).toBeNull();
+      expect(immediate.previousSecretExpiresAt).toBeNull();
+    });
+
+    it('rejects a rotation that lost a race with another one, so no overwritten secret is shown', async () => {
+      prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.rotateSecret(tenantId, 'sub-1', {})).rejects.toThrow(ConflictException);
+    });
+
+    it("does not rotate another tenant's subscription", async () => {
+      prisma.webhookSubscription.findFirst.mockResolvedValue(null);
+
+      await expect(service.rotateSecret(2, 'sub-1', {})).rejects.toThrow(NotFoundException);
+
+      expect(prisma.webhookSubscription.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'sub-1', tenantId: 2 } }),
+      );
+      expect(prisma.webhookSubscription.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('never selects a secret when listing or reading a subscription', async () => {
+      prisma.webhookSubscription.findMany.mockResolvedValue([]);
+      prisma.webhookSubscription.count.mockResolvedValue(0);
+
+      await service.findAll(tenantId, { limit: 20, offset: 0 });
+      await service.findOne(tenantId, 'sub-1');
+
+      for (const select of [
+        prisma.webhookSubscription.findMany.mock.calls[0][0].select,
+        prisma.webhookSubscription.findUnique.mock.calls[0][0].select,
+      ]) {
+        expect(select).not.toHaveProperty('secret');
+        expect(select).not.toHaveProperty('previousSecret');
+        expect(select.previousSecretExpiresAt).toBe(true);
+      }
+    });
   });
 
   describe('getEventCatalog', () => {

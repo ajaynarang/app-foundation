@@ -18,7 +18,10 @@ export type CreateApiKeyInput = z.infer<typeof CreateApiKeySchema>;
 
 export const ApiKeyResponseSchema = z.object({
   id: z.number().int(),
+  /** The full key. Present only in the response that creates it; it is not stored. */
   key: z.string().optional(),
+  /** Prefix and last four characters, e.g. `sk_live_…AbCd`. */
+  keyMasked: z.string(),
   name: z.string(),
   scopes: z.array(AgentScopeSchema),
   ipAllowlist: z.array(z.string()),

@@ -5,8 +5,14 @@ export class ApiKeyDto implements ApiKeyResponse {
   @ApiProperty()
   id: number;
 
-  @ApiProperty({ required: false, description: 'Only returned on creation' })
+  @ApiProperty({
+    required: false,
+    description: 'The full key. Returned once, when the key is created; it is not stored.',
+  })
   key?: string;
+
+  @ApiProperty({ example: 'sk_live_…AbCd', description: 'Prefix and last four characters, for display' })
+  keyMasked: string;
 
   @ApiProperty()
   name: string;

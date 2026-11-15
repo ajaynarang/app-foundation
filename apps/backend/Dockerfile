@@ -70,6 +70,10 @@ RUN rm -rf /production/node_modules/@app/shared-types && \
 FROM node:20-slim AS production
 WORKDIR /app
 
+# A deployed image is production unless the environment says otherwise: with NODE_ENV unset the backend
+# would boot in development mode (public default secrets accepted, Swagger UI on, non-Secure cookies).
+ENV NODE_ENV=production
+
 # Install wget for healthcheck + native libs for @livekit/rtc-node WebRTC binary + Doppler CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \

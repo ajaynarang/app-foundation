@@ -14,6 +14,8 @@ jest.mock('bcrypt', () => ({
 
 const mockPrisma = {
   oAuthClient: { findUnique: jest.fn() },
+  // No membership row: the user row's own tenant and role apply (see resolveGrant).
+  workspaceMember: { findUnique: jest.fn().mockResolvedValue(null) },
   oAuthAuthorizationCode: {
     create: jest.fn(),
     findUnique: jest.fn(),
@@ -144,6 +146,7 @@ describe('OAuthProviderService', () => {
         id: 1,
         clientId: 'client-1',
         isActive: true,
+        tenantId: 7,
       });
       mockPrisma.oAuthAuthorizationCode.create.mockResolvedValue({});
 
@@ -314,6 +317,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c-1',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         scopes: ['platform:read'],
@@ -323,6 +327,7 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthAccessToken.create.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.create.mockResolvedValue({});
       mockPrisma.oAuthRefreshToken.update.mockResolvedValue({});
+      mockPrisma.oAuthRefreshToken.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.refreshToken('valid-token', 'c-1', undefined);
 
@@ -330,13 +335,11 @@ describe('OAuthProviderService', () => {
       expect(result.refresh_token).toBeDefined();
       expect(result.token_type).toBe('Bearer');
       expect(result.scope).toBe('platform:read');
+      expect(mockPrisma.oAuthRefreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { rotatedAt: expect.any(Date) } }),
+      );
       expect(mockPrisma.oAuthRefreshToken.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            rotatedAt: expect.any(Date),
-            replacedByHash: expect.any(String),
-          }),
-        }),
+        expect.objectContaining({ data: { replacedByHash: expect.any(String) } }),
       );
     });
   });
@@ -548,6 +551,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c-1',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'ADMIN', tenant: { id: 1 } },
         redirectUri: 'https://app.com/cb',
@@ -609,6 +613,7 @@ describe('OAuthProviderService', () => {
           clientId: 'c',
           clientType: 'public',
           clientSecret: null,
+          tenantId: 1,
         },
         user: { id: 1, tenantId: 1, role: 'MEMBER', tenant: { id: 1 } },
         scopes: ['platform:read'],

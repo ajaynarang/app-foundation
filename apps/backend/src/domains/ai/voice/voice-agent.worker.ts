@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
+import { DEV_VOICE_AGENT_SECRET_DEFAULT } from '../../../config/configuration';
 
 /**
  * Voice Agent Worker — starts the LiveKit agent server.
@@ -32,8 +33,15 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
     // because the forked agent process from the previous run may still
     // be alive with the old secret. In dev, use a fixed default.
     if (!process.env.VOICE_AGENT_SECRET) {
-      process.env.VOICE_AGENT_SECRET = 'app-voice-dev-secret-do-not-use-in-production';
-      this.logger.warn('VOICE_AGENT_SECRET not set — using dev default. Set a real secret in production.');
+      // The config schema already refuses to boot production in this state;
+      // this keeps the public dev default out of production even if that
+      // check is bypassed.
+      if (this.config.get<string>('environment') === 'production') {
+        this.logger.error('VOICE_AGENT_SECRET not set — voice agent worker disabled');
+        return;
+      }
+      process.env.VOICE_AGENT_SECRET = DEV_VOICE_AGENT_SECRET_DEFAULT;
+      this.logger.warn('VOICE_AGENT_SECRET not set — using the development default');
     }
 
     // Set APP_API_URL for the forked process (defaults to localhost)

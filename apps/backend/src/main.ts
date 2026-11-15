@@ -12,7 +12,10 @@ import helmet from 'helmet';
 import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
 import { OAUTH_SCOPES } from '@app/shared-types';
+import { resolveOAuthIssuer } from '@appshore/platform/domains/oauth-provider/oauth-settings';
 import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
+import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
+import { applyTrustProxy } from './bootstrap/trust-proxy';
 
 async function bootstrap() {
   // Initialize Firebase Admin SDK
@@ -38,6 +41,9 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const configService = app.get(ConfigService<Configuration>);
+
+  // The real client IP behind the load balancer: the rate limit and the API-key IP allowlist read req.ip.
+  applyTrustProxy(app, configService.get('edge', { infer: true })?.trustProxy, configService.get('environment'));
 
   const corsOrigins = configService.get<string>('corsOrigins') || 'http://localhost:3000';
 
@@ -126,10 +132,8 @@ async function bootstrap() {
     credentials: true, // Allow cookies
   });
 
-  // Warn if localhost CORS origins are present in production
-  if (process.env.NODE_ENV === 'production' && corsOrigins.split(',').some((o) => o.trim().includes('localhost'))) {
-    console.warn('[Bootstrap] WARNING: CORS_ORIGINS includes localhost — this should not happen in production!');
-  }
+  // A local origin in production never gets this far: the config schema
+  // refuses to boot (config/configuration.ts).
 
   // Swagger/OpenAPI documentation
   const swaggerConfig = new DocumentBuilder()
@@ -156,7 +160,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   // OAuth 2.1 server metadata (RFC 8414) — must be at well-known root, not under /api/v1
-  const oauthIssuer = process.env.OAUTH_ISSUER || `http://localhost:${process.env.PORT || '8000'}`;
+  // The issuer is the one the token service signs into every access token (config `oauthIssuer`).
+  const oauthIssuer = resolveOAuthIssuer(() => configService.get<string>('oauthIssuer'));
   app.use('/.well-known/oauth-authorization-server', (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -194,7 +199,8 @@ async function bootstrap() {
     res.json(document);
   });
 
-  SwaggerModule.setup('api', app, document);
+  // Interactive Swagger UI: off in production unless SWAGGER_UI_ENABLED=true.
+  const swaggerUiMounted = mountSwaggerUi(app, document);
 
   const port = parseInt(process.env.PORT || '8000', 10);
 
@@ -219,7 +225,7 @@ async function bootstrap() {
   console.log('');
   console.log(`  ✅ App Backend ready on http://localhost:${port}`);
   console.log(`     API:     http://localhost:${port}/api/v1/`);
-  console.log(`     Swagger: http://localhost:${port}/api`);
+  if (swaggerUiMounted) console.log(`     Swagger: http://localhost:${port}/${SWAGGER_UI_PATH}`);
   console.log('');
 
   // Coordinate graceful shutdown: NestJS drains requests first, then we flush OTel spans.

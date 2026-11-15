@@ -31,14 +31,8 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshJwtAuthGuard } from './guards/refresh-jwt-auth.guard';
 import { Throttle } from '@nestjs/throttler';
-import {
-  AUTH_THROTTLE_TTL_MS,
-  AUTH_THROTTLE_LIMIT_STRICT,
-  AUTH_THROTTLE_LIMIT_OTP_SEND,
-  REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-  REFRESH_TOKEN_COOKIE_NAME,
-  REFRESH_TOKEN_COOKIE_PATH,
-} from '../constants';
+import { AUTH_THROTTLE_TTL_MS, AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_LIMIT_OTP_SEND } from '../constants';
+import { clearRefreshTokenCookie, setRefreshTokenCookie, type RefreshTokenCookieContext } from './refresh-token-cookie';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -53,22 +47,13 @@ export class AuthController {
     this.isProduction = this.configService.get<string>('environment') === 'production';
   }
 
-  /** Set refresh token as httpOnly cookie on the response. */
-  private setRefreshTokenCookie(response: Response, refreshToken: string): void {
-    // When set, the cookie domain should cover all subdomains (e.g. a leading-dot
-    // domain like `.example.com`) so the refresh cookie is sent on cross-subdomain
-    // requests. Without this, browsers may treat the cookie as third-party and
-    // block it — causing unexpected logouts after the access token expires.
-    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
+  private get refreshCookieContext(): RefreshTokenCookieContext {
+    return { secure: this.isProduction, legacyDomain: this.configService.get<string>('COOKIE_DOMAIN') || undefined };
+  }
 
-    response.cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
-      httpOnly: true,
-      secure: this.isProduction,
-      sameSite: 'lax',
-      path: REFRESH_TOKEN_COOKIE_PATH,
-      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
-    });
+  /** Set the refresh token as a host-only httpOnly cookie (see refresh-token-cookie.ts). */
+  private setRefreshTokenCookie(response: Response, refreshToken: string): void {
+    setRefreshTokenCookie(response, refreshToken, this.refreshCookieContext);
   }
 
   @Public()
@@ -184,14 +169,7 @@ export class AuthController {
   @ApiResponse({ status: 200 })
   async logout(@CurrentUser() user: any, @Res({ passthrough: true }) response: Response) {
     if (user.tokenId) await this.authService.logout(user.tokenId, user.dbId, user.tenantDbId ?? null);
-    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
-    response.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
-      httpOnly: true,
-      secure: this.isProduction,
-      sameSite: 'lax',
-      path: REFRESH_TOKEN_COOKIE_PATH,
-      ...(cookieDomain ? { domain: cookieDomain } : {}),
-    });
+    clearRefreshTokenCookie(response, this.refreshCookieContext);
     return { message: 'Logout successful' };
   }
 

@@ -60,21 +60,26 @@ export class FeatureFlagsService {
   }
 
   /**
-   * Check if a feature is enabled
+   * Check if a feature is enabled. A flag that does not exist reads as off.
    */
   async isEnabled(key: string): Promise<boolean> {
-    return this.cache.getOrSet<boolean>(
-      buildKey('app:flags', 'enabled', key),
-      async () => {
-        const flag = await this.prisma.featureFlag.findUnique({
-          where: { key },
-          select: { enabled: true },
-        });
+    const cacheKey = buildKey('app:flags', 'enabled', key);
+    const cached = await this.cache.get<boolean>(cacheKey);
+    if (typeof cached === 'boolean') return cached;
 
-        return flag?.enabled ?? false;
-      },
-      CACHE_TTL_COLD_30M,
-    );
+    const flag = await this.prisma.featureFlag.findUnique({
+      where: { key },
+      select: { enabled: true },
+    });
+
+    // A missing flag is answered "off" but never cached. Seeds and migrations
+    // add flags without touching the cache, so a cached "off" would hide a
+    // newly added feature from everyone for the full TTL, and nothing would
+    // invalidate it: no toggle event fires when a row is inserted.
+    if (!flag) return false;
+
+    await this.cache.set(cacheKey, flag.enabled, CACHE_TTL_COLD_30M);
+    return flag.enabled;
   }
 
   /**

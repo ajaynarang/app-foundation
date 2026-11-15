@@ -3,6 +3,36 @@ import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis-client.provider';
 import { CacheNamespace } from '@appshore/kernel/constants/cache.constants';
 
+// KEYS[1] hit counter · KEYS[2] block marker · ARGV ttlMs, limit, blockMs
+// Returns {totalHits, windowLeftMs, blocked (0|1), blockLeftMs}.
+const THROTTLE_HIT_SCRIPT = `
+local blockLeft = redis.call('PTTL', KEYS[2])
+if blockLeft > 0 then
+  return {tonumber(ARGV[2]) + 1, blockLeft, 1, blockLeft}
+end
+local hits = redis.call('INCR', KEYS[1])
+local windowLeft = redis.call('PTTL', KEYS[1])
+if windowLeft < 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+  windowLeft = tonumber(ARGV[1])
+end
+if hits > tonumber(ARGV[2]) then
+  redis.call('SET', KEYS[2], '1', 'PX', ARGV[3])
+  redis.call('DEL', KEYS[1])
+  return {hits, windowLeft, 1, tonumber(ARGV[3])}
+end
+return {hits, windowLeft, 0, 0}
+`;
+
+export interface ThrottleHit {
+  totalHits: number;
+  /** Milliseconds until the current window ends. */
+  windowMs: number;
+  isBlocked: boolean;
+  /** Milliseconds until the block lifts; 0 when not blocked. */
+  blockLeftMs: number;
+}
+
 /** Sentinel value to distinguish "cached null" from "cache miss". Stored as a JSON string. */
 const CACHE_NULL_SENTINEL = '__APP_NULL__';
 
@@ -194,6 +224,24 @@ export class AppCacheService implements OnModuleInit {
       await this.redis.expire(key, ttlSeconds);
     }
     return value;
+  }
+
+  /**
+   * One rate-limit hit, atomically (a single Lua script, so every replica shares one count). Fixed window of
+   * `ttlMs` per key; the hit that passes `limit` blocks the key for `blockMs` and resets the window, so counting
+   * starts fresh once the block lifts.
+   */
+  async throttleHit(key: string, ttlMs: number, limit: number, blockMs: number): Promise<ThrottleHit> {
+    const [totalHits, windowMs, blocked, blockLeftMs] = (await this.redis.eval(
+      THROTTLE_HIT_SCRIPT,
+      2,
+      key,
+      `${key}:blocked`,
+      String(ttlMs),
+      String(limit),
+      String(blockMs),
+    )) as [number, number, number, number];
+    return { totalHits, windowMs, isBlocked: blocked === 1, blockLeftMs };
   }
 
   // ---------------------------------------------------------------------------

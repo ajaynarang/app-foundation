@@ -7,6 +7,7 @@ import { OAuthClientsService } from './oauth-clients.service';
 import { OAuthTokenGuard } from './oauth-token.guard';
 import { OAuthProviderController } from './oauth-provider.controller';
 import { OAuthClientsController } from './oauth-clients.controller';
+import { resolveOAuthAccessTokenSecret } from './oauth-settings';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { OAuthClientsController } from './oauth-clients.controller';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('OAUTH_JWT_SECRET') || configService.get<string>('secretKey') + '-oauth',
+        secret: resolveOAuthAccessTokenSecret((key) => configService.get<string>(key)),
       }),
       inject: [ConfigService],
     }),

@@ -8,6 +8,7 @@ import {
   testWebhook,
   fetchEventCatalog,
   retryDelivery,
+  rotateWebhookSecret,
   type CreateWebhookRequest,
   type UpdateWebhookRequest,
   type WebhookSubscription,
@@ -96,6 +97,21 @@ export function useTestWebhook() {
     },
     onError: (err: Error) => {
       showError('Failed to send test event', extractErrorMessage(err));
+    },
+  });
+}
+
+/** Rotates the signing secret; the caller shows the new one once. */
+export function useRotateWebhookSecret() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, overlapHours }: { id: string; overlapHours: number }) => rotateWebhookSecret(id, overlapHours),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.root });
+      showSuccess('Signing secret rotated');
+    },
+    onError: (err: Error) => {
+      showError('Failed to rotate the signing secret', extractErrorMessage(err));
     },
   });
 }
