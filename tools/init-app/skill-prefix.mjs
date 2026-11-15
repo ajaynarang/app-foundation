@@ -84,7 +84,11 @@ export function replaceSkillNames(text, names, from, to) {
 // looks like a skill name is an identifier: `app-desk` is the Desk Inngest client's app id. Docs inside those folders
 // are still in scope.
 const SOURCE_ROOTS = ['apps/', 'packages/', 'infra/', 'tests/'];
+// foundation.json's globs keep the template's names in every product (tools/foundation maps a product's renamed
+// path back to them), so a skill name there is the template's on purpose.
+const TEMPLATE_NAMED = new Set(['foundation.json']);
 export function inSkillNameScope(rel) {
+  if (TEMPLATE_NAMED.has(rel)) return false;
   return rel.endsWith('.md') || !SOURCE_ROOTS.some((r) => rel.startsWith(r));
 }
 
