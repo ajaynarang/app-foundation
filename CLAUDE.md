@@ -273,7 +273,7 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   `epic`, `audit`) keeps the docs true; `app-qa` runs and extends the Playwright suite; `app-verify` drives the
   running app; `app-deploy` starts a deploy workflow and watches it; `app-test-notes` writes a hand-testing script;
   `app-standards-audit` audits an area and files each gap with its guard; `app-runway` fills the binding docs and the
-  domain skill in a product's first days. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
+  domain skill in a product's first days; `app-pull-foundation` takes a newer template version into a product. They wrap the `superpowers` plugin, declared in `.claude/settings.json`.
 - **The product's own knowledge** goes in one skill, `app-domain` (`owner: product`; empty in the starter): its
   vocabulary, personas, review checks, test preconditions and "Where this product differs" from a foundation rule,
   each difference with its ADR. Review, QA, the persona agent, test notes and the conventions index read it; no
@@ -323,6 +323,19 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
   third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
   so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
+- **`pnpm foundation:status`** — `foundation.json` at the root says which paths the foundation owns (`owned`), which
+  files inside them a product fills in (`seams`), and, in a product, the template version and commit it was
+  scaffolded from (`base`) with the answers init-app was given (`scaffold`). The command rebuilds that base and lists
+  the owned files that differ; it writes nothing. In this template there is no base, so it says so. A new folder the
+  foundation should keep in step across products is added to `owned` in the same pull request
+  (`tools/foundation/foundation-json.test.mjs` fails on a glob that matches nothing). The decision is the ADR
+  "Products follow the foundation by version".
+- **`pnpm foundation:pull [version]`** — in a product, brings the owned files to a newer template version (a tag
+  `v<version>`, `--ref <ref>`, or the default branch). It rebuilds the base and the target with the product's
+  recorded answers, merges each owned file three ways, leaves conflict markers where both sides changed the same
+  lines, and moves `base` in `foundation.json`. It never writes a seam or anything outside `owned`: what the
+  template changed there is listed, with the upgrade notes to read. It refuses a dirty tree; `--dry-run` writes
+  nothing; `--keep` leaves both rebuilt trees to compare against. Exit 2 means conflicts are left. The `app-pull-foundation` skill runs it end to end.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a skill or agent name, a file an optional-feature manifest names, the
   residue list, or a Desk file outside the Desk folder, and paste its last line. It scaffolds three copies of the repo

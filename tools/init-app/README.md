@@ -71,6 +71,11 @@ gives `nor`). The interactive run offers it and accepts another.
    leaves `.gitignore`. Every `verified: <sha>` line leaves the docs' frontmatter: the template's commits are not in
    your history, and a doc with no `verified:` line counts as never verified until `/<prefix>-dev-docs audit` checks it.
 
+6. `foundation.json` records the base: the template version, the commit (when the checkout still has the template's
+   history) and the answers above. `pnpm foundation:status` rebuilds that base later and lists every foundation
+   file you have changed since (`tools/foundation/`, and the ADR "Products follow the foundation by version"). If you
+   later change the app name, the scope or the skill prefix by hand, change them in `foundation.json` too.
+
 Renaming skills can leave a Markdown table out of alignment; run `pnpm exec prettier --write .claude docs` after
 `pnpm install`.
 
@@ -85,8 +90,9 @@ the plans folder, docs/superpowers by default (design history), git worktrees un
 - Refuses to run twice (detects the root package name is no longer `app-foundation`).
 - `--dry-run` first if you're unsure.
 
-After it finishes, follow the printed next steps. Keep `tools/init-app/` if you plan to pull template updates:
-`apply-feature.mjs` is how a returning file of a feature you dropped is removed again.
+After it finishes, follow the printed next steps. A product takes a newer template with `pnpm foundation:pull`
+(`tools/foundation/`), which scaffolds the newer version with the answers recorded in `foundation.json` before it
+compares anything. Keep `tools/init-app/` only if you want `apply-feature.mjs` at hand to drop a feature later.
 
 ## Optional features
 
@@ -148,9 +154,10 @@ template update is caught on the next commit.
 
 ### Pulling template updates without Desk
 
-A template change inside the Desk folder arrives as a modify-or-delete conflict. Run
-`node tools/init-app/apply-feature.mjs --remove desk` again: it deletes what came back and strips any new marked
-block. Then regenerate the OpenAPI documents and the RBAC matrix (below).
+`pnpm foundation:pull` scaffolds the newer template with your recorded `--desk no` before it merges, so the Desk
+folder and its marked blocks never arrive. After a pull, regenerate the OpenAPI documents and the RBAC matrix
+(below). If you merge template files in by hand instead, run `node tools/init-app/apply-feature.mjs --remove desk`
+again: it deletes what came back and strips any new marked block.
 
 ### Adding Desk later
 
