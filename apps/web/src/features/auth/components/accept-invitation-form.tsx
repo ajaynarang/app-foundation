@@ -26,16 +26,9 @@ interface InvitationDetails {
   firstName: string;
   lastName: string;
   role: string;
-  tenant: {
-    tenantId: string;
-    companyName: string;
-    subdomain: string;
-  };
-  invitedByUser: {
-    firstName: string;
-    lastName: string;
-    email?: string;
-  };
+  tenant: { tenantId: string; companyName: string; subdomain: string | null };
+  /** The inviter by name only: the preview never sends their email. */
+  invitedBy: { firstName: string; lastName: string };
   expiresAt: string;
 }
 
@@ -177,7 +170,13 @@ export function AcceptInvitationForm() {
 
     async function fetchInvitation() {
       try {
-        const response = await fetch(`${apiUrl}/invitations/by-token/${token}`);
+        // The token goes in the body, never the path, so it stays out of request logs.
+        const init = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        };
+        const response = await fetch(`${apiUrl}/invitations/preview`, init);
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -321,7 +320,7 @@ export function AcceptInvitationForm() {
           <p className="text-sm">
             <span className="text-muted-foreground">Invited by:</span>{' '}
             <span className="font-medium">
-              {invitation?.invitedByUser.firstName} {invitation?.invitedByUser.lastName}
+              {invitation?.invitedBy.firstName} {invitation?.invitedBy.lastName}
             </span>
           </p>
           <p className="text-sm">

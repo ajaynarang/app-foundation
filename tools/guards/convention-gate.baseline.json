@@ -99,7 +99,7 @@
     },
     "apps/web/src/features/auth/components/accept-invitation-form.tsx": {
       "process-env": 1,
-      "file-size": 388
+      "file-size": 387
     },
     "apps/web/src/features/auth/components/login-form.tsx": {
       "file-size": 718
@@ -283,7 +283,7 @@
       "process-env": 1
     },
     "packages/test-utils/src/schemas/platform.ts": {
-      "file-size": 1113
+      "file-size": 1063
     }
   }
 }
