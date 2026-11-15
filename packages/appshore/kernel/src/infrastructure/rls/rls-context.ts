@@ -166,6 +166,23 @@ export async function runAsPublic<T>(source: string, fn: () => Promise<T> | T): 
   return runInRlsHolder({ ctx: { kind: 'public', source } }, fn);
 }
 
+/**
+ * `POST /invitations/join`: a signed-in account joins another workspace. The request is pinned to the session's
+ * tenant, but the membership and the invitation it writes belong to the invitation's tenant, so this leaves the
+ * session's tenant for a fresh scope as the invitation's (source `invitation`, like the public invitation routes).
+ * It is the one sanctioned way out of a pinned tenant for a request, and only from a tenant scope (or none, in
+ * single-tenant mode and unit tests): a public or system scope never joins, so it is a conflict. The route reads the
+ * invitation's tenant from the token before it calls this; the service checks the caller before it writes.
+ */
+export async function runAsInvitationTenant<T>(id: number, fn: () => Promise<T> | T): Promise<T> {
+  assertTenantId(id);
+  const existing = currentRls();
+  if (existing && existing.kind !== 'tenant') {
+    return keepFirstContext(`Cannot join invitation tenant ${id} inside ${describeCtx(existing)}`, fn);
+  }
+  return runInRlsHolder({ ctx: { kind: 'tenant', tenantId: id, source: RLS_SOURCE.INVITATION } }, fn);
+}
+
 /** A conflicting `runAs*`: thrown in strict mode, else logged and `fn` awaited in the scope already open. */
 async function keepFirstContext<T>(message: string, fn: () => Promise<T> | T): Promise<T> {
   if (isRlsStrict()) throw new RlsContextError(message);
