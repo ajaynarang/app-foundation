@@ -42,6 +42,24 @@ export const authApi = {
     });
   },
 
+  // ─── Email verification ───────────────────────────────────────────────────
+
+  /**
+   * Verify the signed-in user's email with the token from the emailed link. 204 on success; 400
+   * `VERIFICATION_LINK_INVALID` when the link is invalid, used, expired or another account's.
+   */
+  verifyEmail: async (token: string): Promise<void> => {
+    return apiClient<void>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  /** Email the signed-in user a new verification link. 429 `RATE_LIMITED` within a minute of the last one. */
+  resendVerification: async (): Promise<void> => {
+    return apiClient<void>('/auth/verify-email/resend', { method: 'POST' });
+  },
+
   // ─── Phone Authentication ─────────────────────────────────────────────────
 
   /**
