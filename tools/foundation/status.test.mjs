@@ -1,7 +1,7 @@
 // foundation:status end to end on small fixtures. A fixture "template" is a real git repository whose init-app is a
 // few lines that apply the --name and --skill-prefix it is given, so the rebuild (fetch, checkout, scaffold) and the
 // comparison run for real without the whole repository. Nothing here touches the repository the test lives in.
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -12,7 +12,18 @@ import { baseRefs, initAppArgs, rebuildBase } from './base.mjs';
 import { compareTrees, report, sameContent } from './status.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const tmp = (name) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `foundation-${name}-`)));
+// Every temp folder a test makes (fixtures, and the bases it rebuilds) is removed when the file's tests are done.
+const temps = [];
+const keep = (dir) => (temps.push(dir), dir);
+const tmp = (name) => keep(fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `foundation-${name}-`))));
+const rebuild = (options) => {
+  const built = rebuildBase(options);
+  keep(built.dir);
+  return built;
+};
+after(() => {
+  for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
+});
 const write = (root, rel, text) => {
   fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
   fs.writeFileSync(path.join(root, rel), text);
@@ -71,7 +82,7 @@ function fixture() {
   git(template, 'commit', '-q', '-am', 'later');
 
   const manifest = manifestFor({ version: '0.2.0', commit });
-  const { dir: product } = rebuildBase({ manifest, source: template });
+  const { dir: product } = rebuild({ manifest, source: template });
   return { template, product, manifest, commit };
 }
 
@@ -90,7 +101,7 @@ test('init-app is replayed with the recorded answers', () => {
 test('a product that changed nothing is in step with its base, renames and all', () => {
   const { template, product, manifest } = fixture();
   assert.match(fs.readFileSync(path.join(product, 'packages/appshore/name.ts'), 'utf8'), /'acme'/);
-  const { dir, ref } = rebuildBase({ manifest, source: template });
+  const { dir, ref } = rebuild({ manifest, source: template });
   const result = compareTrees({ baseDir: dir, productDir: product, manifest });
   assert.equal(ref, manifest.base.commit);
   assert.deepEqual([result.changed, result.deleted, result.added], [[], [], []]);
@@ -106,7 +117,7 @@ test('only changes to owned files are listed', () => {
   write(product, 'packages/appshore/app.prisma', 'model Thing {}\n'); // seam: ignored
   write(product, 'README.md', '# Acme\n'); // starter: ignored
   write(product, 'apps/backend/src/domains/orders/x.ts', 'export {};\n'); // the product's own: ignored
-  const { dir, ref } = rebuildBase({ manifest, source: template });
+  const { dir, ref } = rebuild({ manifest, source: template });
   const result = compareTrees({ baseDir: dir, productDir: product, manifest });
   assert.deepEqual(result.changed, ['packages/appshore/guard.ts']);
   assert.deepEqual(result.deleted, ['.claude/skills/ac-plan/SKILL.md']);
@@ -134,7 +145,7 @@ test('a realigned Markdown table or a doubled blank line is not a change; a chan
 test('with no recorded commit the version tag is the base', () => {
   const { template, product } = fixture();
   const manifest = manifestFor({ version: '0.2.0', commit: null });
-  const { dir, ref } = rebuildBase({ manifest, source: template });
+  const { dir, ref } = rebuild({ manifest, source: template });
   assert.equal(ref, 'v0.2.0');
   assert.deepEqual(compareTrees({ baseDir: dir, productDir: product, manifest }).changed, []);
 });
