@@ -25,6 +25,7 @@ import { LoginEventService } from './login-event.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { TENANT_PROVISION_HOOKS, type TenantProvisionHooks } from '../domains/platform-hooks';
 import { toUserProfile } from './user-profile';
+import { hashToken } from './token-hash';
 import { IdentityResolverService, type LoginAccount } from './identity-resolver.service';
 import { ApiErrorCode, type WorkspaceChoice } from '@app/shared-types';
 import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
@@ -273,7 +274,7 @@ export class AuthService {
 
   private async sendPasswordReset(user: { id: number; firstName: string }, email: string, workspace?: string) {
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenHash = hashToken(rawToken);
     await this.prisma.passwordResetToken.create({
       data: {
         userId: user.id,
@@ -300,7 +301,7 @@ export class AuthService {
 
   /** Complete a password reset: consumes the one-time token, revokes all sessions. */
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
-    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const tokenHash = hashToken(dto.token);
     const record = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException('This reset link is invalid or has expired. Please request a new one.');
