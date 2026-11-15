@@ -34,6 +34,9 @@ export const DEV_OAUTH_ISSUER_DEFAULT = 'http://localhost:8000';
 
 const MIN_SECRET_LENGTH = 32;
 
+/** AI variables the route resolver replaced. Still set, each earns a boot warning; never read. */
+export const RETIRED_AI_ENV_VARS = ['AI_PROVIDER', 'AI_GATEWAY_API_KEY', 'ANTHROPIC_API_KEY'] as const;
+
 const configSchema = z.object({
   environment: z.enum(['development', 'production', 'test']).default('development'),
   databaseUrl: z.string(),
@@ -66,7 +69,74 @@ const configSchema = z.object({
     bcryptRounds: z.number().default(10),
   }),
 
-  anthropicApiKey: z.string().optional(),
+  // Platform AI routes (`domains/ai/routing/route-registry.ts`). Each is optional: a route is off until its key is
+  // set, and a keyless machine boots with AI answering "not configured".
+  /** Enables `platform-openrouter`, the platform's default language route. */
+  openRouterApiKey: z.string().optional(),
+  /** Enables `platform-cohere`, the platform's embedding route. */
+  cohereApiKey: z.string().optional(),
+  /** External moderation only (OpenAI `omni-moderation-latest`); never a language or embedding route. */
+  openaiApiKey: z.string().optional(),
+  /**
+   * Encrypts workspace AI credentials (bring-your-own-key) as AES-256-GCM envelopes, and is the switch for the
+   * feature: unset, a workspace cannot connect a key. There is deliberately no default and no fallback key. A value
+   * that is not exactly 64 hex characters stops the boot, because `Buffer.from(hex)` would silently cut a typo short
+   * and encrypt under a different key than the operator meant. Generate one: `openssl rand -hex 32`.
+   */
+  aiCredentialsKey: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'AI_CREDENTIALS_KEY must be 64 hex characters (32 bytes). Generate one: openssl rand -hex 32',
+    )
+    .optional(),
+  /**
+   * An OpenRouter management (provisioning) key. When set together with `aiCredentialsKey`, each workspace gets its own
+   * OpenRouter runtime key, capped at its monthly hard budget at OpenRouter's edge; `platform-openrouter` then calls
+   * with that key instead of `openRouterApiKey`. Unset, sub-keys are off and the master key serves every workspace.
+   */
+  openRouterProvisioningKey: z.string().optional(),
+  /**
+   * Enables `platform-bedrock`, the platform's zero-retention route (language and embeddings), in this AWS region,
+   * with the task's own credentials. Unset in development, so a zero-retention workspace correctly fails closed there.
+   */
+  platformBedrockRegion: z
+    .string()
+    .regex(/^[a-z]{2}(-gov)?-[a-z]+-\d$/, 'PLATFORM_BEDROCK_REGION must be an AWS region such as us-east-1')
+    .optional(),
+  /**
+   * The ARNs of the roles the backend runs as (`PLATFORM_ASSUME_ROLE_ARN`, a comma-separated list): the principals a
+   * workspace's AWS role must trust. Empty leaves the workspace Bedrock role flow off (its begin step answers 503).
+   * Terraform sets it to the task role. A malformed entry stops the boot, because it would deny every connect.
+   */
+  platformAssumeRoleArn: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^arn:aws[a-z-]*:(iam|sts)::\d{12}:\S+$/,
+          'PLATFORM_ASSUME_ROLE_ARN must be a comma-separated list of IAM ARNs',
+        ),
+    )
+    .default([]),
+  /** Optional: a CloudFormation quick-create link the Bedrock connect sheet offers beside the trust policy. */
+  platformBedrockCfnTemplateUrl: z.string().url().optional(),
+  /**
+   * Names (never values) of retired AI variables that are still set: `AI_PROVIDER`, `AI_GATEWAY_API_KEY`, and
+   * `ANTHROPIC_API_KEY`, which is no longer a platform route (a developer connects it in Settings as a workspace
+   * credential). Nothing reads them; the routing module logs one boot warning per name so an operator removes them.
+   */
+  retiredAiEnvVars: z.array(z.string()).default([]),
+  /**
+   * `none` turns prompt caching off on every route, so an uncached baseline can be measured. A local switch only:
+   * unset on every deployed task (`isProductionEnv()`), whatever the variable says.
+   */
+  aiPromptCacheOverride: z.enum(['none']).optional(),
+  /**
+   * A folder where each AI call's usage shape is written (numbers and provider names only), to capture the fixtures
+   * behind `usageFromAiSdk`'s spec from live calls. A local switch only: unset on every deployed task.
+   */
+  aiUsageCaptureDir: z.string().optional(),
 
   // Encrypts third-party integration credentials at rest (AES-256).
   credentialsEncryptionKey: z
@@ -99,6 +169,11 @@ const configSchema = z.object({
       /** Requests per window, per principal (signed-in user, OAuth client + user, otherwise client IP), per route. */
       throttleLimit: z.number().int().positive().default(100),
       throttleTtlMs: z.number().int().positive().default(60_000),
+      /**
+       * Tool calls per minute that all third-party agents (OAuth clients, API keys) of one workspace may make
+       * together, on top of each agent's own budget. Users and Desk are not counted against it.
+       */
+      agentTenantCeilingPerMinute: z.number().int().positive().default(600),
       /**
        * Express `trust proxy`: a hop count, `false`, or a subnet list. Unset, production trusts one hop (the load
        * balancer) and other environments trust none. See bootstrap/trust-proxy.ts.
@@ -331,7 +406,23 @@ export default (): Configuration => {
         (process.env.TENANCY_MODE as 'multi' | 'single' | 'personal') ||
         (process.env.MULTI_TENANT === 'false' ? 'single' : 'multi'),
     },
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    retiredAiEnvVars: RETIRED_AI_ENV_VARS.filter((name) => env(name) !== undefined),
+    openRouterApiKey: env('OPENROUTER_API_KEY'),
+    cohereApiKey: env('COHERE_API_KEY'),
+    openaiApiKey: env('OPENAI_API_KEY'),
+    aiCredentialsKey: env('AI_CREDENTIALS_KEY'),
+    openRouterProvisioningKey: env('OPENROUTER_PROVISIONING_KEY'),
+    platformBedrockRegion: env('PLATFORM_BEDROCK_REGION'),
+    platformAssumeRoleArn: (env('PLATFORM_ASSUME_ROLE_ARN') ?? '')
+      .split(',')
+      .map((arn) => arn.trim())
+      .filter(Boolean),
+    platformBedrockCfnTemplateUrl: env('PLATFORM_BEDROCK_CFN_TEMPLATE_URL'),
+    // Measurement switches: honoured on a local run only. Every deployed task (NODE_ENV or ENV_TYPE production,
+    // which covers staging and sandbox on the shipped image) resolves them to unset, so no code that reads them
+    // needs an environment check of its own.
+    aiPromptCacheOverride: isProductionEnv(process.env) ? undefined : env('AI_PROMPT_CACHE_OVERRIDE'),
+    aiUsageCaptureDir: isProductionEnv(process.env) ? undefined : env('AI_USAGE_CAPTURE_DIR'),
     oauthJwtSecret: env('OAUTH_JWT_SECRET'),
     oauthConsentSecret: env('OAUTH_CONSENT_SECRET'),
     credentialsEncryptionKey: env('CREDENTIALS_ENCRYPTION_KEY'),
@@ -346,6 +437,7 @@ export default (): Configuration => {
     edge: {
       throttleLimit: positiveIntEnv('THROTTLE_LIMIT'),
       throttleTtlMs: positiveIntEnv('THROTTLE_TTL_MS'),
+      agentTenantCeilingPerMinute: positiveIntEnv('AGENT_TENANT_CEILING_PER_MINUTE'),
       trustProxy: env('TRUST_PROXY'),
     },
     webhooks: {

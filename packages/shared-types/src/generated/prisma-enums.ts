@@ -14,15 +14,30 @@
  */
 import { z } from 'zod';
 
+// AiCredentialStatus
+export const AiCredentialStatusSchema = z.enum(['ACTIVE', 'FAILING', 'DISABLED'] as const);
+export type AiCredentialStatus = z.infer<typeof AiCredentialStatusSchema>;
+export const AiCredentialStatus = AiCredentialStatusSchema.enum;
+
+// AiCredentialType
+export const AiCredentialTypeSchema = z.enum(['ANTHROPIC_KEY', 'BEDROCK_ROLE', 'OPENROUTER_KEY', 'VERCEL_GATEWAY_KEY'] as const);
+export type AiCredentialType = z.infer<typeof AiCredentialTypeSchema>;
+export const AiCredentialType = AiCredentialTypeSchema.enum;
+
 // AiInvocationStatus
 export const AiInvocationStatusSchema = z.enum(['OK', 'ERROR', 'TIMEOUT', 'RATE_LIMITED', 'BUDGET_BLOCKED'] as const);
 export type AiInvocationStatus = z.infer<typeof AiInvocationStatusSchema>;
 export const AiInvocationStatus = AiInvocationStatusSchema.enum;
 
 // AiSurface
-export const AiSurfaceSchema = z.enum(['CHAT', 'DESK_STEP', 'MEMORY_EXTRACT', 'EMBEDDING', 'KB_INGEST'] as const);
+export const AiSurfaceSchema = z.enum(['CHAT', 'DESK_STEP', 'MEMORY_EXTRACT', 'EMBEDDING', 'KB_INGEST', 'VOICE'] as const);
 export type AiSurface = z.infer<typeof AiSurfaceSchema>;
 export const AiSurface = AiSurfaceSchema.enum;
+
+// AiUsageUnit
+export const AiUsageUnitSchema = z.enum(['TOKEN', 'AUDIO_SECOND', 'CHARACTER', 'SESSION_SECOND'] as const);
+export type AiUsageUnit = z.infer<typeof AiUsageUnitSchema>;
+export const AiUsageUnit = AiUsageUnitSchema.enum;
 
 // AnnouncementPriority
 export const AnnouncementPrioritySchema = z.enum(['INFO', 'WARNING', 'CRITICAL'] as const);

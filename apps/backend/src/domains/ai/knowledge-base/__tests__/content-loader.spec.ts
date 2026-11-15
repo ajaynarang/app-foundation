@@ -63,7 +63,26 @@ describe('loadKnowledgeEntries', () => {
       audience: 'all',
       category: 'general',
       keywords: ['platform', 'overview'],
+      sourcePath: 'knowledge-base/faq/what-is-app.md',
     });
+  });
+
+  it('reads YAML keywords as strings (a bare number or boolean is not a text[] value)', () => {
+    mockedFs.readdirSync.mockImplementation((dirPath: any) =>
+      String(dirPath).endsWith('knowledge-base') ? ([mockDirent('codes.md', false)] as any) : [],
+    );
+    mockedFs.readFileSync.mockReturnValue(SAMPLE_MD.replace('  - overview', '  - 1099\n  - true'));
+
+    expect(loadKnowledgeEntries()[0].keywords).toEqual(['platform', '1099', 'true']);
+  });
+
+  it('refuses an audience no caller can read (the old model-chosen "user"), naming the ones that exist', () => {
+    mockedFs.readdirSync.mockImplementation((dirPath: any) =>
+      String(dirPath).endsWith('knowledge-base') ? ([mockDirent('old.md', false)] as any) : [],
+    );
+    mockedFs.readFileSync.mockReturnValue(SAMPLE_MD.replace('audience: all', 'audience: user'));
+
+    expect(() => loadKnowledgeEntries()).toThrow(/Invalid audience "user".*Valid: all/);
   });
 
   it('should load files from multiple subdirectories', () => {

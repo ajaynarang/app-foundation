@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CitationSchema } from '../ai/assistant-stream.schema';
 
 // ── Conversation Types (Assistant AI) ──
 
@@ -29,6 +30,8 @@ export const MessageResponseSchema = z.object({
   card: z.any().optional(),
   action: z.any().optional(),
   speakText: z.string().optional(),
+  /** The sources an assistant answer named (knowledge-base documents in the starter). */
+  citations: z.array(CitationSchema).optional(),
   createdAt: z.string(),
 });
 export type MessageResponse = z.infer<typeof MessageResponseSchema>;

@@ -54,7 +54,8 @@ export function AiBudgetSheet({ tenant, open, onOpenChange }: AiBudgetSheetProps
         dailyHardUsd: budget.dailyHardUsd,
         monthlySoftUsd: budget.monthlySoftUsd,
         monthlyHardUsd: budget.monthlyHardUsd,
-        notes: budget.notes ?? '',
+        // A `plan:` note is the plan seeder's stamp, not an admin's note. Leave it out; the server drops it on save too.
+        notes: budget.notes?.startsWith('plan:') ? '' : (budget.notes ?? ''),
       });
     }
   }, [budget]);

@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import {
+  AgentActionSchema,
   AgentActivityPageSchema,
+  AgentPolicySchema,
+  AiCredentialConnectResultSchema,
+  AiSettingsSchema,
   AgentScopeSchema,
+  BedrockBeginResponseSchema,
   ConversationGreetingSchema,
   CreateConversationResponseSchema,
   GetMessagesResponseSchema,
@@ -71,25 +76,10 @@ export const AssistantAgentStatusesResponse = defineResponseSchema(
 
 // ─── MCP human-in-the-loop step-up ─────────────────────────────────────────────
 
-export const HitlChallengeContextResponse = defineResponseSchema(
-  'HitlChallengeContext',
-  z.object({
-    token: z.string(),
-    tool: z.string(),
-    tier: z.string(),
-    scopeRequired: z.string(),
-    /** Who is calling — the OAuth client or API key label. */
-    callerLabel: z.string(),
-    callerKind: z.string(),
-    expiresAt: z.string(),
-    requiresStepUp: z.boolean(),
-    stepUpCompleted: z.boolean(),
-    consumed: z.boolean(),
-    expired: z.boolean(),
-    /** Whether the viewer has a PIN set (the PIN itself is never returned). */
-    hasPinSet: z.boolean(),
-  }),
-);
+/** `GET /agent-actions/:token` and each decision: an external agent's write waiting for a person. */
+export const AgentActionResponse = defineResponseSchema('AgentAction', AgentActionSchema);
+/** `GET` / `PUT /agent-policy`: whether external agents wait for a person on a standard write. */
+export const AgentPolicyResponse = defineResponseSchema('AgentPolicy', AgentPolicySchema);
 export const HitlStepUpResultResponse = defineResponseSchema(
   'HitlStepUpResult',
   z.object({ status: z.literal('step_up_verified') }),
@@ -107,3 +97,15 @@ export const VoiceTokenResponse = defineResponseSchema(
     url: z.string(),
   }),
 );
+
+// ─── AI settings (retention policy and workspace AI keys) ─────────────────────
+
+/** `GET /ai-settings` and the policy flip: policy, `byokEnabled`, who pays per need, the credential cards. */
+export const AiSettingsResponse = defineResponseSchema('AiSettings', AiSettingsSchema);
+/** Connect and "Test again": the card and the live test's redacted result. */
+export const AiCredentialConnectResultResponse = defineResponseSchema(
+  'AiCredentialConnectResult',
+  AiCredentialConnectResultSchema,
+);
+/** The Bedrock role flow's first step: the external id, the trust and permissions policies, the IaC snippets. */
+export const BedrockBeginResponse = defineResponseSchema('BedrockBegin', BedrockBeginResponseSchema);

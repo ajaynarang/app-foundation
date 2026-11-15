@@ -1,36 +1,111 @@
 jest.mock('ai', () => ({
+  ...jest.requireActual('ai'),
   generateText: jest.fn(),
   Output: {
     object: jest.fn().mockReturnValue('mock-output'),
   },
-}));
-jest.mock('../ai-provider', () => ({
-  ai: jest.fn().mockReturnValue('mock-model'),
-  MODEL_ID_BY_ALIAS: {
-    fast: 'claude-haiku-4-5',
-    standard: 'claude-sonnet-4-6',
-    powerful: 'claude-opus-4-6',
-  },
-  PROVIDER_BY_ALIAS: { fast: 'anthropic', standard: 'anthropic', powerful: 'anthropic' },
 }));
 
 import { StructuredOutputService } from '../structured-output.service';
 import { generateText } from 'ai';
 import { z } from 'zod';
 import type { AiCallContext } from '@app/shared-types';
+import { makeResolver } from '../../../routing/__tests__/resolver-fixtures';
+import { AiNotConfigured } from '../../../routing/ai-not-configured.error';
+import { ZeroRetentionUnavailable } from '../../redaction/zero-retention-unavailable.error';
+import { AiProviderCreditRefused } from '../../telemetry/ai-provider-credit-refused.error';
+
+const OPENROUTER = { openRouterApiKey: 'sk-or-test' };
+const CTX: AiCallContext = { tenantId: 7, surface: 'KB_INGEST' };
 
 describe('StructuredOutputService', () => {
   let service: StructuredOutputService;
-  let aiTelemetry: { record: jest.Mock; assertBudget: jest.Mock; assertZeroRetention: jest.Mock };
+  let aiTelemetry: { record: jest.Mock; assertBudget: jest.Mock };
 
   beforeEach(() => {
     aiTelemetry = {
       record: jest.fn().mockResolvedValue({ id: 'inv-1' }),
       assertBudget: jest.fn().mockResolvedValue({ state: 'ok' }),
-      assertZeroRetention: jest.fn().mockResolvedValue(undefined),
     };
-    service = new StructuredOutputService(aiTelemetry as any);
+    // A real resolver on the platform OpenRouter route; the model call itself is mocked (`generateText`).
+    service = new StructuredOutputService(aiTelemetry as any, makeResolver({ config: OPENROUTER }).resolver);
     (generateText as jest.Mock).mockReset();
+  });
+
+  describe('extract — routing', () => {
+    it("calls the model the tenant's route resolves, tuned for the alias", async () => {
+      (generateText as jest.Mock).mockResolvedValue({ output: { name: 'x' } });
+
+      await service.extract({
+        messages: [],
+        schema: z.object({ name: z.string() }),
+        modelAlias: 'standard',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: CTX,
+      });
+
+      expect((generateText as jest.Mock).mock.calls[0][0].model).toMatchObject({
+        modelId: 'anthropic/claude-sonnet-5.5',
+      });
+    });
+
+    it('refuses a zero-retention tenant before the prompt leaves: no model call, no ledger row', async () => {
+      const zdr = makeResolver({ aiZeroRetention: true, config: OPENROUTER });
+      service = new StructuredOutputService(aiTelemetry as any, zdr.resolver);
+
+      await expect(
+        service.extract({
+          messages: [{ role: 'user', content: 'secret' }],
+          schema: z.object({ name: z.string() }),
+          modelAlias: 'fast',
+          systemPrompt: 'p',
+          timeoutMs: 30000,
+          maxOutputTokens: 1024,
+          enforceBudget: true,
+          aiContext: CTX,
+        }),
+      ).rejects.toThrow(ZeroRetentionUnavailable);
+
+      expect(generateText).not.toHaveBeenCalled();
+      expect(aiTelemetry.record).not.toHaveBeenCalled();
+    });
+
+    it('answers AiNotConfigured when no route serves language, without calling a model', async () => {
+      service = new StructuredOutputService(aiTelemetry as any, makeResolver().resolver);
+
+      await expect(
+        service.extract({
+          messages: [],
+          schema: z.object({ name: z.string() }),
+          modelAlias: 'fast',
+          systemPrompt: 'p',
+          timeoutMs: 30000,
+          maxOutputTokens: 1024,
+          aiContext: CTX,
+        }),
+      ).rejects.toThrow(AiNotConfigured);
+      expect(generateText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('extract — output ceiling', () => {
+    it("hands the caller's ceiling to every call (the provider default can be the model's whole output window)", async () => {
+      (generateText as jest.Mock).mockResolvedValue({ output: { name: 'test' } });
+
+      await service.extract({
+        messages: [{ role: 'user', content: 'test' }],
+        schema: z.object({ name: z.string() }),
+        modelAlias: 'fast',
+        systemPrompt: 'Extract data',
+        timeoutMs: 30000,
+        maxOutputTokens: 1500,
+        aiContext: CTX,
+      });
+
+      expect((generateText as jest.Mock).mock.calls[0][0].maxOutputTokens).toBe(1500);
+    });
   });
 
   describe('extract — happy path', () => {
@@ -43,27 +118,12 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'Extract data',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: CTX,
       });
 
       expect(result.object).toEqual({ name: 'test' });
       expect(generateText).toHaveBeenCalled();
-    });
-
-    it('uses provided model when available', async () => {
-      (generateText as jest.Mock).mockResolvedValue({ output: { name: 'test' } });
-      const customModel = { modelId: 'custom-model' } as any;
-
-      await service.extract({
-        messages: [],
-        schema: z.object({ name: z.string() }),
-        modelAlias: 'fast',
-        systemPrompt: 'Extract',
-        timeoutMs: 30000,
-        model: customModel,
-      });
-
-      const call = (generateText as jest.Mock).mock.calls[0][0];
-      expect(call.model).toBe(customModel);
     });
   });
 
@@ -75,24 +135,6 @@ describe('StructuredOutputService', () => {
       linkRefType: 'document',
       linkRefId: 'doc-abc',
     };
-
-    it('skips telemetry when no aiContext is supplied', async () => {
-      (generateText as jest.Mock).mockResolvedValue({
-        output: { name: 'x' },
-        usage: { promptTokens: 100, completionTokens: 50 },
-      });
-
-      const result = await service.extract({
-        messages: [],
-        schema: z.object({ name: z.string() }),
-        modelAlias: 'standard',
-        systemPrompt: 'p',
-        timeoutMs: 30000,
-      });
-
-      expect(aiTelemetry.record).not.toHaveBeenCalled();
-      expect(result.aiInvocationId).toBeUndefined();
-    });
 
     it('records a successful invocation with token counts when aiContext is supplied', async () => {
       (generateText as jest.Mock).mockResolvedValue({
@@ -106,14 +148,17 @@ describe('StructuredOutputService', () => {
         modelAlias: 'standard',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: baseContext,
       });
 
       expect(aiTelemetry.record).toHaveBeenCalledTimes(1);
       const [usage, ctx] = aiTelemetry.record.mock.calls[0];
       expect(usage).toMatchObject({
-        provider: 'anthropic',
-        model: 'claude-sonnet-4-6',
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-5.5',
+        routeId: 'platform-openrouter',
+        credentialType: 'PLATFORM_OPENROUTER',
         promptTokens: 200,
         completionTokens: 100,
         totalTokens: 300,
@@ -125,16 +170,16 @@ describe('StructuredOutputService', () => {
       expect(result.aiInvocationId).toBe('inv-1');
     });
 
-    it('maps every model alias to the snapshot model string', async () => {
+    it("maps every model alias to its id on the route's column (the pricing row's model)", async () => {
       (generateText as jest.Mock).mockResolvedValue({
         output: { ok: true },
         usage: { promptTokens: 1, completionTokens: 1 },
       });
 
       for (const [alias, expected] of [
-        ['fast', 'claude-haiku-4-5'],
-        ['standard', 'claude-sonnet-4-6'],
-        ['powerful', 'claude-opus-4-6'],
+        ['fast', 'anthropic/claude-haiku-5.5'],
+        ['standard', 'anthropic/claude-sonnet-5.5'],
+        ['powerful', 'anthropic/claude-opus-5.5'],
       ] as const) {
         aiTelemetry.record.mockClear();
         await service.extract({
@@ -143,10 +188,51 @@ describe('StructuredOutputService', () => {
           modelAlias: alias,
           systemPrompt: 'p',
           timeoutMs: 30000,
+          maxOutputTokens: 1024,
           aiContext: baseContext,
         });
         expect(aiTelemetry.record.mock.calls[0][0].model).toBe(expected);
       }
+    });
+
+    it('records the model that actually answered when a refusal fell back one alias up', async () => {
+      (generateText as jest.Mock).mockResolvedValue({
+        output: { name: 'x' },
+        usage: { inputTokens: 10, outputTokens: 5 },
+        response: { modelId: 'anthropic/claude-sonnet-5.5' },
+      });
+
+      await service.extract({
+        messages: [],
+        schema: z.object({ name: z.string() }),
+        modelAlias: 'fast',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: baseContext,
+      });
+
+      expect(aiTelemetry.record.mock.calls[0][0].model).toBe('anthropic/claude-sonnet-5.5');
+    });
+
+    it('keeps the alias model id when the provider reports an id with no pricing row (e.g. dated)', async () => {
+      (generateText as jest.Mock).mockResolvedValue({
+        output: { name: 'x' },
+        usage: { inputTokens: 10, outputTokens: 5 },
+        response: { modelId: 'anthropic/claude-haiku-5.5-20261001' },
+      });
+
+      await service.extract({
+        messages: [],
+        schema: z.object({ name: z.string() }),
+        modelAlias: 'fast',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: baseContext,
+      });
+
+      expect(aiTelemetry.record.mock.calls[0][0].model).toBe('anthropic/claude-haiku-5.5');
     });
 
     it('records a failed invocation with status=ERROR when generateText throws', async () => {
@@ -159,6 +245,7 @@ describe('StructuredOutputService', () => {
           modelAlias: 'fast',
           systemPrompt: 'p',
           timeoutMs: 30000,
+          maxOutputTokens: 1024,
           aiContext: baseContext,
         }),
       ).rejects.toThrow('upstream 500');
@@ -184,6 +271,7 @@ describe('StructuredOutputService', () => {
           modelAlias: 'fast',
           systemPrompt: 'p',
           timeoutMs: 30000,
+          maxOutputTokens: 1024,
           aiContext: baseContext,
         }),
       ).rejects.toThrow('aborted');
@@ -203,6 +291,7 @@ describe('StructuredOutputService', () => {
           modelAlias: 'fast',
           systemPrompt: 'p',
           timeoutMs: 30000,
+          maxOutputTokens: 1024,
           aiContext: baseContext,
         });
         throw new Error('unreachable');
@@ -224,6 +313,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: baseContext,
       });
 
@@ -247,6 +337,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: ctx,
       });
 
@@ -267,6 +358,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: ctx,
       });
 
@@ -286,6 +378,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: ctx,
       });
 
@@ -303,6 +396,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: ctx,
       });
 
@@ -326,6 +420,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         aiContext: ctx,
       });
       expect(aiTelemetry.assertBudget).not.toHaveBeenCalled();
@@ -342,6 +437,7 @@ describe('StructuredOutputService', () => {
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
+        maxOutputTokens: 1024,
         enforceBudget: true,
         aiContext: ctx,
       });
@@ -359,6 +455,7 @@ describe('StructuredOutputService', () => {
           modelAlias: 'fast',
           systemPrompt: 'p',
           timeoutMs: 30000,
+          maxOutputTokens: 1024,
           enforceBudget: true,
           aiContext: ctx,
         }),
@@ -369,17 +466,87 @@ describe('StructuredOutputService', () => {
       expect(aiTelemetry.record).not.toHaveBeenCalled();
     });
 
-    it('skips the budget check entirely when no aiContext (telemetry-off path)', async () => {
-      (generateText as jest.Mock).mockResolvedValue({ output: { x: 1 } });
-      await service.extract({
+    it('never checks the platform cap on a route the workspace pays for, even when it is over the cap', async () => {
+      // The workspace's own credential: same route shape, the tenant pays.
+      const platform = makeResolver({ config: OPENROUTER }).resolver;
+      const ownKey = {
+        resolve: async (tenantId: number, need: 'language' | 'embedding') => ({
+          ...(await platform.resolve(tenantId, need)),
+          routeId: 'aicred_x1',
+          credentialType: 'ANTHROPIC_KEY',
+          payer: 'TENANT' as const,
+        }),
+      };
+      service = new StructuredOutputService(aiTelemetry as any, ownKey as any);
+      aiTelemetry.assertBudget.mockRejectedValue(new Error('AiBudgetExceededError'));
+      (generateText as jest.Mock).mockResolvedValue({ output: { x: 1 }, usage: { inputTokens: 1, outputTokens: 1 } });
+
+      const result = await service.extract({
         messages: [],
         schema: z.object({ x: z.number() }),
         modelAlias: 'fast',
         systemPrompt: 'p',
         timeoutMs: 30000,
-        enforceBudget: true, // true but no context → nothing to scope the check to
+        maxOutputTokens: 1024,
+        enforceBudget: true,
+        aiContext: ctx,
       });
+
+      expect(result.object).toEqual({ x: 1 });
       expect(aiTelemetry.assertBudget).not.toHaveBeenCalled();
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        routeId: 'aicred_x1',
+        credentialType: 'ANTHROPIC_KEY',
+      });
+    });
+  });
+
+  describe('extract — cache usage and provider refusals', () => {
+    const ctx: AiCallContext = { tenantId: 7, surface: 'KB_INGEST' };
+    const call = () =>
+      service.extract({
+        messages: [],
+        schema: z.object({ x: z.number() }),
+        modelAlias: 'standard',
+        systemPrompt: 'p',
+        timeoutMs: 30000,
+        maxOutputTokens: 1024,
+        aiContext: ctx,
+      });
+
+    it('records cache reads and cache writes read through usageFromAiSdk', async () => {
+      (generateText as jest.Mock).mockResolvedValue({
+        output: { x: 1 },
+        usage: {
+          inputTokens: 5400,
+          outputTokens: 410,
+          inputTokenDetails: { cacheReadTokens: 3000, cacheWriteTokens: 1200 },
+        },
+      });
+      await call();
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        promptTokens: 5400,
+        completionTokens: 410,
+        cachedTokens: 3000,
+        cacheWriteTokens: 1200,
+      });
+    });
+
+    it('turns a provider credit refusal into the budget error every surface handles, and still records the row', async () => {
+      (generateText as jest.Mock).mockRejectedValue(
+        Object.assign(new Error('This request requires more credits, or fewer max_tokens'), { statusCode: 402 }),
+      );
+      await expect(call()).rejects.toBeInstanceOf(AiProviderCreditRefused);
+      expect(aiTelemetry.record.mock.calls[0][0]).toMatchObject({
+        status: 'ERROR',
+        errorCode: 'AiProviderCreditRefused',
+      });
+    });
+
+    it('rethrows any other provider error unchanged', async () => {
+      const boom = new Error('upstream 500');
+      (generateText as jest.Mock).mockRejectedValue(boom);
+      await expect(call()).rejects.toBe(boom);
     });
   });
 });

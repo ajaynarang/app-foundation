@@ -59,7 +59,7 @@ pnpm install
 pnpm init-app          # prompts: name, display name, tenancy mode, keep mobile app?
 pnpm docker:up         # Postgres 16 (pgvector) + Redis 7
 
-cd apps/backend && cp .env.example .env && cd ../..
+cd apps/backend && cp .env.example .env && cd ../..   # AI: chat needs OPENROUTER_API_KEY; KB vector search, COHERE_API_KEY
 cp apps/web/.env.example apps/web/.env.local
 
 pnpm --filter @app/shared-types build

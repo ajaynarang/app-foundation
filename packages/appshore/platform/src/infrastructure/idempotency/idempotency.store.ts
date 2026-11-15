@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, HttpException, Injectable, Logger } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { ApiErrorCode } from '@app/shared-types';
 import { fieldError } from '@appshore/kernel/shared/errors/api-errors';
@@ -77,6 +77,51 @@ export function requestFingerprint(target: string, request: unknown): Idempotenc
 export function assertIdempotencyKey(key: string, fieldName: string = IDEMPOTENCY_KEY_HEADER): void {
   if (!IDEMPOTENCY_KEY_PATTERN.test(key)) {
     throw fieldError(fieldName, `${fieldName} must be 1–255 visible ASCII characters (a UUID is ideal)`);
+  }
+}
+
+/**
+ * How long a store call may take before the caller goes on without it. The app's Redis client queues a command while
+ * Redis is unreachable and never rejects it, so without this bound an outage would stall every keyed create.
+ */
+export const IDEMPOTENCY_STORE_TIMEOUT_MS = 2000;
+
+/** `work`'s value, or `undefined` once {@link IDEMPOTENCY_STORE_TIMEOUT_MS} passes first. Its rejection still rejects. */
+export async function withinStoreTimeout<T>(work: Promise<T>): Promise<T | undefined> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<undefined>(
+    (resolve) => (timer = setTimeout(() => resolve(undefined), IDEMPOTENCY_STORE_TIMEOUT_MS)),
+  );
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The one fail-open claim, shared by the HTTP interceptor and the tool executor: the claim, or null (run without the
+ * key) when the store fails or does not answer in time. A 4xx from the store (409 reuse or in use, 400 bad key)
+ * stands and is thrown.
+ */
+export async function claimOrSkip(
+  store: Pick<IdempotencyStore, 'claim'>,
+  scope: string,
+  key: string,
+  fingerprint: IdempotencyFingerprint,
+  logger: Pick<Logger, 'warn'>,
+): Promise<IdempotencyClaim | null> {
+  try {
+    const claim = await withinStoreTimeout(store.claim(scope, key, fingerprint));
+    if (!claim)
+      logger.warn(`Idempotency store did not answer in time for ${fingerprint.target}: running without the key`);
+    return claim ?? null;
+  } catch (error) {
+    if (error instanceof HttpException) throw error;
+    logger.warn(
+      `Idempotency store unavailable for ${fingerprint.target}, running without the key: ${(error as Error).message}`,
+    );
+    return null;
   }
 }
 

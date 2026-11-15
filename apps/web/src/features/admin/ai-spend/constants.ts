@@ -1,4 +1,4 @@
-import { AiInvocationStatus, AiSurface } from '@app/shared-types';
+import { AiInvocationStatus, AiSurface, type AiPayer } from '@app/shared-types';
 import type { StatusVariant } from '@app/ui';
 
 import type { AiSurface as AiSurfaceType } from './types';
@@ -13,6 +13,7 @@ export const SURFACE_LABELS: Record<AiSurfaceType, string> = {
   [AiSurface.MEMORY_EXTRACT]: 'Memory Extract',
   [AiSurface.EMBEDDING]: 'Embedding',
   [AiSurface.KB_INGEST]: 'KB Ingest',
+  [AiSurface.VOICE]: 'Voice (speech)',
 };
 
 /** One tone per invocation outcome (ui-grammar-guard.test.ts): a call went through, or it was stopped. */
@@ -22,6 +23,15 @@ export const INVOCATION_STATUS_VARIANTS: Record<AiInvocationStatus, StatusVarian
   [AiInvocationStatus.TIMEOUT]: { label: 'Timed out', tone: 'danger' },
   [AiInvocationStatus.RATE_LIMITED]: { label: 'Rate limited', tone: 'danger' },
   [AiInvocationStatus.BUDGET_BLOCKED]: { label: 'Budget blocked', tone: 'danger' },
+};
+
+/**
+ * Who paid for a call: the platform's own key, or the workspace's own credential. A category, not an outcome. Only
+ * platform-paid cost counts toward a workspace's AI budget.
+ */
+export const PAYER_VARIANTS: Record<AiPayer, StatusVariant> = {
+  PLATFORM: { label: 'Platform paid', tone: 'neutral' },
+  TENANT: { label: 'Own key', tone: 'info' },
 };
 
 /** Day-window options for the spend view. */

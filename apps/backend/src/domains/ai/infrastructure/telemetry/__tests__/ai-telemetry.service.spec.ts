@@ -48,6 +48,8 @@ const SONNET_PRICING = {
   inputPerMtokUsd: new Prisma.Decimal('3.000000'),
   outputPerMtokUsd: new Prisma.Decimal('15.000000'),
   cachedInputPerMtokUsd: new Prisma.Decimal('0.300000'),
+  cacheWriteInputPerMtokUsd: new Prisma.Decimal('3.750000'),
+  unitPriceUsd: null,
   effectiveFromDate: new Date('2026-05-27T00:00:00.000Z'),
   effectiveUntilDate: null,
   notes: null,
@@ -180,6 +182,33 @@ describe('AiTelemetryService', () => {
       expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.0024');
     });
 
+    it('prices cache writes at the write rate, apart from plain input and cache reads', async () => {
+      // 10,000 prompt = 6,000 read + 3,000 written + 1,000 plain:
+      //   1,000 plain @ $3 = $0.003
+      //   6,000 read @ $0.30 = $0.0018
+      //   3,000 written @ $3.75 = $0.01125
+      //   500 completion @ $15 = $0.0075
+      //   Total: $0.02355
+      await service.record(
+        makeUsage({ promptTokens: 10_000, completionTokens: 500, cachedTokens: 6_000, cacheWriteTokens: 3_000 }),
+        makeContext(),
+      );
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.02355');
+      expect(call.data.cacheWriteTokens).toBe(3_000);
+    });
+
+    it('prices a cache write at the input rate when the pricing row has no write rate', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue({ ...SONNET_PRICING, cacheWriteInputPerMtokUsd: null });
+      // 2,000 prompt = 1,000 written + 1,000 plain, all at $3 = $0.006; no output.
+      await service.record(
+        makeUsage({ promptTokens: 2_000, completionTokens: 0, cacheWriteTokens: 1_000 }),
+        makeContext(),
+      );
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.006');
+    });
+
     it('clamps negative billable input to zero (defensive)', async () => {
       // Cached tokens exceed prompt tokens — shouldn't happen but the math
       // should not produce a negative cost row.
@@ -203,6 +232,78 @@ describe('AiTelemetryService', () => {
       const call = prisma.aiInvocation.create.mock.calls[0][0];
       expect(call.data.costUsd).toBeNull();
       expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/no model_pricing row/i));
+    });
+  });
+
+  describe('record() — unit-metered (voice) cost', () => {
+    const DEEPGRAM_PRICING = {
+      ...SONNET_PRICING,
+      provider: 'deepgram',
+      model: 'nova-3',
+      inputPerMtokUsd: new Prisma.Decimal('0'),
+      outputPerMtokUsd: new Prisma.Decimal('0'),
+      cachedInputPerMtokUsd: null,
+      cacheWriteInputPerMtokUsd: null,
+      unitPriceUsd: new Prisma.Decimal('0.00012833'),
+    };
+    const voiceUsage = makeUsage({
+      provider: 'deepgram',
+      model: 'nova-3',
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      usageUnit: 'AUDIO_SECOND',
+      usageQuantity: 60,
+    });
+
+    it('prices quantity x unit price and persists the unit and the quantity', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue(DEEPGRAM_PRICING);
+
+      await service.record(voiceUsage, makeContext({ surface: 'VOICE' }));
+
+      // 60 s * $0.00012833 = $0.0076998
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect((call.data.costUsd as Prisma.Decimal).toString()).toBe('0.0076998');
+      expect(call.data).toMatchObject({ usageUnit: 'AUDIO_SECOND', usageQuantity: 60, totalTokens: 0 });
+    });
+
+    it('records null cost when the pricing row has no unit price', async () => {
+      prisma.modelPricing.findFirst.mockResolvedValue({ ...DEEPGRAM_PRICING, unitPriceUsd: null });
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(voiceUsage, makeContext({ surface: 'VOICE' }));
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.costUsd).toBeNull();
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/no unit_price_usd/));
+    });
+
+    it('stores TOKEN and a null quantity on token-metered rows', async () => {
+      await service.record(makeUsage(), makeContext());
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.usageQuantity).toBeNull();
+      expect(call.data.usageUnit).toBe('TOKEN');
+    });
+  });
+
+  describe('record() — long-prompt price tier', () => {
+    it('warns when a Haiku 5.5 prompt is above 100K tokens, because its one pricing row understates the cost', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(makeUsage({ model: 'claude-haiku-5-5', promptTokens: 100_001 }), makeContext());
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/understated/));
+      expect(prisma.aiInvocation.create).toHaveBeenCalled();
+    });
+
+    it('stays quiet at or below the threshold, and for a model with one rate', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.record(makeUsage({ model: 'claude-haiku-5-5', promptTokens: 100_000 }), makeContext());
+      await service.record(makeUsage({ model: 'claude-sonnet-5-5', promptTokens: 500_000 }), makeContext());
+
+      expect(logSpy).not.toHaveBeenCalledWith(expect.stringMatching(/understated/));
     });
   });
 
@@ -318,6 +419,13 @@ describe('AiTelemetryService', () => {
     });
   });
 
+  describe('record() — cache-write tokens', () => {
+    it('writes null when the provider reported no cache writes', async () => {
+      await service.record(makeUsage(), makeContext());
+      expect(prisma.aiInvocation.create.mock.calls[0][0].data.cacheWriteTokens).toBeNull();
+    });
+  });
+
   describe('record() — row shape', () => {
     it('writes every context + usage field through to the row', async () => {
       const context: AiCallContext = {
@@ -379,6 +487,17 @@ describe('AiTelemetryService', () => {
       expect(call.data.errorCode).toBe('AnthropicRateLimit');
     });
 
+    it('records the route that served the call and the credential type behind it', async () => {
+      await service.record(
+        makeUsage({ routeId: 'platform-openrouter', credentialType: 'PLATFORM_OPENROUTER' }),
+        makeContext(),
+      );
+
+      const call = prisma.aiInvocation.create.mock.calls[0][0];
+      expect(call.data.routeId).toBe('platform-openrouter');
+      expect(call.data.credentialType).toBe('PLATFORM_OPENROUTER');
+    });
+
     it('coerces null-ish optional fields to explicit null', async () => {
       await service.record(makeUsage(), makeContext());
       const call = prisma.aiInvocation.create.mock.calls[0][0];
@@ -388,6 +507,8 @@ describe('AiTelemetryService', () => {
       expect(call.data.linkRefId).toBeNull();
       expect(call.data.langfuseTraceId).toBeNull();
       expect(call.data.idempotencyKey).toBeNull();
+      expect(call.data.routeId).toBeNull();
+      expect(call.data.credentialType).toBeNull();
     });
   });
 
@@ -504,8 +625,37 @@ describe('AiTelemetryService', () => {
     it('upserts a default budget row (getOrCreate)', async () => {
       await service.checkBudget(TENANT_ID);
       expect(prisma.tenantAiBudget.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { tenantId: TENANT_ID }, create: { tenantId: TENANT_ID }, update: {} }),
+        expect.objectContaining({
+          where: { tenantId: TENANT_ID },
+          create: { tenantId: TENANT_ID, notes: 'plan:DEFAULT' },
+          update: {},
+        }),
       );
+    });
+  });
+
+  describe('budget — the spend it counts', () => {
+    const isSql = (value: unknown): value is { sql: string; values: unknown[] } =>
+      typeof value === 'object' && value !== null && 'sql' in value && 'values' in value;
+
+    function spendQuerySql(): string {
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+      const parts: string[] = [];
+      strings.forEach((text, i) => {
+        parts.push(text);
+        const value = values[i];
+        if (isSql(value)) parts.push(value.sql);
+        else if (i < values.length) parts.push('?');
+      });
+      return parts.join('');
+    }
+
+    it('sums platform-paid rows only: a null credential type or a PLATFORM_ one', async () => {
+      await service.checkBudget(TENANT_ID);
+      const sql = spendQuerySql();
+      expect(sql).toMatch(/credential_type IS NULL OR credential_type LIKE/);
+      const fragment = (prisma.$queryRaw.mock.calls[0] as unknown[]).find(isSql);
+      expect(fragment?.values).toEqual(['PLATFORM\\_%']);
     });
   });
 
@@ -513,33 +663,6 @@ describe('AiTelemetryService', () => {
     it('busts the per-tenant spent cache after a successful record', async () => {
       await service.record(makeUsage(), makeContext());
       expect(cache.del).toHaveBeenCalledWith('app:ai-telemetry:spent:42');
-    });
-  });
-
-  describe('assertZeroRetention()', () => {
-    it('is a no-op when the tenant does not require zero-retention', async () => {
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: false });
-      await expect(service.assertZeroRetention(TENANT_ID, 'standard')).resolves.toBeUndefined();
-    });
-
-    it('throws ZeroRetentionUnavailable when the tenant requires ZDR but no eligible tier is configured', async () => {
-      // ZDR_ELIGIBLE_TIERS ships empty (pending provider decision) — so a
-      // ZDR tenant is fail-closed on every tier today.
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: true });
-      await expect(service.assertZeroRetention(TENANT_ID, 'standard')).rejects.toMatchObject({
-        // BadRequestException-derived; tier carried in the response payload.
-        response: expect.objectContaining({ tier: 'standard' }),
-      });
-    });
-
-    it('emits AI_ZERO_RETENTION_UNAVAILABLE when it blocks', async () => {
-      prisma.tenant.findUnique.mockResolvedValue({ aiZeroRetention: true });
-      await service.assertZeroRetention(TENANT_ID, 'fast').catch(() => undefined);
-      expect(events.emit).toHaveBeenCalledWith(
-        DOMAIN_EVENTS.AI_ZERO_RETENTION_UNAVAILABLE,
-        TENANT_ID,
-        expect.objectContaining({ tier: 'fast' }),
-      );
     });
   });
 });

@@ -4,10 +4,10 @@ import { AssistantAiModule } from './assistant/assistant.module';
 import { McpToolsModule } from './mcp/mcp-tools.module';
 import { KnowledgeBaseModule } from './knowledge-base/knowledge-base.module';
 import { ModerationModule } from './moderation/moderation.module';
-import { RlsModule } from './rls/rls.module';
 import { McpExternalServerModule } from './mcp-server/mcp-server.module';
 import { VoiceModule } from './voice/voice.module';
 import { AgentContractModule } from './agent-contract/agent-contract.module';
+import { AiConnectModule } from './routing/connect/ai-connect.module';
 /**
  * AI Domain Module — aggregates all AI-related functionality.
  *
@@ -19,6 +19,7 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
  * - Knowledge Base: RAG knowledge base with pgvector search
  * - Moderation: Content moderation, guardrails, PII redaction
  * - Voice: LiveKit voice sessions
+ * - AI settings: the workspace retention policy and its own AI keys (bring-your-own-key)
  */
 @Module({
   imports: [
@@ -28,9 +29,9 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     McpExternalServerModule,
     KnowledgeBaseModule,
     ModerationModule,
-    RlsModule,
     VoiceModule,
     AgentContractModule,
+    AiConnectModule,
   ],
   exports: [
     AssistantAiModule,
@@ -38,7 +39,6 @@ import { AgentContractModule } from './agent-contract/agent-contract.module';
     McpExternalServerModule,
     KnowledgeBaseModule,
     ModerationModule,
-    RlsModule,
     AgentContractModule,
   ],
 })

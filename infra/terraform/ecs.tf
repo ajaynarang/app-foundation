@@ -21,6 +21,15 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   }
 }
 
+# The role a workspace's AWS Bedrock role must trust: the task role the API and the worker share. Set only when
+# bedrock_tenant_roles_enabled, so the task definitions stay byte-identical while it is off. Set it here, never in
+# Doppler: Doppler values override the task environment.
+locals {
+  bedrock_tenant_role_env = var.bedrock_tenant_roles_enabled ? [
+    { name = "PLATFORM_ASSUME_ROLE_ARN", value = aws_iam_role.ecs_task.arn },
+  ] : []
+}
+
 # --- API Task Definition ---
 
 resource "aws_ecs_task_definition" "api" {
@@ -52,9 +61,12 @@ resource "aws_ecs_task_definition" "api" {
     # and an empty list keeps the existing task definition byte-identical.
     # NOTE: `doppler run` lets Doppler values override container env vars, so this
     # key must NOT also be set in that environment's Doppler config.
-    environment = var.api_queue_processors_enabled ? [] : [
-      { name = "QUEUE_PROCESSORS_ENABLED", value = "false" },
-    ]
+    environment = concat(
+      var.api_queue_processors_enabled ? [] : [
+        { name = "QUEUE_PROCESSORS_ENABLED", value = "false" },
+      ],
+      local.bedrock_tenant_role_env,
+    )
 
     secrets = [
       { name = "DOPPLER_TOKEN", valueFrom = aws_ssm_parameter.doppler_token.arn },
@@ -109,7 +121,7 @@ resource "aws_ecs_task_definition" "worker" {
     # Doppler injects all env vars (secrets + config) at container startup
     command = ["doppler", "run", "--fallback", "/tmp/.doppler-fallback.json", "--", "node", "dist/worker.js"]
 
-    environment = []
+    environment = local.bedrock_tenant_role_env
 
     secrets = [
       { name = "DOPPLER_TOKEN", valueFrom = aws_ssm_parameter.doppler_token.arn },

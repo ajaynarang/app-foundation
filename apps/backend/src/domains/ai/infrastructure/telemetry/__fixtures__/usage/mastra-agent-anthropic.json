@@ -1,0 +1,11 @@
+{
+  "_source": "Mastra 1.41 Agent.generate result (getFullOutput) on the Anthropic route: usage normalised from the v3 provider usage (inputTokens.total incl. cache read + write; cacheRead -> cachedInputTokens, cacheWrite -> cacheCreationInputTokens), summed over steps. Shape from @mastra/core normalizeUsage; numbers synthetic.",
+  "usage": {
+    "inputTokens": 48210,
+    "outputTokens": 1830,
+    "totalTokens": 50040,
+    "reasoningTokens": 0,
+    "cachedInputTokens": 39870,
+    "cacheCreationInputTokens": 6120
+  }
+}

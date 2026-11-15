@@ -39,7 +39,7 @@ describe('AssistantRouterService', () => {
 
   describe('route', () => {
     it('should match regex trigger and return regex source', async () => {
-      const result = await service.route('do the thing now', 'member');
+      const result = await service.route('do the thing now', 'member', 7);
       expect(result.source).toBe('regex');
       expect(result.agentId).toBe('assistant');
       expect(result.taskSkill).toBe('example-skill');
@@ -47,14 +47,14 @@ describe('AssistantRouterService', () => {
     });
 
     it('should match plain text trigger (case insensitive)', async () => {
-      const result = await service.route('Run Example Task now', 'member');
+      const result = await service.route('Run Example Task now', 'member', 7);
       expect(result.source).toBe('regex');
       expect(result.agentId).toBe('assistant');
       expect(result.taskSkill).toBe('example-skill');
     });
 
     it('should skip skills without primaryAgent and fall through to the default agent', async () => {
-      const result = await service.route('something unrelated', 'member');
+      const result = await service.route('something unrelated', 'member', 7);
       // No primaryAgent on the matching skill → no regex route. Starter
       // personas are single-domain, so the classifier is skipped entirely.
       expect(result.source).toBe('default');
@@ -63,7 +63,7 @@ describe('AssistantRouterService', () => {
 
     it('should short-circuit starter personas to the default agent without classifying', async () => {
       for (const persona of ['member', 'admin', 'owner', 'super_admin'] as const) {
-        const result = await service.route('show me the latest', persona);
+        const result = await service.route('show me the latest', persona, 7);
         expect(result.source).toBe('default');
         expect(result.agentId).toBe('assistant');
       }
@@ -71,10 +71,10 @@ describe('AssistantRouterService', () => {
     });
 
     it('should use classifier for personas outside the single-domain list (multi-agent extension point)', async () => {
-      const result = await service.route('show me the latest', 'custom-persona' as any);
+      const result = await service.route('show me the latest', 'custom-persona' as any, 7);
       expect(result.source).toBe('classifier');
       expect(result.agentId).toBe('assistant');
-      expect(classifier.classify).toHaveBeenCalledWith('show me the latest');
+      expect(classifier.classify).toHaveBeenCalledWith('show me the latest', 7);
     });
 
     it('should load task skill content from classifier result', async () => {
@@ -82,7 +82,7 @@ describe('AssistantRouterService', () => {
         agentId: 'assistant',
         taskSkill: 'example-skill',
       });
-      const result = await service.route('help me out', 'custom-persona' as any);
+      const result = await service.route('help me out', 'custom-persona' as any, 7);
       expect(result.taskSkillContent).toBe('skill content here');
     });
 

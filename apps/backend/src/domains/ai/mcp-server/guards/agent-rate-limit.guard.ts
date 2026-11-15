@@ -1,3 +1,4 @@
+import { ApiErrorCode } from '@app/shared-types';
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { RateLimitService } from '../../agent-contract/rate-limit.service';
 import type { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
@@ -29,7 +30,15 @@ export class AgentRateLimitGuard implements CanActivate {
     if (!result.allowed) {
       const retryAfter = Math.max(1, Math.ceil((result.resetAt.getTime() - Date.now()) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
-      throw new HttpException({ error: 'rate_limited', retryAfter, limit: result.limit }, HttpStatus.TOO_MANY_REQUESTS);
+      const detail =
+        result.budget === 'workspace'
+          ? 'This workspace has reached its agent request limit for this minute. Try again shortly.'
+          : 'Rate limit reached for this agent. Try again shortly.';
+      throw new HttpException(
+        // The budget, limit and wait travel in the X-RateLimit-* / Retry-After headers; the body is the envelope.
+        { code: ApiErrorCode.RATE_LIMITED, detail },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     return true;
   }

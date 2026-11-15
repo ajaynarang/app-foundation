@@ -10,6 +10,8 @@ import { OutboxRelayJobHandler } from '@appshore/platform/infrastructure/events/
 import { OutboxRelayModule } from '../../events/outbox/outbox-relay.module';
 import { DeadlinesModule } from '@appshore/platform/infrastructure/deadlines/deadlines.module';
 import { DeadlineSweeper } from '@appshore/platform/infrastructure/deadlines/deadline.sweeper';
+import { AiConnectModule } from '../../../domains/ai/routing/connect/ai-connect.module';
+import { AiCredentialRevalidationHandler } from '../../../domains/ai/routing/connect/ai-credential-revalidation.handler';
 import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
 
 /**
@@ -25,6 +27,7 @@ import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
     forwardRef(() => AuthModule),
     OutboxRelayModule,
     DeadlinesModule,
+    AiConnectModule,
   ],
   providers: [
     BulkOpsQueueProcessor,
@@ -35,8 +38,15 @@ import { BulkOpsQueueProcessor } from './bulk-ops-queue.processor';
         login: LoginEventCleanupJobHandler,
         outboxRelay: OutboxRelayJobHandler,
         deadlineSweep: DeadlineSweeper,
-      ): QueueJobHandler[] => [retention, login, outboxRelay, deadlineSweep],
-      inject: [DataRetentionJobHandler, LoginEventCleanupJobHandler, OutboxRelayJobHandler, DeadlineSweeper],
+        aiCredentialRevalidation: AiCredentialRevalidationHandler,
+      ): QueueJobHandler[] => [retention, login, outboxRelay, deadlineSweep, aiCredentialRevalidation],
+      inject: [
+        DataRetentionJobHandler,
+        LoginEventCleanupJobHandler,
+        OutboxRelayJobHandler,
+        DeadlineSweeper,
+        AiCredentialRevalidationHandler,
+      ],
     },
   ],
 })

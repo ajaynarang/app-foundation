@@ -27,14 +27,14 @@ describe('HitlPolicyService', () => {
     expect(svc.resolveTier('platform:write:sensitive', u)).toBe<HitlTier>('sensitive');
   });
 
-  it('returns "none" for a desk principal on a standard write (pre-authorized at enable)', () => {
+  it('returns "standard" for a desk principal on a standard write, so the audit row records the tier (the pipeline still never challenges Desk)', () => {
     const d = fromDeskResponsibility({
       responsibilityId: 1,
       tenantId: 1,
       scopes: ['documents:write'],
       enabledByUserId: 1,
     });
-    expect(svc.resolveTier('documents:write', d)).toBe<HitlTier>('none');
+    expect(svc.resolveTier('documents:write', d)).toBe<HitlTier>('standard');
   });
 
   it('returns "sensitive" for a desk principal on a sensitive write (guardrail + review-inbox in executor)', () => {

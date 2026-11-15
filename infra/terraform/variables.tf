@@ -92,6 +92,19 @@ variable "api_queue_processors_enabled" {
   default     = true
 }
 
+# Bedrock (AI routes). Both default off.
+variable "bedrock_models" {
+  description = "Bedrock base model ids the task role may invoke for the platform's zero-retention route (platform-bedrock): the model catalog's bedrockId without its us. prefix, plus the embedding model. Empty (the default) grants nothing. Example: [\"anthropic.claude-haiku-5-5\", \"anthropic.claude-sonnet-5-5\", \"anthropic.claude-opus-5-5\", \"cohere.embed-v4:0\"]. Then set PLATFORM_BEDROCK_REGION in Doppler."
+  type        = list(string)
+  default     = []
+}
+
+variable "bedrock_tenant_roles_enabled" {
+  description = "Lets workspaces connect their own AWS account (BEDROCK_ROLE): grants the task role sts:AssumeRole and sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to the task role's ARN, the principal a workspace's trust policy names. Off by default."
+  type        = bool
+  default     = false
+}
+
 # RDS
 variable "rds_instance_class" {
   description = "RDS instance type"

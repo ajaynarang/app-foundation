@@ -1,0 +1,23 @@
+{
+  "_source": "Mastra 1.41 Agent.generate result on OpenRouter when the upstream reports no cache_write_tokens: Mastra's accumulator turns the missing count into 0, so the write total is only visible in providerMetadata. Shape from @mastra/core + @openrouter/ai-sdk-provider 2.10; numbers synthetic.",
+  "usage": {
+    "inputTokens": 30500,
+    "outputTokens": 900,
+    "totalTokens": 31400,
+    "cachedInputTokens": 0,
+    "cacheCreationInputTokens": 0
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "provider": "Anthropic",
+      "usage": {
+        "promptTokens": 30500,
+        "completionTokens": 900,
+        "totalTokens": 31400,
+        "promptTokensDetails": {
+          "cachedTokens": 24000
+        }
+      }
+    }
+  }
+}

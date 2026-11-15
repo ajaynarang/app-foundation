@@ -3,10 +3,10 @@ import type { NextRequest } from 'next/server';
 
 // Routes that require authentication.
 //
-// Keep in sync with protectedRoutePatterns in src/shared/lib/navigation.ts —
+// Keep in sync with protectedRoutePatterns in @appshore/web-core/shared/lib/navigation —
 // the two lists must match exactly. When adding a new protected route,
 // update BOTH files.
-const PROTECTED_PREFIXES = ['/admin', '/ai', '/onboarding', '/settings'];
+const PROTECTED_PREFIXES = ['/admin', '/agent-actions', '/ai', '/onboarding', '/settings'];
 
 // Routes that are always public
 const PUBLIC_PREFIXES = [

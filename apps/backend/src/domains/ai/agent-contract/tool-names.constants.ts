@@ -12,7 +12,8 @@
  * @Tool name should appear here. New tool → add an entry here AND in its
  * @Tool decorator.
  *
- * The starter ships only the two sample tools. Add your tool names below.
+ * The starter ships the sample tools below (health, knowledge base, and the support-ticket example pair). Add your
+ * tool names below.
  */
 export const ToolNames = {
   // ─── Meta / system ───────────────────────────────────────────────────────
@@ -20,6 +21,9 @@ export const ToolNames = {
   // ─── Knowledge base ──────────────────────────────────────────────────────
   SEARCH_KB: 'search-kb',
   GET_PRODUCT_INFO: 'get-product-info',
+  // ─── Example pair (support-ticket.tool.ts; safe to delete) ───────────────
+  LIST_SUPPORT_TICKETS: 'list-support-tickets',
+  CREATE_SUPPORT_TICKET: 'create-support-ticket',
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];

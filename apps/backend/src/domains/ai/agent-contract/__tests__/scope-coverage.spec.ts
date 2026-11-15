@@ -44,7 +44,7 @@ describe('scope coverage', () => {
 
     expect(mismatches).toEqual([]);
     expect(totalTools).toBe(totalScopes);
-    // The starter ships 3 tools (health-check, search-kb, get-product-info).
+    // The starter ships 5 tools (health-check, search-kb, get-product-info and the support-ticket pair).
     // Keep a floor of 1 so we still catch the toolset being wiped entirely,
     // without blocking template consumers who replace the samples.
     expect(totalTools).toBeGreaterThanOrEqual(1);

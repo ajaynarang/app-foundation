@@ -47,6 +47,41 @@ describe('NotificationTriggersService', () => {
     );
   });
 
+  it.each([
+    ['failed-test', 'AI key is failing'],
+    ['credit-refused', 'AI key is out of credit'],
+  ] as const)(
+    'aiCredentialFailing (%s) reaches owners and admins, links to AI settings, names only the last four',
+    async (cause, title) => {
+      await service.aiCredentialFailing(7, { type: 'ANTHROPIC_KEY', lastFour: 'wxyz' }, cause);
+      expect(recipients.resolveByRoles).toHaveBeenCalledWith(7, [UserRole.OWNER, UserRole.ADMIN]);
+      const sent = dispatcher.dispatch.mock.calls[0][0];
+      expect(sent).toMatchObject({
+        tenantId: 7,
+        type: PlatformNotificationType.AI_CREDENTIAL_FAILING,
+        title,
+        actionUrl: '/settings/ai',
+      });
+      expect(sent.message).toContain('Anthropic key ending wxyz');
+    },
+  );
+
+  it('aiBudgetReached offers "Connect a key" (AI settings) only when the deployment allows workspace keys', async () => {
+    await service.aiBudgetReached(7, { byokEnabled: true });
+    expect(dispatcher.dispatch.mock.calls[0][0]).toMatchObject({
+      type: PlatformNotificationType.AI_BUDGET_REACHED,
+      actionUrl: '/settings/ai',
+      actionLabel: 'Connect a key',
+    });
+    expect(dispatcher.dispatch.mock.calls[0][0].message).toMatch(/own AI key/);
+
+    await service.aiBudgetReached(7, { byokEnabled: false });
+    const off = dispatcher.dispatch.mock.calls[1][0];
+    expect(off.actionUrl).toBeUndefined();
+    expect(off.actionLabel).toBeUndefined();
+    expect(off.message).not.toMatch(/own AI key/);
+  });
+
   it('userRoleChanged notifies the person and every admin, once each', async () => {
     await service.userRoleChanged(7, 2, 'Arun', 'MEMBER', 'ADMIN');
     expect(recipients.resolveByUserIds).toHaveBeenCalledWith(7, [2, 1], { scopeToMembership: true });

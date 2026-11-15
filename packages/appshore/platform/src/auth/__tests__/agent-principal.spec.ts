@@ -21,6 +21,12 @@ describe('AgentPrincipal factories', () => {
     });
   });
 
+  it('fromUser carries the chat conversation when one is given, and leaves the key out otherwise', () => {
+    const inChat = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_abc' });
+    expect(inChat.conversationId).toBe('conv_abc');
+    expect(fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' })).not.toHaveProperty('conversationId');
+  });
+
   it('fromOAuthUser builds an oauth_client principal', () => {
     const p = fromOAuthUser({
       onBehalfOfUserDbId: 99,

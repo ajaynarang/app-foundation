@@ -23,7 +23,15 @@ export interface UserLifecycleHooks {
 export const USER_LIFECYCLE_HOOKS = 'APPSHORE_USER_LIFECYCLE_HOOKS';
 
 export interface TenantProvisionHooks {
-  /** A tenant was approved/activated — provision app-side resources. */
+  /**
+   * A tenant was approved/activated — provision app-side resources. Also called after a personal-mode signup creates
+   * its ACTIVE workspace, which has no approval step.
+   */
   tenantApproved(tenantDbId: number): Promise<void>;
+  /**
+   * A tenant's plan changed (`PlansService.assignPlan`), after the change committed. Optional. A failure is logged by
+   * the caller and never fails the plan change.
+   */
+  planAssigned?(tenantDbId: number, plan: string): Promise<void>;
 }
 export const TENANT_PROVISION_HOOKS = 'APPSHORE_TENANT_PROVISION_HOOKS';

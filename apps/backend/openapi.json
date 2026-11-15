@@ -200,12 +200,20 @@
               "callCount": {
                 "type": "integer"
               },
+              "platformUsd": {
+                "type": "string"
+              },
+              "tenantUsd": {
+                "type": "string"
+              },
               "totalUsd": {
                 "type": "string"
               }
             },
             "required": [
               "totalUsd",
+              "platformUsd",
+              "tenantUsd",
               "callCount"
             ],
             "type": "object"
@@ -258,6 +266,10 @@
                   "nullable": true,
                   "type": "string"
                 },
+                "cacheWriteTokens": {
+                  "nullable": true,
+                  "type": "integer"
+                },
                 "cachedTokens": {
                   "nullable": true,
                   "type": "integer"
@@ -270,6 +282,10 @@
                   "type": "string"
                 },
                 "createdAt": {
+                  "type": "string"
+                },
+                "credentialType": {
+                  "nullable": true,
                   "type": "string"
                 },
                 "id": {
@@ -295,10 +311,21 @@
                 "model": {
                   "type": "string"
                 },
+                "payer": {
+                  "enum": [
+                    "PLATFORM",
+                    "TENANT"
+                  ],
+                  "type": "string"
+                },
                 "promptTokens": {
                   "type": "integer"
                 },
                 "provider": {
+                  "type": "string"
+                },
+                "routeId": {
+                  "nullable": true,
                   "type": "string"
                 },
                 "status": {
@@ -317,7 +344,8 @@
                     "DESK_STEP",
                     "MEMORY_EXTRACT",
                     "EMBEDDING",
-                    "KB_INGEST"
+                    "KB_INGEST",
+                    "VOICE"
                   ],
                   "type": "string"
                 }
@@ -332,8 +360,12 @@
                 "promptTokens",
                 "completionTokens",
                 "cachedTokens",
+                "cacheWriteTokens",
                 "latencyMs",
                 "status",
+                "routeId",
+                "credentialType",
+                "payer",
                 "langfuseTraceId",
                 "linkRefType",
                 "linkRefId",
@@ -369,10 +401,14 @@
           },
           "windowCostUsd": {
             "type": "string"
+          },
+          "windowPlatformCostUsd": {
+            "type": "string"
           }
         },
         "required": [
           "windowCostUsd",
+          "windowPlatformCostUsd",
           "tenantCount"
         ],
         "type": "object"
@@ -385,7 +421,8 @@
               "DESK_STEP",
               "MEMORY_EXTRACT",
               "EMBEDDING",
-              "KB_INGEST"
+              "KB_INGEST",
+              "VOICE"
             ],
             "type": "string"
           },
@@ -398,6 +435,9 @@
           "windowErrorCount": {
             "type": "integer"
           },
+          "windowPlatformCostUsd": {
+            "type": "string"
+          },
           "windowTotalTokens": {
             "type": "integer"
           }
@@ -405,6 +445,7 @@
         "required": [
           "surface",
           "windowCostUsd",
+          "windowPlatformCostUsd",
           "windowCallCount",
           "windowErrorCount",
           "windowTotalTokens"
@@ -463,6 +504,9 @@
                 },
                 "windowErrorCount": {
                   "type": "integer"
+                },
+                "windowPlatformCostUsd": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -470,6 +514,7 @@
                 "tenantSlug",
                 "companyName",
                 "windowCostUsd",
+                "windowPlatformCostUsd",
                 "windowCallCount",
                 "windowErrorCount",
                 "sparkline",
@@ -1511,6 +1556,112 @@
         ],
         "type": "object"
       },
+      "AgentAction": {
+        "properties": {
+          "approvalRequired": {
+            "type": "boolean"
+          },
+          "args": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "argsRedacted": {
+            "type": "boolean"
+          },
+          "caller": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "oauth_client",
+                  "api_key"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "label"
+            ],
+            "type": "object"
+          },
+          "canDecide": {
+            "type": "boolean"
+          },
+          "canStepUp": {
+            "type": "boolean"
+          },
+          "decidedAt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "decidedBy": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "hasPinSet": {
+            "type": "boolean"
+          },
+          "onBehalfOf": {
+            "nullable": true,
+            "type": "string"
+          },
+          "scopeRequired": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "DENIED",
+              "EXPIRED",
+              "USED"
+            ],
+            "type": "string"
+          },
+          "stepUpRequired": {
+            "type": "boolean"
+          },
+          "tier": {
+            "enum": [
+              "standard",
+              "sensitive"
+            ],
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "tool",
+          "tier",
+          "scopeRequired",
+          "status",
+          "stepUpRequired",
+          "approvalRequired",
+          "caller",
+          "onBehalfOf",
+          "args",
+          "argsRedacted",
+          "expiresAt",
+          "decidedAt",
+          "decidedBy",
+          "canDecide",
+          "canStepUp",
+          "hasPinSet"
+        ],
+        "type": "object"
+      },
       "AgentActivityPage": {
         "properties": {
           "counts": {
@@ -1641,6 +1792,236 @@
           "items",
           "nextCursor",
           "total"
+        ],
+        "type": "object"
+      },
+      "AgentPolicy": {
+        "properties": {
+          "selfConfirm": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selfConfirm"
+        ],
+        "type": "object"
+      },
+      "AiCredentialConnectResult": {
+        "properties": {
+          "credential": {
+            "properties": {
+              "awsRegion": {
+                "nullable": true,
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "inertUnderPolicy": {
+                "type": "boolean"
+              },
+              "lastError": {
+                "nullable": true,
+                "type": "string"
+              },
+              "lastFour": {
+                "nullable": true,
+                "type": "string"
+              },
+              "lastValidatedAt": {
+                "nullable": true,
+                "type": "string"
+              },
+              "priority": {
+                "type": "integer"
+              },
+              "publicId": {
+                "type": "string"
+              },
+              "roleArn": {
+                "nullable": true,
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "ACTIVE",
+                  "FAILING",
+                  "DISABLED"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "ANTHROPIC_KEY",
+                  "BEDROCK_ROLE",
+                  "OPENROUTER_KEY",
+                  "VERCEL_GATEWAY_KEY"
+                ],
+                "type": "string"
+              },
+              "zdrAttested": {
+                "type": "boolean"
+              },
+              "zdrAttestedAt": {
+                "nullable": true,
+                "type": "string"
+              }
+            },
+            "required": [
+              "publicId",
+              "type",
+              "status",
+              "priority",
+              "lastFour",
+              "awsRegion",
+              "roleArn",
+              "zdrAttested",
+              "zdrAttestedAt",
+              "inertUnderPolicy",
+              "lastValidatedAt",
+              "lastError",
+              "createdAt"
+            ],
+            "type": "object"
+          },
+          "probe": {
+            "properties": {
+              "detail": {
+                "type": "string"
+              },
+              "latencyMs": {
+                "type": "integer"
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok",
+              "latencyMs",
+              "detail"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "credential",
+          "probe"
+        ],
+        "type": "object"
+      },
+      "AiSettings": {
+        "properties": {
+          "byokEnabled": {
+            "type": "boolean"
+          },
+          "credentials": {
+            "items": {
+              "properties": {
+                "awsRegion": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "inertUnderPolicy": {
+                  "type": "boolean"
+                },
+                "lastError": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "lastFour": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "lastValidatedAt": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "integer"
+                },
+                "publicId": {
+                  "type": "string"
+                },
+                "roleArn": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "ACTIVE",
+                    "FAILING",
+                    "DISABLED"
+                  ],
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "ANTHROPIC_KEY",
+                    "BEDROCK_ROLE",
+                    "OPENROUTER_KEY",
+                    "VERCEL_GATEWAY_KEY"
+                  ],
+                  "type": "string"
+                },
+                "zdrAttested": {
+                  "type": "boolean"
+                },
+                "zdrAttestedAt": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "publicId",
+                "type",
+                "status",
+                "priority",
+                "lastFour",
+                "awsRegion",
+                "roleArn",
+                "zdrAttested",
+                "zdrAttestedAt",
+                "inertUnderPolicy",
+                "lastValidatedAt",
+                "lastError",
+                "createdAt"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "payers": {
+            "properties": {
+              "embedding": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "embedding"
+            ],
+            "type": "object"
+          },
+          "policy": {
+            "enum": [
+              "STANDARD",
+              "ZDR"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy",
+          "byokEnabled",
+          "payers",
+          "credentials"
         ],
         "type": "object"
       },
@@ -1896,6 +2277,64 @@
         },
         "required": [
           "agents"
+        ],
+        "type": "object"
+      },
+      "BedrockBegin": {
+        "properties": {
+          "cfnQuickCreateUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "permissionsPolicy": {
+            "type": "string"
+          },
+          "platformRoleArns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roleName": {
+            "type": "string"
+          },
+          "terraformSnippet": {
+            "type": "string"
+          },
+          "trustPolicy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalId",
+          "platformRoleArns",
+          "roleName",
+          "trustPolicy",
+          "permissionsPolicy",
+          "terraformSnippet",
+          "cfnQuickCreateUrl"
+        ],
+        "type": "object"
+      },
+      "BedrockCompleteDto": {
+        "properties": {
+          "awsRegion": {
+            "description": "The AWS region the role calls Bedrock in",
+            "example": "us-east-1",
+            "type": "string"
+          },
+          "roleArn": {
+            "description": "The role created in the workspace AWS account from the begin step",
+            "example": "arn:aws:iam::123456789012:role/app-bedrock-access",
+            "type": "string"
+          }
+        },
+        "required": [
+          "roleArn",
+          "awsRegion"
         ],
         "type": "object"
       },
@@ -3402,6 +3841,35 @@
         ],
         "type": "object"
       },
+      "ConnectKeyDto": {
+        "properties": {
+          "secret": {
+            "description": "The provider API key. Tested, then stored encrypted; it is never returned or readable again.",
+            "maxLength": 4096,
+            "minLength": 8,
+            "type": "string",
+            "writeOnly": true
+          },
+          "type": {
+            "description": "The provider. An AWS role is not connected by pasting a key.",
+            "enum": [
+              "ANTHROPIC_KEY",
+              "OPENROUTER_KEY",
+              "VERCEL_GATEWAY_KEY"
+            ],
+            "type": "string"
+          },
+          "zdrAttested": {
+            "description": "An Anthropic key only: the owner attests the organisation has a zero-retention agreement with Anthropic.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "secret"
+        ],
+        "type": "object"
+      },
       "ConversationCreated": {
         "properties": {
           "conversationId": {
@@ -3513,6 +3981,39 @@
                   "additionalProperties": {},
                   "nullable": true,
                   "type": "object"
+                },
+                "citations": {
+                  "items": {
+                    "properties": {
+                      "href": {
+                        "maxLength": 500,
+                        "pattern": "^\\/(?![/\\\\])",
+                        "type": "string"
+                      },
+                      "sourceId": {
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "sourceType": {
+                        "maxLength": 64,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "title": {
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "sourceType",
+                      "sourceId",
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
                 },
                 "content": {
                   "type": "string"
@@ -7851,61 +8352,6 @@
         ],
         "type": "object"
       },
-      "HitlChallengeContext": {
-        "properties": {
-          "callerKind": {
-            "type": "string"
-          },
-          "callerLabel": {
-            "type": "string"
-          },
-          "consumed": {
-            "type": "boolean"
-          },
-          "expired": {
-            "type": "boolean"
-          },
-          "expiresAt": {
-            "type": "string"
-          },
-          "hasPinSet": {
-            "type": "boolean"
-          },
-          "requiresStepUp": {
-            "type": "boolean"
-          },
-          "scopeRequired": {
-            "type": "string"
-          },
-          "stepUpCompleted": {
-            "type": "boolean"
-          },
-          "tier": {
-            "type": "string"
-          },
-          "token": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "token",
-          "tool",
-          "tier",
-          "scopeRequired",
-          "callerLabel",
-          "callerKind",
-          "expiresAt",
-          "requiresStepUp",
-          "stepUpCompleted",
-          "consumed",
-          "expired",
-          "hasPinSet"
-        ],
-        "type": "object"
-      },
       "HitlStepUpResult": {
         "properties": {
           "status": {
@@ -10447,12 +10893,15 @@
       "ResumeAgentDto": {
         "properties": {
           "confirmed": {
+            "description": "Confirm (true) or Cancel (false) on the card",
             "type": "boolean"
           },
           "runId": {
+            "description": "The suspended run id from the `9:` frame",
             "type": "string"
           },
           "toolCallId": {
+            "description": "The card's `toolCallId` from the `9:` frame. Required to confirm; a Cancel with it voids that card.",
             "type": "string"
           }
         },
@@ -12437,6 +12886,18 @@
         },
         "type": "object"
       },
+      "UpdateAgentPolicyDto": {
+        "properties": {
+          "selfConfirm": {
+            "description": "True lets external agents confirm their own standard writes by repeating the call with the token. False (default) makes each one wait for a person to approve it in the app. A sensitive write always needs the PIN.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "selfConfirm"
+        ],
+        "type": "object"
+      },
       "UpdateAiBudgetDto": {
         "properties": {
           "dailyHardUsd": {
@@ -12469,6 +12930,22 @@
           "dailyHardUsd",
           "monthlySoftUsd",
           "monthlyHardUsd"
+        ],
+        "type": "object"
+      },
+      "UpdateAiPolicyDto": {
+        "properties": {
+          "policy": {
+            "description": "`ZDR` requires zero data retention: AI calls run only on routes that keep nothing, or are refused.",
+            "enum": [
+              "STANDARD",
+              "ZDR"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy"
         ],
         "type": "object"
       },
@@ -13848,6 +14325,55 @@
         ],
         "type": "object"
       },
+      "VoiceUsageDto": {
+        "properties": {
+          "conversationId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "description": "Minted once per agent session; a retried report with the same id records nothing",
+            "type": "string"
+          },
+          "sessionMs": {
+            "description": "How long the agent session was connected, in milliseconds",
+            "type": "number"
+          },
+          "sttAudioMs": {
+            "description": "Audio sent to speech-to-text, in milliseconds",
+            "type": "number"
+          },
+          "sttModel": {
+            "description": "The speech-to-text model that ran (a `model_pricing` model for provider `deepgram`)",
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "number"
+          },
+          "ttsCharacters": {
+            "description": "Characters sent to text-to-speech",
+            "type": "number"
+          },
+          "ttsModel": {
+            "description": "The text-to-speech model that ran (a `model_pricing` model for provider `cartesia`)",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "conversationId",
+          "userId",
+          "tenantId",
+          "sttModel",
+          "ttsModel",
+          "sttAudioMs",
+          "ttsCharacters",
+          "sessionMs"
+        ],
+        "type": "object"
+      },
       "WebhookDeliveryLog": {
         "properties": {
           "attempts": {
@@ -14939,7 +15465,8 @@
                 "DESK_STEP",
                 "MEMORY_EXTRACT",
                 "EMBEDDING",
-                "KB_INGEST"
+                "KB_INGEST",
+                "VOICE"
               ],
               "type": "string"
             }
@@ -17660,6 +18187,147 @@
         ]
       }
     },
+    "/api/v1/agent-actions/{token}": {
+      "get": {
+        "operationId": "AgentActionsController_get",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "An external agent's write waiting for (or past) a person: the tool, the caller, and what it will run",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
+    "/api/v1/agent-actions/{token}/approve": {
+      "post": {
+        "operationId": "AgentActionsController_approve",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a standard write: the agent may run it once, with exactly these arguments",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
+    "/api/v1/agent-actions/{token}/deny": {
+      "post": {
+        "operationId": "AgentActionsController_deny",
+        "parameters": [
+          {
+            "description": "The token the agent was given with approval_required or hitl_required",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAction"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deny a write (standard or sensitive): the agent cannot run it",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
     "/api/v1/agent-activity": {
       "get": {
         "operationId": "AgentActivityController_list",
@@ -17769,6 +18437,412 @@
         "summary": "List agent invocation activity for a principal (redacted args)",
         "tags": [
           "Agent Activity"
+        ]
+      }
+    },
+    "/api/v1/agent-policy": {
+      "get": {
+        "operationId": "AgentActionsController_getPolicy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPolicy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether external agents confirm their own standard writes or wait for a person (default)",
+        "tags": [
+          "Agent Actions"
+        ]
+      },
+      "put": {
+        "operationId": "AgentActionsController_setPolicy",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentPolicyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPolicy"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Let external agents confirm their own standard writes, or put human approval back",
+        "tags": [
+          "Agent Actions"
+        ]
+      }
+    },
+    "/api/v1/ai-settings": {
+      "get": {
+        "operationId": "AiCredentialController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The retention policy, who pays for each AI need, and the workspace AI key cards",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials": {
+      "post": {
+        "operationId": "AiCredentialController_connectKey",
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectKeyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "Created: the new resource"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Connect a provider key: it is tested with one small call, then stored encrypted",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/bedrock/begin": {
+      "post": {
+        "operationId": "AiCredentialController_beginBedrock",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BedrockBegin"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start connecting an AWS Bedrock role: the external id, trust policy and IaC to create it (nothing stored)",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/bedrock/complete": {
+      "post": {
+        "operationId": "AiCredentialController_completeBedrock",
+        "parameters": [
+          {
+            "description": "Optional, 1–255 visible ASCII characters (a UUID). A retry with the same key and request replays the first response for 24 hours, marked `Idempotent-Replayed: true`; the same key with a different request is 409 IDEMPOTENCY_KEY_REUSED, and a retry while the first is still running is 409 IDEMPOTENCY_KEY_IN_USE.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BedrockCompleteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "Created: the new resource"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Connect an AWS Bedrock role: checked with and without the external id and one model call, then stored",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/{credential_id}": {
+      "delete": {
+        "operationId": "AiCredentialController_remove",
+        "parameters": [
+          {
+            "description": "AI credential public id (aicred_…)",
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The key is removed"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a workspace AI key",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/credentials/{credential_id}/validate": {
+      "post": {
+        "operationId": "AiCredentialController_validate",
+        "parameters": [
+          {
+            "description": "AI credential public id (aicred_…)",
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCredentialConnectResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Test a workspace AI key again (it may turn Active or Failing)",
+        "tags": [
+          "AI Settings"
+        ]
+      }
+    },
+    "/api/v1/ai-settings/policy": {
+      "patch": {
+        "operationId": "AiCredentialController_updatePolicy",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAiPolicyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Require or drop zero data retention (keys it rules out are kept, unused)",
+        "tags": [
+          "AI Settings"
         ]
       }
     },
@@ -19702,13 +20776,13 @@
         "operationId": "AssistantAiController_listConversations",
         "parameters": [
           {
-            "description": "Page size, 1–100 (out of range is clamped)",
+            "description": "Page size, 1–30 (out of range is clamped)",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 10,
-              "maximum": 100,
+              "default": 30,
+              "maximum": 30,
               "minimum": 1,
               "type": "integer"
             }
@@ -19741,7 +20815,7 @@
             "bearer": []
           }
         ],
-        "summary": "List conversations for the current user",
+        "summary": "List the current user's active conversations (newest first, at most the history cap)",
         "tags": [
           "AI Conversations"
         ]
@@ -19835,6 +20909,46 @@
           }
         ],
         "summary": "Get status of all domain agents for the user persona",
+        "tags": [
+          "AI Conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "AssistantAiController_archiveConversation",
+        "parameters": [
+          {
+            "description": "Conversation public id (conv_…)",
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Archived (or already archived)"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive one of your conversations: it leaves history; its messages are kept",
         "tags": [
           "AI Conversations"
         ]
@@ -19937,6 +21051,7 @@
     },
     "/api/v1/conversations/{conversation_id}/resume": {
       "post": {
+        "description": "Confirm or cancel the confirm card named by `toolCallId`. Confirm turns that one card into a single-use grant for the exact write it shows, then resumes the run; a card that is no longer waiting (already answered, expired, unknown) answers 409 INVALID_STATE and resumes nothing. A Confirm with no `toolCallId` is a 400. Cancel voids the card. Unspent grants are voided when the resumed turn ends.",
         "operationId": "AssistantAiController_resumeAgent",
         "parameters": [
           {
@@ -23424,54 +24539,6 @@
         "summary": "MCP endpoint for API-key principals",
         "tags": [
           "MCP"
-        ]
-      }
-    },
-    "/api/v1/mcp/hitl/{token}": {
-      "get": {
-        "description": "Returns redacted args, the calling principal label, expiry, and whether the user has a PIN set. The PIN itself is never returned. Tenant-scoped.",
-        "operationId": "HitlStepUpController_getContext",
-        "parameters": [
-          {
-            "description": "HITL challenge token returned by the prior tools/call attempt",
-            "in": "path",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HitlChallengeContext"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorEnvelope"
-                }
-              }
-            },
-            "description": "An error: the API error envelope; `code` says what happened"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Fetch context for a pending HITL challenge (for the approval UI)",
-        "tags": [
-          "MCP HITL"
         ]
       }
     },
@@ -27303,6 +28370,46 @@
           }
         ],
         "summary": "Internal: stream the assistant reply for a voice transcript as NDJSON (voice agent only, X-Voice-Agent-Secret)",
+        "tags": [
+          "Voice"
+        ]
+      }
+    },
+    "/api/v1/voice/internal/usage": {
+      "post": {
+        "operationId": "VoiceController_internalUsage",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceUsageDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            },
+            "description": "An error: the API error envelope; `code` says what happened"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Internal: record a finished voice session’s speech usage in the AI cost ledger (voice agent only, X-Voice-Agent-Secret)",
         "tags": [
           "Voice"
         ]

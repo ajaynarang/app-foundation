@@ -16,7 +16,7 @@ class Recorder {
 @Module({ providers: [Recorder], exports: [Recorder] })
 class RecorderModule {}
 
-function hookClass(label: string) {
+function hookClass(label: string, withPlan = false) {
   @Injectable()
   class Hook implements TenantProvisionHooks {
     constructor(readonly recorder: Recorder) {}
@@ -24,13 +24,22 @@ function hookClass(label: string) {
       this.recorder.record(`${label}:${tenantDbId}`);
     }
   }
-  return Hook;
+  @Injectable()
+  class PlanHook extends Hook {
+    async planAssigned(tenantDbId: number, plan: string) {
+      this.recorder.record(`${label}:${tenantDbId}:${plan}`);
+    }
+  }
+  return withPlan ? PlanHook : Hook;
 }
 
-async function resolveHooks(features: readonly OptionalFeature[]): Promise<TenantProvisionHooks> {
+async function resolveHooks(
+  features: readonly OptionalFeature[],
+  alwaysOn: Parameters<typeof featureHookProviders>[1] = [],
+): Promise<TenantProvisionHooks> {
   const moduleRef = await Test.createTestingModule({
-    imports: featureHookImports(features) as never[],
-    providers: featureHookProviders(features),
+    imports: [RecorderModule, ...(featureHookImports(features) as never[])],
+    providers: featureHookProviders(features, alwaysOn),
   }).compile();
   return moduleRef.get<TenantProvisionHooks>(TENANT_PROVISION_HOOKS);
 }
@@ -53,5 +62,29 @@ describe('feature hooks', () => {
     const hooks = await resolveHooks(features);
     await hooks.tenantApproved(42);
     expect(calls).toEqual(['first:42', 'second:42']);
+  });
+
+  it('runs the always-on hooks first, with no feature kept and with features', async () => {
+    const none = await resolveHooks([], [hookClass('ai', true)]);
+    await none.tenantApproved(5);
+    expect(calls).toEqual(['ai:5']);
+
+    calls.splice(0);
+    const features: OptionalFeature[] = [
+      { name: 'first', modules: [], hooks: { imports: [RecorderModule], tenantProvision: hookClass('first') } },
+    ];
+    const hooks = await resolveHooks(features, [hookClass('ai', true)]);
+    await hooks.tenantApproved(6);
+    expect(calls).toEqual(['ai:6', 'first:6']);
+  });
+
+  it('passes planAssigned to every hook that has it, and skips the ones that do not', async () => {
+    const features: OptionalFeature[] = [
+      { name: 'first', modules: [], hooks: { imports: [RecorderModule], tenantProvision: hookClass('first') } },
+      { name: 'second', modules: [], hooks: { imports: [RecorderModule], tenantProvision: hookClass('second', true) } },
+    ];
+    const hooks = await resolveHooks(features, [hookClass('ai', true)]);
+    await hooks.planAssigned?.(9, 'STARTER');
+    expect(calls).toEqual(['ai:9:STARTER', 'second:9:STARTER']);
   });
 });

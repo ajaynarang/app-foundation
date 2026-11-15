@@ -5,6 +5,7 @@ jest.mock('@mastra/memory', () => ({ Memory: jest.fn() }));
 jest.mock('@mastra/observability', () => ({ Observability: jest.fn() }));
 jest.mock('@mastra/langfuse', () => ({ LangfuseExporter: jest.fn() }));
 
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { pipeAgentResponse } from '../pipe-agent-response';
 
 function createReadableStream(chunks: string[]): ReadableStream<string> {
@@ -42,6 +43,156 @@ describe('pipeAgentResponse', () => {
       warn: jest.fn(),
       error: jest.fn(),
     };
+  });
+
+  describe('a stream that fails', () => {
+    /** A text stream that yields `parts`, then throws. */
+    function failingStream(parts: string[], error: Error): ReadableStream<string> {
+      let i = 0;
+      return new ReadableStream<string>({
+        pull(controller) {
+          if (i < parts.length) controller.enqueue(parts[i++]);
+          else controller.error(error);
+        },
+      });
+    }
+
+    it('after text was sent: ends with one terminal x: frame, the generic copy, and persists nothing', async () => {
+      // A response whose headers went out with the first frame.
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+
+      await pipeAgentResponse(
+        { textStream: failingStream(['Half an'], new Error('socket hang up: internal detail')) },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+        },
+      );
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(frames[0]).toBe(`0:${JSON.stringify('Half an')}\n`);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      const payload = JSON.parse(last.slice(2));
+      expect(payload).toEqual({ code: 'INTERNAL', detail: expect.any(String) });
+      expect(payload.detail).not.toContain('internal detail');
+      expect(frames.filter((f: string) => f.startsWith('x:'))).toHaveLength(1);
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('a stream that finishes with an error Mastra recorded on `response.error`: one x: frame, nothing after, nothing persisted', async () => {
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+      const text = 'Half an answer\n\n<followups>\nNext?\n</followups>';
+
+      await pipeAgentResponse(
+        {
+          textStream: createReadableStream([text]),
+          error: new Error('provider 500: internal detail'),
+          suspendPayload: { action: 'confirm' },
+          runId: 'run_1',
+        },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+          cardAccumulator: { card: { type: 'summary' } } as any,
+        },
+      );
+
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(frames[0]).toBe(`0:${JSON.stringify(text)}\n`);
+      const last = frames[frames.length - 1];
+      expect(last.startsWith('x:')).toBe(true);
+      expect(JSON.parse(last.slice(2))).toEqual({ code: 'INTERNAL', detail: expect.any(String) });
+      expect(last).not.toContain('internal detail');
+      // No follow-up, card or suspend frame for a failed turn.
+      expect(frames.filter((f: string) => /^(a|8|9):/.test(f))).toHaveLength(0);
+      expect(mockRes.end).toHaveBeenCalled();
+      expect(mockPrisma.conversationMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('maps a failure through `mapError` (a credit refusal becomes its own code and copy)', async () => {
+      mockRes.write.mockImplementation(() => {
+        mockRes.headersSent = true;
+      });
+      const mapped = invalidState('mapped copy');
+      const mapError = jest.fn().mockReturnValue(mapped);
+      const recorded = { statusCode: 402 };
+
+      await pipeAgentResponse(
+        { textStream: createReadableStream(['Half']), error: recorded },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+          mapError,
+        },
+      );
+
+      expect(mapError).toHaveBeenCalledWith(recorded);
+      const frames = mockRes.write.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(JSON.parse(frames[frames.length - 1].slice(2))).toEqual({ code: 'INVALID_STATE', detail: 'mapped copy' });
+    });
+
+    it('a recorded error that reading throws on is treated as no error', async () => {
+      const response = { textStream: createReadableStream(['Fine']) };
+      Object.defineProperty(response, 'error', {
+        get() {
+          throw new Error('not available');
+        },
+      });
+
+      await pipeAgentResponse(response, {
+        conversationDbId: 1,
+        conversationId: 'conv_1',
+        req: mockReq,
+        res: mockRes,
+        prisma: mockPrisma,
+        logger: mockLogger,
+      });
+
+      expect(mockPrisma.conversationMessage.create).toHaveBeenCalled();
+    });
+
+    it('before anything was sent: answers the error envelope instead of a frame', async () => {
+      mockRes.headersSent = false;
+      mockRes.removeHeader = jest.fn();
+      mockRes.status = jest.fn().mockReturnValue(mockRes);
+      mockRes.json = jest.fn();
+      mockReq.url = '/api/v1/conversations/conv_1/resume';
+      mockReq.method = 'POST';
+
+      await pipeAgentResponse(
+        { textStream: failingStream([], new Error('boom')) },
+        {
+          conversationDbId: 1,
+          conversationId: 'conv_1',
+          req: mockReq,
+          res: mockRes,
+          prisma: mockPrisma,
+          logger: mockLogger,
+        },
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.write).not.toHaveBeenCalled();
+    });
   });
 
   it('sets streaming headers', async () => {
@@ -152,6 +303,27 @@ describe('pipeAgentResponse', () => {
     expect(suspendWrite).toBeDefined();
     const payload = JSON.parse(suspendWrite[0].slice(2).trim());
     expect(payload.runId).toBe('run_123');
+  });
+
+  it("writes the resumed turn's next card as the server-built card, unwrapped from Mastra's envelope", async () => {
+    const card = { action: 'Create Item', description: 'Create Item: name: "Desk"', tool: 'create-item', args: {} };
+    const response = {
+      textStream: createReadableStream(['One more']),
+      suspendPayload: { toolCallId: 'call_2', suspendPayload: card, args: { description: 'model prose' } },
+      runId: 'run_2',
+    };
+
+    await pipeAgentResponse(response, {
+      conversationDbId: 1,
+      conversationId: 'conv_1',
+      req: mockReq,
+      res: mockRes,
+      prisma: mockPrisma,
+      logger: mockLogger,
+    });
+
+    const suspendWrite = mockRes.write.mock.calls.find((c: any[]) => c[0].startsWith('9:'));
+    expect(JSON.parse(suspendWrite[0].slice(2).trim())).toEqual({ ...card, toolCallId: 'call_2', runId: 'run_2' });
   });
 
   it('applies output moderation when moderationService is provided', async () => {

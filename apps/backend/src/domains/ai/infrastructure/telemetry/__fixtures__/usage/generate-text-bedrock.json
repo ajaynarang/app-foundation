@@ -1,0 +1,16 @@
+{
+  "_source": "ai@6 generateText on @ai-sdk/amazon-bedrock 4.0 with no inputTokenDetails: the cache counts live in providerMetadata.bedrock.usage (cacheReadInputTokens / cacheWriteInputTokens). Numbers synthetic; the live-*.json fixtures are live captures.",
+  "usage": {
+    "inputTokens": 7000,
+    "outputTokens": 600,
+    "totalTokens": 7600
+  },
+  "providerMetadata": {
+    "bedrock": {
+      "usage": {
+        "cacheReadInputTokens": 4500,
+        "cacheWriteInputTokens": 1500
+      }
+    }
+  }
+}

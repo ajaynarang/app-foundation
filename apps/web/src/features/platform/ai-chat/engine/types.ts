@@ -1,3 +1,5 @@
+import type { Citation, ReadingFrame } from '@app/shared-types';
+
 // ── User Modes ──
 // Generic platform roles. Drives greetings and placeholders.
 export type UserMode = 'member' | 'admin' | 'owner' | 'super_admin';
@@ -39,12 +41,21 @@ export interface TextCardData {
   body?: string;
 }
 
+/**
+ * The confirm card the server built for one exact write (the `9:` frame): never the model's own words. `tool` and
+ * `args` are what runs on Confirm; `toolCallId` names the card to the resume route.
+ */
 export interface ConfirmationCardData {
   action: string;
   description: string;
-  entityId?: string;
-  entityType?: string;
+  tool?: string;
+  args?: Record<string, unknown>;
+  toolCallId?: string;
+  runId?: string;
 }
+
+/** What became of a confirm card this session: confirmed, cancelled, or no longer waiting (a 409 on Confirm). */
+export type ConfirmationOutcome = 'confirmed' | 'cancelled' | 'expired';
 
 // ── Action Results ──
 export interface ActionResult {
@@ -73,4 +84,8 @@ export interface ChatMessage {
   card?: RichCard;
   action?: ActionResult;
   speakText?: string;
+  /** The sources the answer named (`c:` frames while streaming; stored with the message for history). */
+  citations?: Citation[];
+  /** What the assistant is reading right now (`t:` frames). Transient: cleared when text or a citation arrives. */
+  reading?: ReadingFrame | null;
 }

@@ -1,15 +1,27 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { InvocationPipelineService } from '../invocation-pipeline.service';
 import { ScopeRegistryService } from '../scope-registry.service';
 import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { HitlChallengeService } from '../hitl-challenge.service';
-import { fromUser, fromOAuthUser, fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
+import { ToolAccessPolicyService } from '../tool-access-policy.service';
+import { fromUser, fromOAuthUser, fromDeskResponsibility, fromApiKey } from '@appshore/platform/auth/agent-principal';
+import { z } from 'zod';
+import { TOOL_FAILED_MESSAGE } from '../../mcp/tools/tool-error';
+import { scopesForRole } from '../role-scopes';
+import { intentDigest } from '../intent-digest';
 
 const mockRegistry = {
   scopeForTool: jest.fn(),
   toolsAllowedByScopes: jest.fn(),
+  parametersForTool: jest.fn(),
+};
+const mockPolicy = {
+  actingRole: jest.fn(),
+  checkRole: jest.fn(),
+  checkPlan: jest.fn(),
 };
 const mockHitl = {
   resolveTier: jest.fn(),
@@ -24,7 +36,10 @@ const mockLogger = {
 const mockChallenges = {
   issue: jest.fn(),
   consume: jest.fn(),
+  consumeChatGrant: jest.fn(),
+  tenantAllowsSelfConfirm: jest.fn(),
 };
+const mockConfig = { get: jest.fn() };
 
 describe('InvocationPipelineService', () => {
   let svc: InvocationPipelineService;
@@ -34,6 +49,13 @@ describe('InvocationPipelineService', () => {
     mockHitl.tokenTtlSeconds.mockReturnValue(300);
     mockChallenges.issue.mockReset();
     mockChallenges.consume.mockReset();
+    mockChallenges.consumeChatGrant.mockReset();
+    mockChallenges.tenantAllowsSelfConfirm.mockReset();
+    mockConfig.get.mockImplementation((key: string) => (key === 'APP_URL' ? 'https://app.example.com/' : undefined));
+    mockRegistry.parametersForTool.mockReturnValue(undefined);
+    mockPolicy.actingRole.mockResolvedValue('MEMBER');
+    mockPolicy.checkRole.mockReturnValue(null);
+    mockPolicy.checkPlan.mockResolvedValue(null);
     const mod = await Test.createTestingModule({
       providers: [
         InvocationPipelineService,
@@ -42,6 +64,8 @@ describe('InvocationPipelineService', () => {
         { provide: ToolExecutorService, useValue: mockExecutor },
         { provide: AgentInvocationLoggerService, useValue: mockLogger },
         { provide: HitlChallengeService, useValue: mockChallenges },
+        { provide: ToolAccessPolicyService, useValue: mockPolicy },
+        { provide: ConfigService, useValue: mockConfig },
       ],
     }).compile();
     svc = mod.get(InvocationPipelineService);
@@ -72,7 +96,8 @@ describe('InvocationPipelineService', () => {
     expect(res.content[0].text).toMatch(/unknown/i);
   });
 
-  it('returns hitl_required for third-party standard write and issues a real token', async () => {
+  it('returns hitl_required for a third-party standard write in a self-confirm workspace and issues a real token', async () => {
+    mockChallenges.tenantAllowsSelfConfirm.mockResolvedValue(true);
     mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
@@ -126,7 +151,7 @@ describe('InvocationPipelineService', () => {
         hitlTier: 'none',
       }),
     );
-    expect(mockExecutor.execute).toHaveBeenCalledWith('query-records', { status: 'active' }, p);
+    expect(mockExecutor.execute).toHaveBeenCalledWith('query-records', { status: 'active' }, p, { role: 'MEMBER' });
     expect(mockLogger.completeSuccess).toHaveBeenCalledWith(expect.objectContaining({ rowId: 'row-1', tenantId: 7 }));
     expect(res.content[0].text).toBe('result');
   });
@@ -190,7 +215,7 @@ describe('InvocationPipelineService', () => {
         hitlTier: 'sensitive',
       }),
     );
-    expect(mockExecutor.execute).toHaveBeenCalledWith('void-invoice', { id: 1 }, p);
+    expect(mockExecutor.execute).toHaveBeenCalledWith('void-invoice', { id: 1 }, p, { role: 'MEMBER' });
     expect(mockLogger.completeSuccess).toHaveBeenCalled();
   });
 
@@ -198,7 +223,7 @@ describe('InvocationPipelineService', () => {
     mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
-    mockChallenges.consume.mockResolvedValue({ id: 'tok-1', tier: 'standard' });
+    mockChallenges.consume.mockResolvedValue({ ok: true, row: { id: 1, tier: 'standard' } });
     mockLogger.writePending.mockResolvedValue('row-1');
     mockExecutor.execute.mockResolvedValue({
       content: [{ type: 'text', text: 'sent' }],
@@ -232,7 +257,7 @@ describe('InvocationPipelineService', () => {
     mockRegistry.scopeForTool.mockReturnValue('platform:write');
     mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
     mockHitl.resolveTier.mockReturnValue('standard');
-    mockChallenges.consume.mockResolvedValue(null);
+    mockChallenges.consume.mockResolvedValue({ ok: false, reason: 'invalid' });
 
     const p = fromOAuthUser({
       onBehalfOfUserDbId: Number('1'),
@@ -252,20 +277,530 @@ describe('InvocationPipelineService', () => {
     expect(mockLogger.writePending).not.toHaveBeenCalled();
   });
 
-  it('does not call challenges.issue/consume for user principals (chat stays on inline-confirm UI path)', async () => {
-    mockRegistry.scopeForTool.mockReturnValue('platform:write');
-    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
-    mockHitl.resolveTier.mockReturnValue('standard');
-    mockLogger.writePending.mockResolvedValue('row-1');
-    mockExecutor.execute.mockResolvedValue({
-      content: [{ type: 'text', text: 'sent' }],
+  describe('external agents wait for a person (item 8c)', () => {
+    const schema = z.object({ subject: z.string(), contact: z.object({ email: z.string() }) });
+    const args = { subject: 'Printer', contact: { email: 'ada@example.com' } };
+    const agent = () =>
+      fromOAuthUser({
+        onBehalfOfUserDbId: 4,
+        tenantDbId: 1,
+        role: 'MEMBER',
+        scopes: ['platform:write'],
+        clientId: 'c',
+      });
+    const body = (res: { content: { text: string }[] }) => JSON.parse(res.content[0].text);
+
+    beforeEach(() => {
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['create-thing']));
+      mockRegistry.parametersForTool.mockReturnValue(schema);
     });
 
-    const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
-    await svc.run(p, 'send-invoice', { id: 1 });
+    it('a standard write answers approval_required with the approval link and stores the exact parsed arguments', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.tenantAllowsSelfConfirm.mockResolvedValue(false);
+      mockChallenges.issue.mockResolvedValue({
+        token: '17',
+        ttlSeconds: 3600,
+        stepUpRequired: false,
+        approvalRequired: true,
+      });
 
-    expect(mockChallenges.issue).not.toHaveBeenCalled();
-    expect(mockChallenges.consume).not.toHaveBeenCalled();
-    expect(mockExecutor.execute).toHaveBeenCalled();
+      const res = await svc.run(agent(), 'create-thing', { ...args, _userId: 'forged' });
+
+      expect(body(res)).toMatchObject({
+        status: 'approval_required',
+        token: '17',
+        approvalUrl: 'https://app.example.com/agent-actions/17/approve',
+      });
+      expect(mockChallenges.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ approvalRequired: true, argsPreview: args, argsRedacted: undefined }),
+      );
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('reads the app URL through ConfigService, never process.env', async () => {
+      const before = process.env.APP_URL;
+      process.env.APP_URL = 'https://env.example.com';
+      mockConfig.get.mockReturnValue(undefined);
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.issue.mockResolvedValue({
+        token: '17',
+        ttlSeconds: 3600,
+        stepUpRequired: false,
+        approvalRequired: true,
+      });
+      try {
+        const res = await svc.run(agent(), 'create-thing', args);
+        expect(body(res)).toMatchObject({ status: 'approval_required' });
+        expect(body(res)).not.toHaveProperty('approvalUrl');
+      } finally {
+        if (before === undefined) delete process.env.APP_URL;
+        else process.env.APP_URL = before;
+      }
+    });
+
+    it('a self-confirm workspace gets the echo-the-token flow for a standard write, with nothing to approve', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.tenantAllowsSelfConfirm.mockResolvedValue(true);
+      mockChallenges.issue.mockResolvedValue({
+        token: '18',
+        ttlSeconds: 600,
+        stepUpRequired: false,
+        approvalRequired: false,
+      });
+
+      const res = await svc.run(agent(), 'create-thing', args);
+
+      expect(body(res)).toMatchObject({ status: 'hitl_required', stepUpRequired: false, token: '18' });
+      expect(body(res)).not.toHaveProperty('approvalUrl');
+      expect(mockChallenges.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ approvalRequired: false, argsPreview: undefined }),
+      );
+    });
+
+    it('a sensitive write returns the approval link for the PIN step, with only the redacted arguments stored', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      mockChallenges.tenantAllowsSelfConfirm.mockResolvedValue(false);
+      mockChallenges.issue.mockResolvedValue({
+        token: '19',
+        ttlSeconds: 300,
+        stepUpRequired: true,
+        approvalRequired: false,
+      });
+
+      const res = await svc.run(agent(), 'create-thing', args);
+
+      expect(body(res)).toMatchObject({
+        status: 'hitl_required',
+        stepUpRequired: true,
+        approvalUrl: 'https://app.example.com/agent-actions/19/approve',
+      });
+      expect(mockChallenges.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tier: 'sensitive',
+          approvalRequired: false,
+          argsPreview: undefined,
+          argsRedacted: { subject: 'Printer', contact: { email: '[redacted-email]' } },
+        }),
+      );
+    });
+
+    it('self-confirm on does not remove the PIN step from a sensitive write', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      mockChallenges.tenantAllowsSelfConfirm.mockResolvedValue(true);
+      mockChallenges.issue.mockImplementation(async (input: { tier: string }) => ({
+        token: '20',
+        ttlSeconds: 300,
+        stepUpRequired: input.tier === 'sensitive',
+        approvalRequired: false,
+      }));
+
+      const res = await svc.run(agent(), 'create-thing', args);
+
+      expect(body(res)).toMatchObject({ status: 'hitl_required', stepUpRequired: true });
+      expect(body(res).approvalUrl).toBe('https://app.example.com/agent-actions/20/approve');
+      expect(mockChallenges.issue).toHaveBeenCalledWith(expect.objectContaining({ tier: 'sensitive' }));
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('a retry before the person decides answers approval_pending with the link, and runs nothing', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.consume.mockResolvedValue({ ok: false, reason: 'pending' });
+
+      const res = await svc.run(agent(), 'create-thing', { ...args, _confirmToken: '17' });
+
+      expect(res.isError).toBe(true);
+      expect(body(res)).toEqual({
+        error: 'approval_pending',
+        tool: 'create-thing',
+        approvalUrl: 'https://app.example.com/agent-actions/17/approve',
+      });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+    });
+
+    it('a retry of a denied request answers approval_denied, with no link, and runs nothing', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.consume.mockResolvedValue({ ok: false, reason: 'denied' });
+
+      const res = await svc.run(agent(), 'create-thing', { ...args, _confirmToken: '17' });
+
+      expect(body(res)).toEqual({ error: 'approval_denied', tool: 'create-thing' });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('chat grants (item 8b): a signed-in user writes only against a confirmed card', () => {
+    const schema = z.object({ subject: z.string(), detail: z.object({ amount: z.number() }) });
+    const args = { subject: 'Printer', detail: { amount: 5 } };
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['create-thing']));
+      mockRegistry.parametersForTool.mockReturnValue(schema);
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockLogger.writePending.mockResolvedValue('row-1');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'created' }] });
+    });
+
+    it('a write with no grant answers confirmation_required, changes nothing and logs nothing', async () => {
+      mockChallenges.consumeChatGrant.mockResolvedValue(null);
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      const res = await svc.run(p, 'create-thing', args);
+
+      expect(res.isError).toBeFalsy();
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ status: 'confirmation_required', tool: 'create-thing' });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+    });
+
+    it('a user principal outside a conversation can never write, and no grant is even looked for', async () => {
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER' });
+
+      const res = await svc.run(p, 'create-thing', args);
+
+      expect(JSON.parse(res.content[0].text)).toMatchObject({ status: 'confirmation_required' });
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('spends the grant for this conversation, tool and exact digest, then runs and records the grant on the audit row', async () => {
+      mockChallenges.consumeChatGrant.mockResolvedValue('77');
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      const res = await svc.run(p, 'create-thing', { ...args, _tenantId: 999 });
+
+      expect(mockChallenges.consumeChatGrant).toHaveBeenCalledWith({
+        tenantId: 7,
+        userId: 42,
+        conversationId: 'conv_a',
+        toolName: 'create-thing',
+        argsDigest: intentDigest(schema, args),
+      });
+      expect(mockLogger.writePending).toHaveBeenCalledWith(expect.objectContaining({ confirmationTokenId: '77' }));
+      expect(res.content[0].text).toBe('created');
+      // The chat path never issues or replays a third-party challenge.
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+    });
+
+    it('a read needs no grant', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockHitl.resolveTier.mockReturnValue('none');
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      await svc.run(p, 'create-thing', args);
+
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+
+    it('preflight runs steps 1 to 4 only: no grant is spent, nothing is logged or run', async () => {
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      expect(await svc.preflight(p, 'create-thing', args)).toBeNull();
+      expect(mockChallenges.consumeChatGrant).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('preflight returns the refusal the pipeline would give (a role refusal), so no card is raised for it', async () => {
+      const denial = { content: [{ type: 'text', text: JSON.stringify({ status: 'role_not_permitted' }) }] };
+      mockPolicy.checkRole.mockReturnValue(denial);
+      const p = fromUser({ userId: 42, tenantId: 7, role: 'MEMBER', conversationId: 'conv_a' });
+
+      expect(await svc.preflight(p, 'create-thing', args)).toBe(denial);
+    });
+  });
+
+  describe('arguments (step 2)', () => {
+    const schema = z.object({ subject: z.string().min(1), priority: z.enum(['LOW', 'HIGH']).default('LOW') });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['t']));
+      mockRegistry.parametersForTool.mockReturnValue(schema);
+      mockHitl.resolveTier.mockReturnValue('none');
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+    });
+
+    it('refuses args that do not parse with VALIDATION_FAILED + fieldErrors; nothing runs or is logged', async () => {
+      const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+      const res = await svc.run(p, 't', { subject: 42 });
+      expect(res.isError).toBe(true);
+      const body = JSON.parse(res.content[0].text);
+      expect(body.code).toBe('VALIDATION_FAILED');
+      expect(body.fieldErrors).toHaveProperty('subject');
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockPolicy.checkRole).not.toHaveBeenCalled();
+    });
+
+    it('passes the parsed args (defaults applied, unknown keys dropped) and drops every `_` key the caller sent', async () => {
+      const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+      await svc.run(p, 't', { subject: 'Hi', extra: 'x', _tenantId: 999, _role: 'OWNER', _invocationSource: 'desk' });
+      expect(mockExecutor.execute).toHaveBeenCalledWith('t', { subject: 'Hi', priority: 'LOW' }, p, {
+        role: 'MEMBER',
+      });
+    });
+  });
+
+  describe('role and plan (steps 3 and 4) run before any confirmation', () => {
+    const agent = () =>
+      fromOAuthUser({ onBehalfOfUserDbId: 5, tenantDbId: 1, role: 'ADMIN', scopes: ['platform:write'], clientId: 'c' });
+    const refusalOf = (status: string) => ({ content: [{ type: 'text', text: JSON.stringify({ status }) }] });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['w']));
+      mockHitl.resolveTier.mockReturnValue('standard');
+    });
+
+    it('a role refusal is a plain result (not isError); no challenge is issued and nothing runs', async () => {
+      mockPolicy.checkRole.mockReturnValue(refusalOf('role_not_permitted'));
+      const res = await svc.run(agent(), 'w', {});
+      expect(res.isError).toBeFalsy();
+      expect(res.content[0].text).toMatch(/role_not_permitted/);
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('a plan refusal is a plain result; no challenge is issued and nothing runs', async () => {
+      mockPolicy.checkPlan.mockResolvedValue(refusalOf('not_on_plan'));
+      const res = await svc.run(agent(), 'w', { _confirmToken: 'tok' });
+      expect(res.isError).toBeFalsy();
+      expect(res.content[0].text).toMatch(/not_on_plan/);
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('role and plan are judged with the acting role read for this principal', async () => {
+      mockPolicy.actingRole.mockResolvedValue('ADMIN');
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 300, stepUpRequired: false });
+      const p = agent();
+      await svc.run(p, 'w', {});
+      expect(mockPolicy.actingRole).toHaveBeenCalledWith(p);
+      expect(mockPolicy.checkRole).toHaveBeenCalledWith(p, 'w', 'ADMIN');
+      expect(mockPolicy.checkPlan).toHaveBeenCalledWith(p, 'w', 'ADMIN');
+    });
+
+    it('an API key (deny by default) is challenged for a write', async () => {
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 300, stepUpRequired: false });
+      const p = fromApiKey({ apiKeyId: 3, tenantId: 1, userId: 5, scopes: ['platform:write'] });
+      const res = await svc.run(p, 'w', {});
+      expect(res.content[0].text).toMatch(/hitl_required/);
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('membership and the acting role (step 3, the real policy)', () => {
+    const prisma = { workspaceMember: { findUnique: jest.fn() }, tenant: { findUnique: jest.fn() } };
+    const registry = { ...mockRegistry, roleRestrictionForTool: jest.fn(), planFeatureForTool: jest.fn() };
+    let real: InvocationPipelineService;
+
+    beforeEach(() => {
+      prisma.workspaceMember.findUnique.mockReset();
+      registry.roleRestrictionForTool.mockReturnValue(undefined);
+      registry.planFeatureForTool.mockReturnValue(undefined);
+      const policy = new ToolAccessPolicyService(registry as any, prisma as any, { canActivate: jest.fn() } as any);
+      real = new InvocationPipelineService(
+        registry as any,
+        mockHitl,
+        mockExecutor as any,
+        mockLogger as any,
+        mockChallenges as any,
+        policy,
+        { get: () => undefined } as never,
+      );
+    });
+
+    it('refuses an API key whose owner has no membership, on an unrestricted read', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:read');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['list-support-tickets']));
+      mockHitl.resolveTier.mockReturnValue('none');
+      prisma.workspaceMember.findUnique.mockResolvedValue(null);
+      const key = fromApiKey({ apiKeyId: 2, tenantId: 3, userId: 12, scopes: ['platform:read'] });
+
+      const res = await real.run(key, 'list-support-tickets', {});
+
+      expect(res.isError).toBeFalsy();
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        status: 'role_not_permitted',
+        tool: 'list-support-tickets',
+      });
+      expect(prisma.workspaceMember.findUnique).toHaveBeenCalledWith({
+        where: { userId_tenantId: { userId: 12, tenantId: 3 } },
+        select: { role: true },
+      });
+      expect(mockLogger.writePending).not.toHaveBeenCalled();
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it("caps a chat persona's scopes at the user's current role: a MEMBER in a super_admin conversation", async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['void-invoice']));
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+      // The persona picked by the client says SUPER_ADMIN; its scope set holds the sensitive write.
+      const chat = fromUser({ userId: 4, tenantId: 9, role: 'SUPER_ADMIN', scopes: scopesForRole('SUPER_ADMIN') });
+
+      const res = await real.run(chat, 'void-invoice', { id: 1 });
+
+      expect(res.isError).toBe(true);
+      expect(JSON.parse(res.content[0].text)).toMatchObject({
+        error: 'scope_denied',
+        required_scope: 'platform:write:sensitive',
+      });
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('lets the same persona through when the current role holds the scope', async () => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write:sensitive');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['void-invoice']));
+      mockHitl.resolveTier.mockReturnValue('sensitive');
+      mockLogger.writePending.mockResolvedValue('row-o');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'voided' }] });
+      prisma.workspaceMember.findUnique.mockResolvedValue({ role: 'OWNER' });
+      mockChallenges.consumeChatGrant.mockResolvedValue('5');
+      const chat = fromUser({
+        userId: 4,
+        tenantId: 9,
+        role: 'OWNER',
+        scopes: scopesForRole('OWNER'),
+        conversationId: 'conv_o',
+      });
+
+      const res = await real.run(chat, 'void-invoice', { id: 1 });
+
+      expect(res.content[0].text).toBe('voided');
+    });
+  });
+
+  describe('Desk at each tier', () => {
+    it.each([
+      ['platform:read', 'none'],
+      ['platform:write', 'standard'],
+      ['platform:write:sensitive', 'sensitive'],
+    ] as const)('%s executes with no challenge and records tier %s in the audit row', async (scope, tier) => {
+      const realTier = new HitlPolicyService();
+      mockHitl.resolveTier.mockImplementation((s, pr) => realTier.resolveTier(s, pr));
+      mockRegistry.scopeForTool.mockReturnValue(scope);
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['d']));
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'done' }] });
+      const p = fromDeskResponsibility({ responsibilityId: 1, tenantId: 7, scopes: [scope], enabledByUserId: 42 });
+
+      const res = await svc.run(p, 'd', {});
+
+      expect(res.content[0].text).toBe('done');
+      expect(mockChallenges.issue).not.toHaveBeenCalled();
+      expect(mockChallenges.consume).not.toHaveBeenCalled();
+      expect(mockLogger.writePending).toHaveBeenCalledWith(expect.objectContaining({ hitlTier: tier }));
+      mockHitl.resolveTier.mockReset();
+    });
+  });
+
+  describe('the challenge digest (item 8a): exact arguments, every depth', () => {
+    const writeSchema = z.object({
+      invoice: z.object({ amount: z.number() }),
+      to: z.string(),
+      memo: z.string().default(''),
+    });
+    const agent = () =>
+      fromOAuthUser({ onBehalfOfUserDbId: 5, tenantDbId: 1, role: 'ADMIN', scopes: ['platform:write'], clientId: 'c' });
+
+    beforeEach(() => {
+      mockRegistry.scopeForTool.mockReturnValue('platform:write');
+      mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['send-invoice']));
+      mockRegistry.parametersForTool.mockReturnValue(writeSchema);
+      mockHitl.resolveTier.mockReturnValue('standard');
+      mockChallenges.issue.mockResolvedValue({ token: 't', ttlSeconds: 600, stepUpRequired: false });
+    });
+
+    const issuedDigest = async (args: Record<string, unknown>) => {
+      mockChallenges.issue.mockClear();
+      await svc.run(agent(), 'send-invoice', args);
+      return mockChallenges.issue.mock.calls[0][0].argsDigest as string;
+    };
+
+    it('issues the challenge over the intent digest of the call', async () => {
+      const args = { invoice: { amount: 5 }, to: 'ap@example.com' };
+      expect(await issuedDigest(args)).toBe(intentDigest(writeSchema, args));
+    });
+
+    it('a change inside a nested object needs a new challenge', async () => {
+      const small = await issuedDigest({ invoice: { amount: 5 }, to: 'ap@example.com' });
+      const large = await issuedDigest({ invoice: { amount: 500 }, to: 'ap@example.com' });
+      expect(large).not.toBe(small);
+    });
+
+    it('a change inside a field the log redacts needs a new challenge', async () => {
+      const approved = await issuedDigest({ invoice: { amount: 5 }, to: 'ap@example.com' });
+      const swapped = await issuedDigest({ invoice: { amount: 5 }, to: 'attacker@example.com' });
+      expect(swapped).not.toBe(approved);
+    });
+
+    it('the replay is checked against the exact digest, so swapped arguments cannot spend an approval', async () => {
+      mockChallenges.consume.mockResolvedValue({ ok: false, reason: 'invalid' });
+      await svc.run(agent(), 'send-invoice', {
+        invoice: { amount: 500 },
+        to: 'attacker@example.com',
+        _confirmToken: 't',
+      });
+      expect(mockChallenges.consume).toHaveBeenCalledWith(
+        't',
+        expect.objectContaining({
+          argsDigest: intentDigest(writeSchema, { invoice: { amount: 500 }, to: 'attacker@example.com' }),
+        }),
+      );
+      expect(mockChallenges.consume.mock.calls[0][1].argsDigest).not.toBe(
+        intentDigest(writeSchema, { invoice: { amount: 5 }, to: 'ap@example.com' }),
+      );
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('a re-spelled replay of the same call (key order, explicit default) still matches', async () => {
+      const issued = await issuedDigest({ to: 'ap@example.com', invoice: { amount: 5 } });
+      mockChallenges.consume.mockResolvedValue({ id: 1 });
+      mockLogger.writePending.mockResolvedValue('row');
+      mockExecutor.execute.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+      await svc.run(agent(), 'send-invoice', {
+        memo: '',
+        invoice: { amount: 5 },
+        to: 'ap@example.com',
+        _confirmToken: 't',
+      });
+      expect(mockChallenges.consume.mock.calls[0][1].argsDigest).toBe(issued);
+      expect(mockExecutor.execute).toHaveBeenCalled();
+    });
+  });
+
+  it('an executor throw is logged in full on the audit row and answered generically (step 7)', async () => {
+    mockRegistry.scopeForTool.mockReturnValue('platform:read');
+    mockRegistry.toolsAllowedByScopes.mockReturnValue(new Set(['q']));
+    mockHitl.resolveTier.mockReturnValue('none');
+    mockLogger.writePending.mockResolvedValue('row-x');
+    mockExecutor.execute.mockRejectedValue(new Error('connection to 10.0.0.5 refused'));
+    const p = fromUser({ userId: 1, tenantId: 1, role: 'MEMBER' });
+
+    const res = await svc.run(p, 'q', {});
+
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text)).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
+    expect(mockLogger.completeError).toHaveBeenCalledWith(
+      expect.objectContaining({ rowId: 'row-x', error: 'connection to 10.0.0.5 refused' }),
+    );
   });
 });

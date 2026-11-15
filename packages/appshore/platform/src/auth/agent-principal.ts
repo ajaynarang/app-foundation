@@ -10,6 +10,11 @@ export type UserPrincipal = {
   scopes: AgentScope[];
   authMethod: 'jwt';
   auditId: string;
+  /**
+   * The in-app chat conversation the call belongs to. A chat write runs only against a confirmation the person gave
+   * in this conversation, so a user principal without one can never run a write.
+   */
+  conversationId?: string;
 };
 
 export type OAuthClientPrincipal = {
@@ -50,6 +55,7 @@ export function fromUser(input: {
   tenantId: number;
   role: string;
   scopes?: AgentScope[];
+  conversationId?: string;
 }): UserPrincipal {
   assertDbId(input.userId, 'fromUser.userId');
   assertDbId(input.tenantId, 'fromUser.tenantId');
@@ -61,6 +67,7 @@ export function fromUser(input: {
     scopes: input.scopes ?? [],
     authMethod: 'jwt',
     auditId: `user:${input.userId}`,
+    ...(input.conversationId && { conversationId: input.conversationId }),
   };
 }
 

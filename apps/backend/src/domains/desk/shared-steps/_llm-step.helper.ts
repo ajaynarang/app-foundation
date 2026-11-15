@@ -43,6 +43,11 @@ export interface RunStructuredLlmStepInput<TSchema extends ZodSchema, TOutput = 
   schema: TSchema;
   userMessage: string;
   timeoutMs?: number;
+  /**
+   * The ceiling on the step's answer. Required: size it to the step's schema with `OUTPUT_CEILINGS`
+   * (`domains/ai/routing/output-ceilings.ts`) and name it next to the step.
+   */
+  maxOutputTokens: number;
   /** Extract a confidence number from the validated output, if present. */
   extractConfidence?: (output: TOutput) => number | null | undefined;
   /** Services — passed in so step handlers don't each call nestApp. */
@@ -85,6 +90,7 @@ export async function runStructuredLlmStep<TOutput>(
       modelAlias: input.model,
       systemPrompt,
       timeoutMs: input.timeoutMs ?? 30_000,
+      maxOutputTokens: input.maxOutputTokens,
       // Desk steps are billable, user-supervised work — enforce the hard cap.
       // A blocked step surfaces as a FAILED step (the catch below) carrying
       // the budget message, which routes the episode to human review.

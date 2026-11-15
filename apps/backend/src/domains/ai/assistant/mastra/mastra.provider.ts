@@ -1,11 +1,30 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { PostgresStore } from '@mastra/pg';
 import { Observability } from '@mastra/observability';
 import { LangfuseExporter } from '@mastra/langfuse';
-import { ai } from '../../infrastructure/providers/ai-provider';
+import type { RequestContext } from '@mastra/core/request-context';
+import type { LanguageModel } from 'ai';
+import { REQUEST_MODEL_KEY } from '../../routing/request-model-key';
+
+/**
+ * Per-request model: agents own no model. Every call site resolves the tenant's route
+ * (`AiRouteResolver.resolve(tenantId, 'language')`) and passes the alias's model in the request context under
+ * `REQUEST_MODEL_KEY`. A call without one is a routing bypass, so it fails loud (a clean 500) instead of falling back
+ * to any default provider.
+ */
+export const perRequestModel = ({ requestContext }: { requestContext: RequestContext }): LanguageModel => {
+  // RequestContext<unknown> types its keys as `never`; read through a minimal structural view.
+  const model = (requestContext as { get(key: string): unknown }).get(REQUEST_MODEL_KEY) as LanguageModel | undefined;
+  if (!model) {
+    throw new InternalServerErrorException(
+      `Agent invoked without a resolved model: resolve a route and pass requestContext [${REQUEST_MODEL_KEY}]`,
+    );
+  }
+  return model;
+};
 
 /** Lean base prompt for the generic assistant (~100 tokens). */
 const BASE_ASSISTANT =
@@ -20,6 +39,7 @@ const BASE_ASSISTANT =
  * - LangFuse observability via @mastra/langfuse
  * - Shared Memory with PostgresStore
  *
+ * Agents own no model: each takes the one its caller resolved for the tenant (`perRequestModel`).
  * Agents get a lean base prompt. Skills are injected per-request via
  * AbstractBaseAgent.chat(). Tools are passed dynamically per-request via
  * `toolsets` (Mastra multi-tenant pattern).
@@ -68,7 +88,7 @@ export class MastraProvider implements OnModuleInit, OnModuleDestroy {
         id: 'assistant',
         name: 'Assistant',
         instructions: BASE_ASSISTANT,
-        model: ai('standard'),
+        model: perRequestModel,
         memory,
       }),
     };

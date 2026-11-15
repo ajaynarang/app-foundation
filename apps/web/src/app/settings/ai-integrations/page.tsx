@@ -10,7 +10,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components
 import { Separator } from '@app/ui/components/ui/separator';
 import { UrlRow } from '@app/ui/components/ui/url-row';
 import { getApiBaseUrl, getEnvironmentLabel, getMcpBaseUrl } from '@appshore/web-core/shared/lib/access-environments';
+import { USER_ROLES } from '@app/shared-types';
 import { PageHeader } from '@/shared/components/page-chrome';
+import { useAuthStore } from '@/features/auth';
+import { AgentPolicyCard } from '@/features/platform/agent-actions';
 
 interface Platform {
   id: string;
@@ -197,6 +200,10 @@ export default function AiAssistantsPage() {
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
   const environmentLabel = useMemo(() => getEnvironmentLabel(apiBaseUrl), [apiBaseUrl]);
   const mcpUrl = useMemo(() => getMcpBaseUrl(apiBaseUrl), [apiBaseUrl]);
+  const role = useAuthStore((state) => state.user?.role);
+  const isOwner = role === USER_ROLES.OWNER;
+  // The policy is read by an owner or admin only; a member does not see the row.
+  const canSeePolicy = isOwner || role === USER_ROLES.ADMIN;
 
   return (
     <div className="space-y-6">
@@ -226,6 +233,9 @@ export default function AiAssistantsPage() {
           <UrlRow label="API Base URL" value={apiBaseUrl} />
         </CardContent>
       </Card>
+
+      {/* Whether agent writes wait for a person (owner switch) */}
+      {canSeePolicy ? <AgentPolicyCard isOwner={isOwner} /> : null}
 
       {/* Platform cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

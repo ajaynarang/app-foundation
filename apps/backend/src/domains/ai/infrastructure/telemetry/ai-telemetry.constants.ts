@@ -25,6 +25,8 @@ export const AI_LINK_REF_TYPES = {
   DESK_MEMORY_RULE: 'desk_memory_rule',
   /** Assistant chat turn, keyed by conversation message id (wired in a later PR). */
   CONVERSATION_MESSAGE: 'conversation_message',
+  /** A whole assistant conversation, keyed by its public conversation id (voice session meters). */
+  CONVERSATION: 'conversation',
   /** Knowledge-base ingestion chunk (wired in a later PR). */
   KB_DOCUMENT: 'kb_document',
 } as const;

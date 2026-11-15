@@ -177,6 +177,7 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 
 - **Pin the recipient / entity id from hydrate, never from the LLM draft.** A SUPERVISED gate hides this today, but it becomes a live misroute the day trust flips to ASSISTED/AUTONOMOUS (the no-approval branch executes the args verbatim). The workflow spec should assert a hallucinated `draft.to`/name is ignored.
 - **hydrate resolves domain services via the root Nest container** (see `core/inngest/nest-context.ts`) — this works WITHOUT importing that service's module into DeskModule, because the root `INestApplication` searches the whole DI graph for any exported provider.
+- **After adding a responsibility key, outcome or event, run `pnpm build`.** An exhaustive `Record<Key, …>` over a key union (`Record<TrustLevel, …>` in `core/types/enums.ts` is one; a responsibility often adds its own), a typed `DeskEvents` payload and the `ResponsibilityDefinition` contract are checked only by the compiler. Jest will not catch a missing entry or a wrong shape: ts-jest runs with `diagnostics: false` and `isolatedModules: true` (`apps/backend/package.json`), so specs pass while the map is incomplete. Only the build type-checks it.
 - **Calendar dates** (`@db.Date`): never `new Date(dateOnlyString)` (off-by-one across timezones). Format the raw string or use a UTC-safe helper.
 - **Desk steps run in Inngest workers, not HTTP** — throw plain `Error`, not NestJS exceptions. MCP tools return `{ error }`, never throw.
 - **Auto-escalate terminal failures to a distinct close step** — Inngest memoizes completed steps, so reusing the same step id for the failure path can silently suppress human review.
@@ -205,6 +206,7 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 - The act is "decision-only" and you're about to ship `tools: []` for an automated duty without confirming the new-pattern risk with the user.
 - Recipient/entity id sourced from the LLM draft instead of hydrate.
 - `triggers` is `[{ kind: 'manual' }]` only for a duty that has a natural cadence — you stripped the domain trigger instead of leaving it disabled-by-default.
+- You added a responsibility key, outcome or event and ran only the specs, not `pnpm build` (ts-jest does not type-check, so a missing `Record` entry passes the tests).
 - A new domain enum/status hand-written instead of added to the Prisma schema (see `backend-patterns` §6.4).
 - Trust thresholds inlined instead of imported from `TRUST_LEVEL_CONFIDENCE_THRESHOLDS`.
 - Skipping the `plan` or `review` skills — this skill wraps them, it doesn't replace them.

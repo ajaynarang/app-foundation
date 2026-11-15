@@ -8,19 +8,19 @@ import { HitlPolicyService } from '../hitl-policy.service';
 import { ToolExecutorService } from '../tool-executor.service';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { InvocationPipelineService } from '../invocation-pipeline.service';
+import { ToolAccessPolicyService } from '../tool-access-policy.service';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
 import { RequiresScope } from '../requires-scope.decorator';
-import type { AiPrismaService } from '../../rls/ai-prisma.service';
 import type { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 
 /**
  * Phase A end-to-end smoke: real pipeline + real PrismaClient writing a row
- * into agent_invocation_logs, with mocked registry/moduleRef/aiPrisma. The
+ * into agent_invocation_logs, with mocked registry/moduleRef. The
  * pipeline is always on. Skipped when DATABASE_URL is unset or names no usable
  * database: Postgres is unreachable, refuses the login, has no such database, is
- * not migrated, or holds no seeded tenant. Any other failure in setup fails the spec.
+ * not migrated, or holds no seeded workspace member. Any other failure in setup fails the spec.
  * The rows a run writes (its agent_invocation_logs row and the outbox_events row of
  * app.agent.invocation-completed) are deleted in afterAll.
  */
@@ -62,6 +62,7 @@ describe('Phase A pipeline integration', () => {
   let pipeline: InvocationPipelineService;
   let dbReachable = false;
   let testTenantId: number;
+  let testUserId: number;
   const suiteStart = new Date();
 
   beforeAll(async () => {
@@ -73,14 +74,17 @@ describe('Phase A pipeline integration', () => {
       pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
       const adapter = new PrismaPg(pool);
       prisma = new PrismaClient({ adapter });
-      const anyTenant = await prisma.tenant.findFirst({
+      // The pipeline refuses a person with no membership in the workspace, so act as a real member.
+      const member = await prisma.workspaceMember.findFirst({
         orderBy: { id: 'asc' },
+        select: { userId: true, tenantId: true },
       });
-      if (!anyTenant) {
-        console.warn('pipeline.integration: no seeded tenant — skipping');
+      if (!member) {
+        console.warn('pipeline.integration: no seeded workspace member — skipping');
         return;
       }
-      testTenantId = anyTenant.id;
+      testTenantId = member.tenantId;
+      testUserId = member.userId;
       dbReachable = true;
     } catch (err) {
       if (!isNoDatabase(err)) throw err;
@@ -105,10 +109,6 @@ describe('Phase A pipeline integration', () => {
       get: (token: unknown) => (token === TestRecordsReadTool ? toolInstance : null),
     } as unknown as ModuleRef;
 
-    const aiPrisma = {
-      executeWithRlsContext: (_t: number, _u: number, _r: string, fn: () => Promise<unknown>) => fn(),
-    } as unknown as AiPrismaService;
-
     // The real outbox on the real database; publishing is a no-op, so the staged rows are simply marked published.
     const events = {
       publish: async () => undefined,
@@ -119,7 +119,8 @@ describe('Phase A pipeline integration', () => {
     await scopeRegistry.onApplicationBootstrap();
 
     const hitl = new HitlPolicyService();
-    const executor = new ToolExecutorService(scopeRegistry, aiPrisma, moduleRef, prisma as any);
+    // No tool here declares idempotencyKey, so the store is never asked.
+    const executor = new ToolExecutorService(scopeRegistry, moduleRef, prisma as any, {} as never);
     const logger = new AgentInvocationLoggerService(prisma as any, outbox);
     const challenges = {
       issue: async () => ({
@@ -129,7 +130,11 @@ describe('Phase A pipeline integration', () => {
       consume: async () => ({ ok: true }),
       verifyPin: async () => ({ ok: true }),
     } as any;
-    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges);
+    // The read tool declares no plan feature, so the guard is never consulted; the membership read is real.
+    const policy = new ToolAccessPolicyService(scopeRegistry, prisma as any, { canActivate: async () => true } as any);
+    pipeline = new InvocationPipelineService(scopeRegistry, hitl, executor, logger, challenges, policy, {
+      get: () => undefined,
+    } as never);
   }, 30_000);
 
   afterAll(async () => {
@@ -157,7 +162,7 @@ describe('Phase A pipeline integration', () => {
 
     const before = new Date();
     const principal = fromUser({
-      userId: 1,
+      userId: testUserId,
       tenantId: testTenantId,
       role: 'MEMBER',
       scopes: ['platform:read'],

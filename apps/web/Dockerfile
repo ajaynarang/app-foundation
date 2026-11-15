@@ -18,6 +18,8 @@ WORKDIR /workspace
 
 # Copy workspace manifests first for better layer caching.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# pnpm.patchedDependencies: the frozen install fails without the patch files.
+COPY patches ./patches
 COPY turbo.json* ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/backend/package.json ./apps/backend/
@@ -84,6 +86,8 @@ WORKDIR /workspace
 
 # Copy root workspace configuration
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# pnpm.patchedDependencies: the frozen install fails without the patch files.
+COPY patches ./patches
 COPY turbo.json* ./
 
 # Copy workspace packages (needed for @app/ui, @app/shared-types)

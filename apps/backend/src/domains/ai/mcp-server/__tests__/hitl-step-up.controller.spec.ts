@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { HitlStepUpController } from '../hitl-step-up.controller';
 import { HitlChallengeService } from '../../agent-contract/hitl-challenge.service';
 import { PinService } from '@appshore/platform/auth/pin.service';
+import { AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_TTL_MS } from '@appshore/platform/constants/auth.constants';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
@@ -33,6 +34,7 @@ describe('HitlStepUpController', () => {
   it('completes step-up when PIN verifies', async () => {
     prisma.user.findUnique.mockResolvedValue({ id: 42, pinHash: '$2b$10$x' });
     pinService.verifyPin.mockResolvedValue(true);
+    challenges.markStepUpCompleted.mockResolvedValue(true);
     const res = await ctrl.complete(
       'tok-1',
       { pin: '1234' },
@@ -43,6 +45,13 @@ describe('HitlStepUpController', () => {
     expect(pinService.verifyPin).toHaveBeenCalledWith('1234', '$2b$10$x');
     expect(challenges.markStepUpCompleted).toHaveBeenCalledWith('tok-1', 42);
     expect(res).toEqual({ status: 'step_up_verified' });
+  });
+
+  it("answers 404 when the challenge is used, expired or not this person's, and never reports success", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 42, pinHash: '$2b$10$x' });
+    pinService.verifyPin.mockResolvedValue(true);
+    challenges.markStepUpCompleted.mockResolvedValue(false);
+    await expect(ctrl.complete('tok-1', { pin: '1234' }, { dbId: 42 })).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('answers 400 naming pin when the PIN is wrong', async () => {
@@ -65,5 +74,20 @@ describe('HitlStepUpController', () => {
     await expect(ctrl.complete('tok-1', { pin: '1234' }, { dbId: 42 } as any)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('HitlStepUpController routes', () => {
+  // `GET mcp/hitl/:token` was folded into `GET agent-actions/:token` (item 8c); only the PIN step stays here.
+  it('limits PIN guesses like the PIN login: 5 per 15 minutes per signed-in user, not the global limit', () => {
+    const handler = HitlStepUpController.prototype.complete;
+    expect(Reflect.getMetadata('THROTTLER:LIMITdefault', handler)).toBe(AUTH_THROTTLE_LIMIT_STRICT);
+    expect(Reflect.getMetadata('THROTTLER:TTLdefault', handler)).toBe(AUTH_THROTTLE_TTL_MS);
+    expect(AUTH_THROTTLE_LIMIT_STRICT).toBe(5);
+  });
+
+  it('serves the PIN step only: the context read lives at GET agent-actions/:token', () => {
+    const methods = Object.getOwnPropertyNames(HitlStepUpController.prototype).filter((m) => m !== 'constructor');
+    expect(methods).toEqual(['complete']);
   });
 });

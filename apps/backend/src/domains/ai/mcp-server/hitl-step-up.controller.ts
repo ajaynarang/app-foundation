@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Param, Body, NotFoundException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Param, Body, NotFoundException, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@appshore/platform/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '@appshore/platform/auth/guards/tenant.guard';
@@ -6,13 +7,14 @@ import { RolesGuard } from '@appshore/platform/auth/guards/roles.guard';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
-import { HitlChallengeService, parseHitlTokenOrNull } from '../agent-contract/hitl-challenge.service';
+import { HitlChallengeService } from '../agent-contract/hitl-challenge.service';
 import { PinService } from '@appshore/platform/auth/pin.service';
+import { AUTH_THROTTLE_LIMIT_STRICT, AUTH_THROTTLE_TTL_MS } from '@appshore/platform/constants/auth.constants';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { StepUpDto } from './dto/step-up.dto';
 import { fieldError, invalidState } from '@appshore/kernel/shared/errors/api-errors';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
-import { HitlChallengeContextResponse, HitlStepUpResultResponse } from '../openapi.responses';
+import { HitlStepUpResultResponse } from '../openapi.responses';
 
 @ApiTags('MCP HITL')
 @ApiBearerAuth()
@@ -25,61 +27,10 @@ export class HitlStepUpController {
     private readonly prisma: PrismaService,
   ) {}
 
-  @Get(':token')
-  @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
-  @ApiOperation({
-    summary: 'Fetch context for a pending HITL challenge (for the approval UI)',
-    description:
-      'Returns redacted args, the calling principal label, expiry, and whether the user has a PIN set. The PIN itself is never returned. Tenant-scoped.',
-  })
-  @ApiParam({ name: 'token', description: 'HITL challenge token returned by the prior tools/call attempt' })
-  @ApiResult(HitlChallengeContextResponse)
-  async getContext(
-    @Param('token') token: string,
-    @CurrentUser()
-    user: { dbId: number; tenantDbId?: number; role?: UserRole },
-  ) {
-    const id = parseHitlTokenOrNull(token);
-    if (id === null) throw new NotFoundException('Challenge not found');
-    const challenge = await this.prisma.hitlChallenge.findUnique({
-      where: { id },
-    });
-    if (!challenge) throw new NotFoundException('Challenge not found');
-
-    if (user.role !== UserRole.SUPER_ADMIN && challenge.tenantId !== user.tenantDbId) {
-      throw new NotFoundException('Challenge not found');
-    }
-
-    const record = await this.prisma.user.findUnique({
-      where: { id: user.dbId },
-      select: { pinHash: true },
-    });
-    const hasPinSet = !!record?.pinHash;
-
-    const callerLabel = await this.challenges.callerLabelOf(challenge);
-
-    const now = Date.now();
-    const expired = challenge.expiresAt.getTime() < now;
-    const consumed = !!challenge.consumedAt;
-
-    return {
-      token: String(challenge.id),
-      tool: challenge.toolName,
-      tier: challenge.tier,
-      scopeRequired: challenge.scopeRequired,
-      callerLabel,
-      callerKind: challenge.principalKind,
-      expiresAt: challenge.expiresAt.toISOString(),
-      requiresStepUp: challenge.stepUpRequired,
-      stepUpCompleted: challenge.stepUpCompleted,
-      consumed,
-      expired,
-      hasPinSet,
-    };
-  }
-
   @Post(':token/step-up')
   @HttpCode(HttpStatus.OK)
+  // A PIN is 4 digits: hold guesses to the PIN login's limit (counted per signed-in user), not the global one.
+  @Throttle({ default: { ttl: AUTH_THROTTLE_TTL_MS, limit: AUTH_THROTTLE_LIMIT_STRICT } })
   @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER)
   @ApiOperation({
     summary: 'Complete PIN step-up for a pending HITL challenge token',
@@ -104,7 +55,9 @@ export class HitlStepUpController {
     const ok = await this.pinService.verifyPin(dto.pin, record.pinHash);
     if (!ok) throw fieldError('pin', 'That PIN is not right');
 
-    await this.challenges.markStepUpCompleted(token, user.dbId);
+    if (!(await this.challenges.markStepUpCompleted(token, user.dbId))) {
+      throw new NotFoundException('Challenge not found, already used or expired');
+    }
     return { status: 'step_up_verified' };
   }
 }

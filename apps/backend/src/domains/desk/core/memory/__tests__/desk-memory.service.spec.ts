@@ -342,6 +342,16 @@ describe('DeskMemoryService — findRelevant scoring', () => {
     expect(typeof out[0].createdAt).toBe('string');
   });
 
+  it("embeds the recall query on the tenant's own route, as a query", async () => {
+    mockCandidates([]);
+    await service.findRelevant({ tenantId: 3, agentId: 9, entityRef: {}, queryContext: 'invoice 42' });
+    expect(embedder.embedText).toHaveBeenCalledWith(
+      'invoice 42',
+      { tenantId: 3, surface: 'EMBEDDING', agentId: '9' },
+      'query',
+    );
+  });
+
   it('still returns a row when the embedder fails (semantic score = 0; structural carries it)', async () => {
     embedder.embedText.mockRejectedValueOnce(new Error('gateway down'));
     mockCandidates([buildCandidate({ id: 'b', entityRef: { customerId: '42' } })]);

@@ -21,6 +21,7 @@ import { useAiSpendInvocations } from '../hooks';
 import {
   INVOCATION_STATUS_VARIANTS,
   SURFACE_LABELS,
+  PAYER_VARIANTS,
   getLangfuseTraceUrl,
   getLangfuseSessionUrl,
   buildLangfuseSessionId,
@@ -68,6 +69,7 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
           <TableRow>
             <TableHead>Surface</TableHead>
             <TableHead className="hidden md:table-cell">Model</TableHead>
+            <TableHead className="hidden md:table-cell">Route</TableHead>
             <TableHead className="text-right">Cost</TableHead>
             <TableHead className="hidden sm:table-cell text-right">Tokens</TableHead>
             <TableHead className="hidden lg:table-cell">When</TableHead>
@@ -94,6 +96,10 @@ export function AiSpendInvocationList({ tenantId, surface }: AiSpendInvocationLi
                   )}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-muted-foreground text-xs">{row.model}</TableCell>
+                <TableCell className="hidden md:table-cell text-xs">
+                  <div className="text-muted-foreground">{row.routeId ?? '—'}</div>
+                  <StatusBadge tone={PAYER_VARIANTS[row.payer].tone}>{PAYER_VARIANTS[row.payer].label}</StatusBadge>
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{formatInvocationCost(row.costUsd)}</TableCell>
                 <TableCell className="hidden sm:table-cell text-right tabular-nums text-muted-foreground">
                   {(row.promptTokens + row.completionTokens).toLocaleString()}

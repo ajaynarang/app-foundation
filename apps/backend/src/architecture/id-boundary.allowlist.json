@@ -8,6 +8,10 @@
       "count": 1,
       "reason": "An internal callback from the voice worker carries the tenant key it was handed; it is not a client-facing body. Follow-up with the AI domain"
     },
+    "apps/backend/src/domains/ai/voice/dto/voice-usage.dto.ts": {
+      "count": 1,
+      "reason": "The voice worker's end-of-session usage report carries the same tenant key as its respond callback; an internal body, not a client-facing one. Moves with voice-respond.dto.ts"
+    },
     "apps/backend/src/domains/desk/core/agent/dto/update-agent.dto.ts": {
       "count": 1,
       "reason": "supervisorUserId is the numeric user id the eligible-supervisors picker returns. Move both to the public userId together"

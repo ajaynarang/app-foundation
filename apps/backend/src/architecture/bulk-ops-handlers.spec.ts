@@ -26,6 +26,8 @@ describe('bulk-ops queue wiring', () => {
     [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: `${platform}/auth/login-event-cleanup.processor.ts`,
     [BULK_OPS_JOB_NAMES.OUTBOX_RELAY]: `${platform}/infrastructure/events/outbox-relay.handler.ts`,
     [BULK_OPS_JOB_NAMES.DEADLINE_SWEEP]: `${platform}/infrastructure/deadlines/deadline.sweeper.ts`,
+    [APP_JOB_NAMES.BULK_OPS.AI_CREDENTIAL_REVALIDATE]:
+      '../domains/ai/routing/connect/ai-credential-revalidation.handler.ts',
   };
 
   /** Named in the constants but claimed by no handler today (foundation leftovers) — listed so a new one cannot hide. */

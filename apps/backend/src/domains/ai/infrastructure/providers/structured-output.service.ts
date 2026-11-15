@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AiInvocationStatus } from '@appshore/db';
-import { generateText, Output, type LanguageModel } from 'ai';
+import { generateText, Output } from 'ai';
 import type { ZodSchema } from 'zod';
 import type { AiCallContext, ModelAlias } from '@app/shared-types';
-import { ai, MODEL_ID_BY_ALIAS, PROVIDER_BY_ALIAS } from './ai-provider';
+import { AiRouteResolver } from '../../routing/ai-route-resolver.service';
+import type { ResolvedRoute } from '../../routing/routing.types';
 import { AiTelemetryService } from '../telemetry/ai-telemetry.service';
 import { redactMessages } from '../redaction/pii-redactor';
 import { buildLangfuseSession } from '../telemetry/langfuse-session';
+import { captureUsageShape, usageFromAiSdk, type LedgerTokens } from '../telemetry/usage-from-ai-sdk';
+import { mapProviderRefusal } from '../telemetry/ai-provider-credit-refused.error';
 import { getAiLangfuseTracer } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 
 interface ExtractOptions {
@@ -15,30 +19,33 @@ interface ExtractOptions {
   modelAlias: ModelAlias;
   systemPrompt: string;
   timeoutMs: number;
-  /** Optional pre-built model — bypasses the alias lookup when provided */
-  model?: LanguageModel;
   /**
-   * Cost-telemetry context. When supplied, every model call (including the
-   * primary attempt and any fallback retry that the caller decides to make)
-   * lands an `AiInvocation` row with attribution back to the caller's
-   * surface + linkRef. Omitting `aiContext` skips telemetry — useful only
-   * for paths that haven't been wired yet. See PR 2 of the AI Cost
-   * Telemetry plan for the rollout schedule.
+   * The ceiling on the answer's tokens. REQUIRED: unset, some routes reserve the model's whole output window, which a
+   * tight per-key credit limit refuses outright. Thinking counts toward it on the 5.5 models. Size it to the answer
+   * with `OUTPUT_CEILINGS` (`domains/ai/routing/output-ceilings.ts`) and name it next to the call.
+   */
+  maxOutputTokens: number;
+  /**
+   * Cost-telemetry and routing context. REQUIRED: routing is per tenant, so an unattributed call has no route to take
+   * (and unattributed spend is a ledger bug). Every call lands an `AiInvocation` row with attribution back to the
+   * caller's surface and linkRef.
    *
    * Callers are responsible for chaining `parentInvocationId` on retries:
    * pass the primary attempt's returned `aiInvocationId` as
    * `aiContext.parentInvocationId` for the fallback call so the ledger
    * stitches together a primary→fallback chain.
    */
-  aiContext?: AiCallContext;
+  aiContext: AiCallContext;
   /**
-   * When true (and `aiContext` is present), enforce the tenant's hard cost
+   * When true, enforce the tenant's hard cost
    * budget BEFORE the model call — a tenant over its hard cap gets an
    * `AiBudgetExceededError` thrown instead of an LLM call. Use on
    * user-facing, billable surfaces (document parsing, desk steps). Leave
    * false for non-user-facing surfaces (memory extraction) that should
    * degrade silently rather than hard-fail. Chat enforces separately in
-   * the Mastra path.
+   * the Mastra path. Checked only when the platform pays for the route: the
+   * cap is a control on platform money, and a workspace on its own key is
+   * never capped.
    */
   enforceBudget?: boolean;
 }
@@ -58,27 +65,29 @@ interface ExtractResult<T> {
 export class StructuredOutputService {
   private readonly logger = new Logger(StructuredOutputService.name);
 
-  constructor(private readonly aiTelemetry: AiTelemetryService) {}
+  constructor(
+    private readonly aiTelemetry: AiTelemetryService,
+    private readonly aiRouteResolver: AiRouteResolver,
+    @Optional() private readonly config?: ConfigService,
+  ) {}
 
   async extract<T>(options: ExtractOptions): Promise<ExtractResult<T>> {
-    // Hard-cap enforcement BEFORE we spend a model call. assertBudget throws
-    // AiBudgetExceededError on hard; the caller's existing failure path turns
-    // that into the surface-appropriate fallback (failed job, failed step).
-    // We do NOT record a ledger row for a blocked call — no tokens were spent.
-    if (options.enforceBudget && options.aiContext) {
+    // Route resolution IS the retention gate: a zero-retention tenant with no compliant route is refused
+    // (fail-closed) before the prompt leaves the building, and a deployment with no language route answers
+    // AiNotConfigured. No tokens are spent, so no ledger row is written.
+    const route = await this.aiRouteResolver.resolve(options.aiContext.tenantId, 'language');
+
+    // Hard-cap enforcement BEFORE we spend a model call, and only when the
+    // PLATFORM pays: a workspace on its own credential has no platform cap,
+    // just ledger visibility. assertBudget throws AiBudgetExceededError on
+    // hard; the caller's existing failure path turns that into the
+    // surface-appropriate fallback (failed job, failed step). We do NOT record
+    // a ledger row for a blocked call — no tokens were spent.
+    if (options.enforceBudget && route.payer === 'PLATFORM') {
       await this.aiTelemetry.assertBudget(options.aiContext.tenantId);
     }
 
-    // Zero-data-retention gate — applies to ANY tenant-attributed call (not
-    // just budget-enforced ones); it's a compliance control, not opt-in. A
-    // ZDR-flagged tenant with no compliant route for this tier is blocked
-    // (fail-closed) before the prompt leaves the building.
-    if (options.aiContext) {
-      await this.aiTelemetry.assertZeroRetention(options.aiContext.tenantId, options.modelAlias);
-    }
-
-    const model = options.model ?? ai(options.modelAlias);
-    const provider = this.providerFor(options.modelAlias);
+    const model = route.languageModel(options.modelAlias);
     const startedAt = Date.now();
 
     // Redact allowlisted PII field names from the structured payload before
@@ -90,8 +99,7 @@ export class StructuredOutputService {
     // (excessively deep type instantiation). The runtime behavior is correct.
     const output = (Output as any).object({ schema: options.schema });
 
-    let usagePayload: { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null =
-      null;
+    let usagePayload: LedgerTokens | null = null;
     let outcome: AiInvocationStatus = AiInvocationStatus.OK;
     let errorCode: string | undefined;
 
@@ -109,22 +117,31 @@ export class StructuredOutputService {
         messages,
         output,
         abortSignal: AbortSignal.timeout(options.timeoutMs),
+        maxOutputTokens: options.maxOutputTokens,
         ...(telemetryMetadata ? { experimental_telemetry: telemetryMetadata } : {}),
       });
 
-      usagePayload = this.extractUsage(result);
+      captureUsageShape(
+        options.aiContext.agentId ?? options.aiContext.surface,
+        result,
+        this.config?.get<string>('aiUsageCaptureDir'),
+      );
+      usagePayload = usageFromAiSdk(result);
       const aiInvocationId = await this.recordTelemetry(
         options,
-        provider,
+        route,
         usagePayload,
         Date.now() - startedAt,
         outcome,
         errorCode,
+        result.response?.modelId,
       );
 
       const objectResult = (result.output as T) ?? null;
       return { object: objectResult, ...(aiInvocationId ? { aiInvocationId } : {}) };
-    } catch (err) {
+    } catch (caught) {
+      // A provider's credit refusal becomes the budget error every surface already handles, never silent emptiness.
+      const err = mapProviderRefusal(caught, options.aiContext.tenantId, route);
       const isTimeout = err instanceof Error && (err.name === 'AbortError' || /timeout/i.test(err.message));
       outcome = isTimeout ? AiInvocationStatus.TIMEOUT : AiInvocationStatus.ERROR;
       errorCode = err instanceof Error ? err.name : 'UnknownError';
@@ -134,7 +151,7 @@ export class StructuredOutputService {
       // are zero when the call never returned.
       const aiInvocationId = await this.recordTelemetry(
         options,
-        provider,
+        route,
         usagePayload,
         Date.now() - startedAt,
         outcome,
@@ -142,7 +159,7 @@ export class StructuredOutputService {
       );
 
       // Re-throw so callers' existing retry/fallback logic keeps working.
-      // The thrown error type is unchanged from prior behavior; we just
+      // The thrown error type is unchanged (bar a credit refusal, typed above); we just
       // stamp the invocation id onto it so callers can join the failed
       // ledger row when they handle the throw.
       if (aiInvocationId && err && typeof err === 'object') {
@@ -152,52 +169,31 @@ export class StructuredOutputService {
     }
   }
 
-  /**
-   * Pull provider/usage shape off the AI SDK result. Different providers
-   * surface usage slightly differently (`promptTokens`/`completionTokens` on
-   * AI SDK v3, `inputTokens`/`outputTokens` on some shapes). Reading both
-   * keeps the wrapper robust to upgrades.
-   */
-  private extractUsage(
-    result: any,
-  ): { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null {
-    const usage = result?.usage ?? result?.totalUsage;
-    if (!usage) return null;
-    const promptTokens = usage.promptTokens ?? usage.inputTokens ?? 0;
-    const completionTokens = usage.completionTokens ?? usage.outputTokens ?? 0;
-    const cachedTokens =
-      usage.cachedPromptTokens ?? usage.cacheReadInputTokens ?? usage.promptTokensCached ?? undefined;
-    return { promptTokens, completionTokens, cachedTokens };
-  }
-
-  /**
-   * Coarse provider label for the ledger. Sourced from `ai-provider.ts` so
-   * a provider change updates one place.
-   */
-  private providerFor(modelAlias: ModelAlias): string {
-    return PROVIDER_BY_ALIAS[modelAlias];
-  }
-
   private async recordTelemetry(
     options: ExtractOptions,
-    provider: string,
-    usage: { promptTokens: number; completionTokens: number; cachedTokens: number | undefined } | null,
+    route: ResolvedRoute,
+    usage: LedgerTokens | null,
     latencyMs: number,
     status: AiInvocationStatus,
     errorCode: string | undefined,
+    answeredByModelId?: string,
   ): Promise<string | undefined> {
-    if (!options.aiContext) return undefined;
     try {
       const promptTokens = usage?.promptTokens ?? 0;
       const completionTokens = usage?.completionTokens ?? 0;
       const row = await this.aiTelemetry.record(
         {
-          provider,
-          model: this.modelStringFor(options.modelAlias),
+          provider: route.providerLabel,
+          // A refused call that fell back one alias up was answered (and billed)
+          // by the fallback model, so price it as that model, on the route's own id column.
+          model: route.ledgerModelIdFor(options.modelAlias, answeredByModelId),
+          routeId: route.routeId,
+          credentialType: route.credentialType,
           promptTokens,
           completionTokens,
           totalTokens: promptTokens + completionTokens,
           cachedTokens: usage?.cachedTokens,
+          cacheWriteTokens: usage?.cacheWriteTokens,
           latencyMs,
           status,
           errorCode,
@@ -225,11 +221,8 @@ export class StructuredOutputService {
    * `buildLangfuseSession` helper, and pins the isolated Langfuse tracer so
    * only model calls — not every auto-instrumented span — reach Langfuse.
    *
-   * Returns undefined when no `aiContext` is supplied — callers without
-   * attribution skip both the Postgres ledger AND Langfuse export.
    */
   private buildLangfuseTelemetry(options: ExtractOptions): Record<string, unknown> | undefined {
-    if (!options.aiContext) return undefined;
     const tracer = getAiLangfuseTracer();
     if (!tracer) return undefined;
 
@@ -241,15 +234,5 @@ export class StructuredOutputService {
       tracer,
       metadata: { sessionId, userId, tags },
     };
-  }
-
-  /**
-   * Map the alias to a stable model id for the ledger via the canonical
-   * `MODEL_ID_BY_ALIAS` map in `ai-provider.ts`. Aliases keep callers
-   * decoupled from specific model versions; the ledger preserves the
-   * alias→version snapshot so cost reconciliation survives a model bump.
-   */
-  private modelStringFor(modelAlias: ModelAlias): string {
-    return MODEL_ID_BY_ALIAS[modelAlias] ?? modelAlias;
   }
 }

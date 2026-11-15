@@ -41,12 +41,14 @@ export class DataRetentionJobHandler implements QueueJobHandler {
       const webhookLogsDeleted = await this.cleanupWebhookDeliveryLogs();
       const completedJobsDeleted = await this.cleanupCompletedJobs();
       const domainEventLogsDeleted = await this.cleanupDomainEventLogs();
+      const hitlChallengesDeleted = await this.cleanupHitlChallenges();
 
       const summary = {
         loginEventsDeleted,
         webhookLogsDeleted,
         completedJobsDeleted,
         domainEventLogsDeleted,
+        hitlChallengesDeleted,
       };
 
       this.logger.log(`Data retention cleanup complete: ${JSON.stringify(summary)}`);
@@ -118,6 +120,23 @@ export class DataRetentionJobHandler implements QueueJobHandler {
     });
 
     this.logger.log(`Domain event logs: deleted ${result.count} records older than 90 days`);
+
+    return result.count;
+  }
+
+  /**
+   * Delete agent confirmation challenges (`hitl_challenges`) 24 hours after they expire. A challenge lives minutes;
+   * the day after expiry keeps it readable for the approval page and an operator, then it goes. Keyed on
+   * `expiresAt`, so an open challenge is never deleted however old its row.
+   */
+  private async cleanupHitlChallenges(): Promise<number> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const result = await this.prisma.hitlChallenge.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
+    });
+
+    this.logger.log(`HITL challenges: deleted ${result.count} records expired more than 24 hours ago`);
 
     return result.count;
   }

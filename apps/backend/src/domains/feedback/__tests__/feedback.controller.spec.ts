@@ -1,10 +1,7 @@
-// Mock ESM dependencies pulled in via feedback.service → ai-provider → langfuse
+// Mock ESM dependencies pulled in via feedback.service → langfuse
 jest.mock('langfuse-core', () => ({}));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 jest.mock('ai', () => ({ generateText: jest.fn() }));
-jest.mock('../../ai/infrastructure/providers/ai-provider', () => ({
-  ai: jest.fn(),
-}));
 
 import { FeedbackController } from '../feedback.controller';
 

@@ -1,7 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { McpToolsModule } from '../mcp/mcp-tools.module';
-import { RlsModule } from '../rls/rls.module';
 import { FeatureFlagsModule } from '@appshore/platform/domains/feature-flags/feature-flags.module';
+import { PlansModule } from '@appshore/platform/domains/plans/plans.module';
+import { PlanGuard } from '@appshore/platform/auth/guards/plan.guard';
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { ScopeRegistryService } from './scope-registry.service';
 import { HitlPolicyService } from './hitl-policy.service';
@@ -10,13 +11,17 @@ import { AgentInvocationLoggerService } from './agent-invocation-logger.service'
 import { InvocationPipelineService } from './invocation-pipeline.service';
 import { HitlChallengeService } from './hitl-challenge.service';
 import { RateLimitService } from './rate-limit.service';
+import { ToolAccessPolicyService } from './tool-access-policy.service';
 import { AgentActivityService } from './agent-activity.service';
 import { AgentActivityController } from './agent-activity.controller';
 import { DeveloperScopesController } from './developer-scopes.controller';
+import { AgentActionsController } from './agent-actions.controller';
+import { AgentActionsService } from './agent-actions.service';
+import { TOOL_AVAILABILITY_RULES, ToolAvailabilityService } from './tool-availability.service';
 
 @Module({
-  imports: [forwardRef(() => McpToolsModule), RlsModule, FeatureFlagsModule, CacheModule],
-  controllers: [AgentActivityController, DeveloperScopesController],
+  imports: [forwardRef(() => McpToolsModule), FeatureFlagsModule, PlansModule, CacheModule],
+  controllers: [AgentActivityController, DeveloperScopesController, AgentActionsController],
   providers: [
     ScopeRegistryService,
     HitlPolicyService,
@@ -26,6 +31,14 @@ import { DeveloperScopesController } from './developer-scopes.controller';
     HitlChallengeService,
     RateLimitService,
     AgentActivityService,
+    AgentActionsService,
+    // The tool side of the plan rule runs the real REST guard (see ToolAccessPolicyService.evaluateFeature).
+    PlanGuard,
+    ToolAccessPolicyService,
+    // Tool availability rules: the starter ships none. Replace with a factory that builds your rules (see
+    // tool-availability.service.ts); an unavailable tool is left out of tools/list and every chat toolset.
+    { provide: TOOL_AVAILABILITY_RULES, useValue: [] },
+    ToolAvailabilityService,
   ],
   exports: [
     ScopeRegistryService,
@@ -35,6 +48,8 @@ import { DeveloperScopesController } from './developer-scopes.controller';
     HitlChallengeService,
     RateLimitService,
     AgentActivityService,
+    ToolAccessPolicyService,
+    ToolAvailabilityService,
   ],
 })
 export class AgentContractModule {}

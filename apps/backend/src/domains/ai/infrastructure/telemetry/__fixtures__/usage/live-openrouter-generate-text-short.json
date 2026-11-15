@@ -1,0 +1,61 @@
+{
+  "_source": "Captured live (2026-10-18) by a sibling product: an ai@6 generateText result on OpenRouter -> Anthropic (inputTokenDetails present) for a prompt of about 100 tokens, under the cache minimum. Numbers and provider names only.",
+  "usage": {
+    "inputTokens": 7192,
+    "inputTokenDetails": {
+      "noCacheTokens": 7192,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0
+    },
+    "outputTokens": 340,
+    "outputTokenDetails": {
+      "textTokens": 340,
+      "reasoningTokens": 0
+    },
+    "totalTokens": 7532,
+    "raw": {
+      "prompt_tokens": 7192,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "completion_tokens": 340,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      },
+      "total_tokens": 7532,
+      "cost": 0,
+      "cost_details": {
+        "upstream_inference_cost": 0.026676,
+        "upstream_inference_prompt_cost": 0.021576,
+        "upstream_inference_completions_cost": 0.0051
+      }
+    },
+    "reasoningTokens": 0,
+    "cachedInputTokens": 0
+  },
+  "providerMetadata": {
+    "openrouter": {
+      "provider": "Anthropic",
+      "usage": {
+        "promptTokens": 7192,
+        "promptTokensDetails": {
+          "cachedTokens": 0
+        },
+        "completionTokens": 340,
+        "completionTokensDetails": {
+          "reasoningTokens": 0
+        },
+        "totalTokens": 7532,
+        "cost": 0,
+        "costDetails": {
+          "upstreamInferenceCost": 0.026676
+        }
+      }
+    }
+  }
+}

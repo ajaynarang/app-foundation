@@ -30,7 +30,7 @@ async function main(): Promise<void> {
   try {
     const result = await seed.run(prisma);
     // eslint-disable-next-line no-console
-    console.log(`[${seed.name}] created=${result.created} skipped=${result.skipped}`);
+    console.log(`[${seed.name}] created=${result.created} skipped=${result.skipped} filled=${result.filled}`);
   } finally {
     await prisma.$disconnect();
     await pool.end();

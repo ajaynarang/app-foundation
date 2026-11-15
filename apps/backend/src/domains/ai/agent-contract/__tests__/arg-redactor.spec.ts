@@ -1,4 +1,4 @@
-import { redactArgs, digestArgs } from '../arg-redactor';
+import { redactArgs, withoutInternalKeys } from '../arg-redactor';
 
 describe('redactArgs', () => {
   it('removes internal _tenantId / _userId / _confirmToken keys', () => {
@@ -36,11 +36,8 @@ describe('redactArgs', () => {
   });
 });
 
-describe('digestArgs', () => {
-  it('returns a stable SHA-256 hex for equivalent args', () => {
-    const a = digestArgs({ a: 1, b: 2 });
-    const b = digestArgs({ b: 2, a: 1 });
-    expect(a).toBe(b);
-    expect(a).toMatch(/^[a-f0-9]{64}$/);
+describe('withoutInternalKeys', () => {
+  it('drops every top-level `_` key and keeps the rest as sent', () => {
+    expect(withoutInternalKeys({ _confirmToken: 't', _role: 'OWNER', a: { _b: 1 } })).toEqual({ a: { _b: 1 } });
   });
 });

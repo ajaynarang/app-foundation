@@ -6,6 +6,7 @@ import {
   Headset,
   Home,
   Key,
+  KeyRound,
   Link2,
   LucideIcon,
   Receipt,
@@ -97,6 +98,7 @@ export const settingsSubPanel: SubPanelSection[] = [
       { label: 'API Keys', href: '/settings/api-keys', icon: Key, entitlement: 'api_keys' },
       { label: 'Webhooks', href: '/settings/webhooks', icon: Webhook, entitlement: 'webhooks' },
       { label: 'OAuth Clients', href: '/settings/oauth-clients', icon: Link2, entitlement: 'oauth_clients' },
+      { label: 'AI Keys', href: '/settings/ai', icon: KeyRound },
       { label: 'AI Assistants', href: '/settings/ai-integrations', icon: Bot },
     ],
     roles: ['ADMIN', 'OWNER'],
@@ -215,7 +217,7 @@ export const publicRoutes = ['/', '/login'] as const;
  * Keep in sync with PROTECTED_PREFIXES in src/middleware.ts — the two lists
  * must match exactly.
  */
-export const protectedRoutePatterns = ['/admin', '/ai', '/onboarding', '/settings'] as const;
+export const protectedRoutePatterns = ['/admin', '/agent-actions', '/ai', '/onboarding', '/settings'] as const;
 
 /**
  * Routes outside Settings that only some roles can open. `/admin` is also held

@@ -10,6 +10,7 @@ Add your own product documentation here as you build.
   a timer is a row. [Optional features](adr/0004-optional-features-desk-opt-in.md): Desk is chosen at scaffold
   time, and removed only through its seam and manifest.
 - [`upgrade-notes/`](upgrade-notes/contract-v1.md): what changed on the wire, for a product scaffolded before a
-  change and pulling it now.
+  change and pulling it now. [AI platform](upgrade-notes/ai-platform.md): AI behaviour, env and schema changes,
+  and the deploy order for the `ai_reader` role.
 - [`doppler.md`](doppler.md): secrets and environment configuration.
 - [`WHAT-YOU-GET.md`](WHAT-YOU-GET.md): what the starter ships.

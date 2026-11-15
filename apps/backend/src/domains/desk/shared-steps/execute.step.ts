@@ -137,13 +137,9 @@ export async function executeStep(input: ExecuteInput): Promise<ExecuteOutput> {
       enabledByUserId: supervisorUserId,
     });
 
-    const result = await pipeline.run(principal, input.tool, {
-      ...input.args,
-      // McpToolService normally injects _tenantId from the session; for
-      // Desk invocations we inject it from the principal. Keeps tools
-      // tenant-scoped without relying on the session guard path.
-      _tenantId: episode.tenantId,
-    });
+    // The pipeline's executor injects `_tenantId` (and the other identity params) from the principal; any `_` key
+    // in the args is dropped before the tool runs.
+    const result = await pipeline.run(principal, input.tool, input.args);
 
     if (result.isError) {
       const errText = result.content?.[0]?.type === 'text' ? result.content[0].text : 'unknown';

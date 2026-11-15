@@ -208,9 +208,10 @@ export const AgentStatusResponseSchema = z
  *   - kind '8' — card metadata. Payload is an object (tool `_card`
  *     result). Only emitted if the first observable event is a card —
  *     in practice agents emit text first.
- *   - kind '9' — HITL suspend. Payload is an object with `runId` +
- *     tool-call info. The resume endpoint's observable first frame
- *     when the initial turn suspended on a confirm-action.
+ *   - kind '9' — HITL suspend. Payload is the server-built confirm card
+ *     (`action`, `description`, `tool`, `args`, `toolCallId`) plus
+ *     `runId`. The resume endpoint's observable first frame when the
+ *     resumed turn suspends on another confirm-action.
  *   - kind 'a' — follow-ups array. Parsed follow-up prompts. Payload
  *     is a string[].
  *
