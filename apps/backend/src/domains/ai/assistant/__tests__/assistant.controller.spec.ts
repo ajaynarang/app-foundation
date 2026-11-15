@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { ListConversationsQueryDto } from '../dto/list-conversations-query.dto';
 jest.mock('@mastra/core', () => ({}));
 jest.mock('@mastra/core/agent', () => ({}));
 jest.mock('@mastra/core/tools', () => ({ createTool: jest.fn() }));
@@ -82,8 +85,15 @@ describe('AssistantAiController', () => {
   describe('listConversations', () => {
     it('delegates to service with limit', async () => {
       const user = { userId: 'user_1', tenantDbId: 1 };
-      await controller.listConversations(user, 20);
+      await controller.listConversations(user, await readQueryDto(ListConversationsQueryDto, { limit: '20' }));
       expect(mockService.listConversations).toHaveBeenCalledWith('user_1', 1, 20);
+    });
+  });
+
+  describe('ListConversationsQueryDto', () => {
+    it('defaults to 10 and answers 400 naming limit when it is not a number', async () => {
+      expect((await readQueryDto(ListConversationsQueryDto, {})).limit).toBe(10);
+      expect(await fieldErrorsOf(readQueryDto(ListConversationsQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
     });
   });
 

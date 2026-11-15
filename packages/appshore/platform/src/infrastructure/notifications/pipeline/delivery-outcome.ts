@@ -8,7 +8,7 @@ export const DELIVERY_SKIP_REASONS = {
   NO_ADDRESS: 'NO_ADDRESS',
   NOT_CONFIGURED: 'NOT_CONFIGURED',
   NO_DEVICE: 'NO_DEVICE',
-  /** No WhatsApp template maps this NotificationType. */
+  /** No WhatsApp template maps this notification type. */
   NO_TEMPLATE: 'NO_TEMPLATE',
   /** The platform kill switch is off. */
   FLAG_OFF: 'FLAG_OFF',

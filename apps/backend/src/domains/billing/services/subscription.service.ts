@@ -21,6 +21,8 @@ import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { NormalizedBillingEvent } from '../adapters/payment-provider.interface';
 import { PLAN_ORDER } from '../constants';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import { PAYMENT_METHOD_LIST_CAP } from './payment-method.service';
 
 @Injectable()
 export class SubscriptionService {
@@ -96,7 +98,7 @@ export class SubscriptionService {
       },
     });
     if (existing) {
-      throw new BadRequestException('Tenant already has an active subscription. Use upgrade instead.');
+      throw invalidState('This workspace already has an active subscription. Use upgrade instead.');
     }
 
     try {
@@ -221,7 +223,7 @@ export class SubscriptionService {
   async upgradePlan(tenantId: string, tenantDbId: number, newPlan: TenantPlan, newQuantity?: number): Promise<void> {
     const subscription = await this.findActiveSubscription(tenantDbId);
     if (!subscription) {
-      throw new BadRequestException('No active subscription found. Please create a new subscription first.');
+      throw invalidState('No active subscription found. Please create a new subscription first.');
     }
 
     // Validate that the new plan is actually a higher tier
@@ -444,7 +446,8 @@ export class SubscriptionService {
       }),
       this.prisma.paymentMethod.findMany({
         where: { tenantId: tenantDbId },
-        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        take: PAYMENT_METHOD_LIST_CAP,
       }),
       this.prisma.billingCustomer.findUnique({
         where: { tenantId: tenantDbId },

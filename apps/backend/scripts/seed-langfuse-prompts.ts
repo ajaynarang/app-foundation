@@ -19,6 +19,7 @@ import matter from 'gray-matter';
 import { BASE_ASSISTANT, BASE_SUPPORT } from '../src/domains/prompting/prompts/persona/base-prompts';
 import { CATEGORIZER_FALLBACK, SKILL_CLASSIFIER_FALLBACK } from '../src/domains/prompting/prompts/fallbacks';
 
+// feature:desk:start
 // Desk prompts: registered as in-memory fallbacks on module init, but also
 // seeded to LangFuse here so PromptingService.verifyPromptAvailability() stops
 // warning at boot and operators can edit them in the LangFuse UI. The starter
@@ -26,6 +27,7 @@ import { CATEGORIZER_FALLBACK, SKILL_CLASSIFIER_FALLBACK } from '../src/domains/
 // prompts are seeded by each responsibility as it ships.
 import { DESK_MEMORY_EXTRACT_PROMPT } from '../src/domains/desk/core/memory/prompts/memory-extract.prompt';
 import { AGENT_SYSTEM_PROMPTS } from '../src/domains/desk/responsibilities/agent-system-prompts';
+// feature:desk:end
 import { PROMPT_NAMES } from '../src/domains/prompting/prompting.types';
 
 async function seed() {
@@ -74,6 +76,7 @@ async function seed() {
     console.log(`Created: ${name}`);
   }
 
+  // feature:desk:start
   // Desk — memory-extract default + generic agent personas.
   // Per-responsibility step prompts are seeded by each responsibility as it ships.
   const deskPrompts: Record<string, string> = {
@@ -90,6 +93,7 @@ async function seed() {
     });
     console.log(`Created: ${name}`);
   }
+  // feature:desk:end
 
   // Seed skill prompts from local .md files
   const skillDirs = ['domain', 'tasks'];

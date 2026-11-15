@@ -1,9 +1,8 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
-import { CACHE_TTL_WARM_5M } from '@appshore/kernel/constants/cache.constants';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../infrastructure/events/outbox.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -11,12 +10,29 @@ import { nanoid } from 'nanoid';
 import { AgentScopeSchema, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
 import type {
   AgentScope,
+  CursorList,
   CreateOAuthClientInput,
   UpdateOAuthClientInput,
   OAuthClientResponse,
   OAuthClientCreatedResponse,
 } from '@app/shared-types';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+import type { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+
+const OAUTH_CLIENT_KEYSET = { field: 'createdAt', idField: 'clientId', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /oauth/clients`. */
+export interface OAuthClientListQuery {
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class OAuthClientsService {
@@ -25,7 +41,8 @@ export class OAuthClientsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: AppCacheService,
-    private readonly events: DomainEventService,
+    // Events commit with the write (ADR "Outbox and deadlines").
+    private readonly outbox: OutboxService,
   ) {}
 
   async create(
@@ -68,29 +85,35 @@ export class OAuthClientsService {
     };
   }
 
-  async findAll(tenantId: number | null): Promise<OAuthClientResponse[]> {
-    const cacheKey = buildKey('app:oauth', 'clients', String(tenantId ?? 'global'));
-    return this.cache.getOrSet(
-      cacheKey,
-      async () => {
-        const clients = await this.prisma.oAuthClient.findMany({
-          where: tenantId ? { tenantId } : { tenantId: null },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        return clients.map((c) => ({
-          clientId: c.clientId,
-          name: c.name,
-          description: c.description,
-          redirectUris: c.redirectUris,
-          scopes: c.scopes,
-          clientType: c.clientType,
-          isActive: c.isActive,
-          createdAt: c.createdAt.toISOString(),
-        }));
-      },
-      CACHE_TTL_WARM_5M,
-    );
+  /**
+   * A workspace's OAuth clients (the global ones for a super admin), newest first, as a cursor list. The
+   * tiebreak is the public `clientId`, never the Int key.
+   */
+  async findAll(tenantId: number | null, query: OAuthClientListQuery = {}): Promise<CursorList<OAuthClientResponse>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...OAUTH_CLIENT_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.OAuthClientWhereInput = tenantId ? { tenantId } : { tenantId: null };
+    const [rows, total] = await Promise.all([
+      this.prisma.oAuthClient.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { clientId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.oAuthClient.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.clientId));
+    const items = page.items.map((c) => ({
+      clientId: c.clientId,
+      name: c.name,
+      description: c.description,
+      redirectUris: c.redirectUris,
+      scopes: c.scopes,
+      clientType: c.clientType,
+      isActive: c.isActive,
+      createdAt: c.createdAt.toISOString(),
+    }));
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   async findByClientId(clientId: string, tenantId: number | null): Promise<OAuthClientResponse> {
@@ -146,26 +169,26 @@ export class OAuthClientsService {
   async revoke(clientId: string, tenantId: number | null): Promise<void> {
     const client = await this.loadClientOrThrow(clientId, tenantId);
 
-    await this.prisma.$transaction([
-      this.prisma.oAuthAccessToken.updateMany({
+    await this.outbox.transaction(async (tx, emit) => {
+      await tx.oAuthAccessToken.updateMany({
         where: { clientId: client.id, revokedAt: null },
         data: { revokedAt: new Date() },
-      }),
-      this.prisma.oAuthRefreshToken.updateMany({
+      });
+      await tx.oAuthRefreshToken.updateMany({
         where: { clientId: client.id, revokedAt: null },
         data: { revokedAt: new Date() },
-      }),
-      this.prisma.oAuthClient.update({
+      });
+      await tx.oAuthClient.update({
         where: { clientId },
         data: { isActive: false },
-      }),
-    ]);
+      });
+      await emit(DOMAIN_EVENTS.OAUTH_CLIENT_REVOKED, String(tenantId ?? 'global'), {
+        clientId: client.clientId,
+        name: client.name,
+      });
+    });
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_REVOKED, String(tenantId ?? 'global'), {
-      clientId: client.clientId,
-      name: client.name,
-    });
   }
 
   /** Toggle isActive=false without cascading token revocation. Reversible via resume. */
@@ -173,34 +196,38 @@ export class OAuthClientsService {
     const client = await this.loadClientOrThrow(clientId, tenantId);
     await this.assertNotRevoked(client);
     if (!client.isActive) {
-      throw new BadRequestException('Client is already paused');
+      throw invalidState('This app is already paused');
     }
-    await this.prisma.oAuthClient.update({
-      where: { clientId },
-      data: { isActive: false },
+    await this.outbox.transaction(async (tx, emit) => {
+      await tx.oAuthClient.update({
+        where: { clientId },
+        data: { isActive: false },
+      });
+      await emit(DOMAIN_EVENTS.OAUTH_CLIENT_PAUSED, String(tenantId ?? 'global'), {
+        clientId: client.clientId,
+        name: client.name,
+      });
     });
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_PAUSED, String(tenantId ?? 'global'), {
-      clientId: client.clientId,
-      name: client.name,
-    });
   }
 
   async resume(clientId: string, tenantId: number | null): Promise<void> {
     const client = await this.loadClientOrThrow(clientId, tenantId);
     await this.assertNotRevoked(client);
     if (client.isActive) {
-      throw new BadRequestException('Client is already active');
+      throw invalidState('This app is already active');
     }
-    await this.prisma.oAuthClient.update({
-      where: { clientId },
-      data: { isActive: true },
+    await this.outbox.transaction(async (tx, emit) => {
+      await tx.oAuthClient.update({
+        where: { clientId },
+        data: { isActive: true },
+      });
+      await emit(DOMAIN_EVENTS.OAUTH_CLIENT_RESUMED, String(tenantId ?? 'global'), {
+        clientId: client.clientId,
+        name: client.name,
+      });
     });
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_RESUMED, String(tenantId ?? 'global'), {
-      clientId: client.clientId,
-      name: client.name,
-    });
   }
 
   /**
@@ -220,16 +247,18 @@ export class OAuthClientsService {
     const rawSecret = crypto.randomBytes(32).toString('hex');
     const hashedSecret = await bcrypt.hash(rawSecret, 10);
 
-    await this.prisma.oAuthClient.update({
-      where: { clientId },
-      data: { clientSecret: hashedSecret },
+    await this.outbox.transaction(async (tx, emit) => {
+      await tx.oAuthClient.update({
+        where: { clientId },
+        data: { clientSecret: hashedSecret },
+      });
+      await emit(DOMAIN_EVENTS.OAUTH_CLIENT_ROTATED, String(tenantId ?? 'global'), {
+        clientId: client.clientId,
+        name: client.name,
+      });
     });
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_ROTATED, String(tenantId ?? 'global'), {
-      clientId: client.clientId,
-      name: client.name,
-    });
 
     return { clientSecret: rawSecret };
   }
@@ -253,17 +282,20 @@ export class OAuthClientsService {
     }
     this.assertScopesAreGrantable(dto.scopes);
 
-    const updated = await this.prisma.oAuthClient.update({
-      where: { clientId },
-      data: { scopes: dto.scopes },
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.oAuthClient.update({
+        where: { clientId },
+        data: { scopes: dto.scopes },
+      });
+      await emit(DOMAIN_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED, String(tenantId ?? 'global'), {
+        clientId: client.clientId,
+        name: client.name,
+        scopes: dto.scopes,
+      });
+      return row;
     });
 
     await this.invalidateOAuthClientsCache(tenantId);
-    await this.events.emit(DOMAIN_EVENTS.OAUTH_CLIENT_SCOPES_UPDATED, String(tenantId ?? 'global'), {
-      clientId: client.clientId,
-      name: client.name,
-      scopes: dto.scopes,
-    });
 
     return {
       clientId: updated.clientId,
@@ -285,7 +317,8 @@ export class OAuthClientsService {
       throw new NotFoundException('OAuth client not found');
     }
     if (tenantId !== null && client.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Another workspace's client answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('OAuth client not found');
     }
     return client;
   }
@@ -304,7 +337,7 @@ export class OAuthClientsService {
       where: { clientId: client.id, revokedAt: { not: null } },
     });
     if (revokedTokenCount > 0) {
-      throw new BadRequestException('Cannot modify a revoked OAuth client. Register a new one.');
+      throw invalidState('This app has been revoked and can no longer be changed. Register it again.');
     }
   }
 
@@ -315,7 +348,7 @@ export class OAuthClientsService {
     }
   }
 
-  /** Invalidate the OAuth clients list cache. */
+  /** Clears the key the client list was cached under before it became a cursor list; nothing fills it now. */
   private async invalidateOAuthClientsCache(tenantId: number | null): Promise<void> {
     await this.cache.del(buildKey('app:oauth', 'clients', String(tenantId ?? 'global')));
   }

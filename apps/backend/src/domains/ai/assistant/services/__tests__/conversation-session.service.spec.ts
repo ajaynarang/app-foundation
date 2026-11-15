@@ -2,13 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ConversationSessionService } from '../conversation-session.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 
 describe('ConversationSessionService', () => {
   let service: ConversationSessionService;
   let prisma: any;
-  let events: jest.Mocked<DomainEventService>;
+  let events: ReturnType<typeof createMockOutbox>;
 
   const conversationId = 100;
   const tenantId = 7;
@@ -24,17 +25,16 @@ describe('ConversationSessionService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
-    events = {
-      emit: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<DomainEventService>;
+    events = createMockOutbox(prisma);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConversationSessionService,
         { provide: PrismaService, useValue: prisma },
-        { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: events },
       ],
     }).compile();
 
@@ -119,7 +119,7 @@ describe('ConversationSessionService', () => {
       );
     });
 
-    it('emits with tenantId 0 for anonymous conversations (DomainEventService requires non-null)', async () => {
+    it('emits with tenantId 0 for anonymous conversations (an event requires a non-null tenant)', async () => {
       prisma.conversation.findUnique.mockResolvedValue({ id: conversationId, tenantId: null });
       prisma.conversationSession.create.mockImplementation(({ data }: any) =>
         Promise.resolve({ id: 11, ...data, createdAt: new Date() }),
@@ -158,6 +158,14 @@ describe('ConversationSessionService', () => {
         tenantId,
         expect.objectContaining({ conversationId, sessionId: session.id }),
       );
+    });
+
+    it('publishes nothing when the revoke write fails', async () => {
+      prisma.conversationSession.findUnique.mockResolvedValue({ id: 9, conversationId, tenantId, revokedAt: null });
+      prisma.conversationSession.update.mockRejectedValue(new Error('db down'));
+
+      await expect(service.revoke(9)).rejects.toThrow('db down');
+      expect(events.emit).not.toHaveBeenCalled();
     });
 
     it('is idempotent — already-revoked session returned without re-emitting', async () => {

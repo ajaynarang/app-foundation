@@ -300,7 +300,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                           </kbd>
                         )}
                         {!isCollapsed && navItem.highlight && !hasSubPanel && (
-                          <Sparkles className="h-3.5 w-3.5 text-amber-500 ml-auto flex-shrink-0" />
+                          <Sparkles className="h-3.5 w-3.5 text-caution-text ml-auto flex-shrink-0" />
                         )}
                         {!isCollapsed && hasSubPanel && (
                           <ChevronRight className="h-4 w-4 ml-auto flex-shrink-0 text-muted-foreground" />
@@ -479,7 +479,7 @@ export function AppSidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: A
                 <div className="p-1">
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-critical"
+                    className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors text-critical-text"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>

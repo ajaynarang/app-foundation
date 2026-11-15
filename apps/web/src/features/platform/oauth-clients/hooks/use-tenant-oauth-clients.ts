@@ -3,14 +3,17 @@ import type { AgentScope } from '@app/shared-types';
 import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@appshore/web-core/shared/constants';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { useCursorList } from '@appshore/web-core/shared/list';
 import { oauthClientsApi } from '../api';
 
 /** Tenant-admin list of OAuth clients. Mirrors useOAuthClients but keyed to the tenant-admin list key. */
 export function useTenantOAuthClients() {
-  return useQuery({
+  // A cursor list, newest first ("Load more" appends). `data` is every row loaded so far.
+  const list = useCursorList({
     queryKey: queryKeys.oauthClients.list(),
-    queryFn: oauthClientsApi.list,
+    queryFn: (cursor) => oauthClientsApi.list(cursor),
   });
+  return { ...list, data: list.isLoading ? undefined : list.items };
 }
 
 export function useOAuthClientDetail(clientId: string | null) {

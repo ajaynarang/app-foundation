@@ -9,6 +9,8 @@ import { BaseTenantController } from '@appshore/platform/shared/base/base-tenant
 
 import { SnoozeEpisodeDto } from './dto/snooze.dto';
 import { SuppressionService } from './suppression.service';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { DeskEntitySuppressionResponse } from '../../openapi.responses';
 
 /**
  * HTTP surface for Desk snoozes. Consumed by the Desk UI — the Needs-You
@@ -41,7 +43,8 @@ export class SuppressionController extends BaseTenantController {
     summary:
       'Snooze an episode — closes it with outcome=rejected_by_operator and creates/extends a desk_entity_suppressions row',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Episode id (uuid)' })
+  @ApiResult(DeskEntitySuppressionResponse)
   async snooze(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: SnoozeEpisodeDto) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.suppressions.snooze({
@@ -58,7 +61,8 @@ export class SuppressionController extends BaseTenantController {
   @ApiOperation({
     summary: 'Clear an active suppression so the entity can re-surface on the next scheduled sweep',
   })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Suppression id (uuid)' })
+  @ApiResult(DeskEntitySuppressionResponse)
   async unsnooze(@CurrentUser() user: any, @Param('id', new ParseUUIDPipe()) id: string) {
     const tenantDbId = await this.getTenantDbId(user);
     return this.suppressions.unsnooze(id, tenantDbId, user.dbId);

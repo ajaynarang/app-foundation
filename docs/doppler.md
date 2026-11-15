@@ -122,8 +122,8 @@ When you add a brand-new variable, update all three places:
 
 "Required to boot?" reflects the backend's Zod validation
 (`apps/backend/src/config/configuration.ts`) and code fallbacks — the template is designed to
-boot with **minimal** config (Postgres + Redis). Firebase, Anthropic, Stripe, Twilio, voice,
-and Inngest cloud keys are all optional at boot; the related feature simply stays disabled
+boot with **minimal** config (Postgres + Redis). Firebase, Anthropic, Stripe, Twilio, voice
+and Desk workflow keys are all optional at boot; the related feature simply stays disabled
 until configured.
 
 ### Backend (`app-backend`)
@@ -216,10 +216,19 @@ public https URL of the API, `CORS_ORIGINS` lists no local origin, `INNGEST_DEV`
 | `CARTESIA_API_KEY`                  | No                                                                                                   | Yes     | Text-to-speech for voice mode                                                                                                                             | Cartesia dashboard                                                                                           |
 | `VOICE_AGENT_SECRET`                | No in dev (public dev default); **Yes in production when `LIVEKIT_URL` is set**                      | Yes     | Auth between API and the voice-agent worker                                                                                                               | Generate: `openssl rand -hex 32`                                                                             |
 | `APP_API_URL`                       | No (default `http://localhost:8000`)                                                                 | No      | Public origin the voice-agent worker calls back into                                                                                                      | —                                                                                                            |
-| `INNGEST_ENV`                       | No (default `dev`)                                                                                   | No      | Inngest environment name                                                                                                                                  | —                                                                                                            |
-| `INNGEST_SERVE_ORIGIN`              | No                                                                                                   | No      | Origin the Inngest dev server/cloud reaches the API on                                                                                                    | —                                                                                                            |
-| `INNGEST_EVENT_KEY`                 | No (local CLI dev server needs none)                                                                 | Yes     | Inngest cloud event key                                                                                                                                   | Inngest dashboard                                                                                            |
-| `INNGEST_SIGNING_KEY`               | No (without it the deployed Inngest endpoint rejects every call)                                     | Yes     | Inngest cloud signing key                                                                                                                                 | Inngest dashboard                                                                                            |
+
+<!-- feature:desk:start -->
+
+Desk (the Inngest workflow engine, only when the product kept it):
+
+| Variable               | Required to boot?                                                | Secret? | Purpose                                                | Where to get it   |
+| ---------------------- | ---------------------------------------------------------------- | ------- | ------------------------------------------------------ | ----------------- |
+| `INNGEST_ENV`          | No (default `dev`)                                               | No      | Inngest environment name                               | —                 |
+| `INNGEST_SERVE_ORIGIN` | No                                                               | No      | Origin the Inngest dev server/cloud reaches the API on | —                 |
+| `INNGEST_EVENT_KEY`    | No (local CLI dev server needs none)                             | Yes     | Inngest cloud event key                                | Inngest dashboard |
+| `INNGEST_SIGNING_KEY`  | No (without it the deployed Inngest endpoint rejects every call) | Yes     | Inngest cloud signing key                              | Inngest dashboard |
+
+<!-- feature:desk:end -->
 
 ### Web (`app-frontend`)
 
@@ -246,6 +255,7 @@ remember a rebuild (not just a restart) is needed for changes to take effect.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`       | No                                                      | No      | Stripe.js on billing pages                                           | Stripe dashboard → API keys                               |
 | `NEXT_PUBLIC_LANGFUSE_BASE_URL`            | No                                                      | No      | Langfuse deep-links on the AI Spend page                             | —                                                         |
 | `NEXT_PUBLIC_LANGFUSE_PROJECT_ID`          | No (deep-link hidden without it)                        | No      | Langfuse deep-links                                                  | Langfuse project URL                                      |
+| `NEXT_PUBLIC_DOCS_URL`                     | No (landing-page button hidden without it)              | No      | "Documentation" link on the landing page                             | Your docs site or repository URL                          |
 
 ## Per-environment guidance
 

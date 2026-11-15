@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
@@ -37,20 +38,24 @@ function HasContentOrPromptKey(validationOptions?: ValidationOptions) {
 }
 
 export class SendMessageDto {
+  @ApiProperty()
   @ValidateIf((o) => !o.promptKey)
   @IsString()
   @MaxLength(4000)
   content: string;
 
+  @ApiProperty({ enum: ['text', 'voice'] })
   @IsString()
   @IsIn(['text', 'voice'])
   inputMode: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(128)
   promptKey?: string;
 
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsOptional()
   @IsObject()
   promptVariables?: Record<string, string>;

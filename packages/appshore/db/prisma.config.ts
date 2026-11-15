@@ -21,5 +21,9 @@ export default defineConfig({
   datasource: {
     // Use placeholder during build, real value from env at runtime
     url: process.env.DATABASE_URL || 'postgresql://placeholder:placeholder@localhost:5432/placeholder',
+    // Scratch DB for `migrate diff --from-migrations` and `migrate dev`: replays the migration history without
+    // touching the dev DB (Mastra creates tables at runtime, which `migrate dev` would otherwise want to reset).
+    // Held by scripts/__tests__/prisma-config.spec.ts; the create command is in apps/backend/.env.example.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

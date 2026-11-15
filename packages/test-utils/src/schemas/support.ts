@@ -9,7 +9,7 @@
  *   GET /support/admin/stats, GET /support/admin/tenants.
  */
 import { z } from 'zod';
-import { dbId, isoDateString } from './helpers.js';
+import { dbId, isoDateString, cursorListOf } from './helpers.js';
 
 const SupportCategoryEnum = z.enum(['BILLING', 'TECHNICAL', 'FEATURE_REQUEST', 'ACCOUNT', 'INTEGRATION', 'GENERAL']);
 const SupportPriorityEnum = z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']);
@@ -62,11 +62,6 @@ export const SupportStatsSchema = z.object({
 });
 export type SupportStats = z.infer<typeof SupportStatsSchema>;
 
-/** Super-admin paginated tickets envelope (`GET /support/admin/tickets`). */
-export const SupportTicketListItemSchema = z.object({
-  data: z.array(SupportTicketSchema.passthrough()),
-  total: z.number().int().nonnegative(),
-  page: z.number().int().positive(),
-  limit: z.number().int().positive(),
-});
+/** Ticket lists (`GET /support/tickets`, `GET /support/admin/tickets`): cursor lists, newest first. */
+export const SupportTicketListItemSchema = cursorListOf(SupportTicketSchema.passthrough());
 export type SupportTicketList = z.infer<typeof SupportTicketListItemSchema>;

@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { JobStatus } from '@appshore/db';
 import { JobService } from '../job.service';
 import { PrismaService } from '../../database/prisma.service';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
+import { buildJobVocabulary, EMPTY_APP_JOB_VOCABULARY } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '../job-vocabulary.token';
 
 const mockPrisma = {
   job: {
@@ -73,34 +76,54 @@ describe('JobService', () => {
     });
   });
 
-  describe('listJobsPaginated — status filter semantics', () => {
-    beforeEach(() => {
-      mockPrisma.job.findMany.mockResolvedValue([]);
-      mockPrisma.job.count.mockResolvedValue(0);
-    });
+  describe('listAllJobs: a cursor list, newest first', () => {
+    const stamps = tiedTimestamps(8);
+    const rows = stamps.map((createdAt, index) => ({
+      id: index + 1,
+      // Deliberately not in id order: the tiebreak is the public id, not the Int key.
+      publicId: `00000000-0000-7000-8000-00000000000${(index * 5) % 8}`,
+      tenantId: index % 2 === 0 ? 1 : 2,
+      category: 'webhooks',
+      type: 'deliver',
+      status: index === 7 ? 'FAILED' : 'COMPLETED',
+      createdAt,
+    }));
 
-    it('applies the status filter when a non-empty array is passed', async () => {
-      await service.listJobsPaginated(1, { status: ['QUEUED', 'PROCESSING'] as JobStatus[] });
-      expect(mockPrisma.job.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: { in: ['QUEUED', 'PROCESSING'] } }),
-        }),
+    beforeEach(() => Object.assign(mockPrisma.job, fixtureModel(rows)));
+
+    it('walks every row once across pages, ties included, and the total ignores the cursor', async () => {
+      const seenTotals: number[] = [];
+      const { pages, items } = await walkCursorList(async (cursor) => {
+        const page = await service.listAllJobs({ limit: 2, cursor });
+        seenTotals.push(page.total);
+        return page;
+      });
+
+      expect(pages.map((page) => page.length)).toEqual([2, 2, 2, 2]);
+      expect(new Set(items.map((job) => job.publicId)).size).toBe(8);
+      expect(items.map((job) => job.createdAt.getTime())).toEqual(
+        [...stamps].map((d) => d.getTime()).sort((a, b) => b - a),
       );
+      expect(seenTotals).toEqual([8, 8, 8, 8]);
     });
 
-    it('applies status: { in: [] } when an EMPTY array is passed (matches zero rows)', async () => {
-      await service.listJobsPaginated(1, { status: [] as JobStatus[] });
-      expect(mockPrisma.job.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: { in: [] } }),
-        }),
-      );
+    it('orders by created_at then public id, never the Int key', async () => {
+      await service.listAllJobs({});
+      expect(mockPrisma.job.findMany.mock.calls[0][0]).toMatchObject({
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: 51,
+      });
     });
 
-    it('omits the status filter entirely when status is undefined', async () => {
-      await service.listJobsPaginated(1, { status: undefined });
-      const call = mockPrisma.job.findMany.mock.calls[0][0];
-      expect(call.where).not.toHaveProperty('status');
+    it('filters by tenant and status, and counts only what matches', async () => {
+      const page = await service.listAllJobs({ tenantId: 2, statuses: ['FAILED'] as JobStatus[] });
+      expect(page.items.map((job) => job.id)).toEqual([8]);
+      expect(page).toMatchObject({ total: 1, nextCursor: null });
+    });
+
+    it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+      await expect(service.listAllJobs({ cursor: 'not-a-cursor' })).rejects.toMatchObject({ status: 400 });
+      expect(mockPrisma.job.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -192,6 +215,67 @@ describe('JobService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('reads the job vocabulary merged with the app (JOB_VOCABULARY)', () => {
+    const appVocabulary = buildJobVocabulary({
+      ...EMPTY_APP_JOB_VOCABULARY,
+      queueNames: { REPORTS: 'reports' },
+      jobNames: { REPORTS: { BUILD: 'report-build' } },
+      displayNames: { 'report-build': 'Report Build' },
+      categories: { reports: { display: 'Reports', queue: 'reports', requiredIntegration: null, tenantVisible: true } },
+      manualTypes: { reports: ['report-build'] },
+    });
+    let appService: JobService;
+
+    beforeEach(async () => {
+      const module = await Test.createTestingModule({
+        providers: [
+          JobService,
+          { provide: PrismaService, useValue: mockPrisma },
+          { provide: JOB_VOCABULARY, useValue: appVocabulary },
+        ],
+      }).compile();
+      appService = module.get(JobService);
+    });
+
+    it('creates a job in an app category', async () => {
+      mockPrisma.job.create.mockResolvedValue({ id: 7 });
+      await appService.createJob({
+        tenantId: 1,
+        submittedBy: null,
+        category: 'reports',
+        type: 'report-build',
+        inputData: {},
+      });
+      expect(mockPrisma.job.create).toHaveBeenCalledWith({ data: expect.objectContaining({ category: 'reports' }) });
+    });
+
+    it('refuses a category no vocabulary declares, before any write', async () => {
+      await expect(
+        service.createJob({ tenantId: 1, submittedBy: null, category: 'reports', type: 'report-build', inputData: {} }),
+      ).rejects.toThrow(/unknown job category "reports"/);
+      expect(mockPrisma.job.create).not.toHaveBeenCalled();
+    });
+
+    it('shows an app tenant-visible category to tenants', async () => {
+      mockPrisma.integrationConfig.findMany.mockResolvedValue([]);
+      await expect(appService.getVisibleCategories(1)).resolves.toContain('reports');
+      await expect(service.getVisibleCategories(1)).resolves.not.toContain('reports');
+    });
+
+    it("lists an app category's manual types and labels them with the app's display names", async () => {
+      mockPrisma.job.groupBy.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      const queue = { getRepeatableJobs: jest.fn().mockResolvedValue([]) };
+
+      const [summary] = await appService.getCategorySummary(1, ['reports'], { reports: queue as never });
+
+      expect(summary.displayName).toBe('Reports');
+      expect(summary.types).toEqual([
+        expect.objectContaining({ type: 'report-build', displayName: 'Report Build', schedule: 'Manual' }),
+      ]);
     });
   });
 });

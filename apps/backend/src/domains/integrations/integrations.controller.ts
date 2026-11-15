@@ -11,6 +11,8 @@ import {
   Request,
   Logger,
   NotFoundException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -21,13 +23,30 @@ import { IntegrationsService } from './integrations.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
+import { IntegrationSyncHistoryQueryDto, SyncHistoryQueryDto } from './dto/sync-history-query.dto';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
+import { JobStatusSchema } from '@app/shared-types';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  IntegrationConnectionTestResponse,
+  IntegrationCreatedResponse,
+  IntegrationHealthSummaryResponse,
+  IntegrationResponse,
+  IntegrationSyncHistoryListResponse,
+  IntegrationSyncQueuedResponse,
+  IntegrationSyncStatsResponse,
+  IntegrationUpdatedResponse,
+  IntegrationVendorEntryResponse,
+} from './openapi.responses';
 
 /** BullMQ job name for a manually-triggered integration sync. */
 const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';
 
+@ApiTags('Integrations')
+@ApiBearerAuth()
 @Controller('integrations')
 @UseGuards(JwtAuthGuard)
 @Roles(UserRole.ADMIN, UserRole.OWNER)
@@ -44,6 +63,8 @@ export class IntegrationsController {
   // ---- Static routes (must come before parameterized routes) ----
 
   @Get()
+  @ApiOperation({ summary: "This workspace's integrations (never credentials)" })
+  @ApiResult([IntegrationResponse])
   async listIntegrations(@Request() req) {
     return this.integrationsService.listIntegrations(req.user.tenantId);
   }
@@ -53,32 +74,26 @@ export class IntegrationsController {
    * Returns vendor registry metadata
    */
   @Get('vendors')
+  @ApiOperation({ summary: 'The vendor registry — connection methods per vendor (OAuth env prefixes stripped)' })
+  @ApiResult([IntegrationVendorEntryResponse])
   getVendorRegistry() {
     return this.integrationsService.getVendorRegistry();
   }
 
   @Get('health')
+  @ApiOperation({ summary: 'Integration health — per-integration status, active syncs, last sync per type' })
+  @ApiResult(IntegrationHealthSummaryResponse)
   async getHealthSummary(@Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getHealthSummary(tenant.id);
   }
 
   @Get('sync-history')
-  async getUnifiedSyncHistory(
-    @Request() req,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Query('syncType') syncType?: string,
-    @Query('status') status?: string,
-  ) {
+  @ApiOperation({ summary: 'Every integration’s sync runs — a cursor list, newest first' })
+  @ApiResult(IntegrationSyncHistoryListResponse)
+  async getUnifiedSyncHistory(@Request() req, @Query() query: SyncHistoryQueryDto) {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.getUnifiedSyncHistory(
-      tenant.id,
-      parseInt(limit || '20'),
-      parseInt(offset || '0'),
-      syncType || undefined,
-      status || undefined,
-    );
+    return this.integrationsService.getUnifiedSyncHistory(tenant.id, query);
   }
 
   // ---- Parameterized routes (must come AFTER static routes) ----
@@ -86,20 +101,32 @@ export class IntegrationsController {
   // the service, which scopes the lookup with where: { integrationId, tenantId }.
   // Cross-tenant ids get the same 404 as nonexistent ids (no information leak).
 
-  @Get(':integrationId')
-  async getIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+  @Get(':integration_id')
+  @ApiOperation({ summary: "One integration (never credentials) — 404 for another workspace's id" })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationResponse)
+  async getIntegration(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getIntegration(integrationId, tenant.id);
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Create an integration with encrypted credentials and queue its first sync — dedicated-connect vendors are refused',
+  })
+  @ApiResult(IntegrationCreatedResponse, HttpStatus.CREATED)
   async createIntegration(@Body() dto: CreateIntegrationDto, @Request() req) {
     return this.integrationsService.createIntegration(req.user.tenantId, dto);
   }
 
-  @Patch(':integrationId')
+  @Patch(':integration_id')
+  @ApiOperation({ summary: "Update an integration's name, credentials or enabled flag" })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationUpdatedResponse)
   async updateIntegration(
-    @Param('integrationId') integrationId: string,
+    @Param('integration_id') integrationId: string,
     @Body() dto: UpdateIntegrationDto,
     @Request() req,
   ) {
@@ -107,27 +134,38 @@ export class IntegrationsController {
     return this.integrationsService.updateIntegration(integrationId, tenant.id, dto);
   }
 
-  @Delete(':integrationId')
-  async deleteIntegration(@Param('integrationId') integrationId: string, @Request() req) {
+  @Delete(':integration_id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an integration' })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiNoContentResponse({ description: 'Deleted' })
+  async deleteIntegration(@Param('integration_id') integrationId: string, @Request() req): Promise<void> {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.deleteIntegration(integrationId, tenant.id);
+    await this.integrationsService.deleteIntegration(integrationId, tenant.id);
   }
 
-  @Post(':integrationId/test')
-  async testConnection(@Param('integrationId') integrationId: string, @Request() req) {
+  @Post(':integration_id/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Test an integration's stored credentials against the vendor" })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationConnectionTestResponse)
+  async testConnection(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.testConnection(integrationId, tenant.id);
   }
 
-  @Post(':integrationId/sync')
-  async triggerSync(@Param('integrationId') integrationId: string, @Request() req) {
+  @Post(':integration_id/sync')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Queue a manual sync — 202 with the job to poll' })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationSyncQueuedResponse, HttpStatus.ACCEPTED)
+  async triggerSync(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     const integration = await this.prisma.integrationConfig.findFirst({
       where: { integrationId, tenantId: tenant.id },
       select: {
         id: true,
         tenantId: true,
-        displayName: true,
         integrationType: true,
       },
     });
@@ -159,31 +197,28 @@ export class IntegrationsController {
       ),
     );
 
-    return {
-      success: true,
-      message: `Sync started for ${integration.displayName}.`,
-      jobIds: [job.id],
-    };
+    // 202 with the record to poll: the sync runs on the queue. Follow the job or the sync history.
+    return { jobId: job.publicId, status: JobStatusSchema.enum.QUEUED };
   }
 
-  @Get(':integrationId/sync-history')
+  @Get(':integration_id/sync-history')
+  @ApiOperation({ summary: 'One integration’s sync runs — a cursor list, newest first' })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationSyncHistoryListResponse)
   async getSyncHistory(
-    @Param('integrationId') integrationId: string,
+    @Param('integration_id') integrationId: string,
     @Request() req,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query() query: IntegrationSyncHistoryQueryDto,
   ) {
     const tenant = await this.getTenant(req);
-    return this.integrationsService.getSyncHistory(
-      integrationId,
-      tenant.id,
-      parseInt(limit || '50'),
-      parseInt(offset || '0'),
-    );
+    return this.integrationsService.getSyncHistory(integrationId, tenant.id, query);
   }
 
-  @Get(':integrationId/sync-history/stats')
-  async getSyncStats(@Param('integrationId') integrationId: string, @Request() req) {
+  @Get(':integration_id/sync-history/stats')
+  @ApiOperation({ summary: "One integration's sync totals and success rate" })
+  @ApiParam({ name: 'integration_id', description: 'Integration public id (int_…)' })
+  @ApiResult(IntegrationSyncStatsResponse)
+  async getSyncStats(@Param('integration_id') integrationId: string, @Request() req) {
     const tenant = await this.getTenant(req);
     return this.integrationsService.getSyncStats(integrationId, tenant.id);
   }

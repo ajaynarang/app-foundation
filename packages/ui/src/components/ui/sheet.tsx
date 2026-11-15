@@ -124,6 +124,14 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       return stored ? Math.max(MIN_SHEET_WIDTH, parseInt(stored, 10)) : DEFAULT_SHEET_WIDTH;
     });
     const [isDragging, setIsDragging] = useState(false);
+
+    // Follow `defaultWidth` when it changes after mount (a stored size preference arriving, a parent switching
+    // the size). Not keyed on isDragging, so a drag in progress is never interrupted.
+    React.useEffect(() => {
+      if (defaultWidth && !isDragging) {
+        setSheetWidth(Math.max(MIN_SHEET_WIDTH, defaultWidth));
+      }
+    }, [defaultWidth]);
     const dragStartXRef = useRef(0);
     const dragStartWidthRef = useRef(DEFAULT_SHEET_WIDTH);
 

@@ -1,8 +1,10 @@
 import { Inject, Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
-import { DeliveryChannel, type NotificationCategory, type NotificationType } from '@appshore/db';
+import { DeliveryChannel, type NotificationCategory } from '@appshore/db';
+import { NotificationTypeSchema, PLATFORM_NOTIFICATION_TYPES, type NotificationType } from '@app/shared-types';
 import {
   CHANNEL_RULES,
   NOTIFICATION_POLICIES,
+  NOTIFICATION_TYPES,
   NOTIFICATION_URGENCIES,
   type ChannelRule,
   type NotificationPolicy,
@@ -22,9 +24,20 @@ const RULE_PRECEDENCE: readonly ChannelRule[] = [
 export class NotificationPolicyRegistry {
   private readonly logger = new Logger(NotificationPolicyRegistry.name);
   private readonly policies: NotificationPolicyMap;
+  private readonly declared: readonly NotificationType[];
 
-  constructor(@Optional() @Inject(NOTIFICATION_POLICIES) appPolicies: NotificationPolicyMap = {}) {
+  /**
+   * Refuses to boot on a gap: every declared type (the platform's and the app's NOTIFICATION_TYPES) has exactly one
+   * policy, every policy names a declared type, and no type is declared twice. Held by
+   * `__tests__/notification-policy.registry.spec.ts` and the app's `notification-policy-parity.spec.ts`.
+   */
+  constructor(
+    @Optional() @Inject(NOTIFICATION_POLICIES) appPolicies: NotificationPolicyMap = {},
+    @Optional() @Inject(NOTIFICATION_TYPES) appTypes: readonly string[] = [],
+  ) {
     this.policies = merge(PLATFORM_NOTIFICATION_POLICIES, appPolicies);
+    this.declared = declaredTypes(appTypes);
+    assertPolicyParity(this.declared, this.policies);
   }
 
   get(type: NotificationType): NotificationPolicy {
@@ -45,8 +58,9 @@ export class NotificationPolicyRegistry {
     return this.get(type).urgency === NOTIFICATION_URGENCIES.CRITICAL;
   }
 
+  /** Every declared type: the platform's, then the app's. Each has a policy (checked at boot). */
   types(): NotificationType[] {
-    return Object.keys(this.policies) as NotificationType[];
+    return [...this.declared];
   }
 
   /**
@@ -69,6 +83,33 @@ export class NotificationPolicyRegistry {
       }
     }
     return offered;
+  }
+}
+
+const WHERE =
+  "declare app types in platform-glue/notifications/notification-types.ts and bind each one's policy to NOTIFICATION_POLICIES (platform-glue/hooks.module.ts)";
+
+function declaredTypes(appTypes: readonly string[]): NotificationType[] {
+  const seen = new Set<string>(PLATFORM_NOTIFICATION_TYPES);
+  for (const type of appTypes) {
+    if (!NotificationTypeSchema.safeParse(type).success) {
+      throw new Error(`Notification type ${type} is not a valid notification type (SCREAMING_SNAKE, at most 60 chars)`);
+    }
+    if (seen.has(type)) throw new Error(`Notification type ${type} is declared twice; ${WHERE}.`);
+    seen.add(type);
+  }
+  return [...seen];
+}
+
+function assertPolicyParity(declared: readonly string[], policies: NotificationPolicyMap): void {
+  const known = new Set(declared);
+  const missing = declared.filter((type) => !policies[type]);
+  if (missing.length) {
+    throw new Error(`Notification type ${missing.join(', ')} has no policy; ${WHERE}.`);
+  }
+  const undeclared = Object.keys(policies).filter((type) => !known.has(type));
+  if (undeclared.length) {
+    throw new Error(`A policy for ${undeclared.join(', ')} names a type that is not declared; ${WHERE}.`);
   }
 }
 

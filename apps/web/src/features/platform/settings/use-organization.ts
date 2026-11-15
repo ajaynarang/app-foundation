@@ -31,9 +31,8 @@ export function useOrganization(options?: { enabled?: boolean }) {
 }
 
 /**
- * Updates the tenant company profile. On success refreshes the profile cache
- * and the Desk schedule cache (which surfaces the same tenant timezone
- * read-only on the Crew tab).
+ * Updates the tenant company profile. On success refreshes the profile cache, and with Desk the Desk schedule
+ * cache, which shows the same tenant timezone.
  */
 export function useUpdateOrganization() {
   const qc = useQueryClient();
@@ -41,7 +40,9 @@ export function useUpdateOrganization() {
     mutationFn: (data: UpdateOrganizationProfileInput) => organizationApi.update(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.organization.root });
+      // feature:desk:start
       qc.invalidateQueries({ queryKey: queryKeys.desk.schedule() });
+      // feature:desk:end
       showSuccess('Organization updated');
     },
     onError: (error) => {

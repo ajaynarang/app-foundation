@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuthController } from '../oauth.controller';
 import { AuthTokenService } from '../auth-token.service';
@@ -63,10 +63,8 @@ describe('OAuthController', () => {
       expect(mockAuthTokenService.getConnectUrl).toHaveBeenCalledWith('QUICKBOOKS', 5);
     });
 
-    it('should throw BadRequestException for non-OAuth vendor', async () => {
-      await expect(controller.connect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
-        BadRequestException,
-      );
+    it('answers 404 for a vendor that does not connect with OAuth', async () => {
+      await expect(controller.connect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -99,7 +97,7 @@ describe('OAuthController', () => {
       await controller.callback('c', 's', { query: { code: 'c', state: 's' } }, mockRes as any);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        'https://app.example.com/settings?oauth=connected&vendor=QUICKBOOKS',
+        'https://app.example.com/settings/general?oauth=connected&vendor=QUICKBOOKS',
       );
     });
 
@@ -158,7 +156,7 @@ describe('OAuthController', () => {
       await controller.callback('c', state, { query: { code: 'c', state } }, mockRes as any);
 
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        `https://app.example.com/settings?oauth=error&vendor=${encodeURIComponent('X&next=https://evil.example')}`,
+        `https://app.example.com/settings/general?oauth=error&vendor=${encodeURIComponent('X&next=https://evil.example')}`,
       );
     });
   });
@@ -173,14 +171,15 @@ describe('OAuthController', () => {
         tenantId: 'tenant-abc',
       });
 
-      expect(result.success).toBe(true);
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockAuthTokenService.disconnect).toHaveBeenCalledWith('QUICKBOOKS', 5);
       expect(mockTokenRefreshJob.removeForIntegration).toHaveBeenCalledWith('QUICKBOOKS', 5);
     });
 
-    it('should throw BadRequestException for non-OAuth vendor', async () => {
+    it('answers 404 for a vendor that does not connect with OAuth', async () => {
       await expect(controller.disconnect('UNKNOWN_VENDOR', { tenantId: 'tenant-abc' })).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
     });
   });

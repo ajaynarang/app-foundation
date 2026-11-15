@@ -114,7 +114,7 @@ function ForgotPasswordInner() {
                 }}
                 className="mx-auto w-16 h-16 rounded-full bg-success/10 flex items-center justify-center"
               >
-                <CheckCircle2 className="h-8 w-8 text-success" />
+                <CheckCircle2 className="h-8 w-8 text-success-text" />
               </motion.div>
 
               <div className="space-y-2">

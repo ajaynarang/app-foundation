@@ -12,6 +12,8 @@ import * as path from 'path';
  *   @appshore/db       ← prisma schema + client. Imports nothing appshore.
  *   @appshore/platform ← may import kernel + db. NEVER app code.
  *   apps/backend       ← may import everything.
+ *   @app/ui            ← the web design system + page chrome. Imports no web-core, no router, no app code:
+ *                        what it needs from an app comes through PageChromeProvider.
  *
  * A red test here means a dependency arrow points the wrong way.
  */
@@ -42,9 +44,9 @@ function importsOf(file: string): string[] {
   return specs;
 }
 
-function violations(pkgDir: string, banned: (spec: string) => boolean): string[] {
+function violations(pkgDir: string, banned: (spec: string) => boolean, root = FOUNDATION): string[] {
   const out: string[] = [];
-  for (const file of listTsFiles(path.join(FOUNDATION, pkgDir, 'src'))) {
+  for (const file of listTsFiles(path.join(root, pkgDir, 'src'))) {
     for (const spec of importsOf(file)) {
       if (banned(spec)) out.push(`${path.relative(REPO_ROOT, file)} -> '${spec}'`);
     }
@@ -78,6 +80,23 @@ describe('Foundation package boundaries', () => {
       s === '@appshore/db' ||
       /\.\.\/(\.\.\/)*apps\//.test(s);
     expect(violations('web-core', banned)).toEqual([]);
+  });
+
+  it('@app/ui never imports web-core, a router or app code (the page chrome takes them through its adapter)', () => {
+    const banned = (s: string) =>
+      s.startsWith('@appshore/') ||
+      s.startsWith('@/') ||
+      s === 'next' ||
+      s.startsWith('next/') ||
+      /\.\.\/(\.\.\/)*apps\//.test(s);
+    const packages = path.join(REPO_ROOT, 'packages');
+    // The scan must be looking at the real package: an empty folder would pass with nothing checked.
+    expect(
+      listTsFiles(path.join(packages, 'ui', 'src')).some((f) =>
+        f.endsWith(path.join('page-chrome', 'row-actions.tsx')),
+      ),
+    ).toBe(true);
+    expect(violations('ui', banned, packages)).toEqual([]);
   });
 
   it('kernel package.json declares no prisma/ioredis dependencies', () => {

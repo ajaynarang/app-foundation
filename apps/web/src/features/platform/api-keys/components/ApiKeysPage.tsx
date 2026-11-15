@@ -2,13 +2,22 @@
 
 import { useState } from 'react';
 import { Button } from '@app/ui/components/ui/button';
-import { Badge } from '@app/ui/components/ui/badge';
-import { Skeleton } from '@app/ui/components/ui/skeleton';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@app/ui/components/ui/table';
 import { useTenantApiKeys } from '../hooks/use-tenant-api-keys';
 import type { TenantApiKeyListItem } from '../api';
 import { AgentDetailSheet } from '@/features/ai/agent-detail-sheet';
+import { credentialStatus } from '@/features/ai/agent-scope-ui';
 import { ApiKeyMintSheet } from './ApiKeyMintSheet';
+import {
+  ListErrorState,
+  ListFooter,
+  PageEmptyState,
+  PageLoadingSkeleton,
+  PageSection,
+  RowActions,
+} from '@/shared/components/page-chrome';
+import { useFormatters } from '@/shared/providers/PreferencesProvider';
 
 function summariseScopes(scopes: readonly string[]): string {
   if (scopes.length === 0) return 'None';
@@ -17,13 +26,14 @@ function summariseScopes(scopes: readonly string[]): string {
 }
 
 function renderStatus(key: TenantApiKeyListItem) {
-  if (key.revokedAt) return <Badge variant="critical">Revoked</Badge>;
-  if (!key.isActive) return <Badge variant="muted">Paused</Badge>;
-  return <Badge variant="info">Active</Badge>;
+  const status = credentialStatus(key);
+  return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>;
 }
 
 export function ApiKeysPage() {
-  const { data, isLoading } = useTenantApiKeys();
+  const keys = useTenantApiKeys();
+  const { formatDate } = useFormatters();
+  const { data, isLoading } = keys;
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mintOpen, setMintOpen] = useState(false);
@@ -34,33 +44,26 @@ export function ApiKeysPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">API keys</h2>
-          <p className="text-sm text-muted-foreground">
-            Scoped API keys for scripts, BI tools, and private agents that connect to your tenant.
-          </p>
-        </div>
-        <Button onClick={() => setMintOpen(true)}>Create a key</Button>
-      </div>
-
+    <PageSection
+      title="API keys"
+      description="Scoped API keys for scripts, BI tools, and private agents that connect to your tenant."
+      action={<Button onClick={() => setMintOpen(true)}>Create a key</Button>}
+    >
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
+        <PageLoadingSkeleton variant="table" rows={4} />
+      ) : keys.isError ? (
+        <ListErrorState
+          title="Couldn't load your API keys."
+          error={keys.error}
+          onRetry={() => void keys.refetch()}
+          isRetrying={keys.isRefetching}
+        />
       ) : !data || data.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <p className="text-sm text-muted-foreground">No API keys yet.</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Create a scoped key for scripts, BI tools, or a private agent.
-          </p>
-          <Button className="mt-4" onClick={() => setMintOpen(true)}>
-            Create a key
-          </Button>
-        </div>
+        <PageEmptyState
+          title="No API keys yet"
+          description="Create a scoped key for scripts, BI tools, or a private agent."
+          action={<Button onClick={() => setMintOpen(true)}>Create a key</Button>}
+        />
       ) : (
         <div className="rounded-md border border-border overflow-x-auto">
           <Table>
@@ -71,7 +74,9 @@ export function ApiKeysPage() {
                 <TableHead>Scopes</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last used</TableHead>
-                <TableHead className="w-0" />
+                <TableHead className="w-[1%]">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,25 +89,29 @@ export function ApiKeysPage() {
                   <TableCell className="font-mono text-xs text-muted-foreground">{summariseScopes(k.scopes)}</TableCell>
                   <TableCell>{renderStatus(k)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : '—'}
+                    {k.lastUsedAt ? formatDate(k.lastUsedAt) : '—'}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        open(k);
-                      }}
-                    >
-                      Open
-                    </Button>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <RowActions
+                      primary={{ label: 'Open', ariaLabel: `Open the ${k.name} key`, onClick: () => open(k) }}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {keys.items.length > 0 && (
+        <ListFooter
+          shown={keys.items.length}
+          total={keys.total}
+          hasMore={keys.hasMore}
+          onLoadMore={keys.loadMore}
+          isLoadingMore={keys.isLoadingMore}
+          loadMoreFailed={keys.isLoadMoreError}
+        />
       )}
 
       {selectedId && (
@@ -118,6 +127,6 @@ export function ApiKeysPage() {
       )}
 
       <ApiKeyMintSheet open={mintOpen} onOpenChange={setMintOpen} />
-    </div>
+    </PageSection>
   );
 }

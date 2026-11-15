@@ -11,7 +11,7 @@
  *
  * This is the GENERIC platform set — preferences, feature flags, API keys,
  * OAuth clients, notifications, plans, organization, billing, AI/conversations,
- * onboarding, and the super-admin consoles. Add your own domain namespaces
+ * onboarding, and the super-admin screens. Add your own domain namespaces
  * alongside these as you build features.
  */
 
@@ -108,7 +108,7 @@ export const queryKeys = {
       ['login-activity', scope, 'summary', params] as const,
   },
 
-  // ─── Admin (super-admin consoles) ───────────────────────────────────────
+  // ─── Admin (super-admin screens) ────────────────────────────────────────
   admin: {
     addOnRequests: ['admin', 'add-on-requests'] as const,
     tenants: ['admin', 'tenants'] as const,
@@ -125,11 +125,20 @@ export const queryKeys = {
   aiSpend: {
     root: ['ai-spend'] as const,
     tenants: (days: number) => ['ai-spend', 'tenants', days] as const,
+    summary: (days: number) => ['ai-spend', 'summary', days] as const,
     bySurface: (tenantId: number, days: number) => ['ai-spend', 'by-surface', tenantId, days] as const,
     invocations: (tenantId: number, surface: string | undefined) =>
       ['ai-spend', 'invocations', tenantId, surface ?? 'all'] as const,
     budget: (tenantId: number) => ['ai-spend', 'budget', tenantId] as const,
     costVsQuota: (tenantId: number, days: number) => ['ai-spend', 'cost-vs-quota', tenantId, days] as const,
+  },
+
+  // ─── Timers: deadlines and the durability health strip (super-admin) ─────
+  deadlines: {
+    root: ['deadlines'] as const,
+    list: (params: Record<string, unknown>) => ['deadlines', 'list', params] as const,
+    kinds: ['deadlines', 'kinds'] as const,
+    health: ['deadlines', 'health'] as const,
   },
 
   // ─── AI / conversations ─────────────────────────────────────────────────
@@ -150,9 +159,11 @@ export const queryKeys = {
     messages: (id: string) => ['conversations', id, 'messages'] as const,
   },
 
-  // ─── Desk (agentic runtime — schedule console) ──────────────────────────
+  // feature:desk:start
+  // ─── Desk (agentic runtime — schedule; no screen ships with the template) ─
   desk: {
     root: ['desk'] as const,
     schedule: () => ['desk', 'schedule'] as const,
   },
+  // feature:desk:end
 } as const;

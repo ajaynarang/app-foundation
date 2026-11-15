@@ -181,7 +181,7 @@ export function AcceptInvitationForm() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to load invitation');
+          throw new Error(errorData.detail || 'Failed to load invitation');
         }
 
         const data = await response.json();
@@ -242,7 +242,7 @@ export function AcceptInvitationForm() {
 
       if (!acceptResponse.ok) {
         const errorData = await acceptResponse.json();
-        throw new Error(errorData.message || 'Failed to accept invitation');
+        throw new Error(errorData.detail || 'Failed to accept invitation');
       }
 
       // Step 3: Get Firebase token and exchange for backend JWT

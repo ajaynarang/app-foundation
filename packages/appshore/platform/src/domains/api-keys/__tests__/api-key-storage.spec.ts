@@ -2,7 +2,8 @@ import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Test } from '@nestjs/testing';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../../infrastructure/events/outbox.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 import { ApiKeysService, hashApiKey } from '../api-keys.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
@@ -51,7 +52,7 @@ describe('API key storage', () => {
 
   describe('service', () => {
     const prisma = createMockPrisma();
-    const events = { emit: jest.fn() };
+    const events = createMockOutbox(prisma);
     let svc: ApiKeysService;
 
     const storedRow = (data: Record<string, unknown>) => ({
@@ -77,7 +78,7 @@ describe('API key storage', () => {
         providers: [
           ApiKeysService,
           { provide: PrismaService, useValue: prisma },
-          { provide: DomainEventService, useValue: events },
+          { provide: OutboxService, useValue: events },
         ],
       }).compile();
       svc = mod.get(ApiKeysService);
@@ -105,7 +106,7 @@ describe('API key storage', () => {
       const oldHash = 'a'.repeat(64);
       const existing = storedRow({ id: 501, keyHash: oldHash, keyPrefix: 'sk_live_', keyLast4: 'AbCd' });
       prisma.apiKey.findFirst.mockResolvedValue(existing);
-      prisma.$transaction.mockImplementation((ops: unknown[]) => Promise.resolve(ops));
+      // The revoke and the new row commit in one outbox transaction (the mock runs it on the client itself).
       prisma.apiKey.update.mockReturnValue(null);
       prisma.apiKey.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
         storedRow({ ...data, id: 502 }),
@@ -125,9 +126,10 @@ describe('API key storage', () => {
     it('lists return the masked form and never a key or hash', async () => {
       const row = storedRow({ keyHash: 'a'.repeat(64), keyPrefix: 'sk_live_', keyLast4: 'AbCd' });
       prisma.apiKey.findMany.mockResolvedValue([row]);
+      prisma.apiKey.count.mockResolvedValue(1);
 
-      const [own] = await svc.findAll(42);
-      const [tenant] = await svc.listForTenant(7);
+      const [own] = (await svc.findAll(42)).items;
+      const [tenant] = (await svc.listForTenant(7)).items;
 
       for (const item of [own, tenant]) {
         expect(item.keyMasked).toBe('sk_live_…AbCd');

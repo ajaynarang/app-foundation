@@ -1,6 +1,8 @@
 import { QUEUE_NAMES, WEBHOOKS_JOB_NAMES, NOTIFICATIONS_JOB_NAMES, BULK_OPS_JOB_NAMES } from './queue.constants';
 
-// --- Category Metadata (single source of truth) ---
+// --- Category Metadata (the foundation's categories) ---
+// App categories go in apps/backend/src/platform-glue/queue/job-names.ts (`APP_JOB_CATEGORIES`);
+// readers use the merged vocabulary (`buildJobVocabulary`, the platform's JOB_VOCABULARY token).
 
 export const JOB_CATEGORIES = {
   events: {
@@ -42,8 +44,9 @@ export const ALL_CATEGORIES = Object.keys(JOB_CATEGORIES) as JobCategory[];
 export const TENANT_VISIBLE_CATEGORIES = ALL_CATEGORIES.filter((c) => JOB_CATEGORIES[c].tenantVisible);
 
 // --- Type Display Names ---
-// Generic display names for the built-in job types. Add app-specific job
-// types here so the admin jobs console renders friendly labels.
+// Display names for the foundation's job types, pinned by foundation-vocabulary.spec.ts.
+// App job types get their labels in apps/backend/src/platform-glue/queue/job-names.ts
+// (`APP_JOB_DISPLAY_NAMES`); job listings read the merged vocabulary.
 export const TYPE_DISPLAY_NAMES: Record<string, string> = {
   [NOTIFICATIONS_JOB_NAMES.CLEANUP]: 'Notification Cleanup',
   [NOTIFICATIONS_JOB_NAMES.DIGEST]: 'Notification Digest',
@@ -53,6 +56,8 @@ export const TYPE_DISPLAY_NAMES: Record<string, string> = {
   [BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP]: 'Uploads Cleanup',
   [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: 'Login Events Cleanup',
   [BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]: 'Tokens Cleanup',
+  [BULK_OPS_JOB_NAMES.OUTBOX_RELAY]: 'Outbox Relay',
+  [BULK_OPS_JOB_NAMES.DEADLINE_SWEEP]: 'Deadline Sweep',
 };
 
 export const CATEGORY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
@@ -60,6 +65,7 @@ export const CATEGORY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries
 );
 
 // --- Manual-only types (no repeatable schedule) ---
+// App manual types go in job-names.ts (`APP_MANUAL_TYPES`).
 
 export const MANUAL_CATEGORY_TYPES: Record<string, string[]> = {
   webhooks: [WEBHOOKS_JOB_NAMES.DELIVER],

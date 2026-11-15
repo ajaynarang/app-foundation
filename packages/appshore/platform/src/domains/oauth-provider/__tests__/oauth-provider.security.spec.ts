@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import crypto from 'crypto';
 import { OAuthProviderService } from '../oauth-provider.service';
@@ -9,6 +9,9 @@ import { resolveOAuthAccessTokenSecret, resolveOAuthConsentSecret, resolveOAuthI
  * production code computes: the issuer is required config, consent challenges have their own secret, refresh
  * rotation is atomic, and a client only ever acts for the one tenant it belongs to.
  */
+/** RFC 6749 section 5.2: a code or refresh-token failure is 400 `invalid_grant`. */
+const INVALID_GRANT = { status: 400, response: expect.objectContaining({ error: 'invalid_grant' }) };
+
 describe('OAuthProviderService security', () => {
   const ISSUER = 'https://api.acme.io';
   const settings: Record<string, string | undefined> = {
@@ -241,7 +244,7 @@ describe('OAuthProviderService security', () => {
     it('still treats an already rotated token as reuse', async () => {
       prisma.oAuthRefreshToken.findUnique.mockResolvedValue(stored({ rotatedAt: new Date() }));
 
-      await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1); // only the chain revocation
       expect(prisma.oAuthRefreshToken.create).not.toHaveBeenCalled();
     });
@@ -356,7 +359,7 @@ describe('OAuthProviderService security', () => {
       it("code exchange issues nothing when the user is not a member of the client's tenant", async () => {
         prisma.workspaceMember.findUnique.mockResolvedValue(null);
 
-        await expect(exchange()).rejects.toThrow(BadRequestException);
+        await expect(exchange()).rejects.toMatchObject(INVALID_GRANT);
         expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
         expect(prisma.oAuthRefreshToken.create).not.toHaveBeenCalled();
       });
@@ -364,7 +367,7 @@ describe('OAuthProviderService security', () => {
       it("refresh issues nothing, and leaves the token unrotated, when the user is not a member of the client's tenant", async () => {
         prisma.workspaceMember.findUnique.mockResolvedValue(null);
 
-        await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toThrow(UnauthorizedException);
+        await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
         expect(prisma.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
       });
@@ -396,7 +399,7 @@ describe('OAuthProviderService security', () => {
           client: client({ tenantId: 8 }),
           user: { id: 42, tenantId: null, role: 'MEMBER' },
         });
-        await expect(exchange()).rejects.toThrow(BadRequestException);
+        await expect(exchange()).rejects.toMatchObject(INVALID_GRANT);
       });
     });
 
@@ -414,7 +417,7 @@ describe('OAuthProviderService security', () => {
 
       await expect(
         service.exchangeCode('code', verifier, 'client-1', undefined, authorizeParams.redirectUri),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toMatchObject(INVALID_GRANT);
       expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
     });
 
@@ -431,7 +434,7 @@ describe('OAuthProviderService security', () => {
         user: { id: 42, tenantId: 7, role: 'ADMIN' },
       });
 
-      await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toThrow(BadRequestException);
+      await expect(service.refreshToken('old-refresh', 'client-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
       expect(prisma.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
       expect(prisma.oAuthAccessToken.create).not.toHaveBeenCalled();
     });

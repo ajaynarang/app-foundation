@@ -1,19 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { containsText } from '@appshore/kernel/shared/utils/list-query';
 import { getEventDefinition } from '../../platform-glue/events/event-registry';
 
+/** What `GET /admin/events` passes in, already parsed at the controller. */
 export interface ListEventsFilters {
   search?: string;
-  event?: string;
+  /** The tenant's public slug. */
   tenantId?: string;
   actorType?: string;
-  aggregateType?: string;
   since?: string;
   until?: string;
-  limit: number;
-  offset: number;
+  limit?: number;
+  cursor?: string;
 }
+
+/** Newest first; the row id is a UUIDv7 (never an Int key), so it is a safe tiebreak. */
+const EVENT_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+
+/** The webhook health panel shows the worst tenants first, and never more than this many. */
+export const MAX_WEBHOOK_HEALTH_TENANTS = 100;
 
 @Injectable()
 export class AdminEventsService {
@@ -21,7 +34,11 @@ export class AdminEventsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async listEvents(filters: ListEventsFilters) {
+  /** Domain events across tenants (super admin), newest first, as a cursor list. */
+  async listEvents(filters: ListEventsFilters = {}) {
+    const take = clampCursorLimit(filters.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = filters.cursor ? keysetWhere({ ...EVENT_KEYSET, cursor: filters.cursor }) : undefined;
     const where: Prisma.DomainEventLogWhereInput = {};
 
     if (filters.tenantId) {
@@ -30,11 +47,12 @@ export class AdminEventsService {
       where.tenant = { tenantId: filters.tenantId };
     }
     if (filters.search) {
+      // `containsText` escapes LIKE wildcards: unescaped, `_` or `%` would match every event.
       where.OR = [
-        { event: { contains: filters.search, mode: 'insensitive' } },
-        { aggregateId: { contains: filters.search, mode: 'insensitive' } },
-        { actorLabel: { contains: filters.search, mode: 'insensitive' } },
-        { aggregateType: { contains: filters.search, mode: 'insensitive' } },
+        { event: containsText(filters.search) },
+        { aggregateId: containsText(filters.search) },
+        { actorLabel: containsText(filters.search) },
+        { aggregateType: containsText(filters.search) },
       ];
     }
     if (filters.actorType) {
@@ -53,12 +71,11 @@ export class AdminEventsService {
       }
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.domainEventLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: filters.limit,
-        skip: filters.offset,
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
         select: {
           id: true,
           event: true,
@@ -79,7 +96,8 @@ export class AdminEventsService {
 
     // Reshape response: keep the public-facing `tenantId` (slug) shape the
     // admin UI already renders, even though the DB column is now Int.
-    const enrichedItems = items.map((item) => {
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    const items = page.items.map((item) => {
       const def = getEventDefinition(item.event);
       const { tenant, ...rest } = item;
       return {
@@ -89,12 +107,7 @@ export class AdminEventsService {
       };
     });
 
-    return {
-      items: enrichedItems,
-      total,
-      limit: filters.limit,
-      offset: filters.offset,
-    };
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   async getStats() {
@@ -117,82 +130,73 @@ export class AdminEventsService {
     };
   }
 
+  /**
+   * Events per hour and event type over the last 24 hours. Counted in SQL: the answer is at most 24 rows per
+   * event type in the registry, however many events were written.
+   */
   async getVolume() {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const events = await this.prisma.domainEventLog.findMany({
-      where: { createdAt: { gte: since } },
-      select: { event: true, createdAt: true },
-    });
-
-    // Group by hour + event type
-    const buckets = new Map<string, number>();
-    for (const e of events) {
-      const hour = new Date(e.createdAt);
-      hour.setMinutes(0, 0, 0);
-      const key = `${hour.toISOString()}|${e.event}`;
-      buckets.set(key, (buckets.get(key) ?? 0) + 1);
-    }
-
-    const volume = Array.from(buckets.entries()).map(([key, count]) => {
-      const [hour, event] = key.split('|');
-      return { hour, event, count };
-    });
-
-    // Sort by hour
-    volume.sort((a, b) => a.hour.localeCompare(b.hour));
-
-    return volume;
+    const rows = await this.prisma.$queryRaw<Array<{ hour: Date; event: string; count: bigint | number }>>`
+      SELECT date_trunc('hour', created_at) AS hour, event, COUNT(*) AS count
+      FROM domain_event_log
+      WHERE created_at >= ${since}
+      GROUP BY 1, 2
+      ORDER BY 1 ASC, 2 ASC`;
+    return rows.map((row) => ({ hour: row.hour.toISOString(), event: row.event, count: Number(row.count) }));
   }
 
+  /**
+   * Webhook delivery health over the last 24 hours: the summary counts every delivery; the per-tenant rows are
+   * the worst `MAX_WEBHOOK_HEALTH_TENANTS` by success rate. Counted in SQL, so no delivery row is loaded.
+   */
   async getWebhookHealth() {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [perTenant, [totals]] = await Promise.all([
+      this.prisma.$queryRaw<WebhookHealthRaw[]>`
+        SELECT t.tenant_id AS tenant_slug,
+               COUNT(*) AS total,
+               COUNT(l.delivered_at) AS delivered,
+               COUNT(l.failed_at) AS failed
+        FROM webhook_delivery_logs l
+        JOIN webhook_subscriptions s ON s.id = l.subscription_id
+        JOIN tenants t ON t.id = s.tenant_id
+        WHERE l.created_at >= ${since}
+        GROUP BY t.tenant_id
+        ORDER BY (COUNT(l.delivered_at)::numeric / COUNT(*)) ASC, t.tenant_id ASC
+        LIMIT ${MAX_WEBHOOK_HEALTH_TENANTS}`,
+      this.prisma.$queryRaw<Array<Omit<WebhookHealthRaw, 'tenant_slug'>>>`
+        SELECT COUNT(*) AS total, COUNT(delivered_at) AS delivered, COUNT(failed_at) AS failed
+        FROM webhook_delivery_logs
+        WHERE created_at >= ${since}`,
+    ]);
 
-    const deliveries = await this.prisma.webhookDeliveryLog.findMany({
-      where: { createdAt: { gte: since } },
-      select: {
-        id: true,
-        deliveredAt: true,
-        failedAt: true,
-        subscription: {
-          select: { tenant: { select: { tenantId: true } } },
-        },
-      },
+    const tenants = perTenant.map((row) => {
+      const total = Number(row.total);
+      const delivered = Number(row.delivered);
+      return {
+        tenantId: row.tenant_slug,
+        total,
+        delivered,
+        failed: Number(row.failed),
+        successRate: total > 0 ? Math.round((delivered / total) * 10000) / 100 : 100,
+      };
     });
-
-    // Aggregate success/failure per tenant slug — admin-facing UI shows the slug.
-    const tenantMap = new Map<string, { total: number; delivered: number; failed: number }>();
-
-    for (const d of deliveries) {
-      const tenantSlug = d.subscription.tenant.tenantId;
-      if (!tenantMap.has(tenantSlug)) {
-        tenantMap.set(tenantSlug, { total: 0, delivered: 0, failed: 0 });
-      }
-      const entry = tenantMap.get(tenantSlug);
-      entry.total++;
-      if (d.deliveredAt) entry.delivered++;
-      if (d.failedAt) entry.failed++;
-    }
-
-    const tenants = Array.from(tenantMap.entries()).map(([tenantId, counts]) => ({
-      tenantId,
-      total: counts.total,
-      delivered: counts.delivered,
-      failed: counts.failed,
-      successRate: counts.total > 0 ? Math.round((counts.delivered / counts.total) * 10000) / 100 : 100,
-    }));
-
-    // Sort by success rate ascending so worst tenants appear first
-    tenants.sort((a, b) => a.successRate - b.successRate);
 
     return {
       since: since.toISOString(),
       tenants,
       summary: {
-        totalDeliveries: deliveries.length,
-        totalDelivered: deliveries.filter((d) => d.deliveredAt).length,
-        totalFailed: deliveries.filter((d) => d.failedAt).length,
+        totalDeliveries: Number(totals?.total ?? 0),
+        totalDelivered: Number(totals?.delivered ?? 0),
+        totalFailed: Number(totals?.failed ?? 0),
       },
     };
   }
+}
+
+interface WebhookHealthRaw {
+  tenant_slug: string;
+  total: bigint | number;
+  delivered: bigint | number;
+  failed: bigint | number;
 }

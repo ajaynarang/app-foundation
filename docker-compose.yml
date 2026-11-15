@@ -153,6 +153,7 @@ services:
   #     - backend
   #   command: pnpm run dev
 
+  # feature:desk:start
   # ─────────────────────────────────────────────────────────────
   # Inngest dev server — durable workflow engine for the Desk workflow engine
   # UI: http://localhost:8288
@@ -179,6 +180,7 @@ services:
       - 'http://host.docker.internal:${BACKEND_PORT:-8000}/api/v1/inngest'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+  # feature:desk:end
 
 volumes:
   postgres_data:

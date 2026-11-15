@@ -1,40 +1,35 @@
-import { IsInt, IsOptional, IsBoolean, IsString, IsEnum, Min } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsOptional, IsBoolean, Min } from 'class-validator';
+import { CursorQueryDto, QueryEnum } from '@appshore/kernel/shared/utils/query-dto';
 import { WalletTransactionType } from '@appshore/db';
 
 export class TopUpWalletDto {
+  @ApiProperty()
   @IsInt()
   @Min(100) // minimum $1.00
   amountCents: number;
 }
 
 export class UpdateAutoReloadDto {
+  @ApiProperty()
   @IsBoolean()
   enabled: boolean;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(100)
   thresholdCents?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(100)
   reloadAmountCents?: number;
 }
 
-export class WalletTransactionsQueryDto {
-  @IsOptional()
-  @IsEnum(WalletTransactionType)
+/** `GET /billing/wallet/transactions` — `limit`, `cursor`, `type` (one transaction type). */
+export class WalletTransactionsQueryDto extends CursorQueryDto {
+  @QueryEnum(Object.values(WalletTransactionType))
   type?: WalletTransactionType;
-
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value, 10))
-  @IsInt()
-  @Min(1)
-  limit?: number;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
 }

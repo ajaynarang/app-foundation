@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { DeliveryChannel, DeliveryStatus, NotificationType } from '@appshore/db';
+import { DeliveryChannel, DeliveryStatus } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { PrismaService } from '../../../database/prisma.service';
 import { DeliveryLedgerService } from '../delivery-ledger.service';
 import { DELIVERY_SKIP_REASONS } from '../delivery-outcome';
@@ -27,7 +28,7 @@ describe('DeliveryLedgerService', () => {
   it('writes one row per (recipient, channel) with a time-sortable id and sentAt only on SENT', async () => {
     await service.recordOutcomes({
       tenantId: 7,
-      type: NotificationType.USER_JOINED,
+      type: PlatformNotificationType.USER_JOINED,
       recipients: [
         {
           userId: 42,
@@ -80,10 +81,10 @@ describe('DeliveryLedgerService', () => {
   });
 
   it('writes nothing for an empty audience', async () => {
-    await service.recordOutcomes({ tenantId: 7, type: NotificationType.USER_INVITATION, recipients: [] });
+    await service.recordOutcomes({ tenantId: 7, type: PlatformNotificationType.USER_INVITATION, recipients: [] });
     await service.recordOutcomes({
       tenantId: 7,
-      type: NotificationType.USER_INVITATION,
+      type: PlatformNotificationType.USER_INVITATION,
       recipients: [{ userId: 1, outcomes: [] }],
     });
     expect(prisma.notificationDelivery.createMany).not.toHaveBeenCalled();
@@ -99,7 +100,11 @@ describe('DeliveryLedgerService', () => {
     }));
     prisma.notificationDelivery.createMany.mockRejectedValueOnce(new Error('db blip'));
 
-    await service.recordOutcomes({ tenantId: 7, type: NotificationType.INTEGRATION_SYNC_COMPLETED, recipients });
+    await service.recordOutcomes({
+      tenantId: 7,
+      type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
+      recipients,
+    });
 
     // 240 rows → two inserts of 200 + 40; the first failed and the second still went.
     expect(prisma.notificationDelivery.createMany).toHaveBeenCalledTimes(2);
@@ -112,7 +117,7 @@ describe('DeliveryLedgerService', () => {
     await expect(
       service.recordOutcomes({
         tenantId: 7,
-        type: NotificationType.USER_INVITATION,
+        type: PlatformNotificationType.USER_INVITATION,
         recipients: [{ userId: 42, outcomes: [{ channel: DeliveryChannel.IN_APP, status: DeliveryStatus.SENT }] }],
       }),
     ).resolves.toBeUndefined();
@@ -127,7 +132,7 @@ describe('DeliveryLedgerService', () => {
   it('keeps a pre-generated id when the outcome carries one', async () => {
     await service.recordOutcomes({
       tenantId: 7,
-      type: NotificationType.USER_INVITATION,
+      type: PlatformNotificationType.USER_INVITATION,
       recipients: [
         {
           userId: 1,
@@ -305,7 +310,7 @@ describe('DeliveryLedgerService', () => {
       const log = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
       await service.recordOutcomes({
         tenantId: 7,
-        type: NotificationType.INTEGRATION_SYNC_COMPLETED,
+        type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
         recipients: [
           {
             userId: 1,
@@ -334,7 +339,7 @@ describe('DeliveryLedgerService', () => {
       log.mockClear();
       await service.recordOutcomes({
         tenantId: 7,
-        type: NotificationType.INTEGRATION_SYNC_COMPLETED,
+        type: PlatformNotificationType.INTEGRATION_SYNC_COMPLETED,
         recipients: [{ userId: 3, outcomes: [{ channel: DeliveryChannel.IN_APP, status: DeliveryStatus.SENT }] }],
       });
       expect(log).not.toHaveBeenCalled();

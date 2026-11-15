@@ -63,9 +63,20 @@ Review every file against the backend patterns skill. For each violation found, 
 - The fix (for CONVENTION: provide exact replacement code)
 
 ## CRITICAL violations (always check, all files):
-1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and @Query('snake_case') decorator arguments)
-2. Event emission bypassing DomainEventService / the APP_EVENT_REGISTRY (raw EventEmitter2.emit or plain-object events)
+1. snake_case in DTOs or API responses (except Prisma where/data/select/include/orderBy blocks and the wire `name` of a query DTO param, which is snake_case: rule `naming/snake-case-query-keys`)
+2. A domain event raised outside the write's transaction (ADR "Outbox and deadlines"; held by architecture/no-direct-emit.spec.ts): `DomainEventService.emit` / `.publish` after a write instead of `emit` inside `OutboxService.transaction((tx, emit) => …)`; a write the event describes done on `this.prisma` instead of `tx`; raw `EventEmitter2.emit(name, new DomainEvent(…))`; an event not in the APP_EVENT_REGISTRY; a new or raised entry in `no-direct-emit.allowlist.json` for anything but a signal with no write behind it, or an entry with no reason
+2a. A one-off timer that is not a deadline row (ADR "Outbox and deadlines"; held by `deadlines.integration.spec.ts` and `bulk-ops-handlers.spec.ts`): a delayed BullMQ job, `setTimeout` or a workflow-engine sleep standing in for a timer tied to a write; `DeadlineService.schedule` / `cancel` on `this.prisma` instead of the write's `tx`; a `subjectId` that is an Int primary key; a handler that trusts `payload` instead of re-reading, is not safe to run twice, or does its writes outside `OutboxService.transaction`; a new kind missing from `deadline-kinds.ts`; a new `bulk-ops` job name whose handler is not in the dispatcher's factory
 3. `throw new Error()` instead of NestJS exceptions in HTTP paths (BadRequestException, NotFoundException, etc.)
+3a. An error body written by hand (`res.status(4xx).json({ message })`) or an exception carrying keys beyond `code`, `detail`, `fieldErrors` — every error leaves through the one envelope (`writeErrorEnvelope`; held by architecture/error-envelope.spec.ts)
+3b. A 400 that names no field (use `fieldError()` / `fieldErrors()`, or it is a 401/403/404/409 with a code; rule `errors/controller-400-names-its-field`); error copy that carries an internal id, a storage key or raw exception text (rule `errors/no-internals-in-messages`); a state conflict answered 400 instead of 409 (`invalidState()`, `duplicate()`, `stale()`); `Schema.parse()` at the HTTP boundary instead of `parseWithSchema()`
+3c. Success status by route shape (held by architecture/api-contract.spec.ts, rules `status/*`): a POST without `@HttpCode`; a create that is not 201; an action POST (`/:id/verb`) answering 201; queued work not answering 202 with the record to poll; a DELETE that is not 204 or returns a body; an acknowledgement body (`{ success: true }`, `{ message }`, `{ deleted: true }`) from a controller or from the service it returns
+3d. Another tenant's record answered 403 instead of 404 (rule `errors/cross-tenant-is-404`); an illegal state transition answered 400 or 403 instead of `invalidState()` (rule `errors/transition-is-409`)
+3e. Edge (rules `edge/*`): `@SkipThrottle()` on anything but a health or SSE route (use `@Throttle(GENEROUS_THROTTLE)`), or beside a `@Throttle(...)`; a route behind `ApiKeyAuthGuard` or `OAuthTokenGuard` without `AgentRateLimitGuard` or without `@UseFilters(BearerChallengeFilter)` on its controller
+3f. Any entry in `api-contract.baseline.json` (the starter ships it as `{}` and a test holds it empty), or an `api-contract.allowlist.json` entry with no reason, or a `PROVIDER_ROUTES` entry for a route whose format no third party sets, or a `BOUNDED_LISTS` / `BOUNDED_READS` entry for a list or read whose size nothing fixes
+3g. Lists (rules `output/*` in architecture/api-contract.spec.ts): a list that can grow that is not a `CursorList { items, nextCursor, total }` (a bare array, `{ data, total }`, `offset` / `page` / `skip`); a cursor whose tiebreak is an Int primary key (except the two API key lists, listed in the ADR "ID boundary"); the scope and the keyset spread into one `where` instead of `AND: [scope, keyset]`; a `findMany` reached from a GET with no `take` and no `BOUNDED_READS` entry; rows loaded to count or sum them; a controller returning a Prisma row (`return this.prisma.…`); a converted list with no spec that walks pages over a fixture (`walkCursorList`), ties included
+3h. ID boundary (held by architecture/id-boundary.spec.ts): `ParseIntPipe` on a route param; a DTO property named `id` / `*Id` / `*Ids` typed `number`; a `z.number()` id in a `@app/shared-types` schema or an MCP tool parameter; a service returning a raw row with `id` and numeric foreign keys instead of a `toPublic…` serializer; a new entry or a raised count in `id-boundary.allowlist.json` (it may only shrink), or an entry with no reason
+3i. The published contract (held by architecture/swagger-completeness.spec.ts and rules `docs/*`): a route without `@ApiOperation`, a `:param` without `@ApiParam({ name, description })`, a non-public route that returns a body without `@ApiResult(<response schema>, <status>)` (or `@ApiNoContentResponse()` for a 204), or an `@ApiResult` whose status is not the route's; a response schema that is not what the route sends (a Date typed as anything but an ISO string, a nullable column without `.nullable()`, a field the service does not return); a response shape re-typed in the controller file instead of named once in `openapi.responses.ts` from a `@app/shared-types` schema; a DTO field without `@ApiProperty` / `@ApiPropertyOptional`, or `PartialType` from `@nestjs/mapped-types`; a contract change without the regenerated `apps/backend/openapi.json` and `public-openapi.json`; code that picks the served document by reading `NODE_ENV` or `ENV_TYPE` instead of `isProductionEnv()`; a hand list of public routes, or a new credential guard in neither `AGENT_AUTH_GUARDS` nor `NON_CREDENTIAL_GUARDS` (bootstrap/public-openapi.ts); a v1 route retired without `@DeprecatedRoute({ since, sunset })`
+3j. Idempotency-Key (ADR "API contract", section 5; held by idempotency.spec.ts and swagger-completeness.spec.ts): a create (201 or 202) whose body shows a secret once (a plaintext key, a client or signing secret, a token or token-bearing link) without `@SkipIdempotency()`; a hand-rolled dedupe of a create by a client-sent key instead of the global interceptor; `@SkipIdempotency()` on a create that shows no secret
 4. Enums imported from '@prisma/client' instead of '@appshore/db', or hand-written enum literals/Zod enums duplicating a Prisma enum
 5. Raw AI SDK calls outside the sanctioned paths (Mastra runtime, StructuredOutputService, runStructuredLlmStep)
 6. Missing auth guard decorators (@Roles) on controller endpoints
@@ -74,16 +85,22 @@ Review every file against the backend patterns skill. For each violation found, 
 9. Missing @ApiTags, @ApiBearerAuth on controllers
 10. Cross-domain direct imports (domain A importing domain B internals), or app code imported into packages/appshore/* (layer rule: kernel ← db ← platform ← apps)
 11. A new @Processor class added to an existing queue (one dispatcher per queue — add a QueueJobHandler instead)
+11a. A `bulk-ops` job name whose handler is not injected into and returned by the factory in `bulk-ops-queue.module.ts`, or missing from the map in architecture/bulk-ops-handlers.spec.ts (an unwired handler is a silent no-op)
+11b. An event consumer (an `@OnEvent` listener, a durable-path step, a job it enqueues) that is not safe to run twice for one event id: a write or a job id not keyed on `event.id`, an insert where an upsert belongs. Delivery is at least once; architecture-level proof is platform-glue/events/__tests__/double-delivery.spec.ts
+11c. Product vocabulary in the kernel (held by architecture/foundation-vocabulary.spec.ts): a queue, job name, job label, job category or manual type added to `@appshore/kernel` `queue.constants.ts` / `job.types.ts` for an app job; it belongs in `platform-glue/queue/job-names.ts`. A notification type added to `PLATFORM_NOTIFICATION_TYPES` for an app use, or a Prisma enum reintroduced for it; app types go in `platform-glue/notifications/notification-types.ts` with a policy in `NOTIFICATION_POLICIES`
+11d. The queue role switch read or set anywhere but `main.ts` (`applyQueueProcessingMode()`) and Terraform's `api_queue_processors_enabled`: `worker.ts` reading `QUEUE_PROCESSORS_ENABLED`, the key copied into Doppler or an env example as a default, or `api_queue_processors_enabled = false` with no worker task
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 12. DTO validation: class-validator decorators, @ApiProperty, @Transform for optional strings, cents for money
+12a. Query strings: one `@Query() query: XQueryDto` built from the kernel query-DTO kit (snake_case wire names, `q` for search, `containsText()` for LIKE); no `@Query('x')` parameter (rule `input/query-is-a-dto`) and no `parseInt`/`parseFloat`/`Number()` or `Schema.parse()` in a controller (rules `input/no-number-parse-in-controllers`, `input/no-schema-parse-in-controllers`)
+12b. Bodies: `@Body() dto: XDto`, a class imported as a value; never `@Body('x')`, an inline type, an interface, `Record<…>`, an array or an `import type` class (rule `input/body-is-a-dto-class`). A body a standard defines is a `@ProtocolWireDto`
 13. Cache patterns: correct TTL tier constant, buildKey usage, event-based invalidation registered
 14. Queue patterns: job names from *_JOB_NAMES constants, bullJobIdFromDbId for custom job IDs, correlationId forwarded
 15. Service structure: Logger injection, constructor pattern, tenantId as first param
 16. Error messages: user-friendly, no raw technical errors, Prisma codes, or internal IDs exposed
 17. Prisma queries: N+1 detection (findMany in loop), missing select/include optimization, find-then-create instead of upsert
 18. Domain event naming: app.<aggregate>.<past-tense-action> format, registered in APP_EVENT_REGISTRY
-19. Controller URL naming: kebab-case paths, snake_case URL params, RESTful conventions
+19. Controller URL naming: kebab-case paths, snake_case URL params (rule `naming/snake-case-url-params`), one param name per collection (`naming/one-param-name-per-collection`), every `@Param('x')` matching a `:x` in its route (`naming/param-matches-route`), RESTful conventions
 20. Module registration: proper imports/exports in the parent domain module
 21. BaseTenantController extension for tenant-scoped controllers
 22. State transitions: dedicated method with a whitelisted from→to map (no free-form status updates)
@@ -128,16 +145,18 @@ Review every file against the frontend patterns skill. For each violation found,
 - The fix (for CONVENTION: provide exact replacement code)
 
 ## CRITICAL violations (always check, all files):
-1. Plain HTML elements instead of @app/ui shadcn components: <button>, <input>, <select>, <table>, <label>, <textarea>
-2. Standalone light-only colors without dark variant or semantic token: bg-white, bg-gray-50, text-gray-900, text-gray-600, border-gray-200, hover:bg-gray-100
+1. Plain HTML elements instead of @app/ui shadcn components: <button>, <input>, <select>, <table>, <label>, <textarea>. A shadcn component is imported from `@app/ui/components/ui/*` only: no copy under `apps/web/src/shared/components/ui/` and no import through `@/shared/components/ui/` (single-component-set.test.ts)
+2. A raw Tailwind palette class (`bg-gray-50`, `text-red-500`, `border-yellow-600`, even with a `dark:` pair) or a hex class (`bg-[#…]`) anywhere in `apps/web/src`, `packages/ui/src` or web-core: a surface wears a theme token (`bg-background`, `bg-muted/50`, `border-border`), a status a tone. Tinted text wears the `-text` token (`text-caution-text`), never the fill hue (`text-caution`) (ui-grammar-guard.test.ts)
 3. Missing mutation toasts: every useMutation must have both showSuccess() and showError() (or a verified global fallback)
-4. Loading states using Loader2/spinner/null instead of <Skeleton>
+4. Loading states using Loader2/spinner/null instead of <Skeleton> or a shaped `PageLoadingSkeleton`
 5. Manual Loader2 in buttons instead of the loading={isPending} prop
 6. Local entity type definitions instead of importing from @app/shared-types
 7. Dialog used for forms with 4+ fields (should be Sheet/FormSheet)
 8. Direct Zustand for server state (should be TanStack Query)
 9. Missing 'use client' directive on components using hooks
 10. Hardcoded values that exist in shared-types or centralized constants (query keys, storage keys, enum values)
+10a. A date written with `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString`, `formatDistanceToNow` or a hand-rolled "5m ago" helper: dates go through `useFormatters()` (the user's format and timezone) and relative times through `RelativeTime` (eslint `no-restricted-syntax`; ui-grammar-guard.test.ts)
+10b. A list that reads a query with no `ListErrorState` branch, or an `Alert` used as an empty or error state: a failed fetch must never read as empty (ui-grammar-guard.test.ts)
 
 ## DEEP checks (changed files only in tiered mode, all files in full mode):
 11. Sheet patterns: FormSheet usage, onInteractOutside for edit mode, sticky footer action placement, destructive actions behind AlertDialog
@@ -149,8 +168,8 @@ Review every file against the frontend patterns skill. For each violation found,
 17. Responsive classes: mobile-first, 375/768/1440 breakpoints
 18. API layer: object namespace pattern (entityApi.method()), no direct fetch calls in components
 19. Query tier: QUERY_TIERS used instead of hardcoded staleTime/refetchInterval
-20. Error handling: extractErrorMessage usage, error boundaries per route segment
-21. Page chrome: PageHeader + PageToolbar + FilterBar from shared/components/page-chrome; title AND subtitle present; no hand-rolled headers
+20. Error handling: extractErrorMessage usage, error boundaries per route segment; a raw fetch reads `detail` (never `message`) from an error body, and branches on `code` via extractErrorCode
+21. Page chrome: PageHeader + PageToolbar + ListFilterRow from @/shared/components/page-chrome; title AND subtitle present; no hand-rolled headers. Every settings and admin page renders `PageHeader`, and a section heading is `PageSection`, never a raw h1/h2; a feature folder those pages render is listed in `SETTINGS_ADMIN_DIRS` of ui-grammar-guard.test.ts. A new growing list uses useListParams + useCursorList and renders ListErrorState and ListFooter. A status maps to a tone (StatusVariant) and renders StatusBadge, never a colour class; tinted text wears a `-text` token. Row actions go through RowActions (no raw `<Button>` in a `<TableCell>` or `<li>`; a destructive item confirms first), a status map is added to `STATUS_MAPS` in ui-grammar-guard.test.ts so its labels keep one tone app-wide, a control hidden until hover also shows on focus and touch, and no raw fetch hand-builds a bearer token. `@app/ui` imports no `@appshore/*`, `@/`, `next` or app code (foundation-boundaries.spec.ts)
 22. Button variants: correct variant for context (default/destructive/outline/ghost)
 23. Toasts imported from @app/ui, never raw toast()
 

@@ -233,7 +233,7 @@ export default function OAuthConsentPage() {
       <FullPageShell>
         <Card className="w-full max-w-md">
           <CardContent className="py-12 text-center">
-            <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600 dark:text-emerald-500" />
+            <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-success-text" />
             <h2 className="text-lg font-semibold text-foreground">Authorization granted</h2>
             <p className="mt-2 text-sm text-muted-foreground">Redirecting back to {challenge?.clientName}…</p>
           </CardContent>
@@ -323,7 +323,7 @@ export default function OAuthConsentPage() {
                 onClick={() => setStandardExpanded((v) => !v)}
                 className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/50"
               >
-                <Pencil className="h-4 w-4 text-caution shrink-0" />
+                <Pencil className="h-4 w-4 text-caution-text shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-semibold text-foreground">Standard writes ({standard.length})</h2>
                   <p className="text-xs text-muted-foreground">
@@ -445,7 +445,7 @@ function CountChip({
     tone === 'critical'
       ? 'bg-destructive/10 text-destructive'
       : tone === 'caution'
-        ? 'bg-caution/10 text-caution'
+        ? 'bg-caution/10 text-caution-text'
         : 'bg-muted text-muted-foreground';
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${colors} ${dim ? 'opacity-50' : ''}`}>

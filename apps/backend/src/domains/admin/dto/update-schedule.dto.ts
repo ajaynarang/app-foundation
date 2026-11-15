@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
@@ -29,17 +30,20 @@ class IsCronExpression implements ValidatorConstraintInterface {
 }
 
 export class UpdateScheduleDto {
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @Validate(IsCronExpression)
   pattern?: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(10000, { message: 'Minimum interval is 10 seconds' })
   @Max(86400000, { message: 'Maximum interval is 24 hours' })
   intervalMs?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;

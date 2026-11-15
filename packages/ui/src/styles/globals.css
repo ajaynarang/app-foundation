@@ -51,6 +51,21 @@
   --success: 142.1 76.2% 36.3%;
   --success-foreground: 0 0% 98%;
 
+  /* Brand: the ONE place a product sets its brand colour. Neutral grey by default.
+     --brand is a fill / accent (the focused-row marker, icons): it needs 3:1 on a row surface.
+     --brand-text is brand-coloured TEXT (identifiers are 12 px): it must clear WCAG AA 4.5:1 on background,
+     card and muted. theme-tokens.test.ts in apps/web holds both. */
+  --brand: 0 0% 45%;
+  --brand-foreground: 0 0% 98%;
+  --brand-text: 0 0% 32%;
+
+  /* Status-tone TEXT: a badge's label on its own 15% tint must clear WCAG AA (4.5:1). The base
+     hues above are fill colours; on light surfaces amber/green read 1.7 to 2.8:1, so text goes darker. */
+  --caution-text: 32 81% 29%;
+  --success-text: 143 64% 24%;
+  --info-text: 224 76% 40%;
+  --critical-text: 0 74% 40%;
+
   --radius: 0.5rem;
 }
 
@@ -101,4 +116,41 @@
   /* Success */
   --success: 142.1 70.6% 45.3%;
   --success-foreground: 0 0% 98%;
+
+  /* Brand (dark): see the note in :root. */
+  --brand: 0 0% 65%;
+  --brand-foreground: 0 0% 9%;
+  --brand-text: 0 0% 75%;
+
+  /* Status-tone TEXT (dark): at least 5.5:1 on the 15% tint over card and background. */
+  --caution-text: 47.9 95.8% 53.1%;
+  --success-text: 142.1 70.6% 45.3%;
+  --info-text: 213 94% 74%;
+  --critical-text: 0 91% 78%;
+}
+
+/*
+ * Row actions are revealed, not always shown: inside a list row or a table row, `RowActions` fades in when the
+ * row is hovered or holds focus, so a long list reads as content rather than a column of buttons. Opacity only:
+ * the actions stay in the tab order and in the accessibility tree, and keyboard focus anywhere in the row shows
+ * them. Touch screens (no hover) always show them. They also stay up while the menu is open or an action is busy,
+ * and on the row that is the current one. `reveal="always"` opts a row out.
+ * Every selector below carries the same specificity (0,3,0), so the later "show" rules win over the "hide" rule.
+ */
+@media (hover: hover) and (pointer: fine) {
+  :is(li, tr, [role='row']) [data-row-actions]:not([data-reveal='always']) {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+  :is(li, tr, [role='row']):is(:hover, :focus-within) [data-row-actions],
+  :is(li, tr, [role='row']):has([aria-current='true'], [aria-current='page']) [data-row-actions],
+  :is(li, tr, [role='row']) [data-row-actions]:is(:focus-within, :has([data-state='open'], [aria-busy='true'])) {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-row-actions] {
+    transition: none;
+  }
 }

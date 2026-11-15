@@ -1,0 +1,51 @@
+{
+  "PROVIDER_ROUTES": {
+    "apps/backend/src/domains/billing/controllers/webhook.controller.ts :: POST /webhooks/billing": "Stripe webhooks (docs.stripe.com/webhooks): 200 { received: true }; 400 on a missing or bad signature. Stripe reads only the status and retries on anything but 2xx",
+    "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-webhook.controller.ts :: GET /webhooks/whatsapp": "Meta webhook verification (developers.facebook.com, Graph API webhooks): 200 text/plain with hub.challenge echoed; 403 on a token mismatch. Meta names the hub.* query keys",
+    "packages/appshore/platform/src/infrastructure/notifications/channels/whatsapp/whatsapp-webhook.controller.ts :: POST /webhooks/whatsapp": "WhatsApp Cloud API webhooks (Meta) and the Interakt webhook: 200 once the signature checks, always, so the vendor does not retry; 401 on a bad signature",
+    "apps/backend/src/domains/desk/core/inngest/inngest.controller.ts :: ALL /inngest": "Inngest serve handler (inngest.com/docs, serve): the SDK reads the request and writes the response",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: POST /": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: GET /": "MCP Streamable HTTP: a server without a server-sent stream answers the GET probe with 405",
+    "apps/backend/src/domains/ai/mcp-server/mcp-root.controller.ts :: DELETE /": "MCP Streamable HTTP: session termination; this server is stateless and answers { status: 'ok' }",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: POST /mcp": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: POST /mcp/apikey": "MCP Streamable HTTP (modelcontextprotocol.io, transports): the SDK transport writes the JSON-RPC response; a tool error is a JSON-RPC result, not an envelope",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: GET /mcp": "MCP Streamable HTTP: a server without a server-sent stream answers the GET probe with 405",
+    "apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts :: DELETE /mcp": "MCP Streamable HTTP: session termination; this server is stateless and answers { status: 'ok' }",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: GET /oauth/authorize": "RFC 6749 section 4.1.1: the standard names the query keys (response_type, client_id, redirect_uri, code_challenge); errors are { error, error_description }",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/token": "RFC 6749 sections 4.1.3, 5.1 and 6: 200 with the token response; errors are { error, error_description } (section 5.2)",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/revoke": "RFC 7009: 200 whether or not the token was known",
+    "packages/appshore/platform/src/domains/oauth-provider/oauth-provider.controller.ts :: POST /oauth/register": "RFC 7591 dynamic client registration: 201 with the client metadata the standard names (snake_case); errors per section 3.2.2",
+    "apps/backend/src/domains/integrations/oauth/oauth.controller.ts :: GET /integrations/oauth/callback": "OAuth 2.0 redirect from the vendor (RFC 6749 section 4.1.2): 302 to the web app either way; the vendor names the query keys (QuickBooks sends realmId)",
+    "apps/backend/src/platform-glue/sse/sse.controller.ts :: GET /sse/stream": "Server-sent events (WHATWG HTML, section 9.2): text/event-stream; frames, not JSON bodies",
+    "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/messages": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames",
+    "apps/backend/src/domains/ai/assistant/assistant.controller.ts :: POST /conversations/:conversation_id/resume": "AI SDK UI message stream over server-sent events: the stream protocol sets the frames"
+  },
+  "BOUNDED_LISTS": {
+    "apps/backend/src/domains/admin/admin-ai-spend.controller.ts :: GET /admin/ai-spend/tenants/:tenant_id/by-surface": "One row per AI surface: the query groups by the AiSurface enum",
+    "apps/backend/src/domains/admin/admin-deadlines.controller.ts :: GET /admin/deadlines/kinds": "The kind filter's options: one row per deadline kind on record, an app-owned vocabulary, grouped in SQL and capped at MAX_DEADLINE_KINDS (100)",
+    "apps/backend/src/domains/admin/admin-events.controller.ts :: GET /admin/events/volume": "One bucket per hour and event type over a fixed 24 hours, counted in SQL: at most 24 rows per event in the registry",
+    "apps/backend/src/domains/admin/admin-jobs.controller.ts :: GET /admin/jobs/categories/summary": "One row per job category in the JOB_CATEGORIES registry (code-defined)",
+    "apps/backend/src/domains/admin/admin-schedules.controller.ts :: GET /admin/schedules": "One row per registered repeatable schedule: job_schedules is unique on (category, job_type) and both are code-defined",
+    "apps/backend/src/domains/ai/agent-contract/developer-scopes.controller.ts :: GET /developer/scopes": "The static agent scope catalog (code-defined)",
+    "apps/backend/src/domains/billing/controllers/billing.controller.ts :: GET /billing/payment-methods": "A mirror of the provider customer's payment methods, read with take PAYMENT_METHOD_LIST_CAP (100)",
+    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: GET /desk/agents": "One row per Desk agent of the workspace: desk_agents is unique on (tenant_id, key) and agents are seeded from the code registry",
+    "apps/backend/src/domains/desk/core/responsibility/responsibility.controller.ts :: GET /desk/responsibilities": "One row per entry in RESPONSIBILITY_REGISTRY (code-defined): the handler maps the registry, not the table",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations": "One config per (integration type, vendor) for the workspace: a unique key, bounded by VENDOR_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/vendors": "The static VENDOR_REGISTRY (code-defined)",
+    "packages/appshore/platform/src/domains/announcements/broadcasts-public.controller.ts :: GET /broadcasts/active": "The broadcasts live right now for the banner: read with take ACTIVE_BROADCAST_SCAN_CAP and cut to ACTIVE_BROADCAST_CAP (20)",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans": "The plan catalog: one row per value of the TenantPlan enum"
+  },
+  "BOUNDED_READS": {
+    "apps/backend/src/domains/admin/admin-schedules.controller.ts :: GET /admin/schedules -> ScheduleManagerService.listSchedules": "job_schedules is unique on (category, job_type); both come from the code-defined job registry",
+    "apps/backend/src/domains/desk/core/agent/agent.controller.ts :: GET /desk/agents -> DeskAgentService.listForTenant": "desk_agents is unique on (tenant_id, key); a workspace holds one row per agent in the code registry",
+    "apps/backend/src/domains/desk/core/responsibility/responsibility.controller.ts :: GET /desk/responsibilities -> DeskResponsibilityService.listForTenant": "desk_responsibilities is unique on (tenant_id, key); a workspace holds one row per entry in RESPONSIBILITY_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations -> IntegrationsService.listIntegrations": "integration_configs is unique on (tenant_id, integration_type, vendor); bounded by VENDOR_REGISTRY",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/health -> IntegrationsService.getHealthSummary": "The integration_configs read is bounded by its unique key (tenant_id, integration_type, vendor); the jobs read in the same method has take MAX_ACTIVE_SYNCS_SHOWN",
+    "apps/backend/src/domains/integrations/integrations.controller.ts :: GET /integrations/vendors -> IntegrationsService.getVendorRegistry": "vendor_configs is unique on vendor_id: one row per vendor in VENDOR_REGISTRY",
+    "packages/appshore/platform/src/domains/feature-flags/feature-flags.controller.ts :: GET /feature-flags -> FeatureFlagsService.getAllFlags": "feature_flags is unique on key: one row per feature key the code declares",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans -> PlansService.getAllPlanConfigs": "plan_configs is unique on plan (the TenantPlan enum); plan_entitlements is unique on (plan, feature)",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans/my-plan -> PlansService.getTenantPlanDetails": "The entitlements of one plan: plan_entitlements is unique on (plan, feature), one row per feature key; the plan-event read has take 10",
+    "packages/appshore/platform/src/domains/plans/plans.controller.ts :: GET /plans/tenant/:tenant_id -> PlansService.getTenantPlanDetails": "The entitlements of one plan: plan_entitlements is unique on (plan, feature), one row per feature key; the plan-event read has take 10"
+  },
+  "QUERY_KEY_ALLOWLIST": {}
+}

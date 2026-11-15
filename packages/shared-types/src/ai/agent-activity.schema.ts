@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cursorListSchema } from '../infrastructure/cursor-list';
 import { AgentScopeSchema } from './agent-scopes.schema';
 
 /**
@@ -35,9 +36,6 @@ export type AgentActivityRow = z.infer<typeof AgentActivityRowSchema>;
 export const AgentActivityFilterSchema = z.enum(['all', 'tool_calls', 'approvals']);
 export type AgentActivityFilter = z.infer<typeof AgentActivityFilterSchema>;
 
-/** Cursor-paginated page of activity rows. `nextCursor` is the createdAt ISO string of the last row. */
-export const AgentActivityPageSchema = z.object({
-  rows: z.array(AgentActivityRowSchema),
-  nextCursor: z.string().nullable(),
-});
+/** `GET /agent-activity`: a cursor list, newest first. `nextCursor` is opaque. */
+export const AgentActivityPageSchema = cursorListSchema(AgentActivityRowSchema);
 export type AgentActivityPage = z.infer<typeof AgentActivityPageSchema>;

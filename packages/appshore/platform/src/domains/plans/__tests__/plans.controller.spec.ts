@@ -1,4 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { AssignTenantPlanDto, UpdateProviderPriceDto } from '../dto/assign-plan.dto';
 import { PlansController } from '../plans.controller';
 
 describe('PlansController', () => {
@@ -22,8 +24,11 @@ describe('PlansController', () => {
     expect(service.getAllPlanConfigs).toHaveBeenCalled();
   });
 
-  it('getMyPlan throws without tenantId', async () => {
-    await expect(controller.getMyPlan({})).rejects.toThrow(BadRequestException);
+  it('getMyPlan answers 403 NO_TENANT without a workspace: no field of the request is at fault', async () => {
+    const error = await controller.getMyPlan({}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'NO_TENANT' });
+    expect(service.getTenantPlanDetails).not.toHaveBeenCalled();
   });
 
   it('getMyPlan delegates to service', async () => {
@@ -65,5 +70,28 @@ describe('PlansController', () => {
       enabled: false,
     });
     expect(service.toggleEntitlement).toHaveBeenCalledWith('STARTER', 'reports', false);
+  });
+
+  it('the assign-plan body names a plan that exists, and refuses an undeclared field', async () => {
+    expect(await readBodyDto(AssignTenantPlanDto, { plan: 'PROFESSIONAL', reason: 'Upgrade' })).toEqual({
+      plan: 'PROFESSIONAL',
+      reason: 'Upgrade',
+    });
+    expect(await fieldErrorsOf(readBodyDto(AssignTenantPlanDto, { plan: 'GOLD' }))).toHaveProperty('plan');
+    expect(await fieldErrorsOf(readBodyDto(AssignTenantPlanDto, {}))).toHaveProperty('plan');
+    expect(await fieldErrorsOf(readBodyDto(AssignTenantPlanDto, { plan: 'PROFESSIONAL', status: 'x' }))).toHaveProperty(
+      'status',
+    );
+  });
+
+  it('the provider-price body takes a price id or null, and nothing else', async () => {
+    expect(await readBodyDto(UpdateProviderPriceDto, { providerPriceId: 'price_123' })).toEqual({
+      providerPriceId: 'price_123',
+    });
+    expect(await readBodyDto(UpdateProviderPriceDto, { providerPriceId: null })).toEqual({ providerPriceId: null });
+    expect(await fieldErrorsOf(readBodyDto(UpdateProviderPriceDto, {}))).toHaveProperty('providerPriceId');
+    expect(await fieldErrorsOf(readBodyDto(UpdateProviderPriceDto, { providerPriceId: 42 }))).toHaveProperty(
+      'providerPriceId',
+    );
   });
 });

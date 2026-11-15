@@ -11,8 +11,8 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const tenantId = url.searchParams.get('tenantId');
-  const target = `${API_URL}/dev/users${tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''}`;
+  const tenantId = url.searchParams.get('tenant_id');
+  const target = `${API_URL}/dev/users${tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : ''}`;
 
   const res = await fetch(target, {
     headers: { 'x-dev-auth-secret': secret },

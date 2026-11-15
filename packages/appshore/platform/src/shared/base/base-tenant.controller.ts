@@ -89,14 +89,14 @@ export abstract class BaseTenantController {
    *
    * @param resourceTenantId - The tenant ID of the resource (database ID)
    * @param userTenantId - The tenant ID from the authenticated user (string)
-   * @throws ForbiddenException if tenant access denied
-   * @throws NotFoundException if tenant not found
+   * @throws NotFoundException if the tenant is not found, or the resource belongs to another tenant
    */
   protected async validateTenantAccess(resourceTenantId: number, userTenantId: string): Promise<void> {
     const tenant = await this.getTenant(userTenantId);
 
     if (resourceTenantId !== tenant.id) {
-      throw new ForbiddenException('You do not have access to this resource');
+      // Another workspace's record answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Not found');
     }
   }
 }

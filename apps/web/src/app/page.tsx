@@ -14,6 +14,7 @@ import {
 import { Button } from '@app/ui/components/ui/button';
 import { Card, CardContent } from '@app/ui/components/ui/card';
 import { Badge } from '@app/ui/components/ui/badge';
+import { resolveDocsUrl } from '@/shared/lib/docs-url';
 
 /**
  * Template landing page — the first thing a developer sees after booting the
@@ -28,7 +29,6 @@ import { Badge } from '@app/ui/components/ui/badge';
 // Branding — the literal "Platform" string is replaced across the repo by `pnpm init-app`.
 const APP_NAME = 'Platform';
 const TAGLINE = 'Your platform, ready to build on.';
-const REPO_URL = 'https://github.com/ajaynarang/app-foundation';
 
 const FEATURES = [
   {
@@ -54,7 +54,7 @@ const FEATURES = [
   {
     icon: Workflow,
     title: 'Background jobs & workflows',
-    description: 'BullMQ queues plus Inngest durable workflows.',
+    description: 'BullMQ queues, durable timers and a transactional event outbox.',
   },
   {
     icon: Activity,
@@ -102,6 +102,8 @@ const STEPS: { title: string; description?: string; code?: string }[] = [
 
 export default function LandingPage() {
   const isMultiTenant = process.env.NEXT_PUBLIC_MULTI_TENANT !== 'false';
+  // Your docs site or repository. Unset, the button is not shown.
+  const docsUrl = resolveDocsUrl(process.env.NEXT_PUBLIC_DOCS_URL);
 
   return (
     <div className="bg-background">
@@ -119,12 +121,14 @@ export default function LandingPage() {
               Sign in
             </Button>
           </Link>
-          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="lg">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Documentation
-            </Button>
-          </a>
+          {docsUrl && (
+            <a href={docsUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="lg">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Documentation
+              </Button>
+            </a>
+          )}
         </div>
       </section>
 

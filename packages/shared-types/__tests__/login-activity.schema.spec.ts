@@ -28,23 +28,37 @@ describe('LoginEventStatusSchema', () => {
 });
 
 describe('ListLoginActivityQuerySchema', () => {
-  it('accepts a minimal query (from + to only) and applies limit/offset defaults', () => {
+  it('accepts a minimal query (from + to only) and leaves the page size to the service', () => {
     const parsed = ListLoginActivityQuerySchema.parse({
       from: '2026-05-19',
       to: '2026-05-26',
     });
     expect(parsed.from).toBe('2026-05-19');
     expect(parsed.to).toBe('2026-05-26');
-    expect(parsed.limit).toBe(50);
-    expect(parsed.offset).toBe(0);
+    // The service clamps the limit (50 by default, 100 at most) and decodes the cursor.
+    expect(parsed.limit).toBeUndefined();
+    expect(parsed.cursor).toBeUndefined();
   });
 
-  it('rejects limit > 100', () => {
+  it('carries the cursor of the previous page and drops offset paging', () => {
+    const parsed = ListLoginActivityQuerySchema.parse({
+      from: '2026-05-19',
+      to: '2026-05-26',
+      limit: 20,
+      cursor: 'opaque-cursor',
+      offset: 40,
+    });
+    expect(parsed.cursor).toBe('opaque-cursor');
+    expect(parsed.limit).toBe(20);
+    expect(parsed).not.toHaveProperty('offset');
+  });
+
+  it('rejects a page size that is not an integer', () => {
     expect(() =>
       ListLoginActivityQuerySchema.parse({
         from: '2026-05-19',
         to: '2026-05-26',
-        limit: 101,
+        limit: 2.5,
       }),
     ).toThrow();
   });
@@ -89,6 +103,7 @@ describe('LoginActivityEventSchema', () => {
 
   it('round-trips a fully-populated event including failReason and tenant', () => {
     const input = {
+      publicId: '0190f5c2-7b1e-7c3a-9a55-3f2b1c0d4e6f',
       id: 42,
       createdAt: '2026-05-26T12:34:56.000Z',
       status: 'FAILED' as const,
@@ -113,14 +128,18 @@ describe('LoginActivityEventSchema', () => {
 });
 
 describe('ListLoginActivityResponseSchema', () => {
-  it('accepts an empty page', () => {
+  it('accepts an empty page: the cursor envelope, with no next cursor', () => {
     const parsed = ListLoginActivityResponseSchema.parse({
       items: [],
+      nextCursor: null,
       total: 0,
-      limit: 50,
-      offset: 0,
     });
     expect(parsed.items).toEqual([]);
+    expect(parsed.nextCursor).toBeNull();
     expect(parsed.total).toBe(0);
+  });
+
+  it('rejects the old offset envelope, which has no nextCursor', () => {
+    expect(() => ListLoginActivityResponseSchema.parse({ items: [], total: 0, limit: 50, offset: 0 })).toThrow();
   });
 });

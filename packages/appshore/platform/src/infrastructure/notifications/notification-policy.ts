@@ -1,4 +1,5 @@
-import { DeliveryChannel, type NotificationCategory, type NotificationType } from '@appshore/db';
+import { DeliveryChannel, type NotificationCategory } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 
 /**
  * What a channel does for a type when nothing else intervenes. Each layer below
@@ -35,10 +36,21 @@ export interface NotificationPolicy {
   groupLabel?: string;
 }
 
+/**
+ * Policies keyed by notification type. Types are strings (platform list in `@app/shared-types` plus the app's own),
+ * so this map is string-keyed; the app's own map stays exhaustive at compile time by typing it over the union of the
+ * two `as const` lists (see the app's `platform-glue/notifications/notification-types.ts`).
+ */
 export type NotificationPolicyMap = Partial<Record<NotificationType, NotificationPolicy>>;
 
 /** DI token an app binds its own policy map to. The platform's map is merged in by the registry. */
 export const NOTIFICATION_POLICIES = 'APPSHORE_NOTIFICATION_POLICIES';
+
+/**
+ * DI token an app binds its declared notification types to (a `readonly string[]`, its `as const` list). The
+ * registry refuses to boot when a declared type (platform or app) has no policy, or a policy names an undeclared type.
+ */
+export const NOTIFICATION_TYPES = 'APPSHORE_NOTIFICATION_TYPES';
 
 /** The key each channel uses in UserPreferences.notificationPreferences[category]. */
 export const CHANNEL_PREF_KEYS = {

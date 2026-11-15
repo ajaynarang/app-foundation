@@ -22,7 +22,7 @@ jest.mock('@rekog/mcp-nest', () => ({
 }));
 jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
 
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { AssistantAiService } from '../assistant.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { McpToolService } from '../../mcp/mcp-tool.service';
@@ -170,7 +170,7 @@ describe('AssistantAiService', () => {
       await expect(gen.next()).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong tenant', async () => {
+    it('answers 404 for a conversation of another tenant: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         id: 1,
         conversationId: 'conv_test',
@@ -180,7 +180,7 @@ describe('AssistantAiService', () => {
         title: null,
       });
       const gen = service.generateResponse('conv_test', 'hello', 'text', 'user_1', 1);
-      await expect(gen.next()).rejects.toThrow(ForbiddenException);
+      await expect(gen.next()).rejects.toThrow(NotFoundException);
     });
 
     it('yields blocked when moderation flags input', async () => {
@@ -452,12 +452,13 @@ describe('AssistantAiService', () => {
     it('handles errors during streaming', async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error('DB down'));
 
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         setHeader: jest.fn(),
         write: jest.fn(),
         end: jest.fn(),
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         headersSent: false,
       } as any;
@@ -465,6 +466,9 @@ describe('AssistantAiService', () => {
       await service.streamMessage('conv_test', 'hello', 'text', 'user_1', 1, mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
+      // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
     });
   });
 
@@ -538,7 +542,7 @@ describe('AssistantAiService', () => {
       await expect(service.getMessages('conv_unknown', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException for wrong user', async () => {
+    it('answers 404 for a conversation of another user: a 403 would confirm it exists', async () => {
       mockPrisma.conversation.findUnique.mockResolvedValue({
         conversationId: 'conv_1',
         userId: 999,
@@ -546,16 +550,17 @@ describe('AssistantAiService', () => {
         userMode: 'member',
         messages: [],
       });
-      await expect(service.getMessages('conv_1', 'user_1', 1)).rejects.toThrow(ForbiddenException);
+      await expect(service.getMessages('conv_1', 'user_1', 1)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('resumeAgent', () => {
     it('returns early when conversation validation fails', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         setHeader: jest.fn(),
         write: jest.fn(),
@@ -585,9 +590,10 @@ describe('AssistantAiService', () => {
         }),
       });
 
-      const mockReq = { on: jest.fn() } as any;
+      const mockReq = { on: jest.fn(), url: '/api/v1/conversations/conv_test/messages', method: 'POST' } as any;
       const mockRes = {
         status: jest.fn().mockReturnThis(),
+        removeHeader: jest.fn(),
         json: jest.fn(),
         setHeader: jest.fn(),
         write: jest.fn(),
@@ -598,6 +604,9 @@ describe('AssistantAiService', () => {
       await service.resumeAgent('conv_test', true, 'tc_1', 'run_1', 'user_1', 1, mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
+      // The failure leaves as the one error envelope: a code and `detail`, never a bare `message`.
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, code: 'INTERNAL' }));
+      expect(mockRes.json.mock.calls[0][0]).not.toHaveProperty('message');
     });
   });
 

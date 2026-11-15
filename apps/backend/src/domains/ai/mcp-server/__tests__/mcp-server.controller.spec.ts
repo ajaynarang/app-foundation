@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { McpServerController } from '../mcp-server.controller';
 
 describe('McpServerController', () => {
@@ -31,19 +31,12 @@ describe('McpServerController', () => {
   });
 
   describe('handleSseStream (GET)', () => {
-    it('should return 405 Method Not Allowed', async () => {
-      const res = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      } as any;
+    it('should answer 405 Method Not Allowed through the error envelope', async () => {
+      const error = await controller.handleSseStream().catch((e: unknown) => e);
 
-      await controller.handleSseStream(res);
-
-      expect(res.status).toHaveBeenCalledWith(HttpStatus.METHOD_NOT_ALLOWED);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'Method Not Allowed',
-        message: expect.stringContaining('stateless mode'),
-      });
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(HttpStatus.METHOD_NOT_ALLOWED);
+      expect((error as HttpException).message).toContain('stateless mode');
     });
   });
 

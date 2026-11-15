@@ -39,9 +39,10 @@ import {
 
 /**
  * The channel-agnostic notification pipeline plus every channel the foundation
- * owns: in-app, email, web push, FCM, SMS, WhatsApp. An app binds its policies
- * to NOTIFICATION_POLICIES and its Meta-approved templates to WHATSAPP_TEMPLATES,
- * then calls NotificationDeliveryService from its own triggers.
+ * owns: in-app, email, web push, FCM, SMS, WhatsApp. An app binds its declared
+ * notification types to NOTIFICATION_TYPES, their policies to NOTIFICATION_POLICIES
+ * and its Meta-approved templates to WHATSAPP_TEMPLATES, then calls
+ * NotificationDeliveryService from its own triggers.
  *
  * The WhatsApp queue is registered here so the worker travels with the channel;
  * BullMQ's root connection is still the app's to configure.

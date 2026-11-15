@@ -9,6 +9,8 @@
     "./globals.css": "./src/styles/globals.css",
     "./tailwind-preset": "./tailwind-preset.ts",
     "./components/ui/*": "./src/components/ui/*.tsx",
+    "./components/page-chrome": "./src/components/page-chrome/index.ts",
+    "./components/page-chrome/*": "./src/components/page-chrome/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./lib/*": "./src/lib/*.ts"
   },
@@ -56,6 +58,7 @@
     "react-day-picker": "^9.13.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.2"
   }
 }

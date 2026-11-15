@@ -127,7 +127,8 @@ describe('AuthController', () => {
 
       const result = await controller.logout(user, res);
 
-      expect(result).toEqual({ message: 'Logout successful' });
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockAuthService.logout).toHaveBeenCalledWith('rt_1', 1, 10);
       expect(res.clearCookie).toHaveBeenCalled();
     });
@@ -138,7 +139,8 @@ describe('AuthController', () => {
 
       const result = await controller.logout(user, res);
 
-      expect(result).toEqual({ message: 'Logout successful' });
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockAuthService.logout).not.toHaveBeenCalled();
     });
   });
@@ -164,7 +166,7 @@ describe('AuthController', () => {
 
       const result = await controller.changePassword(user, dto);
 
-      expect(result).toEqual({ success: true, sessionsRevoked: 3 });
+      expect(result).toEqual({ sessionsRevoked: 3 });
     });
 
     it('should default revokeOtherSessions to true', async () => {
@@ -184,14 +186,15 @@ describe('AuthController', () => {
   });
 
   describe('sendPhoneOtp', () => {
-    it('should send OTP and return generic message', async () => {
+    it('should send the OTP and answer nothing (204), whether or not the number is registered', async () => {
       mockAuthService.sendPhoneOtp.mockResolvedValue(undefined);
 
       const result = await controller.sendPhoneOtp({
         phone: '+12025551234',
       });
 
-      expect(result.message).toContain('code has been sent');
+      expect(result).toBeUndefined();
+      expect(mockAuthService.sendPhoneOtp).toHaveBeenCalledWith('+12025551234');
     });
   });
 
@@ -221,7 +224,8 @@ describe('AuthController', () => {
       mockAuthService.setPin.mockResolvedValue(undefined);
 
       const result = await controller.setPin(user, { pin: '5678' });
-      expect(result.message).toBe('PIN set successfully');
+      expect(result).toBeUndefined();
+      expect(mockAuthService.setPin).toHaveBeenCalledWith('USR-001', '5678');
     });
   });
 });

@@ -145,7 +145,7 @@ apps/web/src/
     platform/             # settings, plans, feature-flags, api-keys, workspaces, onboarding, …
     <your-feature>/       # api.ts, hooks/, components/, index.ts
   shared/                 # App-level shared code
-    components/           # page-chrome/, layout/, common/, ui/, command-palette/
+    components/           # page-chrome/, layout/, common/, command-palette/ (no ui/: components come from @app/ui)
     config/  hooks/  providers/  utils/
   middleware.ts           # Route protection + tenant resolution
 
@@ -213,7 +213,9 @@ export const projectsApi = {
 - Object namespace pattern: `entityApi.method()` (not classes)
 - Use `URLSearchParams` for query strings
 - Type the return value: `apiClient<Entity[]>(...)`
-- For blob downloads (PDFs): use raw `fetch()` with auth headers, not `apiClient`
+- For blob downloads (PDFs, exports): use `apiFetchRaw` from the same module. It returns the raw `Response` with the same auth and one-shot refresh as `apiClient`. Never hand-build a bearer header on a raw `fetch()`
+- A 204, and a 200, 201 or 202 with an empty body, resolve to `undefined`. Type such a call `apiClient<void>(...)` and do not read its result
+- A mutation's response is the resource as it is now (the backend sends no `{ success: true }`). Type it as the resource, and prefer writing it into the query cache or invalidating over a second fetch
 - `credentials: 'include'` for cookie-based endpoints
 
 ---
@@ -406,7 +408,7 @@ useEffect(() => {
 }, [openParam]);
 ```
 
-**Use URL state for:** active tab (`?tab=history`), deep links into a detail sheet (`?open=<id>`), shareable filters (`?status=OPEN&assignee=42`), pagination offset when deep-linkability matters.
+**Use URL state for:** active tab (`?tab=history`), deep links into a detail sheet (`?open=<id>`), shareable filters, search and sort (`?status=OPEN&q=acme`). A cursor is never put in the URL: it is opaque and belongs to one fetch.
 
 **Use `useState` for:** sheet open/close NOT triggered by a link, form input values, hover/focus/UI affordances.
 
@@ -538,36 +540,50 @@ Every sheet's actions live in a **sticky bottom footer**, one row:
 
 ## 8.1 Pagination, Sorting, Filters
 
-Two pagination patterns. Pick by whether the state should be shareable.
-
-**Component-state pagination** (default — small lists, internal tools):
+**A list that grows is a cursor list, and it is built from the list kit** (`@appshore/web-core/shared/list`, re-exported by `@/shared/components/page-chrome`). The backend answers `CursorList<T>` from `@app/shared-types`: `{ items, nextCursor, total, counts? }`. The cursor is opaque: pass it back, never build or parse it.
 
 ```typescript
-const PAGE_SIZE = 25;
-const [offset, setOffset] = useState(0);
-const { data } = useProjects({ limit: PAGE_SIZE, offset });
-// Prev: setOffset(o => Math.max(0, o - PAGE_SIZE))
-// Next: setOffset(o => o + PAGE_SIZE)  (use placeholderData: keepPreviousData)
-```
-
-**URL-state pagination** (deep-linkable — shareable filtered views):
-
-```typescript
-const sp = useSearchParams();
-const offset = Number(sp.get('offset') ?? 0);
-const router = useRouter();
-const setOffset = (next: number) => {
-  const url = new URLSearchParams(sp.toString());
-  next > 0 ? url.set('offset', String(next)) : url.delete('offset');
-  router.replace(`?${url.toString()}`, { scroll: false });
+// features/invoices/components/InvoiceList.tsx
+const params = useListParams(INVOICE_LIST_CONFIG); // module-level config; status, search, sort, filters and dates live in the URL
+const query = {
+  status: params.status,
+  q: params.q,
+  sort: params.sort,
+  from: params.dateRange.fromInstant,
+  to: params.dateRange.toInstant,
 };
+const list = useCursorList<Invoice>({
+  queryKey: queryKeys.invoices.list(query), // the key holds every filter: a changed filter is a new list
+  queryFn: (cursor) => invoicesApi.list({ ...query, cursor }),
+});
+// list.items · total · counts · isLoading · isRefreshing · isError · error · hasMore · loadMore · isLoadMoreError
 ```
+
+Branch a list screen in this order, and it is right: `isLoading` → `PageLoadingSkeleton`; `isError` → `ListErrorState`; `items.length === 0` → `PageEmptyState`, worded by `listEmptyKind` (`first-run`, `no-match`, `empty-window`); otherwise the rows, then `ListFooter`. While the next filter loads, the previous rows stay on screen dimmed (`isRefreshing`); a failed "Load more" keeps the rows and `ListFooter` says so (`isLoadMoreError`). Never swap rows for a spinner.
+
+- `useListParams` owns the URL: one list per page URL. A list inside a sheet or a tab that does not own the URL uses `useLocalListParams`.
+- A picker over a growing list uses `usePickerSearch` (and `SearchSelect` for a form field): the first page until the user types, then a server search. Never filter a loaded page in the browser.
+- Several reads feeding one screen: `combineReads` so "unknown" is never shown as "none".
+
+Every list endpoint of the starter is a cursor list, so there is no offset or page-number paging to write: no
+`offset` state, no Previous / Next pair, no `?page=`. "Load more" appends through `useCursorList`.
+
+- **End every list with `<ListFooter>`**: `shown={list.items.length}`, `total={list.total}`, `hasMore`,
+  `onLoadMore={list.loadMore}`, `isLoadingMore`, `loadMoreFailed={list.isLoadMoreError}`. It says
+  "Showing 50 of 312" and holds the Load more button, so a list never stops silently.
+- **The API function returns `CursorList<T>`** (`@app/shared-types`) and takes `cursor`. The hook wraps
+  `useCursorList`; a changed filter goes in the query key and is a new list, back on page one.
+- **Never filter, count or sum a loaded page in the browser.** A filter is a query param the server applies. A
+  figure over the whole list (a total spend, a status count) comes from the server (`total`, `counts`, or a
+  summary endpoint), because the loaded rows are only the first pages.
+- A screen that needs every row for an aggregate walks `nextCursor` with a page cap, never one unbounded read
+  (`billingApi.getTenants`).
 
 **Always:**
 
-- Cap `limit` at the backend's max page limit — never accept arbitrary user input.
-- Pair pagination with `placeholderData: keepPreviousData` so the table doesn't flash a skeleton between pages.
-- Sort/filter params live in the same place as offset (both URL or both state). Don't mix.
+- The page size is the backend's (50 by default, 100 at most). Pass `limit` only when a screen really wants fewer.
+- `useCursorList` already keeps the previous view's rows on screen while a new filter loads (`isRefreshing`).
+- Sort and filter params live in one place (`useListParams` for the URL, `useLocalListParams` for a sheet or tab).
 
 ---
 
@@ -658,14 +674,25 @@ Children still own their own mutations and toasts. The page owns "what counts as
 **Status/label maps (per feature):**
 
 ```typescript
-// features/projects/constants.ts — use semantic theme tokens, never raw palette colors
-export const PRIORITY_VARIANTS: Record<TaskPriority, { label: string; className: string }> = {
-  CRITICAL: { label: 'Critical', className: 'bg-destructive/10 text-destructive' },
-  HIGH: { label: 'High', className: 'bg-amber-500/10 text-amber-500' },
-  MEDIUM: { label: 'Medium', className: 'bg-amber-500/10 text-amber-500' },
-  LOW: { label: 'Low', className: 'bg-muted text-muted-foreground' },
+// features/projects/constants.ts — a status maps to a TONE, never to a class string
+import type { StatusVariant } from '@app/ui';
+
+export const PROJECT_STATUS_VARIANTS: Record<ProjectStatus, StatusVariant> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  ACTIVE: { label: 'Active', tone: 'info' },
+  ON_HOLD: { label: 'On hold', tone: 'warning' },
+  DONE: { label: 'Done', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
+  ARCHIVED: { label: 'Archived', tone: 'muted' },
 };
+// render: <StatusBadge tone={variant.tone}>{variant.label}</StatusBadge>
 ```
+
+**Read a status map with `variantOf(MAP, value)` and turn it into filter options with `variantOptions(MAP)`** (both from `@app/ui`): an unknown value reads as a neutral label of itself instead of crashing the screen. Every status map is listed in `STATUS_MAPS` of `apps/web/src/features/__tests__/ui-grammar-guard.test.ts`, which fails when the same label wears two tones or a common word (Active, Paid, Failed, Expired…) wears the wrong one. A role or a category is not a status: it renders as `<Badge variant="outline">`, never a tone and never `variant="muted"`.
+
+**Status tones.** Six meanings, mapped once to theme tokens in `@app/ui` (`status-tone.ts`): `neutral` not started, `info` moving, `warning` waiting on a person, `success` done well, `danger` stopped, `muted` retired. A feature maps its Prisma enum to a tone and renders `StatusBadge`. It never writes a colour class for a status.
+
+**Tinted text wears the `-text` token.** `text-info-text`, `text-caution-text`, `text-success-text`, `text-critical-text` clear WCAG AA on their own 15% tint in both themes. The fill hues (`text-caution`, `text-success`) read 1.7 to 2.8:1 on that tint in light theme, so they are for fills and icons only. `--brand` and `--brand-text` in `packages/ui/src/styles/globals.css` are the one place a product sets its brand colour; `theme-tokens.test.ts` holds the contrast.
 
 **Select options** MUST be typed constants (in `constants.ts` or at file top), never inline arrays in JSX, with values from the shared enum:
 
@@ -680,14 +707,15 @@ const PROJECT_KINDS = [
 
 ## 12. Dark Theme (NON-NEGOTIABLE)
 
-| Element     | NEVER                               | ALWAYS                                                    |
-| ----------- | ----------------------------------- | --------------------------------------------------------- |
-| Backgrounds | `bg-white`, `bg-gray-50` standalone | `bg-background`, `bg-card`, `bg-gray-50 dark:bg-gray-900` |
-| Text        | `text-gray-900` standalone          | `text-foreground`, `text-muted-foreground`                |
-| Borders     | `border-gray-200` standalone        | `border-border`                                           |
-| Hover       | `hover:bg-gray-100` standalone      | `hover:bg-gray-100 dark:hover:bg-gray-800`                |
+| Element     | NEVER                                        | ALWAYS                                                   |
+| ----------- | -------------------------------------------- | -------------------------------------------------------- |
+| Backgrounds | `bg-white`, `bg-gray-50 dark:bg-gray-900`    | `bg-background`, `bg-card`, `bg-muted/50`                |
+| Text        | `text-gray-900`, `text-gray-500`             | `text-foreground`, `text-muted-foreground`               |
+| Borders     | `border-gray-200`                            | `border-border`                                          |
+| Hover       | `hover:bg-gray-100 dark:hover:bg-gray-800`   | `hover:bg-muted/50`                                      |
+| A status    | `bg-red-500/10 text-red-500`, `text-caution` | `<StatusBadge tone=…>`; tinted text `text-critical-text` |
 
-Prefer semantic tokens over paired raw colors. Status colors are allowed with opacity/dark-safe variants: `bg-red-500/10 text-red-500`.
+**No raw palette class, paired or not, and no hex class.** A surface wears a theme token; a status wears a tone (§11); tinted text wears the `-text` token, because the fill hues read 1.7 to 2.8:1 on their tint in light theme. A product's brand colour is `--brand` / `--brand-text` in `packages/ui/src/styles/globals.css`, nowhere else. This holds in `apps/web/src`, `packages/ui/src` and web-core, and `ui-grammar-guard.test.ts` fails on the first raw class.
 
 ---
 
@@ -721,6 +749,8 @@ Mobile-first. Test at 375px, 768px, 1440px in both themes.
 
 **NEVER create inline `formatRelativeTime`, `formatDate`, or similar helpers** — check `@appshore/web-core/shared/lib/` first; add new formatters there, not in feature code.
 
+**Formatters (one display rule for dates and times).** A user-facing date or time goes through `useFormatters()` from `@/shared/providers/PreferencesProvider` (`formatDate`, `formatTime`, `formatDateTime`, `formatTimestamp`), which applies the user's date format, clock and timezone. A relative time is `<RelativeTime iso={…} />` from the page chrome: "5m ago" with the full timestamp on hover; never `formatDistanceToNow`, `timeAgo` or a hand-rolled helper on screen. `apps/web/eslint.config.mjs` bans `toLocaleDateString` and `toLocaleTimeString` (`no-restricted-syntax`); the maintenance page, which renders outside the app providers, is the one exception. `toLocaleString` on a date is the same mistake even though lint does not catch it.
+
 ---
 
 ## 15. Component Patterns
@@ -735,7 +765,13 @@ Mobile-first. Test at 375px, 768px, 1440px in both themes.
 
 ## 15.4 Page Chrome (Layout & Control Patterns) — NON-NEGOTIABLE
 
-**Every sidebar page uses one canonical chrome.** Components live in `apps/web/src/shared/components/page-chrome/` (`PageHeader`, `PageToolbar`, `PageTabs`, `FilterBar`, `StatusPivot`, `SegmentedControl`, `ViewSwitcher`, `PageActionsMenu`, `PageEmptyState`, `PageLoadingSkeleton`). Four zones, top to bottom:
+**Every sidebar page uses one canonical chrome.** The components live in `@app/ui/components/page-chrome` and the list state in `@appshore/web-core/shared/list`; a page imports both from one place, `@/shared/components/page-chrome`, which re-exports them and adds `SearchSelect`. `@app/ui` imports no web-core, no router and no app code (held by `foundation-boundaries.spec.ts`): what the chrome needs from the app (timezone, formatters, the error reader, `next/link`) is passed once by `PageChromeBridge` in `app/providers.tsx`.
+
+- Page: `PageShell`, `PageHeader`, `PageToolbar`, `PageTabs`, `PageActionsMenu`, `ViewSwitcher`, `StatusPivot`, `SegmentedControl`, `PageSection`, `PageEmptyState`, `PageLoadingSkeleton`.
+- List: `ListFilterRow` (with `ListSearch`, `FilterSelect`, `FilterButton`, `FilterChips`, `SortButton`, `DateRangeFilter`), `ListRows` / `ListRow`, `ListCardGrid` / `ListCard`, `ListFooter`, `ListErrorState`. State: §8.1.
+- Grammar: `RowActions` (one visible primary, the rest behind ⋯, destructive last; the `actions` slots take its props, so a raw button there does not type-check), `Identifier` (a human key), `RelativeTime` ("5m ago", full timestamp on hover).
+
+Four zones, top to bottom:
 
 ```
 Zone 1 · Header        PageHeader: title (REQUIRED) + subtitle (REQUIRED) + optional ⚙ settings gear
@@ -766,6 +802,17 @@ Rule of thumb: clicking it changes the _dataset/entity_ → underline tab; it _f
 - **`ViewSwitcher` vs group switcher**: view = how data is _drawn_ (Board/Table); group = how it's _clustered_. They are separate axes — never a single multi-way toggle that mixes layouts and groupings.
 - **Canvas opt-out**: full-bleed workspaces that escape shell padding and own their chrome opt OUT of `PageHeader`/`PageToolbar` — document the reason with a code comment. They still honor the spirit of the zones: lift workspace-wide controls into a **single control row above the panes**. One filter, one place, all panes — a multi-pane canvas must NOT have the same filter twice.
 - **Empty/loading**: use `PageEmptyState` and `PageLoadingSkeleton` (shaped, never a bare spinner) — see §10.
+
+## 15.6 UI grammar (held by `ui-grammar-guard.test.ts`, no baseline)
+
+The pre-push hook runs `apps/web/src/features/__tests__/ui-grammar-guard.test.ts` beside `theme-tokens.test.ts` (the contrast of every token pair). It has no baseline: a screen that breaks a rule fails the push.
+
+- **Settings and admin pages** (`app/settings/**`, `app/admin/**` and the feature folders they render, listed in `SETTINGS_ADMIN_DIRS`): every page renders `PageHeader` (or hands its body to a feature component that does, listed with its target); a section heading is `PageSection`; no raw `<h1>`/`<h2>`; no `Loader2` as a loading state; no raw `fetch` with a hand-built bearer token (`apiClient` carries auth and the one-shot refresh). A product adds its own settings feature folders to that list.
+- **States, app-wide:** a file that renders a list (`ListFooter`, `ListRows`, `ListCardGrid`, `TableBody`) and reads `isLoading` also renders `ListErrorState`; an `Alert` is never an empty state (`PageEmptyState`) or a read's error state. Order the branches loading → error → empty → rows, so a failed fetch never reads as "No … yet".
+- **Row actions:** no raw `<Button>` inside a `<TableCell>` or `<li>` on a settings or admin screen; the row's actions are `RowActions` (one visible primary, the rest behind ⋯, a destructive item last and confirmed by an `AlertDialog` before it acts, a `disabled` item with its `disabledReason`).
+- **Status:** a status never rides a raw `Badge` (no `variant={…status…}`, no `{x.status}` as text); no `variant="muted"` chip and no `bg-muted` + `text-muted-foreground` chip (4.36:1); no `*_VARIANTS` map of class strings.
+- **Colour, app-wide and in the packages:** no raw palette class, no hex class, no fill hue as text (§12).
+- **Reveal:** a control hidden until hover (`opacity-0 group-hover:opacity-100`) also carries `group-focus-within:opacity-100` or `focus-visible:opacity-100`, and `[@media(hover:none)]:opacity-100`, on the same line, so a keyboard and a phone reach it. `RowActions` does this itself.
 
 ---
 
@@ -874,12 +921,16 @@ ThemeProvider → QueryClientProvider → AuthProvider → TooltipProvider → {
 Shared monorepo UI package (`packages/ui/`) exports:
 
 - `cn()` — clsx + tailwind-merge
-- `showSuccess()`, `showSuccessWithLink()`, `showError()`, toast wrappers (Sonner)
+- `showSuccess()`, `showSuccessWithLink()`, `showSuccessWithAction()` (one action the person can take back, such as Undo), `showWarning()` (done, with something to know), `showError()`: toast wrappers (Sonner)
+- `Button` takes `asChild`: a navigating action is `<Button asChild><Link href="…">…</Link></Button>`, a real link with the button look
+- Page chrome and the list components (`@app/ui/components/page-chrome`, §15.4); `StatusBadge` and the status tones (§11)
 - The shadcn component set (accordion, alert, badge, button, card, dialog, sheet, table, tabs, etc.)
-- `FormSheet` — smart sheet wrapper
+- `FormSheet` — smart sheet wrapper; `SheetSizeControls`, `DateRangeFilter`, `SortButton`
 - Tailwind preset with semantic color tokens, dark mode, animations
 
 Use `@app/ui` components only — no raw `<button>`/`<input>`/`<select>`/`<table>`.
+
+**One component set.** A shadcn component is imported from `@app/ui/components/ui/<name>` and from nowhere else. `apps/web/src/shared/components/ui/` is gone: a file there may only re-export from `@app/ui`, and nothing imports through `@/shared/components/ui/` (held by `apps/web/src/shared/components/__tests__/single-component-set.test.ts`, which the pre-push hook runs). A component that is missing, or needs a new behaviour, is added or changed in `packages/ui/src/components/ui/`, never copied into the app. There is one `FormSheet` and one `Sheet`: `FormSheet` takes `size` (`sm` or `md`) for a fixed width, or `entityType` to show the size controls (`SheetSizeControls`) and remember the chosen width per entity; `titleNode` puts rich content in the title and `headerActions` puts buttons before pin and close.
 
 ---
 
@@ -952,13 +1003,20 @@ Use `useNetworkStatus()` (`@appshore/web-core/shared/hooks/use-network-status.ts
 ```typescript
 {
   statusCode: 400,
+  code: "VALIDATION_FAILED",                // Machine code: branch on this, never on the copy
   detail: "User-friendly message",          // Always safe to show in a toast
-  fieldErrors?: { email: "Must be valid" }, // Only on validation errors
+  fieldErrors?: { email: "Must be valid" }, // Only on a 400
+  timestamp, path, method,
   debugDetail?: "Technical details...",     // Only in development
 }
 ```
 
-`extractErrorMessage()` reads `detail`. `extractFieldErrors()` reads `fieldErrors`.
+These keys and no others. There is no `message` key: a raw `fetch` that reads an error body reads `detail`.
+
+`extractErrorMessage()` reads `detail`, `extractFieldErrors()` reads `fieldErrors`, `extractErrorCode()` reads
+`code` (an `ApiErrorCode` from `@app/shared-types`, or a domain code such as `FEATURE_DISABLED`). A 403, 409 or 429
+shows the backend's own `detail` when it gave one; Nest's bare defaults keep the generic copy. Held by
+`apps/web/src/shared/lib/__tests__/error-utils.test.ts`.
 
 ---
 
@@ -1002,7 +1060,9 @@ Use `useNetworkStatus()` (`@appshore/web-core/shared/hooks/use-network-status.ts
 
 ## 25. New Feature Checklist
 
-- [ ] Page chrome: `PageHeader` + `PageToolbar` + `FilterBar` from `shared/components/page-chrome` — title AND subtitle present; fixed right-cluster order; never hand-roll the header (§15.4)
+- [ ] Page chrome: `PageHeader` + `PageToolbar` + `ListFilterRow` from `@/shared/components/page-chrome` — title AND subtitle present; fixed right-cluster order; never hand-roll the header (§15.4)
+- [ ] A growing list: `useListParams` + `useCursorList`, branching loading, error, empty, rows; `ListErrorState` on failure; `ListFooter` under the rows (§8.1)
+- [ ] A status: enum → tone in `constants.ts`, rendered with `StatusBadge`; tinted text wears a `-text` token (§11)
 - [ ] Types: re-export from `@app/shared-types` (no local entity types)
 - [ ] API: object namespace pattern (`entityApi.method()`) over `apiClient`
 - [ ] Query keys: added to the centralized `query-keys.ts` (list/detail segments distinct)

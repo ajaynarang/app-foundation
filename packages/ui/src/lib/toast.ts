@@ -26,8 +26,18 @@ export function showSuccessWithLink(message: string, linkLabel: string, href: st
   });
 }
 
+/** A success toast with one action the person can take back (e.g. Undo). */
+export function showSuccessWithAction(message: string, actionLabel: string, onAction: () => void) {
+  toast.success(message, { duration: 6000, action: { label: actionLabel, onClick: onAction } });
+}
+
 export function showError(title: string, description?: string) {
   toast.error(title, { description, duration: 8000 });
+}
+
+/** Done, but there is something the person should know — the action still succeeded. */
+export function showWarning(title: string, description?: string) {
+  toast.warning(title, { description, duration: 10000 });
 }
 
 export function showLoading(message: string): string | number {

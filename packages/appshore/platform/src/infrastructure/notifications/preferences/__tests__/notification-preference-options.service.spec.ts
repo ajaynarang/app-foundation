@@ -1,4 +1,5 @@
-import { NotificationCategory, NotificationType } from '@appshore/db';
+import { NotificationCategory } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { NotificationPreferenceOptionsService } from '../notification-preference-options.service';
 import { NotificationPolicyRegistry } from '../../notification-policy.registry';
 import { CHANNEL_RULES, NOTIFICATION_URGENCIES, policy } from '../../notification-policy';
@@ -7,14 +8,18 @@ const { ALWAYS, DEFAULT, OPT_IN, FALLBACK, NEVER } = CHANNEL_RULES;
 
 describe('NotificationPreferenceOptionsService', () => {
   const registry = new NotificationPolicyRegistry({
-    [NotificationType.ROLE_CHANGED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.CRITICAL, {
+    [PlatformNotificationType.ROLE_CHANGED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.CRITICAL, {
       inApp: ALWAYS,
       sms: FALLBACK,
       whatsapp: NEVER,
     }),
-    [NotificationType.SETTINGS_UPDATED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.INFORMATIONAL, {
-      email: OPT_IN,
-    }),
+    [PlatformNotificationType.SETTINGS_UPDATED]: policy(
+      NotificationCategory.BILLING,
+      NOTIFICATION_URGENCIES.INFORMATIONAL,
+      {
+        email: OPT_IN,
+      },
+    ),
   });
   const service = new NotificationPreferenceOptionsService(registry);
   const billing = () => service.list().categories.find((c) => c.category === NotificationCategory.BILLING)!;

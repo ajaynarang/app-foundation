@@ -24,6 +24,8 @@ const mockConfigService = {
 
 function buildReq(overrides: Partial<Request> = {}): Request {
   return {
+    url: '/api/v1/admin/queues',
+    method: 'GET',
     headers: {},
     cookies: {},
     ...overrides,
@@ -33,7 +35,7 @@ function buildReq(overrides: Partial<Request> = {}): Request {
 function buildRes(): { res: Response; status: jest.Mock; json: jest.Mock } {
   const json = jest.fn();
   const status = jest.fn().mockReturnValue({ json });
-  const res = { status } as unknown as Response;
+  const res = { status, removeHeader: jest.fn(), setHeader: jest.fn() } as unknown as Response;
   return { res, status, json };
 }
 
@@ -92,10 +94,9 @@ describe('BullBoardAuthMiddleware', () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
 
     it('does NOT bypass when BULL_BOARD_AUTH is not set', () => {
@@ -110,10 +111,9 @@ describe('BullBoardAuthMiddleware', () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
   });
 
@@ -131,10 +131,9 @@ describe('BullBoardAuthMiddleware', () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
 
     it('returns 401 when Authorization header is not Bearer format', () => {
@@ -147,10 +146,9 @@ describe('BullBoardAuthMiddleware', () => {
       middleware.use(req, res, next);
 
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
   });
 
@@ -176,10 +174,9 @@ describe('BullBoardAuthMiddleware', () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
 
     it('returns 401 when JwtService.verify throws (expired token)', () => {
@@ -198,10 +195,9 @@ describe('BullBoardAuthMiddleware', () => {
       middleware.use(req, res, next);
 
       expect(status).toHaveBeenCalledWith(401);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 401,
-        message: 'Unauthorized',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 401, code: 'UNAUTHENTICATED', detail: 'Sign in to continue.' }),
+      );
     });
   });
 
@@ -226,10 +222,13 @@ describe('BullBoardAuthMiddleware', () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(status).toHaveBeenCalledWith(403);
-      expect(json).toHaveBeenCalledWith({
-        statusCode: 403,
-        message: 'Forbidden: SUPER_ADMIN required',
-      });
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: 403,
+          code: 'FORBIDDEN',
+          detail: 'Only a platform super admin can open the queue board',
+        }),
+      );
     });
 
     it('returns 403 when token is valid but role is OWNER', () => {

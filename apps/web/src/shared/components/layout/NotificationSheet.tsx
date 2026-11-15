@@ -19,14 +19,13 @@ import {
   type Notification,
 } from './use-notifications';
 import { showSuccess, showError } from '@app/ui';
+import { resolveNotificationLink } from '@/shared/lib/notification-links';
+import { ListErrorState, ListFooter } from '@/shared/components/page-chrome';
 
 interface NotificationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-/** Prefix of action links written while a separate console app existed; see navigateToAction. */
-const RETIRED_APP_LINK_PREFIX = 'console:';
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
   SYSTEM: Settings,
@@ -58,7 +57,8 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const category = activeTab === 'ALL' ? undefined : activeTab;
-  const { data: notifData, isLoading, refetch } = useNotifications({ category, limit: 20 });
+  const inbox = useNotifications({ category, limit: 20 });
+  const { isLoading, refetch } = inbox;
 
   // Refetch when sheet opens to ensure fresh data
   useEffect(() => {
@@ -70,11 +70,10 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
   const dismiss = useDismissNotification();
   const markAllRead = useMarkAllRead();
 
-  const notifications = notifData?.data ?? [];
+  const notifications = inbox.items;
 
   const navigateToAction = (url: string) => {
-    // Notices stored before the console app was removed carry a `console:` link; Settings is their home now.
-    router.push(url.startsWith(RETIRED_APP_LINK_PREFIX) ? '/settings' : url);
+    router.push(resolveNotificationLink(url));
     onOpenChange(false);
   };
 
@@ -180,7 +179,16 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                 </>
               )}
 
-              {!isLoading && notifications.length === 0 && (
+              {!isLoading && inbox.isError && (
+                <ListErrorState
+                  title="Couldn't load your notifications."
+                  error={inbox.error}
+                  onRetry={() => void refetch()}
+                  isRetrying={inbox.isRefetching}
+                />
+              )}
+
+              {!isLoading && !inbox.isError && notifications.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Check className="h-10 w-10 text-muted-foreground mb-3" />
                   <p className="text-sm text-muted-foreground">You&apos;re all caught up</p>
@@ -220,12 +228,15 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium text-foreground truncate">{notif.title}</p>
-                            <button
-                              className="opacity-0 group-hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-opacity"
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Dismiss notification"
+                              className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                               onClick={(e) => handleDismiss(e, notif.notificationId)}
                             >
                               <X className="h-3.5 w-3.5 text-muted-foreground" />
-                            </button>
+                            </Button>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
                           <div className="flex items-center gap-2 mt-1">
@@ -233,7 +244,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                               {formatRelativeTime(notif.createdAt)}
                             </span>
                             {notif.actionLabel && (
-                              <span className="text-2xs text-info">{notif.actionLabel} &rarr;</span>
+                              <span className="text-2xs text-info-text">{notif.actionLabel} &rarr;</span>
                             )}
                             {isGrouped && (
                               <button
@@ -276,6 +287,17 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                     </div>
                   );
                 })}
+              {notifications.length > 0 && (
+                <ListFooter
+                  className="px-4 py-3"
+                  shown={notifications.length}
+                  total={inbox.total}
+                  hasMore={inbox.hasMore}
+                  onLoadMore={inbox.loadMore}
+                  isLoadingMore={inbox.isLoadingMore}
+                  loadMoreFailed={inbox.isLoadMoreError}
+                />
+              )}
             </div>
           </ScrollArea>
         </Tabs>

@@ -85,6 +85,13 @@ variable "worker_desired_count" {
   type        = number
 }
 
+# Queue processing split (API and worker roles)
+variable "api_queue_processors_enabled" {
+  description = "When false, the API container gets QUEUE_PROCESSORS_ENABLED=false so BullMQ jobs are consumed only by the worker service. Ships true (the API consumes too). To turn it on: run at least one worker task (worker_desired_count > 0; a precondition in ecs.tf refuses otherwise), then set this to false. Roll back by setting it to true. Set the key only here, never in Doppler: Doppler values override the task environment."
+  type        = bool
+  default     = true
+}
+
 # RDS
 variable "rds_instance_class" {
   description = "RDS instance type"

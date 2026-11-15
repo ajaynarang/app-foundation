@@ -18,13 +18,15 @@ import {
 import { showSuccess, showError } from '@app/ui';
 import { queryKeys } from '@appshore/web-core/shared/constants';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { useCursorList } from '@appshore/web-core/shared/list';
 
 const webhookLogsKey = (id: string) => ['webhooks', id, 'logs'] as const;
 
+/** The workspace's webhook endpoints, newest first: a cursor list ("Load more"). */
 export function useWebhooks() {
-  return useQuery({
-    queryKey: queryKeys.webhooks.root,
-    queryFn: () => listWebhooks(100, 0),
+  return useCursorList({
+    queryKey: [...queryKeys.webhooks.root, 'list'],
+    queryFn: (cursor) => listWebhooks({ cursor }),
   });
 }
 
@@ -73,18 +75,11 @@ export function useDeleteWebhook() {
   });
 }
 
-export function useWebhookLogs(
-  id: string,
-  opts: {
-    limit?: number;
-    offset?: number;
-    dateFrom?: string;
-    dateTo?: string;
-  } = {},
-) {
-  return useQuery({
+/** One endpoint's delivery log, newest first: a cursor list ("Load more"). A changed date range is a new list. */
+export function useWebhookLogs(id: string, opts: { limit?: number; dateFrom?: string; dateTo?: string } = {}) {
+  return useCursorList({
     queryKey: [...webhookLogsKey(id), opts],
-    queryFn: () => getWebhookLogs(id, opts),
+    queryFn: (cursor) => getWebhookLogs(id, { ...opts, cursor }),
     enabled: !!id,
   });
 }

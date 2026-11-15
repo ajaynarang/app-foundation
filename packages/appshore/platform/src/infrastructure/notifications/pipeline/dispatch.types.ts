@@ -1,4 +1,4 @@
-import type { NotificationType } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 
 export interface Recipient {
   id: number;

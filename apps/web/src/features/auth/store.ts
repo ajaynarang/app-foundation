@@ -125,7 +125,7 @@ export const useAuthStore = create<AuthState>()(
             set({ firebaseUser: userCredential.user, isLoading: false, isInitialized: true });
             return get().user;
           }
-          throw new Error(error.message || 'Invalid email or password');
+          throw new Error(error.detail || 'Invalid email or password');
         } catch (error) {
           set({ isLoading: false, isInitialized: false });
           throw error;
@@ -196,7 +196,7 @@ export const useAuthStore = create<AuthState>()(
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.message || 'Token exchange failed');
+          throw new Error(error.detail || 'Token exchange failed');
         }
 
         const data = await response.json();

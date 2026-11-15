@@ -5,21 +5,30 @@
  * (5-minute stale). The drill-in queries are gated by `enabled` so we don't
  * fetch a tenant's breakdown until its row is expanded.
  */
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { showSuccess, showError } from '@app/ui';
 
 import { queryKeys } from '@appshore/web-core/shared/constants/query-keys';
 import { QUERY_TIERS } from '@appshore/web-core/shared/config/query-tiers';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { useCursorList } from '@appshore/web-core/shared/list';
 import { aiSpendApi } from './api';
 import type { UpdateAiBudgetInput } from './types';
 
-const INVOCATION_PAGE_SIZE = 50;
-
+/** The tenants that spent in the window, highest spend first: a cursor list ("Load more"). */
 export function useAiSpendTenants(days: number) {
-  return useQuery({
+  return useCursorList({
     queryKey: queryKeys.aiSpend.tenants(days),
-    queryFn: () => aiSpendApi.tenants(days),
+    queryFn: (cursor) => aiSpendApi.tenants({ days, cursor }),
+    tier: QUERY_TIERS.STATIC,
+  });
+}
+
+/** The window total across every tenant: from the server, so it never depends on the pages loaded. */
+export function useAiSpendSummary(days: number) {
+  return useQuery({
+    queryKey: queryKeys.aiSpend.summary(days),
+    queryFn: () => aiSpendApi.summary(days),
     ...QUERY_TIERS.STATIC,
   });
 }
@@ -33,19 +42,13 @@ export function useAiSpendBySurface(tenantId: number | null, days: number, enabl
   });
 }
 
+/** One tenant's invocations, newest first: a cursor list ("Load more"). */
 export function useAiSpendInvocations(tenantId: number | null, surface: string | undefined, enabled: boolean) {
-  return useInfiniteQuery({
+  return useCursorList({
     queryKey: queryKeys.aiSpend.invocations(tenantId ?? 0, surface),
-    queryFn: ({ pageParam }) =>
-      aiSpendApi.invocations(tenantId as number, {
-        surface,
-        limit: INVOCATION_PAGE_SIZE,
-        cursor: pageParam as string | undefined,
-      }),
+    queryFn: (cursor) => aiSpendApi.invocations(tenantId as number, { surface, cursor }),
     enabled: enabled && tenantId != null,
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    ...QUERY_TIERS.STATIC,
+    tier: QUERY_TIERS.STATIC,
   });
 }
 

@@ -4,16 +4,17 @@ import {
   JobStatusSchema,
   NotificationCategory,
   NotificationCategorySchema,
-  NotificationType,
-  NotificationTypeSchema,
 } from '../generated/prisma-enums';
+import { NotificationTypeSchema, type NotificationType } from './notification-types';
+import { cursorListSchema } from './cursor-list';
 
 // ─── Notifications ───
 
-// `NotificationCategorySchema` and `NotificationTypeSchema` are re-exported
-// from the codegen mirror — the Prisma enums are the single source of truth.
-// `JobStatusSchema` likewise.
-export { NotificationCategory, NotificationCategorySchema, NotificationType, NotificationTypeSchema };
+// `NotificationCategorySchema` and `JobStatusSchema` are re-exported from the codegen mirror (Prisma enums).
+// `NotificationTypeSchema` is a string, not an enum: types are a platform list plus the app's registry
+// (notification-types.ts).
+export { NotificationCategory, NotificationCategorySchema, NotificationTypeSchema };
+export type { NotificationType };
 
 /**
  * In-app notification user-read state. NOT the same value space as the
@@ -24,8 +25,8 @@ export { NotificationCategory, NotificationCategorySchema, NotificationType, Not
 export const NotificationInboxStatusSchema = z.enum(['UNREAD', 'READ', 'DISMISSED']);
 export type NotificationInboxStatus = z.infer<typeof NotificationInboxStatusSchema>;
 
+/** An in-app notification as the API shows it: named by its public id, never the row's Int key. */
 export const NotificationSchema = z.object({
-  id: z.number(),
   notificationId: z.string(),
   type: z.string(),
   category: NotificationCategorySchema.nullable(),
@@ -34,14 +35,14 @@ export const NotificationSchema = z.object({
   actionUrl: z.string().nullable(),
   actionLabel: z.string().nullable(),
   iconType: z.string().nullable(),
-  status: z.string(),
   readAt: z.string().nullable(),
-  dismissedAt: z.string().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
-  groupKey: z.string().nullable().optional(),
   groupCount: z.number().default(1).optional(),
   createdAt: z.string(),
 });
+
+/** `GET /notifications`: a cursor list, newest first. */
+export const NotificationListSchema = cursorListSchema(NotificationSchema);
 
 export const NotificationCountSchema = z.object({
   total: z.number(),
@@ -53,8 +54,8 @@ export const NotificationCountSchema = z.object({
 export const ListNotificationsParamsSchema = z.object({
   status: z.string().optional(),
   category: z.string().optional(),
-  page: z.number().optional(),
   limit: z.number().optional(),
+  cursor: z.string().optional(),
 });
 
 // ─── System Activity / Jobs ───
@@ -66,6 +67,8 @@ export const JobSchema = z.object({
   // Numeric PK — the `jobs` table migrated from a CUID string PK to an Int PK
   // (PR #734/735). Consumers must treat `id` as a number, not a string.
   id: z.number(),
+  /** Public id (uuid): the list cursor tiebreak, and the id a sync-history row is named by. */
+  publicId: z.string(),
   tenantId: z.number(),
   submittedBy: z.number().nullable(),
   category: z.string(),
@@ -116,17 +119,14 @@ export const JobMetricsSchema = z.object({
   avgDurationMs: z.number(),
 });
 
-export const PaginatedJobsSchema = z.object({
-  items: z.array(JobSchema),
-  total: z.number(),
-  limit: z.number(),
-  offset: z.number(),
-});
+/** `GET /admin/jobs`: a cursor list, newest first. */
+export const PaginatedJobsSchema = cursorListSchema(JobSchema);
 
-// Inferred types — `NotificationCategory`, `NotificationType`, `JobStatus`
-// already come from the generated mirror via the re-export above.
+// Inferred types — `NotificationCategory` and `JobStatus` come from the generated mirror, `NotificationType`
+// (a string) from notification-types.ts, via the re-exports above.
 // `NotificationInboxStatus` is exported next to its Schema declaration.
 export type Notification = z.infer<typeof NotificationSchema>;
+export type NotificationList = z.infer<typeof NotificationListSchema>;
 export type NotificationCount = z.infer<typeof NotificationCountSchema>;
 export type ListNotificationsParams = z.infer<typeof ListNotificationsParamsSchema>;
 export type HealthStatus = z.infer<typeof HealthStatusSchema>;

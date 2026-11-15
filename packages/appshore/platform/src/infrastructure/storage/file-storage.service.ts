@@ -108,7 +108,8 @@ export class FileStorageService {
     const response = await this.s3Client.send(command);
 
     if (!response.Body) {
-      throw new NotFoundException(`S3 object not found: ${s3Key}`);
+      this.logger.warn(`S3 object not found: ${s3Key}`);
+      throw new NotFoundException('This file was not found');
     }
 
     const byteArray = await response.Body.transformToByteArray();

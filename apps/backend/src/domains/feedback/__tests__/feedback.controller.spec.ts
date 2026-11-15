@@ -17,7 +17,9 @@ describe('FeedbackController', () => {
   beforeEach(() => {
     service = {
       create: jest.fn().mockResolvedValue({ id: 1, message: 'Great!' }),
-      listOwn: jest.fn().mockResolvedValue([{ id: 1 }, { id: 2 }]),
+      listOwn: jest
+        .fn()
+        .mockResolvedValue({ items: [{ feedbackId: 'a' }, { feedbackId: 'b' }], nextCursor: null, total: 2 }),
     };
     controller = new FeedbackController(service);
   });
@@ -34,10 +36,11 @@ describe('FeedbackController', () => {
 
   describe('listOwn', () => {
     it('should delegate to service with user dbId and tenantDbId', async () => {
-      const result = await controller.listOwn(mockUser);
+      const result = await controller.listOwn(mockUser, { limit: 10, cursor: 'abc' });
 
-      expect(service.listOwn).toHaveBeenCalledWith(10, 42);
-      expect(result).toHaveLength(2);
+      expect(service.listOwn).toHaveBeenCalledWith(10, 42, { limit: 10, cursor: 'abc' });
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBeNull();
     });
   });
 });

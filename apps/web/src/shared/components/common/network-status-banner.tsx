@@ -19,9 +19,7 @@ export function NetworkStatusBanner() {
   return (
     <div
       className={`flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors ${
-        isOnline
-          ? 'bg-sky-500/10 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400'
-          : 'bg-red-500/10 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+        isOnline ? 'bg-info/10 text-info-text' : 'bg-critical/10 text-critical-text'
       }`}
     >
       {isOnline ? (

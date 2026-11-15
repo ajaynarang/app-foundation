@@ -1,3 +1,4 @@
+import { fixtureModel, tiedTimestamps, walkCursorList } from '@appshore/platform/test/helpers/cursor-walk';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { InvoiceService } from '../invoice.service';
@@ -13,6 +14,7 @@ const mockPrisma = {
   billingInvoice: {
     upsert: jest.fn(),
     findMany: jest.fn(),
+    count: jest.fn(),
     findFirst: jest.fn(),
   },
 };
@@ -77,17 +79,63 @@ describe('InvoiceService', () => {
     });
   });
 
-  describe('listInvoices', () => {
-    it('should return paginated invoices', async () => {
+  describe('listInvoices: a cursor list, newest first', () => {
+    it('reads one probe row past the page and hands out a cursor when it came back', async () => {
       const invoices = Array.from({ length: 21 }, (_, i) => ({
         id: `inv-${i}`,
+        createdAt: new Date(Date.UTC(2026, 2, 1) - i * 1000),
       }));
       mockPrisma.billingInvoice.findMany.mockResolvedValue(invoices);
+      mockPrisma.billingInvoice.count.mockResolvedValue(40);
 
       const result = await service.listInvoices(1, { limit: 20 });
 
       expect(result.items).toHaveLength(20);
-      expect(result.hasMore).toBe(true);
+      expect(result.nextCursor).not.toBeNull();
+      expect(result.total).toBe(40);
+      expect(mockPrisma.billingInvoice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 21 }),
+      );
+    });
+
+    describe('walking pages over a fixture', () => {
+      // A billing run writes several invoices in one millisecond; one belongs to another tenant.
+      const stamps = tiedTimestamps(7);
+      const rows = stamps.map((createdAt, index) => ({
+        id: `inv_${(index * 3) % 7}`,
+        tenantId: index === 6 ? 2 : 1,
+        status: index === 0 ? 'OPEN' : 'PAID',
+        createdAt,
+      }));
+
+      beforeEach(() => Object.assign(mockPrisma.billingInvoice, fixtureModel(rows)));
+
+      it('returns every invoice of the tenant once, ties included, and none of another tenant', async () => {
+        const totals: number[] = [];
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listInvoices(1, { limit: 4, cursor });
+          totals.push(page.total);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([4, 2]);
+        expect(new Set(items.map((invoice) => invoice.id)).size).toBe(6);
+        expect(items.every((invoice) => invoice.tenantId === 1)).toBe(true);
+        const times = items.map((invoice) => invoice.createdAt.getTime());
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+        expect(totals).toEqual([6, 6]);
+      });
+
+      it('filters by status in the page and the total (the usage page sends it)', async () => {
+        const page = await service.listInvoices(1, { status: 'OPEN' });
+        expect(page.items.map((invoice) => invoice.status)).toEqual(['OPEN']);
+        expect(page.total).toBe(1);
+      });
+
+      it('answers 400 on a cursor it did not issue (the old row-id cursor included), before any query runs', async () => {
+        await expect(service.listInvoices(1, { cursor: 'inv_3' })).rejects.toMatchObject({ status: 400 });
+        expect(mockPrisma.billingInvoice.findMany).not.toHaveBeenCalled();
+      });
     });
   });
 

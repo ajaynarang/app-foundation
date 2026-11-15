@@ -1,7 +1,15 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { JobStatusSchema } from '@app/shared-types';
+import { JobStatusSchema, type CursorList } from '@app/shared-types';
+import type { Job, Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import type { SyncStatus } from './dto/sync-history-query.dto';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 
 const JOB_STATUS = JobStatusSchema.enum;
@@ -17,6 +25,26 @@ import { randomUUID } from 'crypto';
 
 /** BullMQ job name for a manually-triggered integration sync. */
 const INTEGRATION_SYNC_JOB_NAME = 'integration-sync';
+
+/** The health summary shows a tenant's syncs in flight: the newest of the last ten minutes, never more than this. */
+export const MAX_ACTIVE_SYNCS_SHOWN = 100;
+
+const SYNC_JOB_KEYSET = { field: 'createdAt', idField: 'publicId', kind: 'date', direction: 'desc' } as const;
+
+/** What the sync-history routes pass in, already parsed at the controller. */
+export interface SyncHistoryQuery {
+  limit?: number;
+  cursor?: string;
+  syncType?: string;
+  status?: SyncStatus;
+}
+
+/** A sync status on the wire → the job statuses it stands for. */
+const SYNC_STATUS_WHERE: Record<SyncStatus, Prisma.JobWhereInput['status']> = {
+  running: { in: [JobStatusSchema.enum.QUEUED, JobStatusSchema.enum.PROCESSING] },
+  success: JobStatusSchema.enum.COMPLETED,
+  failed: JobStatusSchema.enum.FAILED,
+};
 
 @Injectable()
 export class IntegrationsService {
@@ -105,6 +133,8 @@ export class IntegrationsService {
           createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
         },
         select: { type: true, inputData: true, startedAt: true },
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: MAX_ACTIVE_SYNCS_SHOWN,
       }),
     ]);
 
@@ -398,14 +428,12 @@ export class IntegrationsService {
   /**
    * Delete integration (tenant-scoped)
    */
-  async deleteIntegration(integrationId: string, tenantId: number) {
+  async deleteIntegration(integrationId: string, tenantId: number): Promise<void> {
     await this.assertIntegrationInTenant(integrationId, tenantId);
 
     await this.prisma.integrationConfig.delete({
       where: { integrationId },
     });
-
-    return { success: true };
   }
 
   /**
@@ -425,21 +453,41 @@ export class IntegrationsService {
   /**
    * Get sync history for an integration (from jobs table, tenant-scoped)
    */
-  async getSyncHistory(integrationId: string, tenantId: number, limit: number = 50, offset: number = 0) {
+  /** One integration's sync runs, newest first, as a cursor list. */
+  async getSyncHistory(integrationId: string, tenantId: number, query: SyncHistoryQuery = {}) {
     const integration = await this.assertIntegrationInTenant(integrationId, tenantId);
-
-    const jobs = await this.prisma.job.findMany({
-      where: {
+    const page = await this.pageSyncJobs(
+      {
         tenantId,
         category: { in: ['vendor', 'telemetry', 'finance'] },
         inputData: { path: ['integrationId'], equals: integrationId },
       },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
-    });
+      query,
+    );
+    return { ...page, items: page.items.map((job) => this.mapJobToSyncHistoryItem(job, integration)) };
+  }
 
-    return jobs.map((job) => this.mapJobToSyncHistoryItem(job, integration));
+  /**
+   * One page of sync jobs, newest first. The tiebreak is the job's public id: its Int key never goes in a
+   * cursor, and a sync row is named by the public id too.
+   */
+  private async pageSyncJobs(scope: Prisma.JobWhereInput, query: SyncHistoryQuery): Promise<CursorList<Job>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...SYNC_JOB_KEYSET, cursor: query.cursor }) : undefined;
+    const where: Prisma.JobWhereInput = { ...scope };
+    if (query.syncType) where.type = query.syncType.toLowerCase();
+    if (query.status) where.status = SYNC_STATUS_WHERE[query.status];
+
+    const [rows, total] = await Promise.all([
+      this.prisma.job.findMany({
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.job.count({ where }),
+    ]);
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.publicId)), total };
   }
 
   /**
@@ -475,64 +523,29 @@ export class IntegrationsService {
    * Get unified sync history across all integrations for a tenant.
    * Powers the Sync Details slide-over panel.
    */
-  async getUnifiedSyncHistory(
-    tenantId: number,
-    limit: number = 20,
-    offset: number = 0,
-    syncType?: string,
-    status?: string,
-  ) {
-    const where: any = {
-      tenantId,
-      category: { in: ['vendor', 'telemetry'] },
-    };
+  /** Every integration's sync runs for the tenant, newest first, as a cursor list. */
+  async getUnifiedSyncHistory(tenantId: number, query: SyncHistoryQuery = {}) {
+    const page = await this.pageSyncJobs({ tenantId, category: { in: ['vendor', 'telemetry'] } }, query);
 
-    if (syncType) {
-      where.type = syncType.toLowerCase();
-    }
-    if (status) {
-      where.status = this.mapSyncStatusToJobStatus(status);
-    }
-
-    const [jobs, total] = await Promise.all([
-      this.prisma.job.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      this.prisma.job.count({ where }),
-    ]);
-
-    // Fetch integration details for display
+    // Integration details for display: one read for the ids on this page.
     const integrationIds = [
-      ...new Set(jobs.map((j) => (j.inputData as Record<string, any>)?.integrationId).filter(Boolean)),
+      ...new Set(page.items.map((j) => (j.inputData as Record<string, any>)?.integrationId).filter(Boolean)),
     ];
-
     const integrations =
       integrationIds.length > 0
         ? await this.prisma.integrationConfig.findMany({
             where: { id: { in: integrationIds as number[] } },
-            select: {
-              id: true,
-              vendor: true,
-              integrationType: true,
-              displayName: true,
-            },
+            select: { id: true, vendor: true, integrationType: true, displayName: true },
           })
         : [];
-
     const integrationMap = new Map(integrations.map((i) => [i.id, i]));
 
     return {
-      items: jobs.map((job) => {
-        const inputData = job.inputData as Record<string, any>;
-        const integration = integrationMap.get(inputData?.integrationId);
+      ...page,
+      items: page.items.map((job) => {
+        const integration = integrationMap.get((job.inputData as Record<string, any>)?.integrationId);
         return this.mapJobToSyncHistoryItem(job, integration ?? null);
       }),
-      total,
-      limit,
-      offset,
     };
   }
 
@@ -553,7 +566,7 @@ export class IntegrationsService {
     const resultData = job.resultData;
 
     return {
-      id: job.id,
+      id: job.publicId,
       syncType: job.type?.toUpperCase() ?? 'UNKNOWN',
       triggerSource: inputData?.triggerSource ?? 'scheduled',
       status: this.mapJobStatusToSyncStatus(job.status),
@@ -575,28 +588,15 @@ export class IntegrationsService {
 
   private mapJobStatusToSyncStatus(jobStatus: string): string {
     switch (jobStatus) {
-      case 'queued':
-      case 'processing':
+      case JOB_STATUS.QUEUED:
+      case JOB_STATUS.PROCESSING:
         return 'running';
-      case 'completed':
+      case JOB_STATUS.COMPLETED:
         return 'success';
-      case 'failed':
+      case JOB_STATUS.FAILED:
         return 'failed';
       default:
         return jobStatus;
-    }
-  }
-
-  private mapSyncStatusToJobStatus(syncStatus: string): string | { in: string[] } {
-    switch (syncStatus) {
-      case 'running':
-        return { in: ['queued', 'processing'] };
-      case 'success':
-        return 'completed';
-      case 'failed':
-        return 'failed';
-      default:
-        return syncStatus;
     }
   }
 }

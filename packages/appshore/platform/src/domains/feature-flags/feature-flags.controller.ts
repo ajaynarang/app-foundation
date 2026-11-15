@@ -1,10 +1,12 @@
 import { Controller, Get, Param, Put, Body, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FeatureFlagsService } from './feature-flags.service';
 import { FeatureFlagDto, FeatureFlagsResponse, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
+
+const FLAG_KEY_PARAM = { name: 'key', description: 'Feature flag key (e.g. `desk`)' };
 
 @ApiTags('Feature Flags')
 @Controller('feature-flags')
@@ -38,6 +40,7 @@ export class FeatureFlagsController {
     status: HttpStatus.NOT_FOUND,
     description: 'Feature flag not found',
   })
+  @ApiParam(FLAG_KEY_PARAM)
   async getFlagByKey(@Param('key') key: string): Promise<FeatureFlagDto> {
     const flag = await this.featureFlagsService.getFlagByKey(key);
 
@@ -62,6 +65,7 @@ export class FeatureFlagsController {
       },
     },
   })
+  @ApiParam(FLAG_KEY_PARAM)
   async isEnabled(@Param('key') key: string): Promise<{ key: string; enabled: boolean }> {
     const enabled = await this.featureFlagsService.isEnabled(key);
     return { key, enabled };
@@ -75,6 +79,7 @@ export class FeatureFlagsController {
     description: 'Feature flag updated successfully',
     type: FeatureFlagDto,
   })
+  @ApiParam(FLAG_KEY_PARAM)
   async updateFlag(@Param('key') key: string, @Body() updateDto: UpdateFeatureFlagDto): Promise<FeatureFlagDto> {
     return this.featureFlagsService.toggleFlag(key, updateDto.enabled);
   }

@@ -24,8 +24,5 @@ export class ChangePasswordDto {
 
 export class ChangePasswordResponseDto {
   @ApiProperty()
-  success: boolean;
-
-  @ApiProperty()
   sessionsRevoked: number;
 }

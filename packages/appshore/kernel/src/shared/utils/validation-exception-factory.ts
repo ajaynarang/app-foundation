@@ -1,4 +1,6 @@
 import { BadRequestException, ValidationError } from '@nestjs/common';
+import { ApiErrorCode } from '@app/shared-types';
+import { queryWireName } from './query-dto';
 
 /**
  * Transforms class-validator ValidationErrors into user-friendly messages.
@@ -24,6 +26,7 @@ export function validationExceptionFactory(errors: ValidationError[]): BadReques
       : `${fieldCount} fields have validation errors. Please check your input.`;
 
   return new BadRequestException({
+    code: ApiErrorCode.VALIDATION_FAILED,
     detail,
     fieldErrors,
   });
@@ -35,7 +38,8 @@ export function validationExceptionFactory(errors: ValidationError[]): BadReques
 function flattenErrors(errors: ValidationError[], prefix = ''): ValidationError[] {
   const result: ValidationError[] = [];
   for (const error of errors) {
-    const property = prefix ? `${prefix}.${error.property}` : error.property;
+    // A query-DTO property is reported by its wire name (`owner_public_id`, not `ownerPublicId`).
+    const property = prefix ? `${prefix}.${error.property}` : queryWireName(error.target, error.property);
     if (error.constraints) {
       result.push({ ...error, property });
     }

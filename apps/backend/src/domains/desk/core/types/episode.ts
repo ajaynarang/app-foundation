@@ -10,6 +10,7 @@ import {
 } from './enums';
 import { StepRecordSchema } from './step';
 import { ApprovalRecordSchema } from './approval';
+import { cursorListSchema, type CursorList } from '@app/shared-types';
 
 /**
  * DeskEpisode REST shapes.
@@ -76,16 +77,15 @@ export type DeskEpisodeDetail = z.infer<typeof DeskEpisodeDetailSchema>;
 
 export const ListDeskEpisodesQuerySchema = z.object({
   status: EpisodeStatusSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(25),
+  /** Page size: clamped to 1…100 by the service; 50 when missing. */
+  limit: z.coerce.number().int().optional(),
   cursor: z.string().optional(),
   scope: z.enum(['mine', 'all']).optional(),
 });
 export type ListDeskEpisodesQuery = z.infer<typeof ListDeskEpisodesQuerySchema>;
 
-export const ListDeskEpisodesResponseSchema = z.object({
-  rows: z.array(DeskEpisodeListItemSchema),
-  nextCursor: z.string().nullable(),
-});
+/** `GET /desk/episodes`: a cursor list, most recently opened first. */
+export const ListDeskEpisodesResponseSchema = cursorListSchema(DeskEpisodeListItemSchema);
 export type ListDeskEpisodesResponse = z.infer<typeof ListDeskEpisodesResponseSchema>;
 
 // ─── Slim list-row contract (row = episode) ─────────────────────────────────
@@ -147,21 +147,26 @@ export const ListHandledEpisodesQuerySchema = z.object({
   agent: z.string().optional(),
   outcome: z.string().optional(),
   q: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  /** Page size: clamped to 1…100 by the service; 50 when missing. */
+  limit: z.coerce.number().int().optional(),
   cursor: z.string().optional(),
 });
 export type ListHandledEpisodesQuery = z.infer<typeof ListHandledEpisodesQuerySchema>;
 
-export const ListHandledEpisodesResponseSchema = z.object({
-  rows: z.array(HandledListItemSchema),
-  nextCursor: z.string().nullable(),
+/**
+ * `GET /desk/episodes/handled`: a cursor list, most recently closed first. `total` counts the whole window;
+ * `summary` describes the page in hand.
+ */
+export const ListHandledEpisodesResponseSchema = cursorListSchema(HandledListItemSchema).extend({
   summary: z.object({
     total: z.number().int(),
     byOutcome: z.record(z.string(), z.number().int()),
     autonomousPct: z.number().min(0).max(1),
   }),
 });
-export type ListHandledEpisodesResponse = z.infer<typeof ListHandledEpisodesResponseSchema>;
+export type ListHandledEpisodesResponse = CursorList<HandledListItem> & {
+  summary: { total: number; byOutcome: Record<string, number>; autonomousPct: number };
+};
 
 // ─── Resolve escalated episode (request body) ────────────────────────────────
 

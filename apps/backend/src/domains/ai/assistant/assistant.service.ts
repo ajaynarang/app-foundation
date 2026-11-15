@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, HttpException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { writeErrorEnvelope } from '@appshore/platform/shared/filters/error-envelope';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { CardAccumulator, McpToolService } from '../mcp/mcp-tool.service';
@@ -53,6 +54,7 @@ export class AssistantAiService {
     conversationId: string,
     userId: string,
     tenantId: number,
+    req: Request,
     res: Response,
   ): Promise<{
     id: number;
@@ -68,24 +70,19 @@ export class AssistantAiService {
       });
 
       if (!found) {
-        throw new NotFoundException(`Conversation ${conversationId} not found`);
+        throw new NotFoundException('Conversation not found');
       }
 
       if (found.userId !== userDbId || found.tenantId !== tenantId) {
-        throw new ForbiddenException('Access denied');
+        // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+        throw new NotFoundException('Conversation not found');
       }
 
       return found;
     } catch (error) {
-      if (error instanceof HttpException) {
-        res.status(error.getStatus()).json({
-          statusCode: error.getStatus(),
-          message: error.message,
-        });
-        return null;
-      }
-      this.logger.error(`Ownership validation error for conversation ${conversationId}`, error);
-      res.status(500).json({ statusCode: 500, message: 'Internal server error' });
+      // This route writes its own response, so the global filter never sees the throw: answer with the same
+      // envelope (which also logs it).
+      writeErrorEnvelope(res, req, error);
       return null;
     }
   }
@@ -158,10 +155,11 @@ export class AssistantAiService {
     });
 
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${conversationId} not found`);
+      throw new NotFoundException('Conversation not found');
     }
     if (conversation.userId !== userDbId || conversation.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Conversation not found');
     }
 
     // 2. Store user message
@@ -364,12 +362,7 @@ export class AssistantAiService {
           `Failed to resolve promptKey=${options.promptKey}`,
           err instanceof Error ? err.stack : String(err),
         );
-        if (!res.headersSent) {
-          res.status(500).json({
-            statusCode: 500,
-            message: 'Failed to resolve prompt',
-          });
-        }
+        writeErrorEnvelope(res, req, new InternalServerErrorException('Failed to resolve prompt'));
         return;
       }
     }
@@ -412,9 +405,8 @@ export class AssistantAiService {
       }
     } catch (error) {
       this.logger.error(`AI streaming error for conversation ${conversationId}`, error);
-      if (!res.headersSent) {
-        res.status(500).json({ statusCode: 500, message: 'AI streaming failed' });
-      }
+      // Before the first chunk the answer is the error envelope. After it the headers are out and nothing is written.
+      writeErrorEnvelope(res, req, new InternalServerErrorException('AI streaming failed'));
     }
 
     res.end();
@@ -430,7 +422,7 @@ export class AssistantAiService {
     req: Request,
     res: Response,
   ) {
-    const conversation = await this.validateConversationOwnership(conversationId, userId, tenantId, res);
+    const conversation = await this.validateConversationOwnership(conversationId, userId, tenantId, req, res);
     if (!conversation) return;
 
     const userDbId = await this.getUserDbId(userId);
@@ -471,9 +463,7 @@ export class AssistantAiService {
       });
     } catch (error) {
       this.logger.error(`Resume error for conversation ${conversationId}`, error);
-      if (!res.headersSent) {
-        res.status(500).json({ statusCode: 500, message: 'Resume failed' });
-      }
+      writeErrorEnvelope(res, req, new InternalServerErrorException('Resume failed'));
     }
   }
 
@@ -540,11 +530,12 @@ export class AssistantAiService {
     });
 
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${conversationId} not found`);
+      throw new NotFoundException('Conversation not found');
     }
 
     if (conversation.userId !== userDbId || conversation.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Conversation not found');
     }
 
     return {

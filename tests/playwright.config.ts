@@ -90,7 +90,8 @@ export default defineConfig({
   projects: [
     {
       name: 'api',
-      testMatch: ['smoke/**/*.spec.ts', 'rbac/**/*.spec.ts'],
+      // `api/**` is where a product's workflow suites and the contract spec live. `pnpm verify:api` runs this project.
+      testMatch: ['smoke/**/*.spec.ts', 'rbac/**/*.spec.ts', 'api/**/*.spec.ts'],
     },
   ],
 });

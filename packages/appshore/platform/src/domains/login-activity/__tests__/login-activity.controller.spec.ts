@@ -10,7 +10,7 @@ describe('LoginActivityController (tenant)', () => {
   let prismaTenantFindUnique: jest.Mock;
 
   beforeEach(async () => {
-    serviceList = jest.fn().mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    serviceList = jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 });
     serviceSummary = jest.fn().mockResolvedValue({
       kpis: { totalSignIns: 0, failedAttempts: 0, failedDeltaPct: 0, uniqueUsers: 0, uniqueIps: 0 },
       notable: { bruteForceSuspects: [], newIpSignIns: [], offHoursSignIns: [] },

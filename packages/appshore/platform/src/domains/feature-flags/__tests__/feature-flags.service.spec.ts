@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { FeatureFlagsService } from '../feature-flags.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { createMockOutbox } from '../../../test/mocks/outbox.mock';
 
 describe('FeatureFlagsService', () => {
   let service: FeatureFlagsService;
@@ -25,6 +25,7 @@ describe('FeatureFlagsService', () => {
         findUnique: jest.fn().mockResolvedValue(mockFlag),
         update: jest.fn().mockResolvedValue(mockFlag),
       },
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     // A small in-memory stand-in with the cache service's own semantics:
@@ -45,9 +46,8 @@ describe('FeatureFlagsService', () => {
       }),
     };
 
-    eventEmitter = {
-      emit: jest.fn().mockResolvedValue(undefined),
-    };
+    // `eventEmitter.emit` records what the outbox published after its transaction committed.
+    eventEmitter = createMockOutbox(prisma);
 
     service = new FeatureFlagsService(prisma, cache, eventEmitter);
   });
@@ -124,13 +124,19 @@ describe('FeatureFlagsService', () => {
         where: { key: 'reports' },
         data: { enabled: false },
       });
-      expect(eventEmitter.emit).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        'app.feature-flag.toggled',
+        'global',
+        expect.objectContaining({ key: 'reports', enabled: false }),
+      );
       expect(result.key).toBe('reports');
     });
 
     it('should throw NotFoundException for P2025 error', async () => {
       prisma.featureFlag.update.mockRejectedValue({ code: 'P2025' });
       await expect(service.toggleFlag('bad', true)).rejects.toThrow(NotFoundException);
+      // Nothing committed, so nothing is published.
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('should re-throw non-P2025 errors', async () => {

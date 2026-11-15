@@ -4,6 +4,7 @@ import { LoginActivityService } from '../login-activity.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../../infrastructure/cache/app-cache.service';
 import { createMockPrisma, createMockCache } from '../../../test/mocks';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 import { LOGIN_ACTIVITY } from '../constants';
 import { loginActivityCacheKeys, rolesKey } from '../login-activity.cache';
 
@@ -171,32 +172,74 @@ describe('LoginActivityService', () => {
   // ──────────────────────────────────────────────────────────────────────
 
   describe('list — ordering, pagination, device label', () => {
-    it('default order is createdAt desc', async () => {
+    it('orders by createdAt desc, then the public id (never the Int key)', async () => {
       stubListReturning([]);
       await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE });
       const args = prisma.loginEvent.findMany.mock.calls[0][0];
-      expect(args.orderBy).toEqual({ createdAt: 'desc' });
+      expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { publicId: 'desc' }]);
     });
 
-    it('respects limit + offset and returns total', async () => {
+    it('reads one probe row past the page size, never skips, and returns the total', async () => {
       stubListReturning([], 412);
-      const res = await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, limit: 25, offset: 50 });
+      const res = await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, limit: 25 });
       const args = prisma.loginEvent.findMany.mock.calls[0][0];
-      expect(args.take).toBe(25);
-      expect(args.skip).toBe(50);
-      expect(res.total).toBe(412);
-      expect(res.limit).toBe(25);
-      expect(res.offset).toBe(50);
+      expect(args.take).toBe(26);
+      expect(args.skip).toBeUndefined();
+      expect(res).toEqual({ items: [], nextCursor: null, total: 412 });
     });
 
-    it('caps page size at MAX_PAGE_LIMIT and defaults to DEFAULT_PAGE_LIMIT', async () => {
+    it('caps page size at 100 and defaults to 50', async () => {
       stubListReturning([]);
       await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, limit: 9999 });
-      expect(prisma.loginEvent.findMany.mock.calls[0][0].take).toBe(LOGIN_ACTIVITY.MAX_PAGE_LIMIT);
+      expect(prisma.loginEvent.findMany.mock.calls[0][0].take).toBe(100 + 1);
 
       prisma.loginEvent.findMany.mockClear();
       await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE });
-      expect(prisma.loginEvent.findMany.mock.calls[0][0].take).toBe(LOGIN_ACTIVITY.DEFAULT_PAGE_LIMIT);
+      expect(prisma.loginEvent.findMany.mock.calls[0][0].take).toBe(50 + 1);
+    });
+
+    describe('walking pages over a fixture', () => {
+      // Three sign-ins share each timestamp, as a burst of failed attempts does.
+      const stamps = tiedTimestamps(7, 3, Date.parse('2026-05-22T10:00:00.000Z'));
+      const rows = stamps.map((createdAt, index) => ({
+        id: index + 1,
+        publicId: `00000000-0000-7000-8000-00000000000${(index * 3) % 7}`,
+        tenantId: index === 6 ? OTHER_TENANT_ID : TENANT_ID,
+        status: 'SUCCESS',
+        userAgent: null,
+        createdAt,
+        user: null,
+      }));
+
+      beforeEach(() => Object.assign(prisma.loginEvent, fixtureModel(rows)));
+
+      it('returns every event of the tenant once, ties included, and none of another tenant', async () => {
+        const { pages, items } = await walkCursorList((cursor) =>
+          service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, limit: 2, cursor }),
+        );
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 2]);
+        expect(items.map((event) => event.id).sort()).toEqual([1, 2, 3, 4, 5, 6]);
+        const times = items.map((event) => Date.parse(event.createdAt));
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+      });
+
+      it('keeps the total at the full match count on every page', async () => {
+        const first = await service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, limit: 4 });
+        const second = await service.list(
+          { isSuperAdmin: false, tenantId: TENANT_ID },
+          { ...RANGE, limit: 4, cursor: first.nextCursor! },
+        );
+        expect([first.total, second.total]).toEqual([6, 6]);
+        expect(second.nextCursor).toBeNull();
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(
+          service.list({ isSuperAdmin: false, tenantId: TENANT_ID }, { ...RANGE, cursor: '%%%' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.loginEvent.findMany).not.toHaveBeenCalled();
+      });
     });
 
     it('returns parsed device labels from user-agent', async () => {

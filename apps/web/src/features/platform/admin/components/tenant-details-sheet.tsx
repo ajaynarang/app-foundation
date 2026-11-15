@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@app/ui/components/ui/badge';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
 import { Button } from '@app/ui/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@app/ui/components/ui/sheet';
 import { SheetKeyboardHint } from '@app/ui/components/ui/form-sheet';
@@ -13,13 +14,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Pencil } from 'lucide-react';
 import { PhoneInput } from '@app/ui/components/ui/phone-input';
-import { useAuth } from '@/features/auth';
-import { showSuccess, showError } from '@app/ui';
+import { apiClient } from '@appshore/web-core/shared/lib/api';
+import { showSuccess, showError, variantOf } from '@app/ui';
 import { useFormatters } from '@/shared/providers/PreferencesProvider';
 import { queryKeys } from '@appshore/web-core/shared/constants';
 import { plansApi } from '@/features/platform/plans';
 import { TenantPlanBillingTab } from './tenant-billing-tab';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { ListErrorState } from '@/shared/components/page-chrome';
+import { memberState, roleLabel } from '@/features/platform/settings/constants';
+import { TENANT_STATUS_VARIANTS } from '../constants';
 
 interface TenantDetailsSheetProps {
   open: boolean;
@@ -53,10 +57,8 @@ export function TenantDetailsSheet({
   onSuspend,
   onReactivate,
 }: TenantDetailsSheetProps) {
-  const { accessToken } = useAuth();
   const { formatDateTime } = useFormatters();
   const queryClient = useQueryClient();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<EditFormData>({
@@ -69,19 +71,14 @@ export function TenantDetailsSheet({
   });
 
   // Fetch tenant details
-  const { data, isLoading } = useQuery({
+  // apiClient carries the token and the one-shot refresh; a hand-built bearer header expired with the access token.
+  const details = useQuery({
     queryKey: ['tenant-details', tenantId],
-    queryFn: async () => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}/details`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch tenant details');
-      return response.json();
-    },
-    enabled: open && !!accessToken,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn: () => apiClient<any>(`/tenants/${tenantId}/details`),
+    enabled: open,
   });
+  const { data, isLoading } = details;
 
   // Fetch tenant plan
   const { data: tenantPlan, isLoading: isPlanLoading } = useQuery({
@@ -118,21 +115,8 @@ export function TenantDetailsSheet({
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async (updateData: Record<string, string>) => {
-      const response = await fetch(`${apiUrl}/tenants/${tenantId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(updateData),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to update tenant');
-      }
-      return response.json();
-    },
+    mutationFn: (updateData: Record<string, string>) =>
+      apiClient(`/tenants/${tenantId}`, { method: 'PATCH', body: JSON.stringify(updateData) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-details', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
@@ -235,7 +219,7 @@ export function TenantDetailsSheet({
                         placeholder="acme"
                         className="rounded-r-none"
                       />
-                      <span className="inline-flex h-9 items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                      <span className="inline-flex h-9 items-center rounded-r-md border border-l-0 border-input bg-muted/50 px-3 text-sm text-muted-foreground">
                         .app.example.com
                       </span>
                     </div>
@@ -320,9 +304,9 @@ export function TenantDetailsSheet({
           <SheetDescription>
             {data?.tenant?.subdomain}.app.example.com
             {status && (
-              <Badge className="ml-2" variant={status === 'ACTIVE' ? 'default' : 'muted'}>
-                {status.replace('_', ' ')}
-              </Badge>
+              <StatusBadge className="ml-2" tone={variantOf(TENANT_STATUS_VARIANTS, status).tone}>
+                {variantOf(TENANT_STATUS_VARIANTS, status).label}
+              </StatusBadge>
             )}
           </SheetDescription>
         </SheetHeader>
@@ -340,6 +324,13 @@ export function TenantDetailsSheet({
               <Skeleton className="h-6 w-32" />
               <Skeleton className="h-20 w-full" />
             </div>
+          ) : details.isError ? (
+            <ListErrorState
+              title="Couldn't load this tenant."
+              error={details.error}
+              onRetry={() => void details.refetch()}
+              isRetrying={details.isRefetching}
+            />
           ) : data ? (
             <Tabs defaultValue="overview">
               <TabsList>
@@ -511,12 +502,12 @@ export function TenantDetailsSheet({
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
                         <TableCell>
-                          <Badge variant="muted">{user.role}</Badge>
+                          <Badge variant="outline">{roleLabel(user.role)}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={user.isActive ? 'default' : 'muted'}>
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
+                          <StatusBadge tone={memberState(user.isActive).tone}>
+                            {memberState(user.isActive).label}
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Never'}

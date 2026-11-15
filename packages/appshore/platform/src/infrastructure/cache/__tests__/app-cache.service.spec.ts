@@ -83,6 +83,19 @@ describe('AppCacheService', () => {
     });
   });
 
+  describe('claim', () => {
+    it('sets the key only if absent, with its TTL in one command (SET NX PX), and reports the win', async () => {
+      mockRedis.set.mockResolvedValue('OK');
+      await expect(service.claim('app:test:key', { a: 1 }, 5000)).resolves.toBe(true);
+      expect(mockRedis.set).toHaveBeenCalledWith('app:test:key', JSON.stringify({ a: 1 }), 'PX', 5000, 'NX');
+    });
+
+    it('reports a lost claim when the key already exists (Redis answers null)', async () => {
+      mockRedis.set.mockResolvedValue(null);
+      await expect(service.claim('app:test:key', { a: 1 }, 5000)).resolves.toBe(false);
+    });
+  });
+
   describe('del', () => {
     it('should delete from Redis', async () => {
       await service.del('app:test:key');

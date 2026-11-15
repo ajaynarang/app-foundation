@@ -56,7 +56,7 @@ export function EventPicker({ wildcard, onWildcardChange, selectedEvents, onSele
     <div className="space-y-3">
       <Label>Events</Label>
 
-      <label className="flex items-center gap-3 rounded-lg border border-blue-600/30 bg-blue-600/5 p-3 cursor-pointer">
+      <label className="flex items-center gap-3 rounded-lg border border-info/30 bg-info/5 p-3 cursor-pointer">
         <Checkbox checked={wildcard} onCheckedChange={(checked) => onWildcardChange(!!checked)} />
         <div>
           <p className="text-sm font-medium">Subscribe to all events</p>
@@ -112,7 +112,7 @@ export function EventPicker({ wildcard, onWildcardChange, selectedEvents, onSele
                     {category.events.map((event) => (
                       <label
                         key={event.name}
-                        className="flex items-start gap-3 rounded-md p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="flex items-start gap-3 rounded-md p-2 cursor-pointer hover:bg-muted/50"
                       >
                         <Checkbox
                           checked={selectedEvents.includes(event.name)}

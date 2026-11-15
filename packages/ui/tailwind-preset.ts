@@ -1,7 +1,7 @@
-import type { Config } from "tailwindcss";
+import type { Config } from 'tailwindcss';
 
 const preset: Partial<Config> = {
-  darkMode: ["class"],
+  darkMode: ['class'],
   theme: {
     extend: {
       fontFamily: {
@@ -41,10 +41,12 @@ const preset: Partial<Config> = {
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
+          text: 'hsl(var(--info-text))',
         },
         caution: {
           DEFAULT: 'hsl(var(--caution))',
           foreground: 'hsl(var(--caution-foreground))',
+          text: 'hsl(var(--caution-text))',
         },
         warning: {
           DEFAULT: 'hsl(var(--warning))',
@@ -53,10 +55,18 @@ const preset: Partial<Config> = {
         critical: {
           DEFAULT: 'hsl(var(--critical))',
           foreground: 'hsl(var(--critical-foreground))',
+          text: 'hsl(var(--critical-text))',
         },
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
+          text: 'hsl(var(--success-text))',
+        },
+        /* Brand: `brand` is a fill / accent, `brand-text` is brand-coloured text (identifiers). Set in globals.css. */
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+          text: 'hsl(var(--brand-text))',
         },
         black: '#000000',
         white: '#FFFFFF',

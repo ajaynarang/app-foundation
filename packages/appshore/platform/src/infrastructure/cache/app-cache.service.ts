@@ -103,6 +103,15 @@ export class AppCacheService implements OnModuleInit {
     await this.redis.set(key, stored, 'PX', ttlMs);
   }
 
+  /**
+   * Set `key` only if it does not exist yet (SET NX PX): an atomic claim across replicas. True when this caller won
+   * the claim; false when the key was already there, whose value is left untouched.
+   */
+  async claim<T>(key: string, value: T, ttlMs: number): Promise<boolean> {
+    const stored = value === null || value === undefined ? CACHE_NULL_SENTINEL : JSON.stringify(value);
+    return (await this.redis.set(key, stored, 'PX', ttlMs, 'NX')) === 'OK';
+  }
+
   async del(key: string): Promise<void> {
     await this.redis.del(key);
   }

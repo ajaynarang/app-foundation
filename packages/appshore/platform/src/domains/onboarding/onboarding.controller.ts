@@ -10,6 +10,9 @@ import { OnboardingStatusResponse } from './dto/onboarding-status.dto';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_HOT_30S } from '@appshore/kernel/constants/cache.constants';
+import { ApiOperation } from '@nestjs/swagger';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { OnboardingStatusResult } from './openapi.responses';
 
 @Controller('onboarding')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
@@ -23,6 +26,8 @@ export class OnboardingController {
 
   @Get('status')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: "The tenant's onboarding checklist — milestones, items and overall progress (OWNER/ADMIN)" })
+  @ApiResult(OnboardingStatusResult)
   async getOnboardingStatus(@TenantDbId() tenantDbId: number): Promise<OnboardingStatusResponse> {
     this.logger.log(`GET /onboarding/status for tenant DB ID ${tenantDbId}`);
 

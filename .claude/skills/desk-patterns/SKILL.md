@@ -66,7 +66,9 @@ Inngest orchestrates the workflow as durable steps. Typical flow:
 4. **draft** (LLM or deterministic) — compose the proposed action; emit confidence.
 5. **gate** (shared step) — conditions + trust level + confidence → approve or gated. The conditions evaluator is supplied per-responsibility; the gate stays job-blind.
 6. **execute** (shared step) — run the MCP tool via the invocation pipeline (agent principal with responsibility-scoped permissions).
-7. **close** (shared step) — set episode status/outcome, write memory, reinforce used memories, emit a domain event.
+7. **close** (shared step) — set episode status/outcome, write memory, reinforce used memories, and stage a domain event with the status write (`OutboxService.transaction`).
+
+**Events in and out of Desk are at least once** (ADR "Outbox and deadlines"). Every Desk write that raises an event stages it in its own transaction through `OutboxService`, never `DomainEventService.emit` after the commit (`no-direct-emit.spec.ts` fails on it). A handler added to the domain-event bridge (`core/trigger/domain-event-bridge.service.ts`) can see one event twice, so it closes episodes with an idempotent `updateMany`, and when it sends an Inngest event it passes the domain event's id as the Inngest event id (`inngest.send({ id: event.id, … })`) so Inngest drops the copy.
 
 **Gate algorithm** (`core/gate/gate.algorithm.ts` — pure, no side effects, unit-testable):
 

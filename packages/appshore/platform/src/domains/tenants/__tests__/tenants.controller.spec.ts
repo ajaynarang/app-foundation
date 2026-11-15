@@ -1,3 +1,7 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { RejectTenantDto } from '../dto/reject-tenant.dto';
+import { TenantListQueryDto } from '../dto/tenant-list-query.dto';
 import { BadRequestException } from '@nestjs/common';
 import { TenantsController } from '../tenants.controller';
 
@@ -10,7 +14,7 @@ describe('TenantsController', () => {
       registerTenant: jest.fn().mockResolvedValue({ tenantId: 't_new' }),
       checkSubdomainAvailability: jest.fn().mockResolvedValue(true),
       getTenantBranding: jest.fn().mockResolvedValue({ logo: null }),
-      getAllTenants: jest.fn().mockResolvedValue([]),
+      listTenants: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       approveTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
       rejectTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
       suspendTenant: jest.fn().mockResolvedValue({ tenantId: 't_1' }),
@@ -40,16 +44,16 @@ describe('TenantsController', () => {
       expect(result.tenantId).toBe('t_new');
     });
 
-    it('should throw BadRequestException when turnstile token missing but secret configured', async () => {
+    it('answers 400 naming turnstileToken when it is missing but the secret is configured', async () => {
       process.env.TURNSTILE_SECRET_KEY = 'secret_key';
       const dto = { companyName: 'TestCo' } as any;
 
-      await expect(controller.register(dto)).rejects.toThrow(BadRequestException);
+      expect(await fieldErrorsOf(controller.register(dto))).toHaveProperty('turnstileToken');
 
       delete process.env.TURNSTILE_SECRET_KEY;
     });
 
-    it('should throw when turnstile verification fails', async () => {
+    it('answers 400 naming turnstileToken when verification fails', async () => {
       process.env.TURNSTILE_SECRET_KEY = 'secret_key';
       const dto = { companyName: 'TestCo', turnstileToken: 'bad_token' } as any;
 
@@ -59,7 +63,7 @@ describe('TenantsController', () => {
         json: () => Promise.resolve({ success: false }),
       }) as any;
 
-      await expect(controller.register(dto)).rejects.toThrow(BadRequestException);
+      expect(await fieldErrorsOf(controller.register(dto))).toHaveProperty('turnstileToken');
 
       global.fetch = originalFetch;
       delete process.env.TURNSTILE_SECRET_KEY;
@@ -97,8 +101,24 @@ describe('TenantsController', () => {
 
   describe('getAllTenants', () => {
     it('should delegate to service', async () => {
-      await controller.getAllTenants('ACTIVE');
-      expect(service.getAllTenants).toHaveBeenCalledWith('ACTIVE');
+      const page = await controller.getAllTenants(
+        await readQueryDto(TenantListQueryDto, { status: 'ACTIVE', q: ' acme ', limit: '10', cursor: 'abc' }),
+      );
+      expect(service.listTenants).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'ACTIVE', q: 'acme', limit: 10, cursor: 'abc' }),
+      );
+      expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
+      await controller.getAllTenants(await readQueryDto(TenantListQueryDto, {}));
+      expect(service.listTenants.mock.calls[1][0].status).toBeUndefined();
+    });
+
+    it('answers 400 naming limit when it is not a whole number, and refuses offset paging', async () => {
+      expect(await fieldErrorsOf(readQueryDto(TenantListQueryDto, { limit: 'abc' }))).toHaveProperty('limit');
+      expect(await fieldErrorsOf(readQueryDto(TenantListQueryDto, { offset: '10' }))).toHaveProperty('offset');
+    });
+
+    it('answers 400 naming status for an unknown one (it used to reach the database)', async () => {
+      expect(await fieldErrorsOf(readQueryDto(TenantListQueryDto, { status: 'active' }))).toHaveProperty('status');
     });
   });
 
@@ -111,8 +131,15 @@ describe('TenantsController', () => {
 
   describe('rejectTenant', () => {
     it('should reject with reason', async () => {
-      await controller.rejectTenant('t_1', 'Fraud');
+      await controller.rejectTenant('t_1', await readBodyDto(RejectTenantDto, { reason: 'Fraud' }));
       expect(service.rejectTenant).toHaveBeenCalledWith('t_1', 'Fraud');
+    });
+
+    it('answers 400 naming reason when it is not text, and refuses an undeclared field', async () => {
+      expect(await fieldErrorsOf(readBodyDto(RejectTenantDto, { reason: 42 }))).toHaveProperty('reason');
+      expect(await fieldErrorsOf(readBodyDto(RejectTenantDto, { reason: 'x', status: 'ACTIVE' }))).toHaveProperty(
+        'status',
+      );
     });
   });
 

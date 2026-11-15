@@ -1,4 +1,4 @@
-import { DomainEvent, EventActor } from '../domain-event';
+import { DomainEvent, EventActor, isActorType, toEventActor } from '../domain-event';
 
 describe('DomainEvent', () => {
   it('creates event with required fields only (backward compat)', () => {
@@ -111,6 +111,62 @@ describe('DomainEvent', () => {
       });
 
       expect(event).toBeInstanceOf(DomainEvent);
+    });
+  });
+
+  describe('restore', () => {
+    it('keeps the given id, timestamp and actor, and never reads EventContext', () => {
+      const timestamp = new Date('2026-10-09T10:00:00.000Z');
+      const event = DomainEvent.restore({
+        id: 'evt-1',
+        event: 'app.widget.updated',
+        tenantId: 'global',
+        data: { a: 1 },
+        timestamp,
+      });
+
+      expect(event).toBeInstanceOf(DomainEvent);
+      expect(event.id).toBe('evt-1');
+      expect(event.timestamp).toBe(timestamp);
+      expect(event.version).toBe(1);
+      expect(event.actor).toBeUndefined();
+    });
+
+    it('keeps an explicit version', () => {
+      const event = DomainEvent.restore({
+        id: 'evt-2',
+        event: 'x',
+        tenantId: 't',
+        data: {},
+        version: 3,
+        timestamp: new Date(),
+      });
+      expect(event.version).toBe(3);
+    });
+  });
+
+  describe('toEventActor / isActorType', () => {
+    it('maps a stored actor and drops a null label', () => {
+      expect(toEventActor({ id: 'u', type: 'user', label: null })).toEqual({ id: 'u', type: 'user' });
+      expect(toEventActor({ id: 'k', type: 'api-key', label: 'CI' })).toEqual({
+        id: 'k',
+        type: 'api-key',
+        label: 'CI',
+      });
+    });
+
+    it('keeps an unknown type as system rather than losing who acted', () => {
+      expect(toEventActor({ id: 'x', type: 'robot' })).toEqual({ id: 'x', type: 'system' });
+    });
+
+    it('returns undefined for no actor', () => {
+      expect(toEventActor(null)).toBeUndefined();
+      expect(toEventActor(undefined)).toBeUndefined();
+    });
+
+    it('knows the actor types', () => {
+      expect(isActorType('integration')).toBe(true);
+      expect(isActorType('robot')).toBe(false);
     });
   });
 });

@@ -1,8 +1,20 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Prisma, SupportCategory, SupportPriority, SupportStatus } from '@appshore/db';
+import type { CursorList } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { containsText } from '@appshore/kernel/shared/utils/list-query';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { listTenantOptions, type TenantOption, type TenantOptionQuery } from '../../shared/lists/tenant-options';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+
+const TICKET_KEYSET = { field: 'createdAt', idField: 'ticketNumber', kind: 'date', direction: 'desc' } as const;
 
 @Injectable()
 export class SupportService {
@@ -57,38 +69,37 @@ export class SupportService {
     return this.mapTicketResponse(ticket);
   }
 
-  async listTicketsForTenant(tenantId: number, params: { status?: string; limit?: number; offset?: number }) {
-    const where: any = { tenantId };
-    if (params.status) where.status = params.status;
+  /** A workspace's tickets, newest first, as a cursor list. The tiebreak is the ticket number. */
+  async listTicketsForTenant(tenantId: number, params: { status?: SupportStatus; limit?: number; cursor?: string }) {
+    const scope: Prisma.SupportTicketWhereInput = { tenantId };
+    if (params.status) scope.status = params.status;
+    return this.pageTickets(scope, params, {});
+  }
 
-    const [tickets, total] = await Promise.all([
+  /** One page of tickets, newest first. A ticket's number is its public id, so it is the keyset tiebreak. */
+  private async pageTickets(
+    scope: Prisma.SupportTicketWhereInput,
+    params: { limit?: number; cursor?: string },
+    extraInclude: Prisma.SupportTicketInclude,
+  ) {
+    const take = clampCursorLimit(params.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = params.cursor ? keysetWhere({ ...TICKET_KEYSET, cursor: params.cursor }) : undefined;
+    const [rows, total] = await Promise.all([
       this.prisma.supportTicket.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: params.limit ?? 50,
-        skip: params.offset ?? 0,
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: [{ createdAt: 'desc' }, { ticketNumber: 'desc' }],
+        take: take + 1,
         include: {
-          createdBy: {
-            select: {
-              userId: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              role: true,
-            },
-          },
+          createdBy: { select: { userId: true, firstName: true, lastName: true, email: true, role: true } },
+          ...extraInclude,
           _count: { select: { messages: true } },
         },
       }),
-      this.prisma.supportTicket.count({ where }),
+      this.prisma.supportTicket.count({ where: scope }),
     ]);
-
-    return {
-      tickets: tickets.map((t) => this.mapTicketResponse(t)),
-      total,
-      limit: params.limit ?? 50,
-      offset: params.offset ?? 0,
-    };
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.ticketNumber));
+    return { items: page.items.map((t) => this.mapTicketResponse(t)), nextCursor: page.nextCursor, total };
   }
 
   async getTicket(ticketId: number, tenantId: number, isSuperAdmin = false) {
@@ -207,58 +218,28 @@ export class SupportService {
 
   // ─── Super Admin endpoints ───
 
+  /** Every tenant's tickets (super admin), newest first, as a cursor list. */
   async listAllTickets(params: {
     tenantId?: number;
-    status?: string;
-    priority?: string;
-    category?: string;
+    status?: SupportStatus;
+    priority?: SupportPriority;
+    category?: SupportCategory;
     search?: string;
     limit?: number;
-    offset?: number;
+    cursor?: string;
   }) {
-    const where: any = {};
-    if (params.tenantId) where.tenantId = params.tenantId;
-    if (params.status) where.status = params.status;
-    if (params.priority) where.priority = params.priority;
-    if (params.category) where.category = params.category;
+    const scope: Prisma.SupportTicketWhereInput = {};
+    if (params.tenantId) scope.tenantId = params.tenantId;
+    if (params.status) scope.status = params.status;
+    if (params.priority) scope.priority = params.priority;
+    if (params.category) scope.category = params.category;
     if (params.search) {
-      where.OR = [
-        { subject: { contains: params.search, mode: 'insensitive' } },
-        { ticketNumber: { contains: params.search, mode: 'insensitive' } },
-      ];
+      // `containsText` escapes LIKE wildcards: unescaped, `_` or `%` would match every ticket.
+      scope.OR = [{ subject: containsText(params.search) }, { ticketNumber: containsText(params.search) }];
     }
-
-    const [tickets, total] = await Promise.all([
-      this.prisma.supportTicket.findMany({
-        where,
-        orderBy: [{ status: 'asc' }, { priority: 'asc' }, { createdAt: 'desc' }],
-        take: params.limit ?? 50,
-        skip: params.offset ?? 0,
-        include: {
-          createdBy: {
-            select: {
-              userId: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              role: true,
-            },
-          },
-          tenant: {
-            select: { tenantId: true, companyName: true, plan: true },
-          },
-          _count: { select: { messages: true } },
-        },
-      }),
-      this.prisma.supportTicket.count({ where }),
-    ]);
-
-    return {
-      tickets: tickets.map((t) => this.mapTicketResponse(t)),
-      total,
-      limit: params.limit ?? 50,
-      offset: params.offset ?? 0,
-    };
+    return this.pageTickets(scope, params, {
+      tenant: { select: { tenantId: true, companyName: true, plan: true } },
+    });
   }
 
   async updateTicket(ticketId: number, dto: UpdateTicketDto) {
@@ -321,13 +302,9 @@ export class SupportService {
     return { open, inProgress, waiting, resolvedLast30d, avgResponseHours };
   }
 
-  async getTenants() {
-    const tenants = await this.prisma.supportTicket.findMany({
-      select: { tenant: { select: { id: true, companyName: true } } },
-      distinct: ['tenantId'],
-      orderBy: { tenant: { companyName: 'asc' } },
-    });
-    return tenants.map((t) => t.tenant);
+  /** Tenants that have opened a ticket, by company name: the rows behind the admin tenant filter (a picker). */
+  async getTenants(query: TenantOptionQuery = {}): Promise<CursorList<TenantOption>> {
+    return listTenantOptions(this.prisma, { supportTickets: { some: {} } }, query);
   }
 
   // ─── Mappers ───

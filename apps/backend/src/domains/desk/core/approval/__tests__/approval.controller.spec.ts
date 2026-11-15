@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { ApprovalListQueryDto } from '../dto/approval-list-query.dto';
 import { BadRequestException } from '@nestjs/common';
 import { UserRole } from '@appshore/db';
 
@@ -13,6 +16,8 @@ class FakePrisma {
   deskApproval = { findUnique: jest.fn() };
 }
 
+const query = (raw: Record<string, unknown> = {}) => readQueryDto(ApprovalListQueryDto, raw);
+
 describe('ApprovalController.listPending', () => {
   let controller: ApprovalController;
   let approvals: FakeApprovalService;
@@ -24,34 +29,44 @@ describe('ApprovalController.listPending', () => {
   });
 
   it('member default → scope=mine with currentUserId', async () => {
-    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 });
+    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, await query());
+    // No limit and no cursor: the first page, at the service's default size of 50.
     expect(approvals.listPending).toHaveBeenCalledWith(7, {
-      limit: 50,
+      limit: undefined,
+      cursor: undefined,
       scope: 'mine',
       currentUserId: 42,
     });
   });
 
   it('admin default → scope=all', async () => {
-    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 });
+    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, await query());
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ scope: 'all' }));
   });
 
   it('explicit scope=all wins over member default', async () => {
-    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, undefined, 'all');
+    await controller.listPending({ role: UserRole.MEMBER, dbId: 42 }, await query({ scope: 'all' }));
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ scope: 'all' }));
   });
 
   it('rejects unknown scope', async () => {
-    await expect(controller.listPending({ role: UserRole.MEMBER, dbId: 1 }, undefined, 'bogus')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    expect(await fieldErrorsOf(query({ scope: 'bogus' }))).toHaveProperty('scope');
+  });
+
+  it('answers 400 naming limit when it is not a number', async () => {
+    expect(await fieldErrorsOf(query({ limit: 'abc' }))).toHaveProperty('limit');
+  });
+
+  it('passes the cursor through and refuses offset paging', async () => {
+    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, await query({ cursor: 'abc', limit: '10' }));
+    expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ cursor: 'abc', limit: 10 }));
+    expect(await fieldErrorsOf(query({ offset: '10' }))).toHaveProperty('offset');
   });
 
   it('clamps limit to 1..100', async () => {
-    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, '999');
+    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, await query({ limit: '999' }));
     expect(approvals.listPending).toHaveBeenCalledWith(7, expect.objectContaining({ limit: 100 }));
-    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, '0');
+    await controller.listPending({ role: UserRole.ADMIN, dbId: 1 }, await query({ limit: '0' }));
     expect(approvals.listPending).toHaveBeenLastCalledWith(7, expect.objectContaining({ limit: 1 }));
   });
 });

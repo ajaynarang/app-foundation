@@ -197,7 +197,7 @@ export function RegistrationForm() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+        throw new Error(errorData.detail || 'Registration failed');
       }
 
       // Success! Redirect to pending approval page
@@ -284,7 +284,7 @@ export function RegistrationForm() {
               transition={{ duration: 0.3 }}
               className="text-center"
             >
-              <p className="text-sm text-critical">{error}</p>
+              <p className="text-sm text-critical-text">{error}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -321,7 +321,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.companyName.message}
                       </motion.p>
@@ -363,7 +363,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         Subdomain not available - try another
                       </motion.p>
@@ -383,7 +383,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.subdomain.message}
                       </motion.p>
@@ -423,7 +423,7 @@ export function RegistrationForm() {
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -5 }}
-                          className="text-sm text-critical mt-2 ml-2"
+                          className="text-sm text-critical-text mt-2 ml-2"
                         >
                           {errors.firstName.message}
                         </motion.p>
@@ -446,7 +446,7 @@ export function RegistrationForm() {
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -5 }}
-                          className="text-sm text-critical mt-2 ml-2"
+                          className="text-sm text-critical-text mt-2 ml-2"
                         >
                           {errors.lastName.message}
                         </motion.p>
@@ -472,7 +472,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.email.message}
                       </motion.p>
@@ -494,7 +494,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.phone.message}
                       </motion.p>
@@ -542,7 +542,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.password.message}
                       </motion.p>
@@ -567,7 +567,7 @@ export function RegistrationForm() {
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
-                        className="text-sm text-critical mt-2 ml-2"
+                        className="text-sm text-critical-text mt-2 ml-2"
                       >
                         {errors.confirmPassword.message}
                       </motion.p>
@@ -612,7 +612,7 @@ export function RegistrationForm() {
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="text-sm text-critical mt-1 ml-7"
+                      className="text-sm text-critical-text mt-1 ml-7"
                     >
                       {errors.termsAccepted.message}
                     </motion.p>

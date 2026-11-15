@@ -1,42 +1,30 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../database/prisma.service';
-import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
-import { JOB_CATEGORIES, JobCategory } from '@appshore/kernel/infrastructure/queue/job.types';
+import { buildJobVocabulary, type JobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from './job-vocabulary.token';
+import { queueByName } from './queue-by-name';
 
 @Injectable()
 export class ScheduleManagerService {
   private readonly logger = new Logger(ScheduleManagerService.name);
 
+  private readonly vocabulary: JobVocabulary;
+
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(QUEUE_NAMES.EVENTS)
-    private readonly eventsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.NOTIFICATIONS)
-    private readonly notificationsQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.WEBHOOKS) private readonly webhooksQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.AI_BACKGROUND)
-    private readonly aiBackgroundQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.BULK_OPS)
-    private readonly bulkOpsQueue: Queue,
-  ) {}
+    private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(JOB_VOCABULARY) vocabulary?: JobVocabulary,
+  ) {
+    this.vocabulary = vocabulary ?? buildJobVocabulary();
+  }
 
-  private getQueueForCategory(category: JobCategory): Queue | null {
-    const meta = JOB_CATEGORIES[category];
+  /** The queue a category runs on, from the merged job vocabulary (kernel and app categories alike). */
+  private getQueueForCategory(category: string): Queue | null {
+    const meta = this.vocabulary.categories[category];
     if (!meta) return null;
-    // queueMap is keyed by the queue NAMES — `meta.queue` is the source of
-    // truth (see job.types.ts) so we resolve the injected Queue instance via
-    // that lookup. Multiple categories may point to the same queue — the map
-    // handles that naturally.
-    const queueMap: Record<string, Queue> = {
-      [QUEUE_NAMES.EVENTS]: this.eventsQueue,
-      [QUEUE_NAMES.NOTIFICATIONS]: this.notificationsQueue,
-      [QUEUE_NAMES.WEBHOOKS]: this.webhooksQueue,
-      [QUEUE_NAMES.AI_BACKGROUND]: this.aiBackgroundQueue,
-      [QUEUE_NAMES.BULK_OPS]: this.bulkOpsQueue,
-    };
-    const queue = queueMap[meta.queue];
+    const queue = queueByName(this.moduleRef, meta.queue);
     if (!queue) {
       this.logger.warn(`No queue injected for category "${category}" (queue: ${meta.queue})`);
       return null;
@@ -68,7 +56,7 @@ export class ScheduleManagerService {
     });
 
     try {
-      await this.reloadSchedule(schedule.category as JobCategory, schedule.jobType);
+      await this.reloadSchedule(schedule.category, schedule.jobType);
     } catch (error) {
       this.logger.error(
         `Schedule ${id} updated in DB but failed to reload in BullMQ: ${error instanceof Error ? error.message : error}`,
@@ -79,7 +67,7 @@ export class ScheduleManagerService {
     return schedule;
   }
 
-  async reloadSchedule(category: JobCategory, jobType: string) {
+  async reloadSchedule(category: string, jobType: string) {
     const schedule = await this.prisma.jobSchedule.findUnique({
       where: { category_jobType: { category, jobType } },
     });

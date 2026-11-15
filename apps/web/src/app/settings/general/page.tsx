@@ -20,6 +20,7 @@ import { usePreferencesStore } from '@/features/platform/settings';
 import type { UserPreferences } from '@/features/platform/settings';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save, RotateCcw } from 'lucide-react';
+import { PageHeader } from '@/shared/components/page-chrome';
 
 export default function GeneralSettingsPage() {
   const { user } = useAuthStore();
@@ -98,10 +99,7 @@ export default function GeneralSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">General</h2>
-        <p className="text-sm text-muted-foreground">Make the platform yours</p>
-      </div>
+      <PageHeader title="General" subtitle="Make the platform yours" />
 
       {/* Display Formats */}
       <Card>

@@ -27,6 +27,11 @@ function redactWebhookData(data: unknown): unknown {
   return obj;
 }
 
+/** The delivery job id of one event to one subscription (BullMQ forbids `:` in a custom id). */
+export function webhookDeliveryJobId(eventId: string, subscriptionId: string): string {
+  return `webhook-${eventId}-${subscriptionId}`;
+}
+
 @Injectable()
 export class WebhookDispatcher {
   private readonly logger = new Logger(WebhookDispatcher.name);
@@ -89,14 +94,12 @@ export class WebhookDispatcher {
       await Promise.all(
         subscriptions.map(async (sub) => {
           try {
-            const log = await this.prisma.webhookDeliveryLog.create({
-              data: {
-                id: generateUuidV7(),
-                subscriptionId: sub.id,
-                event: event.event,
-                payload,
-              },
-            });
+            // Idempotent per event and subscription: the event reaches this dispatcher at least once (the
+            // outbox relay and the durable job retry can both send it again). The (subscription_id, event_id)
+            // unique index makes the lookup a keyed read and refuses a concurrent second row. A second dispatch
+            // reuses the first delivery's log row and job id; a delivery already finished is left alone.
+            const log = await this.findOrCreateLog(sub.id, event, payload);
+            if (!log) return;
 
             const jobPayload: WebhookDeliveryPayload = {
               subscriptionId: sub.id,
@@ -112,6 +115,8 @@ export class WebhookDispatcher {
                 causationId: event.id,
               }),
               {
+                // BullMQ ignores an add whose job id it still holds, so a second dispatch queues nothing new.
+                jobId: webhookDeliveryJobId(event.id, sub.id),
                 attempts: 3,
                 backoff: {
                   type: 'exponential',
@@ -133,13 +138,42 @@ export class WebhookDispatcher {
     }
   }
 
-  async deliverToSubscription(subscriptionId: string, eventName: string, data: unknown): Promise<void> {
+  /** The pending delivery log of this event to this subscription, written once; null when it already finished. */
+  private async findOrCreateLog(
+    subscriptionId: string,
+    event: DomainEvent,
+    payload: Prisma.InputJsonValue,
+  ): Promise<{ id: string } | null> {
+    const prior = await this.findLog(subscriptionId, event.id);
+    if (prior) return prior.deliveredAt || prior.failedAt ? null : prior;
+    try {
+      return await this.prisma.webhookDeliveryLog.create({
+        data: { id: generateUuidV7(), subscriptionId, eventId: event.id, event: event.event, payload },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      // A concurrent dispatch of the same event wrote the row first; continue with that one.
+      const winner = await this.findLog(subscriptionId, event.id);
+      if (!winner || winner.deliveredAt || winner.failedAt) return null;
+      return winner;
+    }
+  }
+
+  private findLog(subscriptionId: string, eventId: string) {
+    return this.prisma.webhookDeliveryLog.findUnique({
+      where: { subscriptionId_eventId: { subscriptionId, eventId } },
+      select: { id: true, deliveredAt: true, failedAt: true },
+    });
+  }
+
+  async deliverToSubscription(subscriptionId: string, eventName: string, data: unknown): Promise<string | null> {
     try {
       const sub = await this.prisma.webhookSubscription.findUnique({
         where: { id: subscriptionId },
         include: { tenant: { select: { tenantId: true } } },
       });
-      if (!sub || !sub.active) return;
+      if (!sub || !sub.active) return null;
 
       // Outbound payloads ship the public tenant slug, not the internal Int PK.
       const payload = {
@@ -165,9 +199,11 @@ export class WebhookDispatcher {
           backoff: { type: 'exponential', delay: 30_000 },
         },
       );
+      return log.id;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`deliverToSubscription failed for subscription ${subscriptionId} event ${eventName}: ${msg}`);
+      return null;
     }
   }
 }

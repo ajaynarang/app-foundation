@@ -10,6 +10,9 @@
 
 # Generated
 **/prisma/migrations/
+# The committed OpenAPI documents: the generator writes them byte for byte (swagger-completeness.spec.ts)
+apps/backend/openapi.json
+apps/backend/public-openapi.json
 **/*.generated.*
 apps/backend/src/generated/
 packages/shared-types/src/generated/

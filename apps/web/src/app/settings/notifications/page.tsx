@@ -23,6 +23,7 @@ import { useNotificationPreferenceOptions } from '@/features/notifications/hooks
 import type { NotificationChannelRule, NotificationPreferenceChannel } from '@app/shared-types';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { Save, RotateCcw } from 'lucide-react';
+import { PageHeader } from '@/shared/components/page-chrome';
 
 /** Copy per category. Which categories appear, and which channels, comes from the server's policy. */
 const CATEGORY_COPY: Record<string, { label: string; description: string }> = {
@@ -159,10 +160,7 @@ export default function NotificationsSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Notifications</h2>
-        <p className="text-sm text-muted-foreground">How and when the Assistant gets your attention</p>
-      </div>
+      <PageHeader title="Notifications" subtitle="How and when the Assistant gets your attention" />
 
       {/* Notification Channels — table grid like alerts page */}
       <Card>

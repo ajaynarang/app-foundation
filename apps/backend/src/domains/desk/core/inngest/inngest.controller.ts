@@ -5,6 +5,7 @@ import { serve } from 'inngest/express';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { createDeskSchedulerFunction } from '../scheduler/desk-scheduler.function';
 import { InngestClientService } from './inngest.client';
+import { ApiExcludeController } from '@nestjs/swagger';
 
 /**
  * Exposes `GET/POST/PUT /api/v1/inngest` — the single HTTP handler that
@@ -39,6 +40,8 @@ import { InngestClientService } from './inngest.client';
  *     but before `app.listen()`, so the Inngest client is fully set up
  *     AND the handler is fresh per process start.
  */
+// The Inngest SDK owns this wire format (see PROVIDER_ROUTES in api-contract.allowlist.json): not in the OpenAPI document.
+@ApiExcludeController()
 @Controller('inngest')
 export class InngestController implements OnApplicationBootstrap {
   private readonly logger = new Logger(InngestController.name);

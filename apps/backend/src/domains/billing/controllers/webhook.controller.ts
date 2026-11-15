@@ -2,19 +2,21 @@
  * Webhook Controller
  *
  * Receives webhook events from payment providers (Stripe).
- * Must be @Public() (no JWT auth) and @SkipThrottle() since webhooks
- * are server-to-server calls that arrive at unpredictable rates.
+ * Must be @Public() (no JWT auth) with a generous @Throttle (GENEROUS_THROTTLE): webhooks are
+ * server-to-server calls that arrive in bursts, and a signed route still gets a ceiling.
  *
  * IMPORTANT: Uses raw body for webhook signature verification.
  * The raw body must be preserved before JSON parsing.
  */
 import { Controller, Post, Req, Headers, HttpCode, HttpStatus, Logger, BadRequestException } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '@appshore/platform/shared/http/edge-throttle';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
 import { BillingEventsHandler } from '../events/billing-events.handler';
 import { BillingEventType } from '../adapters/payment-provider.interface';
 import { Request } from 'express';
+import { ApiOperation } from '@nestjs/swagger';
 
 @Controller('webhooks')
 export class WebhookController {
@@ -33,8 +35,11 @@ export class WebhookController {
    * The provider will retry on non-2xx responses.
    */
   @Public()
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @Post('billing')
+  @ApiOperation({
+    summary: 'Receive a payment-provider (Stripe) webhook: signature-verified, 400 on a missing or invalid signature',
+  })
   @HttpCode(HttpStatus.OK)
   async handleBillingWebhook(@Req() req: Request, @Headers('stripe-signature') signature: string) {
     if (!signature) {

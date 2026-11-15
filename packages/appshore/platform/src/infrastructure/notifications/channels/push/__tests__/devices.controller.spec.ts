@@ -25,7 +25,8 @@ describe('NotificationDevicesController', () => {
     const result = await controller.register(user, { token: 'tok-1', platform: 'android' });
 
     expect(fcmService.registerDevice).toHaveBeenCalledWith(USER_DB_ID, TENANT_DB_ID, 'tok-1', DevicePlatform.ANDROID);
-    expect(result).toEqual({ message: 'Device registered for push notifications' });
+    // 204: nothing to return.
+    expect(result).toBeUndefined();
   });
 
   it('maps ios to the IOS platform enum', async () => {
@@ -38,7 +39,7 @@ describe('NotificationDevicesController', () => {
     const result = await controller.remove(user, { token: 'tok-1' });
 
     expect(fcmService.removeDevice).toHaveBeenCalledWith(USER_DB_ID, 'tok-1');
-    expect(result).toEqual({ message: 'Device removed' });
+    expect(result).toBeUndefined();
   });
 
   it('is open to every workspace role — members register their own phones', () => {

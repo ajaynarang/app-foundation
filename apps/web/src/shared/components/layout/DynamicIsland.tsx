@@ -73,9 +73,9 @@ export function DynamicIsland({
                   'text-xs font-medium tracking-tight',
                   isOnTrial
                     ? daysLeftInTrial !== null && daysLeftInTrial <= 3
-                      ? 'text-critical'
-                      : 'text-caution'
-                    : 'text-info',
+                      ? 'text-critical-text'
+                      : 'text-caution-text'
+                    : 'text-info-text',
                 )}
               >
                 {planLabel}

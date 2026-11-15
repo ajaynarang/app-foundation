@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@app/ui/components
 import { Button } from '@app/ui/components/ui/button';
 import { Label } from '@app/ui/components/ui/label';
 import { Slider } from '@app/ui/components/ui/slider';
-import { RadioGroup, RadioGroupItem } from '@/shared/components/ui/radio-group';
+import { RadioGroup, RadioGroupItem } from '@app/ui/components/ui/radio-group';
 import { Settings, Check, Mic } from 'lucide-react';
 import { getUserPreferences, updateUserPreferences } from '../../settings/api';
 import { getVoiceStatus } from '../api';

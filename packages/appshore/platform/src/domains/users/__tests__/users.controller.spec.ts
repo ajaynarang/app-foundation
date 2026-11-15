@@ -1,3 +1,5 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { UserListQueryDto } from '../dto/user-list-query.dto';
 import { UsersController } from '../users.controller';
 
 describe('UsersController', () => {
@@ -8,7 +10,7 @@ describe('UsersController', () => {
 
   beforeEach(() => {
     service = {
-      getAllUsers: jest.fn().mockResolvedValue([]),
+      listUsers: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getUser: jest.fn().mockResolvedValue({ userId: 'usr_1' }),
       createUser: jest.fn().mockResolvedValue({ userId: 'usr_new' }),
       updateUser: jest.fn().mockResolvedValue({ userId: 'usr_1' }),
@@ -18,9 +20,19 @@ describe('UsersController', () => {
     controller = new UsersController(service);
   });
 
-  it('getAllUsers delegates to service with currentUser', async () => {
-    await controller.getAllUsers(currentUser);
-    expect(service.getAllUsers).toHaveBeenCalledWith('tenant_abc', currentUser);
+  it("getAllUsers lists the caller's workspace as a cursor list", async () => {
+    const query = await readQueryDto(UserListQueryDto, { q: ' ada ', limit: '10', cursor: 'abc' });
+    const page = await controller.getAllUsers(currentUser, query);
+    expect(service.listUsers).toHaveBeenCalledWith(
+      'tenant_abc',
+      expect.objectContaining({ q: 'ada', limit: 10, cursor: 'abc' }),
+    );
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
+  });
+
+  it('getAllUsers answers 400 on offset paging or a limit that is not a number', async () => {
+    await expect(readQueryDto(UserListQueryDto, { offset: '10' })).rejects.toMatchObject({ status: 400 });
+    await expect(readQueryDto(UserListQueryDto, { limit: 'abc' })).rejects.toMatchObject({ status: 400 });
   });
 
   it('getUser delegates to service', async () => {

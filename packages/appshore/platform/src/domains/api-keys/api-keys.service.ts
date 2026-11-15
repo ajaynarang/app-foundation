@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '../../infrastructure/events/outbox.service';
 import { FOUNDATION_DOMAIN_EVENTS as DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events/foundation-events';
 import { createHash } from 'crypto';
 import { nanoid } from 'nanoid';
@@ -8,7 +8,15 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
 import { TenantApiKeyListItemDto } from './dto/list-api-keys.dto';
 import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
-import { AgentScope, NEVER_EXTERNAL_SCOPES } from '@app/shared-types';
+import { AgentScope, NEVER_EXTERNAL_SCOPES, type CursorList } from '@app/shared-types';
+import type { Prisma } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
 
 /**
  * IPv4 CIDR containment check. Returns true when `ip` is inside `cidr`.
@@ -55,13 +63,28 @@ export interface ValidateKeyContext {
   ip?: string;
 }
 
+/**
+ * Newest first. An API key has no public id of its own: its numeric id is already its address
+ * (`/api-keys/:api_key_id`, listed in the id-boundary allowlist), so the cursor carries that and nothing new.
+ * The key hash is unique too, but it is the stored secret and never goes on the wire.
+ */
+const API_KEY_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+const API_KEY_ORDER: Prisma.ApiKeyOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }];
+
+/** `GET /api-keys` and `GET /api-keys/admin/tenant`. */
+export interface ApiKeyListQuery {
+  limit?: number;
+  cursor?: string;
+}
+
 @Injectable()
 export class ApiKeysService {
   private readonly logger = new Logger(ApiKeysService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: DomainEventService,
+    // Events commit with the write (ADR "Outbox and deadlines").
+    private readonly outbox: OutboxService,
   ) {}
 
   async create(userId: number, dto: CreateApiKeyDto): Promise<ApiKeyDto> {
@@ -98,41 +121,59 @@ export class ApiKeysService {
     return this.toDto(apiKey, plaintext);
   }
 
-  async findAll(userId: number): Promise<ApiKeyDto[]> {
-    const keys = await this.prisma.apiKey.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-    });
-    return keys.map((k) => this.toDto(k));
+  /** The caller's own live keys, newest first, as a cursor list. */
+  async findAll(userId: number, query: ApiKeyListQuery = {}): Promise<CursorList<ApiKeyDto>> {
+    const take = clampCursorLimit(query.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = query.cursor ? keysetWhere({ ...API_KEY_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.ApiKeyWhereInput = { userId, revokedAt: null };
+    const [rows, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: API_KEY_ORDER,
+        take: take + 1,
+      }),
+      this.prisma.apiKey.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    return { items: page.items.map((k) => this.toDto(k)), nextCursor: page.nextCursor, total };
   }
 
   /**
-   * List every API key in a tenant, scoped via `user.tenantId`. Used by the
-   * the Desk admin view (Phase D). The plaintext key is not stored, so it cannot be returned.
+   * Every API key in a tenant, scoped via `user.tenantId`, newest first, as a cursor list. Used by the
+   * admin view. The plaintext key is not stored, so it cannot be returned.
    */
-  async listForTenant(tenantId: number): Promise<TenantApiKeyListItemDto[]> {
-    const keys = await this.prisma.apiKey.findMany({
-      where: { user: { tenantId } },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        keyPrefix: true,
-        keyLast4: true,
-        name: true,
-        userId: true,
-        scopes: true,
-        ipAllowlist: true,
-        rateLimitPerMinute: true,
-        isWriteEnabled: true,
-        isActive: true,
-        lastUsedAt: true,
-        requestCount: true,
-        createdAt: true,
-        expiresAt: true,
-        revokedAt: true,
-      },
-    });
-    return keys.map((k) => ({
+  async listForTenant(tenantId: number, query: ApiKeyListQuery = {}): Promise<CursorList<TenantApiKeyListItemDto>> {
+    const take = clampCursorLimit(query.limit);
+    const keyset = query.cursor ? keysetWhere({ ...API_KEY_KEYSET, cursor: query.cursor }) : undefined;
+    const scope: Prisma.ApiKeyWhereInput = { user: { tenantId } };
+    const [rows, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where: keyset ? { AND: [scope, keyset] } : scope,
+        orderBy: API_KEY_ORDER,
+        take: take + 1,
+        select: {
+          id: true,
+          keyPrefix: true,
+          keyLast4: true,
+          name: true,
+          userId: true,
+          scopes: true,
+          ipAllowlist: true,
+          rateLimitPerMinute: true,
+          isWriteEnabled: true,
+          isActive: true,
+          lastUsedAt: true,
+          requestCount: true,
+          createdAt: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      }),
+      this.prisma.apiKey.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id));
+    const items = page.items.map((k) => ({
       id: k.id,
       name: k.name,
       keyMasked: maskKey(k),
@@ -148,6 +189,7 @@ export class ApiKeysService {
       expiresAt: k.expiresAt?.toISOString() ?? null,
       revokedAt: k.revokedAt?.toISOString() ?? null,
     }));
+    return { items, nextCursor: page.nextCursor, total };
   }
 
   async revoke(id: number, userId: number): Promise<void> {
@@ -162,47 +204,59 @@ export class ApiKeysService {
   }
 
   /** Tenant-scoped revoke — used by tenant-admin flows (Desk). */
-  async revokeForTenant(id: number, tenantId: number): Promise<void> {
+  async revokeForTenant(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
-    await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { revokedAt: new Date(), isActive: false },
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { revokedAt: new Date(), isActive: false },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_REVOKED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_REVOKED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
-    });
+    return this.toDto(updated);
   }
 
   /** Toggle isActive=false. No secret change. Reversible via resume(). */
-  async pause(id: number, tenantId: number): Promise<void> {
+  async pause(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
     if (apiKey.revokedAt) {
-      throw new BadRequestException('Cannot pause a revoked key');
+      throw invalidState('A revoked key cannot be paused');
     }
-    await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { isActive: false },
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { isActive: false },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_PAUSED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_PAUSED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
-    });
+    return this.toDto(updated);
   }
 
-  async resume(id: number, tenantId: number): Promise<void> {
+  async resume(id: number, tenantId: number): Promise<ApiKeyDto> {
     const apiKey = await this.findTenantKeyOrThrow(id, tenantId);
     if (apiKey.revokedAt) {
-      throw new BadRequestException('Cannot resume a revoked key');
+      throw invalidState('A revoked key cannot be resumed');
     }
-    await this.prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { isActive: true },
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: apiKey.id },
+        data: { isActive: true },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_RESUMED, String(tenantId), {
+        apiKeyId: apiKey.id,
+        name: apiKey.name,
+      });
+      return row;
     });
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_RESUMED, String(tenantId), {
-      apiKeyId: apiKey.id,
-      name: apiKey.name,
-    });
+    return this.toDto(updated);
   }
 
   /**
@@ -213,16 +267,16 @@ export class ApiKeysService {
   async rotate(id: number, tenantId: number): Promise<{ apiKey: ApiKeyDto; plaintextKey: string }> {
     const existing = await this.findTenantKeyOrThrow(id, tenantId);
     if (existing.revokedAt) {
-      throw new BadRequestException('Cannot rotate a revoked key');
+      throw invalidState('A revoked key cannot be rotated');
     }
     const { plaintext: plaintextKey, ...stored } = mintKey();
 
-    const [, created] = await this.prisma.$transaction([
-      this.prisma.apiKey.update({
+    const created = await this.outbox.transaction(async (tx, emit) => {
+      await tx.apiKey.update({
         where: { id: existing.id },
         data: { revokedAt: new Date(), isActive: false },
-      }),
-      this.prisma.apiKey.create({
+      });
+      const row = await tx.apiKey.create({
         data: {
           ...stored,
           name: existing.name,
@@ -234,13 +288,13 @@ export class ApiKeysService {
           isActive: true,
           expiresAt: existing.expiresAt,
         },
-      }),
-    ]);
-
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_ROTATED, String(tenantId), {
-      oldApiKeyId: existing.id,
-      newApiKeyId: created.id,
-      name: existing.name,
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_ROTATED, String(tenantId), {
+        oldApiKeyId: existing.id,
+        newApiKeyId: row.id,
+        name: existing.name,
+      });
+      return row;
     });
 
     return {
@@ -257,7 +311,7 @@ export class ApiKeysService {
   async updateScopes(id: number, tenantId: number, dto: UpdateApiKeyScopesDto): Promise<ApiKeyDto> {
     const existing = await this.findTenantKeyOrThrow(id, tenantId);
     if (existing.revokedAt) {
-      throw new BadRequestException('Cannot update scopes on a revoked key');
+      throw invalidState('A revoked key cannot change its scopes');
     }
 
     this.assertScopesAreGrantable(dto.scopes);
@@ -270,20 +324,22 @@ export class ApiKeysService {
       );
     }
 
-    const updated = await this.prisma.apiKey.update({
-      where: { id: existing.id },
-      data: {
+    const updated = await this.outbox.transaction(async (tx, emit) => {
+      const row = await tx.apiKey.update({
+        where: { id: existing.id },
+        data: {
+          scopes: dto.scopes,
+          ipAllowlist: nextIpAllowlist,
+          rateLimitPerMinute: dto.rateLimitPerMinute ?? existing.rateLimitPerMinute,
+          isWriteEnabled: writeEnabled,
+        },
+      });
+      await emit(DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
+        apiKeyId: row.id,
+        name: row.name,
         scopes: dto.scopes,
-        ipAllowlist: nextIpAllowlist,
-        rateLimitPerMinute: dto.rateLimitPerMinute ?? existing.rateLimitPerMinute,
-        isWriteEnabled: writeEnabled,
-      },
-    });
-
-    await this.events.emit(DOMAIN_EVENTS.API_KEY_SCOPES_UPDATED, String(tenantId), {
-      apiKeyId: updated.id,
-      name: updated.name,
-      scopes: dto.scopes,
+      });
+      return row;
     });
 
     return this.toDto(updated);

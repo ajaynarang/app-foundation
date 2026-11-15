@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import { AccessToken, AgentDispatchClient, RoomAgentDispatch, RoomConfiguration } from 'livekit-server-sdk';
@@ -64,10 +64,11 @@ export class VoiceService {
       where: { conversationId },
     });
     if (!conversation) {
-      throw new NotFoundException(`Conversation ${conversationId} not found`);
+      throw new NotFoundException('Conversation not found');
     }
     if (conversation.userId !== user.id || conversation.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+      // Someone else's conversation answers as a missing one: a 403 would confirm it exists.
+      throw new NotFoundException('Conversation not found');
     }
 
     // Fetch user's voice preferences

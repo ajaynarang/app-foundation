@@ -9,6 +9,7 @@ const config: Config = {
     './src/shared/**/*.{js,ts,jsx,tsx,mdx}',
     './src/features/**/*.{js,ts,jsx,tsx,mdx}',
     '../../packages/ui/src/**/*.{ts,tsx}',
+    '../../packages/appshore/web-core/src/shared/list/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {

@@ -6,7 +6,7 @@ import { DeskStepWriter } from '../core/episode/desk-step-writer.service';
 import { DeskMemoryReinforcer } from '../core/memory/desk-memory-reinforcer.service';
 import { DeskMemoryWriterService } from '../core/memory/desk-memory-writer.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../platform-glue/events/domain-events.constants';
 
 import { TERMINAL_STATUS_BY_OUTCOME, type DeskOutcome } from './outcomes';
@@ -33,7 +33,7 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
   const stepWriter = app.get(DeskStepWriter);
   const memoryWriter = app.get(DeskMemoryWriterService);
   const reinforcer = app.get(DeskMemoryReinforcer);
-  const events = app.get(DomainEventService);
+  const outbox = app.get(OutboxService);
 
   const step = await stepWriter.open({
     episodeId: input.episodeId,
@@ -45,23 +45,33 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
       input.terminalStatus ?? TERMINAL_STATUS_BY_OUTCOME[input.outcome as DeskOutcome] ?? 'RESOLVED';
     const closedAt = new Date();
 
-    const episode = await prisma.deskEpisode.update({
-      where: { id: input.episodeId },
-      data: {
+    // Episode closed — the Desk UI refreshes the Needs-you + Handled lists and the handoff counts live (SSE).
+    // The event commits with the status (ADR "Outbox and deadlines"); publishing never breaks the close path.
+    const episode = await outbox.transaction(async (tx, emit) => {
+      const row = await tx.deskEpisode.update({
+        where: { id: input.episodeId },
+        data: {
+          status: terminalStatus,
+          outcome: input.outcome,
+          outcomeNote: input.outcomeNote ?? null,
+          closedAt,
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          ownerAgentId: true,
+          entityType: true,
+          entityId: true,
+          retrievedMemoryIds: true,
+          responsibility: { select: { key: true } },
+        },
+      });
+      await emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, row.tenantId, {
+        tenantId: row.tenantId,
+        episodeId: row.id,
         status: terminalStatus,
-        outcome: input.outcome,
-        outcomeNote: input.outcomeNote ?? null,
-        closedAt,
-      },
-      select: {
-        id: true,
-        tenantId: true,
-        ownerAgentId: true,
-        entityType: true,
-        entityId: true,
-        retrievedMemoryIds: true,
-        responsibility: { select: { key: true } },
-      },
+      });
+      return row;
     });
 
     if (input.transition) {
@@ -108,17 +118,6 @@ export async function closeStep(input: CloseInput): Promise<CloseOutput> {
         closedAt: closedAt.toISOString(),
       },
     });
-
-    // Episode closed — tell the Desk UI to refresh the Needs-you + Handled
-    // lists and the handoff counts live (SSE). Best-effort: a failed emit must
-    // never break the operational close path.
-    await events
-      .emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, episode.tenantId, {
-        tenantId: episode.tenantId,
-        episodeId: episode.id,
-        status: terminalStatus,
-      })
-      .catch((err) => logger.warn(`DESK_EPISODE_CHANGED emit failed for ${episode.id}: ${describeError(err)}`));
 
     return {
       episodeId: episode.id,

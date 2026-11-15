@@ -28,10 +28,10 @@ const ROLE_ABBREV: Record<string, string> = {
 };
 
 const ROLE_COLOR: Record<string, string> = {
-  OWNER: 'bg-amber-600',
-  ADMIN: 'bg-blue-600',
-  MEMBER: 'bg-emerald-600',
-  SUPER_ADMIN: 'bg-red-600',
+  OWNER: 'bg-caution text-caution-foreground',
+  ADMIN: 'bg-info text-info-foreground',
+  MEMBER: 'bg-success text-success-foreground',
+  SUPER_ADMIN: 'bg-critical text-critical-foreground',
 };
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -177,8 +177,8 @@ function DevSwitcherPalette() {
           <div className="p-6 text-center">
             <div className="mx-auto mb-3 flex items-center justify-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-info" />
               </span>
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
                 Maintenance Mode
@@ -368,7 +368,7 @@ function TenantTab({
     >
       <span className="shrink-0 text-muted-foreground">{icon}</span>
       <span className="flex-1 truncate font-medium">{label}</span>
-      {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />}
+      {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-success shrink-0" />}
       <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0 font-mono">
         {count}
       </Badge>
@@ -400,7 +400,7 @@ function DevUserItem({
   const identifier = user.email || user.phone || user.userId;
   const roleAbbrev = ROLE_ABBREV[user.role] ?? user.role.slice(0, 4);
   const initials = getInitials(user.firstName, user.lastName);
-  const avatarColor = ROLE_COLOR[user.role] ?? 'bg-gray-600';
+  const avatarColor = ROLE_COLOR[user.role] ?? 'bg-muted-foreground text-background';
 
   return (
     <div
@@ -425,7 +425,7 @@ function DevUserItem({
       {/* Avatar initials */}
       <div
         className={cn(
-          'h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-semibold',
+          'h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-semibold',
           avatarColor,
         )}
       >
@@ -456,7 +456,7 @@ function DevUserItem({
         variant="ghost"
         size="icon"
         onClick={onNewTab}
-        className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         title="Open in new tab"
       >
         <ExternalLink className="h-3.5 w-3.5" />

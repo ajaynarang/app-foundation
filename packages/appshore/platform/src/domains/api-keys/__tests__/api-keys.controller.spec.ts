@@ -11,9 +11,9 @@ describe('ApiKeysController', () => {
   beforeEach(() => {
     service = {
       create: jest.fn().mockResolvedValue({ id: 501, key: 'sk_staging_abc' }),
-      findAll: jest.fn().mockResolvedValue([]),
+      findAll: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       revoke: jest.fn().mockResolvedValue(undefined),
-      listForTenant: jest.fn().mockResolvedValue([]),
+      listForTenant: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       rotate: jest.fn().mockResolvedValue({
         apiKey: { id: 501 },
         plaintextKey: 'sk_live_new',
@@ -38,8 +38,9 @@ describe('ApiKeysController', () => {
   });
 
   it('findAll delegates to service', async () => {
-    await controller.findAll(req);
-    expect(service.findAll).toHaveBeenCalledWith(1);
+    const page = await controller.findAll(req, { limit: 10, cursor: 'abc' });
+    expect(service.findAll).toHaveBeenCalledWith(1, { limit: 10, cursor: 'abc' });
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });
 
   it('revoke delegates to service', async () => {
@@ -48,9 +49,9 @@ describe('ApiKeysController', () => {
   });
 
   it('listForTenant resolves tenantId and delegates', async () => {
-    await controller.listForTenant(authUser);
+    await controller.listForTenant(authUser, { limit: 10 });
     expect(prisma.tenant.findUnique).toHaveBeenCalled();
-    expect(service.listForTenant).toHaveBeenCalledWith(7);
+    expect(service.listForTenant).toHaveBeenCalledWith(7, { limit: 10 });
   });
 
   it('rotate resolves tenantId and delegates', async () => {

@@ -1,8 +1,9 @@
-import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, NestMiddleware, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@appshore/db';
+import { writeErrorEnvelope } from '../../shared/filters/error-envelope';
 
 @Injectable()
 export class BullBoardAuthMiddleware implements NestMiddleware {
@@ -24,7 +25,7 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
     const token = this.extractToken(req);
 
     if (!token) {
-      res.status(401).json({ statusCode: 401, message: 'Unauthorized' });
+      writeErrorEnvelope(res, req, new UnauthorizedException());
       return;
     }
 
@@ -35,10 +36,7 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
 
       if (payload.role !== UserRole.SUPER_ADMIN) {
         this.logger.warn(`Bull Board access denied: role '${payload.role}' is not SUPER_ADMIN`);
-        res.status(403).json({
-          statusCode: 403,
-          message: 'Forbidden: SUPER_ADMIN required',
-        });
+        writeErrorEnvelope(res, req, new ForbiddenException('Only a platform super admin can open the queue board'));
         return;
       }
 
@@ -46,7 +44,7 @@ export class BullBoardAuthMiddleware implements NestMiddleware {
     } catch (err: unknown) {
       const name = err instanceof Error ? err.constructor.name : 'UnknownError';
       this.logger.warn(`Bull Board auth failed: ${name}`);
-      res.status(401).json({ statusCode: 401, message: 'Unauthorized' });
+      writeErrorEnvelope(res, req, new UnauthorizedException());
     }
   }
 

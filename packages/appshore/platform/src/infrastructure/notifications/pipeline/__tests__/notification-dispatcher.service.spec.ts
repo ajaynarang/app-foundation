@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { DeliveryChannel, NotificationCategory, NotificationType } from '@appshore/db';
+import { DeliveryChannel, NotificationCategory } from '@appshore/db';
+import { PlatformNotificationType } from '@app/shared-types';
 import { NotificationDispatcherService } from '../notification-dispatcher.service';
 import { ChannelResolutionService } from '../channel-resolution.service';
 import { NotificationDeliveryService } from '../delivery.service';
@@ -11,7 +12,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { PlansService } from '../../../../domains/plans/plans.service';
 import { FeatureFlagsService } from '../../../../domains/feature-flags/feature-flags.service';
 
-const TYPE = NotificationType.USER_INVITATION;
+const TYPE = PlatformNotificationType.USER_INVITATION;
 const plan = (primary: DeliveryChannel[]) => ({ primary, fallback: [], suppressed: {}, suppressedByQuietHours: false });
 
 describe('NotificationDispatcherService', () => {

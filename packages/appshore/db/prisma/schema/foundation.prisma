@@ -195,6 +195,7 @@ model Tenant {
   pushSubscriptions           PushSubscription[]
   members                     WorkspaceMember[]
   feedback                    Feedback[]
+  deadlines                   Deadline[]
 
   // Billing & wallet
   billingCustomer      BillingCustomer?
@@ -220,6 +221,7 @@ model Tenant {
   // Serves the every-minute scheduler heartbeat scan for tenants with the
   // master Desk-autonomy switch on (desk-scheduler.processor.ts).
   @@index([deskScheduleEnabled])
+  @@index([companyName, tenantId]) // keyset: GET /tenants
   @@map("tenants")
 }
 
@@ -300,6 +302,8 @@ model User {
   @@index([isActive])
   @@index([deletedAt])
   @@index([deletedBy])
+  @@index([tenantId, createdAt, userId]) // keyset: GET /users
+  @@index([tenantId, lastName, userId]) // keyset: GET /desk/agents/eligible-supervisors
   @@map("users")
 }
 
@@ -394,6 +398,8 @@ enum LoginFailReason {
 
 model LoginEvent {
   id         Int              @id @default(autoincrement())
+  /// Keyset tiebreak of the login-activity lists. Writers pass a UUIDv7 so the unique index fills in order.
+  publicId   String           @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   userId     Int              @map("user_id")
   tenantId   Int?             @map("tenant_id")
   status     LoginEventStatus
@@ -446,6 +452,7 @@ model ApiKey {
 
   @@index([userId])
   @@index([userId, revokedAt])
+  @@index([userId, createdAt, id]) // keyset: GET /api-keys
   @@map("api_keys")
 }
 
@@ -487,6 +494,7 @@ model UserInvitation {
   @@index([status])
   @@index([invitedBy])
   @@index([acceptedByUserId])
+  @@index([tenantId, createdAt, invitationId]) // keyset: GET /invitations
   @@map("user_invitations")
 }
 
@@ -575,7 +583,7 @@ model IntegrationConfig {
 
   // Plaintext QB realm ID for fast webhook routing (not sensitive)
   /// Vendor account / workspace identifier (e.g. a QuickBooks realm, a Xero org).
-  realmId String? @map("realm_id") @db.VarChar(30)
+  realmId String? @map("realm_id") @db.VarChar(100)
 
   // Sync settings
   syncIntervalSeconds Int? @map("sync_interval_seconds")
@@ -683,23 +691,6 @@ model FeatureFlag {
 // NOTIFICATION MODELS
 // ============================================================================
 
-enum NotificationType {
-  // Platform
-  USER_INVITATION
-  TENANT_REGISTRATION_CONFIRMATION
-  TENANT_APPROVED
-  TENANT_REJECTED
-
-  // System
-  INTEGRATION_SYNC_COMPLETED
-  INTEGRATION_SYNC_FAILED
-  SETTINGS_UPDATED
-
-  // Team
-  USER_JOINED
-  ROLE_CHANGED
-}
-
 enum NotificationChannel {
   EMAIL
   SMS // Future
@@ -724,7 +715,9 @@ model Notification {
   notificationId String @unique @default(cuid()) @map("notification_id") @db.VarChar(50)
 
   // Notification details
-  type      NotificationType
+  /// A string, not an enum: PLATFORM_NOTIFICATION_TYPES (@app/shared-types) plus the app's registry
+  /// (platform-glue/notifications/notification-types.ts). A product adds a type without a schema change.
+  type      String              @db.VarChar(60)
   channel   NotificationChannel @default(EMAIL)
   recipient String              @db.VarChar(255)
   status    NotificationStatus  @default(PENDING)
@@ -770,6 +763,7 @@ model Notification {
   @@index([userId, readAt, dismissedAt])
   @@index([userId, category, createdAt])
   @@index([type, userId, tenantId, createdAt], map: "idx_notification_grouping")
+  @@index([userId, createdAt, notificationId]) // keyset: GET /notifications
   @@map("notifications")
 }
 
@@ -829,7 +823,8 @@ model NotificationDelivery {
   id       String           @id @db.Uuid
   tenantId Int              @map("tenant_id")
   userId   Int              @map("user_id")
-  type     NotificationType
+  /// The notification type delivered: a string from the same registry as Notification.type.
+  type     String           @db.VarChar(60)
   channel  DeliveryChannel
   status   DeliveryStatus
 
@@ -846,14 +841,14 @@ model NotificationDelivery {
   readAt      DateTime? @map("read_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
+  /// Webhook lookup; NULLs are distinct so channels without a provider id never collide.
+  @@unique([channel, providerMessageId])
   /// Support lookup by user, newest first — across every workspace they belong to.
   @@index([userId, createdAt])
   /// Support lookup by tenant, newest first.
   @@index([tenantId, createdAt])
   /// Retention sweep and per-day status counts.
   @@index([createdAt])
-  /// Webhook lookup; NULLs are distinct so channels without a provider id never collide.
-  @@unique([channel, providerMessageId])
   @@map("notification_deliveries")
 }
 
@@ -869,10 +864,10 @@ model WhatsAppConsent {
   id     Int @id @default(autoincrement())
   userId Int @unique @map("user_id")
 
-  optedInAt  DateTime? @map("opted_in_at") @db.Timestamptz
-  optedOutAt DateTime? @map("opted_out_at") @db.Timestamptz
+  optedInAt  DateTime?             @map("opted_in_at") @db.Timestamptz
+  optedOutAt DateTime?             @map("opted_out_at") @db.Timestamptz
   /// Where the LAST change came from — an inbound STOP outranks nothing, it just records.
-  source WhatsAppConsentSource
+  source     WhatsAppConsentSource
 
   /// Marketing is a separate yes: Meta prices and caps it separately.
   marketingOptedInAt  DateTime? @map("marketing_opted_in_at") @db.Timestamptz
@@ -1049,6 +1044,8 @@ enum JobStatus {
 
 model Job {
   id           Int       @id @default(autoincrement()) @map("id")
+  /// Keyset tiebreak of the job list. Writers pass a UUIDv7 so the unique index fills in order.
+  publicId     String    @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   tenantId     Int       @map("tenant_id")
   submittedBy  Int?      @map("submitted_by")
   category     String    @map("category") @db.VarChar(30)
@@ -1078,6 +1075,7 @@ model Job {
   @@index([submittedBy, status])
   @@index([tenantId, inputHash])
   @@index([tenantId, category, createdAt], map: "jobs_tenant_category_created")
+  @@index([createdAt, publicId]) // keyset: GET /admin/jobs
   @@map("jobs")
 }
 
@@ -1251,6 +1249,7 @@ model WebhookSubscription {
   deliveryLogs WebhookDeliveryLog[]
 
   @@index([tenantId, active])
+  @@index([tenantId, active, createdAt, id]) // keyset: GET /webhooks
   @@map("webhook_subscriptions")
 }
 
@@ -1261,6 +1260,10 @@ model WebhookDeliveryLog {
   subscriptionId String    @map("subscription_id")
   event          String    @db.VarChar(100)
   payload        Json      @db.JsonB
+  /// The domain event this delivery carries (`payload.id`), so a second dispatch of one event to one
+  /// subscription finds the first delivery by key and the unique index refuses a concurrent duplicate.
+  /// Null for a test delivery (`deliverToSubscription`), which carries no domain event.
+  eventId        String?   @map("event_id") @db.VarChar(64)
   responseStatus Int?      @map("response_status")
   responseBody   String?   @map("response_body") @db.Text
   attempts       Int       @default(0)
@@ -1271,6 +1274,8 @@ model WebhookDeliveryLog {
   subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, createdAt])
+  @@index([subscriptionId, createdAt, id]) // keyset: GET /webhooks/:id/logs
+  @@unique([subscriptionId, eventId]) // idempotent dispatch: one delivery per event per subscription
   @@map("webhook_delivery_logs")
 }
 
@@ -1297,7 +1302,80 @@ model DomainEventLog {
   @@index([tenantId, event])
   @@index([tenantId, aggregateType, aggregateId])
   @@index([correlationId])
+  @@index([createdAt, id]) // keyset: GET /admin/events
   @@map("domain_event_log")
+}
+
+/// Transactional outbox (ADR "Outbox and deadlines"). One row per domain event,
+/// written in the SAME transaction as the change it describes, so an event exists
+/// if and only if its change committed. `id` is the event's own UUIDv7: the durable
+/// job id, the `domain_event_log` row and webhook deliveries all carry it. Published
+/// right after commit by OutboxService; anything left unpublished (a crash, an
+/// unreachable Redis) is picked up by the relay tick. Published rows are purged
+/// after 7 days. `tenantId` is the event's tenant as `DomainEvent` carries it (a
+/// numeric id as text, a slug, or 'global'), so there is no FK.
+model OutboxEvent {
+  id             String    @id @db.Uuid
+  event          String    @map("event") @db.VarChar(100)
+  tenantId       String    @map("tenant_id") @db.VarChar(100)
+  data           Json      @db.JsonB
+  actorId        String?   @map("actor_id") @db.VarChar(100)
+  actorType      String?   @map("actor_type") @db.VarChar(20)
+  actorLabel     String?   @map("actor_label") @db.VarChar(255)
+  /// Reserved for the client behind an agent actor. Nullable and unused until
+  /// machine identity lands; kept now so that work needs no migration.
+  actorAgent     Json?     @map("actor_agent") @db.JsonB
+  correlationId  String?   @map("correlation_id") @db.VarChar(50)
+  causationId    String?   @map("causation_id") @db.VarChar(50)
+  occurredAt     DateTime  @map("occurred_at") @db.Timestamptz
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  /// Relay claims made on this row (the request-path publish is not counted).
+  attempts       Int       @default(0)
+  /// Relay lease: a claimed row is not claimed again until this passes.
+  leaseExpiresAt DateTime? @map("lease_expires_at") @db.Timestamptz
+  lastError      String?   @map("last_error") @db.VarChar(500)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  /// Serves the relay claim (published_at IS NULL, by occurred_at) and the purge (published_at < cutoff).
+  @@index([publishedAt, occurredAt])
+  @@map("outbox_events")
+}
+
+/// A timer as a row (ADR "Outbox and deadlines"). Written by DeadlineService in the
+/// SAME transaction as the change that needs it, so a timer exists if and only if
+/// that change committed; the deadline sweeper on `bulk-ops` fires it. State is
+/// derived from the stamps (pending, failing, fired, cancelled), never a column.
+/// At most one pending row per (tenant, dedupe key): a partial unique index in the
+/// migration, which this schema cannot express. `kind` is an app-owned vocabulary
+/// (`platform-glue/deadlines/deadline-kinds.ts`), so it is a string, not an enum.
+model Deadline {
+  /// App-generated UUIDv7 via generateUuidV7() — time-sortable and safe in a
+  /// client-held cursor. No Prisma @default.
+  id            String    @id @db.Uuid
+  tenantId      Int       @map("tenant_id")
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind          String    @map("kind") @db.VarChar(60)
+  /// The subject's type and public id, never an Int primary key.
+  subjectType   String    @map("subject_type") @db.VarChar(40)
+  subjectId     String    @map("subject_id") @db.VarChar(100)
+  dedupeKey     String    @map("dedupe_key") @db.VarChar(200)
+  dueAt         DateTime  @map("due_at") @db.Timestamptz
+  payload       Json      @default("{}") @map("payload") @db.JsonB
+  firedAt       DateTime? @map("fired_at") @db.Timestamptz
+  cancelledAt   DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelReason  String?   @map("cancel_reason") @db.VarChar(200)
+  /// Handler runs so far (incremented at claim; a reschedule restarts it).
+  attempts      Int       @default(0) @map("attempts")
+  /// Sweeper lease, or the backoff after a failed run — the row is not claimed before it.
+  lockedUntilAt DateTime? @map("locked_until_at") @db.Timestamptz
+  lastError     String?   @map("last_error") @db.VarChar(500)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([dueAt])
+  @@index([tenantId, subjectType, subjectId])
+  @@index([kind])
+  @@map("deadlines")
 }
 
 /// Permanent queue failures — when a BullMQ job exhausts its retries, the
@@ -1364,6 +1442,7 @@ model OAuthClient {
 
   @@index([tenantId])
   @@index([createdByUserId])
+  @@index([tenantId, createdAt, clientId]) // keyset: GET /oauth/clients
   @@map("oauth_clients")
 }
 
@@ -1449,6 +1528,8 @@ enum FeedbackStatus {
 
 model Feedback {
   id         Int            @id @default(autoincrement())
+  /// The id in URLs and the keyset tiebreak of the feedback lists. The Int key never leaves the API.
+  publicId   String         @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   tenantId   Int            @map("tenant_id")
   userId     Int            @map("user_id")
   category   String?        @db.VarChar(20)
@@ -1471,6 +1552,7 @@ model Feedback {
   @@index([status])
   @@index([createdAt])
   @@index([resolvedBy])
+  @@index([tenantId, userId, createdAt, publicId]) // keyset: GET /feedback
   @@map("feedback")
 }
 
@@ -1515,6 +1597,7 @@ model SupportTicket {
   @@index([status, priority])
   @@index([tenantId, createdAt])
   @@index([createdById])
+  @@index([createdAt, ticketNumber]) // keyset: GET /support/admin/tickets
   @@map("support_tickets")
 }
 
@@ -1557,6 +1640,8 @@ enum AnnouncementPriority {
 
 model Announcement {
   id          Int                  @id @default(autoincrement())
+  /// The id in URLs and the keyset tiebreak of the broadcast list. The Int key never leaves the API.
+  publicId    String               @unique @default(dbgenerated("gen_random_uuid()")) @map("public_id") @db.Uuid
   title       String               @db.VarChar(500)
   body        String               @db.Text
   targetType  String               @default("ALL") @map("target_type") @db.VarChar(20) // ALL, PLAN, TENANT
@@ -1672,6 +1757,7 @@ model WalletTransaction {
   @@index([tenantId])
   @@index([type])
   @@index([relatedAddOnId])
+  @@index([tenantId, createdAt, id]) // keyset: GET /billing/wallet/transactions
   @@map("wallet_transactions")
 }
 
@@ -1699,6 +1785,7 @@ model BillingInvoice {
   @@index([tenantId])
   @@index([billingCustomerId])
   @@index([status])
+  @@index([tenantId, createdAt, id]) // keyset: GET /billing/invoices
   @@map("billing_invoices")
 }
 
@@ -1954,6 +2041,8 @@ model DeskEpisode {
   @@index([entityType, entityId])
   @@index([workflowId])
   @@index([ownerAgentId])
+  @@index([tenantId, openedAt, id]) // keyset: GET /desk/episodes
+  @@index([tenantId, closedAt, id]) // keyset: GET /desk/episodes/handled
   @@map("desk_episodes")
 }
 
@@ -2038,6 +2127,7 @@ model DeskApproval {
   @@index([stepId])
   @@index([claimedByUserId])
   @@index([decidedByUserId])
+  @@index([decision, requestedAt, id]) // keyset: GET /desk/approvals
   @@map("desk_approvals")
 }
 

@@ -94,6 +94,18 @@ const ALLOWED_STRING_COLUMNS = new Map<string, string>([
   ],
   ['Job.type', 'open-set BullMQ job type registry (one value per background job); grows with each new background job'],
   [
+    'Deadline.kind',
+    'app-owned registry (DEADLINE_KINDS in platform-glue/deadlines/deadline-kinds.ts), like event names; a product adds a kind with its handler, never a foundation schema change',
+  ],
+  [
+    'Notification.type',
+    'app-owned registry: PLATFORM_NOTIFICATION_TYPES in @app/shared-types plus the app\'s list in platform-glue/notifications/notification-types.ts; a product adds a type with its policy, never a foundation schema change (owner decision, ADR "API contract" upgrade note)',
+  ],
+  [
+    'NotificationDelivery.type',
+    'the same notification-type registry as Notification.type; the delivery ledger stores the type it delivered',
+  ],
+  [
     'PlanEntitlement.type',
     'classification registry (software | service | display | limit | …); tenant-billing owned and evolves with plan model',
   ],

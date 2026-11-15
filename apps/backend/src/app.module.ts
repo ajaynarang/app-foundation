@@ -29,7 +29,7 @@ import { AiModule } from './domains/ai/ai.module';
 import { AdminModule } from './domains/admin/admin.module';
 import { BillingModule } from './domains/billing/billing.module';
 import { SupportModule } from './domains/support/support.module';
-import { DeskModule } from './domains/desk/desk.module';
+import { OPTIONAL_FEATURES } from './platform-glue/features';
 import { FeedbackModule } from './domains/feedback/feedback.module';
 import { InAppNotificationsModule } from './domains/notifications/notifications.module';
 
@@ -50,6 +50,7 @@ import { SearchModule } from './platform-glue/search/search.module';
 import { DevModule } from './dev/dev.module';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { EventContextInterceptor } from '@appshore/kernel/infrastructure/events/event-context.interceptor';
+import { IdempotencyInterceptor } from '@appshore/platform/infrastructure/idempotency/idempotency.interceptor';
 import { PromptingModule } from './domains/prompting/prompting.module';
 
 @Module({
@@ -141,7 +142,8 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     AdminModule,
     BillingModule,
     SupportModule,
-    DeskModule,
+    // The optional features this product kept at scaffold time (platform-glue/features).
+    ...OPTIONAL_FEATURES.flatMap((f) => f.modules),
     FeedbackModule,
     OutboundWebhooksModule,
     SearchModule,
@@ -176,6 +178,12 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: EventContextInterceptor,
+    },
+    // Idempotency-Key on every authenticated create (ADR "API contract", section 5): interceptors run after the
+    // guards, so the tenant and user are known.
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: IdempotencyInterceptor,
     },
   ],
 })

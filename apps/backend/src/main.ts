@@ -1,25 +1,34 @@
 import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { validationExceptionFactory } from '@appshore/kernel/shared/utils/validation-exception-factory';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppValidationPipe } from '@appshore/kernel/shared/utils/app-validation-pipe';
+import { applyQueueProcessingMode } from '@appshore/kernel/infrastructure/queue/queue-processing-mode';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from './config/configuration';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { initializeFirebase } from '@appshore/platform/config/firebase.config';
 import { Logger } from 'nestjs-pino';
-import { OAUTH_SCOPES } from '@app/shared-types';
 import { resolveOAuthIssuer } from '@appshore/platform/domains/oauth-provider/oauth-settings';
-import { setNestAppContext } from './domains/desk/core/inngest/nest-context';
+import { OPTIONAL_FEATURES } from './platform-glue/features';
 import { mountSwaggerUi, SWAGGER_UI_PATH } from './bootstrap/swagger-ui';
 import { applyTrustProxy } from './bootstrap/trust-proxy';
+import { applyGlobalPrefix, buildServedOpenApiDocument, OPENAPI_DOCUMENT_PATH } from './bootstrap/openapi';
+import { mountOAuthMetadata } from './bootstrap/oauth-metadata';
+import { DEPRECATION_HEADERS } from '@appshore/platform/shared/http/deprecation';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENT_REPLAYED_HEADER,
+} from '@appshore/platform/infrastructure/idempotency/idempotency.store';
 
 async function bootstrap() {
   // Initialize Firebase Admin SDK
   initializeFirebase();
+
+  // QUEUE_PROCESSORS_ENABLED=false keeps this API process from consuming BullMQ
+  // jobs (the worker task does that). Must run before the app is created.
+  const queueProcessingEnabled = applyQueueProcessingMode();
 
   // 10MB max upload + ~33% base64 inflation + JSON overhead = 15MB body limit
   const JSON_BODY_LIMIT = '15mb';
@@ -86,27 +95,15 @@ async function bootstrap() {
     next();
   });
 
-  // Global validation pipe - enables class-validator DTO validation
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      exceptionFactory: validationExceptionFactory,
-    }),
-  );
+  // Global validation pipe: strict class-validator DTOs for bodies and query strings. A failure is a 400
+  // VALIDATION_FAILED whose `fieldErrors` names each field.
+  app.useGlobalPipes(new AppValidationPipe());
 
   // Global API prefix
   // MCP root controller is excluded because Claude.ai sends POST/GET/DELETE
   // to the domain root `/` after OAuth (MCP spec strips path for auth base URL).
   // The McpRootController handles these at `/` without the api/v1 prefix.
-  app.setGlobalPrefix('api/v1', {
-    exclude: [
-      { path: '/', method: RequestMethod.POST },
-      { path: '/', method: RequestMethod.GET },
-      { path: '/', method: RequestMethod.DELETE },
-    ],
-  });
+  applyGlobalPrefix(app);
 
   // CORS configuration
   // Parse CORS origins: supports exact URLs and wildcard patterns like *.example.com
@@ -127,73 +124,26 @@ async function bootstrap() {
   app.enableCors({
     origin: parsedCorsOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Mcp-Session-Id'],
-    exposedHeaders: ['Mcp-Session-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Mcp-Session-Id', IDEMPOTENCY_KEY_HEADER],
+    // The replay marker and the deprecation headers (ADR "API contract", sections 4 and 5) are readable by a browser.
+    exposedHeaders: ['Mcp-Session-Id', IDEMPOTENT_REPLAYED_HEADER, ...DEPRECATION_HEADERS],
     credentials: true, // Allow cookies
   });
 
   // A local origin in production never gets this far: the config schema
   // refuses to boot (config/configuration.ts).
 
-  // Swagger/OpenAPI documentation
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('App API')
-    .setDescription('App API')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'API Key',
-        description: 'Enter your API key (sk_...)',
-        name: 'Authorization',
-        in: 'header',
-      },
-      'api-key',
-    )
-    .addServer('http://localhost:8000/api/v1', 'Local Development')
-    .addTag('Authentication', 'JWT-based authentication with multi-tenancy')
-    .addTag('API Keys', 'API key management for external developers')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-
-  // OAuth 2.1 server metadata (RFC 8414) — must be at well-known root, not under /api/v1
-  // The issuer is the one the token service signs into every access token (config `oauthIssuer`).
+  // The published contract: the same builder as the committed apps/backend/openapi.json and public-openapi.json.
+  // In production (isProductionEnv(), so every deployed task) it serves the public subset; a local run serves the
+  // full document. This copy names the configured API origin as its server.
   const oauthIssuer = resolveOAuthIssuer(() => configService.get<string>('oauthIssuer'));
-  app.use('/.well-known/oauth-authorization-server', (_req: any, res: any) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.json({
-      issuer: oauthIssuer,
-      authorization_endpoint: `${oauthIssuer}/api/v1/oauth/authorize`,
-      token_endpoint: `${oauthIssuer}/api/v1/oauth/token`,
-      registration_endpoint: `${oauthIssuer}/api/v1/oauth/register`,
-      revocation_endpoint: `${oauthIssuer}/api/v1/oauth/revoke`,
-      response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token'],
-      code_challenge_methods_supported: ['S256'],
-      scopes_supported: [...OAUTH_SCOPES],
-      token_endpoint_auth_methods_supported: ['client_secret_post', 'none'],
-    });
-  });
+  const document = buildServedOpenApiDocument(app, { serverUrl: oauthIssuer });
 
-  // RFC 9728 — OAuth Protected Resource Metadata (Claude.ai requests this)
-  app.use('/.well-known/oauth-protected-resource', (_req: any, res: any) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.json({
-      resource: oauthIssuer,
-      authorization_servers: [oauthIssuer],
-      scopes_supported: [...OAUTH_SCOPES],
-    });
-  });
+  // OAuth 2.1 server metadata (RFC 8414) and protected resource metadata (RFC 9728), at the well-known root, not
+  // under /api/v1. The issuer is the one the token service signs into every access token (config `oauthIssuer`).
+  mountOAuthMetadata(app, oauthIssuer);
 
-  // Serve OpenAPI spec at /api/openapi.json for docs site
-  app.use('/api/openapi.json', (req: any, res: any) => {
+  app.use(OPENAPI_DOCUMENT_PATH, (_req: any, res: any) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.json(document);
@@ -206,9 +156,8 @@ async function bootstrap() {
 
   const logger = app.get(Logger);
 
-  // Expose the DI container to Inngest step handlers (plain async functions,
-  // not NestJS classes). See domains/desk/core/inngest/nest-context.ts.
-  setNestAppContext(app);
+  // Each optional feature this product kept gets the app once it exists (platform-glue/features).
+  for (const feature of OPTIONAL_FEATURES) feature.onAppReady?.(app);
 
   try {
     await app.listen(port);
@@ -226,6 +175,7 @@ async function bootstrap() {
   console.log(`  ✅ App Backend ready on http://localhost:${port}`);
   console.log(`     API:     http://localhost:${port}/api/v1/`);
   if (swaggerUiMounted) console.log(`     Swagger: http://localhost:${port}/${SWAGGER_UI_PATH}`);
+  if (!queueProcessingEnabled) console.log('     Queues:  producer only (QUEUE_PROCESSORS_ENABLED=false)');
   console.log('');
 
   // Coordinate graceful shutdown: NestJS drains requests first, then we flush OTel spans.

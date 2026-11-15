@@ -19,6 +19,9 @@ const ROLE_ORDER: Record<string, number> = {
   SUPER_ADMIN: 3,
 };
 
+/** The most users the development user switcher loads. A seeded database holds far fewer. */
+export const MAX_DEV_SWITCHER_USERS = 500;
+
 @Injectable()
 export class DevService {
   private readonly logger = new Logger(DevService.name);
@@ -35,7 +38,8 @@ export class DevService {
       include: {
         tenant: { select: { tenantId: true, companyName: true } },
       },
-      orderBy: [{ role: 'asc' }, { firstName: 'asc' }],
+      orderBy: [{ role: 'asc' }, { firstName: 'asc' }, { userId: 'asc' }],
+      take: MAX_DEV_SWITCHER_USERS,
     });
 
     const superAdmins = users

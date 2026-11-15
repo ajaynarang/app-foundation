@@ -1,26 +1,35 @@
-import { AiSurface } from '@app/shared-types';
+import { AiInvocationStatus, AiSurface } from '@app/shared-types';
+import type { StatusVariant } from '@app/ui';
 
 import type { AiSurface as AiSurfaceType } from './types';
 
 /**
- * Human labels + dark-theme-safe accent classes per surface. Keyed off the
- * generated `AiSurface` enum so a new surface forces a compile error here
- * until labelled.
+ * Human labels per surface. Keyed off the generated `AiSurface` enum so a new surface forces a compile error here
+ * until labelled. A surface is a category, not a state: it renders as a neutral chip.
  */
-export const SURFACE_LABELS: Record<AiSurfaceType, { label: string; className: string }> = {
-  [AiSurface.CHAT]: { label: 'Chat', className: 'bg-blue-500/10 text-blue-500' },
-  [AiSurface.DESK_STEP]: { label: 'Desk Step', className: 'bg-blue-500/10 text-blue-500' },
-  [AiSurface.MEMORY_EXTRACT]: { label: 'Memory Extract', className: 'bg-gray-500/10 text-muted-foreground' },
-  [AiSurface.EMBEDDING]: { label: 'Embedding', className: 'bg-gray-500/10 text-muted-foreground' },
-  [AiSurface.KB_INGEST]: { label: 'KB Ingest', className: 'bg-gray-500/10 text-muted-foreground' },
+export const SURFACE_LABELS: Record<AiSurfaceType, string> = {
+  [AiSurface.CHAT]: 'Chat',
+  [AiSurface.DESK_STEP]: 'Desk Step',
+  [AiSurface.MEMORY_EXTRACT]: 'Memory Extract',
+  [AiSurface.EMBEDDING]: 'Embedding',
+  [AiSurface.KB_INGEST]: 'KB Ingest',
+};
+
+/** One tone per invocation outcome (ui-grammar-guard.test.ts): a call went through, or it was stopped. */
+export const INVOCATION_STATUS_VARIANTS: Record<AiInvocationStatus, StatusVariant> = {
+  [AiInvocationStatus.OK]: { label: 'Succeeded', tone: 'success' },
+  [AiInvocationStatus.ERROR]: { label: 'Failed', tone: 'danger' },
+  [AiInvocationStatus.TIMEOUT]: { label: 'Timed out', tone: 'danger' },
+  [AiInvocationStatus.RATE_LIMITED]: { label: 'Rate limited', tone: 'danger' },
+  [AiInvocationStatus.BUDGET_BLOCKED]: { label: 'Budget blocked', tone: 'danger' },
 };
 
 /** Day-window options for the spend view. */
 export const WINDOW_OPTIONS = [
-  { value: 7, label: 'Last 7 days' },
-  { value: 30, label: 'Last 30 days' },
-  { value: 1, label: 'Today' },
-] as const;
+  { value: '7', label: 'Last 7 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: '1', label: 'Today' },
+] as const satisfies ReadonlyArray<{ value: string; label: string }>;
 
 /**
  * Project-scoped Langfuse base, e.g. `https://us.cloud.langfuse.com/project/<id>`.

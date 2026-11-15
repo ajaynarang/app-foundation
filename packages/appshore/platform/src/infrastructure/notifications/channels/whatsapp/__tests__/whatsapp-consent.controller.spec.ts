@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { fieldErrorsOf } from '../../../../../test/helpers/field-errors.helpers';
 import { WhatsAppConsentController } from '../whatsapp-consent.controller';
 import { WhatsAppConsentService } from '../whatsapp-consent.service';
 
@@ -26,7 +26,10 @@ describe('WhatsAppConsentController', () => {
   });
 
   it('PATCH with nothing to change is a 400', async () => {
-    await expect(controller.update(user, {})).rejects.toBeInstanceOf(BadRequestException);
+    expect(await fieldErrorsOf(controller.update(user, {}))).toEqual({
+      optedIn: expect.any(String),
+      marketingOptedIn: expect.any(String),
+    });
     expect(consent.update).not.toHaveBeenCalled();
   });
 

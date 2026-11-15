@@ -1,4 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { CursorList } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
 import { AnnouncementStatus } from '@appshore/db';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AppCacheService } from '../../infrastructure/cache/app-cache.service';
@@ -6,13 +13,23 @@ import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.consta
 import { CACHE_TTL_COLD_30M } from '@appshore/kernel/constants/cache.constants';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
+import {
+  ACTIVE_BROADCAST_CAP,
+  ACTIVE_BROADCAST_SCAN_CAP,
+  BROADCAST_AUTHOR_SELECT,
+  toPublicBroadcast,
+  type BroadcastResponse,
+} from './broadcast.serializer';
 
-const CREATED_BY_SELECT = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  email: true,
-} as const;
+const CREATED_BY_SELECT = BROADCAST_AUTHOR_SELECT;
+const BROADCAST_KEYSET = { field: 'createdAt', idField: 'publicId', kind: 'date', direction: 'desc' } as const;
+
+export interface BroadcastListQuery {
+  status?: AnnouncementStatus;
+  cursor?: string;
+  limit?: string | number;
+}
+const WITH_AUTHOR = { createdBy: { select: CREATED_BY_SELECT } } as const;
 
 @Injectable()
 export class AnnouncementsService {
@@ -23,20 +40,35 @@ export class AnnouncementsService {
     private readonly cache: AppCacheService,
   ) {}
 
-  async findAll(status?: AnnouncementStatus) {
-    const where = status ? { status } : {};
-    return this.prisma.announcement.findMany({
-      where,
-      include: { createdBy: { select: CREATED_BY_SELECT } },
-      orderBy: { createdAt: 'desc' },
-    });
+  /** Newest first, cursor-paged: a log of hand-written broadcasts, no status pivot. */
+  async findAll(query: BroadcastListQuery = {}): Promise<CursorList<BroadcastResponse>> {
+    const take = clampCursorLimit(query.limit);
+    const scope = query.status ? { status: query.status } : {};
+    const where = query.cursor ? { AND: [scope, keysetWhere({ ...BROADCAST_KEYSET, cursor: query.cursor })] } : scope;
+    const [rows, total] = await Promise.all([
+      this.prisma.announcement.findMany({
+        where,
+        include: WITH_AUTHOR,
+        orderBy: [{ createdAt: 'desc' }, { publicId: 'desc' }],
+        take: take + 1,
+      }),
+      this.prisma.announcement.count({ where: scope }),
+    ]);
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.publicId));
+    return { items: page.items.map(toPublicBroadcast), nextCursor: page.nextCursor, total };
   }
 
-  async findOne(id: number) {
-    return this.prisma.announcement.findUniqueOrThrow({
-      where: { id },
-      include: { createdBy: { select: CREATED_BY_SELECT } },
-    });
+  async findOne(publicId: string): Promise<BroadcastResponse> {
+    const row = await this.prisma.announcement.findFirst({ where: { publicId }, include: WITH_AUTHOR });
+    if (!row) throw new NotFoundException('Broadcast not found');
+    return toPublicBroadcast(row);
+  }
+
+  /** Public id → PK for a write; a missing broadcast is a 404, never a Prisma P2025. */
+  private async resolveId(publicId: string): Promise<number> {
+    const row = await this.prisma.announcement.findFirst({ where: { publicId }, select: { id: true } });
+    if (!row) throw new NotFoundException('Broadcast not found');
+    return row.id;
   }
 
   private async invalidateAnnouncementCache(): Promise<void> {
@@ -55,13 +87,14 @@ export class AnnouncementsService {
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
         createdById: userId,
       },
-      include: { createdBy: { select: CREATED_BY_SELECT } },
+      include: WITH_AUTHOR,
     });
     await this.invalidateAnnouncementCache();
-    return result;
+    return toPublicBroadcast(result);
   }
 
-  async update(id: number, dto: UpdateAnnouncementDto) {
+  async update(publicId: string, dto: UpdateAnnouncementDto) {
+    const id = await this.resolveId(publicId);
     const { title, body, targetType, targetIds, priority, expiresAt } = dto;
     const result = await this.prisma.announcement.update({
       where: { id },
@@ -73,28 +106,32 @@ export class AnnouncementsService {
         ...(priority !== undefined && { priority }),
         ...(expiresAt !== undefined && { expiresAt: new Date(expiresAt) }),
       },
-      include: { createdBy: { select: CREATED_BY_SELECT } },
+      include: WITH_AUTHOR,
     });
     await this.invalidateAnnouncementCache();
-    return result;
+    return toPublicBroadcast(result);
   }
 
-  async publish(id: number) {
+  async publish(publicId: string) {
+    const id = await this.resolveId(publicId);
     const result = await this.prisma.announcement.update({
       where: { id },
       data: { status: 'PUBLISHED', publishedAt: new Date() },
+      include: WITH_AUTHOR,
     });
     await this.invalidateAnnouncementCache();
-    return result;
+    return toPublicBroadcast(result);
   }
 
-  async archive(id: number) {
+  async archive(publicId: string) {
+    const id = await this.resolveId(publicId);
     const result = await this.prisma.announcement.update({
       where: { id },
       data: { status: 'ARCHIVED' },
+      include: WITH_AUTHOR,
     });
     await this.invalidateAnnouncementCache();
-    return result;
+    return toPublicBroadcast(result);
   }
 
   async findActiveForTenant(tenantId: string, planSlug?: string) {
@@ -104,20 +141,22 @@ export class AnnouncementsService {
     const cacheKey = buildKey('app:announcements', 'active', 'global');
     const allActive = await this.cache.getOrSet(cacheKey, () => this.fetchAllActiveAnnouncements(), CACHE_TTL_COLD_30M);
 
-    // Filter for this tenant in-memory
-    return allActive.filter((a: any) => {
-      if (a.targetType === 'ALL') return true;
-      if (a.targetType === 'TENANT' && a.targetIds?.includes(tenantId)) return true;
-      if (planSlug && a.targetType === 'PLAN' && a.targetIds?.includes(planSlug)) return true;
-      return false;
-    });
+    // Filter for this tenant in-memory, then cap what the banner shows (most urgent first)
+    return allActive
+      .filter((a: any) => {
+        if (a.targetType === 'ALL') return true;
+        if (a.targetType === 'TENANT' && a.targetIds?.includes(tenantId)) return true;
+        if (planSlug && a.targetType === 'PLAN' && a.targetIds?.includes(planSlug)) return true;
+        return false;
+      })
+      .slice(0, ACTIVE_BROADCAST_CAP);
   }
 
   async findActiveForAllOnly() {
     const cacheKey = buildKey('app:announcements', 'active', 'global');
     const allActive = await this.cache.getOrSet(cacheKey, () => this.fetchAllActiveAnnouncements(), CACHE_TTL_COLD_30M);
 
-    return allActive.filter((a: any) => a.targetType === 'ALL');
+    return allActive.filter((a: any) => a.targetType === 'ALL').slice(0, ACTIVE_BROADCAST_CAP);
   }
 
   private async fetchAllActiveAnnouncements() {
@@ -127,9 +166,10 @@ export class AnnouncementsService {
         status: 'PUBLISHED',
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
-      orderBy: [{ publishedAt: 'desc' }],
+      orderBy: [{ publishedAt: 'desc' }, { publicId: 'desc' }],
+      take: ACTIVE_BROADCAST_SCAN_CAP,
       select: {
-        id: true,
+        publicId: true,
         title: true,
         body: true,
         priority: true,

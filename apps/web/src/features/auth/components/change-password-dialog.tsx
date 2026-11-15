@@ -160,7 +160,7 @@ export function ChangePasswordDialog({ open, onOpenChange, userEmail }: ChangePa
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="text-xs text-critical"
+                  className="text-xs text-critical-text"
                 >
                   {fieldError}
                 </motion.p>
@@ -185,7 +185,7 @@ export function ChangePasswordDialog({ open, onOpenChange, userEmail }: ChangePa
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="text-xs text-critical"
+                  className="text-xs text-critical-text"
                 >
                   New password must be different from current password.
                 </motion.p>
@@ -209,7 +209,7 @@ export function ChangePasswordDialog({ open, onOpenChange, userEmail }: ChangePa
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="text-xs text-critical"
+                  className="text-xs text-critical-text"
                 >
                   Passwords don&apos;t match
                 </motion.p>

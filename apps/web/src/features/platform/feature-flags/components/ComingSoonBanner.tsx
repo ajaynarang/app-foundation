@@ -22,7 +22,7 @@ export function ComingSoonBanner({ title, description, features, category }: Com
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 rounded-full blur-xl opacity-50 animate-pulse" />
+              <div className="absolute inset-0 bg-gradient-to-r from-muted to-muted-foreground/20 rounded-full blur-xl opacity-50 animate-pulse" />
               <div className="relative bg-background border-2 border-border rounded-full p-6">
                 <Rocket className="h-16 w-16 text-foreground" />
               </div>
@@ -36,7 +36,7 @@ export function ComingSoonBanner({ title, description, features, category }: Com
                 Coming Soon
               </Badge>
               {category && (
-                <Badge variant="muted" className="text-xs capitalize">
+                <Badge variant="outline" className="text-xs capitalize">
                   {category}
                 </Badge>
               )}
@@ -57,7 +57,7 @@ export function ComingSoonBanner({ title, description, features, category }: Com
             <ul className="space-y-3">
               {features.map((feature, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <div className="mt-0.5 h-5 w-5 rounded-full bg-gray-100 dark:bg-gray-900 border border-border flex items-center justify-center flex-shrink-0">
+                  <div className="mt-0.5 h-5 w-5 rounded-full bg-muted/50 border border-border flex items-center justify-center flex-shrink-0">
                     <div className="h-2 w-2 rounded-full bg-foreground" />
                   </div>
                   <span className="text-sm text-muted-foreground flex-1">{feature}</span>

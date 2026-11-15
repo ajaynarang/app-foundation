@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { AdminTicketListQueryDto, TicketListQueryDto } from '../dto/ticket-list-query.dto';
 import { Test } from '@nestjs/testing';
 import { SupportController } from '../support.controller';
 import { SupportService } from '../support.service';
@@ -16,13 +19,13 @@ describe('SupportController', () => {
   beforeEach(async () => {
     service = {
       createTicket: jest.fn().mockResolvedValue({ id: 1 }),
-      listTicketsForTenant: jest.fn().mockResolvedValue({ tickets: [], total: 0 }),
+      listTicketsForTenant: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getTicket: jest.fn().mockResolvedValue({ id: 1 }),
       addMessage: jest.fn().mockResolvedValue({ id: 1 }),
-      listAllTickets: jest.fn().mockResolvedValue({ tickets: [] }),
+      listAllTickets: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       updateTicket: jest.fn().mockResolvedValue({ id: 1 }),
       getStats: jest.fn().mockResolvedValue({ open: 5 }),
-      getTenants: jest.fn().mockResolvedValue([]),
+      getTenants: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
     };
 
     const module = await Test.createTestingModule({
@@ -40,20 +43,23 @@ describe('SupportController', () => {
   });
 
   it('should list my tickets', async () => {
-    await controller.listMyTickets(mockUser, 'open', '10', '0');
+    await controller.listMyTickets(
+      mockUser,
+      await readQueryDto(TicketListQueryDto, { status: 'OPEN', limit: '10', cursor: 'abc' }),
+    );
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
-      status: 'open',
+      status: 'OPEN',
       limit: 10,
-      offset: 0,
+      cursor: 'abc',
     });
   });
 
   it('should list tickets with no params', async () => {
-    await controller.listMyTickets(mockUser);
+    await controller.listMyTickets(mockUser, await readQueryDto(TicketListQueryDto, {}));
     expect(service.listTicketsForTenant).toHaveBeenCalledWith(1, {
       status: undefined,
       limit: undefined,
-      offset: undefined,
+      cursor: undefined,
     });
   });
 
@@ -69,16 +75,37 @@ describe('SupportController', () => {
   });
 
   it('should list all tickets (super admin)', async () => {
-    await controller.listAllTickets('1', 'open', 'high', 'billing', 'test', '20', '0');
+    await controller.listAllTickets(
+      await readQueryDto(AdminTicketListQueryDto, {
+        tenant_id: '1',
+        status: 'OPEN',
+        priority: 'HIGH',
+        category: 'BILLING',
+        q: 'test',
+        limit: '20',
+        cursor: 'abc',
+      }),
+    );
     expect(service.listAllTickets).toHaveBeenCalledWith({
       tenantId: 1,
-      status: 'open',
-      priority: 'high',
-      category: 'billing',
+      status: 'OPEN',
+      priority: 'HIGH',
+      category: 'BILLING',
       search: 'test',
       limit: 20,
-      offset: 0,
+      cursor: 'abc',
     });
+  });
+
+  it('answers 400 naming the bad param, and refuses the old tenantId and search keys', async () => {
+    const read = (raw: Record<string, unknown>) => readQueryDto(AdminTicketListQueryDto, raw);
+    expect(await fieldErrorsOf(read({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
+    expect(await fieldErrorsOf(read({ status: 'open' }))).toHaveProperty('status');
+    expect(await fieldErrorsOf(read({ limit: 'abc' }))).toHaveProperty('limit');
+    // Offset paging is gone: the key is refused like any other the route does not declare.
+    expect(await fieldErrorsOf(read({ offset: '10' }))).toHaveProperty('offset');
+    expect(await fieldErrorsOf(read({ tenantId: '1' }))).toHaveProperty('tenantId');
+    expect(await fieldErrorsOf(read({ search: 'x' }))).toHaveProperty('search');
   });
 
   it('should get admin ticket', async () => {
@@ -104,7 +131,8 @@ describe('SupportController', () => {
   });
 
   it('should get tenants', async () => {
-    await controller.getTenants();
-    expect(service.getTenants).toHaveBeenCalled();
+    const page = await controller.getTenants({ q: 'acme' });
+    expect(service.getTenants).toHaveBeenCalledWith({ q: 'acme' });
+    expect(page).toEqual({ items: [], nextCursor: null, total: 0 });
   });
 });

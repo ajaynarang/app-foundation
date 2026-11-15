@@ -8,7 +8,11 @@ Playwright-based QA for the platform starter. One framework, one package, all cr
 | -------- | -------- | -------------------------------------------------------- | ----- |
 | smoke    | `@smoke` | Health, auth, critical reads, security headers           | ~30s  |
 | rbac     | `@rbac`  | Every endpoint × every role → expected status            | ~2min |
+| api      | `@api`   | Wire checks and your domain workflow suites (`api/`)     | ~5s   |
 | loadtest | —        | Baseline perf (50 concurrent users × platform endpoints) | ~5min |
+
+`pnpm verify:api` (from the repo root) runs the Playwright `api` project, which is smoke + rbac + `api/`, against a
+backend it builds, migrates, seeds, starts and stops itself. Run it before a pull request that changes the wire.
 
 ## Directory layout
 
@@ -16,6 +20,7 @@ Playwright-based QA for the platform starter. One framework, one package, all cr
 tests/
   smoke/                     — health + security-headers + auth
   rbac/                      — role × endpoint matrix (generated)
+  api/                       — wire checks (status by route shape) + your workflow suites
   loadtest/                  — autocannon baselines
   fixtures/                  — thin re-exports to @app/test-utils
   config/                    — global-setup, test-env, capability detection
@@ -260,7 +265,7 @@ At global-setup time, `tests/config/global-setup.ts` calls `detectCapabilities()
 `tests/config/detect-capabilities.ts`. This function:
 
 1. Acquires a super-admin token via the dev switcher (`POST /dev/switch`).
-2. Calls `GET /plans/tenant/:tenantId` with that token.
+2. Calls `GET /plans/tenant/:tenant_id` with that token.
 3. Reads `planConfig.entitlements[]` — each entry has `{ feature: string, enabled: boolean }`.
 4. Splits into `enabled` and `disabled` sets.
 5. Writes the result to `tests/config/tenant-capabilities.json` (gitignored).

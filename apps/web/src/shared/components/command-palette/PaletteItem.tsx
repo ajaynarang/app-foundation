@@ -21,7 +21,7 @@ export function PaletteItemRow({ item, onSelect }: PaletteItemProps) {
       className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer', isGated && 'opacity-50')}
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        {isGated ? <Sparkles className="h-4 w-4 text-info" /> : <Icon className="h-4 w-4" />}
+        {isGated ? <Sparkles className="h-4 w-4 text-info-text" /> : <Icon className="h-4 w-4" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className={cn('text-sm truncate text-foreground', isGated && 'text-muted-foreground')}>{item.label}</div>

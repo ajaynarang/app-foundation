@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Validate } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsArray, IsDateString, IsOptional, IsString, Validate } from 'class-validator';
+import { Transform } from 'class-transformer';
 import type { LoginActivitySummaryQuery } from '@app/shared-types';
+import { QueryBool, QueryInt } from '@appshore/kernel/shared/utils/query-dto';
 import { RangeNotOver90Days } from './list-login-activity.query.dto';
 
 export class LoginActivitySummaryQueryDto implements LoginActivitySummaryQuery {
@@ -26,18 +27,11 @@ export class LoginActivitySummaryQueryDto implements LoginActivitySummaryQuery {
   @IsString({ each: true })
   roles?: string[];
 
-  @ApiProperty({ required: false, description: 'Scope to a specific tenant' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  /** Scope to one tenant (the numeric id; the super-admin route only). */
+  @QueryInt({ name: 'tenant_id', min: 1, max: 2_147_483_647, description: 'Scope to a specific tenant' })
   tenantId?: number;
 
-  @ApiProperty({
-    required: false,
-    description: 'Exclude SUPER_ADMIN users from results (Super Admin endpoint only)',
-  })
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
+  /** Exclude SUPER_ADMIN users from results (the super-admin route only). `true` / `false`. */
+  @QueryBool({ name: 'exclude_super_admin', description: 'Exclude SUPER_ADMIN users (super-admin route only)' })
   excludeSuperAdmin?: boolean;
 }

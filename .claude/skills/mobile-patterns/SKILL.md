@@ -95,7 +95,7 @@ factory TaskSummary.fromJson(Map<String, dynamic> j) => TaskSummary(
 - **401 → refresh → retry once.** On a 401, call the refresh endpoint (cookie-based), store the new access token, retry the original request once. If refresh fails on an authed request → clear the token + fire an `onAuthExpired` callback.
 - **`onAuthExpired` must route to login.** Wire it to the auth state so the router bounces to the login screen instead of stranding the user on an error card.
 - **Persist the refresh credential.** The access token lives in Keychain/Keystore (`flutter_secure_storage`) and survives restarts — the refresh cookie MUST persist too (a persistent cookie jar, never in-memory). Otherwise the first 401 after relaunch can't refresh and strands the user.
-- Verb helpers (`get/post/patch/put`) return decoded JSON or throw a typed, user-presentable `ApiException` (`isTimeout`, `isAuth`, server `message`). Screens never see a raw transport exception.
+- Verb helpers (`get/post/patch/put`) return decoded JSON or throw a typed, user-presentable `ApiException` (`isTimeout`, `isAuth`, and the server's error envelope: `detail` as the message, `code`, `fieldErrors` — the envelope has no `message` key). Screens never see a raw transport exception.
 
 ---
 

@@ -1,4 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
+import { fieldErrorsOf, readBodyDto } from '../../../test/helpers/field-errors.helpers';
+import { ResetPreferencesDto } from '../dto/reset-preferences.dto';
 import { UserPreferencesController } from '../user-preferences.controller';
 
 describe('UserPreferencesController', () => {
@@ -161,6 +163,12 @@ describe('UserPreferencesController', () => {
       service.resetToDefaults.mockRejectedValue(new Error('Invalid scope'));
 
       await expect(controller.resetToDefaults(mockUser, { scope: 'invalid' as any })).rejects.toThrow('Invalid scope');
+    });
+
+    it('answers 400 naming scope before the service is reached when it is missing or unknown', async () => {
+      expect(await readBodyDto(ResetPreferencesDto, { scope: 'user' })).toEqual({ scope: 'user' });
+      expect(await fieldErrorsOf(readBodyDto(ResetPreferencesDto, { scope: 'invalid' }))).toHaveProperty('scope');
+      expect(await fieldErrorsOf(readBodyDto(ResetPreferencesDto, {}))).toHaveProperty('scope');
     });
   });
 });

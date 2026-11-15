@@ -22,7 +22,7 @@ export function CopyButton({ value, label }: CopyButtonProps) {
 
   return (
     <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 px-2 shrink-0">
-      {copied ? <Check className="h-4 w-4 text-info" /> : <Copy className="h-4 w-4" />}
+      {copied ? <Check className="h-4 w-4 text-info-text" /> : <Copy className="h-4 w-4" />}
     </Button>
   );
 }

@@ -707,6 +707,9 @@ importers:
       '@nestjs/event-emitter':
         specifier: ^3.0.1
         version: 3.1.0(@nestjs/common@11.1.26(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.26)
+      '@nestjs/swagger':
+        specifier: 11.2.5
+        version: 11.2.5(@nestjs/common@11.1.26(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.26)(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -725,6 +728,9 @@ importers:
       bullmq:
         specifier: ^5.69.3
         version: 5.78.0
+      class-transformer:
+        specifier: 0.5.1
+        version: 0.5.1
       class-validator:
         specifier: 0.14.3
         version: 0.14.3
@@ -1068,6 +1074,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19(tsx@4.22.4)(yaml@2.9.0))
+      zustand:
+        specifier: ^5.0.2
+        version: 5.0.14(@types/react@18.3.31)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
     devDependencies:
       tailwindcss:
         specifier: ^3.4.17

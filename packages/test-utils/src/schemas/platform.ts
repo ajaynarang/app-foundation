@@ -47,7 +47,7 @@ import {
   OnboardingStatusResponseSchema as SharedOnboardingStatusResponseSchema,
   AgentScopeSchema,
 } from '@app/shared-types';
-import { dbId, stringId, isoDateString } from './helpers.js';
+import { apiErrorEnvelope, dbId, stringId, isoDateString, cursorListOf } from './helpers.js';
 
 // Note: `SuperAdminPreferencesSchema` is NOT exported from shared-types —
 // hand-written below.
@@ -55,18 +55,18 @@ import { dbId, stringId, isoDateString } from './helpers.js';
 // ── USERS (Phase 4 Group 4d — tightened from Phase-0 placeholders) ───
 //
 // Schemas cover the GET /users list (projected list-row shape),
-// GET /users/:userId detail (list-row + full Prisma tenant row),
+// GET /users/:user_id detail (list-row + full Prisma tenant row),
 // POST /users create (list-row + full tenant row), and
-// PATCH /users/:userId update (list-row + full tenant row).
+// PATCH /users/:user_id update (list-row + full tenant row).
 //
 // Live shape map:
 //
 //   GET /users            → UserListRowSchema[]    — list projection incl. nested `{tenantId, companyName}`.
-//   GET /users/:userId    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema).
+//   GET /users/:user_id    → UserDetailSchema       — list-row + full Prisma tenant row (TenantRowSchema).
 //   POST /users           → UserCreateResponseSchema — list-row + full Prisma tenant row (no `emailVerified`, no `createdAt`, no `lastLoginAt`).
-//   PATCH /users/:userId  → UserDetailSchema       — same as GET /users/:userId.
-//   POST /users/:userId/{activate,deactivate} → `{message: string}`.
-//   DELETE /users/:userId → `{message: string}`.
+//   PATCH /users/:user_id  → UserDetailSchema       — same as GET /users/:user_id.
+//   POST /users/:user_id/{activate,deactivate} → UserDetailSchema — the user as they are now.
+//   DELETE /users/:user_id → 204, no body.
 //
 // `tenant` nested on detail/create/patch is the full `TenantRowSchema`
 // (declared further down in this file). To avoid a forward-reference
@@ -112,15 +112,15 @@ export const UserListItemSchema = UserListRowSchema;
 // `SubdomainCheckSchema` were wide `z.any()` placeholders — they would
 // accept almost any shape, which is exactly what the rubric forbids
 // (`.strict()` everywhere). Group 4c rewrites them against the live
-// `GET /tenants`, `GET /tenants/:tenantId/details`, `GET /tenants/check-
+// `GET /tenants`, `GET /tenants/:tenant_id/details`, `GET /tenants/check-
 // subdomain`, `GET /tenants/branding`, `POST /tenants/:id/approve |
-// /reject | /suspend | /reactivate`, and `PATCH /tenants/:tenantId`
+// /reject | /suspend | /reactivate`, and `PATCH /tenants/:tenant_id`
 // responses of the platform tenants controller.
 //
 // Schema map:
 //   - `TenantListItemSchema` — `GET /tenants[?status=...]` row. List items
 //     carry the full Prisma row + nested owner/admin `users` + `_count`.
-//   - `TenantDetailResponseSchema` — `GET /tenants/:tenantId/details`. A
+//   - `TenantDetailResponseSchema` — `GET /tenants/:tenant_id/details`. A
 //     projected envelope `{ tenant, users, metrics }` — NOT the raw row.
 //   - `TenantRowSchema` — the raw Prisma row returned by the mutation
 //     endpoints (approve / reject / suspend / reactivate / updateTenant
@@ -211,7 +211,7 @@ export const TenantListItemSchema = TenantRowSchema.extend({
 }).strict();
 
 /**
- * `GET /tenants/:tenantId/details` envelope — a projected shape, NOT the
+ * `GET /tenants/:tenant_id/details` envelope — a projected shape, NOT the
  * raw row. Service manually cherry-picks the row fields and embeds a
  * rich `users[]` + scalar `metrics`.
  */
@@ -308,22 +308,13 @@ export const TenantRegisterResponseSchema = z
   .strict();
 
 /**
- * 400 error envelope for `POST /tenants/register` with empty body. Nest's
- * `ValidationPipe` returns `{ statusCode, timestamp, path, method, detail,
- * fieldErrors }`. The fieldErrors map has a string message per field.
- * Hand-written — the envelope shape is the ApiException middleware output
- * and not in shared-types.
+ * 400 for `POST /tenants/register` with an empty body: the standard error envelope with code
+ * `VALIDATION_FAILED` and one message per field in `fieldErrors`.
  */
-export const TenantRegisterValidationErrorSchema = z
-  .object({
-    statusCode: z.literal(400),
-    timestamp: isoDateString,
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    fieldErrors: z.record(z.string(), z.string()),
-  })
-  .strict();
+export const TenantRegisterValidationErrorSchema = apiErrorEnvelope(400).extend({
+  code: z.literal('VALIDATION_FAILED'),
+  fieldErrors: z.record(z.string(), z.string()),
+});
 
 // ── USERS — response shapes that reference TenantRowSchema (Phase 4 Group 4d)
 //
@@ -331,7 +322,7 @@ export const TenantRegisterValidationErrorSchema = z
 // detail / create / update responses embed the full Prisma tenant row.
 
 /**
- * `GET /users/:userId` detail + `PATCH /users/:userId` response.
+ * `GET /users/:user_id` detail + `PATCH /users/:user_id` response.
  *
  * Live shape = list-row projection + full Prisma tenant row. The service's
  * manual re-projection drops the Prisma-row numeric `id`, `tenantId`
@@ -372,7 +363,7 @@ export const UserCreateResponseSchema = z
   .strict();
 
 /**
- * `PATCH /users/:userId` response — the service's updateUser projection
+ * `PATCH /users/:user_id` response — the service's updateUser projection
  * emits `{userId, email, firstName, lastName, role, isActive, tenant}`.
  * It drops `emailVerified` / `createdAt` / `lastLoginAt` (unlike detail).
  * Distinct from both — hand-written.
@@ -386,17 +377,6 @@ export const UserUpdateResponseSchema = z
     role: z.string(),
     isActive: z.boolean(),
     tenant: TenantRowSchema.nullable(),
-  })
-  .strict();
-
-/**
- * `POST /users/:userId/activate`, `POST /users/:userId/deactivate`, and
- * `DELETE /users/:userId` all return `{ message: string }`. One shape
- * for all three — cheap schema, tight contract.
- */
-export const UserMessageResponseSchema = z
-  .object({
-    message: z.string(),
   })
   .strict();
 
@@ -708,70 +688,49 @@ export const SuperAdminPreferencesSchema = z.object({
 
 /** Enums (matches shared-types, duplicated locally for `.strict()` composition). */
 const FeedbackCategoryEnum = z.enum(['bug', 'idea', 'general']);
-const FeedbackStatusEnum = z.enum(['new', 'reviewed', 'resolved']);
+const FeedbackStatusEnum = z.enum(['NEW', 'REVIEWED', 'RESOLVED']);
 
-/** Core projection common to all four row variants. */
-const FeedbackCoreProjection = {
-  id: dbId,
+/**
+ * A feedback row as the API shows it: named by its public id (`feedbackId`, a uuid). No numeric key crosses
+ * the API. POST /feedback, GET /feedback and every admin route answer this shape; the admin routes add the
+ * `user`, `tenant` and `resolver` references, each named by its public id.
+ */
+export const FeedbackRowSchema = z.object({
+  feedbackId: z.string().uuid(),
   category: FeedbackCategoryEnum.nullable(),
   sentiment: z.number().int().min(1).max(5),
   message: z.string(),
   page: z.string().nullable(),
   status: FeedbackStatusEnum,
-  createdAt: isoDateString,
-};
-
-/** Full Prisma row — POST /feedback and all admin PATCH transitions return this shape. */
-export const FeedbackRowSchema = z.object({
-  ...FeedbackCoreProjection,
-  tenantId: dbId,
-  userId: dbId,
   note: z.string().nullable(),
-  resolvedBy: dbId.nullable(),
   resolvedAt: isoDateString.nullable(),
+  createdAt: isoDateString,
   updatedAt: isoDateString,
 });
 
-/** Trimmed user-facing row — GET /feedback (listOwn) drops tenant/user/resolve metadata. */
-export const FeedbackOwnRowSchema = z.object({
-  ...FeedbackCoreProjection,
-});
+/** GET /feedback (listOwn) rows: the same serialized row, without references. */
+export const FeedbackOwnRowSchema = FeedbackRowSchema;
 
-/** Admin row — Prisma row + nested relations (user/tenant/resolver). */
+/** Admin row: the serialized row plus its references, by public id. */
 export const FeedbackAdminRowSchema = FeedbackRowSchema.extend({
   user: z
     .object({
-      id: dbId,
-      firstName: z.string(),
-      lastName: z.string(),
-      email: z.string(),
-      phone: z.string().nullable(),
+      userId: z.string(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+      email: z.string().nullable(),
       role: z.string(),
     })
     .strict(),
-  tenant: z
-    .object({
-      id: dbId,
-      companyName: z.string(),
-    })
-    .strict(),
+  tenant: z.object({ tenantId: z.string(), companyName: z.string().nullable() }).strict(),
   resolver: z
-    .object({
-      id: dbId,
-      firstName: z.string(),
-      lastName: z.string(),
-    })
+    .object({ userId: z.string(), firstName: z.string().nullable(), lastName: z.string().nullable() })
     .strict()
     .nullable(),
 });
 
-/** Pagination envelope around admin rows — GET /admin/feedback. */
-export const FeedbackListEnvelopeSchema = z.object({
-  data: z.array(FeedbackAdminRowSchema),
-  total: z.number().int().nonnegative(),
-  page: z.number().int().positive(),
-  limit: z.number().int().positive(),
-});
+/** GET /admin/feedback: a cursor list, newest first; `counts` holds every status for the filters. */
+export const FeedbackListEnvelopeSchema = cursorListOf(FeedbackAdminRowSchema);
 
 /** GET /admin/feedback/stats envelope. */
 export const FeedbackStatsSchema = z.object({
@@ -822,7 +781,7 @@ export const FeedbackBulkCategorizeSchema = z
 //   GET   /plans/my-plan                          → TenantPlanDetailsResponseSchema
 //     — 11 fields including `planConfig` (nullable; same 17-field shape)
 //       + `planEvents[]` (7 fields; shared-types `PlanEventSchema` is missing `tenantId`).
-//   GET   /plans/tenant/:tenantId                 → TenantPlanDetailsResponseSchema
+//   GET   /plans/tenant/:tenant_id                 → TenantPlanDetailsResponseSchema
 //     — same as /my-plan shape.
 //   PATCH /plans/:plan                            → PlanConfigBareSchema
 //     — 17 fields, NO `entitlements` (service's updatePlanConfig returns the
@@ -832,7 +791,7 @@ export const FeedbackBulkCategorizeSchema = z
 //   PATCH /plans/:plan/entitlements/:feature      → PlanEntitlementRowSchema
 //     — 8 fields (raw Prisma row incl. `type`, `createdAt`, `updatedAt`).
 //       Shared-types PlanEntitlementSchema has only {feature, displayName, enabled}.
-//   PATCH /plans/tenant/:tenantId                 → TenantRowSchema (already
+//   PATCH /plans/tenant/:tenant_id                 → TenantRowSchema (already
 //     declared above for tenants.spec.ts — full Prisma row, no includes).
 //
 // Shared-types drift: shared-types `PlanConfigSchema` + `PlanEventSchema`
@@ -934,7 +893,7 @@ const TenantPlanEventSchema = z
 
 /**
  * TenantPlanDetails envelope — returned by GET /plans/my-plan and
- * GET /plans/tenant/:tenantId. `planConfig` is nullable (it's null when
+ * GET /plans/tenant/:tenant_id. `planConfig` is nullable (it's null when
  * the tenant plan is TRIAL_EXPIRED or another plan without a config row).
  * `planEvents` is always an array, up to 10 rows, descending by createdAt.
  */
@@ -1051,9 +1010,9 @@ export const BroadcastActiveItemSchema = z
 //   Admin CRUD (`/oauth/clients/*`, tenant-scoped CRUD, camelCase):
 //     - GET    /oauth/clients              → OAuthClientResponseSchema[]
 //     - POST   /oauth/clients              → OAuthClientCreatedResponseSchema (secret ONCE)
-//     - GET    /oauth/clients/:clientId    → OAuthClientResponseSchema
-//     - PUT    /oauth/clients/:clientId    → OAuthClientResponseSchema
-//     - DELETE /oauth/clients/:clientId    → 204 no-body (no schema)
+//     - GET    /oauth/clients/:client_id    → OAuthClientResponseSchema
+//     - PUT    /oauth/clients/:client_id    → OAuthClientResponseSchema
+//     - DELETE /oauth/clients/:client_id    → 204 no-body (no schema)
 //
 //   RFC public (`/oauth/*`, RFC 6749/7009/7591, snake_case):
 //     - POST   /oauth/register             → OAuthDCRResponseSchema (RFC 7591)
@@ -1069,12 +1028,9 @@ export const BroadcastActiveItemSchema = z
 //   - shared-types has NO RFC 7591 DCR response schema. The register endpoint
 //     synthesises its own wire shape (snake_case, different field set for
 //     public vs confidential clients). Hand-written below.
-//   - shared-types has NO RFC 7009 / RFC 6749 error-envelope schemas. The
-//     live error envelope is the platform `HttpExceptionFilter` envelope
-//     (`{statusCode, timestamp, path, method, detail, error?, error_description?,
-//     message?}`) which preserves the RFC `{error, error_description}` keys
-//     when the controller throws `BadRequestException({error, error_description})`.
-//     Hand-written below — same shape also matches the revoke 200 `{}` body.
+//   - An error on a protocol route is `{error, error_description}` and nothing else (RFC 6749
+//     section 5.2, RFC 7591 section 3.2.2), written by the platform's `OAuthErrorFilter`.
+//     Hand-written below.
 
 /**
  * Admin-visible OAuth client row (list + detail + update). Hand-written
@@ -1144,38 +1100,13 @@ export const OAuthDCRResponseSchema = z
 export const OAuthRevokeResponseSchema = z.object({}).strict();
 
 /**
- * OAuth error envelope — the platform `HttpExceptionFilter` output when a
- * controller throws `BadRequestException({error, error_description})` with
- * a structured object payload (RFC 6749 §5.2 / §4.1.2.1 / RFC 7591 §3.2.2).
- *
- * The filter preserves the RFC keys via the `extra` spread at
- * `http-exception.filter.ts:143`, but layers them ON TOP of the platform
- * envelope (`statusCode`, `timestamp`, `path`, `method`, `detail`). The
- * `detail` field will typically be `'Request failed'` (fallback used when
- * neither `obj.detail` nor `obj.message` is set on the object payload).
- *
- * For string-form `BadRequestException('some message')` throws, the shape
- * is different: the filter emits `{error: 'Bad Request', message: '...'}`
- * (Nest default) alongside `detail` and no `error_description`. Modelled
- * `.optional()` on all four RFC/Nest keys so one schema accepts both
- * variants — each test asserts the specific key presence it expects via
- * dedicated semantic expectations.
- *
- * Also covers the RFC 7009 revoke `{error: 'invalid_token'}` branch and
- * the DCR `{error: 'invalid_client_metadata'}` branch.
+ * An error from an OAuth protocol route (`/oauth/authorize`, `/oauth/token`, `/oauth/revoke`,
+ * `/oauth/register`): the shape the standards define (RFC 6749 section 5.2, RFC 7591 section 3.2.2), written by
+ * `OAuthErrorFilter`. Exactly these two keys; never the app's error envelope.
  */
 export const OAuthErrorResponseSchema = z
   .object({
-    statusCode: z.number().int(),
-    timestamp: z.string(),
-    path: z.string(),
-    method: z.string(),
-    detail: z.string(),
-    // RFC-structured BadRequest: `{error, error_description}`.
-    error: z.string().optional(),
-    error_description: z.string().optional(),
-    // Nest string-BadRequest: `{error: 'Bad Request', message: '<msg>'}`.
-    message: z.string().optional(),
-    fieldErrors: z.record(z.string(), z.unknown()).optional(),
+    error: z.string().regex(/^[a-z][a-z_]*$/),
+    error_description: z.string(),
   })
   .strict();

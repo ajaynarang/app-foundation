@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import type { NotificationType } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 
 export interface WhatsAppTemplateContext {
   title: string;

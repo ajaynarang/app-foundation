@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DevService } from './dev.service';
+import { DevService, MAX_DEV_SWITCHER_USERS } from './dev.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { AuthService } from '@appshore/platform/auth/auth.service';
 import { LoginEventService } from '@appshore/platform/auth/login-event.service';
@@ -34,6 +34,31 @@ describe('DevService', () => {
     }).compile();
 
     service = module.get<DevService>(DevService);
+  });
+
+  describe('getUsers', () => {
+    it('never reads without a ceiling, and groups tenant users apart from super admins', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([
+        { userId: 'u_sa', email: 'sa@example.com', firstName: 'S', lastName: 'A', role: 'SUPER_ADMIN', tenant: null },
+        {
+          userId: 'u_1',
+          email: 'owner@example.com',
+          firstName: 'O',
+          lastName: 'W',
+          role: 'OWNER',
+          phone: null,
+          tenant: { tenantId: 'acme', companyName: 'Acme' },
+        },
+      ]);
+
+      const result = await service.getUsers();
+
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: MAX_DEV_SWITCHER_USERS }));
+      expect(result.superAdmins.map((user) => user.userId)).toEqual(['u_sa']);
+      expect(result.tenants).toEqual([
+        expect.objectContaining({ tenantId: 'acme', users: [expect.objectContaining({ userId: 'u_1' })] }),
+      ]);
+    });
   });
 
   describe('switchToUser', () => {

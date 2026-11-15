@@ -43,6 +43,7 @@ const flags = [
     enabled: true,
     category: 'ai',
   },
+  // feature:desk:start
   {
     key: 'desk',
     name: 'Desk',
@@ -50,6 +51,7 @@ const flags = [
     enabled: true,
     category: 'ai',
   },
+  // feature:desk:end
 
   // Integrations
   {

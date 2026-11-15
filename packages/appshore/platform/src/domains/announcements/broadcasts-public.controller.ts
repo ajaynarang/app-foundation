@@ -2,6 +2,8 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { AnnouncementsService } from './announcements.service';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { ActiveBroadcast } from './openapi.responses';
 
 @ApiTags('Broadcasts')
 @Controller('broadcasts')
@@ -11,6 +13,7 @@ export class BroadcastsPublicController {
 
   @Get('active')
   @ApiOperation({ summary: 'Get active broadcasts for current tenant' })
+  @ApiResult([ActiveBroadcast])
   findActive(@CurrentUser() user: any) {
     const tenantId = user?.tenantId;
     const planSlug = user?.planSlug;

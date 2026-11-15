@@ -19,6 +19,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix && pnpm --filter @appshore/db lint:schema",
     "type-check": "tsc --noEmit",
+    "// — API contract": "",
+    "openapi:generate": "ts-node scripts/generate-openapi.ts",
     "// — Testing": "",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -188,8 +190,7 @@
     "testPathIgnorePatterns": [
       "\\.schema\\.spec\\.ts$",
       "assistant\\.service\\.spec\\.ts$",
-      "langfuse-prompt\\.service\\.spec\\.ts$",
-      "desk/engine/__tests__/invocation\\.service\\.spec\\.ts$"
+      "langfuse-prompt\\.service\\.spec\\.ts$"
     ],
     "transform": {
       "^.+\\.(t|j)s$": [
@@ -200,6 +201,10 @@
         }
       ]
     },
+    "transformIgnorePatterns": [
+      "/node_modules/",
+      "/packages/appshore/db/generated/"
+    ],
     "collectCoverageFrom": [
       "src/**/*.(t|j)s"
     ],

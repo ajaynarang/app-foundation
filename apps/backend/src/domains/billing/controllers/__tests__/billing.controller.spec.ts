@@ -1,3 +1,6 @@
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { PaginationQueryDto } from '../../dto/billing.dto';
+import { WalletTransactionsQueryDto } from '../../dto/wallet.dto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BillingController } from '../billing.controller';
 import { SubscriptionService } from '../../services/subscription.service';
@@ -19,11 +22,11 @@ const mockWalletService = {
   getBalance: jest.fn().mockResolvedValue({ balanceCents: 10000 }),
   topUp: jest.fn().mockResolvedValue(undefined),
   updateAutoReload: jest.fn().mockResolvedValue(undefined),
-  getTransactions: jest.fn().mockResolvedValue({ items: [], cursor: null }),
+  getTransactions: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
 };
 
 const mockInvoiceService = {
-  listInvoices: jest.fn().mockResolvedValue({ items: [] }),
+  listInvoices: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
   getUpcomingInvoice: jest.fn().mockResolvedValue({ amountDueCents: 5000 }),
   downloadInvoice: jest.fn().mockResolvedValue({ url: 'https://pdf.com' }),
 };
@@ -89,32 +92,35 @@ describe('BillingController', () => {
   });
 
   describe('upgradePlan', () => {
-    it('should upgrade plan and return success', async () => {
+    it('should upgrade plan and answer the overview', async () => {
       const result = await controller.upgradePlan({ tenantId: 'TNT-1' }, 1, {
         newPlan: 'ENTERPRISE',
         newQuantity: 5,
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.upgradePlan).toHaveBeenCalledWith('TNT-1', 1, 'ENTERPRISE', 5);
     });
   });
 
   describe('downgradePlan', () => {
-    it('should downgrade plan and return success', async () => {
+    it('should downgrade plan and answer the overview', async () => {
       const result = await controller.downgradePlan({ tenantId: 'TNT-1' }, 1, {
         newPlan: 'STARTER',
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.downgradePlan).toHaveBeenCalledWith('TNT-1', 1, 'STARTER');
     });
   });
 
   describe('updateQuantity', () => {
-    it('should update quantity and return success', async () => {
+    it('should update quantity and answer the overview', async () => {
       const result = await controller.updateQuantity({ tenantId: 'TNT-1' }, 1, {
         quantity: 10,
       });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.updateQuantity).toHaveBeenCalledWith('TNT-1', 1, 10);
     });
   });
@@ -122,7 +128,8 @@ describe('BillingController', () => {
   describe('cancelSubscription', () => {
     it('should cancel subscription with reason', async () => {
       const result = await controller.cancelSubscription({ tenantId: 'TNT-1' }, 1, { reason: 'Too expensive' });
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.cancelSubscription).toHaveBeenCalledWith('TNT-1', 1, 'Too expensive');
     });
   });
@@ -130,7 +137,8 @@ describe('BillingController', () => {
   describe('reactivateSubscription', () => {
     it('should reactivate subscription', async () => {
       const result = await controller.reactivateSubscription({ tenantId: 'TNT-1' }, 1);
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockSubscriptionService.reactivateSubscription).toHaveBeenCalledWith('TNT-1', 1);
     });
   });
@@ -147,7 +155,8 @@ describe('BillingController', () => {
   describe('topUpWallet', () => {
     it('should top up wallet', async () => {
       const result = await controller.topUpWallet(1, { amountCents: 5000 });
-      expect(result).toEqual({ success: true });
+      // The action answers the wallet as it is now, not an acknowledgement.
+      expect(result).toEqual({ balanceCents: 10000 });
       expect(mockWalletService.topUp).toHaveBeenCalledWith(1, 5000);
     });
   });
@@ -160,7 +169,8 @@ describe('BillingController', () => {
         reloadAmountCents: 5000,
       };
       const result = await controller.updateAutoReload(1, dto);
-      expect(result).toEqual({ success: true });
+      // The action answers the wallet as it is now, not an acknowledgement.
+      expect(result).toEqual({ balanceCents: 10000 });
       expect(mockWalletService.updateAutoReload).toHaveBeenCalledWith(1, {
         enabled: true,
         thresholdCents: 1000,
@@ -171,14 +181,19 @@ describe('BillingController', () => {
 
   describe('getTransactions', () => {
     it('should return paginated transactions', async () => {
-      const query = { type: undefined, limit: 20, cursor: undefined } as any;
+      const query = await readQueryDto(WalletTransactionsQueryDto, { type: 'TOP_UP', limit: '20', cursor: 'abc' });
       const result = await controller.getTransactions(1, query);
-      expect(result).toEqual({ items: [], cursor: null });
-      expect(mockWalletService.getTransactions).toHaveBeenCalledWith(1, {
-        type: undefined,
-        limit: 20,
-        cursor: undefined,
-      });
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
+      expect(mockWalletService.getTransactions).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ type: 'TOP_UP', limit: 20, cursor: 'abc' }),
+      );
+    });
+
+    it('answers 400 on an unknown type, a limit that is not a number, or offset paging', async () => {
+      for (const raw of [{ type: 'bogus' }, { limit: 'abc' }, { offset: '10' }]) {
+        await expect(readQueryDto(WalletTransactionsQueryDto, raw)).rejects.toMatchObject({ status: 400 });
+      }
     });
   });
 
@@ -186,15 +201,15 @@ describe('BillingController', () => {
 
   describe('listInvoices', () => {
     it('should list invoices with pagination', async () => {
-      const result = await controller.listInvoices(1, {
-        limit: 10,
-        cursor: 'cur_1',
-      });
-      expect(result).toEqual({ items: [] });
-      expect(mockInvoiceService.listInvoices).toHaveBeenCalledWith(1, {
-        limit: 10,
-        cursor: 'cur_1',
-      });
+      const result = await controller.listInvoices(
+        1,
+        await readQueryDto(PaginationQueryDto, { limit: '10', cursor: 'cur_1' }),
+      );
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
+      expect(mockInvoiceService.listInvoices).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ limit: 10, cursor: 'cur_1' }),
+      );
     });
   });
 
@@ -235,7 +250,8 @@ describe('BillingController', () => {
   describe('setDefaultPaymentMethod', () => {
     it('should set default payment method', async () => {
       const result = await controller.setDefaultPaymentMethod(1, 'pm_123');
-      expect(result).toEqual({ success: true });
+      // The action answers the billing overview as it is now, not an acknowledgement.
+      expect(result).toEqual({ plan: 'PROFESSIONAL' });
       expect(mockPaymentMethodService.setDefault).toHaveBeenCalledWith(1, 'pm_123');
     });
   });
@@ -243,7 +259,8 @@ describe('BillingController', () => {
   describe('removePaymentMethod', () => {
     it('should remove payment method', async () => {
       const result = await controller.removePaymentMethod(1, 'pm_123');
-      expect(result).toEqual({ success: true });
+      // 204: nothing to return.
+      expect(result).toBeUndefined();
       expect(mockPaymentMethodService.removePaymentMethod).toHaveBeenCalledWith(1, 'pm_123');
     });
   });

@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { AdminJobsController } from '../admin-jobs.controller';
 import { JobService } from '@appshore/platform/infrastructure/queue/job.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
+import { readQueryDto } from '@appshore/kernel/shared/utils/query-dto';
+import { fieldErrorsOf } from '@appshore/platform/test/helpers/field-errors.helpers';
+import { AdminJobListQueryDto, AdminJobsTenantQueryDto } from '../dto/admin-jobs-query.dto';
+import { buildJobVocabulary, EMPTY_APP_JOB_VOCABULARY } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
+import { JOB_VOCABULARY } from '@appshore/platform/infrastructure/queue/job-vocabulary.token';
 
 describe('AdminJobsController', () => {
   let controller: AdminJobsController;
@@ -16,7 +21,7 @@ describe('AdminJobsController', () => {
 
   beforeEach(async () => {
     jobService = {
-      listAllJobsPaginated: jest.fn().mockResolvedValue({ jobs: [], total: 0 }),
+      listAllJobs: jest.fn().mockResolvedValue({ items: [], nextCursor: null, total: 0 }),
       getMetrics: jest.fn().mockResolvedValue({ total: 0 }),
       getCategorySummary: jest.fn().mockResolvedValue([]),
       getJob: jest.fn(),
@@ -73,75 +78,80 @@ describe('AdminJobsController', () => {
 
   // ─── listJobs ────────────────────────────────────────────────────────────
 
-  describe('listJobs', () => {
-    it('should list jobs with default pagination', async () => {
-      await controller.listJobs();
+  /** The query as the global pipe hands it to the handler. */
+  const listQuery = (raw: Record<string, unknown> = {}) => readQueryDto(AdminJobListQueryDto, raw);
+  const tenantQuery = (raw: Record<string, unknown> = {}) => readQueryDto(AdminJobsTenantQueryDto, raw);
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
-        tenantId: undefined,
-        category: undefined,
-        type: undefined,
-        status: undefined,
-        limit: 20,
-        offset: 0,
-        dateFrom: undefined,
-        dateTo: undefined,
-      });
+  describe('listJobs', () => {
+    it('lists with no filter and leaves the page size to the service default', async () => {
+      const result = await controller.listJobs(await listQuery());
+
+      const passed = jobService.listAllJobs.mock.calls[0][0];
+      expect(passed.limit).toBeUndefined();
+      expect(passed.cursor).toBeUndefined();
+      expect(result).toEqual({ items: [], nextCursor: null, total: 0 });
     });
 
     it('should parse query parameters correctly', async () => {
       await controller.listJobs(
-        '5',
-        'documents',
-        'ratecon',
-        'COMPLETED,FAILED',
-        '50',
-        '10',
-        '2026-01-01',
-        '2026-01-31',
+        await listQuery({
+          tenant_id: '5',
+          category: 'documents',
+          type: 'ratecon',
+          status: 'COMPLETED,FAILED',
+          limit: '50',
+          cursor: 'abc',
+          date_from: '2026-01-01',
+          date_to: '2026-01-31',
+        }),
       );
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith({
-        tenantId: 5,
-        category: 'documents',
-        type: 'ratecon',
-        status: ['COMPLETED', 'FAILED'],
-        limit: 50,
-        offset: 10,
-        dateFrom: '2026-01-01',
-        dateTo: '2026-01-31',
-      });
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 5,
+          category: 'documents',
+          type: 'ratecon',
+          statuses: ['COMPLETED', 'FAILED'],
+          limit: 50,
+          cursor: 'abc',
+          dateFrom: '2026-01-01',
+          dateTo: '2026-01-31',
+        }),
+      );
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.listJobs('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(listQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
+    });
+
+    it('refuses the camelCase keys the route used to read (tenantId, dateFrom, dateTo)', async () => {
+      expect(await fieldErrorsOf(listQuery({ tenantId: '5' }))).toHaveProperty('tenantId');
+      expect(await fieldErrorsOf(listQuery({ dateFrom: '2026-01-01' }))).toHaveProperty('dateFrom');
+      expect(await fieldErrorsOf(listQuery({ dateTo: '2026-01-31' }))).toHaveProperty('dateTo');
     });
 
     it('should cap limit at 100', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, '999');
+      await controller.listJobs(await listQuery({ limit: '999' }));
 
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
     });
 
-    it('should default NaN limit to 20', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, 'bad');
-
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 20 }));
+    it('answers 400 naming limit when it is not a whole number, and refuses offset paging', async () => {
+      expect(await fieldErrorsOf(listQuery({ limit: 'bad' }))).toHaveProperty('limit');
+      expect(await fieldErrorsOf(listQuery({ offset: '10' }))).toHaveProperty('offset');
     });
 
-    it('should default NaN offset to 0', async () => {
-      await controller.listJobs(undefined, undefined, undefined, undefined, undefined, 'bad');
-
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
+    it('answers 400 naming a date that is not a date', async () => {
+      expect(await fieldErrorsOf(listQuery({ date_from: 'yesterday' }))).toHaveProperty('date_from');
     });
 
-    it('should split comma-separated status string and reject unknown values', async () => {
-      // 'pending' and 'active' are not valid JobStatus values; controller filters them out.
-      await controller.listJobs(undefined, undefined, undefined, 'QUEUED,PROCESSING,bogus');
-
-      expect(jobService.listAllJobsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ status: ['QUEUED', 'PROCESSING'] }),
+    it('splits a comma-joined status and answers 400 on an unknown value', async () => {
+      await controller.listJobs(await listQuery({ status: 'QUEUED,PROCESSING' }));
+      expect(jobService.listAllJobs).toHaveBeenCalledWith(
+        expect.objectContaining({ statuses: ['QUEUED', 'PROCESSING'] }),
       );
+
+      expect(await fieldErrorsOf(listQuery({ status: 'QUEUED,bogus' }))).toHaveProperty('status');
     });
   });
 
@@ -149,35 +159,36 @@ describe('AdminJobsController', () => {
 
   describe('getMetrics', () => {
     it('should return metrics without tenantId', async () => {
-      await controller.getMetrics();
+      await controller.getMetrics(await tenantQuery());
 
       expect(jobService.getMetrics).toHaveBeenCalledWith(undefined);
     });
 
     it('should return metrics with parsed tenantId', async () => {
-      await controller.getMetrics('42');
+      await controller.getMetrics(await tenantQuery({ tenant_id: '42' }));
 
       expect(jobService.getMetrics).toHaveBeenCalledWith(42);
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.getMetrics('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(tenantQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
     });
   });
 
   // ─── getCategorySummary ──────────────────────────────────────────────────
 
   describe('getCategorySummary', () => {
-    it('should throw BadRequestException when tenantId is missing', async () => {
-      await expect(controller.getCategorySummary()).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is missing', async () => {
+      const fields = await fieldErrorsOf(tenantQuery().then((query) => controller.getCategorySummary(query)));
+      expect(fields).toHaveProperty('tenant_id');
     });
 
-    it('should throw BadRequestException for non-numeric tenantId', async () => {
-      await expect(controller.getCategorySummary('abc')).rejects.toThrow(BadRequestException);
+    it('answers 400 naming tenant_id when it is not a number', async () => {
+      expect(await fieldErrorsOf(tenantQuery({ tenant_id: 'abc' }))).toHaveProperty('tenant_id');
     });
 
     it('should call getCategorySummary with correct params', async () => {
-      await controller.getCategorySummary('10');
+      await controller.getCategorySummary(await tenantQuery({ tenant_id: '10' }));
 
       expect(jobService.getCategorySummary).toHaveBeenCalledWith(
         10,
@@ -219,10 +230,13 @@ describe('AdminJobsController', () => {
       await expect(controller.retryJob(999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw BadRequestException when job is not failed', async () => {
+    it('answers 409 INVALID_STATE when the job has not failed', async () => {
       jobService.getJob.mockResolvedValue({ id: 101, status: 'COMPLETED' });
 
-      await expect(controller.retryJob(101)).rejects.toThrow(BadRequestException);
+      await expect(controller.retryJob(101)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should retry a failed maintenance job (routes to bulk-ops queue)', async () => {
@@ -281,7 +295,7 @@ describe('AdminJobsController', () => {
       expect(result).toEqual({ jobId: 102, status: 'QUEUED' });
     });
 
-    it('should throw BadRequestException for unsupported category', async () => {
+    it('answers 409 INVALID_STATE for a category that cannot be retried', async () => {
       jobService.getJob.mockResolvedValue({
         id: 104,
         status: 'FAILED',
@@ -289,7 +303,10 @@ describe('AdminJobsController', () => {
         inputData: {},
       });
 
-      await expect(controller.retryJob(104)).rejects.toThrow(BadRequestException);
+      await expect(controller.retryJob(104)).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'INVALID_STATE' },
+      });
     });
 
     it('should handle null inputData', async () => {
@@ -333,11 +350,13 @@ describe('AdminJobsController', () => {
         id: 1,
         companyName: 'Test',
       });
+      const pausedAt = new Date();
       prisma.tenant.update.mockResolvedValue({
         id: 1,
+        tenantId: 'acme',
         companyName: 'Test',
         jobsPaused: true,
-        jobsPausedAt: new Date(),
+        jobsPausedAt: pausedAt,
       });
 
       const result = await controller.pauseJobs(1, mockUser);
@@ -349,14 +368,10 @@ describe('AdminJobsController', () => {
           jobsPausedAt: expect.any(Date),
           jobsPausedBy: 1,
         },
-        select: {
-          id: true,
-          companyName: true,
-          jobsPaused: true,
-          jobsPausedAt: true,
-        },
+        select: { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true },
       });
-      expect(result.jobsPaused).toBe(true);
+      // The tenant is named by its public slug; the Int key never leaves the handler.
+      expect(result).toEqual({ tenantId: 'acme', companyName: 'Test', jobsPaused: true, jobsPausedAt: pausedAt });
     });
   });
 
@@ -376,8 +391,10 @@ describe('AdminJobsController', () => {
       });
       prisma.tenant.update.mockResolvedValue({
         id: 1,
+        tenantId: 'acme',
         companyName: 'Test',
         jobsPaused: false,
+        jobsPausedAt: null,
       });
 
       const result = await controller.resumeJobs(1);
@@ -385,9 +402,63 @@ describe('AdminJobsController', () => {
       expect(prisma.tenant.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { jobsPaused: false, jobsPausedAt: null, jobsPausedBy: null },
-        select: { id: true, companyName: true, jobsPaused: true },
+        select: { tenantId: true, companyName: true, jobsPaused: true, jobsPausedAt: true },
       });
-      expect(result.jobsPaused).toBe(false);
+      expect(result).toEqual({ tenantId: 'acme', companyName: 'Test', jobsPaused: false, jobsPausedAt: null });
+    });
+  });
+
+  // ─── the app's job vocabulary ────────────────────────────────────────────
+
+  describe("with the app's job vocabulary (JOB_VOCABULARY)", () => {
+    let appController: AdminJobsController;
+    const reports = { add: jest.fn().mockResolvedValue({}) };
+
+    beforeEach(async () => {
+      const vocabulary = buildJobVocabulary({
+        ...EMPTY_APP_JOB_VOCABULARY,
+        queueNames: { REPORTS: 'reports' },
+        jobNames: { REPORTS: { BUILD: 'report-build' } },
+        categories: {
+          reports: { display: 'Reports', queue: 'reports', requiredIntegration: null, tenantVisible: true },
+        },
+      });
+      const module = await Test.createTestingModule({
+        controllers: [AdminJobsController],
+        providers: [
+          { provide: JobService, useValue: jobService },
+          { provide: PrismaService, useValue: prisma },
+          { provide: JOB_VOCABULARY, useValue: vocabulary },
+          { provide: getQueueToken('reports'), useValue: reports },
+          ...Object.entries(queues).map(([name, queue]) => ({ provide: getQueueToken(name), useValue: queue })),
+        ],
+      }).compile();
+      appController = module.get(AdminJobsController);
+    });
+
+    it("retries a failed job of an app category on the app's queue", async () => {
+      jobService.getJob.mockResolvedValue({
+        id: 201,
+        status: 'FAILED',
+        category: 'reports',
+        type: 'report-build',
+        tenantId: 1,
+        inputData: {},
+      });
+
+      await appController.retryJob(201);
+
+      expect(reports.add).toHaveBeenCalledWith('report-build', expect.any(Object), { jobId: 'reports-201' });
+    });
+
+    it('summarizes every category, app ones included, with their queues', async () => {
+      await appController.getCategorySummary(await tenantQuery({ tenant_id: '10' }));
+
+      expect(jobService.getCategorySummary).toHaveBeenCalledWith(
+        10,
+        expect.arrayContaining(['maintenance', 'reports']),
+        expect.objectContaining({ reports: reports, [QUEUE_NAMES.BULK_OPS]: queues[QUEUE_NAMES.BULK_OPS] }),
+      );
     });
   });
 });

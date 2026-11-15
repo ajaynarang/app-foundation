@@ -5,13 +5,28 @@ import { UserRole } from '@appshore/db';
 import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { AdminAiSpendService } from './admin-ai-spend.service';
 import { UpdateAiBudgetDto } from './dto/update-ai-budget.dto';
+import {
+  AiSpendInvocationListQueryDto,
+  AiSpendTenantListQueryDto,
+  AiSpendQuotaWindowQueryDto,
+  AiSpendWindowQueryDto,
+} from './dto/ai-spend-query.dto';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import {
+  AdminAiBudgetResponse,
+  AdminAiCostVsQuotaResponse,
+  AdminAiSpendInvocationListResponse,
+  AdminAiSpendSummaryResponse,
+  AdminAiSpendSurfaceRowResponse,
+  AdminAiSpendTenantListResponse,
+} from './openapi.responses';
 
 /**
  * Super-admin AI Spend view. Reads from the `vw_ai_cost_*` views over
  * `ai_invocations`. Three endpoints:
  *
- *   GET /admin/ai-spend/tenants?days=7
- *      → per-tenant totals + sparkline, sorted by spend desc.
+ *   GET /admin/ai-spend/tenants?days=7&q=&limit=&cursor=
+ *      → cursor-paged per-tenant totals + sparkline, highest spend first.
  *
  *   GET /admin/ai-spend/tenants/:tenant_id/by-surface?days=7
  *      → per-surface breakdown for one tenant in the window.
@@ -33,68 +48,56 @@ export class AdminAiSpendController {
   constructor(private readonly service: AdminAiSpendService) {}
 
   @Get('tenants')
-  @ApiOperation({ summary: 'List tenants with their N-day AI spend' })
-  async listTenants(@Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 7);
-    return this.service.listTenantSummaries({ days });
+  @ApiOperation({ summary: 'Tenants with their N-day AI spend: cursor-paged, highest spend first' })
+  @ApiResult(AdminAiSpendTenantListResponse)
+  async listTenants(@Query() query: AiSpendTenantListQueryDto) {
+    return this.service.listTenants(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'The N-day AI spend across every tenant, in one figure' })
+  @ApiResult(AdminAiSpendSummaryResponse)
+  async summary(@Query() query: AiSpendWindowQueryDto) {
+    return this.service.getSummary({ days: query.days });
   }
 
   @Get('tenants/:tenant_id/by-surface')
   @ApiOperation({ summary: 'Per-surface AI spend breakdown for one tenant' })
-  @ApiParam({ name: 'tenant_id' })
-  async surfaceBreakdown(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 7);
-    return this.service.listSurfaceBreakdown({ tenantId, days });
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult([AdminAiSpendSurfaceRowResponse])
+  async surfaceBreakdown(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendWindowQueryDto) {
+    return this.service.listSurfaceBreakdown({ tenantId, days: query.days });
   }
 
   @Get('tenants/:tenant_id/invocations')
   @ApiOperation({ summary: 'List AI invocations for one tenant (cursor-paginated)' })
-  @ApiParam({ name: 'tenant_id' })
-  async invocations(
-    @Param('tenant_id', ParseIntPipe) tenantId: number,
-    @Query('surface') surface?: string,
-    @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string,
-  ) {
-    const parsedLimit = parseInt(limit ?? '50', 10);
-    return this.service.listInvocations({
-      tenantId,
-      surface,
-      limit: Number.isFinite(parsedLimit) ? parsedLimit : 50,
-      cursor,
-    });
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiSpendInvocationListResponse)
+  async invocations(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendInvocationListQueryDto) {
+    return this.service.listInvocations({ tenantId, surface: query.surface, limit: query.limit, cursor: query.cursor });
   }
 
   @Get('tenants/:tenant_id/budget')
   @ApiOperation({ summary: "Get a tenant's AI cost budget caps" })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiBudgetResponse)
   async getBudget(@Param('tenant_id', ParseIntPipe) tenantId: number) {
     return this.service.getBudget(tenantId);
   }
 
   @Patch('tenants/:tenant_id/budget')
   @ApiOperation({ summary: "Update a tenant's AI cost budget caps" })
-  @ApiParam({ name: 'tenant_id' })
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiBudgetResponse)
   async updateBudget(@Param('tenant_id', ParseIntPipe) tenantId: number, @Body() dto: UpdateAiBudgetDto) {
     return this.service.updateBudget(tenantId, dto);
   }
 
   @Get('tenants/:tenant_id/cost-vs-quota')
   @ApiOperation({ summary: 'Cost (USD) vs quota (feature counts) for one tenant, side by side' })
-  @ApiParam({ name: 'tenant_id' })
-  async costVsQuota(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query('days') daysParam?: string) {
-    const days = clampDays(daysParam, 30);
-    return this.service.getCostVsQuota({ tenantId, days });
+  @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
+  @ApiResult(AdminAiCostVsQuotaResponse)
+  async costVsQuota(@Param('tenant_id', ParseIntPipe) tenantId: number, @Query() query: AiSpendQuotaWindowQueryDto) {
+    return this.service.getCostVsQuota({ tenantId, days: query.days });
   }
-}
-
-/**
- * Clamp the `?days=` query param to [1, 90]. Pre-validated default keeps
- * the home view fast and stops a runaway 365-day scan from a malicious or
- * fat-fingered request.
- */
-function clampDays(raw: string | undefined, fallback: number): number {
-  const parsed = parseInt(raw ?? '', 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(Math.max(parsed, 1), 90);
 }

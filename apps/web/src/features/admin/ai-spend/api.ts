@@ -1,12 +1,13 @@
 /**
  * AI Spend API client — read-only, super-admin scoped.
  *
- * Mirrors the backend `admin/ai-spend` controller. The invocation list is
- * cursor-paginated; pass `cursor` from the previous page's `nextCursor`.
+ * Mirrors the backend `admin/ai-spend` controller. The tenant list and the invocation list are cursor lists:
+ * pass `cursor` from the previous page's `nextCursor`.
  */
 import { apiClient } from '@appshore/web-core/shared/lib/api';
 import type {
-  AiSpendTenantSummary,
+  AiSpendSummary,
+  AiSpendTenantList,
   AiSpendSurfaceRow,
   AiSpendInvocationList,
   AiBudget,
@@ -25,7 +26,10 @@ function toQuery(params: Record<string, unknown>): string {
 }
 
 export const aiSpendApi = {
-  tenants: (days: number) => apiClient<AiSpendTenantSummary[]>(`/admin/ai-spend/tenants${toQuery({ days })}`),
+  tenants: (params: { days: number; q?: string; limit?: number; cursor?: string }) =>
+    apiClient<AiSpendTenantList>(`/admin/ai-spend/tenants${toQuery(params)}`),
+
+  summary: (days: number) => apiClient<AiSpendSummary>(`/admin/ai-spend/summary${toQuery({ days })}`),
 
   bySurface: (tenantId: number, days: number) =>
     apiClient<AiSpendSurfaceRow[]>(`/admin/ai-spend/tenants/${tenantId}/by-surface${toQuery({ days })}`),

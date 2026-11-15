@@ -1,21 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
-  IsBoolean,
   IsDateString,
   IsIn,
-  IsInt,
   IsOptional,
   IsString,
-  Max,
-  Min,
   Validate,
   ValidatorConstraint,
   type ValidationArguments,
   type ValidatorConstraintInterface,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { LoginEventStatusSchema, type LoginEventStatus, type ListLoginActivityQuery } from '@app/shared-types';
+import { CursorQueryDto, QueryBool, QueryInt, QuerySearch } from '@appshore/kernel/shared/utils/query-dto';
 import { LOGIN_ACTIVITY } from '../constants';
 
 const MS_PER_DAY = 86_400_000;
@@ -41,7 +38,8 @@ export class RangeNotOver90Days implements ValidatorConstraintInterface {
 
 const LOGIN_EVENT_STATUSES = LoginEventStatusSchema.options;
 
-export class ListLoginActivityQueryDto implements Omit<ListLoginActivityQuery, 'limit' | 'offset'> {
+/** `limit` (a whole number, clamped 1…100) and `cursor` come from {@link CursorQueryDto}. */
+export class ListLoginActivityQueryDto extends CursorQueryDto implements Omit<ListLoginActivityQuery, 'limit'> {
   @ApiProperty({ example: '2026-05-19', description: 'Range start (ISO date)' })
   @IsDateString()
   from!: string;
@@ -63,9 +61,8 @@ export class ListLoginActivityQueryDto implements Omit<ListLoginActivityQuery, '
   @IsIn(LOGIN_EVENT_STATUSES, { each: true })
   statuses?: LoginEventStatus[];
 
-  @ApiProperty({ required: false, description: 'Free-text user search (email or name)' })
-  @IsOptional()
-  @IsString()
+  /** Free-text user search (email or name). */
+  @QuerySearch({ name: 'user_query', description: 'Free-text user search (email or name)' })
   userQuery?: string;
 
   @ApiProperty({ required: false, description: 'Filter by IP address' })
@@ -85,37 +82,11 @@ export class ListLoginActivityQueryDto implements Omit<ListLoginActivityQuery, '
   @IsString({ each: true })
   roles?: string[];
 
-  @ApiProperty({ required: false, description: 'Scope to a specific tenant' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  /** Scope to one tenant (the numeric id; the super-admin route only). */
+  @QueryInt({ name: 'tenant_id', min: 1, max: 2_147_483_647, description: 'Scope to a specific tenant' })
   tenantId?: number;
 
-  @ApiProperty({
-    required: false,
-    description: 'Exclude SUPER_ADMIN users from results (Super Admin endpoint only)',
-  })
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
+  /** Exclude SUPER_ADMIN users from results (the super-admin route only). `true` / `false`. */
+  @QueryBool({ name: 'exclude_super_admin', description: 'Exclude SUPER_ADMIN users (super-admin route only)' })
   excludeSuperAdmin?: boolean;
-
-  @ApiProperty({
-    required: false,
-    default: LOGIN_ACTIVITY.DEFAULT_PAGE_LIMIT,
-    description: 'Page size',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(LOGIN_ACTIVITY.MAX_PAGE_LIMIT)
-  limit?: number = LOGIN_ACTIVITY.DEFAULT_PAGE_LIMIT;
-
-  @ApiProperty({ required: false, default: 0, description: 'Page offset' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number = 0;
 }

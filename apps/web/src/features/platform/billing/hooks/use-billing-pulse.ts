@@ -37,7 +37,7 @@ export interface StatusBreakdown {
 export function useBillingPulse() {
   const tenantsQuery = useQuery({
     queryKey: queryKeys.admin.billingTenants,
-    queryFn: () => billingApi.getTenants(),
+    queryFn: () => billingApi.getTenants<Tenant>(),
     ...QUERY_TIERS.STATIC,
   });
 

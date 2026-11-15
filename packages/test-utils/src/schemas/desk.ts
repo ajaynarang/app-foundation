@@ -9,11 +9,11 @@
  *
  *   - DeskApprovalRowSchema           — bare DeskApproval row from claim/decide
  *   - DeskApprovalListItemSchema      — approval row + nested episode (queue view)
- *   - DeskApprovalListSchema          — z.array(DeskApprovalListItemSchema)
+ *   - DeskApprovalListSchema          — cursor list of DeskApprovalListItemSchema
  *
  *   - DeskEpisodeStepSchema           — single step row in episode detail
  *   - DeskEpisodeRowSchema            — bare episode row (list-item shape)
- *   - DeskEpisodeListSchema           — { rows, nextCursor } cursor envelope
+ *   - DeskEpisodeListSchema           — cursor list { items, nextCursor, total }
  *   - DeskEpisodeDetailSchema         — episode + nested steps[] + approvals[]
  *
  *   - DeskMemoryRowSchema             — single memory row from list
@@ -33,7 +33,7 @@
  *     test-utils convention so a server-side type drift trips contract).
  */
 import { z } from 'zod';
-import { isoDateString } from './helpers.js';
+import { isoDateString, cursorListOf } from './helpers.js';
 
 // ── ENUMS ─────────────────────────────────────────────────────────────
 
@@ -111,13 +111,8 @@ export const DeskApprovalListItemSchema = DeskApprovalRowSchema.extend({
 }).strict();
 export type DeskApprovalListItem = z.infer<typeof DeskApprovalListItemSchema>;
 
-/**
- * `GET /desk/approvals` returns a bare array (NOT envelope-wrapped).
- * Pagination is via `?limit=` only — the `take: limit` slice is the
- * only pagination signal returned. May be empty on tenants with no
- * pending approvals.
- */
-export const DeskApprovalListSchema = z.array(DeskApprovalListItemSchema);
+/** `GET /desk/approvals`: a cursor list of pending approvals, oldest request first. */
+export const DeskApprovalListSchema = cursorListOf(DeskApprovalListItemSchema);
 export type DeskApprovalList = z.infer<typeof DeskApprovalListSchema>;
 
 // ── DESK EPISODE STEP ─────────────────────────────────────────────────
@@ -194,16 +189,8 @@ export const DeskEpisodeRowSchema = z
   .strict();
 export type DeskEpisodeRow = z.infer<typeof DeskEpisodeRowSchema>;
 
-/**
- * `GET /desk/episodes` — `{ rows, nextCursor }` cursor envelope
- * (service line 53-56). nextCursor is null on the final page.
- */
-export const DeskEpisodeListSchema = z
-  .object({
-    rows: z.array(DeskEpisodeRowSchema),
-    nextCursor: z.string().nullable(),
-  })
-  .strict();
+/** `GET /desk/episodes`: a cursor list, most recently opened first. `nextCursor` is null on the final page. */
+export const DeskEpisodeListSchema = cursorListOf(DeskEpisodeRowSchema);
 export type DeskEpisodeList = z.infer<typeof DeskEpisodeListSchema>;
 
 /**

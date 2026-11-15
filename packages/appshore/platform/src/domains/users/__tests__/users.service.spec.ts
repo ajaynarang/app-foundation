@@ -3,6 +3,7 @@ import { NotFoundException, ForbiddenException, BadRequestException } from '@nes
 import { UsersService } from '../users.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { USER_LIFECYCLE_HOOKS } from '../../platform-hooks';
+import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -29,6 +30,7 @@ describe('UsersService', () => {
       tenant: { findUnique: jest.fn() },
       user: {
         findMany: jest.fn(),
+        count: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -54,34 +56,106 @@ describe('UsersService', () => {
     service = module.get<UsersService>(UsersService);
   });
 
-  describe('getAllUsers', () => {
-    it('should return users for a given tenant', async () => {
+  describe('listUsers: a cursor list, newest first', () => {
+    it('lists the users of a given tenant, without the Int key', async () => {
       prisma.tenant.findUnique.mockResolvedValue(mockTenant);
       prisma.user.findMany.mockResolvedValue([mockUser]);
+      prisma.user.count.mockResolvedValue(1);
 
-      const result = await service.getAllUsers('tenant_abc');
+      const result = await service.listUsers('tenant_abc');
 
       expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { tenantId: 'tenant_abc' },
       });
-      expect(result).toHaveLength(1);
-      expect(result[0].userId).toBe('user_1234abcd');
-      expect(result[0].email).toBe('john@example.com');
+      expect(result).toMatchObject({ nextCursor: null, total: 1 });
+      expect(result.items[0].userId).toBe('user_1234abcd');
+      expect(result.items[0].email).toBe('john@example.com');
+      expect(prisma.user.findMany.mock.calls[0][0].select).not.toHaveProperty('id');
     });
 
     it('should throw NotFoundException when tenant not found', async () => {
       prisma.tenant.findUnique.mockResolvedValue(null);
 
-      await expect(service.getAllUsers('bad_tenant')).rejects.toThrow(NotFoundException);
+      await expect(service.listUsers('bad_tenant')).rejects.toThrow(NotFoundException);
     });
 
-    it('should return all users when no tenantId provided', async () => {
+    it('lists every tenant when no tenantId is provided', async () => {
       prisma.user.findMany.mockResolvedValue([mockUser]);
+      prisma.user.count.mockResolvedValue(1);
 
-      const result = await service.getAllUsers();
+      const result = await service.listUsers();
 
       expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+    });
+
+    describe('walking pages over a fixture', () => {
+      // Users imported together share a timestamp; one super admin and one other-tenant user must never appear.
+      const stamps = tiedTimestamps(8);
+      const rows = stamps.map((createdAt, index) => ({
+        id: index + 1,
+        userId: `user_${(index * 5) % 8}`,
+        tenantId: index === 7 ? 99 : 1,
+        email: `person${index}@example.com`,
+        firstName: index === 2 ? 'Ada' : 'Sam',
+        lastName: 'Lovelace',
+        role: index === 6 ? 'SUPER_ADMIN' : 'MEMBER',
+        createdAt,
+      }));
+
+      beforeEach(() => {
+        prisma.tenant.findUnique.mockResolvedValue({ ...mockTenant, id: 1 });
+        Object.assign(prisma.user, fixtureModel(rows));
+      });
+
+      it("returns each of the tenant's users once, ties included, and never a super admin", async () => {
+        const { pages, items } = await walkCursorList((cursor) =>
+          service.listUsers('tenant_abc', { limit: 2, cursor }),
+        );
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 2]);
+        expect(items.map((user) => user.userId).sort()).toEqual(
+          ['user_0', 'user_5', 'user_2', 'user_7', 'user_4', 'user_1'].sort(),
+        );
+        const times = items.map((user) => user.createdAt.getTime());
+        expect(times).toEqual([...times].sort((a, b) => b - a));
+      });
+
+      it('searches by name or email and counts only what matches', async () => {
+        const page = await service.listUsers('tenant_abc', { q: 'ada' });
+        expect(page.items.map((user) => user.firstName)).toEqual(['Ada']);
+        expect(page.total).toBe(1);
+      });
+
+      it('keeps the search on every page: the keyset never replaces the search OR', async () => {
+        // Sam and Ada alternate, three to a millisecond: a page that dropped the search would hold an Ada.
+        const alternating = tiedTimestamps(9).map((createdAt, index) => ({
+          id: index + 1,
+          userId: `user_${(index * 4) % 9}`,
+          tenantId: 1,
+          email: `person${index}@example.com`,
+          firstName: index % 2 === 0 ? 'Sam' : 'Ada',
+          lastName: 'Lovelace',
+          role: 'MEMBER',
+          createdAt,
+        }));
+        Object.assign(prisma.user, fixtureModel(alternating));
+
+        const { pages, items } = await walkCursorList(async (cursor) => {
+          const page = await service.listUsers('tenant_abc', { q: 'sam', limit: 2, cursor });
+          expect(page.total).toBe(5);
+          return page;
+        });
+
+        expect(pages.map((page) => page.length)).toEqual([2, 2, 1]);
+        for (const page of pages) expect(page.every((user) => user.firstName === 'Sam')).toBe(true);
+        expect(new Set(items.map((user) => user.userId)).size).toBe(5);
+      });
+
+      it('answers 400 on a cursor it did not issue, before any query runs', async () => {
+        await expect(service.listUsers('tenant_abc', { cursor: 'nope' })).rejects.toMatchObject({ status: 400 });
+        expect(prisma.user.findMany).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -101,13 +175,13 @@ describe('UsersService', () => {
       await expect(service.getUser('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException if user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other_tenant', companyName: 'OtherCo' },
       });
 
-      await expect(service.getUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.getUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -195,14 +269,14 @@ describe('UsersService', () => {
       await expect(service.updateUser('nonexistent', { firstName: 'Jane' })).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException if user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
       await expect(service.updateUser('user_1234abcd', { firstName: 'Jane' }, 'tenant_abc')).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
       );
     });
 
@@ -256,9 +330,9 @@ describe('UsersService', () => {
       prisma.user.findUnique.mockResolvedValue(mockUser);
       prisma.user.update.mockResolvedValue({ ...mockUser, isActive: false });
 
-      const result = await service.deleteUser('user_1234abcd');
+      // DELETE answers 204: the service returns nothing.
+      await expect(service.deleteUser('user_1234abcd')).resolves.toBeUndefined();
 
-      expect(result.message).toBe('User deactivated successfully');
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { userId: 'user_1234abcd' },
         data: { isActive: false },
@@ -285,13 +359,13 @@ describe('UsersService', () => {
       );
     });
 
-    it('should throw ForbiddenException when user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
-      await expect(service.deleteUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.deleteUser('user_1234abcd', 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -302,7 +376,10 @@ describe('UsersService', () => {
 
       const result = await service.toggleUserStatus('user_1234abcd', true);
 
-      expect(result.message).toBe('User activated successfully');
+      // The action answers the user as they are now, not an acknowledgement.
+      expect(result).toMatchObject({ userId: 'user_1234abcd' });
+      expect(result).not.toHaveProperty('message');
+      expect(prisma.user.update).toHaveBeenCalledWith({ where: { userId: 'user_1234abcd' }, data: { isActive: true } });
     });
 
     it('should deactivate a user', async () => {
@@ -311,7 +388,11 @@ describe('UsersService', () => {
 
       const result = await service.toggleUserStatus('user_1234abcd', false);
 
-      expect(result.message).toBe('User deactivated successfully');
+      expect(result).toMatchObject({ userId: 'user_1234abcd' });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 'user_1234abcd' },
+        data: { isActive: false },
+      });
     });
 
     it('should throw NotFoundException if user not found', async () => {
@@ -336,13 +417,13 @@ describe('UsersService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should throw ForbiddenException when user from different tenant', async () => {
+    it("answers 404 for another workspace's user: a 403 would confirm it exists", async () => {
       prisma.user.findUnique.mockResolvedValue({
         ...mockUser,
         tenant: { tenantId: 'other', companyName: 'Other' },
       });
 
-      await expect(service.toggleUserStatus('user_1234abcd', false, 'tenant_abc')).rejects.toThrow(ForbiddenException);
+      await expect(service.toggleUserStatus('user_1234abcd', false, 'tenant_abc')).rejects.toThrow(NotFoundException);
     });
   });
 });

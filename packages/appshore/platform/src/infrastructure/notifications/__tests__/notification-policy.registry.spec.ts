@@ -1,9 +1,11 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { DeliveryChannel, NotificationCategory, NotificationType } from '@appshore/db';
+import { DeliveryChannel, NotificationCategory } from '@appshore/db';
+import { PLATFORM_NOTIFICATION_TYPES, PlatformNotificationType, type NotificationType } from '@app/shared-types';
 import {
   CHANNEL_RULES,
   NOTIFICATION_POLICIES,
+  NOTIFICATION_TYPES,
   NOTIFICATION_URGENCIES,
   policy,
   type NotificationPolicyMap,
@@ -13,19 +15,23 @@ import { PLATFORM_NOTIFICATION_POLICIES } from '../platform-notification-policie
 
 describe('NotificationPolicyRegistry', () => {
   const appMap: NotificationPolicyMap = {
-    [NotificationType.ROLE_CHANGED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.CRITICAL, {
+    [PlatformNotificationType.ROLE_CHANGED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.CRITICAL, {
       inApp: CHANNEL_RULES.ALWAYS,
       sms: CHANNEL_RULES.FALLBACK,
     }),
-    [NotificationType.SETTINGS_UPDATED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.INFORMATIONAL, {
-      email: CHANNEL_RULES.OPT_IN,
-    }),
+    [PlatformNotificationType.SETTINGS_UPDATED]: policy(
+      NotificationCategory.BILLING,
+      NOTIFICATION_URGENCIES.INFORMATIONAL,
+      {
+        email: CHANNEL_RULES.OPT_IN,
+      },
+    ),
   };
 
   it('boots with no app map bound', () => {
     const registry = new NotificationPolicyRegistry();
-    expect(registry.get(NotificationType.USER_JOINED)).toEqual(
-      PLATFORM_NOTIFICATION_POLICIES[NotificationType.USER_JOINED],
+    expect(registry.get(PlatformNotificationType.USER_JOINED)).toEqual(
+      PLATFORM_NOTIFICATION_POLICIES[PlatformNotificationType.USER_JOINED],
     );
   });
 
@@ -33,19 +39,19 @@ describe('NotificationPolicyRegistry', () => {
     const registry = new NotificationPolicyRegistry(appMap);
     expect(registry.types()).toEqual(
       expect.arrayContaining([
-        NotificationType.USER_JOINED,
-        NotificationType.ROLE_CHANGED,
-        NotificationType.SETTINGS_UPDATED,
+        PlatformNotificationType.USER_JOINED,
+        PlatformNotificationType.ROLE_CHANGED,
+        PlatformNotificationType.SETTINGS_UPDATED,
       ]),
     );
-    expect(registry.categoryOf(NotificationType.ROLE_CHANGED)).toBe(NotificationCategory.BILLING);
+    expect(registry.categoryOf(PlatformNotificationType.ROLE_CHANGED)).toBe(NotificationCategory.BILLING);
   });
 
   it('the app map overrides a platform type — an app may change how a foundation type behaves for its users', () => {
     const override = {
-      [NotificationType.USER_JOINED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.TIMELY, {}),
+      [PlatformNotificationType.USER_JOINED]: policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.TIMELY, {}),
     };
-    expect(new NotificationPolicyRegistry(override).categoryOf(NotificationType.USER_JOINED)).toBe(
+    expect(new NotificationPolicyRegistry(override).categoryOf(PlatformNotificationType.USER_JOINED)).toBe(
       NotificationCategory.BILLING,
     );
   });
@@ -59,20 +65,78 @@ describe('NotificationPolicyRegistry', () => {
     const module = await Test.createTestingModule({
       providers: [NotificationPolicyRegistry, { provide: NOTIFICATION_POLICIES, useValue: appMap }],
     }).compile();
-    expect(module.get(NotificationPolicyRegistry).categoryOf(NotificationType.ROLE_CHANGED)).toBe(
+    expect(module.get(NotificationPolicyRegistry).categoryOf(PlatformNotificationType.ROLE_CHANGED)).toBe(
       NotificationCategory.BILLING,
     );
   });
 
   it('boots under Nest DI with the token unbound', async () => {
     const module = await Test.createTestingModule({ providers: [NotificationPolicyRegistry] }).compile();
-    expect(module.get(NotificationPolicyRegistry).types()).toContain(NotificationType.USER_JOINED);
+    expect(module.get(NotificationPolicyRegistry).types()).toContain(PlatformNotificationType.USER_JOINED);
   });
 
   it('isCritical() reads the urgency', () => {
     const registry = new NotificationPolicyRegistry(appMap);
-    expect(registry.isCritical(NotificationType.ROLE_CHANGED)).toBe(true);
-    expect(registry.isCritical(NotificationType.SETTINGS_UPDATED)).toBe(false);
+    expect(registry.isCritical(PlatformNotificationType.ROLE_CHANGED)).toBe(true);
+    expect(registry.isCritical(PlatformNotificationType.SETTINGS_UPDATED)).toBe(false);
+  });
+
+  describe("the app's declared types (NOTIFICATION_TYPES): the registry refuses to boot on a gap", () => {
+    const invoiceOverdue = policy(NotificationCategory.BILLING, NOTIFICATION_URGENCIES.TIMELY, {
+      email: CHANNEL_RULES.DEFAULT,
+    });
+
+    it('knows the platform types and the app types, and nothing else', () => {
+      const registry = new NotificationPolicyRegistry({ INVOICE_OVERDUE: invoiceOverdue }, ['INVOICE_OVERDUE']);
+      expect([...registry.types()].sort()).toEqual([...PLATFORM_NOTIFICATION_TYPES, 'INVOICE_OVERDUE'].sort());
+      expect(registry.categoryOf('INVOICE_OVERDUE')).toBe(NotificationCategory.BILLING);
+    });
+
+    it('refuses a declared app type with no policy', () => {
+      expect(() => new NotificationPolicyRegistry({}, ['INVOICE_OVERDUE'])).toThrow(
+        /INVOICE_OVERDUE.*has no policy.*NOTIFICATION_POLICIES/,
+      );
+    });
+
+    it('refuses a policy for a type nobody declared', () => {
+      expect(() => new NotificationPolicyRegistry({ INVOICE_OVERDUE: invoiceOverdue })).toThrow(
+        /policy for INVOICE_OVERDUE.*not declared.*notification-types\.ts/,
+      );
+    });
+
+    it('refuses an app type that repeats a platform type, or itself', () => {
+      expect(() => new NotificationPolicyRegistry({}, [PlatformNotificationType.USER_JOINED])).toThrow(
+        /USER_JOINED is declared twice/,
+      );
+      expect(
+        () =>
+          new NotificationPolicyRegistry({ INVOICE_OVERDUE: invoiceOverdue }, ['INVOICE_OVERDUE', 'INVOICE_OVERDUE']),
+      ).toThrow(/INVOICE_OVERDUE is declared twice/);
+    });
+
+    it('refuses an app type the VarChar(60) column could not store', () => {
+      const long = 'A'.repeat(61);
+      expect(() => new NotificationPolicyRegistry({ [long]: invoiceOverdue }, [long])).toThrow(
+        /not a valid notification type/,
+      );
+    });
+
+    it('receives the declared types through the NOTIFICATION_TYPES token under Nest DI, and fails the boot on a gap', async () => {
+      const ok = await Test.createTestingModule({
+        providers: [
+          NotificationPolicyRegistry,
+          { provide: NOTIFICATION_POLICIES, useValue: { INVOICE_OVERDUE: invoiceOverdue } },
+          { provide: NOTIFICATION_TYPES, useValue: ['INVOICE_OVERDUE'] },
+        ],
+      }).compile();
+      expect(ok.get(NotificationPolicyRegistry).types()).toContain('INVOICE_OVERDUE');
+
+      await expect(
+        Test.createTestingModule({
+          providers: [NotificationPolicyRegistry, { provide: NOTIFICATION_TYPES, useValue: ['INVOICE_OVERDUE'] }],
+        }).compile(),
+      ).rejects.toThrow(/INVOICE_OVERDUE.*has no policy/);
+    });
   });
 
   describe('offeredChannels()', () => {

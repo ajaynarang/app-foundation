@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cursorListSchema } from '../infrastructure/cursor-list';
 
 // ---------------------------------------------------------------------------
 // Feedback category & status enums
@@ -13,8 +14,19 @@ export const FeedbackStatusEnum = z.enum(['NEW', 'REVIEWED', 'RESOLVED']);
 // ---------------------------------------------------------------------------
 // Core feedback schema
 // ---------------------------------------------------------------------------
+/** A person on a feedback row, named by their public user id. */
+const FeedbackPersonSchema = z.object({
+  userId: z.string(),
+  firstName: z.string().nullable(),
+  lastName: z.string().nullable(),
+});
+
+/**
+ * A feedback row as the API shows it: named by its public id (`feedbackId`, a uuid, also the id in the admin
+ * URL); people and tenants by theirs. No numeric key crosses the API.
+ */
 export const FeedbackSchema = z.object({
-  id: z.number(),
+  feedbackId: z.string().uuid(),
   category: FeedbackCategoryEnum.nullable(),
   sentiment: z.number().int().min(1).max(5),
   message: z.string(),
@@ -22,31 +34,11 @@ export const FeedbackSchema = z.object({
   status: FeedbackStatusEnum,
   note: z.string().nullable(),
   createdAt: z.string(),
+  updatedAt: z.string(),
   resolvedAt: z.string().nullable(),
-  user: z
-    .object({
-      id: z.number(),
-      firstName: z.string(),
-      lastName: z.string(),
-      email: z.string(),
-      phone: z.string().nullable(),
-      role: z.string(),
-    })
-    .optional(),
-  tenant: z
-    .object({
-      id: z.number(),
-      companyName: z.string(),
-    })
-    .optional(),
-  resolver: z
-    .object({
-      id: z.number(),
-      firstName: z.string(),
-      lastName: z.string(),
-    })
-    .nullable()
-    .optional(),
+  user: FeedbackPersonSchema.extend({ email: z.string().nullable(), role: z.string() }).optional(),
+  tenant: z.object({ tenantId: z.string(), companyName: z.string().nullable() }).optional(),
+  resolver: FeedbackPersonSchema.nullable().optional(),
 });
 
 export type Feedback = z.infer<typeof FeedbackSchema>;
@@ -70,14 +62,9 @@ export const FeedbackStatsSchema = z.object({
 export type FeedbackStats = z.infer<typeof FeedbackStatsSchema>;
 
 // ---------------------------------------------------------------------------
-// Paginated list response
+// List response: a cursor list, newest first. On the admin list, `counts` holds every status.
 // ---------------------------------------------------------------------------
-export const FeedbackListResponseSchema = z.object({
-  data: z.array(FeedbackSchema),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
-});
+export const FeedbackListResponseSchema = cursorListSchema(FeedbackSchema);
 
 export type FeedbackListResponse = z.infer<typeof FeedbackListResponseSchema>;
 

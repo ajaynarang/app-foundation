@@ -10,9 +10,27 @@
  * - All transactions are immutable audit records
  */
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { WalletTransactionType } from '@appshore/db';
+import { WalletTransactionType, type Prisma, type WalletTransaction } from '@appshore/db';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import type { CursorList } from '@app/shared-types';
+
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
+
+/** Newest first; the transaction id is a string id (never an Int key), so it is a safe tiebreak. */
+const TRANSACTION_KEYSET = { field: 'createdAt', idField: 'id', kind: 'date', direction: 'desc' } as const;
+
+/** `GET /billing/wallet/transactions`. */
+export interface WalletTransactionListQuery {
+  type?: WalletTransactionType;
+  limit?: number;
+  cursor?: string;
+}
 
 @Injectable()
 export class WalletService {
@@ -32,10 +50,18 @@ export class WalletService {
     });
 
     if (!wallet) {
-      wallet = await this.prisma.wallet.create({
-        data: { tenantId: tenantDbId },
-      });
-      this.logger.log(`Wallet created for tenant ${tenantDbId}`);
+      try {
+        wallet = await this.prisma.wallet.create({
+          data: { tenantId: tenantDbId },
+        });
+        this.logger.log(`Wallet created for tenant ${tenantDbId}`);
+      } catch (error) {
+        // Two first reads race (a page loads the overview and the wallet together): the loser's create hits the
+        // unique tenant index. The row is there now, so read it.
+        if ((error as { code?: string }).code !== 'P2002') throw error;
+        wallet = await this.prisma.wallet.findUnique({ where: { tenantId: tenantDbId } });
+        if (!wallet) throw error;
+      }
     }
 
     return wallet;
@@ -391,34 +417,25 @@ export class WalletService {
    */
   async getTransactions(
     tenantDbId: number,
-    filters?: {
-      type?: WalletTransactionType;
-      limit?: number;
-      cursor?: string;
-    },
-  ) {
-    const wallet = await this.getOrCreateWallet(tenantDbId);
+    query: WalletTransactionListQuery = {},
+  ): Promise<CursorList<WalletTransaction>> {
+    const take = clampCursorLimit(query.limit);
+    // A tenant has one wallet, so the tenant scopes the ledger; the keyset index leads with it.
+    const scope: Prisma.WalletTransactionWhereInput = { tenantId: tenantDbId };
+    if (query.type) scope.type = query.type;
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const where: Prisma.WalletTransactionWhereInput = query.cursor
+      ? { AND: [scope, keysetWhere({ ...TRANSACTION_KEYSET, cursor: query.cursor })] }
+      : scope;
 
-    const take = filters?.limit ?? 20;
-    const where: any = { walletId: wallet.id };
-    if (filters?.type) {
-      where.type = filters.type;
-    }
-
-    const transactions = await this.prisma.walletTransaction.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: take + 1, // fetch one extra for cursor
-      ...(filters?.cursor && {
-        cursor: { id: filters.cursor },
-        skip: 1,
+    const [rows, total] = await Promise.all([
+      this.prisma.walletTransaction.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: take + 1,
       }),
-    });
-
-    const hasMore = transactions.length > take;
-    const items = hasMore ? transactions.slice(0, take) : transactions;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
-
-    return { items, nextCursor, hasMore };
+      this.prisma.walletTransaction.count({ where: scope }),
+    ]);
+    return { ...buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.id)), total };
   }
 }

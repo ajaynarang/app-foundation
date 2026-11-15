@@ -8,6 +8,10 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PaymentMethodType } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { PaymentProviderFactory } from '../adapters/payment-provider.factory';
+import { invalidState } from '@appshore/kernel/shared/errors/api-errors';
+
+/** The most payment methods one customer's list returns: the default first, then newest. */
+export const PAYMENT_METHOD_LIST_CAP = 100;
 
 @Injectable()
 export class PaymentMethodService {
@@ -48,9 +52,11 @@ export class PaymentMethodService {
       this.logger.warn(`Failed to sync payment methods from Stripe for tenant ${tenantDbId}: ${error}`);
     }
 
+    // A mirror of the provider's cards for this customer: bounded by the provider, so capped and not paged.
     return this.prisma.paymentMethod.findMany({
       where: { tenantId: tenantDbId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      take: PAYMENT_METHOD_LIST_CAP,
     });
   }
 
@@ -118,7 +124,7 @@ export class PaymentMethodService {
           where: { tenantId: tenantDbId },
         });
         if (methodCount <= 1) {
-          throw new BadRequestException('Cannot remove the only payment method while an active subscription exists');
+          throw invalidState('Cannot remove the only payment method while an active subscription exists');
         }
       }
     }

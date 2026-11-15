@@ -2,7 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { EmailService } from './services/email.service';
-import { NotificationType, NotificationChannel, NotificationStatus, Notification } from '@appshore/db';
+import { NotificationChannel, NotificationStatus, Notification } from '@appshore/db';
+import { PlatformNotificationType, type NotificationType } from '@app/shared-types';
 import { NotificationFiltersDto } from './dto/notification-filters.dto';
 
 @Injectable()
@@ -41,7 +42,7 @@ export class NotificationService {
 
     // Create notification and send email
     return this.createAndSendNotification(
-      NotificationType.TENANT_REGISTRATION_CONFIRMATION,
+      PlatformNotificationType.TENANT_REGISTRATION_CONFIRMATION,
       ownerEmail,
       metadata,
       async () => {
@@ -77,7 +78,7 @@ export class NotificationService {
     };
 
     // Create notification and send email
-    return this.createAndSendNotification(NotificationType.TENANT_APPROVED, ownerEmail, metadata, async () => {
+    return this.createAndSendNotification(PlatformNotificationType.TENANT_APPROVED, ownerEmail, metadata, async () => {
       await this.emailService.sendTenantApprovalEmail(ownerEmail, ownerFirstName, companyName, subdomain);
     });
   }
@@ -109,7 +110,7 @@ export class NotificationService {
     };
 
     // Create notification and send email
-    return this.createAndSendNotification(NotificationType.TENANT_REJECTED, ownerEmail, metadata, async () => {
+    return this.createAndSendNotification(PlatformNotificationType.TENANT_REJECTED, ownerEmail, metadata, async () => {
       await this.emailService.sendTenantRejectionEmail(ownerEmail, ownerFirstName, companyName, rejectionReason);
     });
   }

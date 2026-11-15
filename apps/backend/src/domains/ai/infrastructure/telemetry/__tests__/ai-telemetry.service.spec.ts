@@ -4,6 +4,8 @@ import { Prisma } from '@appshore/db';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 import { AiTelemetryService } from '../ai-telemetry.service';
 import type { AiCallContext, AiUsage } from '@app/shared-types';
@@ -57,6 +59,7 @@ describe('AiTelemetryService', () => {
   let prisma: any;
   let cache: any;
   let events: any;
+  let outbox: ReturnType<typeof createMockOutbox>;
 
   beforeEach(async () => {
     prisma = {
@@ -85,6 +88,7 @@ describe('AiTelemetryService', () => {
       },
       // Default: zero spend.
       $queryRaw: jest.fn().mockResolvedValue([{ daily: '0', monthly: '0' }]),
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     // Default cache: pass-through to the factory (no caching effect for tests
@@ -98,6 +102,7 @@ describe('AiTelemetryService', () => {
     events = {
       emit: jest.fn().mockResolvedValue(undefined),
     };
+    outbox = createMockOutbox(prisma);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -105,6 +110,7 @@ describe('AiTelemetryService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AppCacheService, useValue: cache },
         { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: outbox },
       ],
     }).compile();
 
@@ -235,10 +241,14 @@ describe('AiTelemetryService', () => {
   });
 
   describe('record() — domain event', () => {
-    it('emits AI_INVOCATION_RECORDED on the hot path', async () => {
+    /** The events `record()` staged on its transaction: `stage(tx, name, tenantId, payload)` minus the tx. */
+    const stagedEvents = () => outbox.stage.mock.calls.map(([, ...args]) => args);
+
+    it("stages AI_INVOCATION_RECORDED on the row's transaction and publishes it after commit (outbox)", async () => {
       const row = await service.record(makeUsage(), makeContext());
 
-      expect(events.emit).toHaveBeenCalledWith(
+      expect(outbox.stage).toHaveBeenCalledWith(
+        prisma, // the mock $transaction hands the client in as the tx
         DOMAIN_EVENTS.AI_INVOCATION_RECORDED,
         TENANT_ID,
         expect.objectContaining({
@@ -249,12 +259,62 @@ describe('AiTelemetryService', () => {
           totalTokens: 1500,
         }),
       );
+      const stagedEvent = await outbox.stage.mock.results[0].value;
+      expect(outbox.publishStaged).toHaveBeenCalledWith([stagedEvent]);
     });
 
-    it('does not throw when event emit fails (non-blocking)', async () => {
-      events.emit.mockRejectedValue(new Error('redis down'));
+    it('does not wait for the publish: a hung enqueue never holds up the AI call', async () => {
+      outbox.publishStaged.mockReturnValue(new Promise<void>(() => undefined));
 
-      await expect(service.record(makeUsage(), makeContext())).resolves.toBeDefined();
+      const row = await service.record(makeUsage(), makeContext());
+
+      expect(row).toBeDefined();
+      expect(outbox.publishStaged).toHaveBeenCalledTimes(1);
+      // The spent cache is dropped on commit, not after the publish.
+      expect(cache.del).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes nothing when the ledger write fails', async () => {
+      prisma.aiInvocation.create.mockRejectedValue(new Error('db down'));
+
+      await expect(service.record(makeUsage(), makeContext())).rejects.toThrow('db down');
+      expect(outbox.stage).not.toHaveBeenCalled();
+      expect(outbox.publishStaged).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing when the transaction rolls back after staging', async () => {
+      prisma.$transaction.mockImplementationOnce(async (fn: (tx: unknown) => unknown) => {
+        await fn(prisma);
+        throw new Error('commit failed');
+      });
+
+      await expect(service.record(makeUsage(), makeContext())).rejects.toThrow('commit failed');
+      expect(outbox.publishStaged).not.toHaveBeenCalled();
+    });
+
+    it('stages nothing for an idempotent replay — no row written, no second event for one invocation', async () => {
+      const existing = { id: 'existing-id', tenantId: TENANT_ID, totalTokens: 1 };
+      prisma.aiInvocation.findUnique.mockResolvedValue(existing);
+
+      const result = await service.record(makeUsage(), makeContext({ idempotencyKey: 'k1' }));
+
+      expect(result).toBe(existing);
+      expect(prisma.aiInvocation.create).not.toHaveBeenCalled();
+      expect(outbox.stage).not.toHaveBeenCalled();
+      expect(outbox.publishStaged).not.toHaveBeenCalled();
+      expect(events.emit).not.toHaveBeenCalled();
+    });
+
+    it('stages the event once when the key is new', async () => {
+      await service.record(makeUsage(), makeContext({ idempotencyKey: 'k-new' }));
+
+      expect(stagedEvents()).toEqual([
+        [
+          DOMAIN_EVENTS.AI_INVOCATION_RECORDED,
+          TENANT_ID,
+          expect.objectContaining({ surface: 'KB_INGEST', totalTokens: 1500 }),
+        ],
+      ]);
     });
   });
 

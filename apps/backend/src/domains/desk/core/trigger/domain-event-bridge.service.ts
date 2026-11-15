@@ -17,6 +17,13 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
  * `DeskResponsibilityService.canRunAutonomously(tenantId, key)` — exactly like
  * the scheduler — so a domain event can't run a responsibility while the tenant
  * master switch or the per-responsibility autonomy switch is off.
+ *
+ * AT-LEAST-ONCE: domain events leave through the transactional outbox (ADR
+ * "Outbox and deadlines"), so a handler here can see the same event twice (a
+ * crash after publish, the relay re-sending it). A close via `updateMany` on
+ * open episodes is safe to repeat. A handler that sends an Inngest event passes
+ * the domain event's own id as the Inngest event id (`inngest.send({ id:
+ * event.id, ... })`), so Inngest drops the second copy.
  */
 @Injectable()
 export class DomainEventBridge {

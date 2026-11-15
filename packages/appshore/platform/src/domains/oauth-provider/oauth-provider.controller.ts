@@ -1,24 +1,22 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  Req,
-  Res,
-  HttpCode,
-  HttpStatus,
-  BadRequestException,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, Req, Res, HttpCode, HttpStatus, UseFilters } from '@nestjs/common';
+import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '../../auth/decorators/public.decorator';
-import { SkipThrottle } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
+import { GENEROUS_THROTTLE } from '../../shared/http/edge-throttle';
 import { OAuthProviderService } from './oauth-provider.service';
+import { OAuthErrorFilter, oauthError, OAUTH_ERROR } from './oauth-error.filter';
 import { OAuthClientsService } from './oauth-clients.service';
 import { OAUTH_SCOPES } from '@app/shared-types';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { ApproveOAuthConsentDto, OAuthRevokeRequestDto, OAuthTokenRequestDto } from './dto/oauth-protocol.dto';
+import { RegisterOAuthClientDto } from './dto/register-oauth-client.dto';
+import { ApiResult } from '../../shared/openapi/api-result';
+import { OAuthConsentApprovedResponse, OAuthTokenIssuedResponse } from './openapi.responses';
+
+// The four protocol routes below (authorize, token, revoke, register) answer errors in the shape the standards
+// define, `{ error, error_description }`, through OAuthErrorFilter. The consent route is called by the web app
+// and keeps the usual error envelope.
 
 /**
  * Extract the tenant subdomain from a hostname.
@@ -42,7 +40,7 @@ function extractTenantSubdomain(hostname: string | undefined): string | null {
 
   const sub = parts[0];
   // Marketing/system subdomains aren't tenants.
-  if (sub === 'www' || sub === 'api' || sub === 'app' || sub === 'console') {
+  if (sub === 'www' || sub === 'api' || sub === 'app') {
     return null;
   }
   return sub;
@@ -61,9 +59,11 @@ export class OAuthProviderController {
    * GET /oauth/authorize — Validates request, returns redirect to consent page.
    */
   @Get('authorize')
+  @UseFilters(OAuthErrorFilter)
   @Public()
-  @SkipThrottle()
+  @Throttle(GENEROUS_THROTTLE)
   @ApiOperation({ summary: 'OAuth 2.1 authorization endpoint' })
+  @ApiResponse({ status: HttpStatus.FOUND, description: "Redirects the person's browser to the consent page" })
   async authorize(
     @Query('response_type') responseType: string,
     @Query('client_id') clientId: string,
@@ -76,13 +76,13 @@ export class OAuthProviderController {
   ) {
     // Validate required params
     if (responseType !== 'code') {
-      throw new BadRequestException('response_type must be "code"');
+      throw oauthError(OAUTH_ERROR.UNSUPPORTED_RESPONSE_TYPE, 'response_type must be "code"');
     }
     if (!clientId || !redirectUri || !scope || !state) {
-      throw new BadRequestException('Missing required parameters');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'client_id, redirect_uri, scope and state are required');
     }
     if (!codeChallenge || codeChallengeMethod !== 'S256') {
-      throw new BadRequestException('PKCE with S256 is required');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'PKCE with S256 is required');
     }
 
     const challengeToken = await this.oauthService.authorize({
@@ -107,20 +107,11 @@ export class OAuthProviderController {
    * Requires JWT auth (logged-in user).
    */
   @Post('authorize/consent')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve OAuth consent' })
-  async approveConsent(
-    @Body('challenge') challenge: string,
-    @Body('selectedScopes') selectedScopes: string[] | undefined,
-    @Req() req: Request,
-  ) {
-    if (!challenge) {
-      throw new BadRequestException('Missing challenge token');
-    }
-    if (selectedScopes !== undefined) {
-      if (!Array.isArray(selectedScopes) || !selectedScopes.every((s) => typeof s === 'string')) {
-        throw new BadRequestException('selectedScopes must be an array of strings when provided');
-      }
-    }
+  @ApiResult(OAuthConsentApprovedResponse)
+  async approveConsent(@Body() body: ApproveOAuthConsentDto, @Req() req: Request) {
+    const { challenge, selectedScopes } = body;
     const user = (req as any).user;
     return this.oauthService.approveConsent(challenge, user.dbId, user.tenantDbId ?? null, selectedScopes);
   }
@@ -130,38 +121,39 @@ export class OAuthProviderController {
    * Rate limited: 10 req/min per IP (targets brute-force).
    */
   @Post('token')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token endpoint' })
-  async token(
-    @Body('grant_type') grantType: string,
-    @Body('code') code: string,
-    @Body('redirect_uri') redirectUri: string,
-    @Body('client_id') clientId: string,
-    @Body('client_secret') clientSecret: string,
-    @Body('code_verifier') codeVerifier: string,
-    @Body('refresh_token') refreshToken: string,
-  ) {
+  @ApiConsumes('application/x-www-form-urlencoded', 'application/json')
+  @ApiResult(OAuthTokenIssuedResponse)
+  async token(@Body() body: OAuthTokenRequestDto) {
+    const {
+      grant_type: grantType,
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_secret: clientSecret,
+      code_verifier: codeVerifier,
+      refresh_token: refreshToken,
+    } = body;
     if (grantType === 'authorization_code') {
       if (!code || !clientId || !codeVerifier || !redirectUri) {
-        throw new BadRequestException('Missing required parameters');
+        throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'code, client_id, code_verifier and redirect_uri are required');
       }
       return this.oauthService.exchangeCode(code, codeVerifier, clientId, clientSecret, redirectUri);
     }
 
     if (grantType === 'refresh_token') {
       if (!refreshToken || !clientId) {
-        throw new BadRequestException('Missing required parameters');
+        throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'refresh_token and client_id are required');
       }
       return this.oauthService.refreshToken(refreshToken, clientId, clientSecret);
     }
 
     // RFC 6749 Section 5.2: errors use 400
-    throw new BadRequestException({
-      error: 'unsupported_grant_type',
-      error_description: 'Only authorization_code and refresh_token are supported',
-    });
+    throw oauthError(OAUTH_ERROR.UNSUPPORTED_GRANT_TYPE, 'Only authorization_code and refresh_token are supported');
   }
 
   /**
@@ -169,13 +161,16 @@ export class OAuthProviderController {
    * Rate limited to prevent abuse.
    */
   @Post('revoke')
+  @UseFilters(OAuthErrorFilter)
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'OAuth 2.1 token revocation' })
-  async revoke(@Body('token') token: string) {
+  @ApiConsumes('application/x-www-form-urlencoded', 'application/json')
+  async revoke(@Body() body: OAuthRevokeRequestDto) {
+    const { token } = body;
     if (!token) {
-      throw new BadRequestException('Missing token');
+      throw oauthError(OAUTH_ERROR.INVALID_REQUEST, 'token is required');
     }
     await this.oauthService.revokeToken(token);
     return {};
@@ -183,55 +178,20 @@ export class OAuthProviderController {
 
   /**
    * POST /oauth/register — Dynamic Client Registration (RFC 7591).
-   * Public endpoint, rate-limited. Allows MCP clients like Claude Desktop
+   * Public endpoint, rate-limited (5 a minute per address). Allows MCP clients like Claude Desktop
    * to self-register without manual setup.
    */
   @Post('register')
+  @UseFilters(OAuthErrorFilter)
   @Public()
-  @SkipThrottle()
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'OAuth 2.1 Dynamic Client Registration (RFC 7591)' })
-  async register(@Body() body: Record<string, any>, @Req() req: Request) {
+  async register(@Body() body: RegisterOAuthClientDto, @Req() req: Request) {
+    // `RegisterOAuthClientDto` has checked the metadata: a name, and redirect URIs that are HTTPS or loopback
+    // (per the MCP authorization spec). A bad value never reaches here; it answers the RFC's error code.
     const clientName = body.client_name;
-    if (!clientName || typeof clientName !== 'string') {
-      throw new BadRequestException({
-        error: 'invalid_client_metadata',
-        error_description: 'client_name is required',
-      });
-    }
-
     const redirectUris = body.redirect_uris;
-    if (
-      !Array.isArray(redirectUris) ||
-      redirectUris.length === 0 ||
-      !redirectUris.every((u: unknown) => typeof u === 'string')
-    ) {
-      throw new BadRequestException({
-        error: 'invalid_client_metadata',
-        error_description: 'redirect_uris must be a non-empty array of strings',
-      });
-    }
-
-    // Validate redirect URIs: must be localhost or HTTPS (per MCP spec)
-    for (const uri of redirectUris) {
-      try {
-        const parsed = new URL(uri);
-        const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-        if (!isLocalhost && parsed.protocol !== 'https:') {
-          throw new BadRequestException({
-            error: 'invalid_client_metadata',
-            error_description: 'redirect_uris must use HTTPS or be localhost URLs',
-          });
-        }
-      } catch (e) {
-        if (e instanceof BadRequestException) throw e;
-        throw new BadRequestException({
-          error: 'invalid_client_metadata',
-          error_description: `Invalid redirect_uri: ${uri}`,
-        });
-      }
-    }
 
     // Requested scopes — default to all available scopes if not specified
     // MCP clients (Claude, ChatGPT) often omit scopes during DCR and rely on

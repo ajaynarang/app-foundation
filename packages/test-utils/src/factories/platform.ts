@@ -127,10 +127,9 @@ export function buildSuperAdminPreferences(overrides: Record<string, unknown> = 
 //
 // Factory shapes MUST match `apps/backend/src/domains/platform/tenants/dto/`:
 //   - `RegisterTenantDto` — public POST /tenants/register (Turnstile-gated).
-//   - `UpdateTenantDto`   — SUPER_ADMIN PATCH /tenants/:tenantId.
-//   - `SuspendTenantDto`  — SUPER_ADMIN POST /tenants/:tenantId/suspend.
-//   - `/reject` takes a raw `{ reason: string }` body (no DTO class); factory
-//     returns the same shape so the rubric's "no inline JSON" rule holds.
+//   - `UpdateTenantDto`   — SUPER_ADMIN PATCH /tenants/:tenant_id.
+//   - `SuspendTenantDto`  — SUPER_ADMIN POST /tenants/:tenant_id/suspend.
+//   - `RejectTenantDto`   — SUPER_ADMIN POST /tenants/:tenant_id/reject (`reason`, optional, at most 1000).
 //
 // The `register` factory emits clearly test-marked values (prefix
 // `qa-test-`, timestamp-suffixed) so a real tenant isn't created by
@@ -166,7 +165,7 @@ export function buildTenantRegistration(overrides: Record<string, unknown> = {})
 }
 
 /**
- * PATCH /tenants/:tenantId body. Default mutates `ownerPhone` — it's the
+ * PATCH /tenants/:tenant_id body. Default mutates `ownerPhone` — it's the
  * lowest-blast-radius scalar on `UpdateTenantDto` (the Prisma side updates
  * `tenant.contactPhone` via the same field). Caller captures prior state,
  * PATCHes with overrides, then restores via a second PATCH.
@@ -179,7 +178,7 @@ export function buildTenantUpdate(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * POST /tenants/:tenantId/suspend body. `SuspendTenantDto` requires
+ * POST /tenants/:tenant_id/suspend body. `SuspendTenantDto` requires
  * `reason` ≥ 10 chars. Used only when a suspendable tenant exists (never
  * the seeded demo tenant) — gated by `@requires:data-suspendable-tenant`
  * when the spec activates it.
@@ -192,10 +191,8 @@ export function buildTenantSuspend(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * POST /tenants/:tenantId/reject body. Controller reads `reason` via
- * `@Body('reason')` — it's a plain string field with no DTO class (no
- * length validation server-side). Factory emits a non-empty string so the
- * rejection reason is recorded meaningfully.
+ * POST /tenants/:tenant_id/reject body — `RejectTenantDto` (`reason`, optional text, at most 1000
+ * characters). Factory emits a non-empty string so the rejection reason is recorded meaningfully.
  */
 export function buildTenantReject(overrides: Record<string, unknown> = {}) {
   return {
@@ -236,7 +233,7 @@ export function buildUser(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * PATCH /users/:userId body — matches `UpdateUserDto` (all fields
+ * PATCH /users/:user_id body — matches `UpdateUserDto` (all fields
  * `@IsOptional()`). Default mutates `firstName` only — low blast radius,
  * no role-promotion side effect, easy to observe in the response echo.
  * Caller captures prior state and restores via a second PATCH with the
@@ -271,9 +268,8 @@ export function buildInvitationAccept(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * DELETE /invitations/:invitationId body — controller reads `reason` via
- * `@Body('reason')`, optional on the service side (stored as
- * `cancellationReason` on the row). Factory emits a non-empty string so
+ * DELETE /invitations/:invitation_id body — `CancelInvitationDto` (`reason`, optional text, at most 500
+ * characters; stored as `cancellationReason` on the row). Factory emits a non-empty string so
  * the cancellation is recorded meaningfully on the row.
  */
 export function buildInvitationCancel(overrides: Record<string, unknown> = {}) {
@@ -324,10 +320,10 @@ export function buildPlanProviderPriceUpdate(overrides: Record<string, unknown> 
 }
 
 /**
- * PATCH /plans/tenant/:tenantId body. Assigns a `TenantPlan` to a tenant;
+ * PATCH /plans/tenant/:tenant_id body. Assigns a `TenantPlan` to a tenant;
  * the controller also threads an optional `reason` string into the
  * `tenant_plan_events` audit row. Callers capture the tenant's original
- * plan via GET /plans/tenant/:tenantId and restore in afterEach.
+ * plan via GET /plans/tenant/:tenant_id and restore in afterEach.
  *
  * Default `plan` is `STARTER` — the lowest-entitlement tier, safe to assign
  * and restore on a non-demo target tenant.
@@ -449,7 +445,7 @@ export function buildOAuthClient(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * PUT /oauth/clients/:clientId body — matches `UpdateOAuthClientSchema`.
+ * PUT /oauth/clients/:client_id body — matches `UpdateOAuthClientSchema`.
  * All four fields are optional; default mutates `name` ONLY (lowest blast
  * radius — no scope / URI change so downstream authorize paths are still
  * valid). Callers that want to exercise the redirectUris / scopes / name

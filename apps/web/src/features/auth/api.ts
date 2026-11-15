@@ -35,8 +35,8 @@ export const authApi = {
   /**
    * Record password change and revoke other sessions
    */
-  changePassword: async (revokeOtherSessions = true): Promise<{ success: boolean; sessionsRevoked: number }> => {
-    return apiClient<{ success: boolean; sessionsRevoked: number }>('/auth/password', {
+  changePassword: async (revokeOtherSessions = true): Promise<{ sessionsRevoked: number }> => {
+    return apiClient<{ sessionsRevoked: number }>('/auth/password', {
       method: 'PATCH',
       body: JSON.stringify({ revokeOtherSessions }),
     });
@@ -47,8 +47,8 @@ export const authApi = {
   /**
    * Send OTP to phone number (silently succeeds even if phone not registered)
    */
-  sendPhoneOtp: async (phone: string): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>('/auth/phone/send-otp', {
+  sendPhoneOtp: async (phone: string): Promise<void> => {
+    return apiClient<void>('/auth/phone/send-otp', {
       method: 'POST',
       body: JSON.stringify({ phone }),
     });
@@ -77,8 +77,8 @@ export const authApi = {
   /**
    * Set 4-digit PIN for authenticated user
    */
-  setPin: async (pin: string): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>('/auth/phone/set-pin', {
+  setPin: async (pin: string): Promise<void> => {
+    return apiClient<void>('/auth/phone/set-pin', {
       method: 'POST',
       body: JSON.stringify({ pin }),
     });
@@ -87,18 +87,18 @@ export const authApi = {
   /**
    * Add phone number to existing account and send OTP
    */
-  addPhone: async (phone: string): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>('/auth/phone/add-phone', {
+  addPhone: async (phone: string): Promise<void> => {
+    return apiClient<void>('/auth/phone/add-phone', {
       method: 'POST',
       body: JSON.stringify({ phone }),
     });
   },
 
   /**
-   * Verify OTP to confirm phone number on existing account
+   * Verify OTP to confirm phone number on existing account. Answers the profile, with the phone on it.
    */
-  verifyAndAddPhone: async (phone: string, code: string): Promise<{ message: string }> => {
-    return apiClient<{ message: string }>('/auth/phone/verify-add-phone', {
+  verifyAndAddPhone: async (phone: string, code: string): Promise<LoginResponse['user']> => {
+    return apiClient<LoginResponse['user']>('/auth/phone/verify-add-phone', {
       method: 'POST',
       body: JSON.stringify({ phone, code }),
     });

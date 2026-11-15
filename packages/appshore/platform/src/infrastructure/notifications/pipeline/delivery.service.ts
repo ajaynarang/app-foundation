@@ -7,7 +7,8 @@ import { FOUNDATION_DOMAIN_EVENTS } from '@appshore/kernel/infrastructure/events
 import { PushService } from '../channels/push/web-push.service';
 import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
 import { EmailService } from '../../notification/services/email.service';
-import { DeliveryChannel, NotificationType } from '@appshore/db';
+import { DeliveryChannel } from '@appshore/db';
+import { type NotificationType } from '@app/shared-types';
 import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 import { isTestMarker } from '@appshore/kernel/shared/utils/test-marker.util';
 import { FcmService } from '../channels/push/fcm.service';

@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { AgentInvocationLoggerService } from '../agent-invocation-logger.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
+import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 import { fromUser } from '@appshore/platform/auth/agent-principal';
@@ -9,7 +10,7 @@ import { digestArgs } from '../arg-redactor';
 
 describe('AgentInvocationLoggerService', () => {
   const prisma = createMockPrisma();
-  const events = { emit: jest.fn() };
+  const events = createMockOutbox(prisma);
   let svc: AgentInvocationLoggerService;
 
   beforeEach(async () => {
@@ -18,7 +19,7 @@ describe('AgentInvocationLoggerService', () => {
       providers: [
         AgentInvocationLoggerService,
         { provide: PrismaService, useValue: prisma },
-        { provide: DomainEventService, useValue: events },
+        { provide: OutboxService, useValue: events },
       ],
     }).compile();
     svc = mod.get(AgentInvocationLoggerService);
@@ -252,6 +253,14 @@ describe('AgentInvocationLoggerService', () => {
       error: 'x',
     });
     expect(prisma.agentInvocationLog.update).not.toHaveBeenCalled();
+    expect(events.emit).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when the outcome write fails', async () => {
+    prisma.agentInvocationLog.update.mockRejectedValueOnce(new Error('row gone'));
+    await expect(svc.completeError({ rowId: 'row-1', tenantId: 7, durationMs: 1, error: 'x' })).rejects.toThrow(
+      'row gone',
+    );
     expect(events.emit).not.toHaveBeenCalled();
   });
 });

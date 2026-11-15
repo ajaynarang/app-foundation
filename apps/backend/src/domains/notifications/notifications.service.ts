@@ -3,14 +3,24 @@ import { PrismaService } from '@appshore/platform/infrastructure/database/prisma
 import { AppCacheService } from '@appshore/platform/infrastructure/cache/app-cache.service';
 import { buildKey } from '@appshore/kernel/infrastructure/cache/cache-key.constants';
 import { CACHE_TTL_HOT_30S } from '@appshore/kernel/constants/cache.constants';
-import { NotificationType } from '@appshore/db';
+import { type NotificationCategory, type Prisma } from '@appshore/db';
+import type { CursorList } from '@app/shared-types';
+import {
+  buildCursorPage,
+  clampCursorLimit,
+  encodeCursor,
+  keysetWhere,
+} from '@appshore/kernel/shared/utils/cursor-pagination';
+import { toPublicNotification, type PublicNotification } from './notification.serializer';
 
 interface ListParams {
   status?: string;
-  category?: string;
-  page?: number;
+  category?: NotificationCategory;
   limit?: number;
+  cursor?: string;
 }
+
+const INBOX_KEYSET = { field: 'createdAt', idField: 'notificationId', kind: 'date', direction: 'desc' } as const;
 
 @Injectable()
 export class InAppNotificationService {
@@ -21,37 +31,38 @@ export class InAppNotificationService {
     private readonly cache: AppCacheService,
   ) {}
 
-  async listForUser(userId: number, params?: ListParams) {
-    const page = params?.page || 1;
-    const limit = params?.limit || 20;
+  /** The caller's inbox, newest first, as a cursor list. The tiebreak is the public notification id. */
+  async listForUser(userId: number, params: ListParams = {}): Promise<CursorList<PublicNotification>> {
+    const take = clampCursorLimit(params.limit);
+    // Decoded before any query runs: a malformed cursor is a 400 and costs nothing.
+    const keyset = params.cursor ? keysetWhere({ ...INBOX_KEYSET, cursor: params.cursor }) : undefined;
 
-    const where: any = {
+    const where: Prisma.NotificationWhereInput = {
       userId,
       channel: 'IN_APP',
       dismissedAt: null,
     };
 
-    if (params?.status === 'unread') {
+    if (params.status === 'unread') {
       where.readAt = null;
-    } else if (params?.status === 'read') {
+    } else if (params.status === 'read') {
       where.readAt = { not: null };
     }
 
-    if (params?.category) {
+    if (params.category) {
       where.category = params.category;
     }
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        where: keyset ? { AND: [where, keyset] } : where,
+        orderBy: [{ createdAt: 'desc' }, { notificationId: 'desc' }],
+        take: take + 1,
       }),
       this.prisma.notification.count({ where }),
     ]);
-
-    return { data, total };
+    const page = buildCursorPage(rows, take, (row) => encodeCursor(row.createdAt, row.notificationId));
+    return { items: page.items.map(toPublicNotification), nextCursor: page.nextCursor, total };
   }
 
   async getUnreadCount(userId: number) {

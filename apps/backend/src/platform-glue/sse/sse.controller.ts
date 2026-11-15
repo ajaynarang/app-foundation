@@ -5,6 +5,8 @@ import { Request } from 'express';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { SseService } from '@appshore/kernel/infrastructure/sse/sse.service';
 import { SSE_EVENTS } from '@appshore/kernel/infrastructure/sse/sse-events.constants';
+import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
+import { SseFrameResponse } from './openapi.responses';
 
 @ApiTags('SSE')
 @Controller('sse')
@@ -15,6 +17,7 @@ export class SseController {
 
   @Sse('stream')
   @ApiOperation({ summary: 'Subscribe to real-time events via SSE' })
+  @ApiResult(SseFrameResponse, 200, 'A text/event-stream of frames, one per event; this is the shape of a frame')
   stream(@CurrentUser() user: any, @Req() req: Request): Observable<MessageEvent> {
     const subject = new Subject<MessageEvent>();
     const disconnect$ = new Subject<void>();

@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
-import { DomainEventService } from '@appshore/kernel/infrastructure/events/domain-event.service';
+import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.constants';
 
 /**
@@ -22,7 +22,7 @@ export class ConversationSessionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: DomainEventService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async issue(conversationId: number, input: { expiresAt?: string }) {
@@ -33,25 +33,26 @@ export class ConversationSessionService {
     if (!conversation) throw new NotFoundException('Conversation not found');
 
     const token = nanoid(22);
-    const session = await this.prisma.conversationSession.create({
-      data: {
+    return this.outbox.transaction(async (tx, emit) => {
+      const session = await tx.conversationSession.create({
+        data: {
+          conversationId: conversation.id,
+          tenantId: conversation.tenantId,
+          token,
+          // Sessions always expire — default 24h when the caller doesn't say.
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // An event needs a numeric/string tenant id. Anonymous prospect conversations have no tenant, so we
+      // emit under tenantId 0 — the event is internal-only (no SSE bridge, no webhooks scoped by tenant).
+      await emit(DOMAIN_EVENTS.CONVERSATION_SESSION_ISSUED, conversation.tenantId ?? 0, {
         conversationId: conversation.id,
-        tenantId: conversation.tenantId,
-        token,
-        // Sessions always expire — default 24h when the caller doesn't say.
-        expiresAt: input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
+        sessionId: session.id,
+      });
 
-    // DomainEventService.emit requires a numeric/string tenant id. Anonymous
-    // prospect conversations have no tenant, so we emit under tenantId 0 — the
-    // event is internal-only (no SSE bridge, no webhooks scoped by tenant).
-    await this.events.emit(DOMAIN_EVENTS.CONVERSATION_SESSION_ISSUED, conversation.tenantId ?? 0, {
-      conversationId: conversation.id,
-      sessionId: session.id,
+      return session;
     });
-
-    return session;
   }
 
   async revoke(sessionId: number) {
@@ -59,17 +60,19 @@ export class ConversationSessionService {
     if (!session) throw new NotFoundException('Conversation session not found');
     if (session.revokedAt) return session;
 
-    const updated = await this.prisma.conversationSession.update({
-      where: { id: session.id },
-      data: { revokedAt: new Date() },
-    });
+    return this.outbox.transaction(async (tx, emit) => {
+      const updated = await tx.conversationSession.update({
+        where: { id: session.id },
+        data: { revokedAt: new Date() },
+      });
 
-    await this.events.emit(DOMAIN_EVENTS.CONVERSATION_SESSION_REVOKED, session.tenantId ?? 0, {
-      conversationId: session.conversationId,
-      sessionId: session.id,
-    });
+      await emit(DOMAIN_EVENTS.CONVERSATION_SESSION_REVOKED, session.tenantId ?? 0, {
+        conversationId: session.conversationId,
+        sessionId: session.id,
+      });
 
-    return updated;
+      return updated;
+    });
   }
 
   async resolveActive(token: string) {

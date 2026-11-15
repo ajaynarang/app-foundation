@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Badge } from '@app/ui/components/ui/badge';
+import { StatusBadge } from '@app/ui/components/ui/status-badge';
+import { credentialStatus } from '@/features/ai/agent-scope-ui';
 import { Skeleton } from '@app/ui/components/ui/skeleton';
 import { useTenantApiKeys } from '@/features/platform/api-keys';
 
@@ -69,9 +70,7 @@ export function ApiKeyProfileTab({ apiKeyId }: ApiKeyProfileTabProps) {
 
       <div className="space-y-1">
         <p className="text-xs font-medium uppercase text-muted-foreground">Status</p>
-        <Badge variant={apiKey.revokedAt ? 'critical' : apiKey.isActive ? 'info' : 'muted'}>
-          {apiKey.revokedAt ? 'Revoked' : apiKey.isActive ? 'Active' : 'Paused'}
-        </Badge>
+        <StatusBadge tone={credentialStatus(apiKey).tone}>{credentialStatus(apiKey).label}</StatusBadge>
       </div>
     </div>
   );
