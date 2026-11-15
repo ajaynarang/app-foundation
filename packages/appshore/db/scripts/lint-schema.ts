@@ -40,6 +40,8 @@ const KNOWN_TOKEN_TABLES = new Set([
   'OAuthRefreshToken',
   'ApiKey',
   'PasswordResetToken',
+  // Holds sha256 of the invitation acceptance token (`tokenHash`), never the token.
+  'UserInvitation',
   'ConversationSession',
   // A workspace's own AI provider key, stored only as an AES-256-GCM envelope; the table holds nothing else.
   'AiCredential',

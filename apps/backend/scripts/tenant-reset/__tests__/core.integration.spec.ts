@@ -102,7 +102,7 @@ describe('tenant reset on Postgres (integration)', () => {
           firstName: 'In',
           lastName: 'Vite',
           role: 'MEMBER',
-          token: `${KEY}_invite_${tag}`,
+          tokenHash: `${KEY}_invite_${tag}`.padEnd(64, '0'),
           expiresAt: new Date(Date.now() + 86_400_000),
           invitedBy: author.id,
         },

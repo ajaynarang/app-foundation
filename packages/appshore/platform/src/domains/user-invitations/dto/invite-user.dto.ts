@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEmail, IsNotEmpty, IsEnum, IsOptional, IsNumber, Matches, Length } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsNotEmpty,
+  IsEnum,
+  IsOptional,
+  IsNumber,
+  Matches,
+  Length,
+  MaxLength,
+} from 'class-validator';
 import { UserRole } from '@appshore/db';
 
 export class InviteUserDto {
@@ -38,6 +48,17 @@ export class InviteUserDto {
   @IsOptional()
   @IsNumber()
   tenantId?: number;
+}
+
+/**
+ * `POST /invitations/preview`: the token travels in the body, so it never reaches a URL path or a request log. An
+ * empty or malformed token is not a validation error: it is an invitation nobody has, so the answer is 404.
+ */
+export class PreviewInvitationDto {
+  @ApiProperty({ description: 'Invitation acceptance token (from the invite link)' })
+  @IsString()
+  @MaxLength(255)
+  token: string;
 }
 
 export class AcceptInvitationDto {

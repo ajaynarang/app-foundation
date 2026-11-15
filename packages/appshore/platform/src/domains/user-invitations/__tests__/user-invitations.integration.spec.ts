@@ -1,10 +1,11 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@appshore/db';
 import { EMAIL_UNIQUE_INDEX_LOCK_KEY } from '@appshore/db/email-uniqueness';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import * as crypto from 'crypto';
 import { UserInvitationsService } from '../user-invitations.service';
+import { hashToken } from '../../../auth/token-hash';
 
 /**
  * Invitations against real Postgres, where one live account per email is enforced case-insensitively (index
@@ -25,6 +26,8 @@ describe('Invitations and one live account per email (Postgres)', () => {
   let service: UserInvitationsService;
   const suffix = crypto.randomBytes(4).toString('hex');
   const tenantIds: number[] = [];
+  /** The raw tokens the service emailed, newest last. */
+  const emailedTokens: string[] = [];
   let n = 0;
 
   beforeAll(async () => {
@@ -33,7 +36,7 @@ describe('Invitations and one live account per email (Postgres)', () => {
       return;
     }
     try {
-      pool = new pg.Pool({ connectionString: DATABASE_URL, max: 2 });
+      pool = new pg.Pool({ connectionString: DATABASE_URL, max: 3 });
       prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
       await prisma.user.count({ where: { email: 'none' } });
     } catch (err) {
@@ -45,7 +48,18 @@ describe('Invitations and one live account per email (Postgres)', () => {
     await lockClient.query('SELECT pg_advisory_lock($1)', [EMAIL_UNIQUE_INDEX_LOCK_KEY]);
     service = new UserInvitationsService(
       prisma as any,
-      { sendUserInvitation: async () => undefined } as any,
+      {
+        sendUserInvitation: async (
+          _to: string,
+          _first: string,
+          _last: string,
+          _by: string,
+          _co: string,
+          raw: string,
+        ) => {
+          emailedTokens.push(raw);
+        },
+      } as any,
       { sendSms: async () => undefined } as any,
       { checkVerification: async () => true } as any,
       { hashPin: async () => 'pin-hash' } as any,
@@ -86,8 +100,10 @@ describe('Invitations and one live account per email (Postgres)', () => {
     await prisma.workspaceMember.create({ data: { userId: user.id, tenantId, role: 'ADMIN', isDefault: true } });
     return user;
   };
-  const makeInvitation = async (tenantId: number, invitedBy: number, data: { email?: string; phone?: string }) =>
-    prisma.userInvitation.create({
+  /** A pending invitation; `token` is the raw token its link would carry (only its hash is stored). */
+  const makeInvitation = async (tenantId: number, invitedBy: number, data: { email?: string; phone?: string }) => {
+    const token = `tok_ui_${++n}_${suffix}`;
+    const row = await prisma.userInvitation.create({
       data: {
         tenantId,
         invitedBy,
@@ -96,10 +112,12 @@ describe('Invitations and one live account per email (Postgres)', () => {
         firstName: 'Jane',
         lastName: 'Doe',
         role: 'MEMBER',
-        token: `tok_ui_${++n}_${suffix}`,
+        tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
+    return { ...row, token };
+  };
   const liveAccounts = (email: string) =>
     prisma.user.count({ where: { email: { equals: email, mode: 'insensitive' }, deletedAt: null } });
 
@@ -175,5 +193,68 @@ describe('Invitations and one live account per email (Postgres)', () => {
         { userId: inviter.userId, role: 'ADMIN', tenantId: tenant.tenantId },
       ),
     ).rejects.toThrow('Invitation already sent to this email');
+  });
+
+  it("the migration's SQL hash is the hash the service stores, so a link emailed before the upgrade still resolves", async () => {
+    if (!ready) return;
+    const tenant = await makeTenant();
+    const inviter = await makeMember(tenant.id, `boss5-${suffix}@example.com`);
+
+    await service.inviteUser(
+      { email: `hashed-${suffix}@example.com`, firstName: 'H', lastName: 'Ash', role: 'MEMBER' as any },
+      { userId: inviter.userId, role: 'ADMIN', tenantId: tenant.tenantId },
+    );
+    const raw = emailedTokens[emailedTokens.length - 1];
+
+    // The exact expression migration 20261116000000_invitation_token_hash runs over the old plain `token` column.
+    const [{ sql_hash }] = await prisma.$queryRawUnsafe<{ sql_hash: string }[]>(
+      `SELECT encode(sha256(convert_to($1, 'UTF8')), 'hex') AS sql_hash`,
+      raw,
+    );
+    const stored = await prisma.userInvitation.findFirstOrThrow({
+      where: { tenantId: tenant.id, email: `hashed-${suffix}@example.com` },
+    });
+    expect(stored.tokenHash).toBe(sql_hash);
+    expect(stored.tokenHash).toBe(hashToken(raw));
+    expect(stored.linkSharedAt).toBeNull();
+    await expect(service.previewInvitation(raw)).resolves.toMatchObject({ invitationId: stored.invitationId });
+  });
+
+  it('a rotated link replaces the emailed one: the old token is 404, the new one works and is marked shared', async () => {
+    if (!ready) return;
+    const tenant = await makeTenant();
+    const inviter = await makeMember(tenant.id, `boss6-${suffix}@example.com`);
+    const invitation = await makeInvitation(tenant.id, inviter.id, { email: `rotated-${suffix}@example.com` });
+
+    const { inviteLink } = await service.rotateInvitationLink(invitation.invitationId, tenant.tenantId);
+    const fresh = new URL(inviteLink).searchParams.get('token') as string;
+
+    await expect(service.previewInvitation(invitation.token)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.acceptInvitation(invitation.token, `fb_rot_${suffix}`)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(service.previewInvitation(fresh)).resolves.toMatchObject({ invitationId: invitation.invitationId });
+    const row = await prisma.userInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
+    expect(row.linkSharedAt).not.toBeNull();
+    expect(row.tokenHash).toBe(hashToken(fresh));
+  });
+
+  it('two concurrent accepts of one token: exactly one wins, the other is a 409, and one account exists', async () => {
+    if (!ready) return;
+    const tenant = await makeTenant();
+    const inviter = await makeMember(tenant.id, `boss7-${suffix}@example.com`);
+    const email = `raced-${suffix}@example.com`;
+    const invitation = await makeInvitation(tenant.id, inviter.id, { email });
+
+    const results = await Promise.allSettled([
+      service.acceptInvitation(invitation.token, `fb_race_a_${suffix}`),
+      service.acceptInvitation(invitation.token, `fb_race_b_${suffix}`),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const [lost] = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(lost.reason).toMatchObject({ status: 409, response: { code: 'INVALID_STATE' } });
+    expect(await liveAccounts(email)).toBe(1);
+    expect(await prisma.workspaceMember.count({ where: { tenantId: tenant.id, user: { email } } })).toBe(1);
   });
 });

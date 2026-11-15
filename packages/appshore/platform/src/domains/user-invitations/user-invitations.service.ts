@@ -16,7 +16,14 @@ import {
   encodeCursor,
   keysetWhere,
 } from '@appshore/kernel/shared/utils/cursor-pagination';
-import { INVITATION_LIST_SELECT, toPublicInvitation, type InvitationListItem } from './invitation.serializer';
+import {
+  INVITATION_LIST_SELECT,
+  INVITATION_PREVIEW_SELECT,
+  toInvitationPreview,
+  toPublicInvitation,
+  type InvitationListItem,
+  type InvitationPreviewItem,
+} from './invitation.serializer';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
 import { SmsService } from '@appshore/kernel/infrastructure/sms/sms.service';
@@ -28,8 +35,21 @@ import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
 import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
 import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
+import { hashToken } from '../../auth/token-hash';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+
+/**
+ * A fresh acceptance token (32 characters over 36, about 165 bits). The raw value goes only into the link that is
+ * emailed, texted or shown once; the row stores its hash (ADR-0012, "Recognised, so hashed").
+ */
+function newInvitationToken(): { raw: string; tokenHash: string } {
+  const raw = nanoid();
+  return { raw, tokenHash: hashToken(raw) };
+}
+
+/** Prisma's transaction client, as the conditional move below receives it. */
+type InvitationTx = Pick<Prisma.TransactionClient, 'userInvitation'>;
 
 /**
  * The same address in any case. The database holds one live account per `lower(email)` (index
@@ -156,8 +176,8 @@ export class UserInvitationsService {
     // A pending invitation takes a seat: refused once the plan's user limit is in use.
     await this.entitlements.assertUserSeatAvailable(tenantId, { route: 'POST /invitations' });
 
-    // Create invitation
-    const token = nanoid();
+    // Create invitation: only the token's hash is stored.
+    const token = newInvitationToken();
     const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
 
     // Determine channel: SMS if phone provided without email
@@ -178,7 +198,7 @@ export class UserInvitationsService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         role: dto.role,
-        token,
+        tokenHash: token.tokenHash,
         status: 'PENDING',
         expiresAt,
       },
@@ -189,14 +209,11 @@ export class UserInvitationsService {
       },
     });
 
-    // Build invite link
-    const frontendUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${frontendUrl}/accept-invitation?token=${token}`;
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
 
-    // Send via appropriate channel
+    // Send via appropriate channel. The link travels only to the invitee: the answer below never carries it.
     if (inviteChannel === 'SMS' && dto.phone) {
-      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${this.inviteLinkFor(token.raw)}`;
       await this.smsService.sendSms(dto.phone, smsBody);
     } else if (dto.email) {
       await this.emailService.sendUserInvitation(
@@ -205,11 +222,11 @@ export class UserInvitationsService {
         invitation.lastName,
         invitedByName,
         invitation.tenant.companyName,
-        token,
+        token.raw,
       );
     }
 
-    return { ...toPublicInvitation(invitation), inviteLink };
+    return toPublicInvitation(invitation);
   }
 
   /**
@@ -254,17 +271,44 @@ export class UserInvitationsService {
    */
   async tenantDbIdForToken(token: string): Promise<number | null> {
     if (!token) return null;
-    const row = await this.prisma.userInvitation.findUnique({ where: { token }, select: { tenantId: true } });
+    const row = await this.prisma.userInvitation.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { tenantId: true },
+    });
     return row?.tenantId ?? null;
+  }
+
+  /**
+   * Moves a pending invitation only while it is still the row the caller read: the same token and still `PENDING`.
+   * Two accepts of one token, or a rotate that lands during an accept, both pass the checks read before the
+   * transaction; the row lock this update takes lets exactly one of them through, and the other is a 409.
+   */
+  private async movePending(
+    tx: InvitationTx,
+    invitation: { id: number; tokenHash: string },
+    data: Prisma.UserInvitationUpdateManyMutationInput,
+    detail = 'This invitation is no longer valid',
+  ): Promise<void> {
+    const { count } = await tx.userInvitation.updateMany({
+      where: { id: invitation.id, tokenHash: invitation.tokenHash, status: 'PENDING' },
+      data,
+    });
+    if (count !== 1) throw invalidState(detail);
+  }
+
+  /** The acceptance link for a raw token. Built only to email, text or show it once; never stored or logged. */
+  private inviteLinkFor(rawToken: string): string {
+    const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    return `${appUrl}/accept-invitation?token=${rawToken}`;
   }
 
   /**
    * Accept invitation and create user
    */
   async acceptInvitation(token: string, firebaseUid: string) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token },
-    });
+    const invitation = token
+      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(token) } })
+      : null;
 
     if (!invitation) {
       throw new NotFoundException('Invitation not found or invalid');
@@ -279,6 +323,9 @@ export class UserInvitationsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Claimed first: a second accept of the same token waits on this row, then finds it no longer pending.
+      await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
+
       // Workspace model: an existing user accepting an invite JOINS the
       // workspace (new membership) instead of erroring.
       const existingUser = invitation.email
@@ -318,15 +365,7 @@ export class UserInvitationsService {
         },
       });
 
-      // Update invitation status
-      await tx.userInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: 'ACCEPTED',
-          acceptedAt: new Date(),
-          acceptedByUserId: user.id,
-        },
-      });
+      await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: user.id } });
 
       return user;
     });
@@ -336,9 +375,9 @@ export class UserInvitationsService {
    * Accept phone-channel invitation: verify OTP, set PIN, create user
    */
   async acceptPhoneInvitation(dto: AcceptPhoneInvitationDto) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token: dto.token },
-    });
+    const invitation = dto.token
+      ? await this.prisma.userInvitation.findUnique({ where: { tokenHash: hashToken(dto.token) } })
+      : null;
 
     if (!invitation || invitation.status !== 'PENDING' || invitation.expiresAt < new Date()) {
       throw invalidState('This invitation is invalid or has expired — ask for a new one');
@@ -360,6 +399,8 @@ export class UserInvitationsService {
     const pinHash = await this.pinService.hashPin(dto.pin);
 
     return this.prisma.$transaction(async (tx) => {
+      await this.movePending(tx, invitation, { status: 'ACCEPTED', acceptedAt: new Date() });
+
       // The phone path signs the caller in as the account it returns, so it never joins an existing account: that
       // would hand whoever holds the phone a session on someone else's email account. The email link does the join.
       if (invitation.email) {
@@ -396,14 +437,7 @@ export class UserInvitationsService {
         create: { userId: user.id, tenantId: invitation.tenantId, role: invitation.role, isDefault: true },
       });
 
-      await tx.userInvitation.update({
-        where: { id: invitation.id },
-        data: {
-          status: 'ACCEPTED',
-          acceptedAt: new Date(),
-          acceptedByUserId: user.id,
-        },
-      });
+      await tx.userInvitation.update({ where: { id: invitation.id }, data: { acceptedByUserId: user.id } });
 
       return user;
     });
@@ -454,56 +488,35 @@ export class UserInvitationsService {
   }
 
   /**
-   * Resend invitation with new token and reset expiry
+   * Resend: rotates the token (the old link stops working), resets the expiry and sends the new link to the invitee
+   * only. The new token has travelled by email or SMS alone, so `linkSharedAt` is cleared. The answer is the public
+   * invitation, never the link.
    */
-  async resendInvitation(invitationId: string, tenantIdString: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { tenantId: tenantIdString },
+  async resendInvitation(invitationId: string, tenantIdString: string): Promise<InvitationListItem> {
+    const invitation = await this.findTenantInvitation(invitationId, tenantIdString, {
+      tenant: { select: { companyName: true } },
+      invitedByUser: { select: { firstName: true, lastName: true } },
     });
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { invitationId },
-      include: {
-        tenant: { select: { companyName: true } },
-        invitedByUser: { select: { firstName: true, lastName: true } },
-      },
-    });
-
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
-
-    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
-    if (invitation.tenantId !== tenant.id) {
-      throw new NotFoundException('Invitation not found');
-    }
 
     if (invitation.status !== 'PENDING') {
       throw invalidState(`An invitation that is ${stateLabel(invitation.status)} cannot be resent`);
     }
 
-    const newToken = nanoid();
-    const newExpiry = new Date(Date.now() + INVITATION_EXPIRY_MS);
-
-    const updatedInvitation = await this.prisma.userInvitation.update({
-      where: { invitationId },
-      data: {
-        token: newToken,
-        expiresAt: newExpiry,
-      },
-      select: INVITATION_LIST_SELECT,
+    const token = newInvitationToken();
+    const updatedInvitation = await this.prisma.$transaction(async (tx) => {
+      await this.movePending(
+        tx,
+        invitation,
+        { tokenHash: token.tokenHash, expiresAt: new Date(Date.now() + INVITATION_EXPIRY_MS), linkSharedAt: null },
+        'This invitation changed while it was being resent. Reload and try again.',
+      );
+      return tx.userInvitation.findUniqueOrThrow({ where: { id: invitation.id }, select: INVITATION_LIST_SELECT });
     });
 
     const invitedByName = `${invitation.invitedByUser.firstName} ${invitation.invitedByUser.lastName}`;
-    const frontendUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${frontendUrl}/accept-invitation?token=${newToken}`;
 
     if (invitation.inviteChannel === 'SMS' && invitation.phone) {
-      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${inviteLink}`;
+      const smsBody = `You've been invited by ${invitedByName}. Set up your account: ${this.inviteLinkFor(token.raw)}`;
       await this.smsService.sendSms(invitation.phone, smsBody);
     } else if (invitation.email) {
       await this.emailService.sendUserInvitation(
@@ -512,71 +525,50 @@ export class UserInvitationsService {
         invitation.lastName,
         invitedByName,
         invitation.tenant.companyName,
-        newToken,
+        token.raw,
       );
     }
 
-    return { ...toPublicInvitation(updatedInvitation), inviteLink };
+    return toPublicInvitation(updatedInvitation);
   }
 
   /**
-   * Get the invite link for an existing pending invitation without regenerating the token
+   * `POST /invitations/:invitation_id/link` (OWNER/ADMIN): the only way to get a shareable link. The stored token is
+   * only a hash, so a link cannot be read back; this rotates the token (the emailed link stops working), stamps
+   * `linkSharedAt` (the token is no longer proof of the mailbox) and returns the new link once. Nothing is sent.
    */
-  async getInvitationLink(invitationId: string, tenantIdString: string) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { tenantId: tenantIdString },
-    });
-
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { invitationId },
-    });
-
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
-
-    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
-    if (invitation.tenantId !== tenant.id) {
-      throw new NotFoundException('Invitation not found');
-    }
+  async rotateInvitationLink(invitationId: string, tenantIdString: string): Promise<{ inviteLink: string }> {
+    const invitation = await this.findTenantInvitation(invitationId, tenantIdString);
 
     if (invitation.status !== 'PENDING') {
       throw invalidState(`An invitation that is ${stateLabel(invitation.status)} has no link to share`);
     }
 
-    const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
-    const inviteLink = `${appUrl}/accept-invitation?token=${invitation.token}`;
+    const token = newInvitationToken();
+    await this.prisma.$transaction((tx) =>
+      this.movePending(
+        tx,
+        invitation,
+        { tokenHash: token.tokenHash, linkSharedAt: new Date() },
+        'This invitation changed while its link was being made. Reload and try again.',
+      ),
+    );
 
-    return { inviteLink };
+    return { inviteLink: this.inviteLinkFor(token.raw) };
   }
 
   /**
-   * Get invitation by token (for public acceptance page)
+   * `POST /invitations/preview` (public, the acceptance page): what the invitee needs to decide, by the token in the
+   * body. Never the token or its hash, no Int id, and the inviter by name only. Unknown token: 404; no longer
+   * pending or expired: 409.
    */
-  async getInvitationByToken(token: string) {
-    const invitation = await this.prisma.userInvitation.findUnique({
-      where: { token },
-      include: {
-        tenant: {
-          select: {
-            tenantId: true,
-            companyName: true,
-            subdomain: true,
-          },
-        },
-        invitedByUser: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
+  async previewInvitation(token: string): Promise<InvitationPreviewItem> {
+    const invitation = token
+      ? await this.prisma.userInvitation.findUnique({
+          where: { tokenHash: hashToken(token) },
+          select: INVITATION_PREVIEW_SELECT,
+        })
+      : null;
 
     if (!invitation) {
       throw new NotFoundException('Invitation not found');
@@ -588,6 +580,33 @@ export class UserInvitationsService {
 
     if (invitation.expiresAt < new Date()) {
       throw invalidState('This invitation has expired — ask for a new one');
+    }
+
+    return toInvitationPreview(invitation);
+  }
+
+  /** The caller's workspace's invitation, or 404: another tenant's invitation answers the same as a missing one. */
+  private async findTenantInvitation<I extends Prisma.UserInvitationInclude = Record<string, never>>(
+    invitationId: string,
+    tenantIdString: string,
+    include?: I,
+  ): Promise<Prisma.UserInvitationGetPayload<{ include: I }>> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { tenantId: tenantIdString },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const invitation = (await this.prisma.userInvitation.findUnique({
+      where: { invitationId },
+      ...(include && { include }),
+    })) as Prisma.UserInvitationGetPayload<{ include: I }> | null;
+
+    // Another tenant's invitation is 404, the same as a missing one: a 400 would confirm that it exists.
+    if (!invitation || invitation.tenantId !== tenant.id) {
+      throw new NotFoundException('Invitation not found');
     }
 
     return invitation;
