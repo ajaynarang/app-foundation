@@ -28,6 +28,10 @@ sources:
   - packages/appshore/platform/src/domains/api-keys/api-keys.service.ts#validateKey
   - packages/appshore/platform/src/domains/oauth-provider/oauth-token.guard.ts#OAuthTokenGuard
   - packages/appshore/platform/src/auth/agent-principal.ts#AgentPrincipal
+  - packages/appshore/platform/src/auth/token-hash.ts#hashToken
+  - packages/appshore/platform/src/domains/user-invitations/user-invitations.service.ts#UserInvitationsService
+  - packages/appshore/platform/src/domains/user-invitations/user-invitations.controller.ts#UserInvitationsController
+  - packages/appshore/db/prisma/migrations/20261116000000_invitation_token_hash/migration.sql
   - packages/appshore/db/prisma/migrations/20261113230000_users_email_unique_live/migration.sql
   - apps/backend/src/domains/ai/mcp-server/mcp-server.controller.ts
   - apps/backend/src/domains/support/support.controller.ts
@@ -53,6 +57,11 @@ guards:
   - oauth-token.guard.spec.ts
   - oauth-provider.security.spec.ts
   - agent-principal.spec.ts
+  - token-hash.spec.ts
+  - invitation-token-storage.spec.ts
+  - user-invitations.controller.spec.ts
+  - user-invitations.service.spec.ts
+  - user-invitations.integration.spec.ts
 examples:
   - assigneeId
 ---
@@ -84,6 +93,19 @@ browsers) can be in two workspaces; tabs share one cookie and so one session.
   that workspace only with a membership there. A password that matches accounts in several workspaces with no hint
   is a 409 `WORKSPACE_SELECTION_REQUIRED` naming them. Every miss is the same generic 401.
   [guard: auth.service.tenant-login.spec.ts, tenant-login.integration.spec.ts]
+
+### Invitation tokens
+
+- An invitation token is a bearer secret. The row stores only `hashToken(token)` (`UserInvitation.tokenHash`); every
+  lookup goes through the hash; the raw token travels only in the link sent to the invitee. No answer to the inviter
+  carries a link. [guard: invitation-token-storage.spec.ts, token-hash.spec.ts]
+- Only OWNER and ADMIN get a shareable link, and only by rotating the token (`POST /invitations/:invitation_id/link`):
+  the emailed link dies, `linkSharedAt` is stamped, the link is shown once. A token never goes in a URL path (the
+  request log keeps paths); a public token route takes it in the body (`POST /invitations/preview`) under the
+  OTP_SEND throttle. [guard: user-invitations.controller.spec.ts, user-invitations.service.spec.ts]
+- Accept, resend and rotate move the invitation with a conditional update (`id`, `tokenHash` and `PENDING` still
+  hold) inside their transaction; the loser of a race is a 409 `INVALID_STATE`.
+  [guard: user-invitations.service.spec.ts, user-invitations.integration.spec.ts]
 
 ### Sessions
 
@@ -181,5 +203,6 @@ reached through the tool pipeline, not by opening a REST route to API keys.
 - A role check standing in for a record-level check on an owned resource.
 - A 403 for another tenant's record.
 - `@UseGuards(ThrottlerGuard)`, or `@SkipThrottle()` outside health and SSE.
-- A refresh token, API key or OAuth secret written to a log, a response after creation, or an error message.
+- A refresh token, API key, OAuth secret or invitation token written to a log, a URL path, a response after
+  creation, or an error message.
 - Domain code that reads the workspace from the request body or branches on `TENANCY_MODE`.
