@@ -10,6 +10,7 @@ import {
 import { auth, isFirebaseConfigured } from '@appshore/web-core/shared/lib/firebase';
 import { getCookieDomain, isLocalhost } from '@appshore/web-core/shared/lib/tenant-url';
 import { readWorkspaceSelection } from './workspace-selection';
+import { AuthErrorCode } from '@app/shared-types';
 
 interface User {
   dbId?: number; // Numeric DB id — used by UI permission checks (e.g. agent supervisor match)
@@ -124,7 +125,7 @@ export const useAuthStore = create<AuthState>()(
           const error = await response.json().catch(() => ({}));
           const selection = readWorkspaceSelection(error);
           if (selection) throw selection;
-          if (error?.code === 'PASSWORD_NOT_SET' && isFirebaseConfigured) {
+          if (error?.code === AuthErrorCode.PASSWORD_NOT_SET && isFirebaseConfigured) {
             // Account authenticates via Firebase — fall back.
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const firebaseToken = await userCredential.user.getIdToken();
