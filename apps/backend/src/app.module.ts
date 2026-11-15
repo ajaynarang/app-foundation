@@ -43,6 +43,7 @@ import { OutboundModule } from '@appshore/platform/infrastructure/outbound/outbo
 import { QueueModule } from './platform-glue/queue/queue.module';
 import { NotificationsQueueModule } from './platform-glue/queue/dispatchers/notifications-queue.module';
 import { BulkOpsQueueModule } from './platform-glue/queue/dispatchers/bulk-ops-queue.module';
+import { AiBackgroundQueueModule } from './platform-glue/queue/dispatchers/ai-background-queue.module';
 import { DataRetentionModule } from './platform-glue/queue/data-retention.module';
 import { HealthModule } from '@appshore/platform/health/health.module';
 import { EventBusModule } from './platform-glue/events/event-bus.module';
@@ -115,6 +116,7 @@ import { PromptingModule } from './domains/prompting/prompting.module';
     QueueModule,
     NotificationsQueueModule,
     BulkOpsQueueModule,
+    AiBackgroundQueueModule,
     PromptingModule,
     EventBusModule,
     HealthModule,

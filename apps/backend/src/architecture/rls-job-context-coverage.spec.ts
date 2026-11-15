@@ -84,6 +84,7 @@ function handledJobNames(): Map<string, string> {
 /** `@Processor` classes the scan above accounts for: a dispatcher routes by `jobNames`, the rest are named here. */
 const KNOWN_PROCESSORS = [
   'apps/backend/src/platform-glue/events/durable-event.processor.ts',
+  'apps/backend/src/platform-glue/queue/dispatchers/ai-background-queue.processor.ts',
   'apps/backend/src/platform-glue/queue/dispatchers/bulk-ops-queue.processor.ts',
   'apps/backend/src/platform-glue/queue/dispatchers/notifications-queue.processor.ts',
   'apps/backend/src/platform-glue/queue/placeholder.processors.ts',

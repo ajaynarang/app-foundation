@@ -42,6 +42,8 @@ export const ON_EVENT_ALLOW_LIST: Readonly<Record<string, string>> = {
   'apps/backend/src/platform-glue/sse/domain-event-sse-bridge.service.ts#handleDomainEvent': SSE_ONLY,
   'apps/backend/src/platform-glue/cache/cache-invalidation.subscriber.ts#handleDomainEvent':
     'Redis cache keys only, no database access',
+  'apps/backend/src/domains/ai/search-index/indexing/search-index.listener.ts#handleDomainEvent':
+    'Enqueues search-index jobs only, no database access; the job declares its tenant',
 };
 
 const files = ROOTS.flatMap((root) => listSourceFiles(root)).map((abs) => ({

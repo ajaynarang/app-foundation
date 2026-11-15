@@ -81,6 +81,7 @@ export const FOUNDATION_RLS_REGISTRY: Readonly<Record<string, RlsTableEntry>> = 
   notification_devices: tenant,
   payment_methods: tenant,
   push_subscriptions: tenant,
+  search_chunks: tenant,
   support_tickets: tenant,
   tenant_add_ons: tenant,
   tenant_ai_budgets: tenant,

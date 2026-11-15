@@ -27,7 +27,10 @@ export const APP_JOB_NAMES = {
   NOTIFICATIONS: {},
   WEBHOOKS: {},
   AI_INTERACTIVE: {},
-  AI_BACKGROUND: {},
+  AI_BACKGROUND: {
+    /** Re-read one tenant record and replace its rows in the search index (`domains/ai/search-index`). */
+    SEARCH_INDEX: 'search-index',
+  },
   BULK_OPS: {
     /** The daily re-test of every workspace AI credential (`domains/ai/routing/connect`), sliced to share the lane. */
     AI_CREDENTIAL_REVALIDATE: 'ai-credential-revalidate',
@@ -40,6 +43,7 @@ export const APP_JOB_NAMES = {
 export const APP_JOB_DISPLAY_NAMES = {
   'ai-credential-revalidate': 'AI Key Revalidation',
   'oauth-refresh': 'OAuth Token Refresh',
+  'search-index': 'Search Index Update',
 } as const satisfies Record<string, string>;
 
 /** App job categories (what a `jobs` row's `category` may hold beside the kernel's). */

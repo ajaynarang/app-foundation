@@ -22,6 +22,8 @@ export const APP_JOB_CONTEXT: Readonly<Record<string, JobContextDecl>> = {
   [APP_JOB_NAMES.BULK_OPS.AI_CREDENTIAL_REVALIDATE]: { forEachTenant: APP_SYSTEM_REASONS.AI_CREDENTIAL_REVALIDATE },
   // One integration's refresh; the payload carries that integration's tenant.
   [APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH]: { tenant: true },
+  // One record of one tenant; the payload carries the tenant.
+  [APP_JOB_NAMES.AI_BACKGROUND.SEARCH_INDEX]: { tenant: true },
 };
 
 /** Every job name's declaration: the foundation's and the app's. */

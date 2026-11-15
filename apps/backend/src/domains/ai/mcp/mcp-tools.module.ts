@@ -4,6 +4,8 @@ import { PrismaModule } from '@appshore/platform/infrastructure/database/prisma.
 import { CacheModule } from '../../../platform-glue/cache/cache.module';
 import { HealthTool } from './tools/health.tool';
 import { KnowledgeTool } from './tools/knowledge.tool';
+import { RecordSearchTool } from './tools/record-search.tool';
+import { SearchIndexModule } from '../search-index/search-index.module';
 import { SupportTicketTool } from './tools/support-ticket.tool';
 import { SupportModule } from '../../support/support.module';
 import { McpToolService } from './mcp-tool.service';
@@ -14,7 +16,7 @@ import { AgentContractModule } from '../agent-contract/agent-contract.module';
  * MCP Tools Module — the extension point for the AI assistant's tool surface.
  *
  * This module ships EMPTY by design: only sample tools are registered
- * (`HealthTool`, `KnowledgeTool` and the `SupportTicketTool` example pair).
+ * (`HealthTool`, `KnowledgeTool`, `RecordSearchTool` and the `SupportTicketTool` example pair).
  * They demonstrate the read-only, knowledge-base and write patterns. Add your
  * own domain tools below.
  *
@@ -41,6 +43,7 @@ import { AgentContractModule } from '../agent-contract/agent-contract.module';
     PrismaModule,
     CacheModule,
     KnowledgeBaseModule,
+    SearchIndexModule,
     forwardRef(() => AgentContractModule),
     SupportModule, // for the SupportTicketTool example pair
     // Import the NestJS modules your tool providers depend on here.
@@ -49,6 +52,7 @@ import { AgentContractModule } from '../agent-contract/agent-contract.module';
     // Register your @Tool + @RequiresScope providers here.
     HealthTool,
     KnowledgeTool,
+    RecordSearchTool,
     SupportTicketTool,
     // Service bridge
     McpToolService,

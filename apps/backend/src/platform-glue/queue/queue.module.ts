@@ -11,7 +11,7 @@ import { JobCleanupJob } from '@appshore/platform/infrastructure/queue/job-clean
 import { BullBoardAuthMiddleware } from '@appshore/platform/infrastructure/queue/bull-board-auth.middleware';
 import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
-import { AiInteractivePlaceholderProcessor, AiBackgroundPlaceholderProcessor } from './placeholder.processors';
+import { AiInteractivePlaceholderProcessor } from './placeholder.processors';
 import { buildJobVocabulary } from '@appshore/kernel/infrastructure/queue/job-vocabulary';
 import { JOB_VOCABULARY } from '@appshore/platform/infrastructure/queue/job-vocabulary.token';
 import { APP_JOB_VOCABULARY, APP_QUEUE_NAMES } from './job-names';
@@ -104,7 +104,6 @@ const APP_QUEUES: string[] = Object.values(APP_QUEUE_NAMES);
     VendorCircuitBreakerService,
     DeadLetterService,
     AiInteractivePlaceholderProcessor,
-    AiBackgroundPlaceholderProcessor,
   ],
   exports: [BullModule, JOB_VOCABULARY, JobService, JobCleanupJob, VendorCircuitBreakerService, DeadLetterService],
 })
