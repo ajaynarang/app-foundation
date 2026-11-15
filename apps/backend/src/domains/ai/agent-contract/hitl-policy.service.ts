@@ -1,30 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { AgentScope, scopeTier, SCOPE_TIERS } from '@app/shared-types';
+import type { AgentScope } from '@app/shared-types';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
+import { decideToolCall, type ConfirmationTier, type ToolCaller } from './tool-policy';
 
-export type HitlTier = 'none' | 'standard' | 'sensitive';
+export type HitlTier = ConfirmationTier;
+
+/** How the one tool rule sees a pipeline principal. A Desk job reaches the pipeline only after its gate step. */
+export function callerOf(principal: AgentPrincipal): ToolCaller {
+  if (principal.kind === 'user') return { kind: 'person' };
+  if (principal.kind === 'desk_responsibility') return { kind: 'cleared-job' };
+  return { kind: 'outside' };
+}
 
 @Injectable()
 export class HitlPolicyService {
   /**
-   * Resolve the HITL tier from (tool scope) × (principal kind/trust).
-   * Desk principals bypass per-call HITL for standard writes (pre-authorized at enable).
+   * The confirmation a tool call needs, from (tool scope) × (who is calling).
+   * An adapter over `decideToolCall` — the rules live there, not here.
    */
   resolveTier(scope: AgentScope, principal: AgentPrincipal): HitlTier {
-    const tier = scopeTier(scope);
-
-    if (tier === SCOPE_TIERS.READ) return 'none';
-
-    if (principal.kind === 'desk_responsibility') {
-      return tier === SCOPE_TIERS.SENSITIVE ? 'sensitive' : 'none';
-    }
-
-    if (principal.kind === 'user') {
-      return tier === SCOPE_TIERS.SENSITIVE ? 'sensitive' : 'standard';
-    }
-
-    // oauth_client or api_key (third-party): same tier mapping as user, step-up differs in Phase B
-    return tier === SCOPE_TIERS.SENSITIVE ? 'sensitive' : 'standard';
+    return decideToolCall(scope, callerOf(principal)).confirmation;
   }
 
   tokenTtlSeconds(tier: HitlTier): number {

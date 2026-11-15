@@ -79,12 +79,8 @@ export const TRUST_LEVEL_DESCRIPTIONS: Record<TrustLevel, string> = {
   AUTONOMOUS: 'The agent runs the job. It only surfaces exceptions and errors.',
 };
 
-/** Confidence thresholds for auto-proceed (matches gate algorithm). null = always gate. */
-export const TRUST_LEVEL_CONFIDENCE_THRESHOLDS: Record<TrustLevel, number | null> = {
-  SUPERVISED: null,
-  ASSISTED: 0.9,
-  AUTONOMOUS: 0.75,
-};
+/** Confidence thresholds for auto-proceed — owned by the one tool rule, re-exported for Desk callers. */
+export { TRUST_LEVEL_CONFIDENCE_THRESHOLDS } from '../../../ai/agent-contract/tool-policy';
 
 // ─── Step kind / Step status / Episode status ───────────────────────────────
 // Public names (`StepKind`, `StepStatus`, `EpisodeStatus`) alias the generated
