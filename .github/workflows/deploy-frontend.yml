@@ -5,6 +5,10 @@
 # Required GitHub Secrets:
 #   VERCEL_WEB_DEPLOY_HOOK_STAGING / VERCEL_WEB_DEPLOY_HOOK_PRODUCTION
 #   VERCEL_TOKEN, VERCEL_TEAM_ID
+#
+# Optional deploy marker (docs/observability.md, "Deploy markers"); a no-op until both exist:
+#   vars.GRAFANA_URL, secrets.GRAFANA_SA_TOKEN   Grafana deploy annotation
+# The web's Sentry release is created by its own build (next.config.ts), from the commit Vercel builds.
 
 name: Deploy Frontend
 
@@ -58,3 +62,18 @@ jobs:
             curl -s -X POST "${{ secrets.VERCEL_WEB_DEPLOY_HOOK_PRODUCTION }}" > /dev/null
           fi
           echo "✓ Web deployment triggered"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The hook only queues the Vercel build, so the line marks when the deploy was asked for, not when it went live.
+      - name: Grafana deploy annotation
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          DEPLOY_ENV: ${{ github.event.inputs.environment }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          .github/scripts/observability-markers.sh grafana-annotation \
+            "Deploy web ${GITHUB_SHA:0:7} to ${DEPLOY_ENV} by ${GITHUB_ACTOR} (${RUN_URL})" \
+            deploy "env:${DEPLOY_ENV}" service:web

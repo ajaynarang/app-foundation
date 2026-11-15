@@ -31,6 +31,7 @@ export * from './platform/conversation.schema';
 export * from './platform/oauth.schema';
 export * from './platform/feedback.schema';
 export * from './platform/login-activity.schema';
+export * from './platform/outbound.schema';
 export {
   FEATURE_KEYS,
   ADDON_FEATURE_KEYS,

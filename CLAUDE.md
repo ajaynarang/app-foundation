@@ -18,8 +18,8 @@ A full-stack monorepo extracted from a production platform with all business-dom
 removed. Everything cross-cutting remains and works:
 
 - **Auth** — first-party email+password (primary, zero external services), phone PIN/OTP,
-  optional Firebase exchange, JWT + refresh token (revocable; NOT rotated on use), login-event
-  tracking, OAuth 2.1 provider.
+  optional Firebase exchange, JWT + rotating refresh token (every refresh issues a successor; a retired token
+  presented again revokes the session), login-event tracking, OAuth 2.1 provider.
   Seeds print dev credentials (owner@example.com / admin@example.com / Password123!).
 - **Multi-tenancy** — tenant-scoped data + a global guard chain. Toggle with `MULTI_TENANT`
   (see below) to run single-tenant from the same code.
@@ -27,7 +27,10 @@ removed. Everything cross-cutting remains and works:
   moderation, per-tenant AI budget, HITL) and an **empty MCP toolset** as your extension point.
 - **Billing** — Stripe subscriptions, wallet, plan entitlements, add-ons (generic).
 - **Infra** — Postgres (pgvector) + Redis, BullMQ queues, transactional outbox, timers, SSE realtime, S3 storage,
-  email/SMS/push, OTel + pino + Loki/Tempo/Grafana, Terraform.
+  email/SMS/push, OTel traces and metrics + pino logs + Sentry errors (each off until its key is set; three levels:
+  0 stdout only, 1 CloudWatch alarms with `alarm_email`, 2 Grafana Cloud and Sentry; `docs/observability.md`), a
+  local-only Loki/Tempo/Prometheus/Grafana compose profile, Terraform. Operator procedures (deploy gate,
+  migrations, maintenance switch, outbound gate, tenant reset, staging-debug stack) are in `docs/operations.md`.
 
 <!-- feature:desk:start -->
 
@@ -43,13 +46,18 @@ removed. Everything cross-cutting remains and works:
 The same codebase runs three ways via `TENANCY_MODE` (multi | single | personal; `MULTI_TENANT`
 kept for compat). Workspace-based membership (one user ↔ many workspaces, per-workspace role,
 live switcher) is built in: `WorkspaceMember` is the source of truth and the JWT carries the
-session's ACTIVE workspace — so two tabs can live in two workspaces. Personal mode auto-creates
+session's ACTIVE workspace, stored on the session's refresh token — so two sessions (two browsers or profiles; tabs
+share one cookie) can live in two workspaces. Personal mode auto-creates
 a private workspace per user at signup (`POST /auth/register`) and hides org chrome.
 
 Modes in detail:
 
 - **Multi-tenant** (default): `MULTI_TENANT=true` (backend) + `NEXT_PUBLIC_MULTI_TENANT=true` (web).
-  Tenants resolve from subdomain; tenant-scoped login; self-registration enabled.
+  Tenants resolve from subdomain; tenant-scoped login (the form sends the subdomain's `tenantId`). One live account
+  per email, held by the partial unique index `users_email_live_key`; a database that predates it may hold
+  duplicates, and then the migration skips the index, boot logs `auth.email_uniqueness_unenforced`, and a password
+  that matches accounts in several workspaces gets a 409 picker (`pnpm accounts:duplicates` lists them, merge per
+  `docs/operations.md`, then `pnpm accounts:enforce-unique-email`); self-registration enabled.
 - **Single-tenant**: `MULTI_TENANT=false` + `IMPLICIT_TENANT_ID=1`. One seeded tenant, no subdomain
   parsing, no tenant UI, registration hidden. Tenant scoping still works (every query resolves to
   the implicit tenant) — no query rewrites needed.
@@ -57,6 +65,15 @@ Modes in detail:
 Tenant enforcement is a global guard chain (`Throttler → Jwt → Tenant → Roles → Plan`) plus
 manual `where: { tenantId }` in services. The `TenantGuard` short-circuits to the implicit tenant
 when `MULTI_TENANT=false`.
+
+Every request, job, AI tool call and deadline handler also runs in a declared tenant context
+(`packages/appshore/kernel/src/infrastructure/rls/`): the auth guards pin the request, `withJobContext` scopes each
+job, cross-tenant work declares `systemScope(reason)` / `forEachTenant` / `@SystemScope`, and every log line carries
+`rls.*`. Every job name, Prisma table, `@OnEvent` handler and super-admin route declares its context, held by the
+`rls-*` specs in `apps/backend/src/architecture/` (app declarations: `platform-glue/queue/job-context.ts`,
+`platform-glue/database/app-rls-registry.ts`). Nothing in the database enforces the context yet (no row-level
+security policy); unit tests run it strict (`RLS_STRICT_CONTEXT=throw`). Every transaction is interactive,
+`$transaction(async (tx) => …)`; the array form is banned (`rls-no-array-transaction.spec.ts`).
 
 ---
 
@@ -84,7 +101,7 @@ packages/
   test-utils/    — auth fixtures, Playwright API client (@app/test-utils)
 infra/
   terraform/     — AWS (ECS, RDS, ElastiCache, S3, ALB, CloudWatch) — var.project parameterized
-  observability/ — Loki + Tempo + Grafana
+  observability/ — local-only Loki + Tempo + Prometheus + Grafana (compose profile; not the production stack)
 tests/         — Playwright QA suite (@app/qa)
 ```
 
@@ -194,7 +211,7 @@ Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=pu
 | Frontend | Next.js 15, Tailwind, shadcn/ui, TanStack Query, Zustand                                    |
 | Auth     | First-party email+password, phone PIN/OTP (Twilio optional), Firebase optional, JWT+refresh |
 | AI       | AI SDK, Anthropic, Mastra, MCP, Langfuse                                                    |
-| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), Loki + Tempo + Grafana                    |
+| Infra    | Docker Compose (dev), AWS ECS + Terraform (prod), OTLP + Sentry (off until keys are set)    |
 
 ---
 
@@ -220,7 +237,7 @@ One decided exception: notification types are strings with an app registry (`PLA
 
 ### API errors (one envelope)
 
-Every error body is `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing
+Every error body is `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing
 else: `detail` is the copy to show, `code` is the machine code (`ApiErrorCode` in `@app/shared-types`, or a domain
 code). There is no `message` key. Throw a NestJS exception or a factory from
 `@appshore/kernel/shared/errors/api-errors` (`fieldError`, `invalidState`, `duplicate`, `stale`); a route that
@@ -256,7 +273,8 @@ success + error toasts; every loading state shows a Skeleton.
 - **`pnpm verify:api`** — run it before a pull request that changes the wire (a status code, a route, a response
   or error body), and paste its last line too. It builds the backend, migrates, seeds, boots it and runs the
   Playwright `api` project (smoke, the RBAC matrix, `tests/api/`) against it. It needs Postgres and Redis and no
-  third-party key. `API_QA_PORT` picks the port when 8000 is taken.
+  third-party key. Export `DATABASE_URL` and `REDIS_URL` first: it migrates and seeds the database it is given,
+  so it has no default and stops when either is unset. `API_QA_PORT` picks the port when 8000 is taken.
 - **`pnpm verify:scaffold`** — run it before a pull request that touches `tools/init-app/`,
   `apps/backend/src/platform-glue/features/`, a file an optional-feature manifest names, or a Desk file outside the
   Desk folder, and paste its last line. It scaffolds two copies of the repo (`--desk no` and `--desk yes`), installs,
@@ -281,4 +299,10 @@ success + error toasts; every loading state shows a Skeleton.
   refuses a route without a summary, a described path param or a documented success body (`@ApiResult` with a
   response schema named in the controller group's `openapi.responses.ts`). Regenerate and commit both files with any
   change to a route, a DTO or a response. Production serves the public subset at `/api/openapi.json`.
+- **`pnpm check:ops`** — the operations files that are not Jest specs: the Grafana-as-code catalog under
+  `infra/observability/grafana-cloud/` (generated files fresh, `validate.mjs`, its specs), the ops shell tests and
+  Terraform fmt / validate / test. It runs inside `pnpm verify`, and the pre-push hook runs it when a push touches
+  `infra/`, `docs/runbooks/`, `.github/` or `tools/`. Change the catalog, never its generated files. A new alert
+  rule needs its `## <rule key>` section in `docs/runbooks/`; applying to Grafana is the manual `grafana-apply`
+  workflow.
 - **Pre-commit hook** — Prettier on staged files.

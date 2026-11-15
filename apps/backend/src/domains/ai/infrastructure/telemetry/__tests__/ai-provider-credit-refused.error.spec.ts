@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { AiBudgetExceededError } from '../ai-budget-exceeded.error';
 import {
   AI_PROVIDER_CREDIT_REFUSED_DETAIL,
@@ -87,7 +88,7 @@ describe('provider credit refusals', () => {
     it("does not log a refusal on the workspace's own key as a platform fault", () => {
       const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
       expect(mapProviderRefusal({ statusCode: 402 }, 7, TENANT)).toBeInstanceOf(AiProviderCreditRefused);
-      logPlatformCreditRefusal(TENANT, 7);
+      logPlatformCreditRefusal(TENANT, 7, { statusCode: 402 });
       expect(log).not.toHaveBeenCalled();
     });
 
@@ -104,6 +105,29 @@ describe('provider credit refusals', () => {
       mapProviderRefusal(new Error('boom'), 7, { ...TENANT, reportCreditRefusal });
       mapProviderRefusal({ statusCode: 402 }, 7, { ...PLATFORM, reportCreditRefusal });
       expect(reportCreditRefusal).not.toHaveBeenCalled();
+    });
+
+    it('reports a platform-paid refusal to the error tracker with source ai, once', () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const report = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+      const refusal = { statusCode: 402 };
+
+      mapProviderRefusal(refusal, 7, PLATFORM);
+      logPlatformCreditRefusal(PLATFORM, null, refusal);
+
+      expect(report).toHaveBeenCalledTimes(2);
+      expect(report).toHaveBeenNthCalledWith(1, refusal, { tenantDbId: 7, source: 'ai' });
+      expect(report).toHaveBeenNthCalledWith(2, refusal, { source: 'ai' });
+    });
+
+    it("does not report a refusal on the workspace's own key, nor any other error", () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const report = jest.spyOn(errorTracking, 'reportError').mockImplementation(() => undefined);
+
+      mapProviderRefusal({ statusCode: 402 }, 7, TENANT);
+      mapProviderRefusal(new Error('boom'), 7, PLATFORM);
+
+      expect(report).not.toHaveBeenCalled();
     });
 
     it('passes any other error through unchanged, and logs nothing', () => {

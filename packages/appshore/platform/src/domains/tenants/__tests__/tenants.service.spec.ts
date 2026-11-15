@@ -100,16 +100,21 @@ describe('TenantsService', () => {
       expect(await service.getTenantBranding('acme')).toBeNull();
     });
 
-    it('should return branding for active tenant', async () => {
+    it("should return branding for active tenant, with the tenant's public id for the login hint", async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
+        tenantId: 'ten_acme',
         companyName: 'Acme Inc',
         status: 'ACTIVE',
       });
       const result = await service.getTenantBranding('acme');
       expect(result).toEqual({
+        tenantId: 'ten_acme',
         companyName: 'Acme Inc',
         logoUrl: null,
       });
+      expect(mockPrisma.tenant.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ select: expect.objectContaining({ tenantId: true }) }),
+      );
     });
   });
 
@@ -399,11 +404,13 @@ describe('TenantsService', () => {
   describe('getTenantBranding — with null logoUrl', () => {
     it('should return null logoUrl for an active tenant', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
+        tenantId: 'ten_acme',
         companyName: 'Acme Inc',
         status: 'ACTIVE',
       });
       const result = await service.getTenantBranding('acme');
       expect(result).toEqual({
+        tenantId: 'ten_acme',
         companyName: 'Acme Inc',
         logoUrl: null,
       });

@@ -4,9 +4,9 @@
  * DO NOT EDIT MANUALLY. Regenerate with:
  *   npx tsx scripts/generate-rbac-matrix.ts --write
  *
- * Generated: 2026-11-13T06:33:28.401Z
- * Source: 22 domains, 102 endpoints
- * Controllers scanned: 286 total endpoints across all controllers
+ * Generated: 2026-11-13T16:37:47.141Z
+ * Source: 23 domains, 106 endpoints
+ * Controllers scanned: 291 total endpoints across all controllers
  *
  * Status codes:
  *   200      = allowed (request succeeds)
@@ -289,70 +289,70 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'GET', path: '/desk/agents',
     description: 'DeskAgentController: GET /desk/agents',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/agents/eligible-supervisors',
     description: 'DeskAgentController: GET /desk/agents/eligible-supervisors',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/approvals',
     description: 'ApprovalController: GET /desk/approvals',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/approvals/counts',
     description: 'ApprovalController: GET /desk/approvals/counts',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/episodes',
     description: 'DeskEpisodeController: GET /desk/episodes',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/episodes/handled',
     description: 'DeskEpisodeController: GET /desk/episodes/handled',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/memories',
     description: 'DeskMemoryController: GET /desk/memories',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/responsibilities',
     description: 'DeskResponsibilityController: GET /desk/responsibilities',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'GET', path: '/desk/schedule',
     description: 'DeskScheduleController: GET /desk/schedule',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
   {
     method: 'PATCH', path: '/desk/schedule',
     description: 'DeskScheduleController: PATCH /desk/schedule',
     domain: 'desk',
-    featureGate: null,
+    featureGate: 'desk',
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: null },
   },
 
@@ -409,35 +409,35 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'GET', path: '/integrations',
     description: 'IntegrationsController: GET /integrations',
     domain: 'integrations',
-    featureGate: null,
+    featureGate: 'integrations',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/integrations/health',
     description: 'IntegrationsController: GET /integrations/health',
     domain: 'integrations',
-    featureGate: null,
+    featureGate: 'integrations',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/integrations/sync-history',
     description: 'IntegrationsController: GET /integrations/sync-history',
     domain: 'integrations',
-    featureGate: null,
+    featureGate: 'integrations',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/integrations/vendors',
     description: 'IntegrationsController: GET /integrations/vendors',
     domain: 'integrations',
-    featureGate: null,
+    featureGate: 'integrations',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'POST', path: '/integrations',
     description: 'IntegrationsController: POST /integrations',
     domain: 'integrations',
-    featureGate: null,
+    featureGate: 'integrations',
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
   },
 
@@ -540,14 +540,14 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'GET', path: '/webhooks',
     description: 'SubscriptionController: GET /webhooks',
     domain: 'other',
-    featureGate: null,
+    featureGate: 'webhooks',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
     method: 'GET', path: '/webhooks/events',
     description: 'SubscriptionController: GET /webhooks/events',
     domain: 'other',
-    featureGate: null,
+    featureGate: 'webhooks',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
   },
   {
@@ -575,7 +575,7 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'POST', path: '/webhooks',
     description: 'SubscriptionController: POST /webhooks',
     domain: 'other',
-    featureGate: null,
+    featureGate: 'webhooks',
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: 403 },
   },
 
@@ -636,14 +636,14 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'GET', path: '/api-keys',
     description: 'ApiKeysController: GET /api-keys',
     domain: 'api-keys',
-    featureGate: null,
+    featureGate: 'api_keys',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
   {
     method: 'GET', path: '/api-keys/admin/tenant',
     description: 'ApiKeysController: GET /api-keys/admin/tenant',
     domain: 'api-keys',
-    featureGate: null,
+    featureGate: 'api_keys',
     expectations: { MEMBER: 200, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 400 },
   },
 
@@ -697,14 +697,14 @@ export const RBAC_MATRIX: RbacEntry[] = [
     method: 'GET', path: '/oauth/clients',
     description: 'OAuthClientsController: GET /oauth/clients',
     domain: 'oauth-provider',
-    featureGate: null,
+    featureGate: 'oauth_clients',
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 200 },
   },
   {
     method: 'POST', path: '/oauth/clients',
     description: 'OAuthClientsController: POST /oauth/clients',
     domain: 'oauth-provider',
-    featureGate: null,
+    featureGate: 'oauth_clients',
     expectations: { MEMBER: 403, ADMIN: null, OWNER: null, SUPER_ADMIN: null },
   },
 
@@ -717,6 +717,38 @@ export const RBAC_MATRIX: RbacEntry[] = [
     domain: 'onboarding',
     featureGate: null,
     expectations: { MEMBER: 403, ADMIN: 200, OWNER: 200, SUPER_ADMIN: 403 },
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // OUTBOUND
+  // ═══════════════════════════════════════════════════════
+  {
+    method: 'GET', path: '/super-admin/outbound/allow-list',
+    description: 'OutboundAdminController: GET /super-admin/outbound/allow-list',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/super-admin/outbound/held-back',
+    description: 'OutboundAdminController: GET /super-admin/outbound/held-back',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'GET', path: '/super-admin/outbound/status',
+    description: 'OutboundAdminController: GET /super-admin/outbound/status',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: 200 },
+  },
+  {
+    method: 'POST', path: '/super-admin/outbound/allow-list',
+    description: 'OutboundAdminController: POST /super-admin/outbound/allow-list',
+    domain: 'outbound',
+    featureGate: null,
+    expectations: { MEMBER: 403, ADMIN: 403, OWNER: 403, SUPER_ADMIN: null },
   },
 
   // ═══════════════════════════════════════════════════════

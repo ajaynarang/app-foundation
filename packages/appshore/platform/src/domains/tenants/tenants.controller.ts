@@ -38,6 +38,7 @@ import {
   TenantRecordResponse,
   TenantRegistrationResultResponse,
 } from './openapi.responses';
+import { SystemScope, TargetTenant } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @ApiTags('Tenants')
 @ApiBearerAuth()
@@ -151,6 +152,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Get()
+  @SystemScope('super-admin')
   @ApiOperation({
     summary: 'Every tenant, by company name: a cursor list; `q` searches, `status` filters (SUPER_ADMIN)',
   })
@@ -161,6 +163,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Post(':tenant_id/approve')
+  @TargetTenant('tenant_id', 'slug')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Approve a pending tenant — activates it and its owner/admins (SUPER_ADMIN); 409 unless PENDING_APPROVAL',
@@ -173,6 +176,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Post(':tenant_id/reject')
+  @TargetTenant('tenant_id', 'slug')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a tenant registration with a reason (SUPER_ADMIN)' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
@@ -183,6 +187,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Post(':tenant_id/suspend')
+  @TargetTenant('tenant_id', 'slug')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Suspend an active tenant and deactivate its users (SUPER_ADMIN); 409 unless ACTIVE',
@@ -195,6 +200,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Post(':tenant_id/reactivate')
+  @TargetTenant('tenant_id', 'slug')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reactivate a suspended tenant and its users (SUPER_ADMIN); 409 unless SUSPENDED',
@@ -207,6 +213,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':tenant_id')
+  @TargetTenant('tenant_id', 'slug')
   @ApiOperation({ summary: "Update a tenant's company, subdomain and owner details (SUPER_ADMIN)" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
   @ApiResult(TenantRecordResponse)
@@ -216,6 +223,7 @@ export class TenantsController extends BaseTenantController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Get(':tenant_id/details')
+  @TargetTenant('tenant_id', 'slug')
   @ApiOperation({ summary: 'A tenant with its lifecycle, users and metrics (SUPER_ADMIN)' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
   @ApiResult(TenantAdminDetailsResponse)

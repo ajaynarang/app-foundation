@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PushService } from '../web-push.service';
 import { PrismaService } from '../../../../database/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { OUTBOUND_GATE } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import { allowAllOutboundGate } from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
 
 describe('PushService', () => {
   let service: PushService;
@@ -33,6 +35,7 @@ describe('PushService', () => {
         PushService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: OUTBOUND_GATE, useValue: allowAllOutboundGate() },
       ],
     }).compile();
 

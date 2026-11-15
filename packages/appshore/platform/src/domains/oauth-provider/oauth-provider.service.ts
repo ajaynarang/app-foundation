@@ -571,16 +571,16 @@ export class OAuthProviderService {
   }
 
   private async revokeAllTokensForUser(userId: number, clientId: number): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.oAuthAccessToken.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.oAuthAccessToken.updateMany({
         where: { userId, clientId, revokedAt: null },
         data: { revokedAt: new Date() },
-      }),
-      this.prisma.oAuthRefreshToken.updateMany({
+      });
+      await tx.oAuthRefreshToken.updateMany({
         where: { userId, clientId, revokedAt: null },
         data: { revokedAt: new Date() },
-      }),
-    ]);
+      });
+    });
   }
 
   private hashToken(token: string): string {

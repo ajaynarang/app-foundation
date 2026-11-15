@@ -8,7 +8,8 @@ The service supports multiple providers in priority order:
 
 1. **Resend** (Recommended) - Modern email API with great deliverability
 2. **Nodemailer with SMTP** - Traditional SMTP for any email provider
-3. **Console Mode** (Development) - Logs emails to console instead of sending
+3. **Console Mode** (`ENV_TYPE=development` only) - Prints each email to the log instead of sending; in any other
+   environment a send with no provider fails with `EmailNotConfiguredError`
 
 ## Setup Options
 
@@ -61,29 +62,32 @@ EMAIL_FROM=noreply@yourdomain.com
 APP_URL=http://localhost:3000
 ```
 
-### Option 3: Console Mode (Development)
+### Option 3: Console Mode (`ENV_TYPE=development` only)
 
-If no email credentials are configured, emails are logged to the console:
+With no Resend or SMTP credentials and `ENV_TYPE=development`, each email is printed to the backend log instead of
+being sent:
 
 ```bash
-# No email config needed - just make sure APP_URL is set
+# Local development only: no email provider keys
+ENV_TYPE=development
 APP_URL=http://localhost:3000
 ```
 
-You'll see emails in the backend logs like this:
+You'll see emails in the backend logs like this. Every address is masked; the body is the plain-text version (the
+HTML when a message has no text version):
 
 ```
-========================================
-EMAIL (Console Mode)
-========================================
-From: noreply@appshore.in
-To: user@example.com
+EMAIL (console mode, ENV_TYPE=development)
+To: u***@example.com
 Subject: You're invited to join Acme Corp on the platform
 ----------------------------------------
-HTML Content:
-[Full email HTML here]
-========================================
+[Plain-text email body here]
 ```
+
+In any other environment, `ENV_TYPE` unset included, a send with no provider prints nothing and throws
+`EmailNotConfiguredError`, so a deployed task never writes reset links or invitation tokens to a log. Set
+`RESEND_API_KEY` or the `SMTP_*` keys there. See `docs/upgrade-notes/operations.md` ("logging standard; email outside
+development fails without a provider").
 
 ## Testing
 
@@ -95,7 +99,7 @@ Send a test invitation:
 4. Fill in the details and send
 
 **With Resend/SMTP:** Email will be sent to the recipient
-**Console Mode:** Check the backend logs to see the email content
+**Console Mode (`ENV_TYPE=development`):** Check the backend logs to see the email content
 
 ## Email Templates
 

@@ -19,7 +19,7 @@ import { UserRole } from '@appshore/db';
 import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
 import { OAuthClientsService } from './oauth-clients.service';
 import { UpdateOAuthClientScopesDto } from './dto/update-oauth-client-scopes.dto';
-import type { OAuthClientResponse } from '@app/shared-types';
+import { FEATURE_KEYS, type OAuthClientResponse } from '@app/shared-types';
 import { CreateOAuthClientDto, UpdateOAuthClientDto } from './dto/oauth-client.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
@@ -29,10 +29,12 @@ import {
   OAuthClientResponse as OAuthClientResponseRef,
   OAuthClientSecretRotatedResponse,
 } from './openapi.responses';
+import { RequireFeature } from '../../auth/decorators/require-feature.decorator';
 
 const CLIENT_ID_PARAM = { name: 'client_id', description: 'OAuth client id (app_…)' };
 
 @ApiTags('OAuth Clients')
+@RequireFeature(FEATURE_KEYS.OAUTH_CLIENTS)
 @Controller('oauth/clients')
 @ApiBearerAuth()
 @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)

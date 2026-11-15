@@ -149,7 +149,13 @@ export const SubdomainAvailabilitySchema = z.object({ available: z.boolean() });
 export type SubdomainAvailability = z.infer<typeof SubdomainAvailabilitySchema>;
 
 /** `GET /tenants/branding/:subdomain`: the login page's branding, or `null` for an unknown or inactive tenant. */
-export const TenantBrandingSchema = z.object({ companyName: z.string(), logoUrl: z.string().nullable() }).nullable();
+export const TenantBrandingSchema = z
+  .object({
+    tenantId: z.string().describe("The tenant's public id — the login form's workspace hint"),
+    companyName: z.string(),
+    logoUrl: z.string().nullable(),
+  })
+  .nullable();
 export type TenantBranding = z.infer<typeof TenantBrandingSchema>;
 
 /** `GET /tenants/:tenant_id/details`: the super-admin tenant sheet: lifecycle, members, metrics. */

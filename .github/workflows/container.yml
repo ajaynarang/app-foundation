@@ -1,0 +1,53 @@
+# .github/workflows/container.yml
+# Manual by default: run it from the Actions tab (or `gh workflow run container.yml`).
+# To run it on every push to main and every PR that touches these paths, uncomment the two triggers below.
+#
+# Builds the backend image with the frozen install (a dropped `COPY patches/` line fails the build), runs it and checks
+# the container is not root: .github/scripts/check-container-user.sh, which a developer can run with Docker up. The
+# fast static half (check-dockerfiles.sh) is in `pnpm check:ops`. The deploy workflow builds the same Dockerfile, so
+# every deploy exercises it too. This workflow pushes nothing.
+
+name: Container
+
+on:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'apps/backend/Dockerfile'
+  #     - 'apps/web/Dockerfile'
+  #     - 'patches/**'
+  #     - 'package.json'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/scripts/check-container-user.sh'
+  #     - '.github/scripts/check-dockerfiles.sh'
+  #     - '.github/workflows/container.yml'
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'apps/backend/Dockerfile'
+  #     - 'apps/web/Dockerfile'
+  #     - 'patches/**'
+  #     - 'package.json'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/scripts/check-container-user.sh'
+  #     - '.github/scripts/check-dockerfiles.sh'
+  #     - '.github/workflows/container.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    name: Backend image builds and runs as non-root
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dockerfiles (static)
+        run: bash .github/scripts/check-dockerfiles.test.sh
+
+      - name: Build and run the image
+        run: bash .github/scripts/check-container-user.sh

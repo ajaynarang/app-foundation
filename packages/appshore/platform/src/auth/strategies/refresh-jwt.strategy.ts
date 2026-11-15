@@ -3,21 +3,29 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import { PrismaService } from '../../infrastructure/database/prisma.service';
+import type { AuthMethod } from '../jwt.service';
+import { RefreshSessionService, type RefreshSession } from '../refresh-session.service';
 
 export interface RefreshJwtPayload {
   sub: string; // userId
   tenantId?: string; // Optional — SUPER_ADMIN / tenant-less users have no tenant
   tokenId: string;
+  authMethod?: AuthMethod;
+  /** tokenId this token replaced on rotation. */
+  prev?: string;
   iat: number;
   exp: number;
 }
 
+/**
+ * Verifies the refresh cookie's signature and expiry (passport-jwt), then hands the row checks to
+ * RefreshSessionService: the stored hash, revocation, reuse detection and the session's lifetime.
+ */
 @Injectable()
 export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(
-    private configService: ConfigService,
-    private prisma: PrismaService,
+    configService: ConfigService,
+    private readonly refreshSessions: RefreshSessionService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -31,47 +39,16 @@ export class RefreshJwtStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     });
   }
 
-  async validate(req: Request, payload: RefreshJwtPayload) {
+  async validate(req: Request, payload: RefreshJwtPayload): Promise<RefreshSession> {
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
     }
 
-    // Validate that refresh token exists in database and is not revoked
-    const tokenRecord = await this.prisma.refreshToken.findUnique({
-      where: { tokenId: payload.tokenId },
-      include: {
-        user: {
-          include: {
-            tenant: true,
-          },
-        },
-      },
+    return this.refreshSessions.validatePresentedToken(payload.tokenId, refreshToken, {
+      ip: req.ip ?? null,
+      userAgent: req.headers?.['user-agent'] ?? null,
     });
-
-    if (!tokenRecord || tokenRecord.isRevoked) {
-      throw new UnauthorizedException('Invalid or revoked refresh token');
-    }
-
-    if (new Date() > tokenRecord.expiresAt) {
-      throw new UnauthorizedException('Refresh token expired');
-    }
-
-    // Tenant check is null-safe: SUPER_ADMIN and tenant-less single-tenant-mode
-    // users have user.tenant = null (mirrors jwt.strategy.ts).
-    if (!tokenRecord.user.isActive || (tokenRecord.user.tenant && !tokenRecord.user.tenant.isActive)) {
-      throw new UnauthorizedException('User or tenant is inactive');
-    }
-
-    return {
-      userId: tokenRecord.user.userId,
-      email: tokenRecord.user.email,
-      role: tokenRecord.user.role,
-      tenantId: tokenRecord.user.tenant?.tenantId,
-      tenantName: tokenRecord.user.tenant?.companyName,
-      tokenId: payload.tokenId,
-      isActive: tokenRecord.user.isActive,
-    };
   }
 }

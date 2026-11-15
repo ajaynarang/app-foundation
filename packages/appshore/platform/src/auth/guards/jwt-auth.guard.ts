@@ -3,6 +3,8 @@ import type { Observable } from 'rxjs';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { RLS_SOURCE, isRlsTenantId, setRlsTenant } from '@appshore/kernel/infrastructure/rls/rls-context';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -25,7 +27,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Only log for MCP/OAuth routes to avoid noise
     if (request?.url === '/' || request?.url?.includes('/mcp')) {
       this.logger.log(
-        `JwtAuthGuard — url=${request.url}, handler=${handler}, controller=${controller}, isPublic=${isPublic}`,
+        `JwtAuthGuard — url=${stripQueryString(request.url)}, handler=${handler}, controller=${controller}, isPublic=${isPublic}`,
       );
     }
 
@@ -43,11 +45,19 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Enrich AsyncLocalStorage log context with tenantId/userId from JWT payload.
     // Only for HTTP contexts — WebSocket and RPC contexts do not have an Express request.
     if (authenticatedUser && context.getType() === 'http') {
+      const tenantDbId = authenticatedUser.tenantDbId;
+      // The request runs as the session's tenant (rls-context.ts). SUPER_ADMIN has no tenant, so its scope stays
+      // empty; a super-admin route declares `@SystemScope` or `@TargetTenant` instead.
+      if (isRlsTenantId(tenantDbId)) setRlsTenant(tenantDbId, RLS_SOURCE.JWT);
+
       const request = context.switchToHttp().getRequest();
       if (request?.setLogContext) {
         request.setLogContext({
           tenantId: String(authenticatedUser.tenantId ?? ''),
           userId: String(authenticatedUser.id ?? authenticatedUser.userId ?? ''),
+          ...(authenticatedUser.role ? { role: String(authenticatedUser.role) } : {}),
+          // SUPER_ADMIN has no tenant, so it carries no tenantDbId.
+          ...(isRlsTenantId(tenantDbId) ? { tenantDbId: String(tenantDbId) } : {}),
         });
       }
     }

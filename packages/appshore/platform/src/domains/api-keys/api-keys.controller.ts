@@ -21,7 +21,7 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { BaseTenantController } from '../../shared/base/base-tenant.controller';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { CursorQueryDto } from '@appshore/kernel/shared/utils/query-dto';
-import type { CursorList } from '@app/shared-types';
+import { FEATURE_KEYS, type CursorList } from '@app/shared-types';
 import { ApiKeysService } from './api-keys.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { ApiKeyDto } from './dto/api-key.dto';
@@ -30,6 +30,7 @@ import { UpdateApiKeyScopesDto } from './dto/update-api-key-scopes.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { SkipIdempotency } from '../../infrastructure/idempotency/idempotency.interceptor';
 import { ApiKeyList, ApiKeyRotation, TenantApiKeyList } from './openapi.responses';
+import { RequireFeature } from '../../auth/decorators/require-feature.decorator';
 
 const API_KEY_ID_PARAM = {
   name: 'api_key_id',
@@ -37,6 +38,7 @@ const API_KEY_ID_PARAM = {
 };
 
 @ApiTags('API Keys')
+@RequireFeature(FEATURE_KEYS.API_KEYS)
 @Controller('api-keys')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

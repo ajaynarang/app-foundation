@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml
 # Manual by default: run it from the Actions tab (or `gh workflow run ci.yml`).
 # To run on every push to main and every PR targeting it, uncomment the two
-# triggers below. Fails if lint, type-check, test, or build fails.
+# triggers below. Fails if lint, type-check, test, build or the Terraform checks fail.
 
 name: CI
 
@@ -336,3 +336,38 @@ jobs:
 
       - name: Type-check
         run: pnpm --filter=@app/ui type-check
+
+  # ─────────────────────────────────────────────────────────────
+  # Terraform: format, validate and the offline tests (the AWS provider is
+  # mocked, so no credentials and no cloud call). No backend and no plan against
+  # a real account. `pnpm check:ops` runs the same four commands locally.
+  # ─────────────────────────────────────────────────────────────
+  terraform:
+    name: Terraform — fmt, validate, test
+    runs-on: ubuntu-latest # runs-on: self-hosted
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.14.5'
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive
+
+      - name: Init (no backend)
+        run: terraform init -backend=false -input=false -lockfile=readonly
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Test
+        run: terraform test

@@ -16,6 +16,7 @@ import {
   TenantPlanSnapshotResponse,
 } from './openapi.responses';
 import { TenantRecordResponse } from '../tenants/openapi.responses';
+import { SystemScope, TargetTenant } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('plans')
 export class PlansController {
@@ -53,6 +54,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('tenant/:tenant_id')
+  @TargetTenant('tenant_id', 'slug')
   @ApiOperation({ summary: "A tenant's plan details (SUPER_ADMIN)" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant public id (tenant_…)' })
   @ApiResult(TenantPlanSnapshotResponse)
@@ -65,6 +67,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch('tenant/:tenant_id')
+  @TargetTenant('tenant_id', 'slug')
   @ApiOperation({
     summary: 'Assign a plan to a tenant and record the plan event (SUPER_ADMIN) — answers the updated tenant',
   })
@@ -79,6 +82,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan/provider-price')
+  @SystemScope('super-admin')
   @ApiOperation({ summary: "Set a plan's billing-provider price id (SUPER_ADMIN)" })
   @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
   @ApiResult(PlanConfigRecordResponse)
@@ -91,6 +95,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan')
+  @SystemScope('super-admin')
   @ApiOperation({ summary: 'Update a plan config — name, pricing, limits, CTA (SUPER_ADMIN)' })
   @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
   @ApiResult(PlanConfigRecordResponse)
@@ -103,6 +108,7 @@ export class PlansController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch(':plan/entitlements/:feature')
+  @SystemScope('super-admin')
   @ApiOperation({ summary: 'Turn one feature entitlement on or off for a plan (SUPER_ADMIN)' })
   @ApiParam({ name: 'plan', description: 'Plan key (TenantPlan, e.g. STARTER)' })
   @ApiParam({ name: 'feature', description: 'Feature key of the entitlement' })

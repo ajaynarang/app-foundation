@@ -61,8 +61,8 @@ describe('ScheduleManagerService reads the merged job vocabulary', () => {
     expect(reports.removeRepeatableByKey).toHaveBeenCalledWith('old-key');
     expect(reports.add).toHaveBeenCalledWith(
       'report-build',
-      {},
-      { repeat: { pattern: '0 * * * *' }, jobId: 'reports-report-build' },
+      expect.objectContaining({ tenantId: 'system', metadata: expect.objectContaining({ source: 'cron' }) }),
+      expect.objectContaining({ repeat: { pattern: '0 * * * *' }, jobId: 'reports-report-build' }),
     );
   });
 
@@ -74,7 +74,7 @@ describe('ScheduleManagerService reads the merged job vocabulary', () => {
 
     expect(bulkOps.add).toHaveBeenCalledWith(
       'job-cleanup',
-      {},
+      expect.objectContaining({ tenantId: 'system' }),
       expect.objectContaining({ jobId: 'maintenance-job-cleanup' }),
     );
   });

@@ -53,9 +53,10 @@ export const TYPE_DISPLAY_NAMES: Record<string, string> = {
   [WEBHOOKS_JOB_NAMES.DELIVER]: 'Webhook Delivery',
   [BULK_OPS_JOB_NAMES.JOB_CLEANUP]: 'Job Cleanup',
   [BULK_OPS_JOB_NAMES.DATA_RETENTION]: 'Data Retention',
-  [BULK_OPS_JOB_NAMES.UPLOADS_CLEANUP]: 'Uploads Cleanup',
   [BULK_OPS_JOB_NAMES.LOGIN_EVENTS_CLEANUP]: 'Login Events Cleanup',
   [BULK_OPS_JOB_NAMES.TOKENS_CLEANUP]: 'Tokens Cleanup',
+  [BULK_OPS_JOB_NAMES.TRIAL_EXPIRY]: 'Trial Expiry',
+  [BULK_OPS_JOB_NAMES.OPS_HEARTBEAT]: 'Ops Heartbeat',
   [BULK_OPS_JOB_NAMES.OUTBOX_RELAY]: 'Outbox Relay',
   [BULK_OPS_JOB_NAMES.DEADLINE_SWEEP]: 'Deadline Sweep',
 };

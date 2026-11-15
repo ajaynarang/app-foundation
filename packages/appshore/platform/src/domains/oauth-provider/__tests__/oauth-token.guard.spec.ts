@@ -1,3 +1,4 @@
+import { currentRls, rlsStorage } from '@appshore/kernel/infrastructure/rls/rls-context';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { OAuthTokenGuard } from '../oauth-token.guard';
@@ -134,5 +135,23 @@ describe('OAuthTokenGuard', () => {
       expect(response).toHaveProperty('error');
       expect(response).toHaveProperty('error_description');
     }
+  });
+
+  it('pins the request to the token tenant, sourced oauth', async () => {
+    oauthService.validateAccessToken.mockResolvedValue({
+      sub: '42',
+      tenantId: 7,
+      role: 'MEMBER',
+      scopes: ['platform:read'],
+      clientId: 'client-1',
+    });
+    const { ctx } = createMockContext({ authorization: 'Bearer tok' });
+
+    const seen = await rlsStorage.run({}, async () => {
+      await guard.canActivate(ctx);
+      return currentRls();
+    });
+
+    expect(seen).toEqual({ kind: 'tenant', tenantId: 7, source: 'oauth' });
   });
 });

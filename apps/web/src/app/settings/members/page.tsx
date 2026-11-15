@@ -43,6 +43,7 @@ import { useAuthStore } from '@/features/auth';
 import { apiClient, api } from '@appshore/web-core/shared/lib/api';
 import { showSuccess, showError } from '@appshore/web-core/shared/lib/toast';
 import { extractErrorMessage } from '@appshore/web-core/shared/lib/error-utils';
+import { showPlanUpgradePrompt } from '@appshore/web-core/shared/lib/plan-upgrade';
 import { memberState, roleLabel } from '@/features/platform/settings/constants';
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,8 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
       onOpenChange(false);
     },
     onError: (err: Error) => {
+      // A full plan (USER_LIMIT_REACHED) gets the upgrade prompt, not a plain failure.
+      if (showPlanUpgradePrompt(err)) return;
       showError('Failed to send invitation', extractErrorMessage(err));
     },
   });
@@ -205,7 +208,10 @@ export default function MembersPage() {
       showSuccess('User activated');
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (e: Error) => showError('Failed to activate user', extractErrorMessage(e)),
+    onError: (e: Error) => {
+      if (showPlanUpgradePrompt(e)) return;
+      showError('Failed to activate user', extractErrorMessage(e));
+    },
   });
 
   // All team members

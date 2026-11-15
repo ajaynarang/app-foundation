@@ -41,7 +41,11 @@ export class WorkspacesController {
     @Body() dto: SwitchWorkspaceDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.workspacesService.switch(user.dbId, dto.tenantId);
+    // `tokenId` is the access token's `sid`: the session (refresh-token family) the switch rotates.
+    const result = await this.workspacesService.switch(user.dbId, dto.tenantId, {
+      familyId: user.tokenId ?? null,
+      authMethod: user.authMethod,
+    });
     // Same host-only cookie as login.
     setRefreshTokenCookie(response, result.refreshToken, {
       secure: this.configService.get<string>('environment') === 'production',

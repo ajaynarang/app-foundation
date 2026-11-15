@@ -63,18 +63,42 @@ resource "aws_iam_role_policy" "ecs_task_ssm" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "ssmmessages:CreateControlChannel",
-        "ssmmessages:CreateDataChannel",
-        "ssmmessages:OpenControlChannel",
-        "ssmmessages:OpenDataChannel"
-      ]
-      # SSM channel actions cannot be scoped to a specific resource — must be *.
-      Resource = "*"
-    }]
+    Statement = [
+      local.ecs_exec_channel_statement,
+      local.ecs_exec_logging_statement,
+      local.ecs_exec_describe_logs_statement,
+    ]
   })
+}
+
+locals {
+  # ECS Exec, shared by both task roles: the SSM channels the agent opens, and the session transcript it writes to the
+  # ecs-exec log group (cloudwatch.tf; the cluster's execute_command_configuration in ecs.tf).
+  ecs_exec_channel_statement = {
+    Sid    = "EcsExecChannels"
+    Effect = "Allow"
+    Action = [
+      "ssmmessages:CreateControlChannel",
+      "ssmmessages:CreateDataChannel",
+      "ssmmessages:OpenControlChannel",
+      "ssmmessages:OpenDataChannel"
+    ]
+    # SSM channel actions cannot be scoped to a specific resource — must be *.
+    Resource = "*"
+  }
+  ecs_exec_logging_statement = {
+    Sid      = "EcsExecTranscript"
+    Effect   = "Allow"
+    Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    Resource = "${aws_cloudwatch_log_group.ecs_exec.arn}:*"
+  }
+  ecs_exec_describe_logs_statement = {
+    Sid    = "EcsExecTranscriptLookup"
+    Effect = "Allow"
+    Action = ["logs:DescribeLogGroups"]
+    # DescribeLogGroups cannot be scoped to one log group — must be *.
+    Resource = "*"
+  }
 }
 
 # Allow ECS tasks to read/write/delete objects in the S3 documents bucket.
@@ -99,12 +123,18 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
 # own credentials. Set `bedrock_models` to the catalog's base ids, then set PLATFORM_BEDROCK_REGION in Doppler.
 # Cross-region inference profiles (`us.` ids) route to the foundation model in other US regions, hence `*` on the
 # foundation model's region: the grant is scoped by model id instead.
-resource "aws_iam_role_policy" "ecs_task_bedrock" {
-  count = length(var.bedrock_models) > 0 ? 1 : 0
-  name  = "${local.prefix}-ecs-task-bedrock"
-  role  = aws_iam_role.ecs_task.id
-
-  policy = jsonencode({
+#
+# A workspace's own AWS account (`BEDROCK_ROLE`): the backend assumes the role the workspace created, with the
+# workspace's external id, from its task role. The resource is any role because workspace role ARNs are not known
+# ahead; the external id and the workspace's own trust policy (which must name the task roles) are the protection. The
+# same flag sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to both task role ARNs (ecs.tf). AWS records a
+# trusted role by its internal id: destroying and recreating a task role breaks every workspace's trust policy until
+# it is saved again.
+#
+# The worker makes AI calls too (the credential revalidation sweep, job-driven structured output, embeddings), so both
+# task roles carry the same two statements under the same variables.
+locals {
+  bedrock_invoke_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Sid    = "BedrockInvoke"
@@ -116,19 +146,8 @@ resource "aws_iam_role_policy" "ecs_task_bedrock" {
       )
     }]
   })
-}
 
-# A workspace's own AWS account (`BEDROCK_ROLE`): the backend assumes the role the workspace created, with the
-# workspace's external id, from this task role. The resource is any role because workspace role ARNs are not known
-# ahead; the external id and the workspace's own trust policy (which must name this role) are the protection. The
-# same flag sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks (ecs.tf). AWS records a trusted role by its
-# internal id: destroying and recreating `ecs_task` breaks every workspace's trust policy until it is saved again.
-resource "aws_iam_role_policy" "ecs_task_assume_tenant_bedrock_roles" {
-  count = var.bedrock_tenant_roles_enabled ? 1 : 0
-  name  = "${local.prefix}-ecs-task-assume-tenant-bedrock-roles"
-  role  = aws_iam_role.ecs_task.id
-
-  policy = jsonencode({
+  assume_tenant_bedrock_roles_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Sid      = "AssumeWorkspaceBedrockRoles"
@@ -137,6 +156,81 @@ resource "aws_iam_role_policy" "ecs_task_assume_tenant_bedrock_roles" {
       Resource = "arn:aws:iam::*:role/*"
     }]
   })
+}
+
+resource "aws_iam_role_policy" "ecs_task_bedrock" {
+  count  = length(var.bedrock_models) > 0 ? 1 : 0
+  name   = "${local.prefix}-ecs-task-bedrock"
+  role   = aws_iam_role.ecs_task.id
+  policy = local.bedrock_invoke_policy
+}
+
+resource "aws_iam_role_policy" "ecs_task_assume_tenant_bedrock_roles" {
+  count  = var.bedrock_tenant_roles_enabled ? 1 : 0
+  name   = "${local.prefix}-ecs-task-assume-tenant-bedrock-roles"
+  role   = aws_iam_role.ecs_task.id
+  policy = local.assume_tenant_bedrock_roles_policy
+}
+
+# --- ECS Worker Task Role ---
+# The worker's own role, so the API and worker grants can diverge (a product adds a worker-only permission here, not
+# on the API). Today it holds what the shared role held: ECS Exec, the documents bucket, and the two Bedrock
+# statements. The worker task runs under it only when worker_own_task_role is true (ecs.tf); see that variable for the
+# two-step switch on a stack with workspace Bedrock roles connected.
+
+resource "aws_iam_role" "ecs_task_worker" {
+  name = "${local.prefix}-iam-role-ecs-task-worker"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_worker_ssm" {
+  name = "${local.prefix}-ecs-task-worker-ssm"
+  role = aws_iam_role.ecs_task_worker.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      local.ecs_exec_channel_statement,
+      local.ecs_exec_logging_statement,
+      local.ecs_exec_describe_logs_statement,
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_worker_s3" {
+  name = "${local.prefix}-ecs-task-worker-s3"
+  role = aws_iam_role.ecs_task_worker.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"]
+      Resource = "${aws_s3_bucket.documents.arn}/*"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ecs_task_worker_bedrock" {
+  count  = length(var.bedrock_models) > 0 ? 1 : 0
+  name   = "${local.prefix}-ecs-task-worker-bedrock"
+  role   = aws_iam_role.ecs_task_worker.id
+  policy = local.bedrock_invoke_policy
+}
+
+resource "aws_iam_role_policy" "ecs_task_worker_assume_tenant_bedrock_roles" {
+  count  = var.bedrock_tenant_roles_enabled ? 1 : 0
+  name   = "${local.prefix}-ecs-task-worker-assume-tenant-bedrock-roles"
+  role   = aws_iam_role.ecs_task_worker.id
+  policy = local.assume_tenant_bedrock_roles_policy
 }
 
 # --- GitHub Actions OIDC Role ---
@@ -173,6 +267,13 @@ resource "aws_iam_openid_connect_provider" "github" {
   }
 }
 
+locals {
+  github_deploy_subjects = var.env == "production" ? [
+    "repo:${var.github_repo}:ref:refs/heads/main",
+    "repo:${var.github_repo}:environment:production",
+  ] : ["repo:${var.github_repo}:*"]
+}
+
 resource "aws_iam_role" "github_deploy" {
   name = "${local.prefix}-iam-role-github-deploy"
 
@@ -184,9 +285,13 @@ resource "aws_iam_role" "github_deploy" {
         Federated = aws_iam_openid_connect_provider.github.arn
       }
       Action = "sts:AssumeRoleWithWebIdentity"
+      # Production: only main, or a job bound to the production GitHub environment. Both subjects are needed: a job
+      # that names an environment presents the environment subject, and build-and-push, which names none, presents the
+      # branch subject. deploy-all.yml already refuses production from any other branch. Staging keeps any ref, so a
+      # branch can be deployed there to be tried.
       Condition = {
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*"
+          "token.actions.githubusercontent.com:sub" = local.github_deploy_subjects
         }
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
@@ -202,7 +307,7 @@ resource "aws_iam_role_policy" "github_deploy" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         # GetAuthorizationToken cannot be scoped to a specific repo — must be *.
         Sid      = "ECRAuth"
@@ -257,6 +362,7 @@ resource "aws_iam_role_policy" "github_deploy" {
           [
             aws_iam_role.ecs_execution.arn,
             aws_iam_role.ecs_task.arn,
+            aws_iam_role.ecs_task_worker.arn,
           ],
           var.env == "staging" ? [aws_iam_role.scheduler[0].arn] : []
         )
@@ -423,7 +529,93 @@ resource "aws_iam_role_policy" "github_deploy" {
           "ecr:ListTagsForResource"
         ]
         Resource = "*"
+      },
+      {
+        # The Grafana CloudWatch read role (grafana.tf). Create, tag and delete are scoped to that role's name; its
+        # inline policy is written through iam:PutRolePolicy above.
+        Sid    = "GrafanaRoleManage"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:DeleteRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:ListRoleTags",
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}-iam-role-grafana-*"
+      },
+      {
+        # The worker's own task role (above). Create, tag and delete are scoped to that role's name; its inline
+        # policies are written through iam:PutRolePolicy above.
+        Sid    = "WorkerTaskRoleManage"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:DeleteRole",
+          "iam:ListRoleTags",
+        ]
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.prefix}-iam-role-ecs-task-worker"
+      },
+      {
+        # The ECS Exec transcript log group (cloudwatch.tf) and the cluster setting that points sessions at it (ecs.tf).
+        Sid    = "EcsExecLoggingManage"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:PutRetentionPolicy",
+          "logs:TagResource",
+          "logs:TagLogGroup",
+          "logs:DeleteLogGroup",
+          "ecs:UpdateCluster",
+          "ecs:UpdateClusterSettings",
+        ]
+        Resource = [
+          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/${var.project}/${var.env}/ecs-exec",
+          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/${var.project}/${var.env}/ecs-exec:*",
+          "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${local.prefix}-ecs-cluster",
+        ]
       }
-    ]
+      ],
+      # The level 1 alarms (alarms.tf): refresh, threshold edits, and the deletes the grafana_alerting_live apply
+      # needs. Keyed on alarm_email, not on alarms_enabled, so the grant is in place before that apply instead of being
+      # removed by it. CI cannot create the SNS topic or its subscription: the first level 1 apply runs with admin
+      # credentials.
+      var.alarm_email != "" ? [{
+        Sid    = "AlarmsRead"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "sns:GetTopicAttributes",
+          "sns:GetSubscriptionAttributes",
+          "sns:ListTagsForResource",
+        ]
+        Resource = "*"
+      }] : [],
+      var.alarm_email != "" ? [{
+        Sid    = "AlarmsMaintain"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DeleteAlarms",
+          "sns:Unsubscribe",
+          "sns:DeleteTopic",
+        ]
+        Resource = [
+          "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${local.prefix}-*",
+          "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${local.prefix}-alerts",
+          "arn:aws:sns:${var.aws_region}:${data.aws_caller_identity.current.account_id}:${local.prefix}-alerts:*",
+        ]
+      }] : [],
+      # The budget (budget.tf) outlives the alarms, so its read grant is separate.
+      local.budget_enabled ? [{
+        Sid      = "BudgetRead"
+        Effect   = "Allow"
+        Action   = ["budgets:ViewBudget", "budgets:ListTagsForResource"]
+        Resource = "*"
+    }] : [])
   })
 }

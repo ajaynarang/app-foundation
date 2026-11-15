@@ -84,16 +84,16 @@ export class PaymentMethodService {
     await adapter.setDefaultPaymentMethod(billingCustomer.providerCustomerId, method.providerPaymentMethodId);
 
     // Update local records: unset all, then set the selected one
-    await this.prisma.$transaction([
-      this.prisma.paymentMethod.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentMethod.updateMany({
         where: { tenantId: tenantDbId },
         data: { isDefault: false },
-      }),
-      this.prisma.paymentMethod.update({
+      });
+      await tx.paymentMethod.update({
         where: { id: paymentMethodId },
         data: { isDefault: true },
-      }),
-    ]);
+      });
+    });
 
     this.logger.log(`Default payment method set for tenant ${tenantDbId}: ${paymentMethodId}`);
   }

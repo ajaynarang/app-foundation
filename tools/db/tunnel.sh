@@ -1,50 +1,57 @@
 #!/usr/bin/env bash
 #
-# Opens an SSM port-forwarding tunnel to the staging RDS PostgreSQL database.
+# Opens an SSM port-forwarding tunnel to the staging (default) or production RDS PostgreSQL database.
 #
 # What this does:
-#   1. Finds a running ECS task in the staging cluster (uses it as a "jump host")
+#   1. Finds a running task of the environment's API service (<project>-<env>-ecs-service-api) to use as the jump
+#      host. Never the worker: its ECS Exec is off.
 #   2. Builds the SSM target string from the task ID + container runtime ID
-#   3. Starts an SSM port-forwarding session that tunnels through the ECS task
-#      to the private RDS instance
+#   3. Starts an SSM port-forwarding session through that task to the private RDS instance
 #
-# After running, connect to the DB at: localhost:5433
+# After running, connect to the DB at localhost:5433 (staging) or localhost:5434 (production).
 #
 # Usage:
-#   ./db-tunnel.sh              # Uses first available container (worker preferred)
-#   ./db-tunnel.sh --container api   # Use the api container specifically
-#   ./db-tunnel.sh --local-port 5434 # Use a different local port
+#   ./tunnel.sh                      # Staging
+#   ./tunnel.sh --env production     # Production: asks you to type 'production'
+#   ./tunnel.sh --local-port 5435    # Use a different local port
 #
-# The RDS host and port come from RDS_HOST / RDS_PORT in the environment, or
-# else from the DATABASE_URL in apps/backend/.env.aws.staging (gitignored).
-# The port falls back to 5432.
+# The RDS host and port come from RDS_HOST / RDS_PORT in the environment, or else from the DATABASE_URL in
+# apps/backend/.env.aws.<env> (gitignored). The port falls back to 5432. The host must be one of that environment's
+# instances (<project>-<env>-…). An existing tunnel on the local port is never reused. PROJECT is the Terraform
+# `project` variable (default "app").
 
 set -euo pipefail
 
-# --- Configuration (change these if infra changes) ---
-CLUSTER="app-staging-ecs-cluster"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BACKEND_DIR="$(cd "$SCRIPT_DIR/../../apps/backend" && pwd)"
+# shellcheck source=lib/db-env.sh
+source "$SCRIPT_DIR/lib/db-env.sh"
+
+ENV="staging"
 RDS_HOST="${RDS_HOST:-}"
 RDS_PORT="${RDS_PORT:-}"
-STAGING_ENV_FILE="$(cd "$(dirname "$0")/../../apps/backend" && pwd)/.env.aws.staging"
-LOCAL_PORT="5433"
-PREFERRED_CONTAINER="worker"  # worker or api — either works as a jump host
+LOCAL_PORT=""
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --container)
-      PREFERRED_CONTAINER="$2"
+    --env)
+      ENV="${2:-}"
       shift 2
       ;;
     --local-port)
-      LOCAL_PORT="$2"
+      LOCAL_PORT="${2:-}"
       shift 2
       ;;
-    -h|--help)
-      echo "Usage: $0 [--container worker|api] [--local-port PORT]"
+    --container)
+      echo "ERROR: --container is gone. The jump host is always a task of the API service (the worker's ECS Exec is off)."
+      exit 1
+      ;;
+    -h | --help)
+      echo "Usage: $0 [--env staging|production] [--local-port PORT]"
       echo ""
-      echo "Opens an SSM tunnel to staging RDS via an ECS container."
-      echo "Connect to the DB at localhost:<local-port> (default: 5433)"
+      echo "Opens an SSM tunnel to the environment's RDS through a running API service task."
+      echo "Connect to the DB at localhost:<local-port> (default: 5433 staging, 5434 production)."
       exit 0
       ;;
     *)
@@ -54,90 +61,50 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+db_env_configure "$ENV" || exit 1
+LOCAL_PORT="${LOCAL_PORT:-$DB_TUNNEL_PORT}"
+ENV_FILE="$BACKEND_DIR/$DB_ENV_FILE_NAME"
+
 # --- Resolve the RDS host and port ---
-STAGING_DB_URL=""
-if [[ -f "$STAGING_ENV_FILE" ]]; then
-  # "|| true": a file with no DATABASE_URL line must reach the error below, not exit silently.
-  STAGING_DB_URL=$(grep -E '^DATABASE_URL=' "$STAGING_ENV_FILE" | head -1 | cut -d= -f2- || true)
+DB_URL=""
+if [[ -f "$ENV_FILE" ]]; then
+  DB_URL=$(db_env_file_value "$ENV_FILE" DATABASE_URL)
 fi
-url_part() {
-  [[ -n "$STAGING_DB_URL" ]] || return 0
-  DB_URL="$STAGING_DB_URL" python3 -c "import os, sys, urllib.parse as u; print(getattr(u.urlsplit(os.environ['DB_URL'].strip().strip('\"')), sys.argv[1]) or '')" "$1"
-}
-RDS_HOST="${RDS_HOST:-$(url_part hostname)}"
-RDS_PORT="${RDS_PORT:-$(url_part port)}"
+if [[ -n "$DB_URL" ]]; then
+  RDS_HOST="${RDS_HOST:-$(db_url_part "$DB_URL" hostname)}"
+  RDS_PORT="${RDS_PORT:-$(db_url_part "$DB_URL" port)}"
+fi
 RDS_PORT="${RDS_PORT:-5432}"
 if [[ -z "$RDS_HOST" ]]; then
-  echo "ERROR: RDS host unknown. Set RDS_HOST, or put DATABASE_URL in $STAGING_ENV_FILE."
+  echo "ERROR: RDS host unknown. Set RDS_HOST, or put DATABASE_URL in $ENV_FILE."
   exit 1
 fi
+db_check_host "$RDS_HOST" || exit 1
+db_require_free_port "$LOCAL_PORT" || exit 1
 
-# --- Fetch running tasks ---
-echo "Finding running ECS tasks in ${CLUSTER}..."
-
-TASK_ARNS=$(aws ecs list-tasks \
-  --cluster "$CLUSTER" \
-  --desired-status RUNNING \
-  --query 'taskArns[*]' \
-  --output text 2>&1)
-
-if [[ -z "$TASK_ARNS" || "$TASK_ARNS" == "None" ]]; then
-  echo "ERROR: No running tasks found in cluster ${CLUSTER}"
-  exit 1
+if [[ "$ENV" == "production" ]]; then
+  echo ""
+  echo "  You are about to open a tunnel to the PRODUCTION database (${RDS_HOST})."
+  db_confirm_production false || exit 1
 fi
 
-# --- Describe tasks to get container runtime IDs ---
-echo "Fetching task details..."
-
-TASKS_JSON=$(aws ecs describe-tasks \
-  --cluster "$CLUSTER" \
-  --tasks $TASK_ARNS \
-  --query 'tasks[?lastStatus==`RUNNING`].{taskId:taskArn,containers:containers[*].{name:name,runtimeId:runtimeId}}' \
-  --output json)
-
-# --- Pick the right container ---
-# Try preferred container first, fall back to any available one
-TARGET_INFO=$(echo "$TASKS_JSON" | python3 -c "
-import json, sys
-
-tasks = json.load(sys.stdin)
-preferred = '${PREFERRED_CONTAINER}'
-
-# Try preferred container first
-for task in tasks:
-    task_id = task['taskId'].split('/')[-1]
-    for container in task['containers']:
-        if container['name'] == preferred:
-            print(f\"{task_id} {container['runtimeId']} {container['name']}\")
-            sys.exit(0)
-
-# Fall back to any container
-for task in tasks:
-    task_id = task['taskId'].split('/')[-1]
-    for container in task['containers']:
-        if container['runtimeId']:
-            print(f\"{task_id} {container['runtimeId']} {container['name']}\")
-            sys.exit(0)
-
-print('ERROR', file=sys.stderr)
-sys.exit(1)
-")
-
-TASK_ID=$(echo "$TARGET_INFO" | awk '{print $1}')
-RUNTIME_ID=$(echo "$TARGET_INFO" | awk '{print $2}')
-CONTAINER_NAME=$(echo "$TARGET_INFO" | awk '{print $3}')
+# --- Pick the jump host: a running task of the API service ---
+echo "Finding a running task of ${DB_API_SERVICE} in ${DB_CLUSTER}..."
+TARGET_INFO=$(db_find_api_task) || exit 1
+read -r TASK_ID RUNTIME_ID CONTAINER_NAME <<<"$TARGET_INFO"
 
 # --- Build SSM target ---
-TARGET="ecs:${CLUSTER}_${TASK_ID}_${RUNTIME_ID}"
+TARGET="ecs:${DB_CLUSTER}_${TASK_ID}_${RUNTIME_ID}"
 
 echo ""
 echo "=== Tunnel Configuration ==="
-echo "  Cluster:    ${CLUSTER}"
-echo "  Container:  ${CONTAINER_NAME}"
-echo "  Task ID:    ${TASK_ID}"
-echo "  Runtime ID: ${RUNTIME_ID}"
-echo "  RDS Host:   ${RDS_HOST}"
-echo "  Local Port: localhost:${LOCAL_PORT} -> ${RDS_HOST}:${RDS_PORT}"
+echo "  Environment: ${ENV}"
+echo "  Cluster:     ${DB_CLUSTER}"
+echo "  Service:     ${DB_API_SERVICE}"
+echo "  Container:   ${CONTAINER_NAME}"
+echo "  Task ID:     ${TASK_ID}"
+echo "  RDS Host:    ${RDS_HOST}"
+echo "  Local Port:  localhost:${LOCAL_PORT} -> ${RDS_HOST}:${RDS_PORT}"
 echo ""
 echo "Starting SSM tunnel... (Ctrl+C to stop)"
 echo ""

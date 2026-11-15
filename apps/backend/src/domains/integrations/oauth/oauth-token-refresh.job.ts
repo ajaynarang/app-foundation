@@ -6,9 +6,10 @@ import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constan
 import { buildJobEnvelope } from '@appshore/kernel/infrastructure/queue/job-envelope.helper';
 import { AuthTokenService } from './auth-token.service';
 import { VENDOR_REGISTRY, getVendorOAuth } from '../vendor-registry';
+import { APP_JOB_NAMES } from '../../../platform-glue/queue/job-names';
 
 /** BullMQ job name for the repeatable OAuth token refresh. */
-const OAUTH_REFRESH_JOB_NAME = 'oauth-refresh';
+const OAUTH_REFRESH_JOB_NAME = APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH;
 
 @Injectable()
 export class OAuthTokenRefreshJob implements OnModuleInit {

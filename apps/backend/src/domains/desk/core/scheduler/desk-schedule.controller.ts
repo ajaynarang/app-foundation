@@ -11,6 +11,8 @@ import { DeskScheduleService } from './desk-schedule.service';
 import { UpdateDeskScheduleDto } from './dto/update-desk-schedule.dto';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { DeskScheduleStateResponse } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for the tenant-wide Desk schedule master switch.
@@ -22,6 +24,7 @@ import { DeskScheduleStateResponse } from '../../openapi.responses';
  */
 @ApiTags('Desk — Schedule')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/schedule')
 export class DeskScheduleController extends BaseTenantController {
   constructor(

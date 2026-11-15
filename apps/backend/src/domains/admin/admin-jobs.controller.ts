@@ -36,6 +36,7 @@ import {
   AdminJobRetryResponse,
   AdminJobsPauseStateResponse,
 } from './openapi.responses';
+import { SystemScope, TargetTenant } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const JOB_STATUS = JobStatusSchema.enum;
 
@@ -61,6 +62,7 @@ export function toJobsPauseState(tenant: {
 
 @Controller('admin/jobs')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class AdminJobsController {
   private readonly vocabulary: JobVocabulary;
 
@@ -166,6 +168,7 @@ export class AdminJobsController {
   }
 
   @Post('tenants/:tenant_id/pause-jobs')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Pause a tenant's background jobs" })
   @ApiParam(TENANT_ID_PARAM)
@@ -183,6 +186,7 @@ export class AdminJobsController {
   }
 
   @Post('tenants/:tenant_id/resume-jobs')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resume a tenant's background jobs" })
   @ApiParam(TENANT_ID_PARAM)

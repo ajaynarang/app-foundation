@@ -1,0 +1,46 @@
+# docker-compose.stg-debug.yml
+#
+# A second Postgres and Redis for debugging staging data on a laptop. Own container names, own ports, own volumes,
+# so a staging copy never replaces the dev database (docker-compose.yml, ports 5499 / 6399).
+#
+#   pnpm stg-debug:up                  # start it
+#   pnpm stg-debug:pull                # copy staging into it (tools/db/pull-staging.sh)
+#   pnpm stg-debug:backend             # run the backend against it
+#   pnpm stg-debug:reset               # stop it and delete its data
+#
+# Ports are bound to loopback. The data is a copy of staging and may hold real people's data: reset it when done.
+
+services:
+  postgres-stg-debug:
+    image: pgvector/pgvector:pg16
+    container_name: app-postgres-stg-debug
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - '127.0.0.1:5495:5432'
+    volumes:
+      - postgres_stg_debug_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d app']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-stg-debug:
+    image: redis:7-alpine
+    container_name: app-redis-stg-debug
+    ports:
+      - '127.0.0.1:6395:6379'
+    volumes:
+      - redis_stg_debug_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_stg_debug_data:
+  redis_stg_debug_data:

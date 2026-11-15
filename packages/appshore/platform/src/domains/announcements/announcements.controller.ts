@@ -9,6 +9,7 @@ import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { BroadcastListQueryDto } from './dto/broadcast-list-query.dto';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { Broadcast, BroadcastList } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const BROADCAST_ID_PARAM = { name: 'id', description: 'The broadcast public id (uuid)' };
 
@@ -16,6 +17,7 @@ const BROADCAST_ID_PARAM = { name: 'id', description: 'The broadcast public id (
 @Controller('admin/broadcasts')
 @ApiBearerAuth()
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class AnnouncementsController {
   constructor(private readonly service: AnnouncementsService) {}
 

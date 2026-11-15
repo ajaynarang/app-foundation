@@ -32,6 +32,8 @@ import {
   DeskResponsibilityRunResultResponse,
   DeskResponsibilityUiSpecResponse,
 } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for the Desk index + responsibility settings page.
@@ -40,6 +42,7 @@ import {
  */
 @ApiTags('Desk — Responsibilities')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/responsibilities')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskResponsibilityController extends BaseTenantController {

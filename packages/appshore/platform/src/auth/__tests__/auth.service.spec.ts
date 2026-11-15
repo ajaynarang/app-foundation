@@ -8,6 +8,8 @@ import { PinService } from '../pin.service';
 import { TwilioVerifyService } from '../../infrastructure/sms/twilio-verify.service';
 import { LoginEventService } from '../login-event.service';
 import { EmailService } from '../../infrastructure/notification/services/email.service';
+import { ConfigService } from '@nestjs/config';
+import { IdentityResolverService } from '../identity-resolver.service';
 
 const mockLoginEventService = {
   recordLoginEvent: jest.fn(),
@@ -38,8 +40,7 @@ const mockPrismaService = {
 
 const mockJwtTokenService = {
   generateTokenPair: jest.fn(),
-  revokeRefreshToken: jest.fn(),
-  generateAccessTokenOnly: jest.fn(),
+  revokeFamily: jest.fn(),
 };
 
 const mockFirebaseAuthService = {
@@ -74,6 +75,8 @@ describe('AuthService - Phone Auth', () => {
         { provide: TwilioVerifyService, useValue: mockTwilioVerifyService },
         { provide: LoginEventService, useValue: mockLoginEventService },
         { provide: EmailService, useValue: { sendEmail: jest.fn() } },
+        IdentityResolverService,
+        { provide: ConfigService, useValue: { get: () => undefined } },
       ],
     }).compile();
 
@@ -326,45 +329,18 @@ describe('AuthService - Phone Auth', () => {
     });
   });
 
-  describe('refreshAccessToken', () => {
-    it('should return new access token and profile', async () => {
-      const user = {
-        userId: 'USR-001',
-        email: 'test@test.com',
-        role: 'ADMIN',
-        isActive: true,
-        tenant: { tenantId: 'TNT-001', companyName: 'ACME', subdomain: null, status: 'ACTIVE', isActive: true },
-        createdAt: new Date(),
-        lastLoginAt: new Date(),
-      };
-      mockPrismaService.user.findUnique.mockResolvedValue(user);
-      mockJwtTokenService.generateAccessTokenOnly.mockReturnValue('new-access-token');
-
-      const result = await service.refreshAccessToken('USR-001', 'token-id');
-
-      expect(result.accessToken).toBe('new-access-token');
-      expect(result.user.userId).toBe('USR-001');
-    });
-
-    it('should throw when user not found or inactive', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
-
-      await expect(service.refreshAccessToken('USR-999', 'token-id')).rejects.toThrow(UnauthorizedException);
-    });
-  });
-
   describe('logout', () => {
-    it('should revoke token and record logout', async () => {
-      mockJwtTokenService.revokeRefreshToken.mockResolvedValue(undefined);
+    it('revokes the whole session (refresh-token family) and records the logout', async () => {
+      mockJwtTokenService.revokeFamily.mockResolvedValue(1);
       mockLoginEventService.recordLogout.mockResolvedValue(undefined);
 
-      await service.logout('token-id', 1, 1);
+      await service.logout('rt_family', 1, 1);
 
-      expect(mockJwtTokenService.revokeRefreshToken).toHaveBeenCalledWith('token-id');
+      expect(mockJwtTokenService.revokeFamily).toHaveBeenCalledWith('rt_family', 1);
       expect(mockLoginEventService.recordLogout).toHaveBeenCalledWith({
         userId: 1,
         tenantId: 1,
-        sessionId: 'token-id',
+        sessionId: 'rt_family',
       });
     });
   });
@@ -486,9 +462,15 @@ describe('AuthService - Phone Auth', () => {
       mockPrismaService.user.update.mockResolvedValue({});
       mockPrismaService.refreshToken.updateMany.mockResolvedValue({ count: 3 });
 
-      const result = await service.recordPasswordChange('USR-001', 'current-token', true);
+      const result = await service.recordPasswordChange('USR-001', 'rt_current_family', true);
 
       expect(result.sessionsRevoked).toBe(3);
+      // "Sign out other sessions" revokes every other family, not every other token: the current session's
+      // rotated tokens survive.
+      expect(mockPrismaService.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 1, isRevoked: false, familyId: { not: 'rt_current_family' } },
+        data: { isRevoked: true, revokedAt: expect.any(Date) },
+      });
     });
   });
 

@@ -185,5 +185,45 @@ describe('DurableEventProcessor', () => {
 
       expect(deadLetter.recordPermanentFailure).not.toHaveBeenCalled();
     });
+
+    it('records a job BullMQ failed for good before its attempts ran out (UnrecoverableError)', async () => {
+      const job: any = {
+        id: 'job-9',
+        name: 'app.load.created',
+        attemptsMade: 1,
+        finishedOn: Date.now(),
+        opts: { attempts: 3 },
+        data: makeEnvelope(sampleJobData),
+      };
+      const err = new Error('unrecoverable');
+
+      await processor.onFailed(job, err);
+
+      expect(deadLetter.recordPermanentFailure).toHaveBeenCalledWith(job, err);
+    });
+
+    it('writes one job.failed line per failed attempt: warn on a retry, error on the final one', async () => {
+      const logger = (processor as any).logger;
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const error = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const job = (attemptsMade: number): any => ({
+        id: 'job-9',
+        name: 'app.load.created',
+        queueName: 'events',
+        attemptsMade,
+        opts: { attempts: 3 },
+        data: makeEnvelope(sampleJobData),
+      });
+
+      await processor.onFailed(job(1), new Error('retry me'));
+      await processor.onFailed(job(3), new Error('terminal'));
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'job.failed', jobId: 'job-9', queue: 'events', final: false }),
+      );
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'job.failed', jobId: 'job-9', queue: 'events', final: true }),
+      );
+    });
   });
 });

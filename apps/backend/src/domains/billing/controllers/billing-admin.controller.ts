@@ -27,6 +27,7 @@ import {
   BillingAdminTenantBillingResponse,
   BillingRevenueStatsResponse,
 } from '../openapi.responses';
+import { SystemScope, TargetTenant } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('admin/billing')
 export class BillingAdminController {
@@ -37,6 +38,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/subscription')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Provision a subscription for a tenant without checkout — refused while one is active' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -53,6 +55,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('tenants/:tenant_id')
+  @TargetTenant('tenant_id')
   @ApiOperation({
     summary: "A tenant's full billing state — plan, subscription, wallet, payment methods, recent invoices",
   })
@@ -67,6 +70,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/credit')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Gift wallet credit to a tenant; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -85,6 +89,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/refund')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refund a provider payment, optionally crediting the wallet' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -98,6 +103,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Patch('tenants/:tenant_id/price')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: "Override the subscription's unit price; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
   @ApiResult(BillingAdminTenantBillingResponse)
@@ -111,6 +117,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/pause')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Pause a tenant's billing; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -125,6 +132,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/resume')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Resume a paused tenant's billing; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -139,6 +147,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/change-plan')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Change a tenant's plan immediately (upgrade, downgrade, or create when none is active)" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -152,6 +161,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/cancel-immediately')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Cancel a tenant's subscription now, not at period end; answers the tenant's billing state",
@@ -168,6 +178,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/extend-trial')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Extend a tenant's trial; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -182,6 +193,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/suspend')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Force-suspend a tenant; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -196,6 +208,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Post('tenants/:tenant_id/reactivate')
+  @TargetTenant('tenant_id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Reactivate a suspended tenant; answers the tenant's billing state" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric database id' })
@@ -210,6 +223,7 @@ export class BillingAdminController {
    */
   @Roles(UserRole.SUPER_ADMIN)
   @Get('revenue')
+  @SystemScope('super-admin')
   @ApiOperation({ summary: 'Revenue statistics — MRR, ARR, ARPU, churn, add-on adoption' })
   @ApiResult(BillingRevenueStatsResponse)
   async getRevenueStats() {

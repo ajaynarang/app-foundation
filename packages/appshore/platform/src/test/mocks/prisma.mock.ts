@@ -52,6 +52,8 @@ const MODEL_NAMES = [
   'oAuthAuthorizationCode',
   'oAuthClient',
   'oAuthRefreshToken',
+  'outboundAllowEntry',
+  'outboundSuppression',
   'paymentMethod',
   'planConfig',
   'planEntitlement',
@@ -102,13 +104,15 @@ export function createMockPrisma() {
     prisma[name] = mockModel();
   }
 
-  // $transaction executes callback with the mock prisma itself
-  prisma.$transaction = jest.fn().mockImplementation(async (cbOrArray: any) => {
-    if (typeof cbOrArray === 'function') {
-      return cbOrArray(prisma);
+  // $transaction runs the callback with the mock prisma itself as `tx`. The array form is refused: it is banned
+  // (apps/backend/src/architecture/rls-no-array-transaction.spec.ts), so a unit test must not pass with it.
+  prisma.$transaction = jest.fn().mockImplementation(async (fn: unknown) => {
+    if (typeof fn !== 'function') {
+      throw new TypeError(
+        'array-form $transaction is banned: pass an interactive callback, $transaction(async (tx) => …)',
+      );
     }
-    // Array of promises
-    return Promise.all(cbOrArray);
+    return fn(prisma);
   });
 
   prisma.$executeRaw = jest.fn().mockResolvedValue(0);

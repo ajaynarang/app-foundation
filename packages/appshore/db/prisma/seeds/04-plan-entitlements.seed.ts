@@ -1,8 +1,9 @@
 import { PrismaClient, TenantPlan } from '../../generated/client';
 
 /**
- * Plan entitlements — generic platform features, developer platform, limits, display.
- * Add-on features are managed by the AddOn catalog and are NEVER plan entitlements.
+ * Plan entitlements — generic platform features, developer platform, limits, display. These rows are the truth the
+ * plan rule reads (TenantEntitlementsService, PlanGuard): `desk` and `audit_log` are plan features here, not add-ons.
+ * Every key in FEATURE_KEYS has a row on every plan, so the plan admin page can show and edit it.
  */
 const entitlements: {
   plan: TenantPlan;
@@ -21,6 +22,14 @@ const entitlements: {
     type: 'software',
   },
   { plan: TenantPlan.TRIAL, feature: 'notifications', displayName: 'Notifications', enabled: true, type: 'software' },
+  // The WhatsApp channel (whatsapp_channel flag, provider keys) is a plan feature too.
+  {
+    plan: TenantPlan.TRIAL,
+    feature: 'whatsapp_notifications',
+    displayName: 'WhatsApp Notifications',
+    enabled: false,
+    type: 'software',
+  },
   { plan: TenantPlan.TRIAL, feature: 'audit_log', displayName: 'Audit Log', enabled: true, type: 'software' },
   // AI
   { plan: TenantPlan.TRIAL, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
@@ -59,6 +68,14 @@ const entitlements: {
     type: 'software',
   },
   { plan: TenantPlan.STARTER, feature: 'notifications', displayName: 'Notifications', enabled: true, type: 'software' },
+  // The WhatsApp channel (whatsapp_channel flag, provider keys) is a plan feature too.
+  {
+    plan: TenantPlan.STARTER,
+    feature: 'whatsapp_notifications',
+    displayName: 'WhatsApp Notifications',
+    enabled: false,
+    type: 'software',
+  },
   { plan: TenantPlan.STARTER, feature: 'audit_log', displayName: 'Audit Log', enabled: false, type: 'software' },
   // AI
   { plan: TenantPlan.STARTER, feature: 'ai_chat', displayName: 'AI Chat', enabled: true, type: 'software' },
@@ -112,6 +129,14 @@ const entitlements: {
     feature: 'notifications',
     displayName: 'Notifications',
     enabled: true,
+    type: 'software',
+  },
+  // The WhatsApp channel (whatsapp_channel flag, provider keys) is a plan feature too.
+  {
+    plan: TenantPlan.PROFESSIONAL,
+    feature: 'whatsapp_notifications',
+    displayName: 'WhatsApp Notifications',
+    enabled: false,
     type: 'software',
   },
   { plan: TenantPlan.PROFESSIONAL, feature: 'audit_log', displayName: 'Audit Log', enabled: true, type: 'software' },
@@ -173,6 +198,14 @@ const entitlements: {
     plan: TenantPlan.ENTERPRISE,
     feature: 'notifications',
     displayName: 'Notifications',
+    enabled: true,
+    type: 'software',
+  },
+  // The WhatsApp channel (whatsapp_channel flag, provider keys) is a plan feature too.
+  {
+    plan: TenantPlan.ENTERPRISE,
+    feature: 'whatsapp_notifications',
+    displayName: 'WhatsApp Notifications',
     enabled: true,
     type: 'software',
   },

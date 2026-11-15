@@ -195,7 +195,8 @@ export const navigationConfig: Record<string, NavigationItem[]> = {
   owner: memberNav,
 
   // Super-admin surfaces that ship with the starter: tenant lifecycle
-  // management, AI spend and timers (deadlines and the outbox backlog). The backend exposes more admin modules
+  // management, AI spend, timers (deadlines and the outbox backlog) and outbound (who a test environment may
+  // message). The backend exposes more admin modules
   // (feature flags, broadcasts, background jobs, events, login activity,
   // plans, billing, cache) — add pages under apps/web/src/app/admin/ and
   // list them here as you build their UIs.
@@ -203,6 +204,7 @@ export const navigationConfig: Record<string, NavigationItem[]> = {
     { label: 'Tenants', href: '/admin/tenants', icon: Building2 },
     { label: 'AI Spend', href: '/admin/ai-spend', icon: DollarSign },
     { label: 'Timers', href: '/admin/timers', icon: Timer },
+    { label: 'Outbound', href: '/admin/outbound', icon: Send },
     { label: 'Settings', href: '/settings/profile', icon: Settings, subPanel: 'settings' },
   ],
 };

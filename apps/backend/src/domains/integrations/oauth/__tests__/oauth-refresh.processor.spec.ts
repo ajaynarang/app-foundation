@@ -1,4 +1,6 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { JOB_EVENTS } from '@appshore/kernel/infrastructure/queue/job-events';
 import type { JobEnvelope } from '@app/shared-types';
 import { OAuthRefreshJobHandler } from '../oauth-refresh.processor';
 import { AuthTokenService } from '../auth-token.service';
@@ -53,6 +55,48 @@ describe('OAuthRefreshJobHandler', () => {
   });
 
   const makeJob = (data: OAuthRefreshJobData, name: string = 'oauth-refresh') => ({ name, data: wrap(data) }) as any;
+
+  /** The `cron.completed` lines this handler logged, so the cron-missed rule sees every run, skipped or not. */
+  function cronCompletions(logSpy: jest.SpyInstance): Array<Record<string, unknown>> {
+    return logSpy.mock.calls
+      .map(([line]) => line as Record<string, unknown>)
+      .filter((line) => typeof line === 'object' && line?.event === JOB_EVENTS.CRON_COMPLETED);
+  }
+
+  describe('a skipped run still completes its CronRun', () => {
+    let logSpy: jest.SpyInstance;
+    beforeEach(() => {
+      logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ['the tenant is paused', { jobsPaused: true }, undefined, 'tenant jobs paused'],
+      ['the integration is gone', { jobsPaused: false }, null, 'integration not found'],
+      [
+        'the integration is disabled',
+        { jobsPaused: false },
+        { id: 1, isEnabled: false, status: 'ACTIVE' },
+        'integration disabled or not configured',
+      ],
+      [
+        'the integration is NOT_CONFIGURED',
+        { jobsPaused: false },
+        { id: 1, isEnabled: true, status: 'NOT_CONFIGURED' },
+        'integration disabled or not configured',
+      ],
+    ])('when %s', async (_case, tenant, config, skipped) => {
+      prisma.tenant.findUnique.mockResolvedValue(tenant);
+      prisma.integrationConfig.findFirst.mockResolvedValue(config);
+
+      await processor.run(makeJob({ tenantId: 1, integrationId: 'int-1', vendor: 'QUICKBOOKS' }));
+
+      expect(cronCompletions(logSpy)).toEqual([
+        expect.objectContaining({ jobName: 'oauth-refresh', skipped, vendor: 'QUICKBOOKS', tenantsFailed: 0 }),
+      ]);
+    });
+  });
 
   describe('process', () => {
     it('should throw when circuit breaker is open', async () => {

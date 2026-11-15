@@ -6,6 +6,7 @@ import type { DomainEventService } from '@appshore/kernel/infrastructure/events/
 import { OutboxService } from '@appshore/platform/infrastructure/events/outbox.service';
 import { OutboxRelay, OUTBOX_RETENTION_DAYS } from '@appshore/platform/infrastructure/events/outbox-relay.service';
 import { toOutboxRow } from '@appshore/platform/infrastructure/events/outbox-row';
+import { TenantIdResolver } from '@appshore/platform/infrastructure/events/tenant-id-resolver.service';
 
 /**
  * The outbox on a real Postgres (ADR "Outbox and deadlines"): the unit specs hold the logic with a mock client;
@@ -106,7 +107,7 @@ describe('outbox on a real database', () => {
     });
     await prisma.outboxEvent.create({ data: toOutboxRow(fresh) });
 
-    const relay = new OutboxRelay(prisma as never, events);
+    const relay = new OutboxRelay(prisma as never, events, new TenantIdResolver(prisma as never));
     const [first, second] = await Promise.all([relay.relay(now), relay.relay(now)]);
 
     // Two relays at once: SKIP LOCKED and the lease hand the stale row to exactly one of them.
@@ -139,7 +140,7 @@ describe('outbox on a real database', () => {
       ],
     });
 
-    const purged = await new OutboxRelay(prisma as never, events).purge(now);
+    const purged = await new OutboxRelay(prisma as never, events, new TenantIdResolver(prisma as never)).purge(now);
 
     expect(purged).toBeGreaterThanOrEqual(1);
     const left = (await prisma.outboxEvent.findMany({ where: { event: EVENT } })).map((row) => row.id).sort();

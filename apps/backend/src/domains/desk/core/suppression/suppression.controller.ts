@@ -11,6 +11,8 @@ import { SnoozeEpisodeDto } from './dto/snooze.dto';
 import { SuppressionService } from './suppression.service';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { DeskEntitySuppressionResponse } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for Desk snoozes. Consumed by the Desk UI — the Needs-You
@@ -27,6 +29,7 @@ import { DeskEntitySuppressionResponse } from '../../openapi.responses';
  */
 @ApiTags('Desk — Suppressions')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class SuppressionController extends BaseTenantController {

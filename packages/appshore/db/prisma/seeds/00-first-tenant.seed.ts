@@ -1,5 +1,5 @@
 import { PrismaClient } from '../../generated/client';
-import { DEV_OWNER_PHONE, devCredentialColumns } from './dev-credentials';
+import { DEV_OWNER_PHONE, IS_PRODUCTION, devCredentialColumns } from './dev-credentials';
 
 /**
  * First tenant bootstrap — both tenancy modes.
@@ -12,9 +12,16 @@ import { DEV_OWNER_PHONE, devCredentialColumns } from './dev-credentials';
  * (slug "demo") so a fresh clone has a workspace to log into immediately.
  * Further tenants come from self-registration + super-admin approval.
  *
- * Both modes create a workspace OWNER (owner@example.com). Outside
- * production the owner gets dev credentials (see dev-credentials.ts) so
- * login works with zero external services.
+ * Both modes create a workspace OWNER (owner@example.com) plus an ADMIN and
+ * a MEMBER teammate, with dev credentials (see dev-credentials.ts) so login
+ * works with zero external services.
+ *
+ * Production (ENV_TYPE=production) never gets demo data: no demo tenant and
+ * no seeded user, whatever DEFAULT_ADMIN_PASSWORD says. Single-tenant gets only
+ * the implicit tenant row (every tenant-scoped query needs it); multi-tenant
+ * gets nothing. Real workspaces and their owners come from registration and
+ * super-admin approval (multi-tenant) or are created by the super-admin.
+ * Rows an earlier seed already wrote are left as they are.
  */
 
 const MULTI_TENANT = process.env.MULTI_TENANT !== 'false';
@@ -29,6 +36,11 @@ export const seed = {
   async run(prisma: PrismaClient): Promise<{ created: number; skipped: number }> {
     let created = 0;
     let tenantDbId: number;
+
+    if (IS_PRODUCTION) {
+      if (!MULTI_TENANT) created += await ensureImplicitTenant(prisma);
+      return { created, skipped: created === 0 ? 1 : 0 };
+    }
 
     if (MULTI_TENANT) {
       const existing = await prisma.tenant.findFirst({ where: { subdomain: 'demo' } });
@@ -50,29 +62,8 @@ export const seed = {
         created++;
       }
     } else {
-      const existing = await prisma.tenant.findUnique({ where: { id: IMPLICIT_TENANT_ID } });
-      if (existing) {
-        tenantDbId = existing.id;
-      } else {
-        // Force the surrogate id so tenant-scoped queries (where: { tenantId:
-        // IMPLICIT_TENANT_ID }) resolve to this row. Raw insert pins the
-        // autoincrement id deterministically.
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "tenants" ("id", "tenant_id", "company_name", "status", "is_active", "plan", "timezone", "created_at", "updated_at")
-           VALUES ($1, $2, $3, 'ACTIVE', true, 'ENTERPRISE', 'UTC', now(), now())
-           ON CONFLICT ("id") DO NOTHING`,
-          IMPLICIT_TENANT_ID,
-          'default',
-          'Default Workspace',
-        );
-        // Keep the sequence ahead of the pinned id so future inserts don't collide.
-        await prisma.$executeRawUnsafe(
-          `SELECT setval(pg_get_serial_sequence('"tenants"', 'id'), GREATEST((SELECT MAX("id") FROM "tenants"), $1))`,
-          IMPLICIT_TENANT_ID,
-        );
-        tenantDbId = IMPLICIT_TENANT_ID;
-        created++;
-      }
+      created += await ensureImplicitTenant(prisma);
+      tenantDbId = IMPLICIT_TENANT_ID;
     }
 
     // Workspace owner (distinct from the platform SUPER_ADMIN).
@@ -192,3 +183,26 @@ export const seed = {
     return { created, skipped: created === 0 ? 1 : 0 };
   },
 };
+
+/** The one implicit tenant row of single-tenant mode. Returns 1 when it was created, 0 when it existed. */
+async function ensureImplicitTenant(prisma: PrismaClient): Promise<number> {
+  const existing = await prisma.tenant.findUnique({ where: { id: IMPLICIT_TENANT_ID } });
+  if (existing) return 0;
+  // Force the surrogate id so tenant-scoped queries (where: { tenantId:
+  // IMPLICIT_TENANT_ID }) resolve to this row. Raw insert pins the
+  // autoincrement id deterministically.
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "tenants" ("id", "tenant_id", "company_name", "status", "is_active", "plan", "timezone", "created_at", "updated_at")
+     VALUES ($1, $2, $3, 'ACTIVE', true, 'ENTERPRISE', 'UTC', now(), now())
+     ON CONFLICT ("id") DO NOTHING`,
+    IMPLICIT_TENANT_ID,
+    'default',
+    'Default Workspace',
+  );
+  // Keep the sequence ahead of the pinned id so future inserts don't collide.
+  await prisma.$executeRawUnsafe(
+    `SELECT setval(pg_get_serial_sequence('"tenants"', 'id'), GREATEST((SELECT MAX("id") FROM "tenants"), $1))`,
+    IMPLICIT_TENANT_ID,
+  );
+  return 1;
+}

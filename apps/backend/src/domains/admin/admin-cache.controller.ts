@@ -8,9 +8,11 @@ import { FlushCacheDto } from './dto/flush-cache.dto';
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { AdminCacheFlushResponse, AdminCacheHealthResponse, AdminCacheStatsResponse } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('admin/cache')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class AdminCacheController {
   private readonly logger = new Logger(AdminCacheController.name);
 

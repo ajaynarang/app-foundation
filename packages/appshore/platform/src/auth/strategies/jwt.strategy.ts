@@ -78,7 +78,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Workspace-based tenancy: the token names the session's ACTIVE workspace.
     // Resolve the membership so each session carries its own workspace + role
-    // (two tabs can live in two different workspaces). Falls back to the
+    // (two sessions can live in two different workspaces). Falls back to the
     // user's default tenant only for tokens that predate the workspace model.
     if (payload.tenantId && user.role !== 'SUPER_ADMIN' && payload.tenantId !== user.tenant?.tenantId) {
       const membership = await this.prisma.workspaceMember.findFirst({

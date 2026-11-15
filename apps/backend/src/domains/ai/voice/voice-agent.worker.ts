@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 import { DEV_VOICE_AGENT_SECRET_DEFAULT } from '../../../config/configuration';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
 
 /**
  * Voice Agent Worker — starts the LiveKit agent server.
@@ -122,7 +123,7 @@ export class VoiceAgentWorker implements OnModuleInit, OnModuleDestroy {
 
       const server = new AgentServer(serverOpts);
       this.workerProcess = server;
-      this.logger.log(`Voice agent worker started — APP_API_URL=${process.env.APP_API_URL}`);
+      this.logger.log(`Voice agent worker started — APP_API_URL=${stripQueryString(process.env.APP_API_URL)}`);
 
       // Catch both the run() promise rejection and any unhandled errors
       // from forked child processes to prevent crashing the main NestJS process.

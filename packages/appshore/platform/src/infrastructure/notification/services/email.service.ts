@@ -1,7 +1,29 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Inject, Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as nodemailer from 'nodemailer';
+import { isDevelopmentEnv } from '@appshore/kernel/shared/utils/env-label';
+import { maskEmail } from '@appshore/kernel/shared/utils/log-redaction';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+import { observeResendResult } from './resend-delivery';
+
+/**
+ * Thrown by `sendEmail` when no provider (Resend or SMTP) is configured outside `ENV_TYPE=development`. A message
+ * that cannot be sent fails loudly instead of being printed to a log a vendor may hold, where it would carry reset
+ * links and invitation tokens.
+ */
+export class EmailNotConfiguredError extends Error {
+  constructor() {
+    super('No email provider is configured: set RESEND_API_KEY or the SMTP_* keys');
+    this.name = 'EmailNotConfiguredError';
+  }
+}
 
 export interface SendEmailOptions {
   to: string;
@@ -23,7 +45,10 @@ export class EmailService {
   private nodemailerTransport: nodemailer.Transporter | null = null;
   private emailProvider: 'resend' | 'nodemailer' | 'console' = 'console';
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     this.initializeEmailProvider();
   }
 
@@ -58,34 +83,56 @@ export class EmailService {
       return;
     }
 
-    // Development mode - just log to console
+    // No provider. On a developer's machine (ENV_TYPE=development) each message is printed to the log, so the
+    // zero-config flows (reset, invitation) still work; anywhere else every send throws EmailNotConfiguredError.
     this.emailProvider = 'console';
     this.logger.warn(
-      'Email service running in CONSOLE mode - emails will be logged but not sent. ' +
-        'Set RESEND_API_KEY or SMTP credentials to enable actual email sending.',
+      'Email service has no provider: with ENV_TYPE=development each message is printed to the log; in any other ' +
+        'environment every send fails. Set RESEND_API_KEY or SMTP credentials to send email.',
     );
+  }
+
+  /** True when a send reaches a real provider (Resend or SMTP); false on the console path. */
+  usesProvider(): boolean {
+    return this.emailProvider !== 'console';
   }
 
   async sendEmail(options: SendEmailOptions): Promise<void> {
     const fromEmail =
       options.from || this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || 'noreply@example.com';
 
+    let message: SendEmailOptions = { ...options, from: fromEmail };
+
+    // The outbound gate sits in front of a real provider only (ADR "Outbound gate"): the development console path is
+    // never gated, so a fresh clone with no keys behaves as before. A held-back email is recorded by the gate and is
+    // not a failure.
+    if (this.emailProvider !== 'console') {
+      const gated = await this.outboundGate.gateEmail(message, { source: OUTBOUND_SOURCE.EMAIL });
+      if (!gated) {
+        this.logger.log(`Email to ${maskEmail(options.to)} held back by the outbound gate`);
+        return;
+      }
+      message = gated;
+    }
+
     try {
       switch (this.emailProvider) {
         case 'resend':
-          await this.sendWithResend({ ...options, from: fromEmail });
+          await this.sendWithResend(message);
           break;
         case 'nodemailer':
-          await this.sendWithNodemailer({ ...options, from: fromEmail });
+          await this.sendWithNodemailer(message);
           break;
         case 'console':
-          this.logToConsole({ ...options, from: fromEmail });
+          if (!isDevelopmentEnv()) throw new EmailNotConfiguredError();
+          this.logToConsole(message);
           break;
       }
 
-      this.logger.log(`Email sent successfully to ${options.to} via ${this.emailProvider}`);
+      this.logger.log(`Email sent to ${maskEmail(options.to)} via ${this.emailProvider}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}:`, error);
+      recordOutboundFailed(OUTBOUND_CHANNEL.EMAIL);
+      this.logger.error({ msg: `Failed to send email to ${maskEmail(options.to)}`, err: toLoggableError(error) });
       throw error;
     }
   }
@@ -95,7 +142,9 @@ export class EmailService {
       throw new InternalServerErrorException('Email service is not available');
     }
 
-    await this.resendClient.emails.send({
+    // Resend reports a refused email in `error` and does not throw; observeResendResult throws it, so it is counted
+    // and ledgered as a failure.
+    const result = await this.resendClient.emails.send({
       from: options.from,
       to: options.to,
       ...(options.cc && options.cc.length > 0 ? { cc: options.cc } : {}),
@@ -104,6 +153,7 @@ export class EmailService {
       html: options.html,
       text: options.text,
     });
+    observeResendResult(result);
   }
 
   private async sendWithNodemailer(options: SendEmailOptions): Promise<void> {
@@ -122,23 +172,18 @@ export class EmailService {
     });
   }
 
+  /** Development only (`sendEmail` checks): the message as a developer needs it, with every address masked. */
   private logToConsole(options: SendEmailOptions): void {
-    this.logger.log('========================================');
-    this.logger.log('EMAIL (Console Mode)');
-    this.logger.log('========================================');
-    this.logger.log(`From: ${options.from}`);
-    this.logger.log(`To: ${options.to}`);
-    if (options.cc && options.cc.length > 0) {
-      this.logger.log(`Cc: ${options.cc.join(', ')}`);
-    }
-    if (options.replyTo) {
-      this.logger.log(`Reply-To: ${options.replyTo}`);
-    }
-    this.logger.log(`Subject: ${options.subject}`);
-    this.logger.log('----------------------------------------');
-    this.logger.log('HTML Content:');
-    this.logger.log(options.html);
-    this.logger.log('========================================');
+    const lines = [
+      'EMAIL (console mode, ENV_TYPE=development)',
+      `To: ${maskEmail(options.to)}`,
+      ...(options.cc && options.cc.length > 0 ? [`Cc: ${options.cc.map((cc) => maskEmail(cc)).join(', ')}`] : []),
+      ...(options.replyTo ? [`Reply-To: ${maskEmail(options.replyTo)}`] : []),
+      `Subject: ${options.subject}`,
+      '----------------------------------------',
+      options.text ?? options.html,
+    ];
+    this.logger.log(lines.join('\n'));
   }
 
   /**

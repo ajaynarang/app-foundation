@@ -17,6 +17,8 @@ import { Roles } from '@appshore/platform/auth/decorators/roles.decorator';
 import { CurrentUser } from '@appshore/platform/auth/decorators/current-user.decorator';
 import { UserRole } from '@appshore/db';
 import { Public } from '@appshore/platform/auth/decorators/public.decorator';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 import { VoiceService } from './voice.service';
 import { VoiceTokenDto } from './dto/voice-token.dto';
 import { VoiceRespondDto } from './dto/voice-respond.dto';
@@ -50,6 +52,7 @@ export class VoiceController {
   }
 
   @Post('token')
+  @RequireFeature(FEATURE_KEYS.VOICE_MODE)
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER, UserRole.SUPER_ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })

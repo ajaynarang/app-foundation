@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { showMutationError } from '@app/ui';
+import { showPlanUpgradePrompt } from '@appshore/web-core/shared/lib/plan-upgrade';
 import { useState } from 'react';
 import { AuthProvider } from '@/shared/components/common/providers/auth-provider';
 import { PreferencesProvider } from '@/shared/providers/PreferencesProvider';
@@ -17,7 +18,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           onError: (error, _variables, _context, mutation) => {
             // Global fallback: show toast ONLY if the mutation didn't define its own onError.
             // If mutation has onError, it already handled the error — don't double-toast.
-            if (!mutation.options.onError) {
+            // A plan gate's 403 (PLAN_UPGRADE_REQUIRED, USER_LIMIT_REACHED) becomes the upgrade prompt.
+            if (!mutation.options.onError && !showPlanUpgradePrompt(error)) {
               showMutationError(error);
             }
           },

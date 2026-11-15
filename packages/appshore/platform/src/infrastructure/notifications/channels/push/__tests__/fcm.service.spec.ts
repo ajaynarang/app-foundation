@@ -1,7 +1,14 @@
+import { Logger } from '@nestjs/common';
 import { DevicePlatform } from '@appshore/db';
 import { createMockPrisma } from '../../../../../test/mocks/prisma.mock';
 import { FcmService } from '../fcm.service';
+import {
+  allowAllOutboundGate,
+  holdAllOutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/testing/outbound-gate.testing';
+import type { OutboundGate } from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 import { initializeFirebase, admin } from '../../../../../config/firebase.config';
+import { renderLogCalls } from '../../../../../test/helpers/rendered-log';
 
 jest.mock('../../../../../config/firebase.config', () => ({
   initializeFirebase: jest.fn(),
@@ -45,7 +52,7 @@ describe('FcmService', () => {
 
   describe('when Firebase credentials are absent', () => {
     it('no-ops on send without touching the device registry and without throwing', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
 
       await expect(service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' })).resolves.toBe(0);
 
@@ -54,7 +61,7 @@ describe('FcmService', () => {
     });
 
     it('still registers devices — tokens collected now work the moment keys arrive', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.upsert.mockResolvedValue({ id: 1 });
 
       await service.registerDevice(USER_DB_ID, TENANT_DB_ID, 'tok-1', DevicePlatform.ANDROID);
@@ -66,7 +73,7 @@ describe('FcmService', () => {
   describe('registerDevice', () => {
     it('upserts on the token so a device changing hands is reassigned, not duplicated', async () => {
       setFirebaseEnv();
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.upsert.mockResolvedValue({ id: 1 });
 
       await service.registerDevice(USER_DB_ID, TENANT_DB_ID, 'tok-1', DevicePlatform.IOS);
@@ -85,7 +92,7 @@ describe('FcmService', () => {
 
   describe('removeDevice', () => {
     it('deletes only the caller-owned row for that token', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.deleteMany.mockResolvedValue({ count: 1 });
 
       await service.removeDevice(USER_DB_ID, 'tok-1');
@@ -100,7 +107,7 @@ describe('FcmService', () => {
     beforeEach(() => setFirebaseEnv());
 
     it('multicasts to every registered device of the user', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([
         { id: 1, token: 'tok-1' },
         { id: 2, token: 'tok-2' },
@@ -117,7 +124,7 @@ describe('FcmService', () => {
     });
 
     it('skips the multicast entirely when the user has no devices', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([]);
 
       await service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' });
@@ -126,7 +133,7 @@ describe('FcmService', () => {
     });
 
     it('prunes tokens FCM reports as dead and keeps the rest', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([
         { id: 1, token: 'dead' },
         { id: 2, token: 'alive' },
@@ -144,7 +151,7 @@ describe('FcmService', () => {
     });
 
     it('does NOT prune on messaging/invalid-argument — payload errors must never delete healthy tokens', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'healthy' }]);
       sendEachForMulticast.mockResolvedValue({
         responses: [{ success: false, error: { code: 'messaging/invalid-argument' } }],
@@ -159,7 +166,7 @@ describe('FcmService', () => {
       (initializeFirebase as jest.Mock).mockImplementation(() => {
         throw new Error('Failed to parse private key');
       });
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
 
       await expect(service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' })).resolves.toBe(0);
@@ -168,21 +175,64 @@ describe('FcmService', () => {
     });
 
     it('logs and swallows a multicast failure — push is best-effort', async () => {
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
       sendEachForMulticast.mockRejectedValue(new Error('fcm down'));
 
       await expect(service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' })).resolves.toBe(0);
     });
 
+    it('logs a multicast failure as an err field the serializer masks, never in the message', async () => {
+      const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const service = new FcmService(prisma, allowAllOutboundGate());
+      prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
+      sendEachForMulticast.mockRejectedValue(new Error('Project of person@example.com is over quota'));
+
+      await service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ msg: expect.any(String), err: expect.any(Object) }),
+      );
+      expect(renderLogCalls(errorSpy.mock.calls)).not.toContain('person@example.com');
+      errorSpy.mockRestore();
+    });
+
     it('no-ops when Firebase app initialization returns null', async () => {
       (initializeFirebase as jest.Mock).mockReturnValue(null);
-      const service = new FcmService(prisma);
+      const service = new FcmService(prisma, allowAllOutboundGate());
       prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
 
       await service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' });
 
       expect(sendEachForMulticast).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('behind the outbound gate', () => {
+    beforeEach(() => setFirebaseEnv());
+
+    it('sends nothing to a held-back user and does not read their devices', async () => {
+      const gate = holdAllOutboundGate();
+      const service = new FcmService(prisma, gate);
+
+      await expect(service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' })).resolves.toBe(0);
+
+      expect(sendEachForMulticast).not.toHaveBeenCalled();
+      expect(prisma.notificationDevice.findMany).not.toHaveBeenCalled();
+      expect(gate.held).toEqual([{ method: 'allowUser', recipient: USER_DB_ID }]);
+    });
+
+    it('marks the title of an allowed send', async () => {
+      const gate: OutboundGate = { ...allowAllOutboundGate(), markPushTitle: (title) => `[STG] ${title}` };
+      const service = new FcmService(prisma, gate);
+      prisma.notificationDevice.findMany.mockResolvedValue([{ id: 1, token: 'tok-1' }]);
+      sendEachForMulticast.mockResolvedValue({ successCount: 1, responses: [{ success: true }] });
+
+      await service.sendToUser(USER_DB_ID, { title: 'T', body: 'B' });
+
+      expect(sendEachForMulticast).toHaveBeenCalledWith(
+        expect.objectContaining({ notification: { title: '[STG] T', body: 'B' } }),
+      );
     });
   });
 });

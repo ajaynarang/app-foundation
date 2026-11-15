@@ -16,7 +16,8 @@ import * as bcrypt from 'bcrypt';
  * accounts through your identity provider.
  */
 
-const IS_PRODUCTION = process.env.ENV_TYPE?.toLowerCase() === 'production';
+/** True when the seeds run against production (ENV_TYPE=production, set by tools/db/migrate.sh and the deploy job). */
+export const IS_PRODUCTION = process.env.ENV_TYPE?.toLowerCase() === 'production';
 
 export const DEV_OWNER_PHONE = '+15555550100';
 export const DEV_SUPERADMIN_PHONE = '+15555550199';

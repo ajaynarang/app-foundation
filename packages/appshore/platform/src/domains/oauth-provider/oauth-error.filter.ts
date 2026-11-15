@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { reportServerError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { errorShapeOf, buildErrorEnvelope } from '../../shared/filters/error-envelope';
 
 /** RFC 6749 §5.2 / §4.1.2.1 and RFC 7591 §3.2.2 error codes this server answers with. */
@@ -75,5 +76,8 @@ export class OAuthErrorFilter implements ExceptionFilter {
 
     res.setHeader('Cache-Control', 'no-store');
     res.status(shape.status).json({ error, error_description: shape.detail });
+    // These routes write their body here, not through writeErrorEnvelope, so this is where their 5xx is reported:
+    // still once per answer, where the body is written.
+    reportServerError(exception, shape.status);
   }
 }

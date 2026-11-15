@@ -6,3 +6,9 @@
 # (apps/web/src/shared/components/page-chrome/__tests__/theme-tokens.test.ts) and the UI grammar
 # (apps/web/src/features/__tests__/ui-grammar-guard.test.ts).
 pnpm verify:arch
+
+# The ops checks (`pnpm check:ops`: the Grafana-as-code catalog, the ops shell tests, Terraform) run when the pushed
+# commits touch the files they check: infra/, docs/runbooks/, .github/ or tools/. `pnpm verify` runs them every time.
+if bash tools/verify/push-touches-ops.sh; then
+  pnpm check:ops
+fi

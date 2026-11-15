@@ -17,8 +17,9 @@
  *  ai-background  : autonomous / background AI work
  *
  * Tier 3 — Slow lane (eventual is fine)
- *  bulk-ops       : mass operations + system cleanup (job-cleanup, data-retention,
- *                   uploads-cleanup, login-events-cleanup, tokens-cleanup)
+ *  bulk-ops       : mass operations + system crons (job-cleanup, data-retention,
+ *                   login-events-cleanup, tokens-cleanup, trial-expiry), the
+ *                   outbox relay, the deadline sweeper and the ops heartbeat
  */
 export const QUEUE_NAMES = {
   EVENTS: 'events',
@@ -57,9 +58,12 @@ export const AI_BACKGROUND_JOB_NAMES = {} as const;
 export const BULK_OPS_JOB_NAMES = {
   JOB_CLEANUP: 'job-cleanup',
   DATA_RETENTION: 'data-retention',
-  UPLOADS_CLEANUP: 'uploads-cleanup',
   LOGIN_EVENTS_CLEANUP: 'login-events-cleanup',
   TOKENS_CLEANUP: 'tokens-cleanup',
+  // Moves tenants whose trial has ended to TRIAL_EXPIRED (TrialExpiryService).
+  TRIAL_EXPIRY: 'trial-expiry',
+  // A no-op every five minutes whose one log line proves Redis, the scheduler and a consumer all work.
+  OPS_HEARTBEAT: 'ops-heartbeat',
   // The outbox relay tick (ADR "Outbox and deadlines"): publishes what a crash left unpublished.
   OUTBOX_RELAY: 'outbox-relay',
   // The deadline sweeper tick (ADR "Outbox and deadlines"): fires timers that came due.

@@ -30,6 +30,7 @@ import {
   SupportTicketMessageResponse,
   SupportTicketResponse,
 } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const TICKET_ID_PARAM = {
   name: 'id',
@@ -84,6 +85,7 @@ export class SupportController {
   // ─── Super Admin endpoints ───
 
   @Get('admin/tickets')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all tickets across tenants (super admin)' })
   @ApiResult(SupportTicketListResponse)
@@ -100,6 +102,7 @@ export class SupportController {
   }
 
   @Get('admin/tickets/:id')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get ticket detail (super admin)' })
   @ApiParam(TICKET_ID_PARAM)
@@ -109,6 +112,7 @@ export class SupportController {
   }
 
   @Put('admin/tickets/:id')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update ticket status/priority (super admin)' })
   @ApiParam(TICKET_ID_PARAM)
@@ -118,6 +122,7 @@ export class SupportController {
   }
 
   @Post('admin/tickets/:id/messages')
+  @SystemScope('super-admin')
   @HttpCode(HttpStatus.CREATED)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
@@ -134,6 +139,7 @@ export class SupportController {
   }
 
   @Get('admin/stats')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get support ticket stats (super admin)' })
   @ApiResult(SupportStatsResponse)
@@ -142,6 +148,7 @@ export class SupportController {
   }
 
   @Get('admin/tenants')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Tenants that have opened a ticket, by name (a picker: cursor list with q)' })
   @ApiResult(SupportTenantListResponse)

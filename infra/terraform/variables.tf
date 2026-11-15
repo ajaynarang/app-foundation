@@ -81,7 +81,7 @@ variable "worker_memory" {
 }
 
 variable "worker_desired_count" {
-  description = "Number of worker tasks to run"
+  description = "Number of worker tasks to run. 0 is allowed: the API then consumes every queue (keep api_queue_processors_enabled true) and its task gets OPS_GAUGES_FROM_API=true, so it reports the queue, cron, outbox and deadline gauges the worker would."
   type        = number
 }
 
@@ -100,7 +100,27 @@ variable "bedrock_models" {
 }
 
 variable "bedrock_tenant_roles_enabled" {
-  description = "Lets workspaces connect their own AWS account (BEDROCK_ROLE): grants the task role sts:AssumeRole and sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to the task role's ARN, the principal a workspace's trust policy names. Off by default."
+  description = "Lets workspaces connect their own AWS account (BEDROCK_ROLE): grants both task roles (API and worker) sts:AssumeRole and sets PLATFORM_ASSUME_ROLE_ARN on the API and worker tasks to both task role ARNs, the principals a workspace's trust policy names. Off by default."
+  type        = bool
+  default     = false
+}
+
+# The worker task role split (iam.tf)
+variable "worker_own_task_role" {
+  description = "Run the worker task under its own task role (ecs_task_worker) instead of the API's (ecs_task). True by default, which is right for a new stack and for any stack with bedrock_tenant_roles_enabled off. A stack with workspace Bedrock roles already connected applies with false first (the worker role is created and both ARNs land in PLATFORM_ASSUME_ROLE_ARN while the worker keeps ecs_task), has each such workspace re-save its trust policy (the Settings sheet then lists both ARNs), then sets true. Otherwise worker-side calls on those credentials are denied and the revalidation sweep marks them failing."
+  type        = bool
+  default     = true
+}
+
+# ECS Exec. Every session is written to the ecs-exec log group (cloudwatch.tf) either way.
+variable "api_enable_exec" {
+  description = "ECS Exec into the API tasks. On by default: the migration jobs and tools/db/tunnel.sh use an API task as the jump host to the private database."
+  type        = bool
+  default     = true
+}
+
+variable "worker_enable_exec" {
+  description = "ECS Exec into the worker tasks. Off by default: nothing needs a shell there, and the tunnel and migration jobs jump through the API. Turn on for an incident, then off again."
   type        = bool
   default     = false
 }
@@ -121,6 +141,17 @@ variable "rds_allocated_storage" {
   description = "Allocated storage in GB for RDS (min 20 for gp3)"
   type        = number
   default     = 20
+}
+
+variable "rds_max_allocated_storage" {
+  description = "Ceiling (GB) for RDS storage autoscaling: RDS grows the volume on its own when free space runs low, up to this cap. 0 turns autoscaling off. Must exceed rds_allocated_storage."
+  type        = number
+  default     = 200
+
+  validation {
+    condition     = var.rds_max_allocated_storage == 0 || var.rds_max_allocated_storage > var.rds_allocated_storage
+    error_message = "rds_max_allocated_storage is 0 (off) or larger than rds_allocated_storage."
+  }
 }
 
 variable "rds_db_name" {
@@ -163,4 +194,59 @@ variable "doppler_token" {
   description = "Doppler service token for the environment. Injected into ECS containers; doppler run uses this to fetch all env vars at startup."
   type        = string
   sensitive   = true
+}
+
+# Observability, level 1 (docs/observability.md): CloudWatch alarms and a budget email, the no-vendor fallback.
+variable "alarm_email" {
+  description = "Email subscribed to the CloudWatch alarm SNS topic and to the budget. Empty (the default) creates no topic, no alarm and no budget. After the first apply AWS emails a subscription confirmation; nothing is delivered until it is confirmed."
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly AWS cost budget in USD, emailed to alarm_email at 80% actual and 100% forecast. An AWS budget measures the whole account, not this stack: when staging and production share an account and both set alarm_email, set 0 in one of them so the account has one budget. 0 = no budget."
+  type        = number
+  default     = 100
+
+  validation {
+    condition     = var.monthly_budget_usd >= 0
+    error_message = "monthly_budget_usd must be 0 (no budget) or a positive amount."
+  }
+}
+
+variable "rds_connections_alarm_threshold" {
+  description = "DatabaseConnections above which the level 1 alarm fires: 75% of the instance's max_connections, which RDS derives from the class (about DBInstanceClassMemory / 9531392). 75 fits a 1 GiB class (about 100); keep it in step with rdsMaxConnections in the Grafana catalog's constants.mjs."
+  type        = number
+  default     = 75
+}
+
+variable "container_insights" {
+  description = "ECS Container Insights on the cluster. Off by default: no alarm or Grafana rule here needs it (service-gone reads the free AWS/ECS CPUUtilization metric), and it is billed per metric. Set true to keep it on an existing stack."
+  type        = bool
+  default     = false
+}
+
+# Observability, level 2: Grafana Cloud reads CloudWatch through a read-only role (grafana.tf).
+variable "grafana_alerting_live" {
+  description = "Set true as the LAST step of going to level 2 (docs/observability.md), after the Grafana rules are applied and test-fired: every level 1 CloudWatch alarm, the SNS topic and its subscription are removed in that apply. The budget stays. Production refuses it until the Grafana read-only role exists (both grafana_cloud_* values set)."
+  type        = bool
+  default     = false
+
+  # In production the flag removes every CloudWatch alarm, so Grafana must already be able to read CloudWatch.
+  validation {
+    condition     = !(var.grafana_alerting_live && var.env == "production" && (var.grafana_cloud_aws_account_id == "" || var.grafana_cloud_external_id == ""))
+    error_message = "grafana_alerting_live = true in production needs grafana_cloud_aws_account_id and grafana_cloud_external_id: the Grafana CloudWatch read role must exist before the CloudWatch alarms are removed."
+  }
+}
+
+variable "grafana_cloud_aws_account_id" {
+  description = "The AWS account Grafana Cloud assumes roles from (shown in its CloudWatch datasource setup). Empty = no Grafana read role."
+  type        = string
+  default     = ""
+}
+
+variable "grafana_cloud_external_id" {
+  description = "The external id Grafana Cloud presents when it assumes the read role (shown in its CloudWatch datasource setup). Not a secret: it guards against the confused-deputy problem. Empty = no Grafana read role."
+  type        = string
+  default     = ""
 }

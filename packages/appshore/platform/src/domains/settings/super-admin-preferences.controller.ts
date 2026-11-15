@@ -7,6 +7,7 @@ import { UserRole } from '@appshore/db';
 import { ApiOperation } from '@nestjs/swagger';
 import { ApiResult } from '../../shared/openapi/api-result';
 import { SuperAdminPreferencesResponse } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('settings/admin')
 export class SuperAdminPreferencesController {
@@ -14,6 +15,7 @@ export class SuperAdminPreferencesController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Get()
+  @SystemScope('super-admin')
   @ApiOperation({ summary: "The super-admin's notification preferences — created with defaults on first read" })
   @ApiResult(SuperAdminPreferencesResponse)
   async getPreferences(@CurrentUser() user: any) {
@@ -22,6 +24,7 @@ export class SuperAdminPreferencesController {
 
   @Roles(UserRole.SUPER_ADMIN)
   @Put()
+  @SystemScope('super-admin')
   @ApiOperation({ summary: "Update the super-admin's notification preferences" })
   @ApiResult(SuperAdminPreferencesResponse)
   async updatePreferences(@CurrentUser() user: any, @Body() dto: UpdateSuperAdminPreferencesDto) {

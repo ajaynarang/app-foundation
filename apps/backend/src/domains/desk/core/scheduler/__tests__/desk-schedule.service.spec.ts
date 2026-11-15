@@ -1,8 +1,10 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ApiErrorCode } from '@app/shared-types';
 
 import { createMockPrisma } from '@appshore/platform/test/mocks/prisma.mock';
 
 import { DeskScheduleService } from '../desk-schedule.service';
+import { DESK_SCHEDULER_ENABLED_ENV, DESK_SCHEDULES_PAUSED_DETAIL } from '../scheduler-availability';
 
 /**
  * Coverage for the tenant master-switch read/write. The switch defaults
@@ -58,6 +60,38 @@ describe('DeskScheduleService', () => {
       const svc = new DeskScheduleService(prisma);
 
       await expect(svc.setState(10, false)).resolves.toEqual({ enabled: false, timezone: 'UTC' });
+    });
+
+    describe('with the platform scheduler off (DESK_SCHEDULER_ENABLED=false)', () => {
+      const prev = process.env[DESK_SCHEDULER_ENABLED_ENV];
+      beforeEach(() => {
+        process.env[DESK_SCHEDULER_ENABLED_ENV] = 'false';
+      });
+      afterEach(() => {
+        if (prev === undefined) delete process.env[DESK_SCHEDULER_ENABLED_ENV];
+        else process.env[DESK_SCHEDULER_ENABLED_ENV] = prev;
+      });
+
+      it('refuses to arm the master switch with a 409 INVALID_STATE, and writes nothing', async () => {
+        const prisma = createMockPrisma();
+        const svc = new DeskScheduleService(prisma);
+
+        const err = await svc.setState(10, true).catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toEqual(
+          expect.objectContaining({ code: ApiErrorCode.INVALID_STATE, detail: DESK_SCHEDULES_PAUSED_DETAIL }),
+        );
+        expect(prisma.tenant.update).not.toHaveBeenCalled();
+      });
+
+      it('still lets a tenant pause (sets false)', async () => {
+        const prisma = createMockPrisma();
+        prisma.tenant.update.mockResolvedValue({ deskScheduleEnabled: false, timezone: 'UTC' });
+        const svc = new DeskScheduleService(prisma);
+
+        await expect(svc.setState(10, false)).resolves.toEqual({ enabled: false, timezone: 'UTC' });
+      });
     });
   });
 });

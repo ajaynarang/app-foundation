@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { currentRls } from '@appshore/kernel/infrastructure/rls/rls-context';
 import type { Job } from 'bullmq';
 import type { JobEnvelope } from '@app/shared-types';
 import { NotificationJobsHandler } from '../notification-cleanup.processor';
@@ -72,5 +73,18 @@ describe('NotificationJobsHandler', () => {
     const result = await handler.run(makeJob('unknown-job'));
     expect(result).toBeUndefined();
     expect(prisma.notification.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('runs the cleanup as declared cross-tenant work (sweep.notification-cleanup)', async () => {
+    const seen: unknown[] = [];
+    prisma.notification.deleteMany.mockImplementation(async () => {
+      seen.push(currentRls());
+      return { count: 0 };
+    });
+    await handler.run(makeJob(NOTIFICATIONS_JOB_NAMES.CLEANUP));
+    expect(seen).toEqual([
+      { kind: 'system', reason: 'sweep.notification-cleanup' },
+      { kind: 'system', reason: 'sweep.notification-cleanup' },
+    ]);
   });
 });

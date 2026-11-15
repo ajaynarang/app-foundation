@@ -23,9 +23,9 @@ const mockPrisma = {
     count: jest.fn(),
   },
   billingSubscription: { findFirst: jest.fn() },
-  $transaction: jest.fn((args: any) => {
-    if (Array.isArray(args)) return Promise.all(args);
-    return args(mockPrisma);
+  $transaction: jest.fn((fn: any) => {
+    if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+    return fn(mockPrisma);
   }),
 };
 
@@ -98,6 +98,20 @@ describe('PaymentMethodService', () => {
       await service.setDefault(1, 'pm-1');
 
       expect(mockAdapter.setDefaultPaymentMethod).toHaveBeenCalledWith('cus_1', 'pm_stripe_1');
+    });
+
+    it('moves the default flag on the transaction client, never the root client', async () => {
+      const tx = { paymentMethod: { updateMany: jest.fn(), update: jest.fn() } };
+      mockPrisma.$transaction.mockImplementationOnce((fn: any) => fn(tx));
+      mockPrisma.paymentMethod.findFirst.mockResolvedValue({ id: 'pm-1', providerPaymentMethodId: 'pm_stripe_1' });
+      mockPrisma.billingCustomer.findUnique.mockResolvedValue({ providerCustomerId: 'cus_1' });
+
+      await service.setDefault(1, 'pm-1');
+
+      expect(tx.paymentMethod.updateMany).toHaveBeenCalledWith({ where: { tenantId: 1 }, data: { isDefault: false } });
+      expect(tx.paymentMethod.update).toHaveBeenCalledWith({ where: { id: 'pm-1' }, data: { isDefault: true } });
+      expect(mockPrisma.paymentMethod.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.paymentMethod.update).not.toHaveBeenCalled();
     });
   });
 

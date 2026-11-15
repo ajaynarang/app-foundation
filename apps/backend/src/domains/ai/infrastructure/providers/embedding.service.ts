@@ -106,7 +106,7 @@ export class EmbeddingService {
       });
     } catch (err) {
       // No workspace to pin a budget error on: the ingest reports the failure; the platform's balance is logged.
-      if (isProviderCreditRefusal(err)) logPlatformCreditRefusal(route, null);
+      if (isProviderCreditRefusal(err)) logPlatformCreditRefusal(route, null, err);
       throw err;
     }
     for (const embedding of result.embeddings) this.assertDimensions(embedding);

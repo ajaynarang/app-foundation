@@ -27,8 +27,16 @@ import { generateId } from '@appshore/kernel/shared/utils/id-generator';
 import { INVITATION_EXPIRY_MS } from '../../constants';
 import { customAlphabet } from 'nanoid';
 import { invalidState, stateLabel } from '@appshore/kernel/shared/errors/api-errors';
+import { TenantEntitlementsService } from '../entitlements/tenant-entitlements.service';
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 32);
+
+/**
+ * The same address in any case. The database holds one live account per `lower(email)` (index
+ * `users_email_live_key`), so every lookup for an existing account or invitation must ignore case too, or it finds
+ * nobody and the write that follows is refused.
+ */
+const sameEmail = (email: string) => ({ equals: email, mode: 'insensitive' as const });
 
 const INVITATION_KEYSET = { field: 'createdAt', idField: 'invitationId', kind: 'date', direction: 'desc' } as const;
 
@@ -51,6 +59,7 @@ export class UserInvitationsService {
     private twilioVerifyService: TwilioVerifyService,
     private pinService: PinService,
     private configService: ConfigService,
+    private entitlements: TenantEntitlementsService,
   ) {}
 
   /**
@@ -112,13 +121,13 @@ export class UserInvitationsService {
     // users belonging to other workspaces are invitable (workspace model).
     if (dto.email) {
       const existingMember = await this.prisma.workspaceMember.findFirst({
-        where: { tenantId, user: { email: dto.email } },
+        where: { tenantId, user: { email: sameEmail(dto.email) } },
       });
       if (existingMember) {
         throw new ConflictException('User with this email is already a member of your workspace');
       }
       const existingUser = await this.prisma.user.findFirst({
-        where: { email: dto.email, tenantId },
+        where: { email: sameEmail(dto.email), tenantId },
       });
       if (existingUser) {
         throw new ConflictException('User with this email already exists in your organization');
@@ -137,12 +146,15 @@ export class UserInvitationsService {
     // Check if pending invitation exists
     if (dto.email) {
       const existingInvitation = await this.prisma.userInvitation.findFirst({
-        where: { email: dto.email, tenantId, status: 'PENDING' },
+        where: { email: sameEmail(dto.email), tenantId, status: 'PENDING' },
       });
       if (existingInvitation) {
         throw new ConflictException('Invitation already sent to this email');
       }
     }
+
+    // A pending invitation takes a seat: refused once the plan's user limit is in use.
+    await this.entitlements.assertUserSeatAvailable(tenantId, { route: 'POST /invitations' });
 
     // Create invitation
     const token = nanoid();
@@ -237,6 +249,16 @@ export class UserInvitationsService {
   }
 
   /**
+   * The tenant DB id an acceptance token belongs to, or null for an unknown token. Read before the public routes enter
+   * the invitation's tenant context; the token is matched, never returned or logged.
+   */
+  async tenantDbIdForToken(token: string): Promise<number | null> {
+    if (!token) return null;
+    const row = await this.prisma.userInvitation.findUnique({ where: { token }, select: { tenantId: true } });
+    return row?.tenantId ?? null;
+  }
+
+  /**
    * Accept invitation and create user
    */
   async acceptInvitation(token: string, firebaseUid: string) {
@@ -260,7 +282,10 @@ export class UserInvitationsService {
       // Workspace model: an existing user accepting an invite JOINS the
       // workspace (new membership) instead of erroring.
       const existingUser = invitation.email
-        ? await tx.user.findFirst({ where: { email: invitation.email, deletedAt: null }, include: { tenant: true } })
+        ? await tx.user.findFirst({
+            where: { email: sameEmail(invitation.email), deletedAt: null },
+            include: { tenant: true },
+          })
         : null;
 
       const user =
@@ -335,6 +360,20 @@ export class UserInvitationsService {
     const pinHash = await this.pinService.hashPin(dto.pin);
 
     return this.prisma.$transaction(async (tx) => {
+      // The phone path signs the caller in as the account it returns, so it never joins an existing account: that
+      // would hand whoever holds the phone a session on someone else's email account. The email link does the join.
+      if (invitation.email) {
+        const existingUser = await tx.user.findFirst({
+          where: { email: sameEmail(invitation.email), deletedAt: null },
+          select: { id: true },
+        });
+        if (existingUser) {
+          throw new ConflictException(
+            'An account already uses this email. Accept the invitation from the email link and sign in to that account.',
+          );
+        }
+      }
+
       const user = await tx.user.create({
         data: {
           userId: generateId('user'),

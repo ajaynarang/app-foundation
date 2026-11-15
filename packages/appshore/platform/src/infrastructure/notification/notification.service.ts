@@ -5,6 +5,8 @@ import { EmailService } from './services/email.service';
 import { NotificationChannel, NotificationStatus, Notification } from '@appshore/db';
 import { PlatformNotificationType, type NotificationType } from '@app/shared-types';
 import { NotificationFiltersDto } from './dto/notification-filters.dto';
+import { maskEmail } from '@appshore/kernel/shared/utils/log-redaction';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 
 @Injectable()
 export class NotificationService {
@@ -130,11 +132,11 @@ export class NotificationService {
     companyName: string,
     reason: string,
   ): Promise<void> {
-    this.logger.log(`Sending tenant suspension notification to ${email} (tenant ${tenantId})`);
+    this.logger.log(`Sending tenant suspension notification to ${maskEmail(email)} (tenant ${tenantId})`);
     try {
       await this.emailService.sendTenantSuspensionEmail(email, firstName, companyName, reason);
     } catch (error) {
-      this.logger.error(`Failed to send suspension email to ${email}`, error.message);
+      this.logger.error({ msg: `Failed to send suspension email to ${maskEmail(email)}`, err: toLoggableError(error) });
     }
   }
 
@@ -152,11 +154,14 @@ export class NotificationService {
     firstName: string,
     companyName: string,
   ): Promise<void> {
-    this.logger.log(`Sending tenant reactivation notification to ${email} (tenant ${tenantId})`);
+    this.logger.log(`Sending tenant reactivation notification to ${maskEmail(email)} (tenant ${tenantId})`);
     try {
       await this.emailService.sendTenantReactivationEmail(email, firstName, companyName);
     } catch (error) {
-      this.logger.error(`Failed to send reactivation email to ${email}`, error.message);
+      this.logger.error({
+        msg: `Failed to send reactivation email to ${maskEmail(email)}`,
+        err: toLoggableError(error),
+      });
     }
   }
 
@@ -225,7 +230,7 @@ export class NotificationService {
         },
       });
 
-      this.logger.log(`Notification sent successfully: ${type} to ${recipient}`);
+      this.logger.log(`Notification sent: ${type} to ${maskEmail(recipient)}`);
 
       return updatedNotification;
     } catch (error) {
@@ -238,7 +243,10 @@ export class NotificationService {
         },
       });
 
-      this.logger.error(`Failed to send notification: ${type} to ${recipient}`, error.message);
+      this.logger.error({
+        msg: `Failed to send notification: ${type} to ${maskEmail(recipient)}`,
+        err: toLoggableError(error),
+      });
 
       // Don't throw - allow business logic to continue
       return failedNotification;

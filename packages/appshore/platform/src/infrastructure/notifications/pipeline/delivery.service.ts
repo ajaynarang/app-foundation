@@ -13,6 +13,7 @@ import { escapeHtml } from '@appshore/kernel/shared/utils/escape-html';
 import { isTestMarker } from '@appshore/kernel/shared/utils/test-marker.util';
 import { FcmService } from '../channels/push/fcm.service';
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
 import {
   DELIVERY_SKIP_REASONS,
   failed,
@@ -23,6 +24,11 @@ import {
   type DeliverySkipReason,
 } from './delivery-outcome';
 import { WHATSAPP_PORT, type WhatsAppPort } from '../channels/whatsapp/whatsapp.port';
+import {
+  OUTBOUND_GATE,
+  type OutboundGate,
+  type OutboundTarget,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 import {
   WhatsAppTemplateRegistry,
   type WhatsAppTemplateSendSpec,
@@ -101,7 +107,20 @@ export class NotificationDeliveryService {
     private readonly emailService: EmailService,
     @Inject(WHATSAPP_PORT) private readonly whatsapp: WhatsAppPort,
     private readonly templates: WhatsAppTemplateRegistry,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {}
+
+  /**
+   * Asked before a send that would reach a provider, so a recipient the outbound gate holds back is ledgered
+   * SKIPPED / GATED instead of as a provider failure or a send. No side effect: the sender's own gate stays the
+   * backstop and records nothing here, because the ledger row is the record.
+   */
+  private async gated(channel: DeliveryChannel, target: OutboundTarget, run: DeliveryRun): Promise<boolean> {
+    if (await this.outboundGate.wouldAllow(target)) return false;
+    run.results[channel] = false;
+    run.outcomes.push(skipped(channel, DELIVERY_SKIP_REASONS.GATED));
+    return true;
+  }
 
   async deliver(params: DeliveryParams): Promise<DeliveryReport> {
     const run: DeliveryRun = { params, results: {}, outcomes: [], pendingSends: [] };
@@ -208,8 +227,8 @@ export class NotificationDeliveryService {
           ? sent(DeliveryChannel.IN_APP)
           : skipped(DeliveryChannel.IN_APP, DELIVERY_SKIP_REASONS.DROPPED_TEST_MARKER),
       );
-    } catch (error: any) {
-      this.logger.error(`In-app delivery failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error({ msg: 'In-app delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.IN_APP] = false;
       run.outcomes.push(failed(DeliveryChannel.IN_APP, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }
@@ -219,6 +238,12 @@ export class NotificationDeliveryService {
     const { params } = run;
     if (!params.recipientEmail) {
       run.outcomes.push(skipped(DeliveryChannel.EMAIL, DELIVERY_SKIP_REASONS.NO_ADDRESS));
+      return;
+    }
+    if (
+      this.emailService.usesProvider() &&
+      (await this.gated(DeliveryChannel.EMAIL, { channel: 'email', address: params.recipientEmail }, run))
+    ) {
       return;
     }
     try {
@@ -234,8 +259,9 @@ export class NotificationDeliveryService {
       });
       run.results[DeliveryChannel.EMAIL] = true;
       run.outcomes.push(sent(DeliveryChannel.EMAIL));
-    } catch (error: any) {
-      this.logger.error(`Email delivery failed: ${error.message}`);
+    } catch (error) {
+      // The provider's text can name the recipient; only the err serializer masks it.
+      this.logger.error({ msg: 'Email delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.EMAIL] = false;
       run.outcomes.push(failed(DeliveryChannel.EMAIL, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }
@@ -244,6 +270,12 @@ export class NotificationDeliveryService {
   /** Web push (VAPID) + mobile push (FCM). Each transport no-ops when unconfigured; one failing must not block the other. */
   private async sendPush(run: DeliveryRun): Promise<void> {
     const { params } = run;
+    if (
+      (this.pushService.canSend() || this.fcmService.canSend()) &&
+      (await this.gated(DeliveryChannel.PUSH, { channel: 'push', userId: params.recipientDbId }, run))
+    ) {
+      return;
+    }
     const [webResult, fcmResult] = await Promise.allSettled([
       this.pushService.sendPushToUser(params.recipientDbId, {
         title: params.title,
@@ -266,7 +298,7 @@ export class NotificationDeliveryService {
     ]);
     for (const settled of [webResult, fcmResult]) {
       if (settled.status === 'rejected') {
-        this.logger.error(`Push delivery failed: ${(settled.reason as Error)?.message}`);
+        this.logger.error({ msg: 'Push delivery failed', err: toLoggableError(settled.reason) });
       }
     }
     // A user with no registered device reached nobody. Reporting that as a
@@ -292,14 +324,15 @@ export class NotificationDeliveryService {
       run.outcomes.push(skipped(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.NOT_CONFIGURED));
       return;
     }
+    if (await this.gated(DeliveryChannel.SMS, { channel: 'sms', phone: params.recipientPhone }, run)) return;
     try {
       const wasSent = await this.smsService.sendSms(params.recipientPhone, `${params.title}: ${params.message}`);
       run.results[DeliveryChannel.SMS] = wasSent;
       run.outcomes.push(
         wasSent ? sent(DeliveryChannel.SMS) : failed(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.PROVIDER_ERROR),
       );
-    } catch (error: any) {
-      this.logger.error(`SMS delivery failed: ${error.message}`);
+    } catch (error) {
+      this.logger.error({ msg: 'SMS delivery failed', err: toLoggableError(error) });
       run.results[DeliveryChannel.SMS] = false;
       run.outcomes.push(failed(DeliveryChannel.SMS, DELIVERY_SKIP_REASONS.PROVIDER_ERROR));
     }

@@ -1,4 +1,4 @@
-import { isCronDueInWindow } from '../cron-window';
+import { cronIntervalSeconds, isCronDueInWindow } from '../cron-window';
 
 /**
  * Pure-function coverage for the cron-window matcher — the core scheduler
@@ -89,5 +89,22 @@ describe('isCronDueInWindow', () => {
       const t = new Date('2026-05-22T14:00:00.000Z');
       expect(isCronDueInWindow('* * * * *', 'UTC', t, t)).toBe(false);
     });
+  });
+});
+
+describe('cronIntervalSeconds', () => {
+  const from = new Date('2026-11-13T10:07:00Z');
+
+  it.each([
+    ['0 4 * * *', 86_400],
+    ['*/5 * * * *', 300],
+    ['0 9,17 * * *', 8 * 3600],
+    ['* * * * *', 60],
+  ])('reads %s as %d seconds (the shortest gap)', (pattern, seconds) => {
+    expect(cronIntervalSeconds(pattern, 'UTC', from)).toBe(seconds);
+  });
+
+  it('is undefined for a pattern it cannot parse', () => {
+    expect(cronIntervalSeconds('not a cron', 'UTC', from)).toBeUndefined();
   });
 });

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { DomainEvent } from '@appshore/kernel/infrastructure/events/domain-event';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { ERROR_SOURCE, reportError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { getEventDefinition } from './event-registry';
 import { TenantIdResolver } from '@appshore/platform/infrastructure/events/tenant-id-resolver.service';
 
@@ -67,8 +69,8 @@ export class EventPersistenceSubscriber {
         update: {}, // no-op on conflict — event already persisted
       });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Failed to persist event ${event.event}: ${msg}`);
+      this.logger.warn({ msg: `Failed to persist event ${event.event}`, err: toLoggableError(error) });
+      reportError(error, { tenantId: event.tenantId, jobName: event.event, source: ERROR_SOURCE.EVENT });
     }
   }
 

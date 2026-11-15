@@ -18,6 +18,11 @@ apps/backend/src/generated/
 packages/shared-types/src/generated/
 **/playwright-report/
 **/test-results/
+# Grafana as code: written by infra/observability/grafana-cloud/scripts/generate.mjs (`pnpm check:ops` runs --check)
+infra/observability/grafana-cloud/alerting/
+infra/observability/grafana-cloud/dashboards/
+# Terraform's provider cache (`terraform init`, run by `pnpm check:ops`)
+**/.terraform/
 
 # Lockfiles
 pnpm-lock.yaml

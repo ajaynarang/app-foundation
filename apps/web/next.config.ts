@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import { execSync } from 'child_process';
 
 function getGitBranch(): string {
@@ -58,6 +59,17 @@ const nextConfig: NextConfig = {
       // ignore malformed NEXT_PUBLIC_API_URL
     }
 
+    // The error tracker's ingest origin, derived from the DSN host (any Sentry region, or a self-hosted one). With no
+    // DSN the CSP names no Sentry origin at all.
+    let sentryOrigin = '';
+    try {
+      if (process.env.NEXT_PUBLIC_SENTRY_DSN?.trim()) {
+        sentryOrigin = new URL(process.env.NEXT_PUBLIC_SENTRY_DSN.trim()).origin;
+      }
+    } catch {
+      // ignore a malformed NEXT_PUBLIC_SENTRY_DSN
+    }
+
     // S3 presigned URLs are used for document upload (PUT) and download (GET).
     // CSP host-source cannot wildcard mid-host (https://*.s3.*.amazonaws.com is
     // invalid and ignored by browsers), so regional virtual-hosted buckets must
@@ -86,7 +98,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       `img-src 'self' data: blob: ${s3Origins}`,
-      `connect-src 'self' blob:${apiOrigin ? ` ${apiOrigin}` : ''} ${s3Origins} https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://challenges.cloudflare.com wss://*.livekit.cloud https://*.livekit.cloud`,
+      `connect-src 'self' blob:${apiOrigin ? ` ${apiOrigin}` : ''} ${s3Origins} https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com wss://*.firebaseio.com https://challenges.cloudflare.com wss://*.livekit.cloud https://*.livekit.cloud${sentryOrigin ? ` ${sentryOrigin}` : ''}`,
       "frame-ancestors 'none'",
       'frame-src https://challenges.cloudflare.com',
       `media-src 'self' ${cdnOrigins}`,
@@ -129,4 +141,25 @@ const nextConfig: NextConfig = {
   output: 'standalone',
 };
 
-export default nextConfig;
+// Error tracking (docs/observability.md). The release is the commit being built, matching the backend's git-sha
+// release. Source maps are uploaded (then deleted from the output, so they are never served) and a release is
+// created only when the build has Sentry credentials; without them the build needs nothing from Sentry and frames
+// stay minified. The runtime is off without NEXT_PUBLIC_SENTRY_DSN either way (src/instrumentation*.ts).
+const sentryRelease = (process.env.SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA)?.trim() || undefined;
+const hasSentryToken = Boolean(process.env.SENTRY_AUTH_TOKEN?.trim());
+const missingSentryBuildVars = ['SENTRY_ORG', 'SENTRY_PROJECT'].filter((name) => !process.env[name]?.trim());
+const canUploadToSentry = hasSentryToken && missingSentryBuildVars.length === 0;
+if (hasSentryToken && !canUploadToSentry) {
+  // A token alone silently ships minified frames; say which piece is missing.
+  console.warn(
+    `[sentry] SENTRY_AUTH_TOKEN is set but ${missingSentryBuildVars.join(' and ')} ${missingSentryBuildVars.length > 1 ? 'are' : 'is'} not — source maps will not be uploaded and no release will be created.`,
+  );
+}
+
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  telemetry: false,
+  sourcemaps: canUploadToSentry ? { deleteSourcemapsAfterUpload: true } : { disable: true },
+  release: { name: sentryRelease, create: canUploadToSentry, finalize: canUploadToSentry },
+  bundleSizeOptimizations: { excludeDebugStatements: true, excludeTracing: true },
+});

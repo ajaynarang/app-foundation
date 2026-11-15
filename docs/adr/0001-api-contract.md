@@ -66,8 +66,9 @@ also metered per agent (`AgentRateLimitGuard`) and answers a 401 with the bearer
 }
 ```
 
-- **Keys.** `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?` and nothing else.
-  `fieldErrors` appears only on a 400. `debugDetail` appears only in development. There is no `message` and no
+- **Keys.** `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?` and nothing
+  else. `fieldErrors` appears only on a 400. `workspaces` (`{ tenantId, name }[]`) appears only on the login's 409
+  `WORKSPACE_SELECTION_REQUIRED`. `debugDetail` appears only in development. There is no `message` and no
   `error` key. A key a thrower attaches that is not on this list is dropped.
 - **Statuses.** **400** malformed or invalid input, naming the field in `fieldErrors`. **401** not authenticated.
   **403** authenticated but not allowed. **404** missing, **or in another tenant**: existence is never confirmed
@@ -75,7 +76,7 @@ also metered per agent (`AgentRateLimitGuard`) and answers a 401 with the bearer
   limited. 422 is not used. A 400 that can name no field is the wrong status: it is a 401, 403 or 409 with a code.
 - **Codes.** `ApiErrorCode` in `@app/shared-types`: `VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`,
   `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `INVALID_STATE`, `STALE`, `DUPLICATE`, `IDEMPOTENCY_KEY_REUSED`,
-  `IDEMPOTENCY_KEY_IN_USE`, `PAYLOAD_TOO_LARGE`, `RATE_LIMITED`, `UNSAFE_WEBHOOK_URL`, `UNAVAILABLE`, `INTERNAL`. The code says what the status cannot: a 409 is `INVALID_STATE`
+  `IDEMPOTENCY_KEY_IN_USE`, `PAYLOAD_TOO_LARGE`, `RATE_LIMITED`, `UNSAFE_WEBHOOK_URL`, `WORKSPACE_SELECTION_REQUIRED`, `UNAVAILABLE`, `INTERNAL`. The code says what the status cannot: a 409 is `INVALID_STATE`
   (this will never succeed), `STALE` (refresh and retry) or `DUPLICATE`. A thrower names a code with the kernel
   factories (`fieldError`, `fieldErrors`, `invalidState`, `stale`, `duplicate`, `parseWithSchema`); otherwise the
   status implies it. A domain adds its own code by throwing `{ code, detail }`, and it passes through unchanged

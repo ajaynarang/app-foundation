@@ -5,6 +5,7 @@ import { DOMAIN_EVENTS } from '../../events/domain-events.constants';
 import { SSE_EVENTS } from '@appshore/kernel/infrastructure/sse/sse-events.constants';
 import { SseService } from '@appshore/kernel/infrastructure/sse/sse.service';
 import { DomainEventSseBridge } from '../domain-event-sse-bridge.service';
+import { SSE_BROADCAST_ROLES } from '../sse-broadcast-roles';
 
 /**
  * End-to-end regression test for the SSE id contract.
@@ -20,7 +21,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
 
   beforeEach(() => {
     emitter = new EventEmitter2({ wildcard: true, delimiter: '.' });
-    sse = new SseService();
+    sse = new SseService(SSE_BROADCAST_ROLES);
     bridge = new DomainEventSseBridge(sse);
     emitter.on('app.**', (e: DomainEvent) => bridge.handleDomainEvent(e));
   });
@@ -30,7 +31,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     const received: MessageEvent[] = [];
     subject.subscribe((e) => received.push(e));
 
-    sse.addClient('user-correct', 7, subject);
+    sse.addClient('user-correct', 7, subject, 'MEMBER');
 
     emitter.emit(
       DOMAIN_EVENTS.NOTIFICATION_SENT,
@@ -55,7 +56,7 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     subject.subscribe((e) => received.push(e));
 
     // Client is registered with User.userId
-    sse.addClient('user-correct', 7, subject);
+    sse.addClient('user-correct', 7, subject, 'MEMBER');
 
     // But the producer (incorrectly) used a firebaseUid value as the recipient id
     emitter.emit(
@@ -79,8 +80,8 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     subjA.subscribe((e) => recvA.push(e));
     subjB.subscribe((e) => recvB.push(e));
 
-    sse.addClient('user-A', 7, subjA);
-    sse.addClient('user-B', 7, subjB);
+    sse.addClient('user-A', 7, subjA, 'MEMBER');
+    sse.addClient('user-B', 7, subjB, 'MEMBER');
 
     emitter.emit(
       DOMAIN_EVENTS.NOTIFICATION_SENT,
@@ -104,8 +105,8 @@ describe('SSE id contract — domain event → bridge → SseService', () => {
     subj1.subscribe((e) => recv1.push(e));
     subj2.subscribe((e) => recv2.push(e));
 
-    sse.addClient('user-1', 7, subj1);
-    sse.addClient('user-2', 7, subj2);
+    sse.addClient('user-1', 7, subj1, 'MEMBER');
+    sse.addClient('user-2', 7, subj2, 'MEMBER');
 
     emitter.emit(DOMAIN_EVENTS.TENANT_UPDATED, new DomainEvent(DOMAIN_EVENTS.TENANT_UPDATED, '7', { name: 'Acme' }));
 

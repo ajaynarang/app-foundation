@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, UnrecoverableError } from 'bullmq';
 import axios from 'axios';
@@ -12,8 +12,16 @@ import {
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
 import { QUEUE_NAMES } from '@appshore/kernel/infrastructure/queue/queue.constants';
 import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-letter.service';
-import { withJobLogContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
+import { withJobContext } from '@appshore/kernel/infrastructure/logging/job-log-context';
 import { buildWebhookHeaders, signingSecrets } from './standard-webhooks';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { reportJobFailure } from '@appshore/kernel/infrastructure/queue/job-events';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 /**
  * Inner payload shape for a webhook delivery job. Producers wrap this in a
@@ -61,6 +69,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly deadLetter: DeadLetterService,
     config: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {
     super();
     this.allowPrivate = config.get<boolean>('webhooks.allowPrivateTargets') === true;
@@ -68,9 +77,9 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   }
 
   async process(job: Job<JobEnvelope<WebhookDeliveryPayload>>): Promise<void> {
-    // `withJobLogContext` reads `tenantId` straight off `job.data`, which
+    // `withJobContext` reads `tenantId` straight off `job.data`, which
     // matches the envelope shape (envelope.tenantId is the wire-format slug).
-    return withJobLogContext(job, async () => this.handle(job));
+    return withJobContext(job, async () => this.handle(job));
   }
 
   private async handle(job: Job<JobEnvelope<WebhookDeliveryPayload>>): Promise<void> {
@@ -80,6 +89,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     // Tenant pause guard. payload.tenantId is the wire-format slug
     // (normalized in DurableEventProcessor), but defend against legacy jobs
     // that may have been queued before the resolver landed (numeric form).
+    let tenantDbId: number | null = null;
     if (payload.tenantId) {
       const where =
         typeof payload.tenantId === 'string' && isNaN(Number(payload.tenantId))
@@ -87,8 +97,9 @@ export class WebhookDeliveryProcessor extends WorkerHost {
           : { id: Number(payload.tenantId) };
       const tenant = await this.prisma.tenant.findUnique({
         where,
-        select: { jobsPaused: true },
+        select: { id: true, jobsPaused: true },
       });
+      tenantDbId = tenant?.id ?? null;
       if (tenant?.jobsPaused) {
         this.logger.log(`Skipping webhook delivery — tenant ${payload.tenantId} is paused`);
         return;
@@ -101,6 +112,23 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
     if (!subscription || !subscription.active) {
       this.logger.warn(`Skipping delivery for inactive/missing subscription ${subscriptionId}`);
+      return;
+    }
+
+    // Outside production only allow-listed hosts receive a webhook (ADR "Outbound gate"). A held-back delivery is
+    // recorded by the gate and closed on the delivery log; retrying would hold it back again.
+    const allowed = await this.outboundGate.allowUrl(subscription.url, {
+      source: OUTBOUND_SOURCE.OUTBOUND_WEBHOOK,
+      tenantId: tenantDbId,
+      subject: payload.event,
+    });
+    if (!allowed) {
+      this.logger.log(`Held back ${payload.event} to ${stripQueryString(subscription.url)}: outbound gate`);
+      await this.recordAttempt(
+        logId,
+        { responseStatus: null, responseBody: 'Held back by the outbound gate: the host is not on the allow-list' },
+        true,
+      );
       return;
     }
 
@@ -134,7 +162,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
         where: { id: logId },
         data: { responseStatus: response.status, responseBody, attempts: { increment: 1 }, deliveredAt: new Date() },
       });
-      this.logger.log(`Delivered ${payload.event} to ${subscription.url} → ${response.status}`);
+      this.logger.log(`Delivered ${payload.event} to ${stripQueryString(subscription.url)} → ${response.status}`);
       return;
     }
     // Non-2xx, a 3xx included (redirects are never followed): record it and throw so BullMQ retries.
@@ -173,21 +201,22 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   /** The target is not (or is no longer) a public address. Retrying cannot help, so fail it now, visibly. */
   private async refuse(logId: string, url: string, error: unknown): Promise<never> {
     const reason = `Refused: ${error instanceof Error ? error.message : 'the webhook URL is not a public address'}`;
-    this.logger.warn(`Refused delivery ${logId} to ${url}: ${reason}`);
+    this.logger.warn(`Refused delivery ${logId} to ${stripQueryString(url)}: ${reason}`);
     await this.recordAttempt(logId, { responseStatus: null, responseBody: reason.slice(0, 1000) }, true);
     throw new UnrecoverableError(reason);
   }
 
   /**
-   * When a webhook delivery job has exhausted all its retry attempts, persist
-   * a row into `dead_letter_logs` so the failure survives Bull's 7-day
-   * `failed` set retention and can be inspected / replayed by an operator.
-   * Intermediate failures (where BullMQ will retry) are skipped.
+   * Log every failed attempt as one structured `job.failed` line (the line alert rules key on). When the job has
+   * failed for good, persist a row into `dead_letter_logs` so the failure survives Bull's 7-day `failed` set
+   * retention and can be inspected / replayed by an operator. A refusal throws `UnrecoverableError`, which is final
+   * at once.
    */
   @OnWorkerEvent('failed')
   async onFailed(job: Job<JobEnvelope<WebhookDeliveryPayload>>, err: Error): Promise<void> {
-    const maxAttempts = job.opts?.attempts ?? 3;
-    if (job.attemptsMade >= maxAttempts || err instanceof UnrecoverableError) {
+    const final = reportJobFailure(this.logger, job, err, 3) || err instanceof UnrecoverableError;
+    if (final) {
+      recordOutboundFailed(OUTBOUND_CHANNEL.WEBHOOK);
       await this.deadLetter.recordPermanentFailure(job, err);
     }
   }

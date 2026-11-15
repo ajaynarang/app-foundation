@@ -5,6 +5,7 @@ import { FeatureFlagDto, FeatureFlagsResponse, UpdateFeatureFlagDto } from './dt
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@appshore/db';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 const FLAG_KEY_PARAM = { name: 'key', description: 'Feature flag key (e.g. `desk`)' };
 
@@ -72,6 +73,7 @@ export class FeatureFlagsController {
   }
 
   @Put(':key')
+  @SystemScope('super-admin')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update feature flag enabled status' })
   @ApiResponse({

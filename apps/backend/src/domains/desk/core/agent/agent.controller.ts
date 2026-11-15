@@ -21,6 +21,8 @@ import {
   DeskAgentUpdateResultResponse,
   DeskEligibleSupervisorListResponse,
 } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN];
 
@@ -34,6 +36,7 @@ const SUPERVISOR_REASSIGN_ROLES: readonly UserRole[] = [UserRole.OWNER, UserRole
  */
 @ApiTags('Desk — Agents')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/agents')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskAgentController extends BaseTenantController {

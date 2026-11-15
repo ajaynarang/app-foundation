@@ -37,3 +37,25 @@ export function isCronDueInWindow(cronExpr: string, tz: string, windowStart: Dat
     return false;
   }
 }
+
+/** Fire times sampled to find a cron's interval; enough to see a weekday-only or `0,30` pattern's shortest gap. */
+const INTERVAL_SAMPLES = 8;
+
+/**
+ * How often a cron pattern fires, in seconds: the shortest gap between its next fire times after `from`. A pattern
+ * with uneven gaps (`0 9,17 * * *`) reports the shorter one, so a "missed run" check never waits longer than the
+ * pattern means. Undefined for a pattern that cannot be parsed or fires fewer than twice.
+ */
+export function cronIntervalSeconds(cronExpr: string, tz = 'UTC', from: Date = new Date()): number | undefined {
+  try {
+    const iterator = CronExpressionParser.parse(cronExpr, { currentDate: from, tz });
+    const times: number[] = [];
+    for (let i = 0; i < INTERVAL_SAMPLES && iterator.hasNext(); i++) times.push(iterator.next().toDate().getTime());
+    if (times.length < 2) return undefined;
+    let shortest = Infinity;
+    for (let i = 1; i < times.length; i++) shortest = Math.min(shortest, times[i] - times[i - 1]);
+    return shortest / 1000;
+  } catch {
+    return undefined;
+  }
+}

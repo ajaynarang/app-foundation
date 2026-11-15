@@ -289,6 +289,7 @@ export const SubdomainCheckSchema = z
  */
 export const TenantBrandingProjectionSchema = z
   .object({
+    tenantId: z.string(),
     companyName: z.string(),
     logoUrl: z.string().nullable(),
   })

@@ -47,30 +47,38 @@ export const authApi = {
   /**
    * Send OTP to phone number (silently succeeds even if phone not registered)
    */
-  sendPhoneOtp: async (phone: string): Promise<void> => {
+  sendPhoneOtp: async (phone: string, tenantId?: string): Promise<void> => {
     return apiClient<void>('/auth/phone/send-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, ...(tenantId ? { tenantId } : {}) }),
     });
   },
 
   /**
    * Login with phone + PIN
    */
-  phoneLogin: async (phone: string, pin: string): Promise<LoginResponse & { requiresPinSetup?: boolean }> => {
+  phoneLogin: async (
+    phone: string,
+    pin: string,
+    tenantId?: string,
+  ): Promise<LoginResponse & { requiresPinSetup?: boolean }> => {
     return apiClient<LoginResponse & { requiresPinSetup?: boolean }>('/auth/phone/login', {
       method: 'POST',
-      body: JSON.stringify({ phone, pin }),
+      body: JSON.stringify({ phone, pin, ...(tenantId ? { tenantId } : {}) }),
     });
   },
 
   /**
    * Verify OTP code and get JWT tokens (OTP-based login / forgot PIN)
    */
-  verifyOtp: async (phone: string, code: string): Promise<LoginResponse & { requiresPinSetup?: boolean }> => {
+  verifyOtp: async (
+    phone: string,
+    code: string,
+    tenantId?: string,
+  ): Promise<LoginResponse & { requiresPinSetup?: boolean }> => {
     return apiClient<LoginResponse & { requiresPinSetup?: boolean }>('/auth/phone/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ phone, code, ...(tenantId ? { tenantId } : {}) }),
     });
   },
 

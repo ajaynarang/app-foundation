@@ -11,8 +11,8 @@ describe('PlansService.assignPlan: the planAssigned hook', () => {
         update: jest.fn().mockResolvedValue({ id: 7, plan: TenantPlan.PROFESSIONAL }),
       },
       tenantPlanEvent: { create: jest.fn().mockResolvedValue({}) },
-      $transaction: jest.fn(async (ops: unknown[]) => {
-        const out = await Promise.all(ops as Promise<unknown>[]);
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const out = await fn(prisma);
         order.push('commit');
         return out;
       }),

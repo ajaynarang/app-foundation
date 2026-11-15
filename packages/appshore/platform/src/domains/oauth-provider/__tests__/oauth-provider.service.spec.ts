@@ -33,9 +33,9 @@ const mockPrisma = {
     update: jest.fn(),
     updateMany: jest.fn(),
   },
-  $transaction: jest.fn((args: any) => {
-    if (Array.isArray(args)) return Promise.all(args);
-    return args(mockPrisma);
+  $transaction: jest.fn((fn: any) => {
+    if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+    return fn(mockPrisma);
   }),
 };
 
@@ -273,6 +273,20 @@ describe('OAuthProviderService', () => {
       mockPrisma.oAuthRefreshToken.updateMany.mockResolvedValue({});
 
       await expect(service.refreshToken('reused-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
+    });
+
+    it('revokes the chain on the transaction client, never the root client', async () => {
+      const tx = { oAuthAccessToken: { updateMany: jest.fn() }, oAuthRefreshToken: { updateMany: jest.fn() } };
+      mockPrisma.$transaction.mockImplementationOnce((fn: any) => fn(tx));
+      mockPrisma.oAuthRefreshToken.findUnique.mockResolvedValue({ rotatedAt: new Date(), userId: 1, clientId: 2 });
+
+      await expect(service.refreshToken('reused-token', 'c-1', undefined)).rejects.toMatchObject(INVALID_GRANT);
+
+      const chain = { where: { userId: 1, clientId: 2, revokedAt: null }, data: { revokedAt: expect.any(Date) } };
+      expect(tx.oAuthAccessToken.updateMany).toHaveBeenCalledWith(chain);
+      expect(tx.oAuthRefreshToken.updateMany).toHaveBeenCalledWith(chain);
+      expect(mockPrisma.oAuthAccessToken.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.oAuthRefreshToken.updateMany).not.toHaveBeenCalled();
     });
 
     it('should throw for revoked refresh token', async () => {

@@ -9,5 +9,6 @@ module.exports = {
   // Prisma's generated runtime is finished JavaScript. Re-compiling it breaks its
   // error classes: a database error then reads "Must call super constructor".
   transformIgnorePatterns: ['/node_modules/', '/packages/appshore/db/generated/'],
+  setupFiles: ['<rootDir>/jest.setup-env.js'],
   testEnvironment: 'node',
 };

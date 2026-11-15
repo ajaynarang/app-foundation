@@ -138,7 +138,7 @@ export class WalletService {
       });
     });
 
-    this.logger.log(`Wallet topped up for tenant ${tenantDbId}: +$${(amountCents / 100).toFixed(2)}`);
+    this.logger.log(`Wallet topped up for tenant ${tenantDbId}`);
   }
 
   /**
@@ -197,7 +197,7 @@ export class WalletService {
       },
     });
 
-    this.logger.log(`Overage deducted for tenant ${tenantDbId}: -$${(amountCents / 100).toFixed(2)} (${description})`);
+    this.logger.log(`Overage deducted for tenant ${tenantDbId}`);
 
     // Check if auto-reload should be triggered
     await this.checkAutoReload(tenantDbId);
@@ -235,7 +235,7 @@ export class WalletService {
       });
     });
 
-    this.logger.log(`Admin credit added for tenant ${tenantDbId}: +$${(amountCents / 100).toFixed(2)} (${reason})`);
+    this.logger.log(`Admin credit added for tenant ${tenantDbId}`);
   }
 
   /**
@@ -267,7 +267,7 @@ export class WalletService {
       });
     });
 
-    this.logger.log(`Overage refunded for tenant ${tenantDbId}: +$${(amountCents / 100).toFixed(2)} (${description})`);
+    this.logger.log(`Overage refunded for tenant ${tenantDbId}`);
   }
 
   /**
@@ -297,7 +297,7 @@ export class WalletService {
       });
     });
 
-    this.logger.log(`Refund credited for tenant ${tenantDbId}: +$${(amountCents / 100).toFixed(2)}`);
+    this.logger.log(`Refund credited for tenant ${tenantDbId}`);
   }
 
   /**
@@ -403,9 +403,7 @@ export class WalletService {
         return { updatedWallet, transaction };
       });
 
-      this.logger.log(
-        `Auto-reload completed for tenant ${tenantDbId}: +$${(wallet.autoReloadAmountCents / 100).toFixed(2)}`,
-      );
+      this.logger.log(`Auto-reload completed for tenant ${tenantDbId}`);
     } catch (error) {
       this.logger.error(`Auto-reload failed for tenant ${tenantDbId}: ${error}`, (error as Error).stack);
       // Don't throw — auto-reload failure shouldn't break the calling flow

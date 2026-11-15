@@ -6,6 +6,7 @@ import {
   isPlaceholderSecret,
   isProductionEnv,
 } from './production-guard';
+import { assertOutboundSafety } from '@appshore/kernel/infrastructure/outbound/outbound-mode';
 
 // Config ownership rule:
 // - App-owned config lives HERE, in the typed zod schema below — validated at
@@ -56,12 +57,25 @@ const configSchema = z.object({
     mode: z.enum(['multi', 'single', 'personal']).default('multi'),
   }),
 
+  // Plan gates (design item 17): `enforce` refuses a plan denial with a 403; `log` writes one `plan.would_deny`
+  // warning and lets it through, so a product with live tenants can watch before it enforces. Kill switches hold in
+  // both modes.
+  planEnforcement: z.enum(['enforce', 'log']).default('enforce'),
+
   // JWT Configuration
   jwt: z.object({
     accessSecret: z.string().default(DEV_JWT_ACCESS_SECRET_DEFAULT),
     refreshSecret: z.string().default(DEV_JWT_REFRESH_SECRET_DEFAULT),
     accessExpiry: z.string().default('15m'),
+    /** Lifetime of one refresh token. Every refresh rotates, so this is how long a session may sit idle. */
     refreshExpiry: z.string().default('7d'),
+    /** Absolute lifetime of a session (a refresh-token family) from sign-in, however often it refreshes. */
+    sessionMaxAge: z.string().default('30d'),
+    /**
+     * A refresh token retired this recently and presented again is a request already in flight (another tab
+     * refreshed first): a plain 401. Later, it is reuse and the whole session is revoked.
+     */
+    refreshReuseGraceSeconds: z.number().int().min(0).default(10),
   }),
 
   // Auth Configuration
@@ -207,6 +221,8 @@ const configSchema = z.object({
   s3: z.object({
     bucket: z.string().default('app-files'),
     region: z.string().default('us-east-1'),
+    /** Optional S3-compatible endpoint (the local MinIO in dev); unset means real AWS S3. */
+    endpoint: z.string().url('S3_ENDPOINT must be a URL, e.g. http://localhost:9300').optional(),
   }),
 });
 
@@ -221,9 +237,18 @@ const configSchema = z.object({
 // sets when NODE_ENV or ENV_TYPE says production (see isProductionEnv).
 // Nothing below runs in development or test.
 const guardedConfigSchema = configSchema.superRefine((config, ctx) => {
-  if (config.environment !== 'production') return;
-
   const fail = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+
+  // The outbound gate (ADR "Outbound gate") is checked in every environment: production must send (`live`), and
+  // anything else must not message real people unless someone said so. It reads ENV_TYPE, not `environment`: every
+  // deployed task is `environment === 'production'`, staging included.
+  try {
+    assertOutboundSafety(process.env);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+
+  if (config.environment !== 'production') return;
 
   const voiceEnabled = !!config.voice.livekitUrl;
 
@@ -389,11 +414,16 @@ export default (): Configuration => {
     apiV1Prefix: process.env.API_V1_PREFIX,
     projectName: process.env.PROJECT_NAME,
     secretKey: env('SECRET_KEY'),
+    planEnforcement: env('PLAN_ENFORCEMENT'),
     jwt: {
       accessSecret: env('JWT_ACCESS_SECRET'),
       refreshSecret: env('JWT_REFRESH_SECRET'),
       accessExpiry: process.env.JWT_ACCESS_EXPIRY,
       refreshExpiry: process.env.JWT_REFRESH_EXPIRY,
+      sessionMaxAge: process.env.JWT_SESSION_MAX_AGE,
+      refreshReuseGraceSeconds: process.env.JWT_REFRESH_REUSE_GRACE_SECONDS
+        ? Number(process.env.JWT_REFRESH_REUSE_GRACE_SECONDS)
+        : undefined,
     },
     auth: {
       bcryptRounds: process.env.BCRYPT_ROUNDS ? Number(process.env.BCRYPT_ROUNDS) : undefined,
@@ -448,6 +478,7 @@ export default (): Configuration => {
     s3: {
       bucket: process.env.S3_BUCKET,
       region: process.env.S3_REGION,
+      endpoint: env('S3_ENDPOINT'),
     },
   };
 

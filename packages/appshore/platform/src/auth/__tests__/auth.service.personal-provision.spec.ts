@@ -47,6 +47,7 @@ describe('AuthService.registerPersonal: the tenant-provision hook', () => {
       {} as never,
       loginEvents as never,
       {} as never,
+      {} as never,
       hooks,
     );
     return { service, order, prisma };

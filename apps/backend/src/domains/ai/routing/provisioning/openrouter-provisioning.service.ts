@@ -95,7 +95,7 @@ export class OpenRouterProvisioningService {
       if (Number(row.limitUsd) === limitUsd) return;
       await setOpenRouterKeyLimit(managementKey, row.keyHash, limitUsd);
       await this.prisma.tenantAiSubKey.update({ where: { tenantId }, data: { limitUsd } });
-      this.logger.log(`Sub-key limit for workspace ${tenantId} set to $${limitUsd}/month`);
+      this.logger.log(`Sub-key limit for workspace ${tenantId} updated`);
     } catch (err) {
       this.logger.warn(`Sub-key limit sync failed for workspace ${tenantId}: ${(err as Error).message}`);
     }
@@ -129,7 +129,7 @@ export class OpenRouterProvisioningService {
           limitUsd,
         },
       });
-      this.logger.log(`Provisioned an OpenRouter sub-key for workspace ${tenantId} (limit $${limitUsd}/month)`);
+      this.logger.log(`Provisioned an OpenRouter sub-key for workspace ${tenantId}`);
       return true;
     } catch (err) {
       if ((err as { code?: string }).code === 'P2002') {

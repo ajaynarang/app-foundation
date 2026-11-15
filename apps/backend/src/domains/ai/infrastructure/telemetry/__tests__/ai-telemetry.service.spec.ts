@@ -9,6 +9,9 @@ import { createMockOutbox } from '@appshore/platform/test/mocks/outbox.mock';
 import { DOMAIN_EVENTS } from '../../../../../platform-glue/events/domain-events.constants';
 import { AiTelemetryService } from '../ai-telemetry.service';
 import type { AiCallContext, AiUsage } from '@app/shared-types';
+import { requestContextStorage } from '@appshore/kernel/infrastructure/logging/request-context.middleware';
+import { resetTenantLabelsForTesting } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { InMemoryMetrics } from '@appshore/kernel/infrastructure/telemetry/testing/in-memory-metrics';
 
 const TENANT_ID = 42;
 
@@ -663,6 +666,51 @@ describe('AiTelemetryService', () => {
     it('busts the per-tenant spent cache after a successful record', async () => {
       await service.record(makeUsage(), makeContext());
       expect(cache.del).toHaveBeenCalledWith('app:ai-telemetry:spent:42');
+    });
+  });
+
+  describe('app_ai_invocation metrics', () => {
+    let harness: InMemoryMetrics;
+
+    beforeEach(() => {
+      resetTenantLabelsForTesting();
+      harness = InMemoryMetrics.install();
+    });
+
+    afterEach(async () => {
+      await harness.uninstall();
+    });
+
+    /** The metric is recorded after the row without being awaited; let it settle. */
+    const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('counts one invocation per new row, labelled with the tenant public id from the log context', async () => {
+      await requestContextStorage.run({ requestId: 'r1', tenantId: 'acme', tenantDbId: String(TENANT_ID) }, () =>
+        service.record(makeUsage(), makeContext()),
+      );
+      await settle();
+
+      const [point] = await harness.points('app_ai_invocation');
+      expect(point.attributes).toEqual({ surface: 'kb_ingest', status: 'ok', tenant: 'acme' });
+      expect((await harness.points('app_ai_invocation_cost_usd'))[0].value).toBeGreaterThan(0);
+    });
+
+    it('looks the public id up when the log context names no tenant, and never uses the numeric id', async () => {
+      prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'beta', aiZeroRetention: false });
+
+      await service.record(makeUsage(), makeContext());
+      await settle();
+
+      expect((await harness.points('app_ai_invocation'))[0].attributes.tenant).toBe('beta');
+    });
+
+    it('counts nothing for an idempotent replay, which wrote no row', async () => {
+      prisma.aiInvocation.findUnique.mockResolvedValueOnce({ id: 'existing', tenantId: TENANT_ID });
+
+      await service.record(makeUsage(), makeContext({ idempotencyKey: 'k1' }));
+      await settle();
+
+      expect(await harness.points('app_ai_invocation')).toEqual([]);
     });
   });
 });

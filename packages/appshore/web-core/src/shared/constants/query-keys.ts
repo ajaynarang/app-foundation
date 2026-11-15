@@ -153,6 +153,14 @@ export const queryKeys = {
     health: ['deadlines', 'health'] as const,
   },
 
+  // ─── Outbound gate: mode, allow-list and held-back sends (super-admin) ─────
+  outbound: {
+    root: ['outbound'] as const,
+    status: ['outbound', 'status'] as const,
+    allowList: ['outbound', 'allow-list'] as const,
+    heldBack: ['outbound', 'held-back'] as const,
+  },
+
   // ─── AI / conversations ─────────────────────────────────────────────────
   ai: {
     root: ['ai'] as const,

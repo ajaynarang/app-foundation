@@ -14,7 +14,13 @@ const mockPrisma = {
   user: {
     update: jest.fn(),
   },
-  $transaction: jest.fn().mockResolvedValue([]),
+  refreshToken: {
+    findFirst: jest.fn(),
+  },
+  $transaction: jest.fn((fn: unknown) => {
+    if (typeof fn !== 'function') throw new TypeError('expected an interactive transaction callback');
+    return (fn as (tx: unknown) => unknown)(mockPrisma);
+  }),
 };
 
 const mockJwt = {
@@ -22,6 +28,13 @@ const mockJwt = {
     accessToken: 'at',
     refreshToken: 'rt',
     refreshTokenId: 'rt_1',
+    familyId: 'rt_1',
+  }),
+  issueSwitchSuccessor: jest.fn().mockResolvedValue({
+    accessToken: 'at',
+    refreshToken: 'rt',
+    refreshTokenId: 'rt_9',
+    familyId: 'rt_family',
   }),
 };
 
@@ -90,18 +103,22 @@ describe('WorkspacesService', () => {
       user: { id: 1, userId: 'user_1', email: 'owner@example.com' },
     };
 
-    it('issues tokens carrying the target workspace + membership role', async () => {
+    const sessionUser = {
+      id: 1,
+      userId: 'user_1',
+      email: 'owner@example.com',
+      role: 'ADMIN',
+      tenantId: 'demo-two',
+      tenantDbId: 2,
+    };
+
+    it("issues a successor in the session's family, carrying the target workspace + membership role", async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+      const result = await service.switch(1, 'demo-two', { familyId: 'rt_family', authMethod: 'email_password' });
 
-      const result = await service.switch(1, 'demo-two');
-
-      expect(mockJwt.generateTokenPair).toHaveBeenCalledWith({
-        id: 1,
-        userId: 'user_1',
-        email: 'owner@example.com',
-        role: 'ADMIN',
-        tenantId: 'demo-two',
-      });
+      // The token service picks the predecessor under the session lock (jwt.service.spec.ts).
+      expect(mockJwt.issueSwitchSuccessor).toHaveBeenCalledWith(sessionUser, 'rt_family', 'email_password');
+      expect(mockJwt.generateTokenPair).not.toHaveBeenCalled();
       expect(result.workspace).toEqual({
         tenantId: 'demo-two',
         name: 'Second Workspace',
@@ -111,9 +128,33 @@ describe('WorkspacesService', () => {
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
 
+    it('records the login default on the transaction client, never the root client', async () => {
+      const tx = { user: { update: jest.fn() }, workspaceMember: { updateMany: jest.fn(), update: jest.fn() } };
+      mockPrisma.$transaction.mockImplementationOnce((fn: unknown) => (fn as (client: typeof tx) => unknown)(tx));
+      mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+      mockPrisma.refreshToken.findFirst.mockResolvedValue(null);
+
+      await service.switch(1, 'demo-two', { familyId: 'rt_old' });
+
+      expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 1 }, data: { tenantId: 2, role: 'ADMIN' } });
+      expect(tx.workspaceMember.updateMany).toHaveBeenCalledWith({ where: { userId: 1 }, data: { isDefault: false } });
+      expect(tx.workspaceMember.update).toHaveBeenCalledWith({ where: { id: 7 }, data: { isDefault: true } });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.workspaceMember.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.workspaceMember.update).not.toHaveBeenCalled();
+    });
+
+    it('passes no family when the access token names none', async () => {
+      mockPrisma.workspaceMember.findFirst.mockResolvedValue(membership);
+
+      await service.switch(1, 'demo-two', {});
+
+      expect(mockJwt.issueSwitchSuccessor).toHaveBeenCalledWith(sessionUser, undefined, undefined);
+    });
+
     it('404s when the user has no membership in the target workspace', async () => {
       mockPrisma.workspaceMember.findFirst.mockResolvedValue(null);
-      await expect(service.switch(1, 'not-mine')).rejects.toThrow(NotFoundException);
+      await expect(service.switch(1, 'not-mine', {})).rejects.toThrow(NotFoundException);
     });
 
     it('rejects switching into an inactive workspace', async () => {
@@ -121,7 +162,7 @@ describe('WorkspacesService', () => {
         ...membership,
         tenant: { ...membership.tenant, status: 'SUSPENDED' },
       });
-      await expect(service.switch(1, 'demo-two')).rejects.toThrow(UnauthorizedException);
+      await expect(service.switch(1, 'demo-two', {})).rejects.toThrow(UnauthorizedException);
     });
   });
 });

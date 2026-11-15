@@ -6,5 +6,6 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', { diagnostics: false, isolatedModules: true }],
   },
+  setupFiles: ['<rootDir>/jest.setup-env.js'],
   testEnvironment: 'node',
 };

@@ -11,9 +11,11 @@ import {
   AdminEventVolumeBucketResponse,
   AdminWebhookHealthResponse,
 } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('admin/events')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 @ApiTags('Admin Events')
 @ApiBearerAuth()
 export class AdminEventsController {

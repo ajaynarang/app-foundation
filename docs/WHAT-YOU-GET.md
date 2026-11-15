@@ -34,7 +34,8 @@ The seed prints ready-to-use **dev credentials** (non-production only):
 
 Phone sign-in also works out of the box: `+1 555 555 0100`, PIN `1234` (mock OTP `123456`).
 Open `http://localhost:3000/login`, sign in as the owner, and you're inside a live workspace
-("Demo Workspace" in multi-tenant mode; "Default Workspace" in single-tenant mode).
+("Demo Workspace" in multi-tenant mode; "Default Workspace" in single-tenant mode). Production seeding
+(`ENV_TYPE=production`) creates none of these demo accounts or the demo workspace.
 
 ---
 
@@ -45,8 +46,9 @@ Open `http://localhost:3000/login`, sign in as the owner, and you're inside a li
 - First-party **email + password** auth (bcrypt, forgot/reset password, change password,
   session revocation) — works with zero external services.
 - Phone **OTP** and **PIN** login; **Firebase** token exchange as an optional alternative.
-- JWT access + refresh tokens (hashed at rest, httpOnly cookie, revocable; not rotated on use),
-  login-event history.
+- JWT access + refresh tokens (hashed at rest, httpOnly cookie, revocable; every refresh rotates the token, and a
+  retired token presented again revokes the session), login-event history. One live account per email; a
+  workspace is a membership of it.
 - Roles (`OWNER / ADMIN / MEMBER / SUPER_ADMIN`), invitations (email/SMS), **API keys**
   with scopes/rotation, and a full **OAuth 2.1 provider** (PKCE — your app can be
   "Sign in with X" for MCP clients like Claude).
@@ -98,7 +100,8 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 - **Search endpoint** with a provider extension point (returns empty until you register
   your domain searchers).
 - **Support tickets** + in-app **feedback** (AI-summarized) + announcements/banners.
-- OpenTelemetry traces, structured pino logs, Loki/Tempo/Grafana docker profile, health
+- OpenTelemetry traces and metrics (exported only once an OTLP endpoint is set; docs/observability.md), structured
+  pino logs, a local-only Loki/Tempo/Prometheus/Grafana docker profile (not the production answer), health
   endpoints (`/api/v1/health/live`, `/health/ready`).
 
 **Three apps**
@@ -112,8 +115,12 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 **Delivery**
 
 - docker-compose dev stack, Terraform for AWS (ECS/RDS/ElastiCache/S3/ALB), GitHub Actions
-  CI (lint, type-check, unit suites, Flutter analyze/test) + deploy pipeline, Playwright QA
-  suite (auto-generated RBAC matrix over every controller, smoke, API tests).
+  CI (lint, type-check, unit suites, Flutter analyze/test) + deploy pipeline, all manual-only (local gates
+  `pnpm verify` and the git hooks are what always runs), Playwright QA suite (auto-generated RBAC matrix over every
+  controller, smoke, API tests).
+- Operator tools (`docs/operations.md`): a production deploy gate (`PRODUCTION_DEPLOYERS`), migration and tunnel
+  scripts with typed production confirmation, a maintenance switch, a gated tenant reset for demo and QA
+  workspaces, and a staging-debug stack that copies staging into a second local database.
 
 ---
 
@@ -141,19 +148,20 @@ records `SKIPPED/NOT_CONFIGURED` in the ledger and everything else still deliver
 
 ## ⚙️ Works when you add a key (all optional)
 
-| Capability        | Env keys (see `apps/backend/.env.example`) | Without it                         |
-| ----------------- | ------------------------------------------ | ---------------------------------- |
-| Real SMS / OTP    | `TWILIO_*`                                 | mock OTP `123456` (non-prod only)  |
-| Email delivery    | `SMTP_*` or `RESEND_API_KEY`               | emails logged to server console    |
-| AI assistant      | `OPENROUTER_API_KEY`                       | chat UI loads, replies unavailable |
-| KB vector search  | `COHERE_API_KEY`                           | knowledge-base search is full-text |
-| Firebase login    | `FIREBASE_*` (backend + web)               | email/password + phone still work  |
-| Stripe billing    | `STRIPE_*`                                 | plans/entitlements still enforced  |
-| File uploads      | `AWS_*` / S3 bucket                        | uploads unavailable                |
-| Voice assistant   | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`    | text chat only                     |
-| LLM observability | `LANGFUSE_*`                               | local prompt fallback used         |
-| Bot protection    | `TURNSTILE_SECRET_KEY`                     | registration unprotected           |
-| Error tracking    | Sentry (scaffold in web-core)              | console logging                    |
+| Capability                               | Env keys (see `apps/backend/.env.example`)                                            | Without it                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Real SMS / OTP                           | `TWILIO_*`                                                                            | mock OTP `123456` (non-prod only)                             |
+| Email delivery                           | `SMTP_*` or `RESEND_API_KEY`                                                          | emails logged to server console                               |
+| AI assistant                             | `OPENROUTER_API_KEY`                                                                  | chat UI loads, replies unavailable                            |
+| KB vector search                         | `COHERE_API_KEY`                                                                      | knowledge-base search is full-text                            |
+| Firebase login                           | `FIREBASE_*` (backend + web)                                                          | email/password + phone still work                             |
+| Stripe billing                           | `STRIPE_*`                                                                            | plans/entitlements still enforced                             |
+| File uploads                             | `AWS_*` / S3 bucket                                                                   | uploads unavailable                                           |
+| Voice assistant                          | `DEEPGRAM_*`, `CARTESIA_*`, `LIVEKIT_*`                                               | text chat only                                                |
+| LLM observability                        | `LANGFUSE_*`                                                                          | local prompt fallback used                                    |
+| Bot protection                           | `TURNSTILE_SECRET_KEY`                                                                | registration unprotected                                      |
+| Error tracking                           | `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`                                                | errors in logs only, nothing sent                             |
+| Messaging real people outside production | `OUTBOUND_MODE=live` + `OUTBOUND_LIVE_OUTSIDE_PRODUCTION=true`, or allow-list entries | only allow-listed recipients are messaged (`/admin/outbound`) |
 
 ---
 

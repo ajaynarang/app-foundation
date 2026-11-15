@@ -17,32 +17,34 @@ pnpm init-app --name acme-crm --yes --dry-run
 
 ## Flags
 
-| Flag             | Default                   | Meaning                                                                                                           |
-| ---------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `--name`         | _(required with `--yes`)_ | Kebab-case app slug, e.g. `acme-crm`                                                                              |
-| `--display-name` | Title-cased name          | Human-facing name shown in the UI, e.g. `"Acme CRM"`                                                              |
-| `--scope`        | `@app`                    | Workspace package scope. Keeping `@app` is safest — renaming it rewrites every import and requires `pnpm install` |
-| `--db`           | name with `-` → `_`       | Postgres database name                                                                                            |
-| `--tenancy`      | `mt`                      | `mt` (multi-tenant) or `st` (single-tenant) — sets the `MULTI_TENANT` defaults in `.env.example` files            |
-| `--mobile`       | `yes`                     | `yes` keeps the Flutter companion app (renames `app_mobile` → `<name>_mobile`); `no` deletes `apps/mobile`        |
-| `--desk`         | `no`                      | Include Desk, the Inngest workflow engine for background AI agents. `no` strips it (see "Optional features")      |
-| `--yes`          | off                       | Non-interactive; accept defaults for anything not passed                                                          |
-| `--dry-run`      | off                       | Print per-rule replacement counts; write nothing                                                                  |
-| `--force`        | off                       | Skip the git-clean and already-initialized guards                                                                 |
+| Flag             | Default                   | Meaning                                                                                                                                      |
+| ---------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--name`         | _(required with `--yes`)_ | Kebab-case app slug, e.g. `acme-crm`                                                                                                         |
+| `--display-name` | Title-cased name          | Human-facing name shown in the UI, e.g. `"Acme CRM"`                                                                                         |
+| `--scope`        | `@app`                    | Workspace package scope. Keeping `@app` is safest — renaming it rewrites every import and requires `pnpm install`                            |
+| `--db`           | name with `-` → `_`       | Postgres database name                                                                                                                       |
+| `--tenancy`      | `mt`                      | `mt` (multi-tenant) or `st` (single-tenant) — sets the `MULTI_TENANT` defaults in `.env.example` files                                       |
+| `--mobile`       | `yes`                     | `yes` keeps the Flutter companion app (renames `app_mobile` → `<name>_mobile`); `no` deletes `apps/mobile`                                   |
+| `--desk`         | `no`                      | Include Desk, the Inngest workflow engine for background AI agents. `no` strips it (see "Optional features")                                 |
+| `--repo-url`     | the git remote `origin`   | Your repository (`https://github.com/<org>/<repo>`). Alert runbook links point there. Ignored when `origin` is the template's own repository |
+| `--yes`          | off                       | Non-interactive; accept defaults for anything not passed                                                                                     |
+| `--dry-run`      | off                       | Print per-rule replacement counts; write nothing                                                                                             |
+| `--force`        | off                       | Skip the git-clean and already-initialized guards                                                                                            |
 
 ## What it renames
 
-| Pattern                                         | Becomes          | Where                                                                           |
-| ----------------------------------------------- | ---------------- | ------------------------------------------------------------------------------- |
-| `app-foundation`                                | `<name>`         | package names, README, CLAUDE.md, landing page                                  |
-| `app-backend` / `app-frontend`                  | `<name>-*`       | Doppler projects (`doppler.yaml`, scripts), OTel/Grafana service names, compose |
-| `app-postgres` … `app-inngest`                  | `<name>-*`       | docker container names                                                          |
-| `__PROJECT__` + terraform `var.project` default | `<name>`         | `infra/`                                                                        |
-| postgres db `app`                               | `<db>`           | `DATABASE_URL`, `POSTGRES_DB`                                                   |
-| branding `Platform`                             | `<display-name>` | web layout metadata, login, landing page (targeted files only)                  |
-| `MULTI_TENANT` / `NEXT_PUBLIC_MULTI_TENANT`     | per `--tenancy`  | `.env.example` files                                                            |
-| `@app/`                                         | `<scope>/`       | only when `--scope` differs from `@app`                                         |
-| flutter `app_mobile`                            | `<name>_mobile`  | `apps/mobile` (pubspec, bundle ids, imports) — only with `--mobile yes`         |
+| Pattern                                         | Becomes                 | Where                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app-foundation`                                | `<name>`                | package names, README, CLAUDE.md, landing page                                                                                                          |
+| `app-backend` / `app-frontend`                  | `<name>-*`              | Doppler projects (`doppler.yaml`, scripts), OTel/Grafana service names, compose                                                                         |
+| `app-postgres` … `app-inngest`                  | `<name>-*`              | docker container names                                                                                                                                  |
+| `__PROJECT__` + terraform `var.project` default | `<name>`                | `infra/`                                                                                                                                                |
+| postgres db `app`                               | `<db>`                  | `DATABASE_URL`, `POSTGRES_DB`                                                                                                                           |
+| branding `Platform`                             | `<display-name>`        | web layout metadata, login, landing page (targeted files only)                                                                                          |
+| `MULTI_TENANT` / `NEXT_PUBLIC_MULTI_TENANT`     | per `--tenancy`         | `.env.example` files                                                                                                                                    |
+| `@app/`                                         | `<scope>/`              | only when `--scope` differs from `@app`                                                                                                                 |
+| flutter `app_mobile`                            | `<name>_mobile`         | `apps/mobile` (pubspec, bundle ids, imports) — only with `--mobile yes`                                                                                 |
+| Grafana-as-code `PROJECT` / `REPO_URL`          | `<name>` / `--repo-url` | `infra/observability/grafana-cloud/catalog/constants.mjs`; then `generate.mjs` regenerates the alerting and dashboard files (or the command is printed) |
 
 Never touched: `.git`, `node_modules`, `pnpm-lock.yaml` (regenerate with `pnpm install`),
 `docs/superpowers/` (historical design docs), **`packages/appshore/` package names**

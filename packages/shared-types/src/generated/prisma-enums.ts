@@ -145,7 +145,7 @@ export type LoginEventStatus = z.infer<typeof LoginEventStatusSchema>;
 export const LoginEventStatus = LoginEventStatusSchema.enum;
 
 // LoginFailReason
-export const LoginFailReasonSchema = z.enum(['ACCOUNT_DISABLED', 'TENANT_INACTIVE', 'INVALID_TOKEN', 'INVALID_CREDENTIALS', 'USER_NOT_FOUND', 'OTHER'] as const);
+export const LoginFailReasonSchema = z.enum(['ACCOUNT_DISABLED', 'TENANT_INACTIVE', 'INVALID_TOKEN', 'INVALID_CREDENTIALS', 'USER_NOT_FOUND', 'REFRESH_REUSE', 'OTHER'] as const);
 export type LoginFailReason = z.infer<typeof LoginFailReasonSchema>;
 export const LoginFailReason = LoginFailReasonSchema.enum;
 
@@ -173,6 +173,11 @@ export const NotificationChannel = NotificationChannelSchema.enum;
 export const NotificationStatusSchema = z.enum(['PENDING', 'SENT', 'FAILED'] as const);
 export type NotificationStatus = z.infer<typeof NotificationStatusSchema>;
 export const NotificationStatus = NotificationStatusSchema.enum;
+
+// OutboundAllowKind
+export const OutboundAllowKindSchema = z.enum(['EMAIL', 'EMAIL_DOMAIN', 'PHONE', 'HOST'] as const);
+export type OutboundAllowKind = z.infer<typeof OutboundAllowKindSchema>;
+export const OutboundAllowKind = OutboundAllowKindSchema.enum;
 
 // PaymentMethodType
 export const PaymentMethodTypeSchema = z.enum(['CARD', 'US_BANK_ACCOUNT'] as const);

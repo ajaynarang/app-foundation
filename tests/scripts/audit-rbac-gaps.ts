@@ -28,6 +28,23 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** `FEATURE_KEYS.X` constant name → value, read from the shared-types source so the scan resolves either spelling. */
+const FEATURE_KEY_VALUES: Record<string, string> = Object.fromEntries(
+  [
+    ...fs
+      .readFileSync(path.resolve(__dirname, '../../packages/shared-types/src/platform/feature-keys.ts'), 'utf8')
+      .matchAll(/^\s+([A-Z_]+): '([a-z_]+)',/gm),
+  ].map((m) => [m[1], m[2]]),
+);
+
+/** The feature a `@RequireFeature('x')` or `@RequireFeature(FEATURE_KEYS.X)` on this line names, if any. */
+function requiredFeatureOf(line: string): string | undefined {
+  const literal = line.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
+  if (literal) return literal[1];
+  const constant = line.match(/@RequireFeature\(FEATURE_KEYS\.(\w+)\)/);
+  return constant ? FEATURE_KEY_VALUES[constant[1]] : undefined;
+}
 // Paths resolved from tests/scripts/ (two levels up = repo root).
 const BACKEND_SRC = process.env.BACKEND_SRC || path.resolve(__dirname, '../../apps/backend/src');
 const TESTS_API = process.env.TESTS_API || path.resolve(__dirname, '../api');
@@ -140,8 +157,8 @@ function parseControllerForAudit(filePath: string): EndpointAudit[] {
           ROLE_REGEX.lastIndex = 0;
           if (roles.length > 0) classRoles = roles;
         }
-        const featureMatch = prevLine.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
-        if (featureMatch) classFeatureGate = featureMatch[1];
+        const classFeature = requiredFeatureOf(prevLine);
+        if (classFeature) classFeatureGate = classFeature;
       }
       break;
     }
@@ -188,8 +205,8 @@ function parseControllerForAudit(filePath: string): EndpointAudit[] {
           ROLE_REGEX.lastIndex = 0;
           if (roles.length > 0) methodRoles = roles;
         }
-        const featureMatch = nearby.match(/@RequireFeature\(['"`]([^'"`]+)['"`]\)/);
-        if (featureMatch && j !== i) methodFeatureGate = featureMatch[1];
+        const methodFeature = requiredFeatureOf(nearby);
+        if (methodFeature && j !== i) methodFeatureGate = methodFeature;
       }
 
       const effectiveRoles = methodRoles.length > 0 ? methodRoles : classRoles;

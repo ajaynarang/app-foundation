@@ -7,9 +7,11 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { AdminJobScheduleResponse } from './openapi.responses';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 @Controller('admin/schedules')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 export class AdminSchedulesController {
   constructor(private readonly scheduleManager: ScheduleManagerService) {}
 

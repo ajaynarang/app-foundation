@@ -1,4 +1,6 @@
 import { shutdownTelemetry } from '@appshore/kernel/infrastructure/telemetry/telemetry';
+// Error tracking second, before the app loads (a no-op without SENTRY_DSN).
+import '@appshore/kernel/infrastructure/error-tracking/instrument';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
@@ -126,7 +128,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'Mcp-Session-Id', IDEMPOTENCY_KEY_HEADER],
     // The replay marker and the deprecation headers (ADR "API contract", sections 4 and 5) are readable by a browser.
-    exposedHeaders: ['Mcp-Session-Id', IDEMPOTENT_REPLAYED_HEADER, ...DEPRECATION_HEADERS],
+    // x-request-id lets the web tag an error-tracker event with the id the backend logged under.
+    exposedHeaders: ['Mcp-Session-Id', 'X-Request-Id', IDEMPOTENT_REPLAYED_HEADER, ...DEPRECATION_HEADERS],
     credentials: true, // Allow cookies
   });
 

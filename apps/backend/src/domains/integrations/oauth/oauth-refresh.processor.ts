@@ -5,9 +5,11 @@ import type { QueueJobHandler } from '@appshore/kernel/infrastructure/queue/job-
 import { VendorCircuitBreakerService } from '@appshore/platform/infrastructure/queue/vendor-circuit-breaker.service';
 import { AuthTokenService } from './auth-token.service';
 import { PrismaService } from '@appshore/platform/infrastructure/database/prisma.service';
+import { CronRun } from '@appshore/kernel/infrastructure/queue/job-events';
+import { APP_JOB_NAMES } from '../../../platform-glue/queue/job-names';
 
 /** BullMQ job name for the repeatable OAuth token refresh. */
-const OAUTH_REFRESH_JOB_NAME = 'oauth-refresh';
+const OAUTH_REFRESH_JOB_NAME = APP_JOB_NAMES.BULK_OPS.OAUTH_REFRESH;
 
 interface OAuthRefreshJobData {
   tenantId: number;
@@ -16,8 +18,9 @@ interface OAuthRefreshJobData {
 }
 
 /**
- * Owns `oauth-refresh` on the `bulk-ops` queue. A plain handler — the owning
- * queue dispatcher routes by name. Circuit breaker: the vendor identifier comes
+ * Owns `oauth-refresh` on the `bulk-ops` queue. A plain handler — the BulkOpsQueueProcessor
+ * dispatcher routes by name. Each run refreshes one tenant's integration and is one
+ * `CronRun`. Circuit breaker: the vendor identifier comes
  * from the job payload — when the remote OAuth endpoint is down we stop hammering
  * its IdP while the rest of the queue keeps moving.
  */
@@ -39,6 +42,10 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
       throw new Error(`Vendor circuit open for ${vendor} — deferring OAuth refresh`);
     }
 
+    // Every run, skipped or not, completes a CronRun: the repeatable stays registered (re-enabling needs no restart),
+    // so the expected-interval series stays, and a deliberate skip must not read as a missed cron.
+    const cron = new CronRun(this.logger, OAUTH_REFRESH_JOB_NAME);
+
     // Tenant pause guard
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -46,6 +53,7 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
     });
     if (tenant?.jobsPaused) {
       this.logger.log(`Skipping OAuth refresh — tenant ${tenantId} is paused`);
+      cron.complete({ vendor, skipped: 'tenant jobs paused' });
       return;
     }
 
@@ -57,27 +65,35 @@ export class OAuthRefreshJobHandler implements QueueJobHandler {
 
     if (!config) {
       this.logger.warn(`Integration ${integrationId} not found, skipping refresh`);
+      cron.complete({ vendor, skipped: 'integration not found' });
       return;
     }
 
     if (!config.isEnabled || config.status === 'NOT_CONFIGURED') {
       this.logger.log(`Integration ${integrationId} is disabled/unconfigured, skipping refresh`);
+      cron.complete({ vendor, skipped: 'integration disabled or not configured' });
       return;
     }
 
     try {
       await this.authTokenService.refreshTokens(config.id);
       await this.circuitBreaker.recordSuccess(vendor);
+      cron.succeeded();
+      cron.complete({ vendor });
     } catch (err) {
       const error = err as Error & { nonRetryable?: boolean };
-      this.logger.error(`OAuth refresh failed for ${vendor} tenant ${tenantId}: ${error.message}`);
 
       // Non-retryable errors (e.g. invalid_grant) — don't trip the breaker;
-      // bad credentials aren't a vendor health signal. Also don't re-throw.
+      // bad credentials aren't a vendor health signal. Also don't re-throw: the
+      // run is counted as this tenant's failure.
       if (error.nonRetryable) {
+        cron.failed(tenantId, err);
+        cron.complete({ vendor });
         return;
       }
 
+      // A retryable failure goes back to BullMQ, which logs and reports it as a failed job.
+      this.logger.warn(`OAuth refresh failed for ${vendor} tenant ${tenantId}; BullMQ will retry`);
       await this.circuitBreaker.recordFailure(vendor);
       throw err;
     }

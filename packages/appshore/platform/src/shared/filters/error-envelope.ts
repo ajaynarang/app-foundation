@@ -1,16 +1,25 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Prisma } from '@appshore/db';
 import type { Request, Response } from 'express';
-import { ApiErrorCode, defaultApiErrorCode, type ApiErrorEnvelope, type FieldErrors } from '@app/shared-types';
+import {
+  ApiErrorCode,
+  defaultApiErrorCode,
+  type ApiErrorEnvelope,
+  type FieldErrors,
+  type WorkspaceChoice,
+} from '@app/shared-types';
 import { isZodError, zodFieldErrors } from '@appshore/kernel/shared/errors/api-errors';
 import { isSilentPath } from '@appshore/kernel/infrastructure/logging/log-filter';
+import { toLoggableError, type LoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import { stripQueryString } from '@appshore/kernel/shared/utils/log-redaction';
+import { reportServerError } from '@appshore/kernel/infrastructure/error-tracking/sentry';
 
 /**
  * The one error envelope (ADR "API contract", section 2). Every error body the API sends — from the global
  * filter, a scoped filter that extends it, or a `@Res` / streaming route before its headers are sent — is built
  * here, so the shape and the `code` cannot drift between endpoints. Only these keys are ever emitted:
- * `statusCode, code, detail, fieldErrors?, timestamp, path, method, debugDetail?`. Anything else a thrower
- * attached is dropped. Held by `error-envelope.spec.ts` here and in the backend's architecture specs.
+ * `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path, method, debugDetail?`. Anything else a
+ * thrower attached is dropped; `workspaces` passes only on `WORKSPACE_SELECTION_REQUIRED`. Held by `error-envelope.spec.ts` here and in the backend's architecture specs.
  */
 
 const logger = new Logger('HttpExceptionFilter');
@@ -34,6 +43,8 @@ export interface ErrorShape {
   code: string;
   detail: string;
   fieldErrors?: FieldErrors;
+  /** The workspaces a sign-in matched — only on `WORKSPACE_SELECTION_REQUIRED`. */
+  workspaces?: WorkspaceChoice[];
   /** Technical detail: logged, and sent as `debugDetail` in development only. */
   debugDetail?: string;
 }
@@ -48,7 +59,29 @@ function fieldErrorsOf(value: unknown): FieldErrors | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+/** Only `{ tenantId, name }` string pairs — ids, hashes or anything else a thrower attached never reach the wire. */
+function workspacesOf(value: unknown): WorkspaceChoice[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const choices = value
+    .filter(
+      (entry): entry is WorkspaceChoice =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as WorkspaceChoice).tenantId === 'string' &&
+        typeof (entry as WorkspaceChoice).name === 'string',
+    )
+    .map(({ tenantId, name }) => ({ tenantId, name }));
+  return choices.length > 0 ? choices : undefined;
+}
+
 /** A thrown non-Error, for the log — never itself a reason the filter fails (circular objects, BigInt). */
+/** `toLoggableError`, with a thrown non-Error described as JSON rather than `[object Object]`. */
+function loggableErrorOf(exception: unknown): LoggableError {
+  return exception instanceof Error
+    ? toLoggableError(exception)
+    : { type: typeof exception, message: describe(exception) };
+}
+
 function describe(value: unknown): string {
   try {
     return JSON.stringify(value) ?? String(value);
@@ -82,6 +115,10 @@ function fromHttpException(exception: HttpException): ErrorShape {
     // fieldErrors belong to a 400 only.
     ...(status === HttpStatus.BAD_REQUEST && fieldErrorsOf(body.fieldErrors)
       ? { fieldErrors: fieldErrorsOf(body.fieldErrors) }
+      : {}),
+    // workspaces belong to the login's workspace-selection answer only.
+    ...(code === ApiErrorCode.WORKSPACE_SELECTION_REQUIRED && workspacesOf(body.workspaces)
+      ? { workspaces: workspacesOf(body.workspaces) }
       : {}),
   };
 }
@@ -192,28 +229,33 @@ export function buildErrorEnvelope(exception: unknown, request: Pick<Request, 'u
     code: shape.code,
     detail: shape.detail,
     ...(shape.fieldErrors ? { fieldErrors: shape.fieldErrors } : {}),
+    ...(shape.workspaces ? { workspaces: shape.workspaces } : {}),
     timestamp: new Date().toISOString(),
     path: request.url,
     method: request.method,
   };
   if (process.env.NODE_ENV === 'development' && shape.debugDetail) envelope.debugDetail = shape.debugDetail;
 
-  const line = `${request.method} ${request.url} - Status: ${shape.status} ${shape.code} - ${shape.detail}`;
+  // The path only: the SSE stream, invite and reset links carry their token in the query string (rule 3). The
+  // body keeps `path` as sent, since the client already holds it.
+  const path = stripQueryString(request.url);
+  const line = `${request.method} ${path} - Status: ${shape.status} ${shape.code} - ${shape.detail}`;
+  // The raw exception rides as an `err` field, never flattened into the message (rule 4); the err serializer masks
+  // any email or phone a provider error echoes.
   if (shape.status >= 500) {
-    logger.error(
-      shape.debugDetail ? `${line} (${shape.debugDetail})` : line,
-      exception instanceof Error ? exception.stack : describe(exception),
-    );
-  } else if (!isSilentPath(request.url ?? '')) {
-    logger.warn(shape.debugDetail ? `${line} (${shape.debugDetail})` : line);
+    logger.error({ msg: line, err: loggableErrorOf(exception) });
+  } else if (!isSilentPath(path)) {
+    logger.warn(shape.debugDetail ? { msg: line, err: loggableErrorOf(exception) } : line);
   }
   return envelope;
 }
 
 /**
  * Answer an error with the envelope. The global filter writes through this, and so does a `@Res()` / streaming
- * route that fails before its headers are sent, so this is the one place an error body is written. Returns false —
- * and writes nothing — once headers are out; the caller then ends its stream itself.
+ * route that fails before its headers are sent, so this is the one place an envelope body is written, and where its
+ * 5xx is reported to the error tracker. (The OAuth protocol routes answer RFC 6749 bodies through `OAuthErrorFilter`,
+ * which reports its own 5xx the same way.) Returns false — and writes and reports nothing — once headers are out; the
+ * caller then ends its stream itself.
  */
 export function writeErrorEnvelope(
   response: Response,
@@ -226,5 +268,8 @@ export function writeErrorEnvelope(
   response.removeHeader('Transfer-Encoding');
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.status(envelope.statusCode).json(envelope);
+  // Where an envelope's 5xx reaches the error tracker (docs/standards/observability.md, rule 10): the global filter
+  // and every `@Res` route write through here, so each 5xx is reported once, whichever path wrote it.
+  reportServerError(exception, envelope.statusCode);
   return true;
 }

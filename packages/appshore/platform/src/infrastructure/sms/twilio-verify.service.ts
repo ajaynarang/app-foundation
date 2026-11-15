@@ -1,6 +1,34 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { getEnvType } from '@appshore/kernel/shared/utils/env-type';
 import { ConfigService } from '@nestjs/config';
+import { maskPhone } from '@appshore/kernel/shared/utils/log-redaction';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import {
+  OTP_FAILURE_REASON,
+  recordOtpFailed,
+  type OtpFailureReason,
+} from '@appshore/kernel/infrastructure/telemetry/metrics';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
+
+/** Twilio's per-number limits (max check attempts, max send attempts) and its HTTP 429. */
+const TWILIO_RATE_LIMIT_CODES = new Set([60202, 60203, 20429]);
+/** "Requested resource not found": the verification expired, was used, or never existed. */
+const TWILIO_VERIFICATION_NOT_FOUND = 20404;
+
+/**
+ * Bucket a Twilio failure for `app_otp_failed{reason}`. Only `provider` means "nobody can sign in" and is what the
+ * otp-provider-failures rule watches; a missing verification on check is the person retyping an expired code.
+ */
+export function classifyTwilioOtpError(err: unknown, stage: 'send' | 'check'): OtpFailureReason {
+  const code = Number((err as { code?: unknown } | null)?.code);
+  if (TWILIO_RATE_LIMIT_CODES.has(code)) return OTP_FAILURE_REASON.RATE_LIMITED;
+  if (stage === 'check' && code === TWILIO_VERIFICATION_NOT_FOUND) return OTP_FAILURE_REASON.INVALID;
+  return OTP_FAILURE_REASON.PROVIDER;
+}
 
 @Injectable()
 export class TwilioVerifyService {
@@ -8,7 +36,10 @@ export class TwilioVerifyService {
   private twilioClient: any = null;
   private readonly verifyServiceSid: string | undefined;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
+  ) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
     this.verifyServiceSid = this.configService.get<string>('TWILIO_VERIFY_SERVICE_SID');
@@ -33,7 +64,7 @@ export class TwilioVerifyService {
 
     if (this.mockOtp) {
       this.logger.debug(
-        `[MOCK] OTP for ${phone}: ${this.mockOtp} (mock active — also sending real OTP if Twilio configured)`,
+        `[MOCK] TWILIO_MOCK_OTP is active for ${maskPhone(phone)} (also sending a real OTP if Twilio is configured)`,
       );
     }
 
@@ -44,12 +75,20 @@ export class TwilioVerifyService {
       return;
     }
 
+    // In allowlist mode a number not on the list gets no code (the gate records it). TWILIO_MOCK_OTP, which works
+    // outside production, still signs in.
+    if (!(await this.outboundGate.allowPhone(phone, { source: OUTBOUND_SOURCE.SIGN_IN_CODE }))) {
+      this.logger.log(`Sign-in code to ${maskPhone(phone)} held back by the outbound gate`);
+      return;
+    }
+
     try {
       await this.twilioClient.verify.v2
         .services(this.verifyServiceSid)
         .verifications.create({ to: phone, channel: 'sms' });
     } catch (err: any) {
-      this.logger.error(`Failed to send OTP to ${phone}`, err);
+      recordOtpFailed(classifyTwilioOtpError(err, 'send'));
+      this.logger.error({ msg: `Failed to send OTP to ${maskPhone(phone)}`, err: toLoggableError(err) });
       throw new BadRequestException('Failed to send verification code. Please try again.');
     }
   }
@@ -60,7 +99,7 @@ export class TwilioVerifyService {
     // If mock OTP matches, allow immediately (dev shortcut). NEVER in
     // production — a leaked TWILIO_MOCK_OTP would be a universal login code.
     if (this.mockOtp && code === this.mockOtp && getEnvType() !== 'production') {
-      this.logger.debug(`[MOCK] OTP matched for ${phone}`);
+      this.logger.debug(`[MOCK] OTP matched for ${maskPhone(phone)}`);
       return true;
     }
 
@@ -74,9 +113,12 @@ export class TwilioVerifyService {
       const result = await this.twilioClient.verify.v2
         .services(this.verifyServiceSid)
         .verificationChecks.create({ to: phone, code });
-      return result.status === 'approved';
+      const approved = result.status === 'approved';
+      if (!approved) recordOtpFailed(OTP_FAILURE_REASON.INVALID);
+      return approved;
     } catch (err: any) {
-      this.logger.error(`OTP check failed for ${phone}`, err);
+      recordOtpFailed(classifyTwilioOtpError(err, 'check'));
+      this.logger.error({ msg: `OTP check failed for ${maskPhone(phone)}`, err: toLoggableError(err) });
       return false;
     }
   }

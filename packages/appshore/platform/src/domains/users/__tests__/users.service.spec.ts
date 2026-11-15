@@ -3,12 +3,14 @@ import { NotFoundException, ForbiddenException, BadRequestException } from '@nes
 import { UsersService } from '../users.service';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { USER_LIFECYCLE_HOOKS } from '../../platform-hooks';
+import { TenantEntitlementsService } from '../../entitlements/tenant-entitlements.service';
 import { fixtureModel, tiedTimestamps, walkCursorList } from '../../../test/helpers';
 
 describe('UsersService', () => {
   let service: UsersService;
   let prisma: any;
   let notificationTriggers: any;
+  let entitlements: { assertUserSeatAvailable: jest.Mock };
 
   const mockTenant = { id: 1, tenantId: 'tenant_abc' };
   const mockUser = {
@@ -42,10 +44,13 @@ describe('UsersService', () => {
       userRoleChanged: jest.fn().mockResolvedValue(undefined),
     };
 
+    entitlements = { assertUserSeatAvailable: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: PrismaService, useValue: prisma },
+        { provide: TenantEntitlementsService, useValue: entitlements },
         {
           provide: USER_LIFECYCLE_HOOKS,
           useValue: notificationTriggers,
@@ -233,6 +238,25 @@ describe('UsersService', () => {
       expect(result.role).toBe('SUPER_ADMIN');
     });
 
+    it("takes a seat: checks the workspace's user limit before creating, and creates nothing when it is full", async () => {
+      prisma.tenant.findUnique.mockResolvedValue(mockTenant);
+      entitlements.assertUserSeatAvailable.mockRejectedValue(
+        new ForbiddenException({ code: 'USER_LIMIT_REACHED', detail: 'full' }),
+      );
+
+      await expect(
+        service.createUser({ email: 'a@example.com', firstName: 'A', lastName: 'B', role: 'MEMBER' }, 'tenant_abc'),
+      ).rejects.toMatchObject({ response: { code: 'USER_LIMIT_REACHED' } });
+      expect(entitlements.assertUserSeatAvailable).toHaveBeenCalledWith(1, { route: 'POST /users' });
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('a super-admin takes no seat', async () => {
+      prisma.user.create.mockResolvedValue({ ...mockUser, role: 'SUPER_ADMIN', tenant: null });
+      await service.createUser({ email: 'a@example.com', firstName: 'A', lastName: 'B', role: 'SUPER_ADMIN' });
+      expect(entitlements.assertUserSeatAvailable).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException if tenant not found during create', async () => {
       prisma.tenant.findUnique.mockResolvedValue(null);
 
@@ -380,6 +404,26 @@ describe('UsersService', () => {
       expect(result).toMatchObject({ userId: 'user_1234abcd' });
       expect(result).not.toHaveProperty('message');
       expect(prisma.user.update).toHaveBeenCalledWith({ where: { userId: 'user_1234abcd' }, data: { isActive: true } });
+    });
+
+    it('reactivating an inactive user takes a seat, and is refused when the plan is full', async () => {
+      prisma.user.findUnique.mockResolvedValue({ ...mockUser, isActive: false, tenantId: 1 });
+      entitlements.assertUserSeatAvailable.mockRejectedValue(
+        new ForbiddenException({ code: 'USER_LIMIT_REACHED', detail: 'full' }),
+      );
+
+      await expect(service.toggleUserStatus('user_1234abcd', true)).rejects.toMatchObject({
+        response: { code: 'USER_LIMIT_REACHED' },
+      });
+      expect(entitlements.assertUserSeatAvailable).toHaveBeenCalledWith(1, { route: 'POST /users/:user_id/activate' });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('deactivating never checks seats', async () => {
+      prisma.user.findUnique.mockResolvedValue({ ...mockUser, tenantId: 1 });
+      prisma.user.update.mockResolvedValue({ ...mockUser, isActive: false });
+      await service.toggleUserStatus('user_1234abcd', false);
+      expect(entitlements.assertUserSeatAvailable).not.toHaveBeenCalled();
     });
 
     it('should deactivate a user', async () => {

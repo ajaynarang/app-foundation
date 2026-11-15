@@ -32,6 +32,8 @@ import { UpdateMemoryDto } from './dto/update-memory.dto';
 import { MemoryListQueryDto } from './dto/memory-list-query.dto';
 import { ApiResult } from '@appshore/platform/shared/openapi/api-result';
 import { DeskMemoryListResponse, DeskMemoryPinnedResponse, DeskMemoryRefResponse } from '../../openapi.responses';
+import { RequireFeature } from '@appshore/platform/auth/decorators/require-feature.decorator';
+import { FEATURE_KEYS } from '@app/shared-types';
 
 /**
  * HTTP surface for the Crew → Agent sheet.
@@ -44,6 +46,7 @@ import { DeskMemoryListResponse, DeskMemoryPinnedResponse, DeskMemoryRefResponse
  */
 @ApiTags('Desk — Memory')
 @ApiBearerAuth()
+@RequireFeature(FEATURE_KEYS.DESK)
 @Controller('desk/memories')
 @Roles(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN)
 export class DeskMemoryController extends BaseTenantController {

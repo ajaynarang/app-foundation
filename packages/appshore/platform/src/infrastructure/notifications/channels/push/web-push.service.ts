@@ -1,7 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma.service';
 import * as webpush from 'web-push';
+import { OUTBOUND_CHANNEL, recordOutboundFailed } from '@appshore/kernel/infrastructure/telemetry/metrics';
+import { toLoggableError } from '@appshore/kernel/infrastructure/queue/job-events';
+import {
+  OUTBOUND_GATE,
+  OUTBOUND_SOURCE,
+  type OutboundGate,
+} from '@appshore/kernel/infrastructure/outbound/outbound-gate.port';
 
 interface PushSubscriptionInput {
   endpoint: string;
@@ -17,6 +24,7 @@ export class PushService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Inject(OUTBOUND_GATE) private readonly outboundGate: OutboundGate,
   ) {
     const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
     const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
@@ -29,12 +37,17 @@ export class PushService {
         this.logger.log('Web Push configured with VAPID keys');
       } catch (error: any) {
         this.isConfigured = false;
-        this.logger.warn(`Web Push not configured — invalid VAPID keys: ${error.message}`);
+        this.logger.warn({ msg: 'Web Push not configured — invalid VAPID keys', err: toLoggableError(error) });
       }
     } else {
       this.isConfigured = false;
       this.logger.warn('Web Push not configured — VAPID keys missing');
     }
+  }
+
+  /** True when VAPID keys are set, so a send can reach a browser. */
+  canSend(): boolean {
+    return this.isConfigured;
   }
 
   async saveSubscription(userId: number, tenantId: number, subscription: PushSubscriptionInput) {
@@ -92,8 +105,13 @@ export class PushService {
       this.logger.warn('Push not sent — VAPID not configured');
       return 0;
     }
+    // Outside production only allow-listed users get a push; the gate records the rest (ADR "Outbound gate").
+    if (!(await this.outboundGate.allowUser(userId, { source: OUTBOUND_SOURCE.PUSH_WEB, subject: payload.title }))) {
+      return 0;
+    }
 
     const subscriptions = await this.getSubscriptionsForUser(userId);
+    const body = JSON.stringify({ ...payload, title: this.outboundGate.markPushTitle(payload.title) });
     let delivered = 0;
 
     for (const sub of subscriptions) {
@@ -103,7 +121,7 @@ export class PushService {
             endpoint: sub.endpoint,
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
-          JSON.stringify(payload),
+          body,
         );
         delivered += 1;
       } catch (error: any) {
@@ -111,7 +129,8 @@ export class PushService {
           await this.prisma.pushSubscription.delete({ where: { id: sub.id } });
           this.logger.log(`Removed expired push subscription for user ${userId}`);
         } else {
-          this.logger.error(`Push send failed for user ${userId}: ${error.message}`);
+          recordOutboundFailed(OUTBOUND_CHANNEL.PUSH);
+          this.logger.error({ msg: `Push send failed for user ${userId}`, err: toLoggableError(error) });
         }
       }
     }

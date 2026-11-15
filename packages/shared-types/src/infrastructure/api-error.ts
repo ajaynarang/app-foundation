@@ -13,6 +13,10 @@ export const ApiErrorCode = {
   UNAUTHENTICATED: 'UNAUTHENTICATED',
   /** 403 — signed in but not allowed (role, scope, plan). */
   FORBIDDEN: 'FORBIDDEN',
+  /** 403 — the workspace's plan does not include this feature; the web shows an upgrade prompt with `detail`. */
+  PLAN_UPGRADE_REQUIRED: 'PLAN_UPGRADE_REQUIRED',
+  /** 403 — every seat the plan includes is in use (members plus pending invitations); the web shows an upgrade prompt. */
+  USER_LIMIT_REACHED: 'USER_LIMIT_REACHED',
   /** 404 — missing, or in another tenant (existence is never confirmed across tenants). */
   NOT_FOUND: 'NOT_FOUND',
   /** 405 — the route exists but not for this method. */
@@ -27,6 +31,11 @@ export const ApiErrorCode = {
   IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
   /** 409 — a request with this `Idempotency-Key` is still running; retry once it has finished. */
   IDEMPOTENCY_KEY_IN_USE: 'IDEMPOTENCY_KEY_IN_USE',
+  /**
+   * 409 — the email and password match accounts in more than one workspace; the body's `workspaces` lists them and
+   * the client retries with one `tenantId`. Only duplicate accounts left from before one-account-per-email can cause it.
+   */
+  WORKSPACE_SELECTION_REQUIRED: 'WORKSPACE_SELECTION_REQUIRED',
   /** 413 — the upload or body is too large. */
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   /** 429 — rate limited; `Retry-After` says when to try again. */
@@ -72,6 +81,12 @@ export function defaultApiErrorCode(status: number): ApiErrorCode {
 /** Field name → one user-facing message. Nested fields use dot paths (`items.0.title`). */
 export type FieldErrors = Record<string, string>;
 
+/** One workspace a sign-in can land in: the tenant's public id and its display name. */
+export interface WorkspaceChoice {
+  tenantId: string;
+  name: string;
+}
+
 /** The one error body every non-protocol route answers. No other keys. */
 export interface ApiErrorEnvelope {
   statusCode: number;
@@ -81,6 +96,8 @@ export interface ApiErrorEnvelope {
   detail: string;
   /** Only on 400, when a field is at fault. */
   fieldErrors?: FieldErrors;
+  /** Only on 409 `WORKSPACE_SELECTION_REQUIRED`: the workspaces the sign-in matched. */
+  workspaces?: WorkspaceChoice[];
   timestamp: string;
   path: string;
   method: string;
@@ -97,6 +114,10 @@ export const ApiErrorEnvelopeSchema: z.ZodType<ApiErrorEnvelope> = z.object({
   code: z.string().describe('An ApiErrorCode, or a code one area adds — treat an unknown code by its HTTP status'),
   detail: z.string().describe('User-facing copy — safe to show'),
   fieldErrors: z.record(z.string(), z.string()).optional().describe('Only on 400: field → message'),
+  workspaces: z
+    .array(z.object({ tenantId: z.string().describe("The tenant's public id"), name: z.string() }))
+    .optional()
+    .describe('Only on 409 WORKSPACE_SELECTION_REQUIRED: retry the sign-in with one of these tenantIds'),
   timestamp: z.string().describe('ISO-8601'),
   path: z.string(),
   method: z.string(),
@@ -109,6 +130,7 @@ export const API_ERROR_ENVELOPE_KEYS = [
   'code',
   'detail',
   'fieldErrors',
+  'workspaces',
   'timestamp',
   'path',
   'method',

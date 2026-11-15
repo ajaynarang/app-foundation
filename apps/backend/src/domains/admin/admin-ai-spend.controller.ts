@@ -20,6 +20,7 @@ import {
   AdminAiSpendSurfaceRowResponse,
   AdminAiSpendTenantListResponse,
 } from './openapi.responses';
+import { SystemScope, TargetTenant } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 /**
  * Super-admin AI Spend view. Reads from the `vw_ai_cost_*` views over
@@ -40,6 +41,7 @@ import {
  */
 @Controller('admin/ai-spend')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 @ApiTags('Admin AI Spend')
 @ApiBearerAuth()
 export class AdminAiSpendController {
@@ -62,6 +64,7 @@ export class AdminAiSpendController {
   }
 
   @Get('tenants/:tenant_id/by-surface')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: 'Per-surface AI spend breakdown for one tenant' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
   @ApiResult([AdminAiSpendSurfaceRowResponse])
@@ -70,6 +73,7 @@ export class AdminAiSpendController {
   }
 
   @Get('tenants/:tenant_id/invocations')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: 'List AI invocations for one tenant (cursor-paginated)' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
   @ApiResult(AdminAiSpendInvocationListResponse)
@@ -78,6 +82,7 @@ export class AdminAiSpendController {
   }
 
   @Get('tenants/:tenant_id/budget')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: "Get a tenant's AI cost budget caps" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
   @ApiResult(AdminAiBudgetResponse)
@@ -86,6 +91,7 @@ export class AdminAiSpendController {
   }
 
   @Patch('tenants/:tenant_id/budget')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: "Update a tenant's AI cost budget caps" })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
   @ApiResult(AdminAiBudgetResponse)
@@ -94,6 +100,7 @@ export class AdminAiSpendController {
   }
 
   @Get('tenants/:tenant_id/cost-vs-quota')
+  @TargetTenant('tenant_id')
   @ApiOperation({ summary: 'Cost (USD) vs quota (feature counts) for one tenant, side by side' })
   @ApiParam({ name: 'tenant_id', description: 'Tenant numeric id (listed in id-boundary.allowlist.json)' })
   @ApiResult(AdminAiCostVsQuotaResponse)

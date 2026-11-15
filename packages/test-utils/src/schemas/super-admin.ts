@@ -244,7 +244,7 @@ export const AdminScheduleListSchema = z.array(AdminScheduleRowSchema);
 // ── Common error envelope (shared across all 400 guards) ─────────────
 
 /**
- * The platform's standard error envelope: `statusCode, code, detail, fieldErrors?, timestamp, path, method,
- * debugDetail?`. The global exception filter emits these keys and no others.
+ * The platform's standard error envelope: `statusCode, code, detail, fieldErrors?, workspaces?, timestamp, path,
+ * method, debugDetail?`. The global exception filter emits these keys and no others.
  */
 export const AppErrorEnvelopeSchema = apiErrorEnvelope();

@@ -1,5 +1,6 @@
 import { BadRequestException, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
+import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';
 import { OAuthErrorFilter, oauthError, OAUTH_ERROR } from '../oauth-error.filter';
 
 function hostFor(headersSent = false) {
@@ -65,5 +66,45 @@ describe('OAuthErrorFilter (RFC 6749 §5.2 / RFC 7591 §3.2.2)', () => {
     const { res, host } = hostFor(true);
     filter.catch(new BadRequestException('x'), host);
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  // This filter writes the body on the OAuth routes instead of writeErrorEnvelope, so it is where their 5xx is reported.
+  // reportServerError drops a status under 500 itself (sentry.spec.ts); here each answer passes its own status.
+  describe('error tracking', () => {
+    it('reports a 5xx once with its status, after the body is written', () => {
+      const report = jest.spyOn(errorTracking, 'reportServerError').mockImplementation(() => undefined);
+      const { res, host } = hostFor();
+      const error = new Error('db down');
+
+      filter.catch(error, host);
+
+      expect(res.json).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledTimes(1);
+      expect(report).toHaveBeenCalledWith(error, 500);
+      expect(report.mock.invocationCallOrder[0]).toBeGreaterThan(res.json.mock.invocationCallOrder[0]);
+    });
+
+    it.each([
+      ['a 400', oauthError(OAUTH_ERROR.INVALID_GRANT, 'Code expired'), 400],
+      ['a 401', new UnauthorizedException(), 401],
+      ['a 429', new ThrottlerException(), 429],
+    ])('passes %s on with its client status, which reportServerError drops', (_label, exception, status) => {
+      const report = jest.spyOn(errorTracking, 'reportServerError').mockImplementation(() => undefined);
+      const { host } = hostFor();
+
+      filter.catch(exception, host);
+
+      expect(report.mock.calls).toEqual([[exception, status]]);
+      expect(status).toBeLessThan(500);
+    });
+
+    it('reports nothing once headers are sent', () => {
+      const report = jest.spyOn(errorTracking, 'reportServerError').mockImplementation(() => undefined);
+      const { host } = hostFor(true);
+
+      filter.catch(new Error('db down'), host);
+
+      expect(report).not.toHaveBeenCalled();
+    });
   });
 });

@@ -12,6 +12,7 @@ import {
   AdminDurabilityHealthResponse,
 } from './openapi.responses';
 import { OUTBOX_HEALTH_READER, type OutboxHealthReader } from './outbox-health.reader';
+import { SystemScope } from '@appshore/kernel/infrastructure/rls/system-scope.decorator';
 
 /**
  * Super-admin Timers (ADR "Outbox and deadlines"): every tenant's deadlines and the durability health strip.
@@ -29,6 +30,7 @@ import { OUTBOX_HEALTH_READER, type OutboxHealthReader } from './outbox-health.r
  */
 @Controller('admin/deadlines')
 @Roles(UserRole.SUPER_ADMIN)
+@SystemScope('super-admin')
 @ApiTags('Admin Deadlines')
 @ApiBearerAuth()
 export class AdminDeadlinesController {

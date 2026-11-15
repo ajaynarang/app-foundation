@@ -9,7 +9,7 @@ import { WhatsAppDispatchService } from '../../channels/whatsapp/whatsapp-dispat
 import { NotificationPolicyRegistry } from '../../notification-policy.registry';
 import { CHANNEL_RULES, NOTIFICATION_URGENCIES, policy } from '../../notification-policy';
 import { PrismaService } from '../../../database/prisma.service';
-import { PlansService } from '../../../../domains/plans/plans.service';
+import { TenantEntitlementsService } from '../../../../domains/entitlements/tenant-entitlements.service';
 import { FeatureFlagsService } from '../../../../domains/feature-flags/feature-flags.service';
 
 const TYPE = PlatformNotificationType.USER_INVITATION;
@@ -22,7 +22,7 @@ describe('NotificationDispatcherService', () => {
   const delivery = { deliver: jest.fn() };
   const ledger = { recordOutcomes: jest.fn().mockResolvedValue(undefined) };
   const flags = { isEnabled: jest.fn() };
-  const plans = { getTenantPlan: jest.fn(), isFeatureEnabled: jest.fn() };
+  const entitlements = { hasFeature: jest.fn() };
   const whatsapp = { enqueue: jest.fn().mockResolvedValue(undefined) };
   const recipients = [
     { id: 1, userId: 'u1', firebaseUid: null, email: null, phone: null },
@@ -34,8 +34,7 @@ describe('NotificationDispatcherService', () => {
     jest.clearAllMocks();
     prisma.tenant.findUnique.mockResolvedValue({ tenantId: 'demo', companyName: 'Acme Inc' });
     flags.isEnabled.mockResolvedValue(true);
-    plans.getTenantPlan.mockResolvedValue('PROFESSIONAL');
-    plans.isFeatureEnabled.mockResolvedValue(true);
+    entitlements.hasFeature.mockResolvedValue(true);
     resolution.resolveForAudience.mockImplementation(
       async ({ userIds }: any) =>
         new Map(userIds.map((id: number) => [id, plan([DeliveryChannel.IN_APP, DeliveryChannel.PUSH])])),
@@ -50,7 +49,7 @@ describe('NotificationDispatcherService', () => {
         { provide: NotificationDeliveryService, useValue: delivery },
         { provide: DeliveryLedgerService, useValue: ledger },
         { provide: FeatureFlagsService, useValue: flags },
-        { provide: PlansService, useValue: plans },
+        { provide: TenantEntitlementsService, useValue: entitlements },
         { provide: WhatsAppDispatchService, useValue: whatsapp },
         {
           provide: NotificationPolicyRegistry,
@@ -67,7 +66,7 @@ describe('NotificationDispatcherService', () => {
     await service.dispatch(message);
     expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(1);
     expect(flags.isEnabled).toHaveBeenCalledTimes(1);
-    expect(plans.isFeatureEnabled).toHaveBeenCalledTimes(1);
+    expect(entitlements.hasFeature).toHaveBeenCalledTimes(1);
     expect(delivery.deliver).toHaveBeenCalledTimes(2);
     expect(delivery.deliver.mock.calls[0][0]).toMatchObject({
       tenantSlug: 'demo',
@@ -76,6 +75,26 @@ describe('NotificationDispatcherService', () => {
       whatsappEntitled: true,
       category: NotificationCategory.TEAM,
     });
+  });
+
+  it('asks the one plan rule for whatsapp_notifications by the numeric tenant, strict (log mode never loosens it)', async () => {
+    await service.dispatch(message);
+    expect(entitlements.hasFeature).toHaveBeenCalledWith(7, 'whatsapp_notifications', {
+      strict: true,
+      route: 'notification-dispatch',
+    });
+  });
+
+  it('a tenant whose plan lacks WhatsApp is not entitled', async () => {
+    entitlements.hasFeature.mockResolvedValue(false);
+    await service.dispatch(message);
+    expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEnabled: true, whatsappEntitled: false });
+  });
+
+  it('the entitlement is not read while the channel is switched off', async () => {
+    flags.isEnabled.mockResolvedValue(false);
+    await service.dispatch(message);
+    expect(entitlements.hasFeature).not.toHaveBeenCalled();
   });
 
   it('writes the ledger before enqueueing WhatsApp — the job id is the ledger id', async () => {
@@ -128,7 +147,7 @@ describe('NotificationDispatcherService', () => {
   });
 
   it('a failed entitlement or tenant lookup degrades, never throws', async () => {
-    plans.getTenantPlan.mockRejectedValue(new Error('plans down'));
+    entitlements.hasFeature.mockRejectedValue(new Error('plans down'));
     prisma.tenant.findUnique.mockRejectedValue(new Error('db down'));
     await service.dispatch(message);
     expect(delivery.deliver.mock.calls[0][0]).toMatchObject({ whatsappEntitled: false, tenantName: 'Your workspace' });

@@ -2,7 +2,8 @@
 # pnpm verify — the gate a branch passes before a pull request is opened.
 #
 # CI in this repo is manual-only, so this script is what holds the rules: format check, lint, schema lint,
-# type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), build.
+# type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), the ops
+# checks (`pnpm check:ops`: the Grafana-as-code catalog, ops shell tests, Terraform), build.
 # It stops at the first step that fails and always ends with one result line. Paste that line into the pull
 # request body.
 #
@@ -45,4 +46,6 @@ run "type-check" pnpm type-check
 run "unit tests" pnpm exec turbo run test --filter=!@app/qa
 # The scaffold tools (init-app, apply-feature, check-variants) live outside every workspace package.
 run "init-app tool tests" pnpm test:init-app
+# The operations files that are not Jest specs: the Grafana-as-code catalog, ops shell tests, Terraform.
+run "ops checks" pnpm check:ops
 run "build" pnpm build

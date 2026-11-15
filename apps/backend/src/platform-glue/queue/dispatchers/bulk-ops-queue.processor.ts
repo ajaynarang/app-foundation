@@ -7,7 +7,7 @@ import { DeadLetterService } from '@appshore/platform/infrastructure/queue/dead-
 
 /**
  * The single `WorkerHost` on the `bulk-ops` queue. Routes by job name to the
- * cleanup handlers (data-retention/job-cleanup, uploads-cleanup,
+ * cleanup handlers (data-retention/job-cleanup, tokens-cleanup,
  * login-events-cleanup) — no competing-consumer race.
  */
 @Injectable()

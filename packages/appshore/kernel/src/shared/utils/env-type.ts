@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
+import { ALLOWED_ENV_TYPES, type EnvType } from './env-label';
 
-export type EnvType = 'production' | 'sandbox' | 'preprod' | 'development';
+export type { EnvType, ObservabilityEnv } from './env-label';
+export { isDevelopmentEnv, resolveObservabilityEnv } from './env-label';
 
 let cachedEnvType: EnvType | null = null;
 let warnedStaging = false;
@@ -9,7 +11,6 @@ export function getEnvType(): EnvType {
   if (cachedEnvType) return cachedEnvType;
 
   const raw = process.env.ENV_TYPE?.toLowerCase();
-  const allowed: EnvType[] = ['production', 'sandbox', 'preprod', 'development'];
 
   if (raw === 'staging') {
     if (!warnedStaging) {
@@ -20,7 +21,7 @@ export function getEnvType(): EnvType {
     return cachedEnvType;
   }
 
-  if (raw && (allowed as string[]).includes(raw)) {
+  if (raw && (ALLOWED_ENV_TYPES as readonly string[]).includes(raw)) {
     cachedEnvType = raw as EnvType;
     return cachedEnvType;
   }

@@ -1,38 +1,55 @@
 #!/usr/bin/env bash
 #
-# One-command database migration for local or AWS staging.
+# One-command database migration for local, AWS staging or AWS production.
 #
-# Local:   Runs against the docker-compose Postgres on localhost:5499 (no tunnel).
-# Staging: Opens an SSM tunnel to the staging RDS, runs migrations, tears down.
+# Local:      Runs against the docker-compose Postgres on localhost:5499 (no tunnel).
+# Staging:    Opens an SSM tunnel to the staging RDS (localhost:5433), runs, tears down.
+# Production: The same against the production stack, on its own tunnel port (5434), and only after the operator types
+#             `production`.
 #
 # Usage:
-#   ./db-migrate.sh --env local                # Local: migrate + seed + knowledge base + langfuse
-#   ./db-migrate.sh --env staging              # Staging: tunnel + migrate + seed + langfuse
-#   ./db-migrate.sh --env staging --status     # Just show status
-#   ./db-migrate.sh --env local --migrate-only # Just migrations, no seeds
-#   ./db-migrate.sh --env staging --dry-run    # Show pending, don't apply
-#   ./db-migrate.sh --env staging --yes        # Skip confirmation
-#   ./db-migrate.sh --env local --seed-langfuse # Seed Langfuse prompts only
-#   ./db-migrate.sh --env local --no-langfuse  # Full mode but skip Langfuse
+#   ./migrate.sh --env local                   # Local: migrate + seed + knowledge base + Langfuse
+#   ./migrate.sh --env staging                 # Staging: tunnel + migrate + seed + knowledge base + Langfuse
+#   ./migrate.sh --env staging --status        # Just show status
+#   ./migrate.sh --env local --migrate-only    # Just migrations, no seeds
+#   ./migrate.sh --env staging --dry-run       # Show pending, don't apply
+#   ./migrate.sh --env staging --yes           # Skip the confirmation (staging and local only)
+#   ./migrate.sh --env local --seed-langfuse   # Seed Langfuse prompts only
+#   ./migrate.sh --env local --no-langfuse     # Full mode but skip Langfuse
+#   ./migrate.sh --env production --dry-run    # Production: show pending only
 #
-# Staging credentials:
-#   The staging DATABASE_URL is read from apps/backend/.env.aws.staging.
-#   That file is gitignored. Never hardcode credentials in this script.
-#   The RDS host and port are taken from that URL (RDS_HOST / RDS_PORT in the
-#   environment override them), so nothing here names a real instance.
+# AWS credentials:
+#   DATABASE_URL is read from apps/backend/.env.aws.<staging|production>. Those files are gitignored; never put
+#   credentials in this script. The RDS host and port come from that URL (RDS_HOST / RDS_PORT override them), and
+#   the host must be one of that environment's instances (<project>-<env>-…), so a file copied from the other
+#   environment stops the run. PROJECT is the Terraform `project` variable (default "app").
+#
+# Production safety:
+#   - Every run that writes needs `production` typed, even with --yes. With no terminal (CI) it needs both --yes and
+#     CONFIRM_ENV=production. --status and --dry-run only read.
+#   - Seeds are the base platform seeds (packages/appshore/db/prisma/seeds/index.ts) with ENV_TYPE=production, so no
+#     dev credential is seeded. Never --reset. SUPER_ADMIN_PASSWORD must be set in .env.aws.production.
+#   - Langfuse keys come only from .env.aws.production, never from a laptop's .env.local.
+#   - An existing tunnel on the port is never reused, in any environment: it could point at another database.
+#
+# The jump host is a running task of the API service (<project>-<env>-ecs-service-api), never the worker: the
+# worker's ECS Exec is off. This script never creates, grants or switches to a database role.
 
 set -euo pipefail
 
 # --- Configuration ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CLUSTER="app-staging-ecs-cluster"
-RDS_HOST="${RDS_HOST:-}"
-RDS_PORT="${RDS_PORT:-}"
-TUNNEL_PORT="5433"
-PREFERRED_CONTAINER="worker"
 BACKEND_DIR="$(cd "$TOOLS_DIR/../apps/backend" && pwd)"
 DB_PKG_DIR="$(cd "$TOOLS_DIR/../packages/appshore/db" && pwd)"
+# Seconds to wait after the tunnel's local port opens, while the forwarding path to RDS establishes.
+TUNNEL_SETTLE_SECONDS="${TUNNEL_SETTLE_SECONDS:-3}"
+# shellcheck source=lib/db-env.sh
+source "$SCRIPT_DIR/lib/db-env.sh"
+
+RDS_HOST="${RDS_HOST:-}"
+RDS_PORT="${RDS_PORT:-}"
+TUNNEL_PORT=""
 
 # Local DB config (the docker-compose defaults, as in apps/backend/.env.example)
 LOCAL_DB_PORT="5499"
@@ -43,58 +60,86 @@ TUNNEL_PID=""
 TUNNEL_STARTED_BY_US=false
 DB_URL=""
 ENV=""
+ENV_FILE=""
 
 # --- Parse arguments ---
-MODE="full"       # full | migrate-only | seed-only | seed-langfuse | status | dry-run
+MODE="full" # full | migrate-only | seed-only | seed-langfuse | status | dry-run
 SKIP_CONFIRM=false
 SKIP_LANGFUSE=false
+
+usage() {
+  echo "Usage: $0 --env <local|staging|production> [OPTIONS]"
+  echo ""
+  echo "One-command database migration for local, AWS staging or AWS production."
+  echo ""
+  echo "Required:"
+  echo "  --env local        Target local PostgreSQL (localhost:${LOCAL_DB_PORT})"
+  echo "  --env staging      Target AWS staging RDS (SSM tunnel on localhost:5433)"
+  echo "  --env production   Target AWS production RDS (SSM tunnel on localhost:5434). A run that writes"
+  echo "                     needs 'production' typed; with no terminal, --yes AND CONFIRM_ENV=production."
+  echo ""
+  echo "Options:"
+  echo "  --migrate-only    Apply Prisma migrations only (no seeds)"
+  echo "  --seed-only       Run DB seeds and the knowledge-base sync only (no migrations)"
+  echo "  --seed-langfuse   Seed Langfuse prompts only (no DB changes)"
+  echo "  --no-langfuse     Skip Langfuse seeding in full mode"
+  echo "  --status          Show migration & seed status (read-only)"
+  echo "  --dry-run         Show pending migrations without applying"
+  echo "  --yes, -y         Skip the confirmation prompt (production still needs 'production' typed)"
+  echo "  -h, --help        Show this help"
+  echo ""
+  echo "The tunnel's jump host is a running task of the API service. PROJECT=<name> when the Terraform"
+  echo "project variable is not 'app'."
+  echo ""
+  echo "Examples:"
+  echo "  $0 --env local                    # Full migrate + seed + knowledge base + Langfuse"
+  echo "  $0 --env staging                  # Full on staging (via SSM tunnel)"
+  echo "  $0 --env staging --status         # Check staging status"
+  echo "  $0 --env staging --dry-run        # See pending staging migrations"
+  echo "  $0 --env local --migrate-only     # Only apply local migrations"
+  echo "  $0 --env production --status      # Check production status (read-only)"
+}
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --env)
-      ENV="$2"
+      ENV="${2:-}"
       shift 2
+      ;;
+    --migrate-only)
+      MODE="migrate-only"
+      shift
+      ;;
+    --seed-only)
+      MODE="seed-only"
+      shift
+      ;;
+    --seed-langfuse)
+      MODE="seed-langfuse"
+      shift
+      ;;
+    --no-langfuse)
+      SKIP_LANGFUSE=true
+      shift
+      ;;
+    --status)
+      MODE="status"
+      shift
+      ;;
+    --dry-run)
+      MODE="dry-run"
+      shift
+      ;;
+    --yes | -y)
+      SKIP_CONFIRM=true
+      shift
       ;;
     --container)
-      PREFERRED_CONTAINER="$2"
-      shift 2
+      echo "ERROR: --container is gone. The jump host is always a task of the API service (the worker's ECS Exec is off)."
+      exit 1
       ;;
-    --migrate-only)   MODE="migrate-only"; shift ;;
-    --seed-only)      MODE="seed-only"; shift ;;
-    --seed-langfuse)  MODE="seed-langfuse"; shift ;;
-    --no-langfuse)    SKIP_LANGFUSE=true; shift ;;
-    --status)         MODE="status"; shift ;;
-    --dry-run)        MODE="dry-run"; shift ;;
-    --yes|-y)        SKIP_CONFIRM=true; shift ;;
-    -h|--help)
-      echo "Usage: $0 --env <local|staging> [OPTIONS]"
-      echo ""
-      echo "One-command database migration for local or AWS staging."
-      echo ""
-      echo "Required:"
-      echo "  --env local      Target local PostgreSQL (localhost:5499)"
-      echo "  --env staging    Target AWS staging RDS (via SSM tunnel)"
-      echo ""
-      echo "Options:"
-      echo "  --container NAME  ECS container to use as tunnel jump host (default: worker)"
-      echo "  --migrate-only    Apply Prisma migrations only (no seeds)"
-      echo "  --seed-only       Run DB seeds and the knowledge-base sync only (no migrations)"
-      echo "  --seed-langfuse   Seed Langfuse prompts only (no DB changes)"
-      echo "  --no-langfuse     Skip Langfuse seeding in full mode"
-      echo "  --status          Show migration & seed status (read-only)"
-      echo "  --dry-run         Show pending migrations without applying"
-      echo "  --yes, -y         Skip confirmation prompt"
-      echo "  -h, --help        Show this help"
-      echo ""
-      echo "Examples:"
-      echo "  $0 --env local                    # Full migrate + seed + langfuse"
-      echo "  $0 --env staging                  # Full on staging (via SSM tunnel)"
-      echo "  $0 --env staging --status         # Check staging status"
-      echo "  $0 --env staging --dry-run        # See pending staging migrations"
-      echo "  $0 --env local --migrate-only     # Only apply local migrations"
-      echo "  $0 --env local --seed-langfuse    # Only seed Langfuse prompts"
-      echo "  $0 --env local --no-langfuse      # Full mode, skip Langfuse"
-      echo "  $0 --env staging --container api  # Use api container for tunnel"
+    -h | --help)
+      usage
       exit 0
       ;;
     *)
@@ -106,46 +151,55 @@ done
 
 # --- Validate ---
 if [[ -z "$ENV" ]]; then
-  echo "ERROR: --env is required. Use --env local or --env staging."
+  echo "ERROR: --env is required. Use --env local, staging or production."
   echo "Run $0 --help for usage."
   exit 1
 fi
 
-if [[ "$ENV" != "local" && "$ENV" != "staging" ]]; then
-  echo "ERROR: --env must be 'local' or 'staging' (got: $ENV)"
-  exit 1
-fi
+case "$ENV" in
+  local) ;;
+  staging | production)
+    db_env_configure "$ENV"
+    TUNNEL_PORT="$DB_TUNNEL_PORT"
+    ;;
+  *)
+    echo "ERROR: --env must be 'local', 'staging' or 'production' (got: $ENV)"
+    exit 1
+    ;;
+esac
+
+is_aws_env() { [[ "$ENV" == "staging" || "$ENV" == "production" ]]; }
+writes_seeds() { [[ "$MODE" == "full" || "$MODE" == "seed-only" ]]; }
 
 # --- Set DB URL ---
 if [[ "$ENV" == "local" ]]; then
   DB_URL="$LOCAL_DB_URL"
 else
-  # Read staging DATABASE_URL from .env.aws.staging (credentials stay in that gitignored file)
-  STAGING_ENV_FILE="$BACKEND_DIR/.env.aws.staging"
-  if [[ ! -f "$STAGING_ENV_FILE" ]]; then
-    echo "ERROR: Staging credentials file not found: $STAGING_ENV_FILE"
-    echo "Create it from .env.aws.staging.example or ask a team member."
+  # DATABASE_URL lives in .env.aws.<env> (gitignored); credentials never sit in this script.
+  ENV_FILE="$BACKEND_DIR/$DB_ENV_FILE_NAME"
+  if [[ ! -f "$ENV_FILE" ]]; then
+    echo "ERROR: ${ENV} credentials file not found: $ENV_FILE"
+    echo "Create it with DATABASE_URL=... (from Doppler's ${ENV} config) or ask a team member."
     exit 1
   fi
-  DB_URL=$(grep -E '^DATABASE_URL=' "$STAGING_ENV_FILE" | head -1 | cut -d= -f2- || true)
+  DB_URL=$(db_env_file_value "$ENV_FILE" DATABASE_URL)
   if [[ -z "$DB_URL" ]]; then
-    echo "ERROR: DATABASE_URL not found in $STAGING_ENV_FILE"
+    echo "ERROR: DATABASE_URL not found in $ENV_FILE"
     exit 1
   fi
   # The RDS endpoint comes from the URL itself, so a new or replaced instance needs no edit here.
-  url_part() {
-    DB_URL="$DB_URL" python3 -c "import os, sys, urllib.parse as u; print(getattr(u.urlsplit(os.environ['DB_URL'].strip('\"')), sys.argv[1]) or '')" "$1"
-  }
-  RDS_HOST="${RDS_HOST:-$(url_part hostname)}"
-  RDS_PORT="${RDS_PORT:-$(url_part port)}"
+  RDS_HOST="${RDS_HOST:-$(db_url_part "$DB_URL" hostname)}"
+  RDS_PORT="${RDS_PORT:-$(db_url_part "$DB_URL" port)}"
   RDS_PORT="${RDS_PORT:-5432}"
-  if [[ -z "$RDS_HOST" ]]; then
-    echo "ERROR: Could not read the database host from DATABASE_URL in $STAGING_ENV_FILE (or set RDS_HOST)."
-    exit 1
-  fi
+  db_check_host "$RDS_HOST" || exit 1
 fi
 
-# --- cd into backend once (all commands run from here) ---
+# Production seeding never falls back to a known super-admin password. Checked before anything is touched.
+if [[ "$ENV" == "production" ]] && writes_seeds; then
+  db_require_seed_password "$ENV_FILE" || exit 1
+fi
+
+# --- All prisma and seed commands run from the db package ---
 cd "$DB_PKG_DIR"
 
 # --- Cleanup handler ---
@@ -177,13 +231,21 @@ header() {
   echo "=========================================="
   echo "  Environment: ${ENV}"
   echo "  Mode:        ${MODE}"
-  if [[ "$ENV" == "staging" ]]; then
+  if is_aws_env; then
+    echo "  Cluster:     ${DB_CLUSTER}"
+    echo "  Jump host:   ${DB_API_SERVICE}"
     echo "  RDS:         ${RDS_HOST}"
     echo "  Tunnel:      localhost:${TUNNEL_PORT}"
   else
     echo "  Database:    localhost:${LOCAL_DB_PORT}/app"
   fi
   echo "=========================================="
+  if [[ "$ENV" == "production" ]]; then
+    echo ""
+    echo "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "  !!   PRODUCTION — real customer data           !!"
+    echo "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  fi
   echo ""
 }
 
@@ -207,73 +269,19 @@ check_local_db() {
   echo "  Local database ready."
 }
 
-check_tunnel_already_running() {
-  if lsof -i ":${TUNNEL_PORT}" &>/dev/null; then
-    if port_ready 127.0.0.1 "$TUNNEL_PORT"; then
-      echo "  Tunnel already running on port ${TUNNEL_PORT} — reusing it."
-      TUNNEL_STARTED_BY_US=false
-      return 0
-    else
-      echo "WARNING: Port ${TUNNEL_PORT} is in use but not responding as PostgreSQL."
-      echo "Kill the process on that port or use a different port."
-      exit 1
-    fi
-  fi
-  return 1
-}
-
 start_tunnel() {
   echo "Starting SSM tunnel..."
+  local target_info task_id runtime_id container_name target
+  target_info=$(db_find_api_task) || exit 1
+  read -r task_id runtime_id container_name <<<"$target_info"
+  target="ecs:${DB_CLUSTER}_${task_id}_${runtime_id}"
 
-  TASK_ARNS=$(aws ecs list-tasks \
-    --cluster "$CLUSTER" \
-    --desired-status RUNNING \
-    --query 'taskArns[*]' \
-    --output text 2>&1)
+  echo "  Container: ${container_name} (task: ${task_id}, service: ${DB_API_SERVICE})"
 
-  if [[ -z "$TASK_ARNS" || "$TASK_ARNS" == "None" ]]; then
-    echo "ERROR: No running tasks in cluster ${CLUSTER}"
-    exit 1
-  fi
-
-  TASKS_JSON=$(aws ecs describe-tasks \
-    --cluster "$CLUSTER" \
-    --tasks $TASK_ARNS \
-    --query 'tasks[?lastStatus==`RUNNING`].{taskId:taskArn,containers:containers[*].{name:name,runtimeId:runtimeId}}' \
-    --output json)
-
-  # Pass preferred container as env var to avoid shell injection into Python
-  TARGET_INFO=$(echo "$TASKS_JSON" | PREFERRED="$PREFERRED_CONTAINER" python3 -c "
-import json, sys, os
-tasks = json.load(sys.stdin)
-preferred = os.environ['PREFERRED']
-for task in tasks:
-    task_id = task['taskId'].split('/')[-1]
-    for container in task['containers']:
-        if container['name'] == preferred and container['runtimeId']:
-            print(f\"{task_id} {container['runtimeId']} {container['name']}\")
-            sys.exit(0)
-for task in tasks:
-    task_id = task['taskId'].split('/')[-1]
-    for container in task['containers']:
-        if container['runtimeId']:
-            print(f\"{task_id} {container['runtimeId']} {container['name']}\")
-            sys.exit(0)
-print('ERROR', file=sys.stderr)
-sys.exit(1)
-")
-
-  TASK_ID=$(echo "$TARGET_INFO" | awk '{print $1}')
-  RUNTIME_ID=$(echo "$TARGET_INFO" | awk '{print $2}')
-  CONTAINER_NAME=$(echo "$TARGET_INFO" | awk '{print $3}')
-  TARGET="ecs:${CLUSTER}_${TASK_ID}_${RUNTIME_ID}"
-
-  echo "  Container: ${CONTAINER_NAME} (task: ${TASK_ID})"
-
-  SSM_LOG="/tmp/ssm-tunnel-$$.log"
+  SSM_LOG="$(mktemp -t ssm-tunnel.XXXXXX)"
 
   aws ssm start-session \
-    --target "$TARGET" \
+    --target "$target" \
     --document-name AWS-StartPortForwardingSessionToRemoteHost \
     --parameters "{\"host\":[\"${RDS_HOST}\"],\"portNumber\":[\"${RDS_PORT}\"],\"localPortNumber\":[\"${TUNNEL_PORT}\"]}" \
     >"$SSM_LOG" 2>&1 &
@@ -282,11 +290,11 @@ sys.exit(1)
   TUNNEL_STARTED_BY_US=true
 
   echo -n "  Waiting for tunnel"
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     if port_ready 127.0.0.1 "$TUNNEL_PORT"; then
       # port_ready passes as soon as session-manager-plugin binds locally,
       # but the forwarding path to RDS needs a moment to fully establish
-      sleep 3
+      sleep "$TUNNEL_SETTLE_SECONDS"
       echo " ready!"
       return 0
     fi
@@ -315,8 +323,8 @@ sys.exit(1)
 
 run_migrate_status() {
   echo "--- Migration Status ---"
-  DATABASE_URL="$DB_URL" pnpm exec prisma migrate status 2>&1 \
-    | grep -v "^Loaded\|^Prisma schema\|^Datasource\|^$" || true
+  DATABASE_URL="$DB_URL" pnpm exec prisma migrate status 2>&1 |
+    grep -v "^Loaded\|^Prisma schema\|^Datasource\|^$" || true
   echo ""
 }
 
@@ -340,11 +348,17 @@ run_migrate_deploy() {
   echo ""
 }
 
+# The base platform seeds. In production ENV_TYPE=production makes dev-credentials.ts seed no known password, and
+# SUPER_ADMIN_PASSWORD (checked above) is the super-admin's. Never --reset.
 run_seeds() {
   echo "--- Running Seeds ---"
   local exit_code=0
-  DATABASE_URL="$DB_URL" pnpm exec ts-node prisma/seeds/index.ts 2>&1 \
-    | grep -v "^\[dotenv" || exit_code=$?
+  local -a seed_env=(env "DATABASE_URL=$DB_URL")
+  if [[ "$ENV" == "production" ]]; then
+    seed_env+=(ENV_TYPE=production)
+  fi
+  "${seed_env[@]}" pnpm exec ts-node prisma/seeds/index.ts 2>&1 |
+    grep -v "^\[dotenv" || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
     echo ""
@@ -360,8 +374,8 @@ run_seeds() {
 run_seed_knowledge() {
   echo "--- Syncing Knowledge Base ---"
   local exit_code=0
-  (cd "$BACKEND_DIR" && DATABASE_URL="$DB_URL" pnpm seed:knowledge) 2>&1 \
-    | grep -v "^\[dotenv" || exit_code=$?
+  (cd "$BACKEND_DIR" && DATABASE_URL="$DB_URL" pnpm seed:knowledge) 2>&1 |
+    grep -v "^\[dotenv" || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
     echo ""
@@ -373,39 +387,41 @@ run_seed_knowledge() {
 
 run_seed_status() {
   echo "--- Seed Status ---"
-  DATABASE_URL="$DB_URL" pnpm exec ts-node prisma/seeds/index.ts --status 2>&1 \
-    | grep -v "^\[dotenv" || true
+  DATABASE_URL="$DB_URL" pnpm exec ts-node prisma/seeds/index.ts --status 2>&1 |
+    grep -v "^\[dotenv" || true
 }
-
 
 run_seed_langfuse() {
   echo "--- Seeding Langfuse Prompts ---"
 
-  # Load Langfuse keys from env files
-  # Priority: .env.aws.staging (staging) → .env.local (secrets) → .env (base URL)
+  # Keys: .env.aws.<env> for an AWS environment, then .env.local (secrets), then .env (base URL). Production reads
+  # ONLY .env.aws.production: falling back to a laptop's .env.local would seed production prompts into the wrong
+  # Langfuse project.
   local env_local="$BACKEND_DIR/.env.local"
   local env_base="$BACKEND_DIR/.env"
-  local env_staging="$BACKEND_DIR/.env.aws.staging"
 
   local secret_key="" public_key="" base_url=""
 
-  # For staging, try .env.aws.staging first
-  if [[ "$ENV" == "staging" && -f "$env_staging" ]]; then
-    secret_key=$(grep -E '^LANGFUSE_SECRET_KEY=' "$env_staging" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    public_key=$(grep -E '^LANGFUSE_PUBLIC_KEY=' "$env_staging" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    base_url=$(grep -E '^LANGFUSE_BASE_URL=' "$env_staging" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+  if is_aws_env && [[ -f "$ENV_FILE" ]]; then
+    secret_key=$(db_env_file_value "$ENV_FILE" LANGFUSE_SECRET_KEY)
+    public_key=$(db_env_file_value "$ENV_FILE" LANGFUSE_PUBLIC_KEY)
+    base_url=$(db_env_file_value "$ENV_FILE" LANGFUSE_BASE_URL)
   fi
 
-  # Fall back to .env.local
+  if [[ "$ENV" == "production" && (-z "$secret_key" || -z "$public_key" || -z "$base_url") ]]; then
+    echo "  WARNING: LANGFUSE_SECRET_KEY / LANGFUSE_PUBLIC_KEY / LANGFUSE_BASE_URL missing from $ENV_FILE"
+    echo "  Skipping Langfuse seed for production (no fallback to local keys)."
+    return 0
+  fi
+
   if [[ -z "$secret_key" && -f "$env_local" ]]; then
-    secret_key=$(grep -E '^LANGFUSE_SECRET_KEY=' "$env_local" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    public_key=$(grep -E '^LANGFUSE_PUBLIC_KEY=' "$env_local" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    base_url=$(grep -E '^LANGFUSE_BASE_URL=' "$env_local" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    secret_key=$(db_env_file_value "$env_local" LANGFUSE_SECRET_KEY)
+    public_key=$(db_env_file_value "$env_local" LANGFUSE_PUBLIC_KEY)
+    base_url=$(db_env_file_value "$env_local" LANGFUSE_BASE_URL)
   fi
 
-  # Fall back to .env for base URL
   if [[ -z "$base_url" && -f "$env_base" ]]; then
-    base_url=$(grep -E '^LANGFUSE_BASE_URL=' "$env_base" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
+    base_url=$(db_env_file_value "$env_base" LANGFUSE_BASE_URL)
   fi
 
   if [[ -z "$secret_key" || -z "$public_key" ]]; then
@@ -417,9 +433,9 @@ run_seed_langfuse() {
   local exit_code=0
   (cd "$BACKEND_DIR" &&
     LANGFUSE_SECRET_KEY="$secret_key" \
-    LANGFUSE_PUBLIC_KEY="$public_key" \
-    LANGFUSE_BASE_URL="$base_url" \
-    npx tsx scripts/seed-langfuse-prompts.ts) 2>&1 || exit_code=$?
+      LANGFUSE_PUBLIC_KEY="$public_key" \
+      LANGFUSE_BASE_URL="$base_url" \
+      npx tsx scripts/seed-langfuse-prompts.ts) 2>&1 || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
     echo ""
@@ -430,6 +446,13 @@ run_seed_langfuse() {
 }
 
 confirm_proceed() {
+  if [[ "$ENV" == "production" ]]; then
+    echo ""
+    echo "  You are about to modify the PRODUCTION database (${RDS_HOST})."
+    db_confirm_production "$SKIP_CONFIRM" || exit 1
+    return 0
+  fi
+
   if [[ "$SKIP_CONFIRM" == true ]]; then
     return 0
   fi
@@ -451,25 +474,15 @@ header
 
 # Langfuse-only mode doesn't need DB connectivity
 if [[ "$MODE" != "seed-langfuse" ]]; then
-  if [[ "$ENV" == "staging" ]]; then
+  if is_aws_env; then
     check_aws_session
-    if ! check_tunnel_already_running; then
-      start_tunnel
-    fi
+    db_require_free_port "$TUNNEL_PORT" || exit 1
+    start_tunnel
     # Point DB_URL at the local SSM tunnel instead of the private RDS host.
-    # The URL is parsed, not pattern-matched: it may carry no port, a host in
-    # another case, or a host that differs from an RDS_HOST override.
-    TUNNEL_DB_URL=$(DB_URL="$DB_URL" python3 -c "
-import os, sys, urllib.parse as u
-parts = u.urlsplit(os.environ['DB_URL'].strip().strip('\"'))
-if not parts.scheme or not parts.hostname:
-    sys.exit(1)
-userinfo, at, _ = parts.netloc.rpartition('@')
-print(u.urlunsplit(parts._replace(netloc=userinfo + at + '127.0.0.1:' + sys.argv[1])))
-" "$TUNNEL_PORT" || true)
+    TUNNEL_DB_URL=$(db_tunnel_url "$DB_URL" "$TUNNEL_PORT" || true)
     if [[ -z "$TUNNEL_DB_URL" || "$TUNNEL_DB_URL" == "$DB_URL" ]]; then
       echo "ERROR: Could not point DATABASE_URL at the tunnel (127.0.0.1:${TUNNEL_PORT})."
-      echo "Check the DATABASE_URL in $STAGING_ENV_FILE: expected postgresql://user:password@host[:port]/db."
+      echo "Check the DATABASE_URL in $ENV_FILE: expected postgresql://user:password@host[:port]/db."
       exit 1
     fi
     DB_URL="$TUNNEL_DB_URL"
@@ -509,6 +522,7 @@ case "$MODE" in
     ;;
 
   seed-langfuse)
+    if [[ "$ENV" == "production" ]]; then confirm_proceed; fi
     run_seed_langfuse
     echo "Done. Langfuse prompts seeded."
     ;;
