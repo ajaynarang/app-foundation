@@ -10,14 +10,16 @@ import { ToolNames } from '../../agent-contract/tool-names.constants';
 import { idempotencyKeyArg } from '../../agent-contract/tool-idempotency';
 
 /**
- * Example tool pair: a read and a write over the existing support desk, showing every rule a product's own tools
- * follow. Both call `SupportService`; neither adds a model.
+ * Example tools: a read and two writes over the existing support desk, showing every rule a product's own tools
+ * follow. All call `SupportService`; none adds a model. `reply-to-support-ticket` is also the act of the reference
+ * Desk job (`support_followup`), when Desk is kept.
  *
  * - Each method declares `@RequiresScope`; the write's scope (`platform:write`) makes it a write everywhere: chat
  *   offers `confirm-action` and runs it only against the person's confirmed card, an external agent is challenged,
  *   MCP clients see it as not read-only.
- * - The write declares `@RestrictToRoles` with the same roles as its REST twin (`POST /support/tickets`).
- * - The write is a create with no natural key, so it declares `idempotencyKey: idempotencyKeyArg`: an agent that
+ * - Each write declares `@RestrictToRoles` with the same roles as its REST twin (`POST /support/tickets`,
+ *   `POST /support/tickets/:id/messages`).
+ * - Each write is a create with no natural key, so it declares `idempotencyKey: idempotencyKeyArg`: an agent that
  *   retries with the same key and arguments gets the first ticket back instead of a second one. The executor takes
  *   the key out before the method runs, so the method never sees it.
  * - Identity comes only from the server-injected `_tenantId` / `_userDbId`; the schemas take no tenant or user field,
@@ -26,7 +28,8 @@ import { idempotencyKeyArg } from '../../agent-contract/tool-idempotency';
  *   message to an agent.
  *
  * Safe to delete. To remove it: delete this file, remove `SupportTicketTool` (and `SupportModule`, if nothing else
- * needs it) from `mcp-tools.module.ts`, and remove the two `*_SUPPORT_TICKET*` entries from `tool-names.constants.ts`.
+ * needs it) from `mcp-tools.module.ts`, and remove the `*_SUPPORT_TICKET*` entries from `tool-names.constants.ts`. The
+ * reference Desk job goes with it: delete its folder and its registrations (listed in that folder's `definition.ts`).
  */
 interface ServerArgs {
   _tenantId: number;
@@ -118,5 +121,31 @@ export class SupportTicketTool {
       priority: params.priority,
     });
     return { created: true, ticket: TICKET_SUMMARY(ticket) };
+  }
+
+  @RequiresScope('platform:write')
+  @RestrictToRoles([UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER])
+  @Tool({
+    name: ToolNames.REPLY_TO_SUPPORT_TICKET,
+    description:
+      'Add a reply to one of this workspace’s own support tickets, on behalf of the user. Use it to answer a question from support or to ask for an update on a ticket that has gone quiet. Confirm the wording with the user first. Returns the ticket number and when the reply was posted.',
+    parameters: z.object({
+      ticketNumber: z.string().trim().min(1).max(20).describe('The ticket to reply on, for example ST-1001'),
+      content: z.string().trim().min(1).max(10_000).describe('The reply, as plain text'),
+      idempotencyKey: idempotencyKeyArg,
+    }),
+    annotations: {
+      readOnlyHint: false,
+      idempotentHint: false,
+    },
+  })
+  async replyToSupportTicket(params: { ticketNumber: string; content: string } & ServerArgs) {
+    const message = await this.support.addMessageByTicketNumber(
+      params._tenantId,
+      params.ticketNumber,
+      params._userDbId,
+      params.content,
+    );
+    return { replied: true, ticketNumber: params.ticketNumber, postedAt: message.createdAt };
   }
 }

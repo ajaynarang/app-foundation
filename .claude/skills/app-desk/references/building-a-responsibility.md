@@ -4,6 +4,8 @@ requires: desk
 sources:
   - apps/backend/src/domains/desk/responsibilities/index.ts
   - apps/backend/src/domains/desk/responsibilities/definition.types.ts
+  - apps/backend/src/domains/desk/responsibilities/support-followup/definition.ts#SUPPORT_FOLLOWUP_DEFINITION
+  - apps/backend/src/domains/desk/responsibilities/support-followup/workflow/support-followup.function.ts#supportFollowupHandler
   - apps/backend/src/domains/desk/shared-steps/outcomes.ts#DESK_OUTCOMES
   - apps/backend/src/domains/desk/shared-steps/_llm-step.helper.ts#runStructuredLlmStep
   - apps/backend/src/domains/desk/core/types/enums.ts#TRUST_LEVEL_CONFIDENCE_THRESHOLDS
@@ -48,8 +50,36 @@ domains/desk/
     ├── coming-soon.ts                     ← COMING_SOON stubs (UI only)
     ├── desk-bootstrap.service.ts          ← seeds desk_responsibilities rows per tenant
     ├── desk-prompt.registrar.ts           ← prompt registration
-    └── <your-key>/                        ← definition, steps/, workflow/, prompts/, adapters
+    ├── support-followup/                  ← THE REFERENCE JOB: copy its shape
+    │   ├── definition.ts                  ← what the job is; lists every file and registration
+    │   ├── schemas.ts                     ← conditions + perceive/decide/draft outputs (Zod)
+    │   ├── fan-out.ts                     ← the sensor: which records need a run
+    │   ├── preflight.ts                   ← checks with no model, before any LLM cost
+    │   ├── steps/                         ← hydrate, perceive, decide, draft
+    │   ├── prompts/                       ← one system prompt per model step, and their names
+    │   ├── conditions-evaluator.ts        ← the hard rules the gate applies under ASSISTED
+    │   ├── workflow/                      ← the Inngest function and its spec
+    │   ├── approval-adapter.ts            ← what the approval sheet shows
+    │   └── reinforcement-judge.ts         ← did the close agree with a memory it used
+    └── <your-key>/                        ← the same files, for your job
 ```
+
+## The reference job
+
+`support_followup` finds support tickets the workspace opened that nobody has replied on for a few days, drafts a
+short follow-up, and posts it on the ticket through the `reply-to-support-ticket` tool: asking first under
+SUPERVISED, and acting without asking under ASSISTED when the operator's rules and the confidence allow. It is real
+and it is safe to delete (its `definition.ts` lists what to remove). What it shows that a copy must keep:
+
+- **The code picks the steps.** The model returns a state, a choice from a fixed list, and wording. It never names
+  a tool or a record.
+- **The record is pinned from hydrate.** The draft schema has no ticket field, and an operator's edit can change the
+  wording only; the spec proves both.
+- **The schemas and prompt names live in the job's folder**, not in shared-types or `PROMPT_NAMES`, so a product
+  scaffolded without Desk loses them with the folder.
+- **The act is retry-safe.** The execute step passes an `idempotencyKey` built from the episode and the draft
+  number, so a retried step posts once.
+- **Text from the record is fenced as data** in what the model is shown (`steps/user-message.ts`).
 
 ## The task spine (every responsibility has these)
 
@@ -59,7 +89,7 @@ domains/desk/
 2. Outcome vocabulary — add to `DESK_OUTCOMES` + `TERMINAL_STATUS_BY_OUTCOME` in `shared-steps/outcomes.ts` (or reuse an existing outcome).
 3. Fan-out (TDD) — a pure tenant-scoped Prisma query returning the work items. Cheap; per-item enrichment happens in hydrate.
 4. step.types + conditions-evaluator (TDD) + reinforcement-judge (TDD) — the judge is a decision table mapping memory polarity × closing transition → CONFIRM/CONTRADICT/NEUTRAL.
-5. Prompts — perceive/decide/draft prompt files + `PROMPT_NAMES` entries (`domains/prompting/prompting.types.ts`) + registrar wiring (`desk-prompt.registrar.ts`).
+5. Prompts — perceive/decide/draft prompt files + a `prompts/index.ts` map of name → text in the job's folder + registrar wiring (`desk-prompt.registrar.ts`).
 6. Steps — hydrate (load entity + memory + preflight; resolve recipient/contact; **pin recipient/entity id**) + perceive(`fast`)/decide(`standard`)/draft(`standard`) via `runStructuredLlmStep()`.
 7. Workflow + spec — the Inngest function covering all terminal paths (preflight abort/skip, no-action, gate→execute→close, approve/edited/reject/expired/retry-cap, auto-escalate). Add the typed `DeskEvents['app/desk.<key>.run']` entry in `core/inngest/inngest.client.ts`.
 8. Approval adapter (TDD) — the decision-sheet payload (artifact, header, summary, context bullets, confidence) built from episode steps, so the approval UI renders it without responsibility-specific UI code.
@@ -77,11 +107,12 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 1. `desk/responsibilities/<key>/definition.ts` (new) + `desk/responsibilities/index.ts` (registry array — order = UI card order).
 2. `desk/responsibilities/coming-soon.ts` — remove the stub if promoting one.
 3. `desk/shared-steps/outcomes.ts` — new outcome (if any).
-4. `desk/core/inngest/inngest.controller.ts` — register the workflow function.
+4. `desk/core/inngest/desk-inngest-functions.ts` — add the workflow function to the served list.
 5. `desk/core/inngest/inngest.client.ts` — typed `DeskEvents['app/desk.<key>.run']` entry.
 6. `desk/core/trigger/trigger.service.ts` — `run<Key>ForTenant` method + `runByKey` case + the fan-out import.
 7. `desk/core/approval/approval-enrichment.service.ts` — the enrich() branch.
-8. `desk/responsibilities/desk-prompt.registrar.ts` + `domains/prompting/prompting.types.ts` `PROMPT_NAMES`.
+8. `desk/responsibilities/desk-prompt.registrar.ts` and `apps/backend/scripts/seed-langfuse-prompts.ts` (inside its
+   `feature:desk` block), from a `prompts/index.ts` map in the job's folder. Keep the names out of `PROMPT_NAMES`.
 9. Shared types export if the schemas live in `@app/shared-types`.
 
 > Because every responsibility touches the same registration files, **concurrent PRs conflict additively (keep-both)**. Ship one at a time, or note it in the PR and rebase keep-both.
@@ -96,6 +127,9 @@ These are the additive, keep-both-on-conflict files. Edit all that apply:
 - **Calendar dates** (`@db.Date`): never `new Date(dateOnlyString)` (off-by-one across timezones). Format the raw string or use a UTC-safe helper.
 - **Desk steps run in Inngest workers, not HTTP** — throw plain `Error`, not NestJS exceptions. MCP tools return `{ error }`, never throw.
 - **Auto-escalate terminal failures to a distinct close step** — Inngest memoizes completed steps, so reusing the same step id for the failure path can silently suppress human review.
+- **A spec that imports the served function list loads every workflow's real steps**, which reach the Langfuse client
+  (ESM-only under Jest). Stub it with `jest.mock('langfuse', …)` as `desk-inngest-functions.spec.ts` does; a workflow's
+  own spec mocks its step modules instead.
 - **Registry-shape specs** may hardcode the AVAILABLE-responsibility count or use a COMING_SOON key as a "no-evaluator" example — update those; it's an expected change, not a regression.
 - **Bootstrap lifecycle flip:** existing tenants' rows go COMING_SOON → AVAILABLE via the bootstrap upsert; they stay `enabled: false` (operator must toggle the card on). No migration.
 - **After ANY rebase, re-run `pnpm backend:prisma:generate` + shared-types build** in the worktree — otherwise you chase phantom type errors from other merged PRs (a stale generated client looks exactly like a real failure).

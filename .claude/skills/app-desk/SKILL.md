@@ -9,7 +9,7 @@ requires: desk
 
 # Desk — add a new Desk responsibility
 
-The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engine: autonomous "responsibilities" run as Inngest-orchestrated episodes with human-in-the-loop approval, trust levels, and memory. The starter ships ONE no-op example (`welcome`) and an **empty registry** — this skill turns a responsibility idea into a shipped, reviewed PR.
+The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engine: autonomous "responsibilities" run as Inngest-orchestrated episodes with human-in-the-loop approval, trust levels, and memory. The starter ships one real job to copy, **`support_followup`** (a follow-up on a support ticket that has gone quiet), beside a no-op `welcome`. This skill turns a responsibility idea into a shipped, reviewed PR.
 
 **Announce at start:** "Using app-desk to plan and ship the `<key>` responsibility."
 
@@ -23,7 +23,10 @@ The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engi
   task spine, the registration touchpoints and the hard-won gotchas. The plan and the executor both need it.
 - The **`app-conventions`** skill for every backend rule a responsibility's code follows (its index, then the
   reference for the area you touch), plus the Desk rules and the full architecture below.
-- `apps/backend/src/domains/desk/responsibilities/index.ts` — the registry, with the `welcome` example and the add-a-responsibility checklist in its doc comment.
+- **The reference job**, `apps/backend/src/domains/desk/responsibilities/support-followup/`. Start at `definition.ts`: its
+  header lists every file of a job and every place a job is registered. Then read `workflow/support-followup.function.ts`
+  (the order of steps and every way an episode ends) and its spec. A new job mirrors this folder file for file.
+- `apps/backend/src/domains/desk/responsibilities/index.ts` — the registry and the add-a-responsibility checklist in its doc comment.
 - `apps/backend/src/domains/desk/responsibilities/definition.types.ts` — the `ResponsibilityDefinition` contract (the spec).
 
 ### Desk rules (the summary)
@@ -32,6 +35,10 @@ The Desk domain (`apps/backend/src/domains/desk/`) is a durable AI workflow engi
 - The gate algorithm (`core/gate/gate.algorithm.ts`) is pure and job-blind; per-responsibility conditions ride in through
   the definition's `conditionsEvaluator`.
 - Trust thresholds are single-source in shared-types (`TRUST_LEVEL_CONFIDENCE_THRESHOLDS`); never inline them.
+- A job is a **workflow**: the code picks the steps, in a fixed order. The model fills in perceive, decide and draft; it
+  never chooses which tool runs or on what record. The trust level decides ask or act, inside the shared gate step.
+- A tool's confirmation tier has one rule, `hitlTierForScope` in shared-types. The gate (`decideGate`) and the tool
+  pipeline (`HitlPolicyService.resolveTier`) both call it; never restate the tier rules in a job.
 - Responsibilities call existing domain services through MCP tools in the execute step; never duplicate business logic.
   Every Desk tool call runs through the one tool pipeline (the `app-conventions` reference
   [`ai-tools.md`](../app-conventions/references/ai-tools.md)): the plan check runs for a Desk duty, the role check and
@@ -130,7 +137,7 @@ Sensor/actuator is the law: existing engines and services DETECT; the responsibi
 
 Invoke **`app-plan`** with the responsibility brief + the research findings. The plan MUST:
 
-- Name the reference responsibility (or the `welcome` example) to mirror file-for-file.
+- Name the reference job (`support-followup/`) as the one to mirror file-for-file, and say where the new job differs.
 - Contain **complete code for the novel files** (schemas, fan-out, conditions-evaluator, definition) and **exact deltas + reference pointers** for the template-mirroring files (steps, workflow, adapters, registration).
 - Flag every **verification read** (Prisma field names, tool param names, service signatures) the executor must do before writing.
 - List the **registration touchpoints** and use the **task spine**, both in

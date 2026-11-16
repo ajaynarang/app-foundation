@@ -4,7 +4,7 @@ import { MCP_TOOL_METADATA_KEY, Tool, type McpRegistryDiscoveryService } from '@
 import { z } from 'zod';
 import { TenantPlan, UserRole } from '@appshore/db';
 import { TenantEntitlementsService } from '@appshore/platform/domains/entitlements/tenant-entitlements.service';
-import { fromApiKey, fromOAuthUser, fromUser } from '@appshore/platform/auth/agent-principal';
+import { fromApiKey, fromDeskResponsibility, fromOAuthUser, fromUser } from '@appshore/platform/auth/agent-principal';
 import { InvocationPipelineService } from '../../../agent-contract/invocation-pipeline.service';
 import { ScopeRegistryService } from '../../../agent-contract/scope-registry.service';
 import { HitlPolicyService } from '../../../agent-contract/hitl-policy.service';
@@ -60,7 +60,7 @@ function mcpRegistryFor(...classes: Array<new (...args: never[]) => object>): Mc
 }
 
 describe('example tool pair through the whole pipeline', () => {
-  const support = { listTicketsForTenant: jest.fn(), createTicket: jest.fn() };
+  const support = { listTicketsForTenant: jest.fn(), createTicket: jest.fn(), addMessageByTicketNumber: jest.fn() };
   const prisma = {
     user: { findUnique: jest.fn() },
     workspaceMember: { findUnique: jest.fn() },
@@ -293,5 +293,61 @@ describe('example tool pair through the whole pipeline', () => {
     expect(res.isError).toBe(true);
     expect(body(res)).toEqual({ error: TOOL_FAILED_MESSAGE, code: 'TOOL_FAILED' });
     expect(audit.completeError).toHaveBeenCalled();
+  });
+
+  describe('reply-to-support-ticket', () => {
+    const replyArgs = { ticketNumber: 'ST-1001', content: 'Any update on this?' };
+    const posted = { messageId: 'm-1', createdAt: new Date('2026-11-16T00:00:00Z') };
+    /** The principal Desk's execute step builds for the reference job: its tools' scopes, acting for the supervisor. */
+    const desk = () =>
+      fromDeskResponsibility({ responsibilityId: 3, tenantId: 7, scopes: ['platform:write'], enabledByUserId: 99 });
+
+    beforeEach(() => {
+      support.addMessageByTicketNumber.mockResolvedValue(posted);
+    });
+
+    it('a Desk duty runs it with no challenge (Desk gated it already), as the supervisor, in its own tenant', async () => {
+      const res = await pipeline.run(desk(), 'reply-to-support-ticket', { ...replyArgs, _tenantId: 999, _userDbId: 1 });
+
+      expect(res.isError).toBeFalsy();
+      expect(body(res)).toMatchObject({ replied: true, ticketNumber: 'ST-1001' });
+      expect(support.addMessageByTicketNumber).toHaveBeenCalledWith(7, 'ST-1001', 99, 'Any update on this?');
+      expect(challenges.issue).not.toHaveBeenCalled();
+      expect(challenges.consumeChatGrant).not.toHaveBeenCalled();
+    });
+
+    it('a Desk retry with the same key posts the reply once', async () => {
+      const keyed = { ...replyArgs, idempotencyKey: 'desk:e1:0' };
+      const first = await pipeline.run(desk(), 'reply-to-support-ticket', keyed);
+      const retry = await pipeline.run(desk(), 'reply-to-support-ticket', keyed);
+
+      expect(retry).toEqual(first);
+      expect(support.addMessageByTicketNumber).toHaveBeenCalledTimes(1);
+    });
+
+    it('a Desk duty that was not granted the scope is refused', async () => {
+      const readOnly = fromDeskResponsibility({
+        responsibilityId: 3,
+        tenantId: 7,
+        scopes: ['platform:read'],
+        enabledByUserId: 99,
+      });
+      const res = await pipeline.run(readOnly, 'reply-to-support-ticket', replyArgs);
+      expect(body(res).error).toBe('scope_denied');
+      expect(support.addMessageByTicketNumber).not.toHaveBeenCalled();
+    });
+
+    it('a person in chat must confirm it first, like any write', async () => {
+      challenges.consumeChatGrant.mockResolvedValue(null);
+      const res = await pipeline.run(member(), 'reply-to-support-ticket', replyArgs);
+      expect(body(res)).toMatchObject({ status: 'confirmation_required', tool: 'reply-to-support-ticket' });
+      expect(support.addMessageByTicketNumber).not.toHaveBeenCalled();
+    });
+
+    it('an empty reply is VALIDATION_FAILED and nothing runs', async () => {
+      const res = await pipeline.run(desk(), 'reply-to-support-ticket', { ticketNumber: 'ST-1001', content: '  ' });
+      expect(body(res)).toMatchObject({ code: 'VALIDATION_FAILED', fieldErrors: { content: expect.any(String) } });
+      expect(support.addMessageByTicketNumber).not.toHaveBeenCalled();
+    });
   });
 });

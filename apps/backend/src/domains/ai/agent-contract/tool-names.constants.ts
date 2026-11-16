@@ -24,6 +24,7 @@ export const ToolNames = {
   // ─── Example pair (support-ticket.tool.ts; safe to delete) ───────────────
   LIST_SUPPORT_TICKETS: 'list-support-tickets',
   CREATE_SUPPORT_TICKET: 'create-support-ticket',
+  REPLY_TO_SUPPORT_TICKET: 'reply-to-support-ticket',
 } as const;
 
 export type ToolName = (typeof ToolNames)[keyof typeof ToolNames];

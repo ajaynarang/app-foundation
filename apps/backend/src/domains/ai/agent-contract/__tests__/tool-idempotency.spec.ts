@@ -9,7 +9,7 @@ import { IDEMPOTENCY_KEY_ARG, declaresIdempotencyKey, idempotencyKeyArg } from '
  * honours. A new create tool belongs on this list, or on `NATURAL_KEY_CREATES` with the reason its natural key is
  * enough.
  */
-const IDEMPOTENT_CREATE_TOOLS: string[] = [ToolNames.CREATE_SUPPORT_TICKET];
+const IDEMPOTENT_CREATE_TOOLS: string[] = [ToolNames.CREATE_SUPPORT_TICKET, ToolNames.REPLY_TO_SUPPORT_TICKET];
 
 /** A create whose own unique field already makes a retry harmless. Tool name, then the reason. */
 const NATURAL_KEY_CREATES: Record<string, string> = {};

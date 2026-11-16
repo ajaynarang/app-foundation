@@ -34,8 +34,8 @@ removed. Everything cross-cutting remains and works:
 
 <!-- feature:desk:start -->
 
-- **Desk** — Inngest durable workflow engine for background AI agents (empty responsibility registry). Optional:
-  chosen at scaffold time, off by default.
+- **Desk** — Inngest durable workflow engine for background AI agents, with one reference job to copy
+  (`support_followup`). Optional: chosen at scaffold time, off by default.
 
 <!-- feature:desk:end -->
 
@@ -143,7 +143,8 @@ tests/         — Playwright QA suite (@app/qa)
 
 <!-- feature:desk:start -->
 
-With Desk: `desk/` is the Inngest durable workflow engine (**empty responsibility registry**).
+With Desk: `desk/` is the Inngest durable workflow engine. It ships one reference job,
+`responsibilities/support-followup/` (a follow-up on a quiet support ticket): copy its shape for your own.
 
 <!-- feature:desk:end -->
 
@@ -197,7 +198,8 @@ bind to app implementations.
 
 <!-- feature:desk:start -->
 
-- **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`.
+- **Desk responsibilities:** add to the registry in `apps/backend/src/domains/desk/responsibilities/`; copy the
+  reference job `support-followup/` (its `definition.ts` lists every file and every registration).
 
 <!-- feature:desk:end -->
 

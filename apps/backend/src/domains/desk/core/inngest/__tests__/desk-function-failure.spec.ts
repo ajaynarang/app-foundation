@@ -1,3 +1,6 @@
+// The function list now includes a real workflow, whose steps reach the Langfuse client (ESM-only under Jest).
+jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
+
 import { Logger } from '@nestjs/common';
 import { Inngest, internalEvents } from 'inngest';
 import * as errorTracking from '@appshore/kernel/infrastructure/error-tracking/sentry';

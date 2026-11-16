@@ -998,6 +998,23 @@ each tenant; a tenant with no embedding route is indexed for full-text only.
 **To turn it back.** Return an empty list from the seam file and run `pnpm search:rebuild`: it deletes every row of
 a type that is no longer registered.
 
+## 23. A second example write tool, `reply-to-support-ticket`; one function for a tool's confirmation tier
+
+**What changed.**
+
+- **New tool `reply-to-support-ticket`** (scope `platform:write`, `@RestrictToRoles(MEMBER, ADMIN, OWNER)` like
+  `POST /support/tickets/:id/messages`) in `mcp/tools/support-ticket.tool.ts`. It takes a ticket number and the
+  reply, finds the ticket inside the caller's tenant (`SupportService.addMessageByTicketNumber`), and accepts the
+  optional `idempotencyKey`. An API key or OAuth client that already holds `platform:write` can call it; an external
+  agent is challenged and a chat user confirms, like any write.
+- **`hitlTierForScope(scope)`** in `@app/shared-types` is now the one rule that turns a scope into a confirmation
+  tier (`none`, `standard`, `sensitive`). `HitlPolicyService.resolveTier` and the workflow engine's gate both call
+  it. Behaviour is unchanged: the two already agreed, and a spec now holds them together for every scope. The
+  `HitlTier` type moved there too; `hitl-policy.service.ts` still exports it.
+
+**What to do.** Nothing. If you copied the tier rules into your own code, call `hitlTierForScope` instead. If you
+deleted the example support tools, drop the new method when you take this change.
+
 ## Deploy order for `ai_reader`
 
 Section 21's migration, `drop_ai_reader_role`, revokes the role's grants and drops it. Tasks on code from before

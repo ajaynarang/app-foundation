@@ -23,10 +23,11 @@ import { CATEGORIZER_FALLBACK, SKILL_CLASSIFIER_FALLBACK } from '../src/domains/
 // Desk prompts: registered as in-memory fallbacks on module init, but also
 // seeded to LangFuse here so PromptingService.verifyPromptAvailability() stops
 // warning at boot and operators can edit them in the LangFuse UI. The starter
-// ships only the generic memory-extract default; per-responsibility step
-// prompts are seeded by each responsibility as it ships.
+// ships the generic memory-extract default and the reference job's step
+// prompts; each responsibility adds its own as it ships.
 import { DESK_MEMORY_EXTRACT_PROMPT } from '../src/domains/desk/core/memory/prompts/memory-extract.prompt';
 import { AGENT_SYSTEM_PROMPTS } from '../src/domains/desk/responsibilities/agent-system-prompts';
+import { SUPPORT_FOLLOWUP_STEP_PROMPTS } from '../src/domains/desk/responsibilities/support-followup/prompts';
 // feature:desk:end
 import { PROMPT_NAMES } from '../src/domains/prompting/prompting.types';
 
@@ -82,6 +83,7 @@ async function seed() {
   const deskPrompts: Record<string, string> = {
     [PROMPT_NAMES.DESK_MEMORY_EXTRACT]: DESK_MEMORY_EXTRACT_PROMPT,
     ...AGENT_SYSTEM_PROMPTS,
+    ...SUPPORT_FOLLOWUP_STEP_PROMPTS,
   };
 
   for (const [name, prompt] of Object.entries(deskPrompts)) {

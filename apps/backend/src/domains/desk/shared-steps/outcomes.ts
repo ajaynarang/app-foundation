@@ -26,6 +26,9 @@ export const DESK_OUTCOMES = {
   // its own terminal outcome strings. Add yours here so a typo is a compile
   // error, not a silent fallthrough.
   COMPLETED: 'completed',
+
+  // ── support_followup (the reference job) ────────────────────────────
+  FOLLOWUP_SENT: 'followup_sent',
 } as const;
 
 export type DeskOutcome = (typeof DESK_OUTCOMES)[keyof typeof DESK_OUTCOMES];
@@ -43,6 +46,7 @@ export type DeskOutcome = (typeof DESK_OUTCOMES)[keyof typeof DESK_OUTCOMES];
  */
 export const TERMINAL_STATUS_BY_OUTCOME: Partial<Record<DeskOutcome, CloseInput['terminalStatus']>> = {
   [DESK_OUTCOMES.COMPLETED]: 'RESOLVED',
+  [DESK_OUTCOMES.FOLLOWUP_SENT]: 'RESOLVED',
   [DESK_OUTCOMES.NO_ACTION_NEEDED]: 'RESOLVED',
   [DESK_OUTCOMES.ESCALATED_TO_HUMAN]: 'ESCALATED',
   [DESK_OUTCOMES.REJECTED_BY_OPERATOR]: 'REJECTED_BY_OPERATOR',

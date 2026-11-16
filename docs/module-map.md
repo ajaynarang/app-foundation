@@ -57,9 +57,9 @@ web:      @appshore/kernel ← @appshore/web-core ← apps/web        (@app/ui i
 
 <!-- feature:desk:start -->
 
-| Folder          | Owns                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| `domains/desk/` | Desk, the durable workflow engine for background AI agents (empty responsibility registry) |
+| Folder          | Owns                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| `domains/desk/` | Desk, the durable workflow engine for background AI agents, and its reference job (`support_followup`) |
 
 Desk is wired in only through `platform-glue/features/desk.feature.ts`. It imports `ai` and `prompting`; nothing
 imports Desk except that seam (`optional-features.spec.ts`).

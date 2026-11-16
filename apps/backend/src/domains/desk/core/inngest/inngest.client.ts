@@ -13,14 +13,21 @@ import type { ApprovalDecision } from '@app/shared-types';
  */
 export type DeskEvents = {
   /** Example responsibility-start event for the shipped `welcome`
-   * responsibility. Add one `.run` event per responsibility you build; `id`
-   * carries the dedupe key so Inngest rejects duplicates (matches the
-   * Postgres partial unique index on `desk_episodes(tenant_id, dedupe_key)
-   * WHERE status in open). */
+   * responsibility. Add one `.run` event per responsibility you build. */
   'app/desk.welcome.run': {
     data: {
       episodeId: string;
       tenantId: number;
+      idempotencyKey: string;
+    };
+  };
+  /** Starts one run of the reference job (`support_followup`) for one ticket. `ticketNumber` is carried for the
+   * Inngest dashboard; the workflow reads the ticket from the episode. */
+  'app/desk.support_followup.run': {
+    data: {
+      episodeId: string;
+      tenantId: number;
+      ticketNumber: string;
       idempotencyKey: string;
     };
   };
@@ -74,9 +81,12 @@ export class InngestClientService implements OnModuleInit {
   }
 
   /**
-   * Publish a strongly-typed Desk event. `id` (idempotency key) should be
-   * the same dedupe key we store on desk_episodes so the runtime, Inngest,
-   * and Postgres agree on "one open episode per entity".
+   * Publish a strongly-typed Desk event. For a run event, pass an `id` built
+   * from the episode id (see `TriggerService.runSupportFollowupForTenant`):
+   * one episode gets one run, and a retried send is dropped by Inngest.
+   * Postgres already keeps "one open episode per entity" (the partial unique
+   * index on the dedupe key), so the event id must not repeat that key: a
+   * second episode for the same entity would never run.
    *
    * Type parameter enforces that `data` matches the declared shape for that
    * event name — DeskEvents is the single source of truth for payloads.

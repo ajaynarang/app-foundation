@@ -2,6 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { DeskEpisodeStepKind } from '@appshore/db';
 
 import type { ApprovalArtifact, ApprovalDecisionHeader } from '../types';
+import { buildSupportFollowupApprovalPayload } from '../../responsibilities/support-followup/approval-adapter';
+import { SUPPORT_FOLLOWUP_KEY } from '../../responsibilities/support-followup/step.types';
+import type {
+  DecideOutput,
+  DraftOutput,
+  HydrateOutput,
+  PerceiveOutput,
+} from '../../responsibilities/support-followup/step.types';
 
 /**
  * Computes the canonical approval-sheet payload (artifact, decisionHeader,
@@ -9,11 +17,11 @@ import type { ApprovalArtifact, ApprovalDecisionHeader } from '../types';
  * list. Runs at read time so we don't have to migrate the DeskApproval table or
  * recompute on every workflow iteration.
  *
- * This is an extension point. The starter ships an EMPTY responsibility
- * registry, so `enrich()` returns the empty payload for every key and the UI
- * falls back to raw-action rendering. When you add a responsibility, branch on
- * `input.responsibilityKey` here and build its artifact from the step outputs
- * (use the `pickStepOutput` helper below).
+ * This is an extension point. A responsibility with no adapter gets the empty
+ * payload and the UI falls back to raw-action rendering. When you add a
+ * responsibility, branch on `input.responsibilityKey` here and build its
+ * artifact from the step outputs (use the `pickStepOutput` helper below), the
+ * way the reference job (`support_followup`) does.
  */
 @Injectable()
 export class ApprovalEnrichmentService {
@@ -22,18 +30,21 @@ export class ApprovalEnrichmentService {
    * Returns the payload as a plain object suitable for spreading onto the
    * ApprovalRecord shape.
    */
-  enrich(_input: {
+  enrich(input: {
     responsibilityKey: string;
     proposedAction: Record<string, unknown>;
     steps: readonly StepOutputLite[];
   }): EnrichedApprovalPayload {
-    // No responsibilities registered — every approval renders from the raw
-    // proposed action. Register per-responsibility adapters here, e.g.:
-    //
-    //   if (_input.responsibilityKey === 'welcome') {
-    //     const hydrate = pickStepOutput<MyHydrate>(_input.steps, DeskEpisodeStepKind.HYDRATE);
-    //     return buildWelcomeApprovalPayload({ hydrate, proposedAction: _input.proposedAction });
-    //   }
+    if (input.responsibilityKey === SUPPORT_FOLLOWUP_KEY) {
+      return buildSupportFollowupApprovalPayload({
+        hydrate: pickStepOutput<HydrateOutput>(input.steps, DeskEpisodeStepKind.HYDRATE),
+        perceive: pickStepOutput<PerceiveOutput>(input.steps, DeskEpisodeStepKind.PERCEIVE),
+        decide: pickStepOutput<DecideOutput>(input.steps, DeskEpisodeStepKind.DECIDE),
+        draft: pickStepOutput<DraftOutput>(input.steps, DeskEpisodeStepKind.DRAFT),
+        proposedAction: input.proposedAction,
+      });
+    }
+    // No adapter for this key: the approval renders from the raw proposed action.
     return EMPTY_PAYLOAD;
   }
 }

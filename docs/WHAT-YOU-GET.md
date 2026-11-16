@@ -87,7 +87,8 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 <!-- feature:desk:start -->
 
 - **Desk**: durable agent workflow engine on Inngest (episodes, approvals, memory,
-  suppression) with one sample responsibility (`welcome`). Chosen at scaffold time; off by default.
+  suppression) with one real job to copy: a follow-up on a support ticket that has gone quiet
+  (`support_followup`). Chosen at scaffold time; off by default.
 
 <!-- feature:desk:end -->
 
