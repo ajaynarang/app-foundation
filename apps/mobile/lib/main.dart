@@ -97,7 +97,10 @@ class _HomeShellState extends State<_HomeShell> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) {
+          setState(() => _tab = i);
+          widget.auth.loadUserIfMissing();
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.confirmation_number_outlined), label: 'Tickets'),
           NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), label: 'Status'),

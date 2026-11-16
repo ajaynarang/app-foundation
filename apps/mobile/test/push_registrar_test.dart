@@ -1,30 +1,11 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:app_mobile/features/push/push_messaging.dart';
 import 'package:app_mobile/features/push/push_registrar.dart';
 
 import 'helpers.dart';
-
-class FakeMessaging implements PushMessaging {
-  FakeMessaging({this.allowed = true, this.token = 'token-1'});
-
-  final bool allowed;
-  String? token;
-  final refreshed = StreamController<String>.broadcast();
-
-  @override
-  Future<bool> requestPermission() async => allowed;
-
-  @override
-  Future<String?> getToken() async => token;
-
-  @override
-  Stream<String> get onTokenRefresh => refreshed.stream;
-}
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
@@ -52,6 +33,7 @@ void main() {
       'POST {"token":"token-2","platform":"ios"}',
       'DELETE {"token":"token-2"}',
     ]);
+    expect(messaging.token, isNull, reason: 'the token is killed on the device too');
   });
 
   test('does nothing when notifications are refused', () async {

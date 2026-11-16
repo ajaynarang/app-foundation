@@ -72,7 +72,10 @@ router yet. The rules marked "when you add" describe code that does not exist ye
 - `flutter analyze` is clean and `flutter test` is green before every commit (`pnpm mobile:test`); `pnpm verify`
   runs both as its `mobile` step. [guard: script:verify:mobile]
 - Layers point one way: widget → state (a controller) → repository → `ApiClient`. A widget never calls the HTTP
-  client, parses JSON or holds business logic in `build`. [review-only: no Dart spec reads imports]
+  client, parses JSON or holds business logic in `build`. A screen with one read and no paging may keep that read's
+  state in its own `State` and call the repository from there (`TicketDetailScreen`). `lib/features/status/` predates
+  these rules (it calls `ApiClient` and casts in the widget): bring it in line when you next change it.
+  [review-only: no Dart spec reads imports]
 - A feature is a folder under `lib/features/<area>/` with its repository, its state and its screens; a widget two
   features share goes in `lib/widgets/`. [review-only: needs reading]
 - Every controller and subscription is disposed; after every `await`, check `if (!mounted) return;` before touching
@@ -123,9 +126,10 @@ router yet. The rules marked "when you add" describe code that does not exist ye
 ### Push
 
 - Notification permission is asked after sign-in, not at cold boot. The device token goes to
-  `POST /notifications/devices` after sign-in and on every token change, and is removed with `DELETE` before
-  sign-out, while the session can still authorize it. A failed registration never blocks the app.
-  [guard: apps/mobile/test/push_registrar_test.dart]
+  `POST /notifications/devices` after sign-in and on every token change. At sign-out it is removed with `DELETE`
+  before the session ends, while the request can still be authorized, and then deleted on the device, so a sign-out
+  with no connection still stops that account's notifications. A failed registration never blocks the app.
+  [guard: apps/mobile/test/push_registrar_test.dart, apps/mobile/test/app_test.dart]
 - `firebase_messaging` stays on 16.x while the backend takes an FCM registration token: 17 moves to installation
   ids. [review-only: a version pin]
 

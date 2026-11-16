@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:app_mobile/core/api_client.dart';
+import 'package:app_mobile/features/push/push_messaging.dart';
 
 /// A JSON answer. `refreshCookie` adds the Set-Cookie the API sends with a new session.
 http.Response jsonResponse(int status, Object? body, {String? refreshCookie, String? reasonPhrase}) {
@@ -50,3 +52,23 @@ Map<String, Object?> ticketJson(int id, {String status = 'OPEN', List<Object?>? 
   'createdAt': '2026-11-12T00:00:00.000Z',
   if (messages != null) 'messages': messages,
 };
+
+class FakeMessaging implements PushMessaging {
+  FakeMessaging({this.allowed = true, this.token = 'token-1'});
+
+  final bool allowed;
+  String? token;
+  final refreshed = StreamController<String>.broadcast();
+
+  @override
+  Future<bool> requestPermission() async => allowed;
+
+  @override
+  Future<String?> getToken() async => token;
+
+  @override
+  Stream<String> get onTokenRefresh => refreshed.stream;
+
+  @override
+  Future<void> deleteToken() async => token = null;
+}

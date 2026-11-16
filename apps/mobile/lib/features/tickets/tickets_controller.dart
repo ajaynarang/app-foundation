@@ -18,31 +18,41 @@ class TicketsController extends ChangeNotifier {
   bool loading = true;
   bool loadingMore = false;
 
-  /// The last failure's copy, cleared by the next success.
+  /// The last load's failure copy; cleared when the next load starts.
   String? error;
 
   String? _nextCursor;
   bool _disposed = false;
 
+  // Bumped by every refresh: a page asked for before the refresh belongs to the old list and is dropped.
+  int _generation = 0;
+
   bool get hasMore => _nextCursor != null;
 
   /// Loads the first page again. Rows already on screen stay there if it fails.
-  Future<void> refresh() => _load(null);
+  Future<void> refresh() {
+    _generation++;
+    return _load(null);
+  }
 
   Future<void> loadMore() async {
     if (hasMore && !loadingMore) await _load(_nextCursor);
   }
 
   Future<void> _load(String? cursor) async {
+    final generation = _generation;
     cursor == null ? loading = items.isEmpty : loadingMore = true;
+    error = null;
     _notify();
     try {
       final page = await _repository.list(cursor: cursor);
+      if (generation != _generation) return;
       items = cursor == null ? page.items : [...items, ...page.items];
       total = page.total;
       _nextCursor = page.nextCursor;
       error = null;
     } on ApiException catch (e) {
+      if (generation != _generation) return;
       error = e.message;
     }
     loading = false;

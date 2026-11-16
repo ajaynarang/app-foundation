@@ -45,7 +45,8 @@ Push goes through Firebase Cloud Messaging on both platforms (APNs through FCM o
 the same Firebase project (`FIREBASE_*` in `apps/backend/.env.example`).
 
 1. In the Firebase console, add an Android app and an iOS app to the project the backend uses. Use the app's bundle
-   id and application id.
+   id and application id. Set your own first: the iOS bundle id (`PRODUCT_BUNDLE_IDENTIFIER` in
+   `ios/Runner.xcodeproj`) is not renamed by `init-app`.
 2. Pass the four values from each app's settings to its build. The app id differs per platform:
 
    ```bash

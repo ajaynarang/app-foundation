@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:app_mobile/features/auth/auth_controller.dart';
 import 'package:app_mobile/features/auth/auth_repository.dart';
+import 'package:app_mobile/features/push/push_registrar.dart';
 import 'package:app_mobile/main.dart';
 
 import 'helpers.dart';
@@ -42,10 +43,15 @@ Future<http.Response> backend(http.Request r) async {
   return jsonResponse(204, null);
 }
 
-Future<AuthController> pumpApp(WidgetTester tester, Future<http.Response> Function(http.Request) handler) async {
+Future<AuthController> pumpApp(
+  WidgetTester tester,
+  Future<http.Response> Function(http.Request) handler, {
+  FakeMessaging? messaging,
+}) async {
   final api = apiAnswering(handler);
   final auth = AuthController(api, AuthRepository(api));
-  await tester.pumpWidget(CompanionApp(api: api, auth: auth));
+  final push = messaging == null ? null : PushRegistrar(api, messaging, platform: 'ios');
+  await tester.pumpWidget(CompanionApp(api: api, auth: auth, push: push));
   await auth.restore();
   await tester.pumpAndSettle();
   return auth;
@@ -136,5 +142,86 @@ void main() {
     await tester.tap(find.text('Ticket 4'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
+  });
+
+  testWidgets('Sign out deregisters push while still signed in, then revokes the session', (tester) async {
+    final calls = <String>[];
+    await pumpApp(tester, (r) async {
+      final path = r.url.path.replaceFirst('/api/v1', '');
+      if (path == '/notifications/devices' || path == '/auth/logout') {
+        calls.add('${r.method} $path ${r.headers['Authorization']}');
+      }
+      return backend(r);
+    }, messaging: FakeMessaging());
+    await signIn(tester);
+
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Olive Owner'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(calls, [
+      'POST /notifications/devices Bearer a',
+      'DELETE /notifications/devices Bearer a',
+      'POST /auth/logout Bearer a',
+    ]);
+    expect(find.text('Welcome back'), findsOneWidget);
+  });
+
+  testWidgets('an email in several workspaces picks one and signs in to it', (tester) async {
+    final bodies = <String>[];
+    await pumpApp(tester, (r) async {
+      if (!r.url.path.endsWith('/auth/login')) return backend(r);
+      bodies.add(r.body);
+      if (r.body.contains('tenantId')) return backend(r);
+      return jsonResponse(409, {
+        'statusCode': 409,
+        'code': 'WORKSPACE_SELECTION_REQUIRED',
+        'detail': 'This email signs in to more than one workspace. Choose the one you want.',
+        'workspaces': [
+          {'tenantId': 'acme', 'name': 'Acme'},
+          {'tenantId': 'globex', 'name': 'Globex'},
+        ],
+      });
+    });
+    await signIn(tester);
+    expect(find.text('Choose a workspace'), findsOneWidget);
+
+    await tester.tap(find.text('Globex'));
+    await tester.pumpAndSettle();
+    expect(bodies, hasLength(2));
+    expect(bodies.last, contains('"tenantId":"globex"'));
+    expect(find.text('Support tickets'), findsOneWidget);
+  });
+
+  testWidgets('the list loads the next page as it scrolls; a failed page retries and a refresh recovers', (
+    tester,
+  ) async {
+    var page2Fails = true;
+    Map<String, Object?> page(int from, int to, String? next) => {
+      'items': [for (var i = from; i <= to; i++) ticketJson(i)],
+      'nextCursor': next,
+      'total': 3,
+    };
+    await pumpApp(tester, (r) async {
+      if (!r.url.path.endsWith('/support/tickets')) return backend(r);
+      if (r.url.queryParameters['cursor'] == null) return jsonResponse(200, page(1, 2, 'c2'));
+      return page2Fails
+          ? jsonResponse(500, {'statusCode': 500, 'detail': 'Something went wrong on our side.'})
+          : jsonResponse(200, page(3, 3, null));
+    });
+    await signIn(tester);
+
+    // Page 2 was asked for as soon as its row was built, and failed: the row offers Try again, the rows stay.
+    expect(find.text('Ticket 2'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+
+    // A refresh that works clears the failure; the row must ask for page 2 again by itself.
+    page2Fails = false;
+    await tester.drag(find.text('Ticket 1'), const Offset(0, 400));
+    await tester.pumpAndSettle();
+    expect(find.text('Ticket 3'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
   });
 }

@@ -106,30 +106,19 @@ class _TicketRow extends StatelessWidget {
 
 /// The last row while more pages exist: it asks for the next page when it scrolls into view, and turns into a
 /// Try again button if that page fails.
-class _MoreRow extends StatefulWidget {
+class _MoreRow extends StatelessWidget {
   const _MoreRow({required this.controller});
 
   final TicketsController controller;
 
   @override
-  State<_MoreRow> createState() => _MoreRowState();
-}
-
-class _MoreRowState extends State<_MoreRow> {
-  @override
-  void initState() {
-    super.initState();
-    // Built means scrolled into view. After the frame: loading notifies listeners, which must not happen in build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.controller.error == null) {
-        widget.controller.loadMore();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final c = widget.controller;
+    final c = controller;
+    // Built means scrolled into view. Asked on every build, not once: the row outlives a failed page and a
+    // refresh. After the frame, because loading notifies listeners, which must not happen during build.
+    if (c.error == null && !c.loadingMore) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => c.loadMore());
+    }
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Center(

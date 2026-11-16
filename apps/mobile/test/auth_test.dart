@@ -1,5 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:app_mobile/core/api_client.dart';
 import 'package:app_mobile/features/auth/auth_controller.dart';
@@ -46,15 +47,39 @@ void main() {
     expect(auth.user, isNull);
   });
 
+  test('starting with no network keeps the stored session', () async {
+    FlutterSecureStorage.setMockInitialValues({'accessToken': 'a', 'refreshToken': 'r'});
+    final auth = controllerFor(apiAnswering((_) async => throw http.ClientException('offline')));
+    await auth.restore();
+    expect(auth.status, AuthStatus.signedIn);
+  });
+
+  test('a user missing after an offline start is fetched once the API answers', () async {
+    FlutterSecureStorage.setMockInitialValues({'accessToken': 'a', 'refreshToken': 'r'});
+    var online = false;
+    final auth = controllerFor(
+      apiAnswering((_) async => online ? jsonResponse(200, userJson) : jsonResponse(503, null, reasonPhrase: 'Down')),
+    );
+    await auth.restore();
+    await auth.loadUserIfMissing();
+    expect(auth.user, isNull);
+
+    online = true;
+    await auth.loadUserIfMissing();
+    expect(auth.user?.email, 'owner@example.com');
+  });
+
   test('sign-in, then sign-out revokes on the server and clears the device', () async {
     final log = <String>[];
+    String? logoutBearer;
     final auth = controllerFor(
-      apiAnswering(
-        (r) async => r.url.path.endsWith('/auth/login')
-            ? jsonResponse(200, {'accessToken': 'a', 'user': userJson}, refreshCookie: 'r')
-            : jsonResponse(204, null),
-        log: log,
-      ),
+      apiAnswering((r) async {
+        if (r.url.path.endsWith('/auth/login')) {
+          return jsonResponse(200, {'accessToken': 'a', 'user': userJson}, refreshCookie: 'r');
+        }
+        logoutBearer = r.headers['Authorization'];
+        return jsonResponse(204, null);
+      }, log: log),
     );
     await auth.signIn('owner@example.com', 'Password123!');
     expect(auth.status, AuthStatus.signedIn);
@@ -63,6 +88,7 @@ void main() {
     expect(auth.status, AuthStatus.signedOut);
     expect(auth.user, isNull);
     expect(log, ['POST /auth/login', 'POST /auth/logout']);
+    expect(logoutBearer, 'Bearer a', reason: 'logout must go out before the session is cleared');
     expect(await const FlutterSecureStorage().read(key: 'refreshToken'), isNull);
   });
 

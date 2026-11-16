@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:app_mobile/core/cursor_page.dart';
@@ -62,6 +64,37 @@ void main() {
 
     await controller.loadMore();
     expect(cursors, [null, 'c2']);
+  });
+
+  test('a page asked for before a refresh is dropped when it answers after it', () async {
+    final page2 = Completer<void>();
+    final controller = TicketsController(
+      TicketsRepository(
+        apiAnswering((r) async {
+          if (r.url.queryParameters['cursor'] == null) {
+            return jsonResponse(200, {
+              'items': [ticketJson(9), ticketJson(1)],
+              'nextCursor': 'c2',
+              'total': 3,
+            });
+          }
+          await page2.future;
+          return jsonResponse(200, {
+            'items': [ticketJson(1)],
+            'nextCursor': null,
+            'total': 3,
+          });
+        }),
+      ),
+    );
+    await controller.refresh();
+    final stale = controller.loadMore();
+    await controller.refresh();
+    page2.complete();
+    await stale;
+
+    expect(controller.items.map((t) => t.id), [9, 1]);
+    expect(controller.hasMore, isTrue);
   });
 
   test('a failed page keeps the rows on screen and shows the envelope copy', () async {

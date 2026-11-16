@@ -13,6 +13,9 @@ abstract class PushMessaging {
   Future<String?> getToken();
 
   Stream<String> get onTokenRefresh;
+
+  /// Makes the token dead, so nothing sent to it reaches this device. The next [getToken] makes a new one.
+  Future<void> deleteToken();
 }
 
 /// Firebase Cloud Messaging: FCM on Android, APNs through FCM on iOS. The backend's notification pipeline sends to
@@ -43,9 +46,14 @@ class FirebasePushMessaging implements PushMessaging {
 
   @override
   Future<bool> requestPermission() async {
-    final settings = await FirebaseMessaging.instance.requestPermission();
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    try {
+      final settings = await FirebaseMessaging.instance.requestPermission();
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      debugPrint('Could not ask for notification permission ($e).');
+      return false;
+    }
   }
 
   @override
@@ -61,4 +69,13 @@ class FirebasePushMessaging implements PushMessaging {
 
   @override
   Stream<String> get onTokenRefresh => FirebaseMessaging.instance.onTokenRefresh;
+
+  @override
+  Future<void> deleteToken() async {
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+    } catch (e) {
+      debugPrint('Could not delete the push token ($e).');
+    }
+  }
 }

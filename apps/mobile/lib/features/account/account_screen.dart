@@ -21,9 +21,12 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Future<void> _signOut() async {
     setState(() => _busy = true);
-    await widget.onSignOut();
-    // Signed out: the root widget has swapped this screen out.
-    if (mounted) setState(() => _busy = false);
+    try {
+      await widget.onSignOut();
+      // Signed out: the root widget has swapped this screen out.
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override

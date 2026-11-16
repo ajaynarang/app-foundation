@@ -20,16 +20,15 @@ class PushRegistrar {
   /// Call once the person is signed in. Asks for permission; does nothing when it is refused.
   Future<void> start() async {
     if (!await _messaging.requestPermission()) return;
-    await _tokens?.cancel();
+    unawaited(_tokens?.cancel());
     _tokens = _messaging.onTokenRefresh.listen(_register);
     final token = await _messaging.getToken();
     if (token != null) await _register(token);
   }
 
-  /// Call before sign-out, while the session can still authorize the request. A session the server ended cannot
-  /// deregister; the next sign-in on this device moves the token to that account.
+  /// Call before sign-out, while the session can still authorize the request.
   Future<void> stop() async {
-    await _tokens?.cancel();
+    unawaited(_tokens?.cancel());
     _tokens = null;
     final token = await _messaging.getToken();
     if (token == null) return;
@@ -38,6 +37,9 @@ class PushRegistrar {
     } on ApiException catch (e) {
       debugPrint('Could not deregister this device for push: ${e.message}');
     }
+    // Offline, the server still lists the token under this account. Killing the token on the device makes sure
+    // the signed-out phone shows none of that account's notifications; the server prunes dead tokens on send.
+    await _messaging.deleteToken();
   }
 
   Future<void> _register(String token) async {

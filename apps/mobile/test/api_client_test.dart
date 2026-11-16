@@ -201,6 +201,12 @@ void main() {
     expect(e.message, isNotEmpty);
   });
 
+  test('any transport failure, a TLS handshake included, becomes an ApiException', () async {
+    final e = await failureOf(apiAnswering((_) async => throw Exception('HandshakeException')));
+    expect(e.isOffline, isTrue);
+    expect(e.code, 'NETWORK');
+  });
+
   test('an error body that is not JSON still becomes an ApiException', () async {
     final e = await failureOf(clientAnswering(502, '<html>Bad Gateway</html>', reasonPhrase: 'Bad Gateway'));
     expect(e.statusCode, 502);

@@ -135,7 +135,9 @@ class ApiClient {
       return await _inner.send(req).then(http.Response.fromStream).timeout(timeout);
     } on TimeoutException {
       throw ApiException(0, 'The server took too long to answer. Try again.', code: 'TIMEOUT');
-    } on http.ClientException {
+    } catch (_) {
+      // Not only http.ClientException: a TLS failure (captive portal, wrong device clock) arrives as a raw
+      // HandshakeException. Callers catch ApiException only, so nothing else may leave this method.
       throw ApiException(0, 'Cannot reach the server. Check your connection.', code: 'NETWORK');
     }
   }

@@ -22,7 +22,11 @@ class AuthController extends ChangeNotifier {
 
   /// At boot: a stored session is checked with `GET /auth/me` (which refreshes it when the access token is old).
   Future<void> restore() async {
-    await _api.restoreSession();
+    try {
+      await _api.restoreSession();
+    } catch (_) {
+      // The Keychain / Keystore could not be read (restored backup, lost key): sign in again, never a stuck splash.
+    }
     if (!_api.hasSession) return _set(AuthStatus.signedOut);
     try {
       user = await _repository.me();
@@ -31,6 +35,17 @@ class AuthController extends ChangeNotifier {
       // screen shows its own Try again.
     }
     if (status == AuthStatus.unknown) _set(AuthStatus.signedIn);
+  }
+
+  /// After a start with no connection, [user] is missing: fetch it once the app is back online.
+  Future<void> loadUserIfMissing() async {
+    if (user != null || status != AuthStatus.signedIn) return;
+    try {
+      user = await _repository.me();
+      notifyListeners();
+    } on ApiException {
+      // Still offline; the next visit tries again.
+    }
   }
 
   /// Throws [ApiException]; the sign-in screen shows it.
