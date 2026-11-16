@@ -106,7 +106,8 @@ security policy); unit tests run it strict (`RLS_STRICT_CONTEXT=throw`). Every t
 apps/
   backend/   — NestJS 11 API: YOUR domains + app shell + platform-glue (composition/vocabulary)
   web/       — Next.js 15 (App Router, Tailwind, shadcn/ui, TanStack Query, Zustand)
-  mobile/    — Flutter companion app (status + auth scaffold; API client in lib/core/)
+  mobile/    — Flutter companion app (sign-in with a refreshing session, push registration, an example
+               list and detail screen; API client in lib/core/)
 packages/
   appshore/      — the AppShore Platform (@appshore/* — reusable, app-blind; init-app never renames these)
     kernel/        — @appshore/kernel: DB-free mechanics (logging, event/queue/cache mechanics,

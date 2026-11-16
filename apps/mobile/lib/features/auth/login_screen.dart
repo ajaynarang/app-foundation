@@ -1,123 +1,152 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
+import '../status/status_screen.dart';
+import 'auth_controller.dart';
+import 'auth_repository.dart';
+import 'session_user.dart';
 
-/// Phone-OTP login scaffold, wired to the foundation's real endpoints:
-///   POST /auth/phone/send-otp   { phone }
-///   POST /auth/phone/verify-otp { phone, code }
+/// Email and password sign-in (`POST /auth/login`), the foundation's primary method.
 ///
-/// The foundation also supports Firebase token exchange
-/// (POST /auth/firebase/exchange) — swap this screen for your provider's
-/// flow when you pick one.
+/// The backend also has phone OTP (`/auth/phone/send-otp`, `/auth/phone/verify-otp`) and Firebase exchange
+/// (`/auth/firebase/exchange`). Each answers the same session, so a screen for one of them signs in through
+/// `ApiClient.startSession` the same way.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.api, required this.onAuthenticated});
+  const LoginScreen({super.key, required this.auth, required this.api});
 
+  final AuthController auth;
   final ApiClient api;
-  final VoidCallback onAuthenticated;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
-  final _codeController = TextEditingController();
-  bool _otpSent = false;
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _busy = false;
   String? _error;
+  Map<String, String> _fieldErrors = const {};
 
-  Future<void> _run(Future<void> Function() action) async {
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signIn({String? tenantId}) async {
     setState(() {
       _busy = true;
       _error = null;
+      _fieldErrors = const {};
     });
     try {
-      await action();
+      await widget.auth.signIn(_email.text.trim(), _password.text, tenantId: tenantId);
+      // Signed in: the root widget swaps this screen out.
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } catch (e) {
-      setState(() => _error = e.toString());
+      if (!mounted) return;
+      final choices = AuthRepository.workspaceChoices(e);
+      if (choices.isNotEmpty) {
+        setState(() => _busy = false);
+        final chosen = await _chooseWorkspace(choices);
+        if (chosen != null && mounted) await _signIn(tenantId: chosen.tenantId);
+        return;
+      }
+      setState(() {
+        _error = e.message;
+        _fieldErrors = e.fieldErrors;
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _sendOtp() => _run(() async {
-        await widget.api.post('/auth/phone/send-otp', body: {'phone': _phoneController.text.trim()});
-        setState(() => _otpSent = true);
-      });
-
-  Future<void> _verifyOtp() => _run(() async {
-        final res = await widget.api.post('/auth/phone/verify-otp', body: {
-          'phone': _phoneController.text.trim(),
-          'code': _codeController.text.trim(),
-        });
-        final token = res['accessToken'] as String?;
-        if (token == null) {
-          throw ApiException(500, 'No access token in response');
-        }
-        widget.api.accessToken = token;
-        widget.onAuthenticated();
-      });
+  Future<WorkspaceChoice?> _chooseWorkspace(List<WorkspaceChoice> choices) {
+    return showModalBottomSheet<WorkspaceChoice>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(title: Text('Choose a workspace', style: Theme.of(context).textTheme.titleMedium)),
+            for (final w in choices)
+              ListTile(
+                leading: const Icon(Icons.apartment_outlined),
+                title: Text(w.name),
+                onTap: () => Navigator.of(context).pop(w),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Padding(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Welcome back', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 4),
-                Text(
-                  'Sign in with your phone number',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  enabled: !_otpSent,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone number',
-                    hintText: '+1 555 000 1234',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                if (_otpSent) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _codeController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'One-time code',
-                      border: OutlineInputBorder(),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Welcome back', style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text('Sign in with your email and password', style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      autofillHints: const [AutofillHints.username, AutofillHints.email],
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        border: const OutlineInputBorder(),
+                        errorText: _fieldErrors['email'],
+                      ),
                     ),
-                  ),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ],
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _busy ? null : (_otpSent ? _verifyOtp : _sendOtp),
-                  child: _busy
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_otpSent ? 'Verify code' : 'Send code'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _password,
+                      obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
+                      onSubmitted: (_) => _busy ? null : _signIn(),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: const OutlineInputBorder(),
+                        errorText: _fieldErrors['password'],
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                    ],
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _busy ? null : _signIn,
+                      child: _busy
+                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Sign in'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).push(MaterialPageRoute<void>(builder: (_) => StatusScreen(api: widget.api))),
+                      child: const Text('Check the connection'),
+                    ),
+                  ],
                 ),
-                if (_otpSent)
-                  TextButton(
-                    onPressed: _busy ? null : () => setState(() => _otpSent = false),
-                    child: const Text('Use a different number'),
-                  ),
-              ],
+              ),
             ),
           ),
         ),

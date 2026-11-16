@@ -652,3 +652,25 @@ your workspace opened that nobody has replied on for a few days. Its code is
 on its card.
 
 <!-- feature:desk:end -->
+
+## 2026-11-16: `pnpm verify` runs the Flutter app; the mobile starter has a real session
+
+**What changes when you pull it.** `pnpm verify` gains a `mobile` step (`pnpm verify:mobile`, `tools/verify/mobile.sh`):
+`flutter analyze` and `flutter test` in `apps/mobile`. `pnpm verify:scaffold` runs the same step in every variant.
+
+- **A product without `apps/mobile`** passes the step with nothing to check.
+- **A product that kept `apps/mobile`** now needs Flutter on the PATH of every machine that runs `pnpm verify`. With
+  no Flutter the step fails; it never skips. An app that does not analyze clean, or has a failing test, fails the gate
+  from the first run.
+- **The pull does not touch `apps/mobile`**: the folder is yours. The template's app is no longer a stub. It has
+  sign-in with a session that refreshes the way the web's does, push registration through
+  `POST /notifications/devices`, and an example cursor list and detail screen. To take any of it, copy from the
+  template's `apps/mobile/lib/` (start with `core/api_client.dart` and `core/json.dart`); the rules are in the
+  `mobile.md` conventions reference.
+- **No backend change.** The app uses the routes as they are.
+
+**What to set first.** Install Flutter where `pnpm verify` runs, if you kept the app. If you start the manual CI
+workflow, its scaffold job now sets Flutter up by itself.
+
+**How to turn it back.** Drop the app (`node tools/init-app/apply-feature.mjs --remove mobile`), or remove the
+`run "mobile"` line from `tools/verify/verify.sh` and the lines that hold it in `tools/verify/gates.test.sh`.
