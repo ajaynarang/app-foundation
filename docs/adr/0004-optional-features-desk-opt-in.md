@@ -53,7 +53,7 @@ accepts a conflict on any later template change to those models. The starter nev
   has none; every file with a feature marker is listed in the manifest.
 - `pnpm verify:scaffold` (`tools/init-app/check-variants.mjs`, also the manual `scaffold-variants` CI job):
   scaffolds the repo with and without Desk, installs, regenerates OpenAPI and the RBAC matrix, type-checks the
-  backend, web and `tests/`, runs the backend specs, and fails on any mention of Inngest or the Desk folder that is
+  backend, web and `tests/`, runs the backend specs and the mobile gate (`pnpm verify:mobile`), and fails on any mention of Inngest or the Desk folder that is
   not on the residue list, or a residue entry that no longer matches. It takes minutes, so it runs before a pull
   request that touches the seam, the manifest, or a file the manifest names, not on every push.
 
