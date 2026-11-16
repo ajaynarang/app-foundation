@@ -1,3 +1,6 @@
+// The function list now includes a real workflow, whose steps reach the Langfuse client (ESM-only under Jest).
+jest.mock('langfuse', () => ({ Langfuse: jest.fn() }));
+
 import { Inngest } from 'inngest';
 
 import { buildDeskInngestFunctions } from '../desk-inngest-functions';
@@ -19,6 +22,11 @@ describe('buildDeskInngestFunctions', () => {
 
   it('serves the scheduler heartbeat by default', () => {
     expect(ids(buildDeskInngestFunctions(client) as never)).toContain(HEARTBEAT_ID);
+  });
+
+  it('serves the reference job whether or not the scheduler is on', () => {
+    expect(ids(buildDeskInngestFunctions(client) as never)).toContain('support-followup');
+    expect(ids(buildDeskInngestFunctions(client, { schedulerEnabled: false }) as never)).toEqual(['support-followup']);
   });
 
   it('leaves the heartbeat out when the scheduler is off', () => {

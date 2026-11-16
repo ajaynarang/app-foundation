@@ -1,5 +1,5 @@
 import type { AgentScope, ScopeTier, TrustLevel } from '@app/shared-types';
-import { scopeTier } from '@app/shared-types';
+import { hitlTierForScope, scopeTier } from '@app/shared-types';
 import { TRUST_LEVEL_CONFIDENCE_THRESHOLDS } from '../types';
 
 import type { ConditionsResult } from '../../responsibilities/definition.types';
@@ -9,8 +9,9 @@ import type { ConditionsResult } from '../../responsibilities/definition.types';
  * gate.step.ts which calls into this function with plain data.
  *
  * Consumes scope directly (via ScopeRegistryService lookup by the caller)
- * and derives tier via shared-types' `scopeTier()`. No custom ToolRisk
- * vocabulary — Desk reuses the platform's existing 3-tier scope model:
+ * and derives the confirmation tier via shared-types' `hitlTierForScope()`, the
+ * same function behind `HitlPolicyService.resolveTier`, so the tier rules have
+ * one home. No custom ToolRisk vocabulary — Desk reuses the platform's 3 tiers:
  *
  *   read       → never gates
  *   sensitive  → always gates (regardless of trust)
@@ -67,12 +68,13 @@ export function decideGate(input: GateDecisionInput): GateDecision {
   }
 
   const tier = scopeTier(toolScope);
+  const confirmation = hitlTierForScope(toolScope);
 
   // Universal fail-safes — tier overrides trust level
-  if (tier === 'sensitive') {
+  if (confirmation === 'sensitive') {
     return { gated: true, rule: 'sensitive_always_gates', toolScope, tier };
   }
-  if (tier === 'read') {
+  if (confirmation === 'none') {
     return { gated: false, rule: 'read_never_gates', toolScope, tier };
   }
 

@@ -1,3 +1,6 @@
+import { AgentScopeSchema, hitlTierForScope } from '@app/shared-types';
+import { fromDeskResponsibility } from '@appshore/platform/auth/agent-principal';
+import { HitlPolicyService } from '../../../../ai/agent-contract/hitl-policy.service';
 import { decideGate } from '../gate.algorithm';
 import type { GateDecisionInput } from '../gate.algorithm';
 import type { ConditionsResult } from '../../../responsibilities/definition.types';
@@ -253,5 +256,28 @@ describe('decideGate — Autonomous trust on standard tier', () => {
       }),
     );
     expect(decision.gated).toBe(false);
+  });
+});
+
+/**
+ * The tier rules have one home: `hitlTierForScope` in shared-types. The tool pipeline reads it through
+ * `HitlPolicyService.resolveTier`, Desk's gate through `decideGate`. This holds the two together for every scope, so
+ * a scope cannot be "sensitive" to one and "standard" to the other.
+ */
+describe('decideGate and HitlPolicyService agree on every scope', () => {
+  const hitl = new HitlPolicyService();
+  const principal = fromDeskResponsibility({ responsibilityId: 1, tenantId: 1, scopes: [], enabledByUserId: 1 });
+
+  it.each(AgentScopeSchema.options)('%s', (scope) => {
+    const tier = hitl.resolveTier(scope, principal);
+    expect(tier).toBe(hitlTierForScope(scope));
+
+    // The most permissive setting: only the tier itself can still gate.
+    const freest = decideGate(baseInput({ trustLevel: 'AUTONOMOUS', toolScope: scope, lastLlmConfidence: 1 }));
+    // The strictest setting: only a read still passes.
+    const strictest = decideGate(baseInput({ trustLevel: 'SUPERVISED', toolScope: scope, lastLlmConfidence: 0 }));
+
+    expect(freest.gated).toBe(tier === 'sensitive');
+    expect(strictest.gated).toBe(tier !== 'none');
   });
 });

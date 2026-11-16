@@ -387,6 +387,43 @@ describe('SupportService', () => {
 
   // ─── updateTicket ───
 
+  describe('addMessageByTicketNumber', () => {
+    it('finds the ticket inside the tenant and posts the reply as the workspace', async () => {
+      prisma.supportTicket.findFirst.mockResolvedValue({ id: 42, firstResponseAt: null });
+      prisma.supportTicketMessage.create.mockResolvedValue({
+        messageId: 'm-1',
+        ticketId: 42,
+        authorRole: 'user',
+        content: 'Any update?',
+        isInternal: false,
+        author: null,
+        createdAt: new Date('2026-11-16T00:00:00Z'),
+      });
+
+      const result = await service.addMessageByTicketNumber(7, 'ST-1001', 5, 'Any update?');
+
+      expect(prisma.supportTicket.findFirst.mock.calls[0][0]).toEqual({
+        where: { tenantId: 7, ticketNumber: 'ST-1001' },
+        select: { id: true },
+      });
+      expect(prisma.supportTicketMessage.create.mock.calls[0][0].data).toEqual({
+        ticketId: 42,
+        authorId: 5,
+        authorRole: 'user',
+        content: 'Any update?',
+        isInternal: false,
+      });
+      expect(result).toMatchObject({ messageId: 'm-1', content: 'Any update?' });
+    });
+
+    it("answers 404 for another workspace's ticket number, and writes nothing", async () => {
+      prisma.supportTicket.findFirst.mockResolvedValue(null);
+
+      await expect(service.addMessageByTicketNumber(8, 'ST-1001', 5, 'x')).rejects.toThrow(NotFoundException);
+      expect(prisma.supportTicketMessage.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('updateTicket', () => {
     it('should update ticket status', async () => {
       prisma.supportTicket.update.mockResolvedValue({

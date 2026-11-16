@@ -7,6 +7,9 @@ import { DOMAIN_EVENTS } from '../../../../platform-glue/events/domain-events.co
 import { generateUuidV7 } from '@appshore/kernel/shared/utils/uuidv7';
 import { InngestClientService } from '../inngest/inngest.client';
 import { OPEN_EPISODE_STATUSES, EpisodeStatusSchema } from '../types';
+import { findQuietTicketsForTenant } from '../../responsibilities/support-followup/fan-out';
+import { SupportFollowupConditionsSchema } from '../../responsibilities/support-followup/schemas';
+import { SUPPORT_FOLLOWUP_KEY, SUPPORT_TICKET_ENTITY } from '../../responsibilities/support-followup/step.types';
 
 const EPISODE_STATUS = EpisodeStatusSchema.enum;
 
@@ -14,12 +17,13 @@ const EPISODE_STATUS = EpisodeStatusSchema.enum;
  * TriggerService — the entry point that opens episodes + publishes Inngest
  * events for responsibility runs.
  *
- * This is the generic engine. The starter ships with an EMPTY responsibility
- * registry, so `runByKey` has nothing to dispatch to and fail-closes on any
+ * This is the generic engine. The starter wires one run method, the reference
+ * job's (`runSupportFollowupForTenant`); `runByKey` fail-closes on any other
  * key. To add a responsibility:
  *   1. Register its definition in `responsibilities/index.ts`.
  *   2. Add a fan-out + per-entity `upsertEpisode` + `inngest.send` loop here
- *      (one `run<X>ForTenant` method), and wire it into `runByKey`.
+ *      (one `run<X>ForTenant` method, shaped like the reference job's), and
+ *      wire it into `runByKey`.
  *
  * `upsertEpisode` (partial-unique dedupe + suppression + open-episode reuse +
  * SSE refresh event) is fully generic and reusable by every responsibility.
@@ -36,21 +40,97 @@ export class TriggerService {
 
   /**
    * Generic dispatch — run whichever responsibility `key` names for one tenant.
-   * The starter registry is empty, so every key fail-closes with a
-   * BadRequestException. Wire `case '<your-key>': return this.run...` here as
-   * you add responsibilities.
+   * A key with no run method fail-closes with a BadRequestException. Wire
+   * `case '<your-key>': return this.run...` here as you add responsibilities.
    *
    * `key` is typed `string` (not a narrowed union) because callers pass it
    * straight off the DB `desk_responsibilities.key` column.
    */
-  async runByKey(key: string, _tenantId: number): Promise<RunResult> {
+  async runByKey(key: string, tenantId: number): Promise<RunResult> {
     switch (key) {
-      // Register your responsibility run methods here, e.g.:
-      //   case 'welcome':
-      //     return this.runWelcomeForTenant(_tenantId);
+      case SUPPORT_FOLLOWUP_KEY:
+        return this.runSupportFollowupForTenant(tenantId);
+      // Register your responsibility run methods here.
       default:
         throw new BadRequestException(`No run method wired for responsibility ${key}`);
     }
+  }
+
+  /**
+   * The reference job's run: one episode per quiet support ticket, then one Inngest event per episode. Called by
+   * "Run now" and by the scheduler. Every run method has the same four guards (seeded, enabled, available, a
+   * supervisor to act for), the same dedupe and suppression (in `upsertEpisode`), and its own fan-out.
+   */
+  async runSupportFollowupForTenant(tenantId: number): Promise<RunResult> {
+    const key = SUPPORT_FOLLOWUP_KEY;
+    const responsibility = await this.prisma.deskResponsibility.findUnique({
+      where: { tenantId_key: { tenantId, key } },
+      select: {
+        id: true,
+        agentId: true,
+        enabled: true,
+        lifecycle: true,
+        trustLevel: true,
+        conditions: true,
+        agent: { select: { supervisorUserId: true } },
+      },
+    });
+
+    if (!responsibility) {
+      this.logger.warn(`${key} not seeded for tenant ${tenantId}`);
+      return { episodesOpened: 0, skipped: 'responsibility_not_seeded' };
+    }
+    if (!responsibility.enabled || responsibility.lifecycle !== 'AVAILABLE') {
+      return { episodesOpened: 0, skipped: responsibility.enabled ? 'not_available' : 'disabled' };
+    }
+    // The execute step acts for the agent's supervisor. Without one, stop here instead of failing every episode.
+    if (responsibility.agent.supervisorUserId == null) {
+      this.logger.warn(`${key} tenant ${tenantId}: agent has no supervisor, skipping`);
+      return { episodesOpened: 0, skipped: 'no_supervisor' };
+    }
+
+    // The operator's own wait decides which tickets count as quiet.
+    const conditions = SupportFollowupConditionsSchema.parse(responsibility.conditions ?? {});
+    const tickets = await findQuietTicketsForTenant(this.prisma, tenantId, {
+      staleAfterDays: conditions.staleAfterDays,
+    });
+
+    const firedAt = new Date();
+    const today = firedAt.toISOString().slice(0, 10);
+    let opened = 0;
+    let reused = 0;
+
+    for (const ticket of tickets) {
+      const dedupeKey = `${key}:${SUPPORT_TICKET_ENTITY}:${ticket.ticketNumber}`;
+      const episode = await this.upsertEpisode({
+        tenantId,
+        responsibilityKey: key,
+        entityType: SUPPORT_TICKET_ENTITY,
+        entityId: ticket.ticketNumber,
+        entityLabel: `${ticket.ticketNumber} · ${ticket.subject.slice(0, 80)} · quiet ${ticket.daysQuiet}d`,
+        responsibilityId: responsibility.id,
+        ownerAgentId: responsibility.agentId,
+        trustLevelSnapshot: responsibility.trustLevel,
+        conditionsSnapshot: responsibility.conditions,
+        trigger: { kind: 'SCHEDULED', label: 'Support follow-up sweep', source: 'trigger.service', firedAt },
+        dedupeKey,
+      });
+      // Suppressed for this ticket: no episode, no event.
+      if ('skipped' in episode) continue;
+      if (episode.isNew) opened++;
+      else reused++;
+
+      // The date is in the key, so a ticket can be picked up again on a later day once its earlier run has closed.
+      const idempotencyKey = `${dedupeKey}:${today}`;
+      await this.inngest.send(
+        'app/desk.support_followup.run',
+        { episodeId: episode.id, tenantId, ticketNumber: ticket.ticketNumber, idempotencyKey },
+        { id: idempotencyKey },
+      );
+    }
+
+    this.logger.log(`${key} tenant ${tenantId}: opened=${opened} reused=${reused} (${tickets.length} quiet tickets)`);
+    return { episodesOpened: opened, episodesReused: reused };
   }
 
   /**

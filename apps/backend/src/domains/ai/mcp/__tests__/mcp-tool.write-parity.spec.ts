@@ -71,9 +71,9 @@ describe('MCP write tools are derived from scopes and always confirmed', () => {
     );
   });
 
-  it('the starter ships one write, the example create-support-ticket', () => {
+  it('the starter ships two writes, the example support tools', () => {
     const writes = discovered.filter((t) => scopeTier(t.scope) !== 'read').map((t) => t.toolName);
-    expect(writes).toEqual(['create-support-ticket']);
+    expect(writes.sort()).toEqual(['create-support-ticket', 'reply-to-support-ticket']);
   });
 
   it('a third-party agent calling any write is challenged, not run', () => {

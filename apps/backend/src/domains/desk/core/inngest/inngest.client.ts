@@ -24,6 +24,16 @@ export type DeskEvents = {
       idempotencyKey: string;
     };
   };
+  /** Starts one run of the reference job (`support_followup`) for one ticket. `ticketNumber` is carried for the
+   * Inngest dashboard; the workflow reads the ticket from the episode. */
+  'app/desk.support_followup.run': {
+    data: {
+      episodeId: string;
+      tenantId: number;
+      ticketNumber: string;
+      idempotencyKey: string;
+    };
+  };
   /** Published when a human decides an approval — wakes any workflow that's
    * currently awaiting the matching approvalId via step.waitForEvent. */
   'app/desk.approval.decided': {

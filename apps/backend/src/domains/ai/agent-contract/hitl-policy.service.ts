@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { AgentScope, scopeTier, SCOPE_TIERS } from '@app/shared-types';
+import { AgentScope, hitlTierForScope, type HitlTier } from '@app/shared-types';
 import { AgentPrincipal } from '@appshore/platform/auth/agent-principal';
 
-export type HitlTier = 'none' | 'standard' | 'sensitive';
+export type { HitlTier };
 
 @Injectable()
 export class HitlPolicyService {
@@ -11,12 +11,11 @@ export class HitlPolicyService {
    * who confirms. The pipeline challenges a third-party agent, a chat user confirms a card raised by `confirm-action`
    * (the pipeline spends that grant), and a
    * Desk duty is never challenged by the pipeline (Desk's gate step runs before every execute and gates by this same
-   * tier). The tier is recorded on the audit row for every kind, Desk included.
+   * tier). The tier is recorded on the audit row for every kind, Desk included. The rule itself is
+   * `hitlTierForScope` in shared-types, the same function Desk's `decideGate` calls.
    */
   resolveTier(scope: AgentScope, _principal: AgentPrincipal): HitlTier {
-    const tier = scopeTier(scope);
-    if (tier === SCOPE_TIERS.READ) return 'none';
-    return tier === SCOPE_TIERS.SENSITIVE ? 'sensitive' : 'standard';
+    return hitlTierForScope(scope);
   }
 
   tokenTtlSeconds(tier: HitlTier): number {

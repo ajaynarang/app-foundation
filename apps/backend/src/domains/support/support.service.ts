@@ -216,6 +216,19 @@ export class SupportService {
     };
   }
 
+  /**
+   * Reply to a workspace's own ticket, found by its ticket number (the id a person or an agent knows it by). The
+   * lookup is scoped to the tenant, so a number from another workspace is a 404, never a write.
+   */
+  async addMessageByTicketNumber(tenantId: number, ticketNumber: string, authorId: number, content: string) {
+    const ticket = await this.prisma.supportTicket.findFirst({
+      where: { tenantId, ticketNumber },
+      select: { id: true },
+    });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+    return this.addMessage(ticket.id, authorId, 'user', { content }, tenantId);
+  }
+
   // ─── Super Admin endpoints ───
 
   /** Every tenant's tickets (super admin), newest first, as a cursor list. */

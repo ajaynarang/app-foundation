@@ -1,5 +1,6 @@
 import type { ResponsibilityDefinition } from './definition.types';
 import { COMING_SOON_RESPONSIBILITIES } from './coming-soon';
+import { SUPPORT_FOLLOWUP_DEFINITION } from './support-followup/definition';
 
 /**
  * Responsibility registry — the Desk engine's main extension point.
@@ -7,9 +8,10 @@ import { COMING_SOON_RESPONSIBILITIES } from './coming-soon';
  * Code-authored; not user-editable. Seeded into desk_responsibilities rows per
  * tenant (see seeds/). Order matters for the UI — index order = card order.
  *
- * The starter ships ONE generic example responsibility (`welcome`) so the
- * engine has something concrete to render and seed. It is manual-trigger only
- * and wires no tools, so it never fans out or calls the LLM on its own.
+ * The starter ships two:
+ *   - `welcome`: a no-op that shows the smallest valid definition. Manual trigger only, no tools, no run method.
+ *   - `support_followup`: the reference job. It is real, and it is the one to copy
+ *     (`responsibilities/support-followup/definition.ts` lists every file and every registration).
  *
  * To add a real responsibility:
  *   1. Author its definition under `responsibilities/<key>/definition.ts`.
@@ -35,6 +37,7 @@ const WELCOME_DEFINITION: ResponsibilityDefinition = {
 
 export const RESPONSIBILITY_REGISTRY: readonly ResponsibilityDefinition[] = [
   WELCOME_DEFINITION,
+  SUPPORT_FOLLOWUP_DEFINITION,
   ...COMING_SOON_RESPONSIBILITIES,
 ] as const;
 

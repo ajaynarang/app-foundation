@@ -44,6 +44,20 @@ export function scopeTier(scope: AgentScope): ScopeTier {
   return SCOPE_TIERS.STANDARD;
 }
 
+/** How much human confirmation a tool call needs: none (a read), standard (a write), sensitive (always a person). */
+export type HitlTier = 'none' | 'standard' | 'sensitive';
+
+/**
+ * The one rule that turns a tool's scope into its confirmation tier. Chat, external agents and the tool pipeline read
+ * it through `HitlPolicyService.resolveTier`; Desk's gate reads it through `decideGate`. Change the rule here and
+ * every caller follows: a read is never confirmed, a sensitive scope always is, anything else is a standard write.
+ */
+export function hitlTierForScope(scope: AgentScope): HitlTier {
+  const tier = scopeTier(scope);
+  if (tier === SCOPE_TIERS.READ) return 'none';
+  return tier === SCOPE_TIERS.SENSITIVE ? 'sensitive' : 'standard';
+}
+
 /** Scopes that MUST never be granted to a non-user principal (OAuth clients, API keys). Runtime-enforced. */
 export const NEVER_EXTERNAL_SCOPES: readonly AgentScope[] = ['platform:admin'] as const;
 
@@ -53,7 +67,7 @@ export interface AgentScopeDescription {
   /** Plain-English description rendered in the scope-grant preview. Imperative. */
   grantsPlainEnglish: string;
   /** HITL tier — mirrors hitl-policy.service.ts for this scope. */
-  hitlTier: 'none' | 'standard' | 'sensitive';
+  hitlTier: HitlTier;
   /** Up to 4 representative tool names that use this scope. */
   sampleTools: string[];
 }

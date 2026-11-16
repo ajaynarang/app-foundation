@@ -1,5 +1,6 @@
 import type { Inngest, InngestFunction } from 'inngest';
 
+import { createSupportFollowupFunction } from '../../responsibilities/support-followup/workflow/support-followup.function';
 import { createDeskSchedulerFunction } from '../scheduler/desk-scheduler.function';
 
 export interface DeskInngestFunctionOptions {
@@ -11,8 +12,8 @@ export interface DeskInngestFunctionOptions {
 }
 
 /**
- * Every Desk function served to Inngest. The starter ships no responsibility workflow functions (the registry is
- * empty). When you add a responsibility, build its Inngest function (one per responsibility, listening for
+ * Every Desk function served to Inngest. The starter ships one responsibility workflow, the reference job
+ * (`support_followup`). When you add a responsibility, build its Inngest function (one per responsibility, listening for
  * `<app>/desk.<key>.run`), give its config `onFailure: reportDeskFunctionFailure` (from `./desk-function-failure`),
  * and add it here. `desk-function-failure.spec.ts` fails for a function served without a failure handler.
  */
@@ -20,6 +21,6 @@ export function buildDeskInngestFunctions(
   client: Inngest,
   { schedulerEnabled = true }: DeskInngestFunctionOptions = {},
 ): InngestFunction.Any[] {
-  const responsibilityFunctions: InngestFunction.Any[] = [];
+  const responsibilityFunctions: InngestFunction.Any[] = [createSupportFollowupFunction(client)];
   return [...responsibilityFunctions, ...(schedulerEnabled ? [createDeskSchedulerFunction(client)] : [])];
 }
