@@ -102,14 +102,14 @@ under "Where this product differs", with a link to the ADR that records why
 CI is manual (ADR [CI is manual by default; enforcement is local](adr/0007-ci-manual-enforcement-local.md)). What
 must always run, runs on the developer's machine, cheapest first:
 
-| When                  | What runs                                                                                                                                     |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| On every edit         | The Claude Code hooks (`.claude/settings.json`): protected paths block; the convention gate and the drift reminder advise                     |
-| On every commit       | `.husky/pre-commit`: Prettier and the convention gate on staged files, then `pnpm guards`                                                     |
-| On every push         | `.husky/pre-push`: `pnpm verify:arch`; `pnpm check:ops` when the push touches ops files; `pnpm guards`, `pnpm test:guards`, `pnpm test:hooks` |
-| Before a pull request | `pnpm verify` (format, lint, schema lint, type-check, unit tests, guards and their tests, hook tests, `check:ops`, the RBAC audit, build)     |
-| Wire changed          | `pnpm verify:api` (boots the backend and runs the Playwright `api` project)                                                                   |
-| Scaffolding changed   | `pnpm verify:scaffold` (scaffolds the variants and checks each one)                                                                           |
+| When                  | What runs                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| On every edit         | The Claude Code hooks (`.claude/settings.json`): protected paths block; the convention gate and the drift reminder advise                         |
+| On every commit       | `.husky/pre-commit`: Prettier and the convention gate on staged files, then `pnpm guards`                                                         |
+| On every push         | `.husky/pre-push`: `pnpm verify:arch`; `pnpm check:ops` when the push touches ops files; `pnpm guards`, `pnpm test:guards`, `pnpm test:hooks`     |
+| Before a pull request | `pnpm verify` (format, lint, schema lint, type-check, unit tests, mobile, guards and their tests, hook tests, `check:ops`, the RBAC audit, build) |
+| Wire changed          | `pnpm verify:api` (boots the backend and runs the Playwright `api` project)                                                                       |
+| Scaffolding changed   | `pnpm verify:scaffold` (scaffolds the variants and checks each one)                                                                               |
 
 `pnpm verify` ends with one line, `verify: PASS <sha> (<n>s)` or `verify: FAIL at "<step>" <sha> (<n>s)`, with `+dirty`
 after the sha when the tree had uncommitted changes. That line goes in the pull request body; a reviewer checks the sha

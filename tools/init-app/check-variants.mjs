@@ -10,7 +10,8 @@
  * fully kept or fully removed, TENANCY_MODE), the regenerated alert catalog (check-scaffold-observability.mjs) and the
  * runway's starter check (runwayStarterCheck); install; build the foundation packages; regenerate the OpenAPI
  * documents and the RBAC matrix; type-check the backend, apps/web, packages/test-utils and tests/; migrate; run the
- * backend unit and architecture specs; then `pnpm guards`, `pnpm test:guards` and `pnpm test:hooks`, and search for
+ * backend unit and architecture specs and `pnpm verify:mobile` (flutter analyze and test where mobile is kept, a
+ * pass with nothing to check where it is not); then `pnpm guards`, `pnpm test:guards` and `pnpm test:hooks`, and search for
  * every template skill and agent name, read before the rename (none may be left). Without Desk, the copy is also
  * searched for `inngest` and `domains/desk` (any case): every hit must be on
  * tools/init-app/features/desk.residue.json, and every entry there must still match.
@@ -419,6 +420,9 @@ function runVariant(name, { keep }) {
     // the repo already migrated, and makes a fresh CI database ready for the integration specs.
     run('migrate', 'pnpm', ['--filter', '@appshore/db', 'prisma:migrate:deploy']);
     run('backend unit and architecture specs', 'pnpm', ['--filter', '@app/backend', 'test']);
+    // With mobile kept, the renamed Flutter app must still analyze and pass its tests; without it, the gate must pass
+    // on a tree that has no apps/mobile.
+    run('mobile gate', 'pnpm', ['verify:mobile']);
 
     // The workflow guards, under the product's prefix, with or without git.
     run('guards', 'pnpm', ['guards']);
