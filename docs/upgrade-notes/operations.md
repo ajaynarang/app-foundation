@@ -620,3 +620,31 @@ it. To run the container as root again, remove the `USER node` line (`check:ops`
 **What to set first.** Nothing.
 
 **How to turn it back.** Deploy the previous release. No schema or data change.
+
+<!-- feature:desk:start -->
+
+## 2026-11-16: Desk ships a reference job, `support_followup`
+
+**What changes when you pull it.** The responsibility registry gains one real job: a follow-up on a support ticket
+your workspace opened that nobody has replied on for a few days. Its code is
+`apps/backend/src/domains/desk/responsibilities/support-followup/`; it is the job to copy for your own.
+
+- **Every tenant gets a new row** in `desk_responsibilities` on the next boot (the bootstrap upsert): key
+  `support_followup`, enabled, trust level SUPERVISED. No migration.
+- **It does not run by itself.** The scheduler fires a job only when the job is armed for automatic runs and the
+  workspace's schedule switch is on, and both are off by default. "Run now" works at once, and under SUPERVISED
+  every follow-up waits for a person's approval before it is posted.
+- **It needs a model route** for its three model steps. Without one, a run closes as "escalated to a person" at the
+  first model step, and posts nothing.
+- **Inngest serves one more function**, `support-followup`. Sync the app with Inngest after the deploy, as for any
+  new function.
+- **Three prompts** (`desk.support_followup.perceive.v1`, `.decide.v1`, `.draft.v1`) are registered as fallbacks at
+  boot; `pnpm --filter @app/backend seed:langfuse` adds them to Langfuse if you edit prompts there.
+
+**What to set first.** Nothing.
+
+**How to turn it back.** Delete the job: its folder and the registrations its `definition.ts` lists, then the
+`support_followup` rows in `desk_responsibilities`. To keep the code but stop it for one workspace, turn the job off
+on its card.
+
+<!-- feature:desk:end -->
