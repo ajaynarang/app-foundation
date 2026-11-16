@@ -640,6 +640,10 @@ your workspace opened that nobody has replied on for a few days. Its code is
   new function.
 - **Three prompts** (`desk.support_followup.perceive.v1`, `.decide.v1`, `.draft.v1`) are registered as fallbacks at
   boot; `pnpm --filter @app/backend seed:langfuse` adds them to Langfuse if you edit prompts there.
+- **A run event is sent once per episode.** The trigger service sends a job's run event only when it opens a new
+  episode, with the episode's id in the event id. A run asked for while the episode is still open sends nothing and
+  is counted as reused. If your own job sends its run event with an id made from the record and the day, a second
+  run the same day is dropped by Inngest and its episode never starts: key it by the episode.
 
 **What to set first.** Nothing.
 
