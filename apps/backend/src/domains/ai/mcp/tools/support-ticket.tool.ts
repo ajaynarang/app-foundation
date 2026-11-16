@@ -12,7 +12,7 @@ import { idempotencyKeyArg } from '../../agent-contract/tool-idempotency';
 /**
  * Example tools: a read and two writes over the existing support desk, showing every rule a product's own tools
  * follow. All call `SupportService`; none adds a model. `reply-to-support-ticket` is also the act of the reference
- * Desk job (`domains/desk/responsibilities/support-followup`).
+ * Desk job (`support_followup`), when Desk is kept.
  *
  * - Each method declares `@RequiresScope`; the write's scope (`platform:write`) makes it a write everywhere: chat
  *   offers `confirm-action` and runs it only against the person's confirmed card, an external agent is challenged,
