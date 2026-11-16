@@ -194,7 +194,8 @@ Not scripted, and not covered by `pnpm verify:scaffold`. The tables never left, 
 Each copy then gets the cheap checks (the prefix, reserved names and plans in `.claude/workflow.json`, the
 `.gitignore` plans line, no `verified:` line left, the alert catalog, the runway's starter check, each feature
 manifest fully kept or fully removed), then installs, builds the foundation packages, regenerates OpenAPI and the
-RBAC matrix, type-checks the backend, web, `packages/test-utils` and `tests/`, migrates, and runs the backend specs.
+RBAC matrix, type-checks the backend, web, `packages/test-utils` and `tests/`, migrates, runs the backend specs, and runs `pnpm verify:mobile`: `flutter analyze`
+and `flutter test` on the renamed app where mobile is kept, a pass with nothing to check where it is not.
 After those: `pnpm guards`, `pnpm test:guards`, `pnpm test:hooks`, and a search for every template skill and agent
 name (read before the rename), which must be gone. A copy without Desk is also searched for `inngest` and
 `domains/desk` (any case): a hit not on the residue list fails, and so does an entry that no longer matches.

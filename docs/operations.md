@@ -290,8 +290,8 @@ on a push or a pull request.
 - **Deploy and apply workflows** (`deploy-all.yml`, `deploy-frontend.yml`, `quality-gate.yml`, `grafana-apply.yml`)
   have `workflow_dispatch` only and no commented triggers. They change a live environment and must never run on a
   push.
-- **What always runs is local.** `pnpm verify` (format, lint, schema lint, type-check, unit tests, the repository
-  guards and their tests, `pnpm check:ops`, the RBAC gap audit, build) before a pull request, ending with a result
+- **What always runs is local.** `pnpm verify` (format, lint, schema lint, type-check, unit tests, the Flutter
+  analyze and test, the repository guards and their tests, `pnpm check:ops`, the RBAC gap audit, build) before a pull request, ending with a result
   line that names the commit it checked; the pre-commit hook (Prettier and the convention gate on staged files, then `pnpm guards`); the
   pre-push hook (the architecture specs on every push, `pnpm check:ops` when the push touches `infra/`,
   `docs/runbooks/`, `.github/` or `tools/`, then `pnpm guards`, `pnpm test:guards` and `pnpm test:hooks`). A rule that must always hold

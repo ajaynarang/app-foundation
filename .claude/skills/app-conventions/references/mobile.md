@@ -13,6 +13,7 @@ sources:
 guards:
   - apps/mobile/test/api_client_test.dart
   - script:mobile:test
+  - script:verify:mobile
 examples:
   - jsonStr
   - jsonInt
@@ -54,8 +55,8 @@ timeout yet. The rules below are how it grows; the ones marked "when you add" de
 
 ### Layers and code quality
 
-- `flutter analyze` is clean and `flutter test` is green before every commit (`pnpm mobile:test`).
-  [guard: script:mobile:test]
+- `flutter analyze` is clean and `flutter test` is green before every commit (`pnpm mobile:test`); `pnpm verify`
+  runs both as its `mobile` step. [guard: script:verify:mobile]
 - Layers point one way: widget → state (provider or controller) → repository → `ApiClient`. A widget never calls the
   HTTP client, parses JSON or holds business logic in `build`. [review-only: no Dart spec reads imports]
 - A feature is a folder under `lib/features/<area>/` with its repository, its state and its screens; a shared widget

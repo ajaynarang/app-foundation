@@ -25,6 +25,7 @@
     "verify": "bash tools/verify/verify.sh",
     "verify:api": "bash tools/verify/api-qa.sh",
     "verify:scaffold": "node tools/init-app/check-variants.mjs",
+    "verify:mobile": "bash tools/verify/mobile.sh",
     "check:ops": "bash tools/verify/check-ops.sh",
     "audit:rbac": "tsx tests/scripts/audit-rbac-gaps.ts --ci",
     "test:init-app": "node --test tools/init-app/*.test.mjs",

@@ -315,7 +315,8 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
 
 <!-- feature:mobile:start -->
 
-**Mobile:** `cd apps/mobile && flutter analyze && flutter test` (`pnpm mobile:test`).
+**Mobile:** `cd apps/mobile && flutter analyze && flutter test` (`pnpm mobile:test`). `pnpm verify` runs the same
+two commands as its `mobile` step (`pnpm verify:mobile`), so it needs Flutter on PATH.
 
 <!-- feature:mobile:end -->
 
@@ -323,7 +324,8 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
 
 - **`pnpm verify`** — run it before opening a pull request and paste its last line into the pull request body.
   It runs the format check, lint, schema lint, type-check, every package's unit tests (all but `@app/qa`; the web
-  jest also runs `@appshore/web-core`'s tests), `pnpm guards` and their tests, `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
+  jest also runs `@appshore/web-core`'s tests), `pnpm verify:mobile` (`flutter analyze` and `flutter test` when
+  `apps/mobile` exists; a pass with nothing to check when it does not), `pnpm guards` and their tests, `pnpm check:ops`, the RBAC gap audit (`pnpm audit:rbac`) and the
   build, stops at the first failure, and ends with one line: `verify: PASS <sha> (<n>s)` or
   `verify: FAIL at "<step>" <sha> (<n>s)`, where `<sha>` is the commit the run started on and `+dirty` follows it
   when the tree had uncommitted changes (ADR "CI is manual by default; enforcement is local"). The
@@ -360,7 +362,7 @@ guards before prose, and the product's own domain skill" (`docs/adr/0015-workflo
   (every default inside a fresh `git init`; mobile and Desk off with prefix `zz` and no git; Desk on with plans
   untracked), checks what `init-app` wrote (skill prefix, reserved names, plans, no `verified:` line, each feature
   fully kept or removed), installs, builds the foundation packages, regenerates OpenAPI and the RBAC matrix,
-  type-checks the backend, web and `tests/`, runs the backend specs, then `pnpm guards`, `pnpm test:guards`,
+  type-checks the backend, web and `tests/`, runs the backend specs and `pnpm verify:mobile`, then `pnpm guards`, `pnpm test:guards`,
   `pnpm test:hooks` and a search for every template skill name, and checks that nothing names `inngest` or
   `domains/desk` in a copy without Desk unless `tools/init-app/features/desk.residue.json` lists it. It takes
   minutes and needs Postgres and Redis.

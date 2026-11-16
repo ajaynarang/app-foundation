@@ -28,7 +28,8 @@ machine, and the same commands run in CI when CI is started.**
     tests) on every push, and `pnpm check:ops` when the push touches `infra/`, `docs/runbooks/`, `.github/` or
     `tools/`;
   - `pnpm verify` before a pull request: format check, lint, schema lint, type-check, every package's unit tests
-    through turbo (all but the Playwright suite), the init-app tool tests, `pnpm check:ops`, the RBAC gap audit
+    through turbo (all but the Playwright suite), the Flutter analyze and test where `apps/mobile` exists, the
+    init-app tool tests, `pnpm check:ops`, the RBAC gap audit
     (`pnpm audit:rbac`) and the build;
   - `pnpm verify:api` before a pull request that changes the wire, and `pnpm verify:scaffold` before one that
     touches scaffolding.

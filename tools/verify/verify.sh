@@ -2,7 +2,8 @@
 # pnpm verify — the gate a branch passes before a pull request is opened.
 #
 # CI in this repo is manual-only, so this script is what holds the rules: format check, lint, schema lint,
-# type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), the
+# type-check, every package's unit tests (all but the Playwright suite, which needs a running backend), the Flutter
+# app's analyze and test when apps/mobile exists (`pnpm verify:mobile`), the
 # repository guards (`pnpm guards`) and their tests, the Claude Code hook tests, the ops
 # checks (`pnpm check:ops`: the Grafana-as-code catalog, ops shell tests, Terraform), the RBAC gap audit, build.
 # It stops at the first step that fails and always ends with one result line (tools/verify/result-line.sh):
@@ -48,6 +49,8 @@ run "lint" pnpm lint
 run "schema lint" pnpm lint:schema
 run "type-check" pnpm type-check
 run "unit tests" pnpm exec turbo run test --filter=!@app/qa
+# The Flutter app is outside the pnpm workspace: analyze and test it when the product keeps apps/mobile.
+run "mobile" pnpm verify:mobile
 # The scaffold tools (init-app, apply-feature, check-variants) live outside every workspace package.
 run "init-app tool tests" pnpm test:init-app
 # foundation.json and `pnpm foundation:status` (tools/foundation): the manifest still points at real paths.
