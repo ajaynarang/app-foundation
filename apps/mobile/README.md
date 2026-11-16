@@ -66,3 +66,15 @@ background is shown by the OS. Routing a tap to a screen is yours to add: the me
 ```bash
 pnpm verify:mobile              # flutter analyze && flutter test; also a step of pnpm verify
 ```
+
+Two more checks need a running, seeded backend, so `pnpm verify` does not run them:
+
+```bash
+# The session, the example reads and the error envelope over the real wire (creates one ticket).
+flutter test test/live_api_test.dart --dart-define=LIVE_API_TEST=true
+
+# The real app on a simulator or device: sign in, open a ticket, sign out.
+flutter test integration_test -d <device id>
+```
+
+Both take `--dart-define=API_BASE_URL=...` for a backend that is not on `localhost:8000`.
