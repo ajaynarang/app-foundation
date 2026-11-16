@@ -14,7 +14,7 @@ import { TriggerService } from './trigger.service';
  */
 
 function makeInngest() {
-  return { send: jest.fn().mockResolvedValue(undefined) } as const;
+  return { send: jest.fn().mockResolvedValue(undefined) };
 }
 
 /** The outbox; `emit` records what it published once its transaction committed. */
@@ -80,7 +80,7 @@ describe('TriggerService', () => {
     beforeEach(() => jest.useFakeTimers().setSystemTime(NOW));
     afterEach(() => jest.useRealTimers());
 
-    it('opens one episode per quiet ticket and sends one run event each, keyed by ticket and day', async () => {
+    it('opens one episode per quiet ticket and starts one run each, keyed by the episode', async () => {
       const { prisma, inngest, svc } = setup();
 
       await expect(svc.runByKey('support_followup', 10)).resolves.toEqual({ episodesOpened: 3, episodesReused: 0 });
@@ -107,17 +107,41 @@ describe('TriggerService', () => {
       expect(inngest.send).toHaveBeenCalledTimes(3);
       expect(inngest.send).toHaveBeenCalledWith(
         'app/desk.support_followup.run',
-        {
-          episodeId: 'ep-ST-1',
-          tenantId: 10,
-          ticketNumber: 'ST-1',
-          idempotencyKey: 'support_followup:support_ticket:ST-1:2026-11-16',
-        },
-        { id: 'support_followup:support_ticket:ST-1:2026-11-16' },
+        { episodeId: 'ep-ST-1', tenantId: 10, ticketNumber: 'ST-1', idempotencyKey: 'support_followup:ep-ST-1' },
+        { id: 'support_followup:ep-ST-1' },
       );
     });
 
-    it('reuses an open episode, and sends nothing for a suppressed ticket', async () => {
+    it('starts a run for a second episode on the same ticket the same day (the key is the episode, not the day)', async () => {
+      const { prisma, inngest, svc } = setup();
+      prisma.supportTicket.findMany.mockResolvedValue([ticket('ST-1')]);
+      prisma.deskEpisode.create.mockResolvedValueOnce({ id: 'ep-a' }).mockResolvedValueOnce({ id: 'ep-b' });
+
+      await svc.runSupportFollowupForTenant(10);
+      await svc.runSupportFollowupForTenant(10);
+
+      expect(inngest.send.mock.calls.map(([, , opts]) => opts.id)).toEqual([
+        'support_followup:ep-a',
+        'support_followup:ep-b',
+      ]);
+    });
+
+    it('closes the episode as failed when its run cannot be started, and carries on with the next ticket', async () => {
+      const { prisma, inngest, svc } = setup();
+      inngest.send.mockRejectedValueOnce(new Error('inngest unreachable'));
+      prisma.deskEpisode.updateMany.mockResolvedValue({ count: 1 });
+
+      await expect(svc.runSupportFollowupForTenant(10)).resolves.toEqual({ episodesOpened: 3, episodesReused: 0 });
+
+      expect(prisma.deskEpisode.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.deskEpisode.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: 'ep-ST-1', tenantId: 10, status: 'RUNNING' },
+        data: { status: 'FAILED', outcome: 'failed', outcomeNote: 'The run could not be started: inngest unreachable' },
+      });
+      expect(inngest.send).toHaveBeenCalledTimes(3);
+    });
+
+    it('leaves an open episode to the run it already has, and sends nothing for a suppressed ticket', async () => {
       const { prisma, inngest, svc } = setup();
       prisma.deskEpisode.findFirst.mockResolvedValueOnce({ id: 'ep-open' }).mockResolvedValue(null);
       prisma.deskEntitySuppression.findFirst
@@ -126,7 +150,8 @@ describe('TriggerService', () => {
         .mockResolvedValue(null);
 
       await expect(svc.runSupportFollowupForTenant(10)).resolves.toEqual({ episodesOpened: 1, episodesReused: 1 });
-      expect(inngest.send.mock.calls.map(([, data]) => data.ticketNumber)).toEqual(['ST-1', 'ST-3']);
+      // ST-1 is open (reused, no second run), ST-2 is suppressed, ST-3 is new.
+      expect(inngest.send.mock.calls.map(([, data]) => data.ticketNumber)).toEqual(['ST-3']);
     });
 
     it.each([

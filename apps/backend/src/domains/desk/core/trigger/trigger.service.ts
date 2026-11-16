@@ -96,7 +96,6 @@ export class TriggerService {
     });
 
     const firedAt = new Date();
-    const today = firedAt.toISOString().slice(0, 10);
     let opened = 0;
     let reused = 0;
 
@@ -117,15 +116,26 @@ export class TriggerService {
       });
       // Suppressed for this ticket: no episode, no event.
       if ('skipped' in episode) continue;
-      if (episode.isNew) opened++;
-      else reused++;
-
-      // The date is in the key, so a ticket can be picked up again on a later day once its earlier run has closed.
-      const idempotencyKey = `${dedupeKey}:${today}`;
-      await this.inngest.send(
-        'app/desk.support_followup.run',
-        { episodeId: episode.id, tenantId, ticketNumber: ticket.ticketNumber, idempotencyKey },
-        { id: idempotencyKey },
+      // An open episode already has its run (it may be waiting for an approval). A second event would start a second
+      // run over the same episode, so a reused episode is counted and left alone.
+      if (!episode.isNew) {
+        reused++;
+        continue;
+      }
+      opened++;
+      await this.startRun(episode.id, tenantId, () =>
+        // One episode, one run: the event id is the episode's. A key per ticket per day would make Inngest drop the
+        // event of a second episode opened the same day, and that episode would never run.
+        this.inngest.send(
+          'app/desk.support_followup.run',
+          {
+            episodeId: episode.id,
+            tenantId,
+            ticketNumber: ticket.ticketNumber,
+            idempotencyKey: `${key}:${episode.id}`,
+          },
+          { id: `${key}:${episode.id}` },
+        ),
       );
     }
 
@@ -237,9 +247,36 @@ export class TriggerService {
     return { id: created.id, isNew: true };
   }
 
-  /** Reserved so the Inngest client stays wired even with no responsibilities. */
-  protected get inngestClient(): InngestClientService {
-    return this.inngest;
+  /**
+   * Sends the event that starts a new episode's run. If the event cannot be sent, the episode would sit RUNNING with
+   * no run behind it and block every later sweep for its record, so it is closed as failed here and the next sweep
+   * opens a fresh one. Every `run<X>ForTenant` starts its runs through this.
+   */
+  protected async startRun(episodeId: string, tenantId: number, send: () => Promise<void>): Promise<void> {
+    try {
+      await send();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`desk-run-not-started tenant=${tenantId} episode=${episodeId}: ${message}`);
+      await this.outbox.transaction(async (tx, emit) => {
+        const closed = await tx.deskEpisode.updateMany({
+          where: { id: episodeId, tenantId, status: EPISODE_STATUS.RUNNING },
+          data: {
+            status: EPISODE_STATUS.FAILED,
+            outcome: 'failed',
+            outcomeNote: `The run could not be started: ${message.slice(0, 300)}`,
+            closedAt: new Date(),
+          },
+        });
+        if (closed.count > 0) {
+          await emit(DOMAIN_EVENTS.DESK_EPISODE_CHANGED, tenantId, {
+            tenantId,
+            episodeId,
+            status: EPISODE_STATUS.FAILED,
+          });
+        }
+      });
+    }
   }
 }
 

@@ -35,7 +35,7 @@ const event = {
     episodeId: 'e1',
     tenantId: 10,
     ticketNumber: 'ST-1001',
-    idempotencyKey: 'support_followup:support_ticket:ST-1001:2026-11-16',
+    idempotencyKey: 'support_followup:e1',
   },
 };
 

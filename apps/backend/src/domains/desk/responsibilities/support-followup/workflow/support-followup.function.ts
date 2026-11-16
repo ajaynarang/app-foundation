@@ -200,8 +200,8 @@ function editedContent(editedAction: unknown): string | null {
 }
 
 /**
- * One Inngest function per job. Two layers of dedupe: the event id here, and the partial unique index on open
- * episodes. Concurrency is per tenant, so one workspace's sweep cannot starve another's.
+ * One Inngest function per job. One episode gets one run: the trigger sends the event only for a new episode, with the
+ * episode's id as the event id. Concurrency is per tenant, so one workspace's sweep cannot starve another's.
  */
 export function createSupportFollowupFunction(inngest: Inngest): InngestFunction.Any {
   return inngest.createFunction(
