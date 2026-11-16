@@ -33,9 +33,7 @@ class _StatusScreenState extends State<StatusScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Platform status'),
-        actions: [
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
-        ],
+        actions: [IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh))],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _health,

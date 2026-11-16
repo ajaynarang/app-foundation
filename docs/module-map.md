@@ -82,7 +82,8 @@ holds the arrows.
 
 <!-- feature:mobile:start -->
 
-`apps/mobile/` is the Flutter companion app (auth and status scaffold). It talks to the backend over the same API.
+`apps/mobile/` is the Flutter companion app: sign-in with a session that refreshes, push registration, and one example
+list and detail screen (support tickets). It talks to the backend over the same API and changes none of it.
 
 <!-- feature:mobile:end -->
 

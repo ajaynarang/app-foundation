@@ -1,5 +1,5 @@
 name: app_mobile
-description: 'A new Flutter project.'
+description: 'Mobile companion app: sign-in, push, and example screens against the backend API.'
 publish_to: 'none'
 version: 0.1.0
 
@@ -7,8 +7,13 @@ environment:
   sdk: ^3.9.2
 
 dependencies:
+  firebase_core: ^4.15.2
+  # 16.x on purpose: 17 deprecates getToken/onTokenRefresh for installation ids, and the backend's
+  # POST /notifications/devices takes an FCM registration token.
+  firebase_messaging: ^16.0.0
   flutter:
     sdk: flutter
+  flutter_secure_storage: ^11.2.0
   http: ^1.6.0
 
 dev_dependencies:

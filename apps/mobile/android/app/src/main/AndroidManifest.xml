@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app is an API client. Debug builds get this from the debug manifest; a release build needs it here. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="app_mobile"
         android:name="${applicationName}"
