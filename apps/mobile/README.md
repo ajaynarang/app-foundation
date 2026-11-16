@@ -4,13 +4,13 @@ A Flutter client of the backend API. It changes nothing on the backend and holds
 
 ## What is in it
 
-| Area | Where | What it does |
-| --- | --- | --- |
-| Session | `lib/core/api_client.dart` | One HTTP entry point. Keeps the access and refresh tokens in the Keychain / Keystore, refreshes once on a 401 and retries, and sends the app to sign-in when the server ends the session. |
-| Sign-in | `lib/features/auth/` | Email and password (`POST /auth/login`), with a workspace picker when the email belongs to several. |
-| Push | `lib/features/push/` | Registers the device with the backend after sign-in (`POST /notifications/devices`) and removes it at sign-out. Off until configured, see below. |
-| Example screens | `lib/features/tickets/` | A cursor list and a detail screen over the support tickets API. Copy this folder for your own screens. |
-| Status, account | `lib/features/status/`, `lib/features/account/` | Backend health; who is signed in and sign out. |
+| Area            | Where                                           | What it does                                                                                                                                                                              |
+| --------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session         | `lib/core/api_client.dart`                      | One HTTP entry point. Keeps the access and refresh tokens in the Keychain / Keystore, refreshes once on a 401 and retries, and sends the app to sign-in when the server ends the session. |
+| Sign-in         | `lib/features/auth/`                            | Email and password (`POST /auth/login`), with a workspace picker when the email belongs to several.                                                                                       |
+| Push            | `lib/features/push/`                            | Registers the device with the backend after sign-in (`POST /notifications/devices`) and removes it at sign-out. Off until configured, see below.                                          |
+| Example screens | `lib/features/tickets/`                         | A cursor list and a detail screen over the support tickets API. Copy this folder for your own screens.                                                                                    |
+| Status, account | `lib/features/status/`, `lib/features/account/` | Backend health; who is signed in and sign out.                                                                                                                                            |
 
 The rules for growing it are in `.claude/skills/app-conventions/references/mobile.md`.
 
@@ -33,11 +33,11 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 
 Everything is a `--dart-define`, read in `lib/core/app_config.dart`.
 
-| Define | Default | What it is |
-| --- | --- | --- |
-| `API_BASE_URL` | `http://localhost:8000/api/v1` | The backend. |
-| `APP_NAME` | `Platform` | The app title. |
-| `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID` | unset | Push. Off until all four are set. |
+| Define                                                                                       | Default                        | What it is                        |
+| -------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------------- |
+| `API_BASE_URL`                                                                               | `http://localhost:8000/api/v1` | The backend.                      |
+| `APP_NAME`                                                                                   | `Platform`                     | The app title.                    |
+| `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID` | unset                          | Push. Off until all four are set. |
 
 ## Turn push on
 

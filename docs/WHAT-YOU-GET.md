@@ -110,10 +110,10 @@ Same code and the same `where: { tenantId }` queries run unchanged in every mode
 
 **Three apps**
 
-| App            | What it is                                                                            |
-| -------------- | ------------------------------------------------------------------------------------- |
-| `apps/backend` | NestJS 11 API — your domains go in `src/domains/`                                     |
-| `apps/web`     | Next.js 15 product app — login, registration, settings (15 pages), AI chat, admin     |
+| App            | What it is                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `apps/backend` | NestJS 11 API — your domains go in `src/domains/`                                                                  |
+| `apps/web`     | Next.js 15 product app — login, registration, settings (15 pages), AI chat, admin                                  |
 | `apps/mobile`  | Flutter companion — sign-in, session refresh, push, an example list and detail; your screens go in `lib/features/` |
 
 **Delivery**
