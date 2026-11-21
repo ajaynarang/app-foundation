@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Bring a Claude Code cloud session up to where a local machine already is:
+# Session start for a Claude Code cloud session (tools/cloud-env/README.md): bring it up to where a local machine already is:
 # Docker and the compose services running, the database migrated to this
 # branch, and the Doppler CLI pointed at the dev configs. Run it once at the
 # start of each cloud session; safe to run again. The environment's setup

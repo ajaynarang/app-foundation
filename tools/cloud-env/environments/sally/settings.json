@@ -24,6 +24,6 @@
     "DOPPLER_TOKEN_DOCS": "<set in claude.ai: read-only Doppler service token for sally-docs/dev>"
   },
   "networkSecrets": [],
-  "setupScript": "setup-script.sh",
-  "sessionStart": "tools/dev/cloud-dev-up.sh"
+  "setupScript": "app-shore/sally: tools/cloud-env/setup-script.sh",
+  "sessionStart": "app-shore/sally: tools/cloud-env/session-start.sh"
 }

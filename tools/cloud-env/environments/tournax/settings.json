@@ -24,6 +24,6 @@
     "DOPPLER_TOKEN_CONSOLE": "<set in claude.ai: read-only Doppler service token for tournax-console/dev>"
   },
   "networkSecrets": [],
-  "setupScript": "setup-script.sh",
-  "sessionStart": "tools/dev/cloud-dev-up.sh"
+  "setupScript": "app-shore/tournax: tools/cloud-env/setup-script.sh",
+  "sessionStart": "app-shore/tournax: tools/cloud-env/session-start.sh"
 }

@@ -23,6 +23,6 @@
     "DOPPLER_TOKEN_FRONTEND": "<set in claude.ai: read-only Doppler service token for throughline-frontend/dev>"
   },
   "networkSecrets": [],
-  "setupScript": "setup-script.sh",
-  "sessionStart": "tools/dev/cloud-dev-up.sh"
+  "setupScript": "app-shore/throughline: tools/cloud-env/setup-script.sh",
+  "sessionStart": "app-shore/throughline: tools/cloud-env/session-start.sh"
 }

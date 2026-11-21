@@ -3,7 +3,7 @@
 # Print the address of the docker compose Postgres that is running now, built
 # from the container itself (user, password, database, published port), never
 # from an env file that may be out of date. Used by install.sh and
-# cloud-dev-up.sh:  export DATABASE_URL="$(tools/dev/local-db-url.sh)"
+# tools/cloud-env/session-start.sh:  export DATABASE_URL="$(tools/dev/local-db-url.sh)"
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
