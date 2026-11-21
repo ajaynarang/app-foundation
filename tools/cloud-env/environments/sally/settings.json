@@ -1,0 +1,21 @@
+{
+  "$comment": "What this cloud environment holds, for rebuilding it in claude.ai if it is ever lost. Never put a secret value here: variables marked <set in claude.ai> are entered only in the environment's settings. Update this file whenever you change the environment.",
+  "name": "sally",
+  "scope": "personal",
+  "repositories": ["app-shore/sally"],
+  "network": {
+    "access": "limited",
+    "allowPackageManagers": true,
+    "allowMcpServers": true,
+    "allowedHosts": ["api.doppler.com", "cli.doppler.com", "dl.google.com", "downloads.gradle.org", "jitpack.io"],
+    "$hosts": "Doppler API and CLI download; Google, Gradle and JitPack for Android (Flutter) builds."
+  },
+  "variables": {
+    "DOPPLER_TOKEN_BACKEND": "<set in claude.ai: read-only Doppler service token for sally-backend/dev>",
+    "DOPPLER_TOKEN_FRONTEND": "<set in claude.ai: read-only Doppler service token for sally-frontend/dev>",
+    "DOPPLER_TOKEN_DOCS": "<set in claude.ai: read-only Doppler service token for sally-docs/dev>"
+  },
+  "networkSecrets": [],
+  "setupScript": "setup-script.sh",
+  "sessionStart": "tools/dev/cloud-dev-up.sh"
+}
