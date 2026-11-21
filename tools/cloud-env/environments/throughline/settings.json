@@ -7,8 +7,16 @@
     "access": "limited",
     "allowPackageManagers": true,
     "allowMcpServers": true,
-    "allowedHosts": ["api.doppler.com", "cli.doppler.com", "dl.google.com", "downloads.gradle.org", "jitpack.io"],
-    "$hosts": "Doppler API and CLI download; Google, Gradle and JitPack for Android (Flutter) builds."
+    "allowedHosts": [
+      "api.doppler.com",
+      "cli.doppler.com",
+      "dl.google.com",
+      "downloads.gradle.org",
+      "jitpack.io",
+      "*.frame.claudeusercontent.com",
+      "*.frame.staging.claudeusercontent.com"
+    ],
+    "$hosts": "Doppler API and CLI download; Google, Gradle and JitPack for Android (Flutter) builds; the two *.frame hosts were added in claude.ai (as found on 2026-11-21)."
   },
   "variables": {
     "DOPPLER_TOKEN_BACKEND": "<set in claude.ai: read-only Doppler service token for throughline-backend/dev>",
