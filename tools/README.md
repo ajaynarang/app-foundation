@@ -4,16 +4,17 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ## Layout
 
-| Folder        | Purpose                                                    |
-| ------------- | ---------------------------------------------------------- |
-| `init-app/`   | One-time template rename (see `init-app/README.md`)        |
-| `db/`         | Database tunnel, migrations, staging pull                  |
-| `ops/`        | Operator switches (maintenance mode)                       |
-| `dev/`        | Local dev environment helpers                              |
-| `verify/`     | The local gates a branch passes before a pull request      |
-| `guards/`     | The repository guards (`pnpm guards`)                      |
-| `foundation/` | Which template version this repo is on (`foundation.json`) |
-| `.dumps/`     | Saved DB dumps (gitignored)                                |
+| Folder        | Purpose                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `init-app/`   | One-time template rename (see `init-app/README.md`)                                                                          |
+| `db/`         | Database tunnel, migrations, staging pull                                                                                    |
+| `ops/`        | Operator switches (maintenance mode)                                                                                         |
+| `dev/`        | Local dev environment helpers                                                                                                |
+| `verify/`     | The local gates a branch passes before a pull request                                                                        |
+| `guards/`     | The repository guards (`pnpm guards`)                                                                                        |
+| `foundation/` | Which template version this repo is on (`foundation.json`)                                                                   |
+| `cloud-env/`  | Cloud environment setup for Claude Code on the web, and the record of each product's environment (see `cloud-env/README.md`) |
+| `.dumps/`     | Saved DB dumps (gitignored)                                                                                                  |
 
 ## Scripts
 
@@ -44,11 +45,14 @@ Operator scripts and dev utilities. Not application code — these are invoked b
 
 ### `dev/`
 
-| Script             | What it does                                              |
-| ------------------ | --------------------------------------------------------- |
-| `dev/app-dev.sh`   | Open iTerm2 tabs running backend + web with custom ports. |
-| `dev/install.sh`   | One-time project bootstrap (run from repo root).          |
-| `dev/kill-port.sh` | Kill the process holding a given port.                    |
+| Script                | What it does                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev/app-dev.sh`      | Open iTerm2 tabs running backend + web with custom ports.                                                                                    |
+| `dev/install.sh`      | Project bootstrap on a Mac or a cloud session: Docker, install, builds, migrate, seed (run from repo root).                                  |
+| `dev/docker-up.sh`    | Start Docker if it is off (starts the daemon on Linux), then the compose services; skips an image that cannot be pulled.                     |
+| `dev/cloud-dev-up.sh` | Claude Code cloud sessions only, once per session: start Docker and the compose services, point the Doppler CLI at the dev configs, migrate. |
+| `dev/local-db-url.sh` | Print the address of the running compose Postgres, read from the container itself.                                                           |
+| `dev/kill-port.sh`    | Kill the process holding a given port.                                                                                                       |
 
 ### `verify/`
 

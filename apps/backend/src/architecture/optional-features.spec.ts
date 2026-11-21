@@ -110,6 +110,16 @@ describe('optional features', () => {
       expect(unregisteredMarkerFiles(root, manifest, textFiles(root))).toEqual([]);
     });
 
+    it("a developer's local env files are not repo content, the example is", () => {
+      fs.copyFileSync(path.join(root, 'apps/backend/.env.example'), path.join(root, 'apps/backend/.env'));
+      write('apps/web/.env.local', '# feature:demo:start\n');
+      const files = textFiles(root);
+      expect(files).toContain('apps/backend/.env.example');
+      expect(files).not.toContain('apps/backend/.env');
+      expect(files).not.toContain('apps/web/.env.local');
+      expect(unregisteredMarkerFiles(root, manifest, files)).toEqual([]);
+    });
+
     it('a kept feature with a missing path, block or JSON entry fails', () => {
       fs.rmSync(path.join(root, 'apps/backend/src/domains/demo'), { recursive: true });
       write('apps/backend/.env.example', 'A=1\n');

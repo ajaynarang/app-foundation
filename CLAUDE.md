@@ -233,6 +233,14 @@ pnpm prisma:migrate:deploy && pnpm db:seed     # apply migration + seed platform
 cd ../.. && pnpm dev                           # backend + web
 ```
 
+**One command instead:** `./tools/dev/install.sh` runs every step above except `pnpm dev` (Docker, install, builds, migrate, seed) on a
+Mac or in a cloud session, reading the database address from the running Postgres container.
+
+**Claude Code cloud sessions:** the cloud environment's setup script runs `tools/dev/install.sh` on each fresh machine
+(the environment's record is in `tools/cloud-env/`). Run `tools/dev/cloud-dev-up.sh` once per session before any of the
+commands above: it starts Docker and the compose services, points the Doppler CLI at the dev configs through the
+`DOPPLER_TOKEN_<APP>` variables saved on the cloud environment, and migrates.
+
 Default dev DB URL: `postgresql://postgres:postgres@localhost:5499/app?schema=public`.
 
 ---
