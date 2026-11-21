@@ -237,7 +237,7 @@ cd ../.. && pnpm dev                           # backend + web
 Mac or in a cloud session, reading the database address from the running Postgres container.
 
 **Claude Code cloud sessions:** the cloud environment's setup script runs `tools/dev/install.sh` on each fresh machine
-(the environment's record is in `tools/cloud-env/`). Run `tools/dev/cloud-dev-up.sh` once per session before any of the
+(everything for the cloud environment is in `tools/cloud-env/`). Run `tools/cloud-env/session-start.sh` once per session before any of the
 commands above: it starts Docker and the compose services, points the Doppler CLI at the dev configs through the
 `DOPPLER_TOKEN_<APP>` variables saved on the cloud environment, and migrates.
 

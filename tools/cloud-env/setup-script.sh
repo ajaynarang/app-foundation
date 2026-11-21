@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Cloud environment setup script for a product built from app-foundation.
 #
-# Paste this into the environment's "Setup script" box (claude.ai, cloud
-# environment settings) and set REPO to the repository's name. It runs as root
+# A product keeps its copy in tools/cloud-env/setup-script.sh with REPO set to its
+# name, and pastes that exact text into the environment's "Setup script" box. It runs as root
 # on a fresh Ubuntu machine, in the folder that holds the checkouts, before
 # Claude starts. It cannot read the environment's variables or secrets.
 #
 # All the real work is the repo's own tools/dev/install.sh, the same script a
 # Mac runs. Docker is stopped at the end; the images and the migrated database
-# stay on this machine's disk, and tools/dev/docker-up.sh starts them again in
-# the session in about 15 seconds.
+# stay on this machine's disk, and tools/cloud-env/session-start.sh brings them
+# back at the start of the session.
 set -euo pipefail
 REPO=app-foundation
 

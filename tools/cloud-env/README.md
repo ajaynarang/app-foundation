@@ -18,7 +18,11 @@ So the cloud database is disposable. Anything worth keeping has to be committed 
 
 ## What the setup does
 
-The setup script (`setup-script.sh` here, pasted into the environment's settings) does almost nothing itself. It
+Every repo keeps everything for its cloud environment in `tools/cloud-env/`: `setup-script.sh` (the exact text pasted
+into the environment's "Setup script" box), `session-start.sh` (run by Claude at the start of each session) and a short
+`README.md`. The template's own copies are in this folder.
+
+The setup script does almost nothing itself. It
 calls the repo's own **`tools/dev/install.sh`**, the same script a Mac runs, so there is one setup to maintain:
 
 1. `tools/dev/docker-up.sh postgres redis` starts Docker if it is off (on Linux it starts the daemon; on a Mac
@@ -31,7 +35,7 @@ calls the repo's own **`tools/dev/install.sh`**, the same script a Mac runs, so 
 
 The setup script then stops Docker. The images and the migrated database stay on the machine's disk.
 
-**At the start of each session**, run `tools/dev/cloud-dev-up.sh` (say so in the repo's CLAUDE.md, so Claude does
+**At the start of each session**, run `tools/cloud-env/session-start.sh` (the repo's CLAUDE.md says so, so Claude does
 it). It is the part that needs the environment's variables, which only exist once the session runs:
 
 1. `tools/dev/docker-up.sh` brings Docker and every compose service back, database included. A service whose image
@@ -42,7 +46,7 @@ it). It is the part that needs the environment's variables, which only exist onc
 3. It rebuilds and migrates, because the session's branch may be ahead of the default branch the setup script used.
 
 Measured on a fresh machine: 45 to 70 seconds per product for the setup script, 30 to 60 seconds for
-`cloud-dev-up.sh`.
+`session-start.sh`.
 
 ## What each setting means
 
@@ -79,24 +83,27 @@ cd apps/backend && DOPPLER_TOKEN="$DOPPLER_TOKEN_BACKEND" doppler run -- pnpm ru
 
 ## The environments
 
-| Folder                      | Repository              | Notes                                                           |
-| --------------------------- | ----------------------- | --------------------------------------------------------------- |
-| `environments/sally/`       | `app-shore/sally`       | Not built from the template; its own `install.sh` and RLS role. |
-| `environments/throughline/` | `app-shore/throughline` | Template setup script with `REPO=throughline`.                  |
-| `environments/tournax/`     | `app-shore/tournax`     | Template setup script with `REPO=tournax`.                      |
+| Folder                      | Repository              | Its setup script                                                        |
+| --------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `environments/sally/`       | `app-shore/sally`       | `tools/cloud-env/setup-script.sh` in sally (own `install.sh`, RLS role) |
+| `environments/throughline/` | `app-shore/throughline` | `tools/cloud-env/setup-script.sh` in throughline                        |
+| `environments/tournax/`     | `app-shore/tournax`     | `tools/cloud-env/setup-script.sh` in tournax                            |
 
-Each folder holds `settings.json` (everything to type into claude.ai, secrets as placeholders) and
-`setup-script.sh` (the exact text of the Setup script box). Change the environment, then change its folder.
+Each folder holds `settings.json`: everything to type into claude.ai that lives nowhere else (scope, allowed hosts,
+variable names), secrets as placeholders. The setup script itself lives in the product's repo, one copy only. Change
+the environment, then change its `settings.json`.
 
 ## A new product
 
-1. Copy `setup-script.sh` into `environments/<name>/` and set `REPO`.
+1. A product scaffolded from this template already has `tools/cloud-env/`, and init-app sets `REPO` to its name. An
+   older product copies this folder's `setup-script.sh` and `session-start.sh` into its own `tools/cloud-env/` and
+   sets `REPO`.
 2. Copy an existing `settings.json` and set the name, repository and one `DOPPLER_TOKEN_<APP>` per Doppler project.
 3. In claude.ai, create the environment from those two files, then enter the real tokens there.
 
 ## Known limits
 
-- **The Doppler CLI is not installed by these scripts yet.** `cloud-dev-up.sh` needs it on the machine and skips
+- **The Doppler CLI is not installed by these scripts yet.** `session-start.sh` needs it on the machine and skips
   Doppler without it. Add its install to each environment's setup script (`cli.doppler.com` is on the allowed list
   for that), then record the line here. The sally environment's current setup script may already have it; it could
   not be read when this folder was written.
