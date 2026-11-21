@@ -189,6 +189,9 @@ const SKIP_DIRS = new Set([
 // The rename walker in tools/init-app/init-app.mjs skips the same two: the tool itself and the design history.
 const SKIP_REL = ['tools/init-app', 'docs/superpowers'];
 const TEXT_FILE = /\.(ts|tsx|js|mjs|cjs|json|md|ya?ml|sh|prisma|tf|toml|dart|css|example)$|^\.env/;
+// A developer's own env files (`cp .env.example .env`, tools/dev/install.sh) are git-ignored, never committed, and
+// would carry the example's markers. Only `.env.example` is repo content.
+const LOCAL_ENV_FILE = /^\.env(\.(?!example$).+)?$/;
 
 /** Repo-relative paths of the text files the guards read. */
 export function textFiles(root: string, dir = root, out: string[] = []): string[] {
@@ -198,7 +201,7 @@ export function textFiles(root: string, dir = root, out: string[] = []): string[
     if (SKIP_REL.some((p) => rel === p || rel.startsWith(p + '/'))) continue;
     if (entry.isDirectory()) {
       if (!SKIP_DIRS.has(entry.name)) textFiles(root, full, out);
-    } else if (entry.isFile() && TEXT_FILE.test(entry.name)) {
+    } else if (entry.isFile() && TEXT_FILE.test(entry.name) && !LOCAL_ENV_FILE.test(entry.name)) {
       out.push(rel);
     }
   }
